@@ -1,9 +1,13 @@
 from cassandraengine.tests.base import BaseCassEngTestCase
 
+from cassandraengine.exceptions import ModelException
 from cassandraengine.models import Model
 from cassandraengine import columns
 
 class TestModelClassFunction(BaseCassEngTestCase):
+    """
+    Tests verifying the behavior of the Model metaclass
+    """
 
     def test_column_attributes_handled_correctly(self):
         """
@@ -24,10 +28,33 @@ class TestModelClassFunction(BaseCassEngTestCase):
         self.assertIsNone(inst.id)
         self.assertIsNone(inst.text)
 
+    def test_multiple_primary_keys_fail(self):
+        """Test attempting to define multiple primary keys fails"""
+        with self.assertRaises(ModelException):
+            class MultiPK(Model):
+                id1 = columns.Integer(primary_key=True)
+                id2 = columns.Integer(primary_key=True)
 
-class TestModelValidation(BaseCassEngTestCase):
-    pass
+    def test_db_map(self):
+        """
+        Tests that the db_map is properly defined
+        -the db_map allows columns
+        """
+        class WildDBNames(Model):
+            content = columns.Text(db_field='words_and_whatnot')
+            numbers = columns.Integer(db_field='integers_etc')
 
-class TestModelSerialization(BaseCassEngTestCase):
-    pass
+        db_map = WildDBNames._db_map
+        self.assertEquals(db_map['words_and_whatnot'], 'content')
+        self.assertEquals(db_map['integers_etc'], 'numbers')
+
+    def test_attempting_to_make_duplicate_column_names_fails(self):
+        """
+        Tests that trying to create conflicting db column names will fail
+        """
+
+        with self.assertRaises(ModelException):
+            class BadNames(Model):
+                words = columns.Text()
+                content = columns.Text(db_field='words')
 
