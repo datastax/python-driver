@@ -5,9 +5,6 @@ from uuid import uuid1, uuid4
 from cassandraengine.exceptions import ValidationError
 
 class BaseColumn(object):
-    """
-    The base column
-    """
 
     #the cassandra type this column maps to
     db_type = None

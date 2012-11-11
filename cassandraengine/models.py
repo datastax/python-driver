@@ -1,6 +1,6 @@
 
 from cassandraengine import columns
-from cassandraengine.exceptions import ColumnFamilyException
+from cassandraengine.exceptions import ModelException
 from cassandraengine.manager import Manager
 
 class BaseModel(object):
@@ -8,6 +8,8 @@ class BaseModel(object):
     The base model class, don't inherit from this, inherit from Model, defined below
     """
 
+    #table names will be generated automatically from it's model name and package
+    #however, you can alse define them manually here
     db_name = None
 
     def __init__(self, **values):
@@ -75,7 +77,7 @@ class ModelMetaClass(type):
             if isinstance(v, columns.BaseColumn):
                 if v.is_primary_key:
                     if pk_name:
-                        raise ColumnFamilyException("More than one primary key defined for {}".format(name))
+                        raise ModelException("More than one primary key defined for {}".format(name))
                     pk_name = k
                 _columns[k] = attrs.pop(k)
                 _columns[k].set_db_name(k)
@@ -96,8 +98,8 @@ class ModelMetaClass(type):
         col_names = set()
         for k,v in _columns.items():
             if v.db_field in col_names:
-                raise ColumnFamilyException("{} defines the column {} more than once".format(name, v.db_field))
-            col_names.add(k)
+                raise ModelException("{} defines the column {} more than once".format(name, v.db_field))
+            col_names.add(v.db_field)
 
         #get column family name
         cf_name = attrs.pop('db_name', None) or name

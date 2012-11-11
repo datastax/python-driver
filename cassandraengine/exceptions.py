@@ -1,4 +1,4 @@
 #cassandraengine exceptions
-class ColumnFamilyException(BaseException): pass
+class ModelException(BaseException): pass
 class ValidationError(BaseException): pass
 
