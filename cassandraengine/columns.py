@@ -2,6 +2,8 @@
 import re
 from uuid import uuid1, uuid4
 
+from cassandraengine.exceptions import ValidationError
+
 class BaseColumn(object):
     """
     The base column
@@ -23,9 +25,16 @@ class BaseColumn(object):
         self.null = null
 
     def validate(self, value):
-        if not self.has_default:
-            if not self.null and value is None:
+        """
+        Returns a cleaned and validated value. Raises a ValidationError
+        if there's a problem
+        """
+        if value is None:
+            if self.has_default:
+                return self.get_default()
+            elif not self.null:
                 raise ValidationError('null values are not allowed')
+        return value
 
     def to_python(self, value):
         """
@@ -37,6 +46,10 @@ class BaseColumn(object):
     @property
     def has_default(self):
         return bool(self.default)
+
+    @property
+    def is_primary_key(self):
+        return self.primary_key
 
     def get_default(self):
         if self.has_default:
@@ -82,19 +95,17 @@ class Integer(BaseColumn):
     db_type = 'int'
 
     def validate(self, value):
-        super(Integer, self).validate(value)
+        val = super(Integer, self).validate(value)
         try:
-            long(value)
+            return long(val)
         except (TypeError, ValueError):
             raise ValidationError("{} can't be converted to integral value".format(value))
 
     def to_python(self, value):
-        self.validate(value)
-        return long(value)
+        return self.validate(value)
 
     def to_database(self, value):
-        self.validate()
-        return value
+        return self.validate(value)
 
 class DateTime(BaseColumn):
     db_type = 'timestamp'
@@ -107,16 +118,16 @@ class UUID(BaseColumn):
 
     re_uuid = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
 
-    def __init__(self, **kwargs):
-        super(UUID, self).__init__(**kwargs)
-        if 'default' not in kwargs:
-            self.default = uuid4
+    def __init__(self, default=lambda:uuid4(), **kwargs):
+        super(UUID, self).__init__(default=default, **kwargs)
 
     def validate(self, value):
-        super(UUID, self).validate(value)
-        if not self.re_uuid.match(value):
+        val = super(UUID, self).validate(value)
+        from uuid import UUID as _UUID
+        if isinstance(val, _UUID): return val
+        if not self.re_uuid.match(val):
             raise ValidationError("{} is not a valid uuid".format(value))
-        return value
+        return _UUID(val)
 
 class Boolean(BaseColumn):
     db_type = 'boolean'
@@ -130,11 +141,17 @@ class Boolean(BaseColumn):
 class Float(BaseColumn):
     db_type = 'double'
 
+    def validate(self, value):
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            raise ValidationError("{} is not a valid float".format(value))
+
     def to_python(self, value):
-        return float(value)
+        return self.validate(value)
 
     def to_database(self, value):
-        return float(value)
+        return self.validate(value)
 
 class Decimal(BaseColumn):
     db_type = 'decimal'
