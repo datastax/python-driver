@@ -106,6 +106,9 @@ class Integer(BaseColumn):
 
 class DateTime(BaseColumn):
     db_type = 'timestamp'
+    def __init__(self, **kwargs):
+        super(DateTime, self).__init__(**kwargs)
+        raise NotImplementedError
 
 class UUID(BaseColumn):
     """
@@ -153,4 +156,23 @@ class Float(BaseColumn):
 class Decimal(BaseColumn):
     db_type = 'decimal'
     #TODO: this
+    def __init__(self, **kwargs):
+        super(DateTime, self).__init__(**kwargs)
+        raise NotImplementedError
 
+class Counter(BaseColumn):
+    def __init__(self, **kwargs):
+        super(DateTime, self).__init__(**kwargs)
+        raise NotImplementedError
+
+#TODO: research supercolumns
+#http://wiki.apache.org/cassandra/DataModel
+class List(BaseColumn):
+    def __init__(self, **kwargs):
+        super(DateTime, self).__init__(**kwargs)
+        raise NotImplementedError
+
+class Dict(BaseColumn):
+    def __init__(self, **kwargs):
+        super(DateTime, self).__init__(**kwargs)
+        raise NotImplementedError

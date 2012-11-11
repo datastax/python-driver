@@ -42,7 +42,7 @@ class QuerySet(object):
         """
         cur = self._cursor
         values = cur.fetchone()
-        if values is None: return None
+        if values is None: return
         names = [i[0] for i in cur.description]
         value_dict = dict(zip(names, values))
         return value_dict
@@ -64,15 +64,12 @@ class QuerySet(object):
         return QuerySet(self.model, query_args=qargs)
 
     def exclude(self, **kwargs):
-        """
-        Need to invert the logic for all kwargs
-        """
+        """ Need to invert the logic for all kwargs """
         pass
 
     def count(self):
-        """
-        Returns the number of rows matched by this query
-        """
+        """ Returns the number of rows matched by this query """
+        qs = 'SELECT COUNT(*) FROM {}'.format(self.column_family_name)
 
     def find(self, pk):
         """
@@ -127,6 +124,23 @@ class QuerySet(object):
         conn = get_connection()
         cur = conn.cursor()
         cur.execute(qs, field_values)
+
+    #----delete---
+    def delete(self):
+        """
+        Deletes the contents of a query
+        """
+
+    def delete_instance(self, instance):
+        """ Deletes one instance """
+        pk_name = self.model._pk_name
+        qs = ['DELETE FROM {}'.format(self.column_family_name)]
+        qs += ['WHERE {0}=:{0}'.format(pk_name)]
+        qs = ' '.join(qs)
+
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(qs, {pk_name:instance.pk})
 
     def _create_column_family(self):
         #construct query string

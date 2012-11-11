@@ -38,6 +38,15 @@ class TestModelIO(BaseCassEngTestCase):
         tm2 = TestModel.objects.find(tm.pk)
         self.assertEquals(tm.count, tm2.count)
 
+    def test_model_deleting_works_properly(self):
+        """
+        Tests that an instance's delete method deletes the instance
+        """
+        tm = TestModel.objects.create(count=8, text='123456789')
+        tm.delete()
+        tm2 = TestModel.objects.find(tm.pk)
+        self.assertIsNone(tm2)
+
     def test_nullable_columns_are_saved_properly(self):
         """
         Tests that nullable columns save without any trouble

@@ -65,7 +65,8 @@ class BaseModel(object):
         return self
 
     def delete(self):
-        pass
+        """ Deletes this instance """
+        self.objects._delete_instance(self)
 
 
 class ModelMetaClass(type):
