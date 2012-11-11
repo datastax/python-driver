@@ -14,7 +14,7 @@ class BaseColumn(object):
         :param primary_key: bool flag, there can be only one primary key per doc
         :param db_field: the fieldname this field will map to in the database
         :param default: the default value, can be a value or a callable (no args)
-        :param null: bool, is the field nullable?
+        :param null: boolean, is the field nullable?
         """
         self.primary_key = primary_key
         self.db_field = db_field

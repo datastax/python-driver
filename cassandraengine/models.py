@@ -26,10 +26,6 @@ class BaseModel(object):
                 setattr(self, k, None)
 
     @classmethod
-    def _column_family_definition(cls):
-        pass
-
-    @classmethod
     def find(cls, pk):
         """ Loads a document by it's primary key """
         cls.objects.find(pk)
@@ -39,6 +35,16 @@ class BaseModel(object):
         """ Returns the object's primary key, regardless of it's name """
         return getattr(self, self._pk_name)
 
+    #dynamic column methods
+    def __getitem__(self, key):
+        return self._dynamic_columns[key]
+
+    def __setitem__(self, key, val):
+        self._dynamic_columns[key] = val
+
+    def __delitem__(self, key):
+        del self._dynamic_columns[key]
+
     def validate(self):
         """ Cleans and validates the field values """
         for name, col in self._columns.items():
@@ -47,11 +53,9 @@ class BaseModel(object):
 
     def as_dict(self):
         """ Returns a map of column names to cleaned values """
-        values = {}
+        values = self._dynamic_columns or {}
         for name, col in self._columns.items():
             values[name] = col.to_database(getattr(self, name, None))
-
-        #TODO: merge in dynamic columns
         return values
 
     def save(self):

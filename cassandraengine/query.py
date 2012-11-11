@@ -1,3 +1,5 @@
+import copy
+
 from cassandraengine.connection import get_connection
 
 class QuerySet(object):
@@ -5,16 +7,18 @@ class QuerySet(object):
     #TODO: querysets should be executed lazily
     #TODO: conflicting filter args should raise exception unless a force kwarg is supplied
 
-    def __init__(self, model, query={}):
+    def __init__(self, model, query_args={}):
         super(QuerySet, self).__init__()
         self.model = model
+        self.query_args = query_args
         self.column_family_name = self.model.objects.column_family_name
 
         self._cursor = None
 
     #----query generation / execution----
     def _execute_query(self):
-        pass
+        conn = get_connection()
+        self._cursor = conn.cursor()
 
     def _generate_querystring(self):
         pass
@@ -27,39 +31,61 @@ class QuerySet(object):
 
     #----Reads------
     def __iter__(self):
-        pass
+        if self._cursor is None:
+            self._execute_query()
+        return self
+
+    def _get_next(self):
+        """
+        Gets the next cursor result
+        Returns a db_field->value dict
+        """
+        cur = self._cursor
+        values = cur.fetchone()
+        if values is None: return None
+        names = [i[0] for i in cur.description]
+        value_dict = dict(zip(names, values))
+        return value_dict
 
     def next(self):
-        pass
+        values = self._get_next() 
+        if values is None: raise StopIteration
+        return values
 
     def first(self):
-        conn = get_connection()
-        cur = conn.cursor()
         pass
 
     def all(self):
-        pass
+        return QuerySet(self.model)
 
     def filter(self, **kwargs):
-        pass
+        qargs = copy.deepcopy(self.query_args)
+        qargs.update(kwargs)
+        return QuerySet(self.model, query_args=qargs)
 
     def exclude(self, **kwargs):
+        """
+        Need to invert the logic for all kwargs
+        """
         pass
+
+    def count(self):
+        """
+        Returns the number of rows matched by this query
+        """
 
     def find(self, pk):
         """
         loads one document identified by it's primary key
         """
+        #TODO: make this a convenience wrapper of the filter method
         qs = 'SELECT * FROM {column_family} WHERE {pk_name}=:{pk_name}'
         qs = qs.format(column_family=self.column_family_name,
                        pk_name=self.model._pk_name)
         conn = get_connection()
-        cur = conn.cursor()
-        cur.execute(qs, {self.model._pk_name:pk})
-        values = cur.fetchone()
-        names = [i[0] for i in cur.description]
-        value_dict = dict(zip(names, values))
-        return value_dict
+        self._cursor = conn.cursor()
+        self._cursor.execute(qs, {self.model._pk_name:pk})
+        return self._get_next()
 
 
     #----writes----
