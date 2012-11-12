@@ -32,7 +32,7 @@ class BaseModel(object):
 
     @property
     def pk(self):
-        """ Returns the object's primary key, regardless of it's name """
+        """ Returns the object's primary key """
         return getattr(self, self._pk_name)
 
     #dynamic column methods
@@ -78,26 +78,31 @@ class ModelMetaClass(type):
         #and set default column names
         _columns = {}
         pk_name = None
+
+        def _transform_column(col_name, col_obj):
+            _columns[col_name] = col_obj
+            col_obj.set_db_name(col_name)
+            allow_delete = not col_obj.primary_key
+            attrs[col_name] = col_obj.get_property(allow_delete=allow_delete)
+
+        #transform column definitions
         for k,v in attrs.items():
             if isinstance(v, columns.BaseColumn):
                 if v.is_primary_key:
                     if pk_name:
                         raise ModelException("More than one primary key defined for {}".format(name))
                     pk_name = k
-                _columns[k] = attrs.pop(k)
-                _columns[k].set_db_name(k)
+                _transform_column(k,v)
 
         #set primary key if it's not already defined
         if not pk_name:
-            _columns['id'] = columns.UUID(primary_key=True)
-            _columns['id'].set_db_name('id')
-            pk_name = 'id'
+            k,v = 'id', columns.UUID(primary_key=True)
+            _transform_column(k,v)
+            pk_name = k
         
-        #setup pk shortcut
+        #setup primary key shortcut
         if pk_name != 'pk':
-            pk_get = lambda self: getattr(self, pk_name)
-            pk_set = lambda self, val: setattr(self, pk_name, val)
-            attrs['pk'] = property(pk_get, pk_set)
+            attrs['pk'] = _columns[pk_name].get_property(allow_delete=False)
 
         #check for duplicate column names
         col_names = set()
@@ -107,7 +112,7 @@ class ModelMetaClass(type):
             col_names.add(v.db_field)
 
         #get column family name
-        cf_name = attrs.pop('db_name', None) or name
+        cf_name = attrs.pop('db_name', name)
 
         #create db_name -> model name map for loading
         db_map = {}

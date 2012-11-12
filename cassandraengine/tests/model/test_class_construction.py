@@ -19,8 +19,8 @@ class TestModelClassFunction(BaseCassEngTestCase):
             text = columns.Text()
 
         self.assertHasAttr(TestModel, '_columns')
-        self.assertNotHasAttr(TestModel, 'id')
-        self.assertNotHasAttr(TestModel, 'text')
+        self.assertHasAttr(TestModel, 'id')
+        self.assertHasAttr(TestModel, 'text')
 
         inst = TestModel()
         self.assertHasAttr(inst, 'id')
