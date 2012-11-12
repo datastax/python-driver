@@ -23,9 +23,7 @@ class Manager(object):
         return cf_name
 
     def __call__(self, **kwargs):
-        """
-        filter shortcut
-        """
+        """ filter shortcut """
         return self.filter(**kwargs)
 
     def find(self, pk):
@@ -71,9 +69,7 @@ class Manager(object):
         QuerySet(self.model).save(instance)
 
     def _delete_instance(self, instance):
-        """
-        Deletes a single instance
-        """
+        """ Deletes a single instance """
         QuerySet(self.model).delete_instance(instance)
 
     #----column family create/delete----

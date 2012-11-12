@@ -2,10 +2,21 @@ import copy
 
 from cassandraengine.connection import get_connection
 
+#CQL 3 reference:
+#http://www.datastax.com/docs/1.1/references/cql/index
+
+class Query(object):
+
+    pass
+
 class QuerySet(object):
     #TODO: querysets should be immutable
     #TODO: querysets should be executed lazily
     #TODO: conflicting filter args should raise exception unless a force kwarg is supplied
+
+    #CQL supports ==, >, >=, <, <=, IN (a,b,c,..n)
+    #REVERSE, LIMIT
+    #ORDER BY
 
     def __init__(self, model, query_args={}):
         super(QuerySet, self).__init__()

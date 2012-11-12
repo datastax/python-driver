@@ -119,11 +119,13 @@ class ModelMetaClass(type):
         for name, col in _columns.items():
             db_map[col.db_field] = name
 
+        #add management members to the class
         attrs['_columns'] = _columns
         attrs['_db_map'] = db_map
         attrs['_pk_name'] = pk_name
         attrs['_dynamic_columns'] = {}
 
+        #create the class and add a manager to it
         klass = super(ModelMetaClass, cls).__new__(cls, name, bases, attrs)
         klass.objects = Manager(klass)
         return klass

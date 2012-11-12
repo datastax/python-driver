@@ -197,11 +197,16 @@ class Counter(BaseColumn):
 #TODO: research supercolumns
 #http://wiki.apache.org/cassandra/DataModel
 class List(BaseColumn):
+    #checkout cql.cqltypes.ListType
     def __init__(self, **kwargs):
         super(DateTime, self).__init__(**kwargs)
         raise NotImplementedError
 
 class Dict(BaseColumn):
+    #checkout cql.cqltypes.MapType
     def __init__(self, **kwargs):
         super(DateTime, self).__init__(**kwargs)
         raise NotImplementedError
+
+#checkout cql.cqltypes.SetType
+#checkout cql.cqltypes.CompositeType
