@@ -28,13 +28,6 @@ class TestModelClassFunction(BaseCassEngTestCase):
         self.assertIsNone(inst.id)
         self.assertIsNone(inst.text)
 
-    def test_multiple_primary_keys_fail(self):
-        """Test attempting to define multiple primary keys fails"""
-        with self.assertRaises(ModelException):
-            class MultiPK(Model):
-                id1 = columns.Integer(primary_key=True)
-                id2 = columns.Integer(primary_key=True)
-
     def test_db_map(self):
         """
         Tests that the db_map is properly defined
@@ -57,4 +50,16 @@ class TestModelClassFunction(BaseCassEngTestCase):
             class BadNames(Model):
                 words = columns.Text()
                 content = columns.Text(db_field='words')
+
+    def test_column_ordering_is_preserved(self):
+        """
+        Tests that the _columns dics retains the ordering of the class definition
+        """
+
+        class Stuff(Model):
+            words = columns.Text()
+            content = columns.Text()
+            numbers = columns.Integer()
+
+        self.assertEquals(Stuff._columns.keys(), ['id', 'words', 'content', 'numbers'])
 

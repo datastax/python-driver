@@ -52,21 +52,3 @@ class TestModelIO(BaseCassEngTestCase):
         Tests that nullable columns save without any trouble
         """
 
-    @skip
-    def test_dynamic_columns(self):
-        """
-        Tests that items put into dynamic columns are saved and retrieved properly
-
-        Note: seems I've misunderstood how arbitrary column names work in Cassandra
-        skipping for now
-        """
-        #TODO:Fix this
-        tm = TestModel(count=8, text='123456789')
-        tm['other'] = 'something'
-        tm['number'] = 5
-        tm.save()
-
-        tm2 = TestModel.objects.find(tm.pk)
-        self.assertEquals(tm['other'], tm2['other'])
-        self.assertEquals(tm['number'], tm2['number'])
-

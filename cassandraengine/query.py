@@ -158,15 +158,17 @@ class QuerySet(object):
         qs = ['CREATE TABLE {}'.format(self.column_family_name)]
 
         #add column types
+        pkeys = []
         qtypes = []
         def add_column(col):
             s = '{} {}'.format(col.db_field, col.db_type)
-            if col.primary_key: s += ' PRIMARY KEY'
+            if col.primary_key: pkeys.append(col.db_field)
             qtypes.append(s)
-        add_column(self.model._columns[self.model._pk_name])
+        #add_column(self.model._columns[self.model._pk_name])
         for name, col in self.model._columns.items():
-            if col.primary_key: continue
             add_column(col)
+
+        qtypes.append('PRIMARY KEY ({})'.format(', '.join(pkeys)))
 
         qs += ['({})'.format(', '.join(qtypes))]
         qs = ' '.join(qs)

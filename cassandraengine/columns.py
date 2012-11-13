@@ -9,6 +9,8 @@ class BaseColumn(object):
     #the cassandra type this column maps to
     db_type = None
 
+    instance_counter = 0
+
     def __init__(self, primary_key=False, db_field=None, default=None, null=False):
         """
         :param primary_key: bool flag, there can be only one primary key per doc
@@ -22,6 +24,10 @@ class BaseColumn(object):
         self.null = null
 
         self.value = None
+
+        #keep track of instantiation order
+        self.position = BaseColumn.instance_counter
+        BaseColumn.instance_counter += 1
 
     def validate(self, value):
         """
@@ -97,8 +103,8 @@ class BaseColumn(object):
         Returns a column definition for CQL table definition
         """
         dterms = [self.db_field, self.db_type]
-        if self.primary_key:
-            dterms.append('PRIMARY KEY')
+        #if self.primary_key:
+            #dterms.append('PRIMARY KEY')
         return ' '.join(dterms)
 
     def set_db_name(self, name):
@@ -196,6 +202,8 @@ class Counter(BaseColumn):
 
 #TODO: research supercolumns
 #http://wiki.apache.org/cassandra/DataModel
+#checkout composite columns:
+#http://www.datastax.com/dev/blog/introduction-to-composite-columns-part-1
 class List(BaseColumn):
     #checkout cql.cqltypes.ListType
     def __init__(self, **kwargs):

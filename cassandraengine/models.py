@@ -1,3 +1,4 @@
+from collections import OrderedDict
 
 from cassandraengine import columns
 from cassandraengine.exceptions import ModelException
@@ -17,8 +18,6 @@ class BaseModel(object):
         for k,v in values.items():
             if k in self._columns:
                 setattr(self, k, v)
-            else:
-                self._dynamic_columns[k] = v
 
         #set excluded columns to None
         for k in self._columns.keys():
@@ -34,16 +33,6 @@ class BaseModel(object):
     def pk(self):
         """ Returns the object's primary key """
         return getattr(self, self._pk_name)
-
-    #dynamic column methods
-    def __getitem__(self, key):
-        return self._dynamic_columns[key]
-
-    def __setitem__(self, key, val):
-        self._dynamic_columns[key] = val
-
-    def __delitem__(self, key):
-        del self._dynamic_columns[key]
 
     def validate(self):
         """ Cleans and validates the field values """
@@ -76,7 +65,7 @@ class ModelMetaClass(type):
         """
         #move column definitions into _columns dict
         #and set default column names
-        _columns = {}
+        _columns = OrderedDict()
         pk_name = None
 
         def _transform_column(col_name, col_obj):
@@ -85,20 +74,20 @@ class ModelMetaClass(type):
             allow_delete = not col_obj.primary_key
             attrs[col_name] = col_obj.get_property(allow_delete=allow_delete)
 
-        #transform column definitions
-        for k,v in attrs.items():
-            if isinstance(v, columns.BaseColumn):
-                if v.is_primary_key:
-                    if pk_name:
-                        raise ModelException("More than one primary key defined for {}".format(name))
-                    pk_name = k
-                _transform_column(k,v)
+        #import ipdb; ipdb.set_trace()
+        column_definitions = [(k,v) for k,v in attrs.items() if isinstance(v, columns.BaseColumn)]
+        column_definitions = sorted(column_definitions, lambda x,y: cmp(x[1].position, y[1].position))
 
-        #set primary key if it's not already defined
-        if not pk_name:
+        #prepend primary key if none has been defined
+        if not any([v.primary_key for k,v in column_definitions]):
             k,v = 'id', columns.UUID(primary_key=True)
+            column_definitions = [(k,v)] + column_definitions
+
+        #transform column definitions
+        for k,v in column_definitions:
+            if pk_name is None and v.primary_key:
+                pk_name = k
             _transform_column(k,v)
-            pk_name = k
         
         #setup primary key shortcut
         if pk_name != 'pk':
