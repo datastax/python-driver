@@ -12,7 +12,7 @@ var
 sdist
 develop-eggs
 .installed.cfg
-
+.vagrant
 # Installer logs
 pip-log.txt
 
