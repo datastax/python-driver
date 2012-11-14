@@ -71,10 +71,7 @@ class ModelMetaClass(type):
         def _transform_column(col_name, col_obj):
             _columns[col_name] = col_obj
             col_obj.set_db_name(col_name)
-            allow_delete = not col_obj.primary_key
-            attrs[col_name] = col_obj.get_property(allow_delete=allow_delete)
 
-        #import ipdb; ipdb.set_trace()
         column_definitions = [(k,v) for k,v in attrs.items() if isinstance(v, columns.BaseColumn)]
         column_definitions = sorted(column_definitions, lambda x,y: cmp(x[1].position, y[1].position))
 
@@ -91,7 +88,9 @@ class ModelMetaClass(type):
         
         #setup primary key shortcut
         if pk_name != 'pk':
-            attrs['pk'] = _columns[pk_name].get_property(allow_delete=False)
+            pk_get = lambda self: getattr(self, pk_name)
+            pk_set = lambda self, val: setattr(self, pk_name, val)
+            attrs['pk'] = property(pk_get, pk_set)
 
         #check for duplicate column names
         col_names = set()

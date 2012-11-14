@@ -18,10 +18,12 @@ class TestModelClassFunction(BaseCassEngTestCase):
         class TestModel(Model):
             text = columns.Text()
 
+        #check class attributes
         self.assertHasAttr(TestModel, '_columns')
-        self.assertHasAttr(TestModel, 'id')
+        self.assertNotHasAttr(TestModel, 'id')
         self.assertHasAttr(TestModel, 'text')
 
+        #check instance attributes
         inst = TestModel()
         self.assertHasAttr(inst, 'id')
         self.assertHasAttr(inst, 'text')
@@ -63,3 +65,21 @@ class TestModelClassFunction(BaseCassEngTestCase):
 
         self.assertEquals(Stuff._columns.keys(), ['id', 'words', 'content', 'numbers'])
 
+    def test_value_managers_are_keeping_model_instances_isolated(self):
+        """
+        Tests that instance value managers are isolated from other instances
+        """
+        class Stuff(Model):
+            num = columns.Integer()
+
+        inst1 = Stuff(num=5)
+        inst2 = Stuff(num=7)
+
+        self.assertNotEquals(inst1.num, inst2.num)
+        self.assertEquals(inst1.num, 5)
+        self.assertEquals(inst2.num, 7)
+
+    def test_meta_data_is_not_inherited(self):
+        """
+        Test that metadata defined in one class, is not inherited by subclasses
+        """
