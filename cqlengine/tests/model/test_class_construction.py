@@ -1,8 +1,8 @@
-from cassandraengine.tests.base import BaseCassEngTestCase
+from cqlengine.tests.base import BaseCassEngTestCase
 
-from cassandraengine.exceptions import ModelException
-from cassandraengine.models import Model
-from cassandraengine import columns
+from cqlengine.exceptions import ModelException
+from cqlengine.models import Model
+from cqlengine import columns
 
 class TestModelClassFunction(BaseCassEngTestCase):
     """

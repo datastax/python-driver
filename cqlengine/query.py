@@ -1,6 +1,6 @@
 import copy
 
-from cassandraengine.connection import get_connection
+from cqlengine.connection import get_connection
 
 #CQL 3 reference:
 #http://www.datastax.com/docs/1.1/references/cql/index

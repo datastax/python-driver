@@ -1,8 +1,8 @@
 from unittest import skip
-from cassandraengine.tests.base import BaseCassEngTestCase
+from cqlengine.tests.base import BaseCassEngTestCase
 
-from cassandraengine.models import Model
-from cassandraengine import columns
+from cqlengine.models import Model
+from cqlengine import columns
 
 class TestModel(Model):
     count   = columns.Integer()

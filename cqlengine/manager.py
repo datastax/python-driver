@@ -1,6 +1,6 @@
 #manager class
 
-from cassandraengine.query import QuerySet
+from cqlengine.query import QuerySet
 
 class Manager(object):
 

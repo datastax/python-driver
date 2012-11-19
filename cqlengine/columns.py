@@ -2,12 +2,43 @@
 import re
 from uuid import uuid1, uuid4
 
-from cassandraengine.exceptions import ValidationError
+from cqlengine.exceptions import ValidationError
+
+class BaseValueManager(object):
+
+    def __init__(self, instance, column, value):
+        self.instance = instance
+        self.column = column
+        self.initial_value = value
+        self.value = value
+
+    def deleted(self):
+        return self.value is None and self.initial_value is not None
+
+    def getval(self):
+        return self.value
+
+    def setval(self, val):
+        self.value = val
+
+    def delval(self):
+        self.value = None
+
+    def get_property(self):
+        _get = lambda slf: self.getval()
+        _set = lambda slf, val: self.setval(val)
+        _del = lambda slf: self.delval()
+
+        if self.column.can_delete:
+            return property(_get, _set, _del)
+        else:
+            return property(_get, _set)
 
 class BaseColumn(object):
 
     #the cassandra type this column maps to
     db_type = None
+    value_manager = BaseValueManager
 
     instance_counter = 0
 
@@ -63,6 +94,10 @@ class BaseColumn(object):
     @property
     def is_primary_key(self):
         return self.primary_key
+
+    @property
+    def can_delete(self):
+        return not self.primary_key
 
     #methods for replacing column definitions with properties that interact
     #with a column's value member

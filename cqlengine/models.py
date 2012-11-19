@@ -1,8 +1,8 @@
 from collections import OrderedDict
 
-from cassandraengine import columns
-from cassandraengine.exceptions import ModelException
-from cassandraengine.manager import Manager
+from cqlengine import columns
+from cqlengine.exceptions import ModelException
+from cqlengine.manager import Manager
 
 class BaseModel(object):
     """
@@ -11,18 +11,14 @@ class BaseModel(object):
 
     #table names will be generated automatically from it's model name and package
     #however, you can alse define them manually here
-    db_name = None
+    db_name = None 
 
     def __init__(self, **values):
-        #set columns from values
-        for k,v in values.items():
-            if k in self._columns:
-                setattr(self, k, v)
-
-        #set excluded columns to None
-        for k in self._columns.keys():
-            if k not in values:
-                setattr(self, k, None)
+        self._values = {}
+        for name, column in self._columns.items():
+            value_mngr = column.value_manager(self, column, values.get(name, None))
+            self._values[name] = value_mngr
+            setattr(self, name, value_mngr.get_property())
 
     @classmethod
     def find(cls, pk):
