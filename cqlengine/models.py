@@ -18,7 +18,6 @@ class BaseModel(object):
         for name, column in self._columns.items():
             value_mngr = column.value_manager(self, column, values.get(name, None))
             self._values[name] = value_mngr
-            setattr(self, name, value_mngr.get_property())
 
     @classmethod
     def find(cls, pk):
@@ -67,6 +66,15 @@ class ModelMetaClass(type):
         def _transform_column(col_name, col_obj):
             _columns[col_name] = col_obj
             col_obj.set_db_name(col_name)
+            #set properties
+            _get = lambda self: self._values[col_name].getval()
+            _set = lambda self, val: self._values[col_name].setval(val)
+            _del = lambda self: self._values[col_name].delval()
+            if col_obj.can_delete:
+                attrs[col_name] = property(_get, _set)
+            else:
+                attrs[col_name] = property(_get, _set, _del)
+
 
         column_definitions = [(k,v) for k,v in attrs.items() if isinstance(v, columns.BaseColumn)]
         column_definitions = sorted(column_definitions, lambda x,y: cmp(x[1].position, y[1].position))
@@ -84,9 +92,7 @@ class ModelMetaClass(type):
         
         #setup primary key shortcut
         if pk_name != 'pk':
-            pk_get = lambda self: getattr(self, pk_name)
-            pk_set = lambda self, val: setattr(self, pk_name, val)
-            attrs['pk'] = property(pk_get, pk_set)
+            attrs['pk'] = attrs[pk_name]
 
         #check for duplicate column names
         col_names = set()

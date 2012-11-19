@@ -20,7 +20,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
 
         #check class attributes
         self.assertHasAttr(TestModel, '_columns')
-        self.assertNotHasAttr(TestModel, 'id')
+        self.assertHasAttr(TestModel, 'id')
         self.assertHasAttr(TestModel, 'text')
 
         #check instance attributes
