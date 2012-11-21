@@ -54,7 +54,7 @@ class cassandra {
 node cassandraengine inherits basenode {
   include cassandra
   
-  package {["python-pip", "python-dev"]:
+  package {["python-pip", "python-dev", "python-nose"]:
     ensure => installed
   }
 
