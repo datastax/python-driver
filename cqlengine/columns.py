@@ -99,33 +99,6 @@ class BaseColumn(object):
     def can_delete(self):
         return not self.primary_key
 
-    #methods for replacing column definitions with properties that interact
-    #with a column's value member
-    #this will allow putting logic behind value access (lazy loading, etc)
-    def _getval(self):
-        """ This columns value getter """
-        return self.value
-
-    def _setval(self, val):
-        """ This columns value setter """
-        self.value = val
-
-    def _delval(self):
-        """ This columns value deleter """
-        raise NotImplementedError
-
-    def get_property(self, allow_delete=True):
-        """
-        Returns the property object that will set and get this
-        column's value and be assigned to this column's model attribute
-        """
-        getval = lambda slf: self._getval()
-        setval = lambda slf, val: self._setval(val)
-        delval = lambda slf: self._delval()
-        if not allow_delete:
-            return property(getval, setval)
-        return property(getval, setval, delval)
-
     def get_default(self):
         if self.has_default:
             if callable(self.default):
