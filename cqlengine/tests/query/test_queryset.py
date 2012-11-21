@@ -11,6 +11,11 @@ class TestQuerySet(BaseCassEngTestCase):
         Tests the queryset filter method
         """
 
+    def test_using_invalid_column_names_in_filter_kwargs_raises_error(self):
+        """
+        Tests that using invalid or nonexistant column names for filter args raises an error
+        """
+
     def test_where_clause_generation(self):
         """
         Tests the where clause creation
