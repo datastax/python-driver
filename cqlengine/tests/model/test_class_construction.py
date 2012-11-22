@@ -18,7 +18,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         class TestModel(Model):
             text = columns.Text()
 
-        #check class attributes
+        #check class attibutes
         self.assertHasAttr(TestModel, '_columns')
         self.assertHasAttr(TestModel, 'id')
         self.assertHasAttr(TestModel, 'text')
@@ -78,6 +78,11 @@ class TestModelClassFunction(BaseCassEngTestCase):
         self.assertNotEquals(inst1.num, inst2.num)
         self.assertEquals(inst1.num, 5)
         self.assertEquals(inst2.num, 7)
+
+    def test_normal_fields_can_be_defined_between_primary_keys(self):
+        """
+        Tests tha non primary key fields can be defined between primary key fields
+        """
 
     def test_meta_data_is_not_inherited(self):
         """

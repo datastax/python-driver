@@ -2,6 +2,7 @@
 
 from cqlengine.query import QuerySet
 
+#TODO: refactor this into the QuerySet
 class Manager(object):
 
     def __init__(self, model):
@@ -27,31 +28,15 @@ class Manager(object):
         return self.filter(**kwargs)
 
     def find(self, pk):
-        """
-        Returns the row corresponding to the primary key value given
-        """
-        values = QuerySet(self.model).find(pk)
-        if values is None: return
-
-        #change the column names to model names
-        #in case they are different
-        field_dict = {}
-        db_map = self.model._db_map
-        for key, val in values.items():
-            if key in db_map:
-                field_dict[db_map[key]] = val
-            else:
-                field_dict[key] = val
-        return self.model(**field_dict)
+        """ Returns the row corresponding to the primary key set given """
+        #TODO: rework this to work with multiple primary keys
+        return QuerySet(self.model).find(pk)
 
     def all(self):
         return QuerySet(self.model).all()
 
     def filter(self, **kwargs):
         return QuerySet(self.model).filter(**kwargs)
-
-    def exclude(self, **kwargs):
-        return QuerySet(self.model).exclude(**kwargs)
 
     def create(self, **kwargs):
         return self.model(**kwargs).save()

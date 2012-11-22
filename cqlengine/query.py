@@ -80,7 +80,7 @@ class QueryOperator(object):
                 pass
             _recurse(QueryOperator)
         try:
-            return QueryOperator.opmap[symbol.upper()](column)
+            return QueryOperator.opmap[symbol.upper()]
         except KeyError:
             raise QueryOperatorException("{} doesn't map to a QueryOperator".format(symbol))
 
@@ -119,10 +119,10 @@ class QuerySet(object):
     #REVERSE, LIMIT
     #ORDER BY
 
-    def __init__(self, model, query_args={}):
+    def __init__(self, model):
         super(QuerySet, self).__init__()
         self.model = model
-        self.column_family_name = self.model.objects.column_family_name
+        self.column_family_name = self.model.column_family_name()
 
         #Where clause filters
         self._where = []
@@ -141,65 +141,82 @@ class QuerySet(object):
         self._cursor = None
 
     #----query generation / execution----
-    def _execute_query(self):
-        conn = get_connection()
-        self._cursor = conn.cursor()
 
     def _validate_where_syntax(self):
-        """
-        Checks that a filterset will not create invalid cql
-        """
+        """ Checks that a filterset will not create invalid cql """
         #TODO: check that there's either a = or IN relationship with a primary key or indexed field
+        #TODO: abuse this to see if we can get cql to raise an exception
 
     def _where_clause(self):
-        """
-        Returns a where clause based on the given filter args
-        """
+        """ Returns a where clause based on the given filter args """
         self._validate_where_syntax()
         return ' AND '.join([f.cql for f in self._where])
 
     def _where_values(self):
-        """
-        Returns the value dict to be passed to the cql query
-        """
+        """ Returns the value dict to be passed to the cql query """
         values = {}
-        for where in self._where: values.update(where.get_dict())
+        for where in self._where:
+            values.update(where.get_dict())
         return values
 
-    def _select_query(self):
+    def _select_query(self, count=False):
         """
         Returns a select clause based on the given filter args
-        """
-        pass
 
-    @property
-    def cursor(self):
-        if self._cursor is None:
-            self._cursor = self._execute_query()
-        return self._cursor
+        :param count: indicates this should return a count query only
+        """
+        qs = []
+        if count:
+            qs += ['SELECT COUNT(*)']
+        else:
+            fields = self.models._columns.keys()
+            if self._defer_fields:
+                fields = [f for f in fields if f not in self._defer_fields]
+            elif self._only_fields:
+                fields = [f for f in fields if f in self._only_fields]
+            db_fields = [self.model._columns[f].db_fields for f in fields]
+            qs += ['SELECT {}'.format(', '.join(db_fields))]
+
+        qs += ['FROM {}'.format(self.column_family_name)]
+
+        if self._where:
+            qs += ['WHERE {}'.format(self._where_clause())]
+
+        #TODO: add support for limit, start, order by, and reverse
+        return ' '.join(qs)
 
     #----Reads------
     def __iter__(self):
         if self._cursor is None:
-            self._execute_query()
+            conn = get_connection()
+            self._cursor = conn.cursor()
+            self._cursor.execute(self._select_query(), self._where_values())
         return self
 
+    def _construct_instance(self, values):
+        #translate column names to model names
+        field_dict = {}
+        db_map = self.model._db_map
+        for key, val in values.items():
+            if key in db_map:
+                field_dict[db_map[key]] = val
+            else:
+                field_dict[key] = val
+        return self.model(**field_dict)
+
     def _get_next(self):
-        """
-        Gets the next cursor result
-        Returns a db_field->value dict
-        """
+        """ Gets the next cursor result """
         cur = self._cursor
         values = cur.fetchone()
         if values is None: return
         names = [i[0] for i in cur.description]
         value_dict = dict(zip(names, values))
-        return value_dict
+        return self._construct_instance(value_dict)
 
     def next(self):
-        values = self._get_next() 
-        if values is None: raise StopIteration
-        return values
+        instance = self._get_next() 
+        if instance is None: raise StopIteration
+        return instance
 
     def first(self):
         pass
@@ -242,15 +259,22 @@ class QuerySet(object):
 
         return clone
 
+    def __call__(self, **kwargs):
+        return self.filter(**kwargs)
+
     def count(self):
         """ Returns the number of rows matched by this query """
-        qs = 'SELECT COUNT(*) FROM {}'.format(self.column_family_name)
+        con = get_connection()
+        cur = con.cursor()
+        cur.execute(self._select_query(count=True), self._where_values())
+        return cur.fetchone()
 
     def find(self, pk):
         """
         loads one document identified by it's primary key
         """
         #TODO: make this a convenience wrapper of the filter method
+        #TODO: rework this to work with multiple primary keys
         qs = 'SELECT * FROM {column_family} WHERE {pk_name}=:{pk_name}'
         qs = qs.format(column_family=self.column_family_name,
                        pk_name=self.model._pk_name)
@@ -325,6 +349,9 @@ class QuerySet(object):
         conn = get_connection()
         cur = conn.cursor()
         cur.execute(qs, field_values)
+
+    def create(self, **kwargs):
+        return self.model(**kwargs).save()
 
     #----delete---
     def delete(self, columns=[]):

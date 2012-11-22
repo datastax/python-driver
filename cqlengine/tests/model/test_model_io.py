@@ -52,3 +52,7 @@ class TestModelIO(BaseCassEngTestCase):
         Tests that nullable columns save without any trouble
         """
 
+    def test_column_deleting_works_properly(self):
+        """
+        """
+

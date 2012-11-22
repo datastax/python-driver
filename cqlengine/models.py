@@ -2,7 +2,7 @@ from collections import OrderedDict
 
 from cqlengine import columns
 from cqlengine.exceptions import ModelException
-from cqlengine.manager import Manager
+from cqlengine.query import QuerySet
 
 class BaseModel(object):
     """
@@ -19,10 +19,27 @@ class BaseModel(object):
             value_mngr = column.value_manager(self, column, values.get(name, None))
             self._values[name] = value_mngr
 
+        #TODO: note any deferred or only fields so they're not deleted
+
     @classmethod
     def find(cls, pk):
         """ Loads a document by it's primary key """
+        #TODO: rework this to work with multiple primary keys
         cls.objects.find(pk)
+
+    @classmethod
+    def column_family_name(cls):
+        """
+        Returns the column family name if it's been defined
+        otherwise, it creates it from the module and class name
+        """
+        if cls.db_name:
+            return cls.db_name
+        cf_name = cls.__module__ + '.' + cls.__name__
+        cf_name = cf_name.replace('.', '_')
+        #trim to less than 48 characters or cassandra will complain
+        cf_name = cf_name[-48:]
+        return cf_name
 
     @property
     def pk(self):
@@ -45,12 +62,14 @@ class BaseModel(object):
     def save(self):
         is_new = self.pk is None
         self.validate()
-        self.objects._save_instance(self)
+        #self.objects._save_instance(self)
+        self.objects.save(self)
         return self
 
     def delete(self):
         """ Deletes this instance """
-        self.objects._delete_instance(self)
+        #self.objects._delete_instance(self)
+        self.objects.delete_instance(self)
 
 
 class ModelMetaClass(type):
@@ -115,9 +134,9 @@ class ModelMetaClass(type):
         attrs['_pk_name'] = pk_name
         attrs['_dynamic_columns'] = {}
 
-        #create the class and add a manager to it
+        #create the class and add a QuerySet to it
         klass = super(ModelMetaClass, cls).__new__(cls, name, bases, attrs)
-        klass.objects = Manager(klass)
+        klass.objects = QuerySet(klass)
         return klass
 
 
