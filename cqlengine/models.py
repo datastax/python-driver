@@ -62,13 +62,11 @@ class BaseModel(object):
     def save(self):
         is_new = self.pk is None
         self.validate()
-        #self.objects._save_instance(self)
         self.objects.save(self)
         return self
 
     def delete(self):
         """ Deletes this instance """
-        #self.objects._delete_instance(self)
         self.objects.delete_instance(self)
 
 
@@ -84,7 +82,7 @@ class ModelMetaClass(type):
 
         def _transform_column(col_name, col_obj):
             _columns[col_name] = col_obj
-            col_obj.set_db_name(col_name)
+            col_obj.set_column_name(col_name)
             #set properties
             _get = lambda self: self._values[col_name].getval()
             _set = lambda self, val: self._values[col_name].setval(val)
@@ -93,7 +91,6 @@ class ModelMetaClass(type):
                 attrs[col_name] = property(_get, _set)
             else:
                 attrs[col_name] = property(_get, _set, _del)
-
 
         column_definitions = [(k,v) for k,v in attrs.items() if isinstance(v, columns.BaseColumn)]
         column_definitions = sorted(column_definitions, lambda x,y: cmp(x[1].position, y[1].position))
@@ -116,9 +113,9 @@ class ModelMetaClass(type):
         #check for duplicate column names
         col_names = set()
         for k,v in _columns.items():
-            if v.db_field in col_names:
-                raise ModelException("{} defines the column {} more than once".format(name, v.db_field))
-            col_names.add(v.db_field)
+            if v.db_field_name in col_names:
+                raise ModelException("{} defines the column {} more than once".format(name, v.db_field_name))
+            col_names.add(v.db_field_name)
 
         #get column family name
         cf_name = attrs.pop('db_name', name)
@@ -126,7 +123,7 @@ class ModelMetaClass(type):
         #create db_name -> model name map for loading
         db_map = {}
         for name, col in _columns.items():
-            db_map[col.db_field] = name
+            db_map[col.db_field_name] = name
 
         #add management members to the class
         attrs['_columns'] = _columns

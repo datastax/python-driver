@@ -8,11 +8,11 @@ from cqlengine import query
 class TestModel(Model):
     test_id = columns.Integer(primary_key=True)
     attempt_id = columns.Integer(primary_key=True)
-    descriptions = columns.Text()
+    description = columns.Text()
     expected_result = columns.Integer()
     test_result = columns.Integer(index=True)
 
-class TestQuerySet(BaseCassEngTestCase):
+class TestQuerySetOperation(BaseCassEngTestCase):
 
     def test_query_filter_parsing(self):
         """
@@ -54,7 +54,7 @@ class TestQuerySet(BaseCassEngTestCase):
         assert where == 'test_id = :{} AND expected_result >= :{}'.format(*ids)
 
 
-    def test_querystring_construction(self):
+    def test_querystring_generation(self):
         """
         Tests the select querystring creation
         """
@@ -101,3 +101,60 @@ class TestQuerySet(BaseCassEngTestCase):
         """
         Tests that setting only or defer fields that don't exist raises an exception
         """
+
+class TestQuerySetUsage(BaseCassEngTestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestQuerySetUsage, cls).setUpClass()
+        try: TestModel.objects._delete_column_family()
+        except: pass
+        TestModel.objects._create_column_family()
+
+        TestModel.objects.create(test_id=0, attempt_id=0, description='try1', expected_result=5, test_result=30)
+        TestModel.objects.create(test_id=0, attempt_id=1, description='try2', expected_result=10, test_result=30)
+        TestModel.objects.create(test_id=0, attempt_id=2, description='try3', expected_result=15, test_result=30)
+        TestModel.objects.create(test_id=0, attempt_id=3, description='try4', expected_result=20, test_result=25)
+
+        TestModel.objects.create(test_id=1, attempt_id=0, description='try5', expected_result=5, test_result=25)
+        TestModel.objects.create(test_id=1, attempt_id=1, description='try6', expected_result=10, test_result=25)
+        TestModel.objects.create(test_id=1, attempt_id=2, description='try7', expected_result=15, test_result=25)
+        TestModel.objects.create(test_id=1, attempt_id=3, description='try8', expected_result=20, test_result=20)
+
+        TestModel.objects.create(test_id=2, attempt_id=0, description='try9', expected_result=50, test_result=40)
+        TestModel.objects.create(test_id=2, attempt_id=1, description='try10', expected_result=60, test_result=40)
+        TestModel.objects.create(test_id=2, attempt_id=2, description='try11', expected_result=70, test_result=45)
+        TestModel.objects.create(test_id=2, attempt_id=3, description='try12', expected_result=75, test_result=45)
+
+    @classmethod
+    def tearDownClass(cls):
+        super(TestQuerySetUsage, cls).tearDownClass()
+        TestModel.objects._delete_column_family()
+
+    def test_count(self):
+        q = TestModel.objects(test_id=0)
+        assert q.count() == 4
+
+    def test_iteration(self):
+        q = TestModel.objects(test_id=0)
+        #tuple of expected attempt_id, expected_result values
+        import ipdb; ipdb.set_trace()
+        compare_set = set([(0,5), (1,10), (2,15), (3,20)])
+        for t in q:
+            val = t.attempt_id, t.expected_result
+            assert val in compare_set
+            compare_set.remove(val)
+        assert len(compare_set) == 0
+
+        q = TestModel.objects(attempt_id=3)
+        assert len(q) == 3
+        #tuple of expected test_id, expected_result values
+        compare_set = set([(0,20), (1,20), (2,75)])
+        for t in q:
+            val = t.test_id, t.expected_result
+            assert val in compare_set
+            compare_set.remove(val)
+        assert len(compare_set) == 0
+
+
+

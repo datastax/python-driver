@@ -56,6 +56,9 @@ class BaseColumn(object):
         self.default = default
         self.null = null
 
+        #the column name in the model definition
+        self.column_name = None
+
         self.value = None
 
         #keep track of instantiation order
@@ -112,17 +115,21 @@ class BaseColumn(object):
         """
         Returns a column definition for CQL table definition
         """
-        dterms = [self.db_field, self.db_type]
+        dterms = [self.db_field_name, self.db_type]
         #if self.primary_key:
             #dterms.append('PRIMARY KEY')
         return ' '.join(dterms)
 
-    def set_db_name(self, name):
+    def set_column_name(self, name):
         """
         Sets the column name during document class construction
         This value will be ignored if db_field is set in __init__
         """
-        self.db_field = self.db_field or name
+        self.column_name = name
+
+    @property
+    def db_field_name(self):
+        return self.db_field or self.column_name
 
 class Bytes(BaseColumn):
     db_type = 'blob'

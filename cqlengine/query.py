@@ -39,7 +39,7 @@ class QueryOperator(object):
         Returns this operator's portion of the WHERE clause
         :param valname: the dict key that this operator's compare value will be found in
         """
-        return '{} {} :{}'.format(self.column.db_field, self.cql_symbol, self.identifier)
+        return '{} {} :{}'.format(self.column.db_field_name, self.cql_symbol, self.identifier)
 
     def validate_operator(self):
         """
@@ -140,6 +140,12 @@ class QuerySet(object):
 
         self._cursor = None
 
+    def __unicode__(self):
+        return self._select_query()
+
+    def __str__(self):
+        return str(self.__unicode__())
+
     #----query generation / execution----
 
     def _validate_where_syntax(self):
@@ -169,12 +175,12 @@ class QuerySet(object):
         if count:
             qs += ['SELECT COUNT(*)']
         else:
-            fields = self.models._columns.keys()
+            fields = self.model._columns.keys()
             if self._defer_fields:
                 fields = [f for f in fields if f not in self._defer_fields]
             elif self._only_fields:
                 fields = [f for f in fields if f in self._only_fields]
-            db_fields = [self.model._columns[f].db_fields for f in fields]
+            db_fields = [self.model._columns[f].db_field_name for f in fields]
             qs += ['SELECT {}'.format(', '.join(db_fields))]
 
         qs += ['FROM {}'.format(self.column_family_name)]
@@ -182,7 +188,10 @@ class QuerySet(object):
         if self._where:
             qs += ['WHERE {}'.format(self._where_clause())]
 
-        #TODO: add support for limit, start, order by, and reverse
+        if not count:
+            #TODO: add support for limit, start, order by, and reverse
+            pass
+
         return ' '.join(qs)
 
     #----Reads------
@@ -191,6 +200,7 @@ class QuerySet(object):
             conn = get_connection()
             self._cursor = conn.cursor()
             self._cursor.execute(self._select_query(), self._where_values())
+            self._rowcount = self._cursor.rowcount
         return self
 
     def _construct_instance(self, values):
@@ -267,7 +277,10 @@ class QuerySet(object):
         con = get_connection()
         cur = con.cursor()
         cur.execute(self._select_query(count=True), self._where_values())
-        return cur.fetchone()
+        return cur.fetchone()[0]
+
+    def __len__(self):
+        return self.count()
 
     def find(self, pk):
         """
@@ -319,23 +332,14 @@ class QuerySet(object):
         prior to calling this.
         """
         assert type(instance) == self.model
+
         #organize data
         value_pairs = []
-
-        #get pk
-        col = self.model._columns[self.model._pk_name]
         values = instance.as_dict()
-        value_pairs += [(col.db_field, values.get(self.model._pk_name))]
 
         #get defined fields and their column names
         for name, col in self.model._columns.items():
-            if col.is_primary_key: continue
-            value_pairs += [(col.db_field, values.get(name))]
-
-        #add dynamic fields
-        for key, val in values.items():
-            if key in self.model._columns: continue
-            value_pairs += [(key, val)]
+            value_pairs += [(col.db_field_name, values.get(name))]
 
         #construct query string
         field_names = zip(*value_pairs)[0]
@@ -357,7 +361,21 @@ class QuerySet(object):
     def delete(self, columns=[]):
         """
         Deletes the contents of a query
+
+        :returns: number of rows deleted
         """
+        qs = ['DELETE FROM {}'.format(self.column_family_name)]
+        if self._where:
+            qs += ['WHERE {}'.format(self._where_clause())]
+        qs = ' '.join(qs)
+
+        #TODO: Return number of rows deleted
+        con = get_connection()
+        cur = con.cursor()
+        cur.execute(qs, self._where_values())
+        return cur.fetchone()
+
+
 
     def delete_instance(self, instance):
         """ Deletes one instance """
@@ -378,8 +396,8 @@ class QuerySet(object):
         pkeys = []
         qtypes = []
         def add_column(col):
-            s = '{} {}'.format(col.db_field, col.db_type)
-            if col.primary_key: pkeys.append(col.db_field)
+            s = '{} {}'.format(col.db_field_name, col.db_type)
+            if col.primary_key: pkeys.append(col.db_field_name)
             qtypes.append(s)
         #add_column(self.model._columns[self.model._pk_name])
         for name, col in self.model._columns.items():
