@@ -4,11 +4,12 @@ from hashlib import md5
 from time import time
 
 from cqlengine.connection import get_connection
-from cqlengine.exceptions import QueryException
+from cqlengine.exceptions import CQLEngineException
 
 #CQL 3 reference:
 #http://www.datastax.com/docs/1.1/references/cql/index
 
+class QueryException(CQLEngineException): pass
 class QueryOperatorException(QueryException): pass
 
 class QueryOperator(object):
