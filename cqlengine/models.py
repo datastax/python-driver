@@ -9,9 +9,12 @@ class BaseModel(object):
     The base model class, don't inherit from this, inherit from Model, defined below
     """
 
-    #table names will be generated automatically from it's model name and package
+    #table names will be generated automatically from it's model and package name
     #however, you can alse define them manually here
     db_name = None 
+
+    #the keyspace for this model 
+    keyspace = 'cqlengine'
 
     def __init__(self, **values):
         self._values = {}

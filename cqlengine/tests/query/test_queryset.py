@@ -1,6 +1,8 @@
 from cqlengine.tests.base import BaseCassEngTestCase
 
 from cqlengine.exceptions import ModelException
+from cqlengine.management import create_column_family
+from cqlengine.management import delete_column_family
 from cqlengine.models import Model
 from cqlengine import columns
 from cqlengine import query
@@ -107,9 +109,9 @@ class TestQuerySetUsage(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(TestQuerySetUsage, cls).setUpClass()
-        try: TestModel.objects._delete_column_family()
+        try: delete_column_family(TestModel)
         except: pass
-        TestModel.objects._create_column_family()
+        create_column_family(TestModel)
 
         TestModel.objects.create(test_id=0, attempt_id=0, description='try1', expected_result=5, test_result=30)
         TestModel.objects.create(test_id=0, attempt_id=1, description='try2', expected_result=10, test_result=30)
@@ -129,7 +131,8 @@ class TestQuerySetUsage(BaseCassEngTestCase):
     @classmethod
     def tearDownClass(cls):
         super(TestQuerySetUsage, cls).tearDownClass()
-        TestModel.objects._delete_column_family()
+        #TestModel.objects._delete_column_family()
+        delete_column_family(TestModel)
 
     def test_count(self):
         q = TestModel.objects(test_id=0)
@@ -138,7 +141,6 @@ class TestQuerySetUsage(BaseCassEngTestCase):
     def test_iteration(self):
         q = TestModel.objects(test_id=0)
         #tuple of expected attempt_id, expected_result values
-        import ipdb; ipdb.set_trace()
         compare_set = set([(0,5), (1,10), (2,15), (3,20)])
         for t in q:
             val = t.attempt_id, t.expected_result

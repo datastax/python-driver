@@ -46,15 +46,23 @@ class QueryOperator(object):
         Checks that this operator can be used on the column provided
         """
         if self.symbol is None:
-            raise QueryOperatorException("{} is not a valid operator, use one with 'symbol' defined".format(self.__class__.__name__))
+            raise QueryOperatorException(
+                    "{} is not a valid operator, use one with 'symbol' defined".format(
+                        self.__class__.__name__
+                    )
+                )
         if self.cql_symbol is None:
-            raise QueryOperatorException("{} is not a valid operator, use one with 'cql_symbol' defined".format(self.__class__.__name__))
+            raise QueryOperatorException(
+                    "{} is not a valid operator, use one with 'cql_symbol' defined".format(
+                        self.__class__.__name__
+                    )
+                )
 
     def validate_value(self):
         """
         Checks that the compare value works with this operator
 
-        *doesn't do anything by default
+        Doesn't do anything by default
         """
         pass
 
@@ -109,7 +117,6 @@ class LessThanOrEqualOperator(QueryOperator):
     cql_symbol = '<='
 
 class QuerySet(object):
-    #TODO: querysets should be immutable
     #TODO: querysets should be executed lazily
     #TODO: support specifying offset and limit (use slice) (maybe return a mutated queryset)
     #TODO: support specifying columns to exclude or select only
@@ -195,9 +202,10 @@ class QuerySet(object):
         return ' '.join(qs)
 
     #----Reads------
+
     def __iter__(self):
         if self._cursor is None:
-            conn = get_connection()
+            conn = get_connection(self.model.keyspace)
             self._cursor = conn.cursor()
             self._cursor.execute(self._select_query(), self._where_values())
             self._rowcount = self._cursor.rowcount
@@ -274,7 +282,7 @@ class QuerySet(object):
 
     def count(self):
         """ Returns the number of rows matched by this query """
-        con = get_connection()
+        con = get_connection(self.model.keyspace)
         cur = con.cursor()
         cur.execute(self._select_query(count=True), self._where_values())
         return cur.fetchone()[0]
@@ -291,7 +299,7 @@ class QuerySet(object):
         qs = 'SELECT * FROM {column_family} WHERE {pk_name}=:{pk_name}'
         qs = qs.format(column_family=self.column_family_name,
                        pk_name=self.model._pk_name)
-        conn = get_connection()
+        conn = get_connection(self.model.keyspace)
         self._cursor = conn.cursor()
         self._cursor.execute(qs, {self.model._pk_name:pk})
         return self._get_next()
@@ -350,7 +358,7 @@ class QuerySet(object):
         qs += ["({})".format(', '.join([':'+f for f in field_names]))]
         qs = ' '.join(qs)
 
-        conn = get_connection()
+        conn = get_connection(self.model.keyspace)
         cur = conn.cursor()
         cur.execute(qs, field_values)
 
@@ -370,7 +378,7 @@ class QuerySet(object):
         qs = ' '.join(qs)
 
         #TODO: Return number of rows deleted
-        con = get_connection()
+        con = get_connection(self.model.keyspace)
         cur = con.cursor()
         cur.execute(qs, self._where_values())
         return cur.fetchone()
@@ -384,42 +392,8 @@ class QuerySet(object):
         qs += ['WHERE {0}=:{0}'.format(pk_name)]
         qs = ' '.join(qs)
 
-        conn = get_connection()
+        conn = get_connection(self.model.keyspace)
         cur = conn.cursor()
         cur.execute(qs, {pk_name:instance.pk})
-
-    def _create_column_family(self):
-        #construct query string
-        qs = ['CREATE TABLE {}'.format(self.column_family_name)]
-
-        #add column types
-        pkeys = []
-        qtypes = []
-        def add_column(col):
-            s = '{} {}'.format(col.db_field_name, col.db_type)
-            if col.primary_key: pkeys.append(col.db_field_name)
-            qtypes.append(s)
-        #add_column(self.model._columns[self.model._pk_name])
-        for name, col in self.model._columns.items():
-            add_column(col)
-
-        qtypes.append('PRIMARY KEY ({})'.format(', '.join(pkeys)))
-
-        qs += ['({})'.format(', '.join(qtypes))]
-        qs = ' '.join(qs)
-
-        #add primary key
-        conn = get_connection()
-        cur = conn.cursor()
-        try:
-            cur.execute(qs)
-        except BaseException, e:
-            if 'Cannot add already existing column family' not in e.message:
-                raise
-
-    def _delete_column_family(self):
-        conn = get_connection()
-        cur = conn.cursor()
-        cur.execute('drop table {};'.format(self.column_family_name))
 
 

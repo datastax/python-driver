@@ -84,6 +84,11 @@ class TestModelClassFunction(BaseCassEngTestCase):
         Tests tha non primary key fields can be defined between primary key fields
         """
 
+    def test_model_keyspace_attribute_must_be_a_string(self):
+        """
+        Tests that users can't set the keyspace to None, or something else
+        """
+
     def test_meta_data_is_not_inherited(self):
         """
         Test that metadata defined in one class, is not inherited by subclasses
