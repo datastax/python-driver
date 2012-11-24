@@ -221,24 +221,7 @@ class Decimal(BaseColumn):
 
 class Counter(BaseColumn):
     def __init__(self, **kwargs):
-        super(DateTime, self).__init__(**kwargs)
+        super(Counter, self).__init__(**kwargs)
         raise NotImplementedError
 
-#TODO: research supercolumns
-#http://wiki.apache.org/cassandra/DataModel
-#checkout composite columns:
-#http://www.datastax.com/dev/blog/introduction-to-composite-columns-part-1
-class List(BaseColumn):
-    #checkout cql.cqltypes.ListType
-    def __init__(self, **kwargs):
-        super(DateTime, self).__init__(**kwargs)
-        raise NotImplementedError
-
-class Dict(BaseColumn):
-    #checkout cql.cqltypes.MapType
-    def __init__(self, **kwargs):
-        super(DateTime, self).__init__(**kwargs)
-        raise NotImplementedError
-
-#checkout cql.cqltypes.SetType
-#checkout cql.cqltypes.CompositeType
+#TODO: Foreign key fields

@@ -118,14 +118,10 @@ class LessThanOrEqualOperator(QueryOperator):
     cql_symbol = '<='
 
 class QuerySet(object):
-    #TODO: querysets should be executed lazily
     #TODO: support specifying offset and limit (use slice) (maybe return a mutated queryset)
     #TODO: support specifying columns to exclude or select only
+    #TODO: support ORDER BY
     #TODO: cache results in this instance, but don't copy them on deepcopy
-
-    #CQL supports ==, >, >=, <, <=, IN (a,b,c,..n)
-    #REVERSE, LIMIT
-    #ORDER BY
 
     def __init__(self, model):
         super(QuerySet, self).__init__()

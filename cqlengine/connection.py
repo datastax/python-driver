@@ -24,48 +24,10 @@ def get_connection(keyspace, create_missing_keyspace=True):
                 if create_missing_keyspace:
                     from cqlengine.management import create_keyspace
                     create_keyspace(keyspace)
-                    #http://www.datastax.com/docs/1.0/references/cql/CREATE_KEYSPACE
-                    cur = con.cursor()
-                    cur.execute("""create keyspace {}
-                                   with strategy_class = 'SimpleStrategy'
-                                   and strategy_options:replication_factor=1;""".format(keyspace))
-                    con.set_initial_keyspace(keyspace)
                 else:
                     raise CQLConnectionError('"{}" is not an existing keyspace'.format(keyspace))
 
         _conn[keyspace] = con
 
     return con
-
-#cli examples here:
-#http://wiki.apache.org/cassandra/CassandraCli
-#http://www.datastax.com/docs/1.0/dml/using_cql
-#http://stackoverflow.com/questions/10871595/how-do-you-create-a-counter-columnfamily-with-cql3-in-cassandra
-"""
-try:
-    cur.execute("create table colfam (id int PRIMARY KEY);")
-except cql.ProgrammingError:
-    #cur.execute('drop table colfam;')
-    pass
-"""
-
-#http://www.datastax.com/docs/1.0/references/cql/INSERT
-#updates/inserts do the same thing
-
-"""
-cur.execute('insert into colfam (id, content) values (:id, :content)', dict(id=1, content='yo!'))
-
-cur.execute('select * from colfam WHERE id=1;')
-cur.fetchone()
-
-cur.execute("update colfam set content='hey' where id=1;")
-cur.execute('select * from colfam WHERE id=1;')
-cur.fetchone()
-
-cur.execute('delete from colfam WHERE id=1;')
-cur.execute('delete from colfam WHERE id in (1);')
-"""
-
-#TODO: Add alter altering existing schema functionality
-#http://www.datastax.com/docs/1.0/references/cql/ALTER_COLUMNFAMILY
 

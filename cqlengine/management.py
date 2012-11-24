@@ -43,7 +43,6 @@ def create_column_family(model):
 
     indexes = [c for n,c in model._columns.items() if c.index]
     if indexes:
-        import ipdb; ipdb.set_trace()
         for column in indexes:
             #TODO: check for existing index...
             #can that be determined from the connection client?
