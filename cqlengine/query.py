@@ -17,8 +17,7 @@ class QueryOperator(object):
     # ie: colname__<symbol>
     symbol = None
 
-    # The comparator symbol this operator
-    # uses in cql
+    # The comparator symbol this operator uses in cql
     cql_symbol = None
 
     def __init__(self, column, value):
@@ -372,6 +371,8 @@ class QuerySet(object):
         cur = conn.cursor()
         cur.execute(qs, field_values)
 
+        #TODO: delete deleted / nulled fields
+
     def create(self, **kwargs):
         return self.model(**kwargs).save()
 
@@ -379,8 +380,6 @@ class QuerySet(object):
     def delete(self, columns=[]):
         """
         Deletes the contents of a query
-
-        :returns: number of rows deleted
         """
         qs = ['DELETE FROM {}'.format(self.column_family_name)]
         if self._where:

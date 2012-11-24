@@ -11,8 +11,6 @@ class TestModel(Model):
     count   = columns.Integer()
     text    = columns.Text()
     
-#class TestModel2(Model):
-    
 class TestModelIO(BaseCassEngTestCase):
 
     @classmethod

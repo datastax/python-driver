@@ -55,6 +55,8 @@ class BaseColumn(object):
         self.index = index
         self.db_field = db_field
         self.default = default
+
+        #TODO: make this required, since fields won't actually be nulled, but deleted
         self.null = null
 
         #the column name in the model definition
@@ -116,10 +118,7 @@ class BaseColumn(object):
         """
         Returns a column definition for CQL table definition
         """
-        dterms = [self.db_field_name, self.db_type]
-        #if self.primary_key:
-            #dterms.append('PRIMARY KEY')
-        return ' '.join(dterms)
+        return '{} {}'.format(self.db_field_name, self.db_type)
 
     def set_column_name(self, name):
         """
@@ -214,14 +213,20 @@ class Float(BaseColumn):
 
 class Decimal(BaseColumn):
     db_type = 'decimal'
-    #TODO: this
+    #TODO: decimal field
     def __init__(self, **kwargs):
         super(DateTime, self).__init__(**kwargs)
         raise NotImplementedError
 
 class Counter(BaseColumn):
+    #TODO: counter field
     def __init__(self, **kwargs):
         super(Counter, self).__init__(**kwargs)
         raise NotImplementedError
 
-#TODO: Foreign key fields
+class ForeignKey(BaseColumn):
+    #TODO: Foreign key field
+    def __init__(self, **kwargs):
+        super(ForeignKey, self).__init__(**kwargs)
+        raise NotImplementedError
+
