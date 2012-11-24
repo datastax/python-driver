@@ -220,7 +220,35 @@ class TestQuerySetIterator(BaseQuerySetUsage):
             compare_set.remove(val)
         assert len(compare_set) == 0
 
+class TestQuerySetOrdering(BaseQuerySetUsage):
 
+    def test_order_by_success_case(self):
+
+        q = TestModel.objects(test_id=0).order_by('attempt_id')
+        expected_order = [0,1,2,3]
+        for model, expect in zip(q,expected_order):
+            assert model.attempt_id == expect
+
+        q = q.order_by('-attempt_id')
+        expected_order.reverse()
+        for model, expect in zip(q,expected_order):
+            assert model.attempt_id == expect
+
+    def test_ordering_by_non_second_primary_keys_fail(self):
+
+        with self.assertRaises(query.QueryException):
+            q = TestModel.objects(test_id=0).order_by('test_id')
+
+    def test_ordering_by_non_primary_keys_fails(self):
+        with self.assertRaises(query.QueryException):
+            q = TestModel.objects(test_id=0).order_by('description')
+
+    def test_ordering_on_indexed_columns_fails(self):
+        with self.assertRaises(query.QueryException):
+            q = IndexedTestModel.objects(test_id=0).order_by('attempt_id')
+
+class TestQuerySetSlicing(BaseQuerySetUsage):
+    pass
 
 class TestQuerySetValidation(BaseQuerySetUsage):
 

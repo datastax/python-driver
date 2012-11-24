@@ -84,6 +84,11 @@ class TestModelClassFunction(BaseCassEngTestCase):
         Tests tha non primary key fields can be defined between primary key fields
         """
 
+    def test_at_least_one_non_primary_key_column_is_required(self):
+        """
+        Tests that an error is raised if a model doesn't contain at least one primary key field
+        """
+
     def test_model_keyspace_attribute_must_be_a_string(self):
         """
         Tests that users can't set the keyspace to None, or something else

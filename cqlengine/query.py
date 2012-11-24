@@ -119,7 +119,6 @@ class LessThanOrEqualOperator(QueryOperator):
 class QuerySet(object):
     #TODO: support specifying offset and limit (use slice) (maybe return a mutated queryset)
     #TODO: support specifying columns to exclude or select only
-    #TODO: support ORDER BY
     #TODO: cache results in this instance, but don't copy them on deepcopy
 
     def __init__(self, model):
@@ -131,7 +130,7 @@ class QuerySet(object):
         self._where = []
 
         #ordering arguments
-        self._order = []
+        self._order = None
 
         #subset selection
         self._limit = None
@@ -215,7 +214,9 @@ class QuerySet(object):
             qs += ['WHERE {}'.format(self._where_clause())]
 
         if not count:
-            #TODO: add support for limit, start, order by, and reverse
+            if self._order:
+                qs += ['ORDER BY {}'.format(self._order)]
+            #TODO: add support for limit, start, and reverse
             pass
 
         return ' '.join(qs)
@@ -230,6 +231,14 @@ class QuerySet(object):
             self._cursor.execute(self._select_query(), self._where_values())
             self._rowcount = self._cursor.rowcount
         return self
+
+    def __getitem__(self, s):
+
+        if isinstance(s, slice):
+            pass
+        else:
+            s = long(s)
+        pass
 
     def _construct_instance(self, values):
         #translate column names to model names
@@ -300,6 +309,39 @@ class QuerySet(object):
 
         return clone
 
+    def order_by(self, colname):
+        """
+        orders the result set.
+        ordering can only select one column, and it must be the second column in a composite primary key
+
+        Default order is ascending, prepend a '-' to the column name for descending
+        """
+        if colname is None:
+            clone = copy.deepcopy(self)
+            clone._order = None
+            return clone
+
+        order_type = 'DESC' if colname.startswith('-') else 'ASC'
+        colname = colname.replace('-', '')
+
+        column = self.model._columns.get(colname)
+        if column is None:
+            raise QueryException("Can't resolve the column name: '{}'".format(colname))
+
+        #validate the column selection
+        if not column.primary_key:
+            raise QueryException(
+                "Can't order on '{}', can only order on (clustered) primary keys".format(colname))
+
+        pks = [v for k,v in self.model._columns.items() if v.primary_key]
+        if column == pks[0]:
+            raise QueryException(
+                "Can't order by the first primary key, clustering (secondary) keys only")
+
+        clone = copy.deepcopy(self)
+        clone._order = '{} {}'.format(column.db_field_name, order_type)
+        return clone
+
     def count(self):
         """ Returns the number of rows matched by this query """
         #TODO: check for previous query execution and return row count if it exists
@@ -310,6 +352,39 @@ class QuerySet(object):
 
     def __len__(self):
         return self.count()
+
+#    def set_limits(self, start, limit):
+#        """ Sets the start and limit parameters """
+#        #validate
+#        if not (start is None or isinstance(start, (int, long))):
+#            raise QueryException("'start' must be None, or an int or long")
+#        if not (limit is None or isinstance(limit, (int, long))):
+#            raise QueryException("'limit' must be None, or an int or long")
+#
+#        clone = copy.deepcopy(self)
+#        clone._start = start
+#        clone._limit = limit
+#        return clone
+#
+#    def start(self, v):
+#        """ Sets the limit """
+#        if not (v is None or isinstance(v, (int, long))):
+#            raise TypeError
+#        if v == self._start:
+#            return self
+#        clone = copy.deepcopy(self)
+#        clone._start = v
+#        return clone
+#
+#    def limit(self, v):
+#        """ Sets the limit """
+#        if not (v is None or isinstance(v, (int, long))):
+#            raise TypeError
+#        if v == self._limit:
+#            return self
+#        clone = copy.deepcopy(self)
+#        clone._limit = v
+#        return clone
 
     def _only_or_defer(self, action, fields):
         clone = copy.deepcopy(self)
