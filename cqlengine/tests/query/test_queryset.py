@@ -12,6 +12,13 @@ class TestModel(Model):
     attempt_id = columns.Integer(primary_key=True)
     description = columns.Text()
     expected_result = columns.Integer()
+    test_result = columns.Integer()
+
+class IndexedTestModel(Model):
+    test_id = columns.Integer(primary_key=True)
+    attempt_id = columns.Integer(index=True)
+    description = columns.Text()
+    expected_result = columns.Integer()
     test_result = columns.Integer(index=True)
 
 class TestQuerySetOperation(BaseCassEngTestCase):
@@ -104,14 +111,15 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         Tests that setting only or defer fields that don't exist raises an exception
         """
 
-class TestQuerySetUsage(BaseCassEngTestCase):
+class BaseQuerySetUsage(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(TestQuerySetUsage, cls).setUpClass()
-        try: delete_column_family(TestModel)
-        except: pass
+        super(BaseQuerySetUsage, cls).setUpClass()
+        delete_column_family(TestModel)
+        delete_column_family(IndexedTestModel)
         create_column_family(TestModel)
+        create_column_family(IndexedTestModel)
 
         TestModel.objects.create(test_id=0, attempt_id=0, description='try1', expected_result=5, test_result=30)
         TestModel.objects.create(test_id=0, attempt_id=1, description='try2', expected_result=10, test_result=30)
@@ -128,13 +136,32 @@ class TestQuerySetUsage(BaseCassEngTestCase):
         TestModel.objects.create(test_id=2, attempt_id=2, description='try11', expected_result=70, test_result=45)
         TestModel.objects.create(test_id=2, attempt_id=3, description='try12', expected_result=75, test_result=45)
 
+        IndexedTestModel.objects.create(test_id=0, attempt_id=0, description='try1', expected_result=5, test_result=30)
+        IndexedTestModel.objects.create(test_id=1, attempt_id=1, description='try2', expected_result=10, test_result=30)
+        IndexedTestModel.objects.create(test_id=2, attempt_id=2, description='try3', expected_result=15, test_result=30)
+        IndexedTestModel.objects.create(test_id=3, attempt_id=3, description='try4', expected_result=20, test_result=25)
+
+        IndexedTestModel.objects.create(test_id=4, attempt_id=0, description='try5', expected_result=5, test_result=25)
+        IndexedTestModel.objects.create(test_id=5, attempt_id=1, description='try6', expected_result=10, test_result=25)
+        IndexedTestModel.objects.create(test_id=6, attempt_id=2, description='try7', expected_result=15, test_result=25)
+        IndexedTestModel.objects.create(test_id=7, attempt_id=3, description='try8', expected_result=20, test_result=20)
+
+        IndexedTestModel.objects.create(test_id=8, attempt_id=0, description='try9', expected_result=50, test_result=40)
+        IndexedTestModel.objects.create(test_id=9, attempt_id=1, description='try10', expected_result=60, test_result=40)
+        IndexedTestModel.objects.create(test_id=10, attempt_id=2, description='try11', expected_result=70, test_result=45)
+        IndexedTestModel.objects.create(test_id=11, attempt_id=3, description='try12', expected_result=75, test_result=45)
+
     @classmethod
     def tearDownClass(cls):
-        super(TestQuerySetUsage, cls).tearDownClass()
-        #TestModel.objects._delete_column_family()
+        super(BaseQuerySetUsage, cls).tearDownClass()
         delete_column_family(TestModel)
+        delete_column_family(IndexedTestModel)
+
+class TestQuerySetCountAndSelection(BaseQuerySetUsage):
 
     def test_count(self):
+        assert TestModel.objects.count() == 12
+
         q = TestModel.objects(test_id=0)
         assert q.count() == 4
 
@@ -157,6 +184,54 @@ class TestQuerySetUsage(BaseCassEngTestCase):
             assert val in compare_set
             compare_set.remove(val)
         assert len(compare_set) == 0
+        
+    def test_delete(self):
+        TestModel.objects.create(test_id=3, attempt_id=0, description='try9', expected_result=50, test_result=40)
+        TestModel.objects.create(test_id=3, attempt_id=1, description='try10', expected_result=60, test_result=40)
+        TestModel.objects.create(test_id=3, attempt_id=2, description='try11', expected_result=70, test_result=45)
+        TestModel.objects.create(test_id=3, attempt_id=3, description='try12', expected_result=75, test_result=45)
+        
+        assert TestModel.objects.count() == 16
+        assert TestModel.objects(test_id=3).count() == 4
+        
+        TestModel.objects(test_id=3).delete()
+        
+        assert TestModel.objects.count() == 12
+        assert TestModel.objects(test_id=3).count() == 0
+
+class TestQuerySetValidation(BaseQuerySetUsage):
+
+    def test_primary_key_or_index_must_be_specified(self):
+        """
+        Tests that queries that don't have an equals relation to a primary key or indexed field fail
+        """
+        with self.assertRaises(query.QueryException):
+            q = TestModel.objects(test_result=25)
+            iter(q)
+
+    def test_primary_key_or_index_must_have_equal_relation_filter(self):
+        """
+        Tests that queries that don't have non equal (>,<, etc) relation to a primary key or indexed field fail
+        """
+        with self.assertRaises(query.QueryException):
+            q = TestModel.objects(test_id__gt=0)
+            iter(q)
+
+
+    def test_indexed_field_can_be_queried(self):
+        """
+        Tests that queries on an indexed field will work without any primary key relations specified
+        """
+        q = IndexedTestModel.objects(test_result=25)
+        count = q.count()
+        assert q.count() == 4
+
+
+
+
+
+
+
 
 
 

@@ -4,6 +4,8 @@ from cqlengine import columns
 from cqlengine.exceptions import ModelException
 from cqlengine.query import QuerySet
 
+class ModelDefinitionException(ModelException): pass
+
 class BaseModel(object):
     """
     The base model class, don't inherit from this, inherit from Model, defined below
@@ -37,12 +39,12 @@ class BaseModel(object):
         otherwise, it creates it from the module and class name
         """
         if cls.db_name:
-            return cls.db_name
+            return cls.db_name.lower()
         cf_name = cls.__module__ + '.' + cls.__name__
         cf_name = cf_name.replace('.', '_')
         #trim to less than 48 characters or cassandra will complain
         cf_name = cf_name[-48:]
-        return cf_name
+        return cf_name.lower()
 
     @property
     def pk(self):
@@ -66,6 +68,7 @@ class BaseModel(object):
         is_new = self.pk is None
         self.validate()
         self.objects.save(self)
+        #delete any fields that have been deleted / set to none
         return self
 
     def delete(self):
@@ -120,13 +123,19 @@ class ModelMetaClass(type):
                 raise ModelException("{} defines the column {} more than once".format(name, v.db_field_name))
             col_names.add(v.db_field_name)
 
+        #check for indexes on models with multiple primary keys
+        if len([1 for k,v in column_definitions if v.primary_key]) > 1:
+            if len([1 for k,v in column_definitions if v.index]) > 0:
+                raise ModelDefinitionException(
+                    'Indexes on models with multiple primary keys is not supported')
+
         #get column family name
         cf_name = attrs.pop('db_name', name)
 
         #create db_name -> model name map for loading
         db_map = {}
-        for name, col in _columns.items():
-            db_map[col.db_field_name] = name
+        for field_name, col in _columns.items():
+            db_map[col.db_field_name] = field_name
 
         #add management members to the class
         attrs['_columns'] = _columns

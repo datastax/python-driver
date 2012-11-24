@@ -89,6 +89,11 @@ class TestModelClassFunction(BaseCassEngTestCase):
         Tests that users can't set the keyspace to None, or something else
         """
 
+    def test_indexes_arent_allowed_on_models_with_multiple_primary_keys(self):
+        """
+        Tests that attempting to define an index on a model with multiple primary keys fails
+        """
+
     def test_meta_data_is_not_inherited(self):
         """
         Test that metadata defined in one class, is not inherited by subclasses

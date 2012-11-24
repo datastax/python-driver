@@ -52,6 +52,7 @@ class BaseColumn(object):
         :param null: boolean, is the field nullable?
         """
         self.primary_key = primary_key
+        self.index = index
         self.db_field = db_field
         self.default = default
         self.null = null
@@ -129,7 +130,13 @@ class BaseColumn(object):
 
     @property
     def db_field_name(self):
+        """ Returns the name of the cql name of this column """
         return self.db_field or self.column_name
+
+    @property
+    def db_index_name(self):
+        """ Returns the name of the cql index """
+        return 'index_{}'.format(self.db_field_name)
 
 class Bytes(BaseColumn):
     db_type = 'blob'

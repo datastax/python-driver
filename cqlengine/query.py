@@ -97,7 +97,7 @@ class EqualsOperator(QueryOperator):
     symbol = 'EQ'
     cql_symbol = '='
 
-class InOperator(QueryOperator):
+class InOperator(EqualsOperator):
     symbol = 'IN'
     cql_symbol = 'IN'
 
@@ -158,7 +158,11 @@ class QuerySet(object):
 
     def _validate_where_syntax(self):
         """ Checks that a filterset will not create invalid cql """
-        #TODO: check that there's either a = or IN relationship with a primary key or indexed field
+
+        #check that there's either a = or IN relationship with a primary key or indexed field
+        equal_ops = [w for w in self._where if isinstance(w, EqualsOperator)]
+        if not any([w.column.primary_key or w.column.index for w in equal_ops]):
+            raise QueryException('Where clauses require either a "=" or "IN" comparison with either a primary key or indexed field')
         #TODO: abuse this to see if we can get cql to raise an exception
 
     def _where_clause(self):
