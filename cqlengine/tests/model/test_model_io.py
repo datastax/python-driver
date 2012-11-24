@@ -30,7 +30,7 @@ class TestModelIO(BaseCassEngTestCase):
         Tests that models can be saved and retrieved
         """
         tm = TestModel.objects.create(count=8, text='123456789')
-        tm2 = TestModel.objects.find(tm.pk)
+        tm2 = TestModel.objects(id=tm.pk).first()
 
         for cname in tm._columns.keys():
             self.assertEquals(getattr(tm, cname), getattr(tm2, cname))
@@ -44,7 +44,7 @@ class TestModelIO(BaseCassEngTestCase):
         tm.count = 100
         tm.save()
 
-        tm2 = TestModel.objects.find(tm.pk)
+        tm2 = TestModel.objects(id=tm.pk).first()
         self.assertEquals(tm.count, tm2.count)
 
     def test_model_deleting_works_properly(self):
@@ -53,7 +53,7 @@ class TestModelIO(BaseCassEngTestCase):
         """
         tm = TestModel.objects.create(count=8, text='123456789')
         tm.delete()
-        tm2 = TestModel.objects.find(tm.pk)
+        tm2 = TestModel.objects(id=tm.pk).first()
         self.assertIsNone(tm2)
 
     def test_nullable_columns_are_saved_properly(self):

@@ -199,6 +199,29 @@ class TestQuerySetCountAndSelection(BaseQuerySetUsage):
         assert TestModel.objects.count() == 12
         assert TestModel.objects(test_id=3).count() == 0
 
+class TestQuerySetIterator(BaseQuerySetUsage):
+
+    def test_multiple_iterations_work_properly(self):
+        """ Tests that iterating over a query set more than once works """
+        q = TestModel.objects(test_id=0)
+        #tuple of expected attempt_id, expected_result values
+        compare_set = set([(0,5), (1,10), (2,15), (3,20)])
+        for t in q:
+            val = t.attempt_id, t.expected_result
+            assert val in compare_set
+            compare_set.remove(val)
+        assert len(compare_set) == 0
+
+        #try it again
+        compare_set = set([(0,5), (1,10), (2,15), (3,20)])
+        for t in q:
+            val = t.attempt_id, t.expected_result
+            assert val in compare_set
+            compare_set.remove(val)
+        assert len(compare_set) == 0
+
+
+
 class TestQuerySetValidation(BaseQuerySetUsage):
 
     def test_primary_key_or_index_must_be_specified(self):

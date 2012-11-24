@@ -142,6 +142,9 @@ class QuerySet(object):
         self._defer_fields = []
         self._only_fields = []
 
+        #results cache
+        self._result_cache = None
+
         self._cursor = None
 
     def __unicode__(self):
@@ -149,6 +152,22 @@ class QuerySet(object):
 
     def __str__(self):
         return str(self.__unicode__())
+
+    def __call__(self, **kwargs):
+        return self.filter(**kwargs)
+
+    def __deepcopy__(self, memo):
+        clone = self.__class__(self.model)
+        for k,v in self.__dict__.items():
+            if k in ['_result_cache']:
+                clone.__dict__[k] = None
+            else:
+                clone.__dict__[k] = copy.deepcopy(v, memo)
+
+        return clone
+
+    def __len__(self):
+        return self.count()
 
     #----query generation / execution----
 
@@ -205,6 +224,7 @@ class QuerySet(object):
     #----Reads------
 
     def __iter__(self):
+        #TODO: cache results
         if self._cursor is None:
             conn = get_connection(self.model.keyspace)
             self._cursor = conn.cursor()
@@ -234,11 +254,14 @@ class QuerySet(object):
 
     def next(self):
         instance = self._get_next() 
-        if instance is None: raise StopIteration
+        if instance is None:
+            #TODO: this is inefficient, we should be caching the results
+            self._cursor = None
+            raise StopIteration
         return instance
 
     def first(self):
-        pass
+        return iter(self)._get_next()
 
     def all(self):
         clone = copy.deepcopy(self)
@@ -278,11 +301,9 @@ class QuerySet(object):
 
         return clone
 
-    def __call__(self, **kwargs):
-        return self.filter(**kwargs)
-
     def count(self):
         """ Returns the number of rows matched by this query """
+        #TODO: check for previous query execution and return row count if it exists
         con = get_connection(self.model.keyspace)
         cur = con.cursor()
         cur.execute(self._select_query(count=True), self._where_values())
@@ -290,20 +311,6 @@ class QuerySet(object):
 
     def __len__(self):
         return self.count()
-
-    def find(self, pk):
-        """
-        loads one document identified by it's primary key
-        """
-        #TODO: make this a convenience wrapper of the filter method
-        #TODO: rework this to work with multiple primary keys
-        qs = 'SELECT * FROM {column_family} WHERE {pk_name}=:{pk_name}'
-        qs = qs.format(column_family=self.column_family_name,
-                       pk_name=self.model._pk_name)
-        conn = get_connection(self.model.keyspace)
-        self._cursor = conn.cursor()
-        self._cursor.execute(qs, {self.model._pk_name:pk})
-        return self._get_next()
 
     def _only_or_defer(self, action, fields):
         clone = copy.deepcopy(self)
@@ -313,7 +320,9 @@ class QuerySet(object):
         #check for strange fields
         missing_fields = [f for f in fields if f not in self.model._columns.keys()]
         if missing_fields:
-            raise QueryException("Can't resolve fields {} in {}".format(', '.join(missing_fields), self.model.__name__))
+            raise QueryException(
+                "Can't resolve fields {} in {}".format(
+                    ', '.join(missing_fields), self.model.__name__))
 
         if action == 'defer':
             clone._defer_fields = fields
@@ -378,12 +387,9 @@ class QuerySet(object):
             qs += ['WHERE {}'.format(self._where_clause())]
         qs = ' '.join(qs)
 
-        #TODO: Return number of rows deleted
         con = get_connection(self.model.keyspace)
         cur = con.cursor()
         cur.execute(qs, self._where_values())
-        return cur.fetchone()
-
 
 
     def delete_instance(self, instance):

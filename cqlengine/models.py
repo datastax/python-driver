@@ -27,12 +27,6 @@ class BaseModel(object):
         #TODO: note any deferred or only fields so they're not deleted
 
     @classmethod
-    def find(cls, pk):
-        """ Loads a document by it's primary key """
-        #TODO: rework this to work with multiple primary keys
-        cls.objects.find(pk)
-
-    @classmethod
     def column_family_name(cls):
         """
         Returns the column family name if it's been defined
