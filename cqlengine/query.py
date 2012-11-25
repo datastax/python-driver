@@ -117,7 +117,7 @@ class LessThanOrEqualOperator(QueryOperator):
     cql_symbol = '<='
 
 class QuerySet(object):
-    #TODO: support specifying offset and limit (use slice) (maybe return a mutated queryset)
+    #TODO: delete empty columns on save
     #TODO: support specifying columns to exclude or select only
     #TODO: cache results in this instance, but don't copy them on deepcopy
 
@@ -132,9 +132,9 @@ class QuerySet(object):
         #ordering arguments
         self._order = None
 
-        #subset selection
-        self._limit = None
-        self._start = None
+        #CQL has a default limit of 10000, it's defined here
+        #because explicit is better than implicit
+        self._limit = 10000
 
         #see the defer and only methods
         self._defer_fields = []
@@ -190,34 +190,28 @@ class QuerySet(object):
             values.update(where.get_dict())
         return values
 
-    def _select_query(self, count=False):
+    def _select_query(self):
         """
         Returns a select clause based on the given filter args
-
-        :param count: indicates this should return a count query only
         """
-        qs = []
-        if count:
-            qs += ['SELECT COUNT(*)']
-        else:
-            fields = self.model._columns.keys()
-            if self._defer_fields:
-                fields = [f for f in fields if f not in self._defer_fields]
-            elif self._only_fields:
-                fields = [f for f in fields if f in self._only_fields]
-            db_fields = [self.model._columns[f].db_field_name for f in fields]
-            qs += ['SELECT {}'.format(', '.join(db_fields))]
+        fields = self.model._columns.keys()
+        if self._defer_fields:
+            fields = [f for f in fields if f not in self._defer_fields]
+        elif self._only_fields:
+            fields = [f for f in fields if f in self._only_fields]
+        db_fields = [self.model._columns[f].db_field_name for f in fields]
 
+        qs = ['SELECT {}'.format(', '.join(db_fields))]
         qs += ['FROM {}'.format(self.column_family_name)]
 
         if self._where:
             qs += ['WHERE {}'.format(self._where_clause())]
 
-        if not count:
-            if self._order:
-                qs += ['ORDER BY {}'.format(self._order)]
-            #TODO: add support for limit, start, and reverse
-            pass
+        if self._order:
+            qs += ['ORDER BY {}'.format(self._order)]
+
+        if self._limit:
+            qs += ['LIMIT {}'.format(self._limit)]
 
         return ' '.join(qs)
 
@@ -235,10 +229,15 @@ class QuerySet(object):
     def __getitem__(self, s):
 
         if isinstance(s, slice):
-            pass
+            #return a new query with limit defined
+            #start and step are not supported
+            if s.start: raise QueryException('CQL does not support START')
+            if s.step: raise QueryException('step is not supported')
+            return self.limit(s.stop)
         else:
+            #return the object at this index
             s = long(s)
-        pass
+            raise NotImplementedError
 
     def _construct_instance(self, values):
         #translate column names to model names
@@ -345,46 +344,33 @@ class QuerySet(object):
     def count(self):
         """ Returns the number of rows matched by this query """
         #TODO: check for previous query execution and return row count if it exists
+        qs = ['SELECT COUNT(*)']
+        qs += ['FROM {}'.format(self.column_family_name)]
+        if self._where:
+            qs += ['WHERE {}'.format(self._where_clause())]
+        qs = ' '.join(qs)
+
         con = get_connection(self.model.keyspace)
         cur = con.cursor()
-        cur.execute(self._select_query(count=True), self._where_values())
+        cur.execute(qs, self._where_values())
         return cur.fetchone()[0]
 
-    def __len__(self):
-        return self.count()
+    def limit(self, v):
+        """
+        Sets the limit on the number of results returned 
+        CQL has a default limit of 10,000
+        """
+        if not (v is None or isinstance(v, (int, long))):
+            raise TypeError
+        if v == self._limit:
+            return self
 
-#    def set_limits(self, start, limit):
-#        """ Sets the start and limit parameters """
-#        #validate
-#        if not (start is None or isinstance(start, (int, long))):
-#            raise QueryException("'start' must be None, or an int or long")
-#        if not (limit is None or isinstance(limit, (int, long))):
-#            raise QueryException("'limit' must be None, or an int or long")
-#
-#        clone = copy.deepcopy(self)
-#        clone._start = start
-#        clone._limit = limit
-#        return clone
-#
-#    def start(self, v):
-#        """ Sets the limit """
-#        if not (v is None or isinstance(v, (int, long))):
-#            raise TypeError
-#        if v == self._start:
-#            return self
-#        clone = copy.deepcopy(self)
-#        clone._start = v
-#        return clone
-#
-#    def limit(self, v):
-#        """ Sets the limit """
-#        if not (v is None or isinstance(v, (int, long))):
-#            raise TypeError
-#        if v == self._limit:
-#            return self
-#        clone = copy.deepcopy(self)
-#        clone._limit = v
-#        return clone
+        if v < 0:
+            raise QueryException("Negative limit is not allowed")
+
+        clone = copy.deepcopy(self)
+        clone._limit = v
+        return clone
 
     def _only_or_defer(self, action, fields):
         clone = copy.deepcopy(self)
