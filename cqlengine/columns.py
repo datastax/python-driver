@@ -198,6 +198,10 @@ class Boolean(Column):
 class Float(Column):
     db_type = 'double'
 
+    def __init__(self, double_precision=True, **kwargs):
+        self.db_type = 'double' if double_precision else 'float'
+        super(Float, self).__init__(**kwargs)
+
     def validate(self, value):
         try:
             return float(value)

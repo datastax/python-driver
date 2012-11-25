@@ -95,7 +95,7 @@ class ModelMetaClass(type):
             else:
                 attrs[col_name] = property(_get, _set, _del)
 
-        column_definitions = [(k,v) for k,v in attrs.items() if isinstance(v, columns.BaseColumn)]
+        column_definitions = [(k,v) for k,v in attrs.items() if isinstance(v, columns.Column)]
         column_definitions = sorted(column_definitions, lambda x,y: cmp(x[1].position, y[1].position))
 
         #prepend primary key if none has been defined

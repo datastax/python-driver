@@ -2,7 +2,7 @@
 
 from cqlengine.tests.base import BaseCassEngTestCase
 
-from cqlengine.columns import BaseColumn
+from cqlengine.columns import Column
 from cqlengine.columns import Bytes
 from cqlengine.columns import Ascii
 from cqlengine.columns import Text
