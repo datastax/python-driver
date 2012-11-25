@@ -432,7 +432,25 @@ class QuerySet(object):
         cur = conn.cursor()
         cur.execute(qs, field_values)
 
-        #TODO: delete deleted / nulled fields
+        #TODO: delete deleted / nulled columns
+        deleted = [k for k,v in instance._values.items() if v.deleted]
+        if deleted:
+            import ipdb; ipdb.set_trace()
+            del_fields = [self.model._columns[f] for f in deleted]
+            del_fields = [f.db_field_name for f in del_fields if not f.primary_key]
+            pks = self.model._primary_keys
+            qs = ['DELETE {}'.format(', '.join(del_fields))]
+            qs += ['FROM {}'.format(self.column_family_name)]
+            qs += ['WHERE']
+            eq = lambda col: '{0} = :{0}'.format(v.db_field_name)
+            qs += [' AND '.join([eq(f) for f in pks.values()])]
+            qs = ' '.join(qs)
+
+            pk_dict = dict([(v.db_field_name, getattr(instance, k)) for k,v in pks.items()])
+            cur.execute(qs, pk_dict)
+            
+
+
 
     def create(self, **kwargs):
         return self.model(**kwargs).save()

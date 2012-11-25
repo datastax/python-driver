@@ -10,7 +10,7 @@ from cqlengine import columns
 class TestModel(Model):
     count   = columns.Integer()
     text    = columns.Text()
-    
+
 class TestModelIO(BaseCassEngTestCase):
 
     @classmethod
@@ -53,11 +53,6 @@ class TestModelIO(BaseCassEngTestCase):
         tm.delete()
         tm2 = TestModel.objects(id=tm.pk).first()
         self.assertIsNone(tm2)
-
-    def test_nullable_columns_are_saved_properly(self):
-        """
-        Tests that nullable columns save without any trouble
-        """
 
     def test_column_deleting_works_properly(self):
         """

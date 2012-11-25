@@ -78,16 +78,6 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         query2 = query1.filter(expected_result__gte=1)
         assert len(query2._where) == 2
 
-    def test_queryset_slicing(self):
-        """
-        Check that the limit and start is implemented as iterator slices
-        """
-
-    def test_proper_delete_behavior(self):
-        """
-        Tests that deleting the contents of a queryset works properly
-        """
-
     def test_the_all_method_clears_where_filter(self):
         """
         Tests that calling all on a queryset with previously defined filters returns a queryset with no filters

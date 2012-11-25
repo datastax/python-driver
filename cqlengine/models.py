@@ -24,7 +24,7 @@ class BaseModel(object):
             value_mngr = column.value_manager(self, column, values.get(name, None))
             self._values[name] = value_mngr
 
-        #TODO: note any deferred or only fields so they're not deleted
+        #TODO: note any absent fields so they're not deleted
 
     @classmethod
     def column_family_name(cls):
@@ -75,13 +75,16 @@ class ModelMetaClass(type):
     def __new__(cls, name, bases, attrs):
         """
         """
-        #move column definitions into _columns dict
+        #move column definitions into columns dict
         #and set default column names
-        _columns = OrderedDict()
+        columns = OrderedDict()
+        primary_keys = OrderedDict()
         pk_name = None
 
         def _transform_column(col_name, col_obj):
-            _columns[col_name] = col_obj
+            columns[col_name] = col_obj
+            if col_obj.primary_key:
+                primary_keys[col_name] = col_obj
             col_obj.set_column_name(col_name)
             #set properties
             _get = lambda self: self._values[col_name].getval()
@@ -112,7 +115,7 @@ class ModelMetaClass(type):
 
         #check for duplicate column names
         col_names = set()
-        for k,v in _columns.items():
+        for v in columns.values():
             if v.db_field_name in col_names:
                 raise ModelException("{} defines the column {} more than once".format(name, v.db_field_name))
             col_names.add(v.db_field_name)
@@ -128,11 +131,12 @@ class ModelMetaClass(type):
 
         #create db_name -> model name map for loading
         db_map = {}
-        for field_name, col in _columns.items():
+        for field_name, col in columns.items():
             db_map[col.db_field_name] = field_name
 
         #add management members to the class
-        attrs['_columns'] = _columns
+        attrs['_columns'] = columns
+        attrs['_primary_keys'] = primary_keys
         attrs['_db_map'] = db_map
         attrs['_pk_name'] = pk_name
         attrs['_dynamic_columns'] = {}

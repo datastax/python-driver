@@ -12,6 +12,7 @@ class BaseValueManager(object):
         self.initial_value = value
         self.value = value
 
+    @property
     def deleted(self):
         return self.value is None and self.initial_value is not None
 
