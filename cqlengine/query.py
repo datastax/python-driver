@@ -3,7 +3,6 @@ import copy
 from hashlib import md5
 from time import time
 
-from cqlengine.connection import get_connection
 from cqlengine.connection import connection_manager
 from cqlengine.exceptions import CQLEngineException
 
@@ -221,9 +220,9 @@ class QuerySet(object):
     def __iter__(self):
         #TODO: cache results
         if self._cursor is None:
-            conn = get_connection()
-            self._cursor = conn.cursor()
-            self._cursor.execute(self._select_query(), self._where_values())
+            #TODO: the query and caching should happen in the same function
+            with connection_manager() as con:
+                self._cursor = con.execute(self._select_query(), self._where_values())
             self._rowcount = self._cursor.rowcount
         return self
 

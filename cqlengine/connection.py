@@ -59,28 +59,6 @@ def setup(hosts, username=None, password=None):
     _set_conn(host)
     
 
-#TODO: look into the cql connection pool class
-_old_conn = {}
-def get_connection(keyspace=None, create_missing_keyspace=True):
-    con = _old_conn.get(keyspace)
-    if con is None:
-        con = cql.connect('127.0.0.1', 9160)
-        con.set_cql_version('3.0.0')
-
-        if keyspace:
-            try:
-                con.set_initial_keyspace(keyspace)
-            except cql.ProgrammingError, e:
-                if create_missing_keyspace:
-                    from cqlengine.management import create_keyspace
-                    create_keyspace(keyspace)
-                else:
-                    raise CQLConnectionError('"{}" is not an existing keyspace'.format(keyspace))
-
-        _old_conn[keyspace] = con
-
-    return con
-
 class connection_manager(object):
     """
     Connection failure tolerant connection manager. Written to be used in a 'with' block for connection pooling

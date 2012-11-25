@@ -1,4 +1,3 @@
-from cqlengine.connection import get_connection
 from cqlengine.connection import connection_manager
 
 def create_keyspace(name):
