@@ -9,7 +9,7 @@ from cqlengine import columns
 
 class TestModel(Model):
     count   = columns.Integer()
-    text    = columns.Text()
+    text    = columns.Text(required=False)
 
 class TestModelIO(BaseCassEngTestCase):
 
@@ -57,4 +57,12 @@ class TestModelIO(BaseCassEngTestCase):
     def test_column_deleting_works_properly(self):
         """
         """
+        tm = TestModel.objects.create(count=8, text='123456789')
+        tm.text = None
+        tm.save()
+
+        tm2 = TestModel.objects(id=tm.pk).first()
+        assert tm2.text is None
+        assert tm2._values['text'].initial_value is None
+
 
