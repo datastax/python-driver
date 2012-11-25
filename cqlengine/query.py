@@ -4,6 +4,7 @@ from hashlib import md5
 from time import time
 
 from cqlengine.connection import get_connection
+from cqlengine.connection import connection_manager
 from cqlengine.exceptions import CQLEngineException
 
 #CQL 3 reference:
@@ -220,7 +221,7 @@ class QuerySet(object):
     def __iter__(self):
         #TODO: cache results
         if self._cursor is None:
-            conn = get_connection(self.model.keyspace)
+            conn = get_connection()
             self._cursor = conn.cursor()
             self._cursor.execute(self._select_query(), self._where_values())
             self._rowcount = self._cursor.rowcount
@@ -350,10 +351,9 @@ class QuerySet(object):
             qs += ['WHERE {}'.format(self._where_clause())]
         qs = ' '.join(qs)
 
-        con = get_connection(self.model.keyspace)
-        cur = con.cursor()
-        cur.execute(qs, self._where_values())
-        return cur.fetchone()[0]
+        with connection_manager() as con:
+            cur = con.execute(qs, self._where_values())
+            return cur.fetchone()[0]
 
     def limit(self, v):
         """
@@ -430,11 +430,10 @@ class QuerySet(object):
         qs += ["({})".format(', '.join([':'+f for f in field_names]))]
         qs = ' '.join(qs)
 
-        conn = get_connection(self.model.keyspace)
-        cur = conn.cursor()
-        cur.execute(qs, field_values)
+        with connection_manager() as con:
+            con.execute(qs, field_values)
 
-        #TODO: delete deleted / nulled columns
+        #delete deleted / nulled columns
         deleted = [k for k,v in instance._values.items() if v.deleted]
         if deleted:
             del_fields = [self.model._columns[f] for f in deleted]
@@ -448,10 +447,10 @@ class QuerySet(object):
             qs = ' '.join(qs)
 
             pk_dict = dict([(v.db_field_name, getattr(instance, k)) for k,v in pks.items()])
-            cur.execute(qs, pk_dict)
+
+            with connection_manager() as con:
+                con.execute(qs, pk_dict)
             
-
-
 
     def create(self, **kwargs):
         return self.model(**kwargs).save()
@@ -466,9 +465,8 @@ class QuerySet(object):
             qs += ['WHERE {}'.format(self._where_clause())]
         qs = ' '.join(qs)
 
-        con = get_connection(self.model.keyspace)
-        cur = con.cursor()
-        cur.execute(qs, self._where_values())
+        with connection_manager() as con:
+            con.execute(qs, self._where_values())
 
 
     def delete_instance(self, instance):
@@ -478,8 +476,7 @@ class QuerySet(object):
         qs += ['WHERE {0}=:{0}'.format(pk_name)]
         qs = ' '.join(qs)
 
-        conn = get_connection(self.model.keyspace)
-        cur = conn.cursor()
-        cur.execute(qs, {pk_name:instance.pk})
+        with connection_manager() as con:
+            con.execute(qs, {pk_name:instance.pk})
 
 

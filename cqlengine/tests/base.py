@@ -1,6 +1,13 @@
 from unittest import TestCase
+from cqlengine import connection
 
 class BaseCassEngTestCase(TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super(BaseCassEngTestCase, cls).setUpClass()
+        if not connection._hosts:
+            connection.setup(['localhost'])
 
     def assertHasAttr(self, obj, attr):
         self.assertTrue(hasattr(obj, attr), 

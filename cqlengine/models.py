@@ -24,10 +24,8 @@ class BaseModel(object):
             value_mngr = column.value_manager(self, column, values.get(name, None))
             self._values[name] = value_mngr
 
-        #TODO: note any absent fields so they're not deleted
-
     @classmethod
-    def column_family_name(cls):
+    def column_family_name(cls, include_keyspace=True):
         """
         Returns the column family name if it's been defined
         otherwise, it creates it from the module and class name
@@ -38,7 +36,9 @@ class BaseModel(object):
         cf_name = cf_name.replace('.', '_')
         #trim to less than 48 characters or cassandra will complain
         cf_name = cf_name[-48:]
-        return cf_name.lower()
+        cf_name = cf_name.lower()
+        if not include_keyspace: return cf_name
+        return '{}.{}'.format(cls.keyspace, cf_name)
 
     @property
     def pk(self):
