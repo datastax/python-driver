@@ -2,18 +2,24 @@ from cqlengine.connection import connection_manager
 
 def create_keyspace(name):
     with connection_manager() as con:
-        con.execute("""CREATE KEYSPACE {}
-           WITH strategy_class = 'SimpleStrategy'
-           AND strategy_options:replication_factor=1;""".format(name))
+        if name not in [k.name for k in con.con.client.describe_keyspaces()]:
+            con.execute("""CREATE KEYSPACE {}
+               WITH strategy_class = 'SimpleStrategy'
+               AND strategy_options:replication_factor=1;""".format(name))
 
 def delete_keyspace(name):
     with connection_manager() as con:
-        con.execute("DROP KEYSPACE {}".format(name))
+        if name in [k.name for k in con.con.client.describe_keyspaces()]:
+            con.execute("DROP KEYSPACE {}".format(name))
 
-def create_column_family(model):
+def create_column_family(model, create_missing_keyspace=True):
     #construct query string
     cf_name = model.column_family_name()
     raw_cf_name = model.column_family_name(include_keyspace=False)
+
+    #create missing keyspace
+    if create_missing_keyspace:
+        create_keyspace(model.keyspace)
 
     with connection_manager() as con:
         #check for an existing column family
