@@ -103,6 +103,7 @@ class ModelMetaClass(type):
             k,v = 'id', columns.UUID(primary_key=True)
             column_definitions = [(k,v)] + column_definitions
 
+        #TODO: check that the defined columns don't conflict with any of the Model API's existing attributes/methods
         #transform column definitions
         for k,v in column_definitions:
             if pk_name is None and v.primary_key:

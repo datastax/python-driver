@@ -35,7 +35,7 @@ class BaseValueManager(object):
         else:
             return property(_get, _set)
 
-class BaseColumn(object):
+class Column(object):
 
     #the cassandra type this column maps to
     db_type = None
@@ -64,8 +64,8 @@ class BaseColumn(object):
         self.value = None
 
         #keep track of instantiation order
-        self.position = BaseColumn.instance_counter
-        BaseColumn.instance_counter += 1
+        self.position = Column.instance_counter
+        Column.instance_counter += 1
 
     def validate(self, value):
         """
@@ -136,16 +136,16 @@ class BaseColumn(object):
         """ Returns the name of the cql index """
         return 'index_{}'.format(self.db_field_name)
 
-class Bytes(BaseColumn):
+class Bytes(Column):
     db_type = 'blob'
 
-class Ascii(BaseColumn):
+class Ascii(Column):
     db_type = 'ascii'
 
-class Text(BaseColumn):
+class Text(Column):
     db_type = 'text'
 
-class Integer(BaseColumn):
+class Integer(Column):
     db_type = 'int'
 
     def validate(self, value):
@@ -161,13 +161,13 @@ class Integer(BaseColumn):
     def to_database(self, value):
         return self.validate(value)
 
-class DateTime(BaseColumn):
+class DateTime(Column):
     db_type = 'timestamp'
     def __init__(self, **kwargs):
         super(DateTime, self).__init__(**kwargs)
         raise NotImplementedError
 
-class UUID(BaseColumn):
+class UUID(Column):
     """
     Type 1 or 4 UUID
     """
@@ -186,7 +186,7 @@ class UUID(BaseColumn):
             raise ValidationError("{} is not a valid uuid".format(value))
         return _UUID(val)
 
-class Boolean(BaseColumn):
+class Boolean(Column):
     db_type = 'boolean'
 
     def to_python(self, value):
@@ -195,7 +195,7 @@ class Boolean(BaseColumn):
     def to_database(self, value):
         return bool(value)
 
-class Float(BaseColumn):
+class Float(Column):
     db_type = 'double'
 
     def validate(self, value):
@@ -210,20 +210,20 @@ class Float(BaseColumn):
     def to_database(self, value):
         return self.validate(value)
 
-class Decimal(BaseColumn):
+class Decimal(Column):
     db_type = 'decimal'
     #TODO: decimal field
     def __init__(self, **kwargs):
         super(DateTime, self).__init__(**kwargs)
         raise NotImplementedError
 
-class Counter(BaseColumn):
+class Counter(Column):
     #TODO: counter field
     def __init__(self, **kwargs):
         super(Counter, self).__init__(**kwargs)
         raise NotImplementedError
 
-class ForeignKey(BaseColumn):
+class ForeignKey(Column):
     #TODO: Foreign key field
     def __init__(self, **kwargs):
         super(ForeignKey, self).__init__(**kwargs)
