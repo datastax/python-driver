@@ -43,22 +43,20 @@ class BaseColumn(object):
 
     instance_counter = 0
 
-    def __init__(self, primary_key=False, index=False, db_field=None, default=None, null=False):
+    def __init__(self, primary_key=False, index=False, db_field=None, default=None, required=True):
         """
         :param primary_key: bool flag, indicates this column is a primary key. The first primary key defined
         on a model is the partition key, all others are cluster keys
         :param index: bool flag, indicates an index should be created for this column
         :param db_field: the fieldname this field will map to in the database
         :param default: the default value, can be a value or a callable (no args)
-        :param null: boolean, is the field nullable?
+        :param required: boolean, is the field required?
         """
         self.primary_key = primary_key
         self.index = index
         self.db_field = db_field
         self.default = default
-
-        #TODO: make this required, since fields won't actually be nulled, but deleted
-        self.null = null
+        self.required = required
 
         #the column name in the model definition
         self.column_name = None
@@ -77,8 +75,8 @@ class BaseColumn(object):
         if value is None:
             if self.has_default:
                 return self.get_default()
-            elif not self.null:
-                raise ValidationError('null values are not allowed')
+            elif self.required:
+                raise ValidationError('{} - None values are not allowed'.format(self.column_name or self.db_field))
         return value
 
     def to_python(self, value):
