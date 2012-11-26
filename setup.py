@@ -20,6 +20,7 @@ setup(
     name='cqlengine',
     version=version,
     description='Cassandra CQL ORM for Python in the style of the Django orm and mongoengine',
+    dependency_links = ['https://github.com/bdeggleston/cqlengine/archive/0.0.1-ALPHA.tar.gz#egg=cqlengine-0.0.1-ALPHA.tar.gz'],
     long_description=long_desc,
     classifiers = [
         "Development Status :: 3 - Alpha",
