@@ -1,4 +1,5 @@
 #column field types
+from datetime import datetime
 import re
 from uuid import uuid1, uuid4
 
@@ -165,7 +166,17 @@ class DateTime(Column):
     db_type = 'timestamp'
     def __init__(self, **kwargs):
         super(DateTime, self).__init__(**kwargs)
-        raise NotImplementedError
+
+    def to_python(self, value):
+        if isinstance(value, datetime):
+            return value
+        return datetime.fromtimestamp(value)
+
+    def to_database(self, value):
+        value = super(DateTime, self).to_database(value)
+        if not isinstance(value, datetime):
+            raise ValidationError("'{}' is not a datetime object".format(value))
+        return value.strftime('%Y-%m-%d %H:%M:%S')
 
 class UUID(Column):
     """
@@ -216,10 +227,6 @@ class Float(Column):
 
 class Decimal(Column):
     db_type = 'decimal'
-    #TODO: decimal field
-    def __init__(self, **kwargs):
-        super(DateTime, self).__init__(**kwargs)
-        raise NotImplementedError
 
 class Counter(Column):
     #TODO: counter field

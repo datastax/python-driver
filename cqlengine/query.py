@@ -117,9 +117,8 @@ class LessThanOrEqualOperator(QueryOperator):
     cql_symbol = '<='
 
 class QuerySet(object):
-    #TODO: delete empty columns on save
-    #TODO: support specifying columns to exclude or select only
     #TODO: cache results in this instance, but don't copy them on deepcopy
+    #TODO: support multiple iterators
 
     def __init__(self, model):
         super(QuerySet, self).__init__()
@@ -224,7 +223,9 @@ class QuerySet(object):
             with connection_manager() as con:
                 self._cursor = con.execute(self._select_query(), self._where_values())
             self._rowcount = self._cursor.rowcount
-        return self
+            return self
+        else:
+            raise QueryException("QuerySet only supports a single iterator at a time, though this will be fixed shortly")
 
     def __getitem__(self, s):
 

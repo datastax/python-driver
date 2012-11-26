@@ -21,7 +21,9 @@ class BaseModel(object):
     def __init__(self, **values):
         self._values = {}
         for name, column in self._columns.items():
-            value_mngr = column.value_manager(self, column, values.get(name, None))
+            value =  values.get(name, None)
+            if value is not None: value = column.to_python(value)
+            value_mngr = column.value_manager(self, column, value)
             self._values[name] = value_mngr
 
     @classmethod
