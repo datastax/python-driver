@@ -33,6 +33,7 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     keywords='cassandra,cql,orm',
+    install_requires = ['cql'],
     author='Blake Eggleston',
     author_email='bdeggleston@gmail.com',
     url='https://github.com/bdeggleston/cqlengine',
