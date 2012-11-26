@@ -92,7 +92,6 @@ class connection_manager(object):
             except TTransportException:
                 #TODO: check for other errors raised in the event of a connection / server problem
                 #move to the next connection and set the connection pool
-                self.con_pool.return_connection(self.con)
                 self.con = None
                 _host_idx += 1
                 _host_idx %= len(_hosts)

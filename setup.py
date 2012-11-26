@@ -1,5 +1,9 @@
 from setuptools import setup, find_packages
 
+#next time:
+#python setup.py register
+#python setup.py sdist upload
+
 version = '0.0.1-ALPHA'
 
 long_desc = """
