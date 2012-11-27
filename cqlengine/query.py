@@ -117,8 +117,6 @@ class LessThanOrEqualOperator(QueryOperator):
     cql_symbol = '<='
 
 class QuerySet(object):
-    #TODO: cache results in this instance, but don't copy them on deepcopy
-    #TODO: support multiple iterators
 
     def __init__(self, model):
         super(QuerySet, self).__init__()
@@ -140,9 +138,9 @@ class QuerySet(object):
         self._only_fields = []
 
         #results cache
-        self._result_cache = None
-
         self._cursor = None
+        self._result_cache = None
+        self._result_idx = None
 
     def __unicode__(self):
         return self._select_query()
@@ -156,7 +154,7 @@ class QuerySet(object):
     def __deepcopy__(self, memo):
         clone = self.__class__(self.model)
         for k,v in self.__dict__.items():
-            if k in ['_result_cache']:
+            if k in ['_cursor', '_result_cache', '_result_idx']:
                 clone.__dict__[k] = None
             else:
                 clone.__dict__[k] = copy.deepcopy(v, memo)
@@ -216,29 +214,65 @@ class QuerySet(object):
 
     #----Reads------
 
-    def __iter__(self):
-        #TODO: cache results
-        if self._cursor is None:
-            #TODO: the query and caching should happen in the same function
-            with connection_manager() as con:
-                self._cursor = con.execute(self._select_query(), self._where_values())
-            self._rowcount = self._cursor.rowcount
-            return self
+    def _execute_query(self):
+        with connection_manager() as con:
+            self._cursor = con.execute(self._select_query(), self._where_values())
+            self._result_cache = [None]*self._cursor.rowcount
+
+    def _fill_result_cache_to_idx(self, idx):
+        if self._result_cache is None:
+            self._execute_query()
+        if self._result_idx is None:
+            self._result_idx = -1
+
+        names = [i[0] for i in self._cursor.description]
+        qty = idx - self._result_idx
+        if qty < 1:
+            return
         else:
-            raise QueryException("QuerySet only supports a single iterator at a time, though this will be fixed shortly")
+            for values in self._cursor.fetchmany(qty):
+                value_dict = dict(zip(names, values))
+                self._result_idx += 1
+                self._result_cache[self._result_idx] = self._construct_instance(value_dict)
+
+    def __iter__(self):
+        if self._result_cache is None:
+            self._execute_query()
+
+        for idx in range(len(self._result_cache)):
+            instance = self._result_cache[idx]
+            if instance is None:
+                self._fill_result_cache_to_idx(idx)
+            yield self._result_cache[idx]
 
     def __getitem__(self, s):
+        if self._result_cache is None:
+            self._execute_query()
+
+        num_results = len(self._result_cache)
 
         if isinstance(s, slice):
-            #return a new query with limit defined
-            #start and step are not supported
-            if s.start: raise QueryException('CQL does not support START')
-            if s.step: raise QueryException('step is not supported')
-            return self.limit(s.stop)
+            #calculate the amount of results that need to be loaded
+            end = num_results if s.step is None else s.step
+            if end < 0:
+                end += num_results
+            else:
+                end -= 1
+            self._fill_result_cache_to_idx(end)
+            return self._result_cache[s.start:s.stop:s.step]
         else:
             #return the object at this index
             s = long(s)
-            raise NotImplementedError
+
+            #handle negative indexing
+            if s < 0: s += num_results
+
+            if s >= num_results:
+                raise IndexError
+            else:
+                self._fill_result_cache_to_idx(s)
+                return self._result_cache[s]
+            
 
     def _construct_instance(self, values):
         #translate column names to model names
@@ -251,25 +285,11 @@ class QuerySet(object):
                 field_dict[key] = val
         return self.model(**field_dict)
 
-    def _get_next(self):
-        """ Gets the next cursor result """
-        cur = self._cursor
-        values = cur.fetchone()
-        if values is None: return
-        names = [i[0] for i in cur.description]
-        value_dict = dict(zip(names, values))
-        return self._construct_instance(value_dict)
-
-    def next(self):
-        instance = self._get_next() 
-        if instance is None:
-            #TODO: this is inefficient, we should be caching the results
-            self._cursor = None
-            raise StopIteration
-        return instance
-
     def first(self):
-        return iter(self)._get_next()
+        try:
+            return iter(self).next()
+        except StopIteration:
+            return None
 
     def all(self):
         clone = copy.deepcopy(self)
@@ -345,15 +365,18 @@ class QuerySet(object):
     def count(self):
         """ Returns the number of rows matched by this query """
         #TODO: check for previous query execution and return row count if it exists
-        qs = ['SELECT COUNT(*)']
-        qs += ['FROM {}'.format(self.column_family_name)]
-        if self._where:
-            qs += ['WHERE {}'.format(self._where_clause())]
-        qs = ' '.join(qs)
-
-        with connection_manager() as con:
-            cur = con.execute(qs, self._where_values())
-            return cur.fetchone()[0]
+        if self._result_cache is None:
+            qs = ['SELECT COUNT(*)']
+            qs += ['FROM {}'.format(self.column_family_name)]
+            if self._where:
+                qs += ['WHERE {}'.format(self._where_clause())]
+            qs = ' '.join(qs)
+    
+            with connection_manager() as con:
+                cur = con.execute(qs, self._where_values())
+                return cur.fetchone()[0]
+        else:
+            return len(self._result_cache)
 
     def limit(self, v):
         """

@@ -210,6 +210,19 @@ class TestQuerySetIterator(BaseQuerySetUsage):
             compare_set.remove(val)
         assert len(compare_set) == 0
 
+    def test_multiple_iterators_are_isolated(self):
+        """
+        tests that the use of one iterator does not affect the behavior of another
+        """
+        q = TestModel.objects(test_id=0).order_by('attempt_id')
+        expected_order = [0,1,2,3]
+        iter1 = iter(q)
+        iter2 = iter(q)
+        for attempt_id in expected_order:
+            assert iter1.next().attempt_id == attempt_id
+            assert iter2.next().attempt_id == attempt_id
+
+
 class TestQuerySetOrdering(BaseQuerySetUsage):
 
     def test_order_by_success_case(self):
@@ -238,7 +251,37 @@ class TestQuerySetOrdering(BaseQuerySetUsage):
             q = IndexedTestModel.objects(test_id=0).order_by('attempt_id')
 
 class TestQuerySetSlicing(BaseQuerySetUsage):
-    pass
+
+    def test_out_of_range_index_raises_error(self):
+        q = TestModel.objects(test_id=0).order_by('attempt_id')
+        with self.assertRaises(IndexError):
+            q[10]
+
+    def test_array_indexing_works_properly(self):
+        q = TestModel.objects(test_id=0).order_by('attempt_id')
+        expected_order = [0,1,2,3]
+        for i in range(len(q)):
+            assert q[i].attempt_id == expected_order[i]
+
+    def test_negative_indexing_works_properly(self):
+        q = TestModel.objects(test_id=0).order_by('attempt_id')
+        expected_order = [0,1,2,3]
+        assert q[-1].attempt_id == expected_order[-1]
+        assert q[-2].attempt_id == expected_order[-2]
+
+    def test_slicing_works_properly(self):
+        q = TestModel.objects(test_id=0).order_by('attempt_id')
+        expected_order = [0,1,2,3]
+        for model, expect in zip(q[1:3], expected_order[1:3]):
+            assert model.attempt_id == expect
+
+    def test_negative_slicing(self):
+        q = TestModel.objects(test_id=0).order_by('attempt_id')
+        expected_order = [0,1,2,3]
+        for model, expect in zip(q[-3:], expected_order[-3:]):
+            assert model.attempt_id == expect
+        for model, expect in zip(q[:-1], expected_order[:-1]):
+            assert model.attempt_id == expect
 
 class TestQuerySetValidation(BaseQuerySetUsage):
 
@@ -248,7 +291,7 @@ class TestQuerySetValidation(BaseQuerySetUsage):
         """
         with self.assertRaises(query.QueryException):
             q = TestModel.objects(test_result=25)
-            iter(q)
+            [i for i in q]
 
     def test_primary_key_or_index_must_have_equal_relation_filter(self):
         """
@@ -256,7 +299,7 @@ class TestQuerySetValidation(BaseQuerySetUsage):
         """
         with self.assertRaises(query.QueryException):
             q = TestModel.objects(test_id__gt=0)
-            iter(q)
+            [i for i in q]
 
 
     def test_indexed_field_can_be_queried(self):
