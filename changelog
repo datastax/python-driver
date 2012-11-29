@@ -1,0 +1,10 @@
+CHANGELOG
+
+0.0.4-ALPHA (in progress)
+* added create method shortcut to the model class
+
+0.0.3-ALPHA
+* added queryset result caching
+* added queryset array index access and slicing
+* updating table name generation (more readable)
+
