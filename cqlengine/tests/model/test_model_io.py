@@ -27,7 +27,7 @@ class TestModelIO(BaseCassEngTestCase):
         """
         Tests that models can be saved and retrieved
         """
-        tm = TestModel.objects.create(count=8, text='123456789')
+        tm = TestModel.create(count=8, text='123456789')
         tm2 = TestModel.objects(id=tm.pk).first()
 
         for cname in tm._columns.keys():
@@ -49,7 +49,7 @@ class TestModelIO(BaseCassEngTestCase):
         """
         Tests that an instance's delete method deletes the instance
         """
-        tm = TestModel.objects.create(count=8, text='123456789')
+        tm = TestModel.create(count=8, text='123456789')
         tm.delete()
         tm2 = TestModel.objects(id=tm.pk).first()
         self.assertIsNone(tm2)
@@ -57,7 +57,7 @@ class TestModelIO(BaseCassEngTestCase):
     def test_column_deleting_works_properly(self):
         """
         """
-        tm = TestModel.objects.create(count=8, text='123456789')
+        tm = TestModel.create(count=8, text='123456789')
         tm.text = None
         tm.save()
 

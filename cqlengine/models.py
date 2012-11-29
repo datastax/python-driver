@@ -69,6 +69,10 @@ class BaseModel(object):
             values[name] = col.to_database(getattr(self, name, None))
         return values
 
+    @classmethod
+    def create(cls, **kwargs):
+        return cls.objects.create(**kwargs)
+
     def save(self):
         is_new = self.pk is None
         self.validate()
