@@ -16,6 +16,11 @@ develop-eggs
 # Installer logs
 pip-log.txt
 
+# IDE
+.project
+.pydevproject
+.settings/
+
 # Unit test / coverage reports
 .coverage
 .tox
