@@ -346,11 +346,14 @@ class TestQuerySetDelete(BaseQuerySetUsage):
         assert TestModel.objects(test_id=3).count() == 0
 
     def test_delete_without_partition_key(self):
-        
-        pass
+        """ Tests that attempting to delete a model without defining a partition key fails """
+        with self.assertRaises(query.QueryException):
+            TestModel.objects(attempt_id=0).delete()
 
     def test_delete_without_any_where_args(self):
-        pass
+        """ Tests that attempting to delete a whole table without any arguments will fail """
+        with self.assertRaises(query.QueryException):
+            TestModel.objects(attempt_id=0).delete()
 
 
 

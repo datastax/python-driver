@@ -500,9 +500,12 @@ class QuerySet(object):
         """
         Deletes the contents of a query
         """
+        #validate where clause
+        partition_key = self.model._primary_keys.values()[0]
+        if not any([c.column == partition_key for c in self._where]):
+            raise QueryException("The partition key must be defined on delete queries")
         qs = ['DELETE FROM {}'.format(self.column_family_name)]
-        if self._where:
-            qs += ['WHERE {}'.format(self._where_clause())]
+        qs += ['WHERE {}'.format(self._where_clause())]
         qs = ' '.join(qs)
 
         with connection_manager() as con:
