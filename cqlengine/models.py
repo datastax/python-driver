@@ -3,7 +3,7 @@ import re
 
 from cqlengine import columns
 from cqlengine.exceptions import ModelException
-from cqlengine.query import QuerySet
+from cqlengine.query import QuerySet, QueryException
 
 class ModelDefinitionException(ModelException): pass
 
@@ -11,6 +11,9 @@ class BaseModel(object):
     """
     The base model class, don't inherit from this, inherit from Model, defined below
     """
+    
+    class DoesNotExist(QueryException): pass
+    class MultipleObjectsReturned(QueryException): pass
 
     #table names will be generated automatically from it's model and package name
     #however, you can alse define them manually here

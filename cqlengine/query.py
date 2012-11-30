@@ -215,13 +215,13 @@ class QuerySet(object):
     #----Reads------
 
     def _execute_query(self):
-        with connection_manager() as con:
-            self._cursor = con.execute(self._select_query(), self._where_values())
-            self._result_cache = [None]*self._cursor.rowcount
+        if self._result_cache is None:
+            with connection_manager() as con:
+                self._cursor = con.execute(self._select_query(), self._where_values())
+                self._result_cache = [None]*self._cursor.rowcount
 
     def _fill_result_cache_to_idx(self, idx):
-        if self._result_cache is None:
-            self._execute_query()
+        self._execute_query()
         if self._result_idx is None:
             self._result_idx = -1
 
@@ -236,8 +236,7 @@ class QuerySet(object):
                 self._result_cache[self._result_idx] = self._construct_instance(value_dict)
 
     def __iter__(self):
-        if self._result_cache is None:
-            self._execute_query()
+        self._execute_query()
 
         for idx in range(len(self._result_cache)):
             instance = self._result_cache[idx]
@@ -246,8 +245,7 @@ class QuerySet(object):
             yield self._result_cache[idx]
 
     def __getitem__(self, s):
-        if self._result_cache is None:
-            self._execute_query()
+        self._execute_query()
 
         num_results = len(self._result_cache)
 
@@ -328,6 +326,25 @@ class QuerySet(object):
             clone._where.append(operator)
 
         return clone
+
+    def get(self, **kwargs):
+        """
+        Returns a single instance matching this query, optionally with additional filter kwargs.
+
+        A DoesNotExistError will be raised if there are no rows matching the query
+        A MultipleObjectsFoundError will be raised if there is more than one row matching the queyr
+        """
+        if kwargs: return self.filter(**kwargs).get()
+        self._execute_query()
+        if len(self._result_cache) == 0:
+            raise self.model.DoesNotExist
+        elif len(self._result_cache) > 1:
+            raise self.model.MultipleObjectsReturned(
+                    '{} objects found'.format(len(self._result_cache)))
+        else:
+            return self[0]
+        
+
 
     def order_by(self, colname):
         """

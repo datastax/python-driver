@@ -147,7 +147,7 @@ class BaseQuerySetUsage(BaseCassEngTestCase):
         delete_column_family(TestModel)
         delete_column_family(IndexedTestModel)
 
-class TestQuerySetCountAndSelection(BaseQuerySetUsage):
+class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
 
     def test_count(self):
         assert TestModel.objects.count() == 12
@@ -175,22 +175,6 @@ class TestQuerySetCountAndSelection(BaseQuerySetUsage):
             compare_set.remove(val)
         assert len(compare_set) == 0
         
-    def test_delete(self):
-        TestModel.objects.create(test_id=3, attempt_id=0, description='try9', expected_result=50, test_result=40)
-        TestModel.objects.create(test_id=3, attempt_id=1, description='try10', expected_result=60, test_result=40)
-        TestModel.objects.create(test_id=3, attempt_id=2, description='try11', expected_result=70, test_result=45)
-        TestModel.objects.create(test_id=3, attempt_id=3, description='try12', expected_result=75, test_result=45)
-        
-        assert TestModel.objects.count() == 16
-        assert TestModel.objects(test_id=3).count() == 4
-        
-        TestModel.objects(test_id=3).delete()
-        
-        assert TestModel.objects.count() == 12
-        assert TestModel.objects(test_id=3).count() == 0
-
-class TestQuerySetIterator(BaseQuerySetUsage):
-
     def test_multiple_iterations_work_properly(self):
         """ Tests that iterating over a query set more than once works """
         q = TestModel.objects(test_id=0)
@@ -221,6 +205,41 @@ class TestQuerySetIterator(BaseQuerySetUsage):
         for attempt_id in expected_order:
             assert iter1.next().attempt_id == attempt_id
             assert iter2.next().attempt_id == attempt_id
+
+    def test_get_success_case(self):
+        """
+        Tests that the .get() method works on new and existing querysets
+        """
+        m = TestModel.objects.get(test_id=0, attempt_id=0)
+        assert isinstance(m, TestModel)
+        assert m.test_id == 0
+        assert m.attempt_id == 0
+
+        q = TestModel.objects(test_id=0, attempt_id=0)
+        m = q.get()
+        assert isinstance(m, TestModel)
+        assert m.test_id == 0
+        assert m.attempt_id == 0
+
+        q = TestModel.objects(test_id=0)
+        m = q.get(attempt_id=0)
+        assert isinstance(m, TestModel)
+        assert m.test_id == 0
+        assert m.attempt_id == 0
+
+    def test_get_doesnotexist_exception(self):
+        """
+        Tests that get calls that don't return a result raises a DoesNotExist error
+        """
+        with self.assertRaises(TestModel.DoesNotExist):
+            TestModel.objects.get(test_id=100)
+
+    def test_get_multipleobjects_exception(self):
+        """
+        Tests that get calls that return multiple results raise a MultipleObjectsReturned error
+        """
+        with self.assertRaises(TestModel.MultipleObjectsReturned):
+            TestModel.objects.get(test_id=1)
 
 
 class TestQuerySetOrdering(BaseQuerySetUsage):
@@ -309,6 +328,29 @@ class TestQuerySetValidation(BaseQuerySetUsage):
         q = IndexedTestModel.objects(test_result=25)
         count = q.count()
         assert q.count() == 4
+
+class TestQuerySetDelete(BaseQuerySetUsage):
+
+    def test_delete(self):
+        TestModel.objects.create(test_id=3, attempt_id=0, description='try9', expected_result=50, test_result=40)
+        TestModel.objects.create(test_id=3, attempt_id=1, description='try10', expected_result=60, test_result=40)
+        TestModel.objects.create(test_id=3, attempt_id=2, description='try11', expected_result=70, test_result=45)
+        TestModel.objects.create(test_id=3, attempt_id=3, description='try12', expected_result=75, test_result=45)
+        
+        assert TestModel.objects.count() == 16
+        assert TestModel.objects(test_id=3).count() == 4
+        
+        TestModel.objects(test_id=3).delete()
+        
+        assert TestModel.objects.count() == 12
+        assert TestModel.objects(test_id=3).count() == 0
+
+    def test_delete_without_partition_key(self):
+        
+        pass
+
+    def test_delete_without_any_where_args(self):
+        pass
 
 
 

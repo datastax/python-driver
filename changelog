@@ -1,6 +1,7 @@
 CHANGELOG
 
 0.0.4-ALPHA (in progress)
+* added .get() method to QuerySet
 * added create method shortcut to the model class
 
 0.0.3-ALPHA
