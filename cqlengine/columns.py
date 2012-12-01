@@ -234,9 +234,3 @@ class Counter(Column):
         super(Counter, self).__init__(**kwargs)
         raise NotImplementedError
 
-class ForeignKey(Column):
-    #TODO: Foreign key field
-    def __init__(self, **kwargs):
-        super(ForeignKey, self).__init__(**kwargs)
-        raise NotImplementedError
-
