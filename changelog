@@ -1,6 +1,8 @@
 CHANGELOG
 
 0.0.4-ALPHA (in progress)
+* changing create_column_family management function to create_table
+* changing delete_column_family management function to delete_table
 * added partition key validation to QuerySet delete method
 * added .get() method to QuerySet
 * added create method shortcut to the model class

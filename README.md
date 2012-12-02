@@ -36,8 +36,8 @@ pip install cqlengine
 >>> connection.setup(['127.0.0.1:9160'])
 
 #...and create your CQL table
->>> from cqlengine.management import create_column_family
->>> create_column_family(ExampleModel)
+>>> from cqlengine.management import create_table
+>>> create_table(ExampleModel)
 
 #now we can create some rows:
 >>> em1 = ExampleModel.create(example_type=0, description="example1")

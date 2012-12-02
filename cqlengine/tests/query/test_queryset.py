@@ -1,8 +1,8 @@
 from cqlengine.tests.base import BaseCassEngTestCase
 
 from cqlengine.exceptions import ModelException
-from cqlengine.management import create_column_family
-from cqlengine.management import delete_column_family
+from cqlengine.management import create_table
+from cqlengine.management import delete_table
 from cqlengine.models import Model
 from cqlengine import columns
 from cqlengine import query
@@ -106,10 +106,10 @@ class BaseQuerySetUsage(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(BaseQuerySetUsage, cls).setUpClass()
-        delete_column_family(TestModel)
-        delete_column_family(IndexedTestModel)
-        create_column_family(TestModel)
-        create_column_family(IndexedTestModel)
+        delete_table(TestModel)
+        delete_table(IndexedTestModel)
+        create_table(TestModel)
+        create_table(IndexedTestModel)
 
         TestModel.objects.create(test_id=0, attempt_id=0, description='try1', expected_result=5, test_result=30)
         TestModel.objects.create(test_id=0, attempt_id=1, description='try2', expected_result=10, test_result=30)
@@ -144,8 +144,8 @@ class BaseQuerySetUsage(BaseCassEngTestCase):
     @classmethod
     def tearDownClass(cls):
         super(BaseQuerySetUsage, cls).tearDownClass()
-        delete_column_family(TestModel)
-        delete_column_family(IndexedTestModel)
+        delete_table(TestModel)
+        delete_table(IndexedTestModel)
 
 class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
 

@@ -12,7 +12,7 @@ def delete_keyspace(name):
         if name in [k.name for k in con.con.client.describe_keyspaces()]:
             con.execute("DROP KEYSPACE {}".format(name))
 
-def create_column_family(model, create_missing_keyspace=True):
+def create_table(model, create_missing_keyspace=True):
     #construct query string
     cf_name = model.column_family_name()
     raw_cf_name = model.column_family_name(include_keyspace=False)
@@ -56,7 +56,7 @@ def create_column_family(model, create_missing_keyspace=True):
                 con.execute(qs)
 
 
-def delete_column_family(model):
+def delete_table(model):
     #check that model exists
     cf_name = model.column_family_name()
     raw_cf_name = model.column_family_name(include_keyspace=False)

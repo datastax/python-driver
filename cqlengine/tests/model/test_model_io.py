@@ -1,8 +1,8 @@
 from unittest import skip
 from cqlengine.tests.base import BaseCassEngTestCase
 
-from cqlengine.management import create_column_family
-from cqlengine.management import delete_column_family
+from cqlengine.management import create_table
+from cqlengine.management import delete_table
 from cqlengine.models import Model
 from cqlengine.models import Model
 from cqlengine import columns
@@ -16,12 +16,12 @@ class TestModelIO(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(TestModelIO, cls).setUpClass()
-        create_column_family(TestModel)
+        create_table(TestModel)
 
     @classmethod
     def tearDownClass(cls):
         super(TestModelIO, cls).tearDownClass()
-        delete_column_family(TestModel)
+        delete_table(TestModel)
 
     def test_model_save_and_load(self):
         """

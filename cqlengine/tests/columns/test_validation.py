@@ -15,7 +15,7 @@ from cqlengine.columns import Boolean
 from cqlengine.columns import Float
 from cqlengine.columns import Decimal
 
-from cqlengine.management import create_column_family, delete_column_family
+from cqlengine.management import create_table, delete_table
 from cqlengine.models import Model
 
 class TestDatetime(BaseCassEngTestCase):
@@ -26,12 +26,12 @@ class TestDatetime(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(TestDatetime, cls).setUpClass()
-        create_column_family(cls.DatetimeTest)
+        create_table(cls.DatetimeTest)
 
     @classmethod
     def tearDownClass(cls):
         super(TestDatetime, cls).tearDownClass()
-        delete_column_family(cls.DatetimeTest)
+        delete_table(cls.DatetimeTest)
 
     def test_datetime_io(self):
         now = datetime.now()
@@ -47,12 +47,12 @@ class TestDecimal(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(TestDecimal, cls).setUpClass()
-        create_column_family(cls.DecimalTest)
+        create_table(cls.DecimalTest)
 
     @classmethod
     def tearDownClass(cls):
         super(TestDecimal, cls).tearDownClass()
-        delete_column_family(cls.DecimalTest)
+        delete_table(cls.DecimalTest)
 
     def test_datetime_io(self):
         dt = self.DecimalTest.objects.create(test_id=0, dec_val=D('0.00'))
