@@ -1,6 +1,6 @@
 CHANGELOG
 
-0.0.4-ALPHA (in progress)
+0.0.4-ALPHA
 * added Sphinx docs
 * changing create_column_family management function to create_table
 * changing delete_column_family management function to delete_table
