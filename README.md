@@ -3,7 +3,7 @@ cqlengine
 
 cqlengine is a Cassandra CQL ORM for Python in the style of the Django orm and mongoengine
 
-[Documentation](https://github.com/bdeggleston/cqlengine/wiki/Documentation)
+[Documentation](https://cqlengine.readthedocs.org/en/latest/)
 
 [Report a Bug](https://github.com/bdeggleston/cqlengine/issues)
 
