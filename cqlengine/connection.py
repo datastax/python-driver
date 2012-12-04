@@ -3,6 +3,7 @@
 #http://cassandra.apache.org/doc/cql/CQL.html
 
 from collections import namedtuple
+import Queue
 import random
 
 import cql
@@ -20,6 +21,7 @@ _host_idx = 0
 _conn= None
 _username = None
 _password = None
+_max_connections = 10
 
 def _set_conn(host):
     """
@@ -28,7 +30,7 @@ def _set_conn(host):
     _conn = cql.connect(host.name, host.port, user=_username, password=_password)
     _conn.set_cql_version('3.0.0')
 
-def setup(hosts, username=None, password=None):
+def setup(hosts, username=None, password=None, max_connections=10):
     """
     Records the hosts and connects to one of them
 
@@ -37,10 +39,11 @@ def setup(hosts, username=None, password=None):
     global _hosts
     global _username
     global _password
-
+    global _max_connections
     _username = username
     _password = password
-
+    _max_connections = max_connections
+    
     for host in hosts:
         host = host.strip()
         host = host.split(':')
@@ -57,7 +60,82 @@ def setup(hosts, username=None, password=None):
     random.shuffle(_hosts)
     host = _hosts[_host_idx]
     _set_conn(host)
+
+
+class ConnectionPool(object):
+    """Handles pooling of database connections."""
+
+    # Connection pool queue
+    _queue = None
+
+    @classmethod
+    def clear(cls):
+        """
+        Force the connection pool to be cleared. Will close all internal
+        connections.
+        """
+        try:
+            while not cls._queue.empty():
+                cls._queue.get().close()
+        except:
+            pass
     
+    @classmethod
+    def get(cls):
+        """
+        Returns a usable database connection. Uses the internal queue to
+        determine whether to return an existing connection or to create
+        a new one.
+        """
+        try:
+            if cls._queue.empty():
+                return cls._create_connection()
+            return cls._queue.get()
+        except CQLConnectionError as cqle:
+            raise cqle
+        except:
+            if not cls._queue:
+                cls._queue = Queue.Queue(maxsize=_max_connections)
+            return cls._create_connection()
+
+    @classmethod
+    def put(cls, conn):
+        """
+        Returns a connection to the queue freeing it up for other queries to
+        use.
+
+        :param conn: The connection to be released
+        :type conn: connection
+        """
+        try:
+            if cls._queue.full():
+                conn.close()
+            else:
+                cls._queue.put(conn)
+        except:
+            if not cls._queue:
+                cls._queue = Queue.Queue(maxsize=_max_connections)
+            cls._queue.put(conn)
+
+    @classmethod
+    def _create_connection(cls):
+        """
+        Creates a new connection for the connection pool.
+        """
+        global _hosts
+        global _username
+        global _password
+        
+        if not _hosts:
+            raise CQLConnectionError("At least one host required")
+
+        random.shuffle(_hosts)
+        host = _hosts[_host_idx]
+
+        new_conn = cql.connect(host.name, host.port, user=_username, password=_password)
+        new_conn.set_cql_version('3.0.0')
+        return new_conn
+        
 
 class connection_manager(object):
     """
@@ -67,13 +145,13 @@ class connection_manager(object):
         if not _hosts:
             raise CQLConnectionError("No connections have been configured, call cqlengine.connection.setup")
         self.keyspace = None
-        self.con = _conn
+        self.con = ConnectionPool.get()
 
     def __enter__(self):
         return self
 
     def __exit__(self, type, value, traceback):
-        pass
+        ConnectionPool.put(self.con)
 
     def execute(self, query, params={}):
         """

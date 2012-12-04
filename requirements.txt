@@ -2,3 +2,4 @@ cql==1.2.0
 ipython==0.13.1
 ipdb==0.7
 Sphinx==1.1.3
+mock==1.0.1
