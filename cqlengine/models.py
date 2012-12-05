@@ -75,6 +75,18 @@ class BaseModel(object):
     @classmethod
     def create(cls, **kwargs):
         return cls.objects.create(**kwargs)
+    
+    @classmethod
+    def all(cls):
+        return cls.objects.all()
+    
+    @classmethod
+    def filter(cls, **kwargs):
+        return cls.objects.filter(**kwargs)
+    
+    @classmethod
+    def get(cls, **kwargs):
+        return cls.objects.get(**kwargs)
 
     def save(self):
         is_new = self.pk is None
