@@ -23,13 +23,6 @@ _username = None
 _password = None
 _max_connections = 10
 
-def _set_conn(host):
-    """
-    """
-    global _conn
-    _conn = cql.connect(host.name, host.port, user=_username, password=_password)
-    _conn.set_cql_version('3.0.0')
-
 def setup(hosts, username=None, password=None, max_connections=10):
     """
     Records the hosts and connects to one of them
@@ -58,8 +51,9 @@ def setup(hosts, username=None, password=None, max_connections=10):
         raise CQLConnectionError("At least one host required")
 
     random.shuffle(_hosts)
-    host = _hosts[_host_idx]
-    _set_conn(host)
+    
+    con = ConnectionPool.get()
+    ConnectionPool.put(con)
 
 
 class ConnectionPool(object):
@@ -129,7 +123,6 @@ class ConnectionPool(object):
         if not _hosts:
             raise CQLConnectionError("At least one host required")
 
-        random.shuffle(_hosts)
         host = _hosts[_host_idx]
 
         new_conn = cql.connect(host.name, host.port, user=_username, password=_password)
@@ -146,12 +139,17 @@ class connection_manager(object):
             raise CQLConnectionError("No connections have been configured, call cqlengine.connection.setup")
         self.keyspace = None
         self.con = ConnectionPool.get()
+        self.cur = None
+        
+    def close(self):
+        if self.cur: self.cur.close()
+        ConnectionPool.put(self.con)
 
     def __enter__(self):
         return self
 
     def __exit__(self, type, value, traceback):
-        ConnectionPool.put(self.con)
+        self.close()
 
     def execute(self, query, params={}):
         """
@@ -164,18 +162,17 @@ class connection_manager(object):
 
         for i in range(len(_hosts)):
             try:
-                cur = self.con.cursor()
-                cur.execute(query, params)
-                return cur
+                self.cur = self.con.cursor()
+                self.cur.execute(query, params)
+                return self.cur
             except TTransportException:
                 #TODO: check for other errors raised in the event of a connection / server problem
                 #move to the next connection and set the connection pool
                 self.con = None
                 _host_idx += 1
                 _host_idx %= len(_hosts)
-                host = _hosts[_host_idx]
-                _set_conn(host)
-                self.con = _conn
+                self.con.close()
+                self.con = ConnectionPool._create_connection()
 
         raise CQLConnectionError("couldn't reach a Cassandra server")
 
