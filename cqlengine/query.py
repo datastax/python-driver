@@ -138,7 +138,8 @@ class QuerySet(object):
         self._only_fields = []
 
         #results cache
-        self._cursor = None
+        self._con = None
+        self._cur = None
         self._result_cache = None
         self._result_idx = None
 
@@ -154,7 +155,7 @@ class QuerySet(object):
     def __deepcopy__(self, memo):
         clone = self.__class__(self.model)
         for k,v in self.__dict__.items():
-            if k in ['_cursor', '_result_cache', '_result_idx']:
+            if k in ['_con', '_cur', '_result_cache', '_result_idx']:
                 clone.__dict__[k] = None
             else:
                 clone.__dict__[k] = copy.deepcopy(v, memo)
@@ -163,6 +164,12 @@ class QuerySet(object):
 
     def __len__(self):
         return self.count()
+    
+    def __del__(self):
+        if self._con:
+            self._con.close()
+            self._con = None
+            self._cur = None
 
     #----query generation / execution----
 
@@ -216,24 +223,30 @@ class QuerySet(object):
 
     def _execute_query(self):
         if self._result_cache is None:
-            with connection_manager() as con:
-                self._cursor = con.execute(self._select_query(), self._where_values())
-                self._result_cache = [None]*self._cursor.rowcount
+            self._con = connection_manager()
+            self._cur = self._con.execute(self._select_query(), self._where_values())
+            self._result_cache = [None]*self._cur.rowcount
 
     def _fill_result_cache_to_idx(self, idx):
         self._execute_query()
         if self._result_idx is None:
             self._result_idx = -1
 
-        names = [i[0] for i in self._cursor.description]
         qty = idx - self._result_idx
         if qty < 1:
             return
         else:
-            for values in self._cursor.fetchmany(qty):
+            names = [i[0] for i in self._cur.description]
+            for values in self._cur.fetchmany(qty):
                 value_dict = dict(zip(names, values))
                 self._result_idx += 1
                 self._result_cache[self._result_idx] = self._construct_instance(value_dict)
+                
+            #return the connection to the connection pool if we have all objects
+            if self._result_cache and self._result_cache[-1] is not None:
+                self._con.close()
+                self._con = None
+                self._cur = None
 
     def __iter__(self):
         self._execute_query()

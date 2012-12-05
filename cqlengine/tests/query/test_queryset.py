@@ -355,8 +355,33 @@ class TestQuerySetDelete(BaseQuerySetUsage):
         with self.assertRaises(query.QueryException):
             TestModel.objects(attempt_id=0).delete()
 
-
-
+class TestQuerySetConnectionHandling(BaseQuerySetUsage):
+    
+    def test_conn_is_returned_after_filling_cache(self):
+        """
+        Tests that the queryset returns it's connection after it's fetched all of it's results
+        """
+        q = TestModel.objects(test_id=0)
+        #tuple of expected attempt_id, expected_result values
+        compare_set = set([(0,5), (1,10), (2,15), (3,20)])
+        for t in q:
+            val = t.attempt_id, t.expected_result
+            assert val in compare_set
+            compare_set.remove(val)
+            
+        assert q._con is None
+        assert q._cur is None
+        
+    def test_conn_is_returned_after_queryset_is_garbage_collected(self):
+        """ Tests that the connection is returned to the connection pool after the queryset is gc'd """
+        from cqlengine.connection import ConnectionPool
+        assert ConnectionPool._queue.qsize() == 1
+        q = TestModel.objects(test_id=0)
+        v = q[0]
+        assert ConnectionPool._queue.qsize() == 0
+        
+        del q
+        assert ConnectionPool._queue.qsize() == 1
 
 
 
