@@ -4,7 +4,7 @@ from decimal import Decimal as D
 
 from cqlengine.tests.base import BaseCassEngTestCase
 
-from cqlengine.columns import Column
+from cqlengine.columns import Column, TimeUUID
 from cqlengine.columns import Bytes
 from cqlengine.columns import Ascii
 from cqlengine.columns import Text
@@ -63,5 +63,36 @@ class TestDecimal(BaseCassEngTestCase):
         dt2 = self.DecimalTest.objects(test_id=0).first()
         assert dt2.dec_val == D('5')
         
+class TestTimeUUID(BaseCassEngTestCase):
+    class TimeUUIDTest(Model):
+        test_id = Integer(primary_key=True)
+        timeuuid = TimeUUID()
+        
+    @classmethod
+    def setUpClass(cls):
+        super(TestTimeUUID, cls).setUpClass()
+        create_table(cls.TimeUUIDTest)
+        
+    @classmethod
+    def tearDownClass(cls):
+        super(TestTimeUUID, cls).tearDownClass()
+        delete_table(cls.TimeUUIDTest)
+        
+    def test_timeuuid_io(self):
+        t0 = self.TimeUUIDTest.create(test_id=0)
+        t1 = self.TimeUUIDTest.get(test_id=0)
+        
+        assert t1.timeuuid.time == t1.timeuuid.time
+
+
+
+
+
+
+
+
+
+
+
 
 
