@@ -1,5 +1,5 @@
 from cqlengine.columns import *
 from cqlengine.models import Model
 
-__version__ = '0.0.4-ALPHA'
+__version__ = '0.0.5'
 

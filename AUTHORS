@@ -4,5 +4,6 @@ Blake Eggleston <bdeggleston@gmail.com>
 
 CONTRIBUTORS
 
-Eric Scrivner
+Eric Scrivner - test environment, connection pooling
+Jon Haddad - helped hash out some of the architecture
 

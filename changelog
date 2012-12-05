@@ -1,5 +1,9 @@
 CHANGELOG
 
+0.0.5
+* added connection pooling
+* adding a few convenience query classmethods to the model class
+
 0.0.4-ALPHA
 * added Sphinx docs
 * changing create_column_family management function to create_table
