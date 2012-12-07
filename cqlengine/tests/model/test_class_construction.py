@@ -3,6 +3,7 @@ from cqlengine.tests.base import BaseCassEngTestCase
 from cqlengine.exceptions import ModelException
 from cqlengine.models import Model
 from cqlengine import columns
+import cqlengine
 
 class TestModelClassFunction(BaseCassEngTestCase):
     """
@@ -103,3 +104,27 @@ class TestModelClassFunction(BaseCassEngTestCase):
         """
         Test that metadata defined in one class, is not inherited by subclasses
         """
+        
+class TestManualTableNaming(BaseCassEngTestCase):
+    
+    class RenamedTest(cqlengine.Model):
+        keyspace = 'whatever'
+        table_name = 'manual_name'
+        
+        id = cqlengine.UUID(primary_key=True)
+        data = cqlengine.Text()
+        
+    def test_proper_table_naming(self):
+        assert self.RenamedTest.column_family_name(include_keyspace=False) == 'manual_name'
+        assert self.RenamedTest.column_family_name(include_keyspace=True) == 'whatever.manual_name'
+
+
+
+
+
+
+
+
+
+
+

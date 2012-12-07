@@ -17,7 +17,7 @@ class BaseModel(object):
 
     #table names will be generated automatically from it's model and package name
     #however, you can alse define them manually here
-    db_name = None 
+    table_name = None 
 
     #the keyspace for this model 
     keyspace = 'cqlengine'
@@ -36,21 +36,21 @@ class BaseModel(object):
         Returns the column family name if it's been defined
         otherwise, it creates it from the module and class name
         """
-        if cls.db_name:
-            return cls.db_name.lower()
-        
-        camelcase = re.compile(r'([a-z])([A-Z])')
-        ccase = lambda s: camelcase.sub(lambda v: '{}_{}'.format(v.group(1), v.group(2).lower()), s)
-
         cf_name = ''
-        module = cls.__module__.split('.')
-        if module:
-            cf_name = ccase(module[-1]) + '_'
-
-        cf_name += ccase(cls.__name__)
-        #trim to less than 48 characters or cassandra will complain
-        cf_name = cf_name[-48:]
-        cf_name = cf_name.lower()
+        if cls.table_name:
+            cf_name = cls.table_name.lower()
+        else:
+            camelcase = re.compile(r'([a-z])([A-Z])')
+            ccase = lambda s: camelcase.sub(lambda v: '{}_{}'.format(v.group(1), v.group(2).lower()), s)
+    
+            module = cls.__module__.split('.')
+            if module:
+                cf_name = ccase(module[-1]) + '_'
+    
+            cf_name += ccase(cls.__name__)
+            #trim to less than 48 characters or cassandra will complain
+            cf_name = cf_name[-48:]
+            cf_name = cf_name.lower()
         if not include_keyspace: return cf_name
         return '{}.{}'.format(cls.keyspace, cf_name)
 
@@ -156,9 +156,6 @@ class ModelMetaClass(type):
             if len([1 for k,v in column_definitions if v.index]) > 0:
                 raise ModelDefinitionException(
                     'Indexes on models with multiple primary keys is not supported')
-
-        #get column family name
-        cf_name = attrs.pop('db_name', name)
 
         #create db_name -> model name map for loading
         db_map = {}
