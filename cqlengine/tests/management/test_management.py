@@ -3,6 +3,7 @@ from cqlengine.tests.base import BaseCassEngTestCase
 from cqlengine.connection import ConnectionPool
 
 from mock import Mock
+from cqlengine import management
 
 
 class ConnectionPoolTestCase(BaseCassEngTestCase):
@@ -35,3 +36,12 @@ class ConnectionPoolTestCase(BaseCassEngTestCase):
         self.assertEquals(1, ConnectionPool._queue.qsize())
         self.assertEquals(conn, ConnectionPool.get())
         self.assertEquals(0, ConnectionPool._queue.qsize())
+    
+
+class CreateKeyspaceTest(BaseCassEngTestCase):
+    def test_create_succeeeds(self):
+        management.create_keyspace('test_keyspace')
+        management.delete_keyspace('test_keyspace')
+    
+    
+    

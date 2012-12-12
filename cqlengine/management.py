@@ -1,11 +1,11 @@
 from cqlengine.connection import connection_manager
 
-def create_keyspace(name):
+def create_keyspace(name, strategy_class = 'SimpleStrategy', replication_factor=3):
     with connection_manager() as con:
         if name not in [k.name for k in con.con.client.describe_keyspaces()]:
             con.execute("""CREATE KEYSPACE {}
-               WITH strategy_class = 'SimpleStrategy'
-               AND strategy_options:replication_factor=1;""".format(name))
+               WITH strategy_class = '{}'
+               AND strategy_options:replication_factor={};""".format(name, strategy_class, replication_factor))
 
 def delete_keyspace(name):
     with connection_manager() as con:
@@ -38,8 +38,11 @@ def create_table(model, create_missing_keyspace=True):
                 add_column(col)
 
             qtypes.append('PRIMARY KEY ({})'.format(', '.join(pkeys)))
-
+            
             qs += ['({})'.format(', '.join(qtypes))]
+            
+            # add read_repair_chance
+            qs += ["WITH read_repair_chance = {}".format(model.read_repair_chance)]
             qs = ' '.join(qs)
 
             con.execute(qs)
