@@ -1,5 +1,9 @@
 CHANGELOG
 
+0.0.8
+* added configurable read repair chance to model definitions
+* added configurable keyspace strategy class and replication factor to keyspace creator
+
 0.0.7
 * fixed manual table name bug
 * changed model level db_name field to table_name
