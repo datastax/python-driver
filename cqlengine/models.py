@@ -21,6 +21,7 @@ class BaseModel(object):
 
     #the keyspace for this model 
     keyspace = 'cqlengine'
+    read_repair_chance = 0.1
 
     def __init__(self, **values):
         self._values = {}
