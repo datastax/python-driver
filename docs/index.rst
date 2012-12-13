@@ -38,33 +38,33 @@ Getting Started
             description     = columns.Text(required=False)
 
         #next, setup the connection to your cassandra server(s)...
-        from cqlengine import connection
-        connection.setup(['127.0.0.1:9160'])
+        >>> from cqlengine import connection
+        >>> connection.setup(['127.0.0.1:9160'])
 
         #...and create your CQL table
-        from cqlengine.management import create_table
-        create_table(ExampleModel)
+        >>> from cqlengine.management import create_table
+        >>> create_table(ExampleModel)
 
         #now we can create some rows:
-        em1 = ExampleModel.create(example_type=0, description="example1")
-        em2 = ExampleModel.create(example_type=0, description="example2")
-        em3 = ExampleModel.create(example_type=0, description="example3")
-        em4 = ExampleModel.create(example_type=0, description="example4")
-        em5 = ExampleModel.create(example_type=1, description="example5")
-        em6 = ExampleModel.create(example_type=1, description="example6")
-        em7 = ExampleModel.create(example_type=1, description="example7")
-        em8 = ExampleModel.create(example_type=1, description="example8")
+        >>> em1 = ExampleModel.create(example_type=0, description="example1")
+        >>> em2 = ExampleModel.create(example_type=0, description="example2")
+        >>> em3 = ExampleModel.create(example_type=0, description="example3")
+        >>> em4 = ExampleModel.create(example_type=0, description="example4")
+        >>> em5 = ExampleModel.create(example_type=1, description="example5")
+        >>> em6 = ExampleModel.create(example_type=1, description="example6")
+        >>> em7 = ExampleModel.create(example_type=1, description="example7")
+        >>> em8 = ExampleModel.create(example_type=1, description="example8")
         # Note: the UUID and DateTime columns will create uuid4 and datetime.now
         # values automatically if we don't specify them when creating new rows
 
         #and now we can run some queries against our table
-        ExampleModel.objects.count()
+        >>> ExampleModel.objects.count()
         8
-        q = ExampleModel.objects(example_type=1)
-        q.count()
+        >>> q = ExampleModel.objects(example_type=1)
+        >>> q.count()
         4
-        for instance in q:
-            print q.description
+        >>> for instance in q:
+        >>>     print q.description
         example5
         example6
         example7
@@ -73,12 +73,12 @@ Getting Started
         #here we are applying additional filtering to an existing query
         #query objects are immutable, so calling filter returns a new
         #query object
-        q2 = q.filter(example_id=em5.example_id)
+        >>> q2 = q.filter(example_id=em5.example_id)
 
-        q2.count()
+        >>> q2.count()
         1
-        for instance in q2:
-            print q.description
+        >>> for instance in q2:
+        >>>     print q.description
         example5
 
 
