@@ -22,14 +22,15 @@ pip install cqlengine
 
 ```python
 #first, define a model
->>> from cqlengine import columns
->>> from cqlengine.models import Model
+from cqlengine import columns
+from cqlengine.models import Model
 
->>> class ExampleModel(Model):
->>>     example_id      = columns.UUID(primary_key=True)  
->>>     example_type    = columns.Integer(index=True)
->>>     created_at      = columns.DateTime()
->>>     description     = columns.Text(required=False)
+class ExampleModel(Model):
+    read_repair_chance = 0.05 # optional - defaults to 0.1
+    example_id      = columns.UUID(primary_key=True)  
+    example_type    = columns.Integer(index=True)
+    created_at      = columns.DateTime()
+    description     = columns.Text(required=False)
 
 #next, setup the connection to your cassandra server(s)...
 >>> from cqlengine import connection
