@@ -1,7 +1,7 @@
 cqlengine
 ===============
 
-cqlengine is a Cassandra CQL ORM for Python in the style of the Django orm and mongoengine
+cqlengine is a Cassandra CQL 3 ORM for Python with an interface similar to the Django orm and mongoengine
 
 [Documentation](https://cqlengine.readthedocs.org/en/latest/)
 
@@ -10,8 +10,6 @@ cqlengine is a Cassandra CQL ORM for Python in the style of the Django orm and m
 [Users Mailing List](https://groups.google.com/forum/?fromgroups#!forum/cqlengine-users)
 
 [Dev Mailing List](https://groups.google.com/forum/?fromgroups#!forum/cqlengine-dev)
-
-**NOTE: cqlengine is in alpha and under development, some features may change (hopefully with notice). Make sure to check the changelog and test your app before upgrading**
 
 ## Installation
 ```
