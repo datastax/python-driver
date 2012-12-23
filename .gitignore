@@ -23,6 +23,11 @@ html/
 .project
 .pydevproject
 .settings/
+.idea/
+*.iml
+
+.DS_Store
+
 
 # Unit test / coverage reports
 .coverage
