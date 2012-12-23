@@ -16,8 +16,8 @@ class BaseModel(object):
     class MultipleObjectsReturned(QueryException): pass
 
     #table names will be generated automatically from it's model and package name
-    #however, you can alse define them manually here
-    table_name = None 
+    #however, you can also define them manually here
+    table_name = None
 
     #the keyspace for this model 
     keyspace = 'cqlengine'
@@ -112,6 +112,12 @@ class ModelMetaClass(type):
         primary_keys = OrderedDict()
         pk_name = None
 
+        #get inherited properties
+        inherited_columns = OrderedDict()
+        for base in bases:
+            for k,v in getattr(base, '_defined_columns', {}).items():
+                inherited_columns.setdefault(k,v)
+
         def _transform_column(col_name, col_obj):
             column_dict[col_name] = col_obj
             if col_obj.primary_key:
@@ -129,7 +135,13 @@ class ModelMetaClass(type):
         column_definitions = [(k,v) for k,v in attrs.items() if isinstance(v, columns.Column)]
         column_definitions = sorted(column_definitions, lambda x,y: cmp(x[1].position, y[1].position))
 
-        #prepend primary key if none has been defined
+        column_definitions = inherited_columns.items() + column_definitions
+
+        #columns defined on model, excludes automatically
+        #defined columns
+        defined_columns = OrderedDict(column_definitions)
+
+        #prepend primary key if one hasn't been defined
         if not any([v.primary_key for k,v in column_definitions]):
             k,v = 'id', columns.UUID(primary_key=True)
             column_definitions = [(k,v)] + column_definitions
@@ -163,9 +175,13 @@ class ModelMetaClass(type):
         for field_name, col in column_dict.items():
             db_map[col.db_field_name] = field_name
 
+        #short circuit table_name inheritance
+        attrs['table_name'] = attrs.get('table_name')
+
         #add management members to the class
         attrs['_columns'] = column_dict
         attrs['_primary_keys'] = primary_keys
+        attrs['_defined_columns'] = defined_columns
         attrs['_db_map'] = db_map
         attrs['_pk_name'] = pk_name
         attrs['_dynamic_columns'] = {}
