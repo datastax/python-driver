@@ -1,5 +1,9 @@
 CHANGELOG
 
+0.0.9
+* fixed column inheritance bug
+* manually defined table names are no longer inherited by subclasses
+
 0.0.8
 * added configurable read repair chance to model definitions
 * added configurable keyspace strategy class and replication factor to keyspace creator
