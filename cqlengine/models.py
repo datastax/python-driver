@@ -16,11 +16,12 @@ class BaseModel(object):
     class MultipleObjectsReturned(QueryException): pass
 
     #table names will be generated automatically from it's model and package name
-    #however, you can alse define them manually here
-    db_name = None 
+    #however, you can also define them manually here
+    table_name = None
 
     #the keyspace for this model 
     keyspace = 'cqlengine'
+    read_repair_chance = 0.1
 
     def __init__(self, **values):
         self._values = {}
@@ -36,21 +37,21 @@ class BaseModel(object):
         Returns the column family name if it's been defined
         otherwise, it creates it from the module and class name
         """
-        if cls.db_name:
-            return cls.db_name.lower()
-        
-        camelcase = re.compile(r'([a-z])([A-Z])')
-        ccase = lambda s: camelcase.sub(lambda v: '{}_{}'.format(v.group(1), v.group(2).lower()), s)
-
         cf_name = ''
-        module = cls.__module__.split('.')
-        if module:
-            cf_name = ccase(module[-1]) + '_'
-
-        cf_name += ccase(cls.__name__)
-        #trim to less than 48 characters or cassandra will complain
-        cf_name = cf_name[-48:]
-        cf_name = cf_name.lower()
+        if cls.table_name:
+            cf_name = cls.table_name.lower()
+        else:
+            camelcase = re.compile(r'([a-z])([A-Z])')
+            ccase = lambda s: camelcase.sub(lambda v: '{}_{}'.format(v.group(1), v.group(2).lower()), s)
+    
+            module = cls.__module__.split('.')
+            if module:
+                cf_name = ccase(module[-1]) + '_'
+    
+            cf_name += ccase(cls.__name__)
+            #trim to less than 48 characters or cassandra will complain
+            cf_name = cf_name[-48:]
+            cf_name = cf_name.lower()
         if not include_keyspace: return cf_name
         return '{}.{}'.format(cls.keyspace, cf_name)
 
@@ -111,6 +112,12 @@ class ModelMetaClass(type):
         primary_keys = OrderedDict()
         pk_name = None
 
+        #get inherited properties
+        inherited_columns = OrderedDict()
+        for base in bases:
+            for k,v in getattr(base, '_defined_columns', {}).items():
+                inherited_columns.setdefault(k,v)
+
         def _transform_column(col_name, col_obj):
             column_dict[col_name] = col_obj
             if col_obj.primary_key:
@@ -128,7 +135,13 @@ class ModelMetaClass(type):
         column_definitions = [(k,v) for k,v in attrs.items() if isinstance(v, columns.Column)]
         column_definitions = sorted(column_definitions, lambda x,y: cmp(x[1].position, y[1].position))
 
-        #prepend primary key if none has been defined
+        column_definitions = inherited_columns.items() + column_definitions
+
+        #columns defined on model, excludes automatically
+        #defined columns
+        defined_columns = OrderedDict(column_definitions)
+
+        #prepend primary key if one hasn't been defined
         if not any([v.primary_key for k,v in column_definitions]):
             k,v = 'id', columns.UUID(primary_key=True)
             column_definitions = [(k,v)] + column_definitions
@@ -157,17 +170,18 @@ class ModelMetaClass(type):
                 raise ModelDefinitionException(
                     'Indexes on models with multiple primary keys is not supported')
 
-        #get column family name
-        cf_name = attrs.pop('db_name', name)
-
         #create db_name -> model name map for loading
         db_map = {}
         for field_name, col in column_dict.items():
             db_map[col.db_field_name] = field_name
 
+        #short circuit table_name inheritance
+        attrs['table_name'] = attrs.get('table_name')
+
         #add management members to the class
         attrs['_columns'] = column_dict
         attrs['_primary_keys'] = primary_keys
+        attrs['_defined_columns'] = defined_columns
         attrs['_db_map'] = db_map
         attrs['_pk_name'] = pk_name
         attrs['_dynamic_columns'] = {}

@@ -1,5 +1,20 @@
 CHANGELOG
 
+0.0.9
+* fixed column inheritance bug
+* manually defined table names are no longer inherited by subclasses
+
+0.0.8
+* added configurable read repair chance to model definitions
+* added configurable keyspace strategy class and replication factor to keyspace creator
+
+0.0.7
+* fixed manual table name bug
+* changed model level db_name field to table_name
+
+0.0.6
+* added TimeUUID column
+
 0.0.5
 * added connection pooling
 * adding a few convenience query classmethods to the model class

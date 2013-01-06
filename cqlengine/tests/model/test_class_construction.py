@@ -3,6 +3,7 @@ from cqlengine.tests.base import BaseCassEngTestCase
 from cqlengine.exceptions import ModelException
 from cqlengine.models import Model
 from cqlengine import columns
+import cqlengine
 
 class TestModelClassFunction(BaseCassEngTestCase):
     """
@@ -79,6 +80,19 @@ class TestModelClassFunction(BaseCassEngTestCase):
         self.assertEquals(inst1.num, 5)
         self.assertEquals(inst2.num, 7)
 
+    def test_superclass_fields_are_inherited(self):
+        """
+        Tests that fields defined on the super class are inherited properly
+        """
+        class TestModel(Model):
+            text = columns.Text()
+
+        class InheritedModel(TestModel):
+            numbers = columns.Integer()
+
+        assert 'text' in InheritedModel._columns
+        assert 'numbers' in InheritedModel._columns
+
     def test_normal_fields_can_be_defined_between_primary_keys(self):
         """
         Tests tha non primary key fields can be defined between primary key fields
@@ -103,3 +117,31 @@ class TestModelClassFunction(BaseCassEngTestCase):
         """
         Test that metadata defined in one class, is not inherited by subclasses
         """
+        
+class TestManualTableNaming(BaseCassEngTestCase):
+    
+    class RenamedTest(cqlengine.Model):
+        keyspace = 'whatever'
+        table_name = 'manual_name'
+        
+        id = cqlengine.UUID(primary_key=True)
+        data = cqlengine.Text()
+        
+    def test_proper_table_naming(self):
+        assert self.RenamedTest.column_family_name(include_keyspace=False) == 'manual_name'
+        assert self.RenamedTest.column_family_name(include_keyspace=True) == 'whatever.manual_name'
+
+    def test_manual_table_name_is_not_inherited(self):
+        class InheritedTest(self.RenamedTest): pass
+        assert InheritedTest.table_name is None
+
+
+
+
+
+
+
+
+
+
+

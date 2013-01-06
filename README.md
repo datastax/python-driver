@@ -1,7 +1,7 @@
 cqlengine
 ===============
 
-cqlengine is a Cassandra CQL ORM for Python in the style of the Django orm and mongoengine
+cqlengine is a Cassandra CQL 3 ORM for Python with an interface similar to the Django orm and mongoengine
 
 [Documentation](https://cqlengine.readthedocs.org/en/latest/)
 
@@ -10,8 +10,6 @@ cqlengine is a Cassandra CQL ORM for Python in the style of the Django orm and m
 [Users Mailing List](https://groups.google.com/forum/?fromgroups#!forum/cqlengine-users)
 
 [Dev Mailing List](https://groups.google.com/forum/?fromgroups#!forum/cqlengine-dev)
-
-**NOTE: cqlengine is in alpha and under development, some features may change (hopefully with notice). Make sure to check the changelog and test your app before upgrading**
 
 ## Installation
 ```
@@ -22,14 +20,15 @@ pip install cqlengine
 
 ```python
 #first, define a model
->>> from cqlengine import columns
->>> from cqlengine.models import Model
+from cqlengine import columns
+from cqlengine.models import Model
 
->>> class ExampleModel(Model):
->>>     example_id      = columns.UUID(primary_key=True)  
->>>     example_type    = columns.Integer(index=True)
->>>     created_at      = columns.DateTime()
->>>     description     = columns.Text(required=False)
+class ExampleModel(Model):
+    read_repair_chance = 0.05 # optional - defaults to 0.1
+    example_id      = columns.UUID(primary_key=True)  
+    example_type    = columns.Integer(index=True)
+    created_at      = columns.DateTime()
+    description     = columns.Text(required=False)
 
 #next, setup the connection to your cassandra server(s)...
 >>> from cqlengine import connection

@@ -5,7 +5,7 @@
 cqlengine documentation
 =======================
 
-cqlengine is a Cassandra CQL ORM for Python with an interface similar to the Django orm and mongoengine
+cqlengine is a Cassandra CQL 3 ORM for Python with an interface similar to the Django orm and mongoengine
 
 :ref:`getting-started`
 
@@ -28,14 +28,14 @@ Getting Started
     .. code-block:: python
 
         #first, define a model
-        >>> from cqlengine import columns
-        >>> from cqlengine import Model
+        from cqlengine import columns
+        from cqlengine import Model
 
-        >>> class ExampleModel(Model):
-        >>>     example_id      = columns.UUID(primary_key=True)  
-        >>>     example_type    = columns.Integer(index=True)
-        >>>     created_at      = columns.DateTime()
-        >>>     description     = columns.Text(required=False)
+        class ExampleModel(Model):
+            example_id      = columns.UUID(primary_key=True)  
+            example_type    = columns.Integer(index=True)
+            created_at      = columns.DateTime()
+            description     = columns.Text(required=False)
 
         #next, setup the connection to your cassandra server(s)...
         >>> from cqlengine import connection
