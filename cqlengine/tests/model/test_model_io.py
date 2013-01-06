@@ -4,7 +4,6 @@ from cqlengine.tests.base import BaseCassEngTestCase
 from cqlengine.management import create_table
 from cqlengine.management import delete_table
 from cqlengine.models import Model
-from cqlengine.models import Model
 from cqlengine import columns
 
 class TestModel(Model):
