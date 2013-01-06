@@ -84,6 +84,15 @@ class TestTimeUUID(BaseCassEngTestCase):
         
         assert t1.timeuuid.time == t1.timeuuid.time
 
+class TestInteger(BaseCassEngTestCase):
+    class IntegerTest(Model):
+        test_id = UUID(primary_key=True)
+        value   = Integer(default=0)
+
+    def test_default_zero_fields_validate(self):
+        """ Tests that integer columns with a default value of 0 validate """
+        it = self.IntegerTest()
+        it.validate()
 
 
 

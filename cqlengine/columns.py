@@ -97,7 +97,7 @@ class Column(object):
 
     @property
     def has_default(self):
-        return bool(self.default)
+        return self.default is not None
 
     @property
     def is_primary_key(self):
