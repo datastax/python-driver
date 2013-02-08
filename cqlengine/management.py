@@ -49,8 +49,8 @@ def create_table(model, create_missing_keyspace=True):
 
         #get existing index names
         ks_info = con.con.client.describe_keyspace(model.keyspace)
-        cf_def = [cf for cf in ks_info.cf_defs if cf.name == raw_cf_name][0]
-        idx_names = [i.index_name for i in  cf_def.column_metadata]
+        cf_defs = [cf for cf in ks_info.cf_defs if cf.name == raw_cf_name]
+        idx_names = [i.index_name for i in  cf_defs[0].column_metadata] if cf_defs else []
         idx_names = filter(None, idx_names)
 
         indexes = [c for n,c in model._columns.items() if c.index]
