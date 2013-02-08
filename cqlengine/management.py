@@ -47,11 +47,16 @@ def create_table(model, create_missing_keyspace=True):
 
             con.execute(qs)
 
+        #get existing index names
+        ks_info = con.con.client.describe_keyspace(model.keyspace)
+        cf_def = [cf for cf in ks_info.cf_defs if cf.name == raw_cf_name][0]
+        idx_names = [i.index_name for i in  cf_def.column_metadata]
+        idx_names = filter(None, idx_names)
+
         indexes = [c for n,c in model._columns.items() if c.index]
         if indexes:
             for column in indexes:
-                #TODO: check for existing index...
-                #can that be determined from the connection client?
+                if column.db_index_name in idx_names: continue
                 qs = ['CREATE INDEX {}'.format(column.db_index_name)]
                 qs += ['ON {}'.format(cf_name)]
                 qs += ['({})'.format(column.db_field_name)]

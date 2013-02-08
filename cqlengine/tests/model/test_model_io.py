@@ -66,3 +66,9 @@ class TestModelIO(BaseCassEngTestCase):
         assert tm2._values['text'].initial_value is None
 
 
+    def test_a_sensical_error_is_raised_if_you_try_to_create_a_table_twice(self):
+        """
+        """
+        create_table(TestModel)
+        create_table(TestModel)
+
