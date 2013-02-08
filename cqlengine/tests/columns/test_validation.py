@@ -1,6 +1,7 @@
 #tests the behavior of the column classes
 from datetime import datetime
 from decimal import Decimal as D
+from cqlengine import ValidationError
 
 from cqlengine.tests.base import BaseCassEngTestCase
 
@@ -83,6 +84,57 @@ class TestTimeUUID(BaseCassEngTestCase):
         t1 = self.TimeUUIDTest.get(test_id=0)
         
         assert t1.timeuuid.time == t1.timeuuid.time
+
+class TestInteger(BaseCassEngTestCase):
+    class IntegerTest(Model):
+        test_id = UUID(primary_key=True)
+        value   = Integer(default=0)
+
+    def test_default_zero_fields_validate(self):
+        """ Tests that integer columns with a default value of 0 validate """
+        it = self.IntegerTest()
+        it.validate()
+
+class TestText(BaseCassEngTestCase):
+
+    def test_min_length(self):
+        #min len defaults to 1
+        col = Text()
+
+        with self.assertRaises(ValidationError):
+            col.validate('')
+
+        col.validate('b')
+
+        #test not required defaults to 0
+        Text(required=False).validate('')
+
+        #test arbitrary lengths
+        Text(min_length=0).validate('')
+        Text(min_length=5).validate('blake')
+        Text(min_length=5).validate('blaketastic')
+        with self.assertRaises(ValidationError):
+            Text(min_length=6).validate('blake')
+
+    def test_max_length(self):
+
+        Text(max_length=5).validate('blake')
+        with self.assertRaises(ValidationError):
+            Text(max_length=5).validate('blaketastic')
+
+    def test_type_checking(self):
+        Text().validate('string')
+        Text().validate(u'unicode')
+        Text().validate(bytearray('bytearray'))
+
+        with self.assertRaises(ValidationError):
+            Text().validate(None)
+
+        with self.assertRaises(ValidationError):
+            Text().validate(5)
+
+        with self.assertRaises(ValidationError):
+            Text().validate(True)
 
 
 

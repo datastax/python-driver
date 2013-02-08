@@ -24,6 +24,14 @@ Columns
 
        columns.Text()
 
+    **options**
+
+        :attr:`~columns.Text.min_length`
+            Sets the minimum length of this string. If this field is not set , and the column is not a required field, it defaults to 0, otherwise 1.
+
+        :attr:`~columns.Text.max_length`
+            Sets the maximum length of this string. Defaults to None
+
 .. class:: Integer()
 
     Stores an integer value ::

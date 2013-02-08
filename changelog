@@ -1,5 +1,10 @@
 CHANGELOG
 
+0.1
+* added min_length and max_length validators to the Text column
+* added == and != equality operators to model class
+* fixed bug with default values that would evaluate to False (ie: 0, '')
+
 0.0.9
 * fixed column inheritance bug
 * manually defined table names are no longer inherited by subclasses

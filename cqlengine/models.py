@@ -31,6 +31,12 @@ class BaseModel(object):
             value_mngr = column.value_manager(self, column, value)
             self._values[name] = value_mngr
 
+    def __eq__(self, other):
+        return self.as_dict() == other.as_dict()
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     @classmethod
     def column_family_name(cls, include_keyspace=True):
         """

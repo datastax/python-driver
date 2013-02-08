@@ -1,5 +1,5 @@
 #cqlengine exceptions
-class CQLEngineException(BaseException): pass
+class CQLEngineException(Exception): pass
 class ModelException(CQLEngineException): pass
 class ValidationError(CQLEngineException): pass
 
