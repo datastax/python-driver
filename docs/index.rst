@@ -46,14 +46,14 @@ Getting Started
         >>> create_table(ExampleModel)
 
         #now we can create some rows:
-        >>> em1 = ExampleModel.create(example_type=0, description="example1")
-        >>> em2 = ExampleModel.create(example_type=0, description="example2")
-        >>> em3 = ExampleModel.create(example_type=0, description="example3")
-        >>> em4 = ExampleModel.create(example_type=0, description="example4")
-        >>> em5 = ExampleModel.create(example_type=1, description="example5")
-        >>> em6 = ExampleModel.create(example_type=1, description="example6")
-        >>> em7 = ExampleModel.create(example_type=1, description="example7")
-        >>> em8 = ExampleModel.create(example_type=1, description="example8")
+        >>> em1 = ExampleModel.create(example_type=0, description="example1", created_at=datetime.now())
+        >>> em2 = ExampleModel.create(example_type=0, description="example2", created_at=datetime.now())
+        >>> em3 = ExampleModel.create(example_type=0, description="example3", created_at=datetime.now())
+        >>> em4 = ExampleModel.create(example_type=0, description="example4", created_at=datetime.now())
+        >>> em5 = ExampleModel.create(example_type=1, description="example5", created_at=datetime.now())
+        >>> em6 = ExampleModel.create(example_type=1, description="example6", created_at=datetime.now())
+        >>> em7 = ExampleModel.create(example_type=1, description="example7", created_at=datetime.now())
+        >>> em8 = ExampleModel.create(example_type=1, description="example8", created_at=datetime.now())
         # Note: the UUID and DateTime columns will create uuid4 and datetime.now
         # values automatically if we don't specify them when creating new rows
 
