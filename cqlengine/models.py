@@ -52,6 +52,7 @@ class BaseModel(object):
             #trim to less than 48 characters or cassandra will complain
             cf_name = cf_name[-48:]
             cf_name = cf_name.lower()
+            cf_name = re.sub(r'^_+', '', cf_name)
         if not include_keyspace: return cf_name
         return '{}.{}'.format(cls.keyspace, cf_name)
 
