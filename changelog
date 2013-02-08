@@ -1,5 +1,8 @@
 CHANGELOG
 
+0.1.1
+* fixed a bug occurring when creating tables from the REPL
+
 0.1
 * added min_length and max_length validators to the Text column
 * added == and != equality operators to model class
