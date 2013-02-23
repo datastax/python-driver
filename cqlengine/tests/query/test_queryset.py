@@ -55,12 +55,12 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         query1 = TestModel.objects(test_id=5)
         ids = [o.identifier for o in query1._where]
         where = query1._where_clause()
-        assert where == 'test_id = :{}'.format(*ids)
+        assert where == '"test_id" = :{}'.format(*ids)
 
         query2 = query1.filter(expected_result__gte=1)
         ids = [o.identifier for o in query2._where]
         where = query2._where_clause()
-        assert where == 'test_id = :{} AND expected_result >= :{}'.format(*ids)
+        assert where == '"test_id" = :{} AND "expected_result" >= :{}'.format(*ids)
 
 
     def test_querystring_generation(self):

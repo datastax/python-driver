@@ -84,7 +84,7 @@ def create_table(model, create_missing_keyspace=True):
                 if "Cannot add already existing column family" not in unicode(ex):
                     raise
 
-        #get existing index names
+        #get existing index names, skip ones that already exist
         ks_info = con.con.client.describe_keyspace(model.keyspace)
         cf_defs = [cf for cf in ks_info.cf_defs if cf.name == raw_cf_name]
         idx_names = [i.index_name for i in  cf_defs[0].column_metadata] if cf_defs else []
@@ -96,9 +96,16 @@ def create_table(model, create_missing_keyspace=True):
                 if column.db_index_name in idx_names: continue
                 qs = ['CREATE INDEX {}'.format(column.db_index_name)]
                 qs += ['ON {}'.format(cf_name)]
-                qs += ['({})'.format(column.db_field_name)]
+                qs += ['("{}")'.format(column.db_field_name)]
                 qs = ' '.join(qs)
-                con.execute(qs)
+
+                try:
+                    con.execute(qs)
+                except CQLEngineException as ex:
+                    # 1.2 doesn't return cf names, so we have to examine the exception
+                    # and ignore if it says the index already exists
+                    if "Index already exists" not in unicode(ex):
+                        raise
 
 
 def delete_table(model):

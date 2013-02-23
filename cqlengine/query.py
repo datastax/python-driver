@@ -39,7 +39,7 @@ class QueryOperator(object):
         Returns this operator's portion of the WHERE clause
         :param valname: the dict key that this operator's compare value will be found in
         """
-        return '{} {} :{}'.format(self.column.db_field_name, self.cql_symbol, self.identifier)
+        return '"{}" {} :{}'.format(self.column.db_field_name, self.cql_symbol, self.identifier)
 
     def validate_operator(self):
         """
@@ -205,7 +205,7 @@ class QuerySet(object):
             fields = [f for f in fields if f in self._only_fields]
         db_fields = [self.model._columns[f].db_field_name for f in fields]
 
-        qs = ['SELECT {}'.format(', '.join(db_fields))]
+        qs = ['SELECT {}'.format(', '.join(['"{}"'.format(f) for f in db_fields]))]
         qs += ['FROM {}'.format(self.column_family_name)]
 
         if self._where:
@@ -389,7 +389,7 @@ class QuerySet(object):
                 "Can't order by the first primary key, clustering (secondary) keys only")
 
         clone = copy.deepcopy(self)
-        clone._order = '{} {}'.format(column.db_field_name, order_type)
+        clone._order = '"{}" {}'.format(column.db_field_name, order_type)
         return clone
 
     def count(self):
@@ -478,7 +478,7 @@ class QuerySet(object):
         field_names = zip(*value_pairs)[0]
         field_values = dict(value_pairs)
         qs = ["INSERT INTO {}".format(self.column_family_name)]
-        qs += ["({})".format(', '.join(field_names))]
+        qs += ["({})".format(', '.join(['"{}"'.format(f) for f in field_names]))]
         qs += ['VALUES']
         qs += ["({})".format(', '.join([':'+f for f in field_names]))]
         qs = ' '.join(qs)
@@ -492,7 +492,7 @@ class QuerySet(object):
             del_fields = [self.model._columns[f] for f in deleted]
             del_fields = [f.db_field_name for f in del_fields if not f.primary_key]
             pks = self.model._primary_keys
-            qs = ['DELETE {}'.format(', '.join(del_fields))]
+            qs = ['DELETE {}'.format(', '.join(['"{}"'.format(f) for f in del_fields]))]
             qs += ['FROM {}'.format(self.column_family_name)]
             qs += ['WHERE']
             eq = lambda col: '{0} = :{0}'.format(v.column.db_field_name)
