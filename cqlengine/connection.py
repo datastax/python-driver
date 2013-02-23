@@ -165,6 +165,8 @@ class connection_manager(object):
                 self.cur = self.con.cursor()
                 self.cur.execute(query, params)
                 return self.cur
+            except cql.ProgrammingError as ex:
+                raise CQLEngineException(unicode(ex))
             except TTransportException:
                 #TODO: check for other errors raised in the event of a connection / server problem
                 #move to the next connection and set the connection pool

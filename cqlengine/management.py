@@ -1,11 +1,43 @@
-from cqlengine.connection import connection_manager
+import json
 
-def create_keyspace(name, strategy_class = 'SimpleStrategy', replication_factor=3):
+from cqlengine.connection import connection_manager
+from cqlengine.exceptions import CQLEngineException
+
+def create_keyspace(name, strategy_class='SimpleStrategy', replication_factor=3, durable_writes=True, **replication_values):
+    """
+    creates a keyspace
+
+    :param name: name of keyspace to create
+    :param strategy_class: keyspace replication strategy class
+    :param replication_factor: keyspace replication factor
+    :param durable_writes: 1.2 only, write log is bypassed if set to False
+    :param **replication_values: 1.2 only, additional values to ad to the replication data map
+    """
     with connection_manager() as con:
         if name not in [k.name for k in con.con.client.describe_keyspaces()]:
-            con.execute("""CREATE KEYSPACE {}
-               WITH strategy_class = '{}'
-               AND strategy_options:replication_factor={};""".format(name, strategy_class, replication_factor))
+
+            try:
+                #Try the 1.1 method
+                con.execute("""CREATE KEYSPACE {}
+                   WITH strategy_class = '{}'
+                   AND strategy_options:replication_factor={};""".format(name, strategy_class, replication_factor))
+            except CQLEngineException:
+                #try the 1.2 method
+                replication_map = {
+                    'class': strategy_class,
+                    'replication_factor':replication_factor
+                }
+                replication_map.update(replication_values)
+
+                query = """
+                CREATE KEYSPACE {}
+                WITH REPLICATION = {}
+                """.format(name, json.dumps(replication_map).replace('"', "'"))
+
+                if strategy_class != 'SimpleStrategy':
+                    query += " AND DURABLE_WRITES = {}".format('true' if durable_writes else 'false')
+
+                con.execute(query)
 
 def delete_keyspace(name):
     with connection_manager() as con:
@@ -31,8 +63,8 @@ def create_table(model, create_missing_keyspace=True):
             pkeys = []
             qtypes = []
             def add_column(col):
-                s = '{} {}'.format(col.db_field_name, col.db_type)
-                if col.primary_key: pkeys.append(col.db_field_name)
+                s = '"{}" {}'.format(col.db_field_name, col.db_type)
+                if col.primary_key: pkeys.append('"{}"'.format(col.db_field_name))
                 qtypes.append(s)
             for name, col in model._columns.items():
                 add_column(col)
@@ -42,7 +74,7 @@ def create_table(model, create_missing_keyspace=True):
             qs += ['({})'.format(', '.join(qtypes))]
             
             # add read_repair_chance
-            qs += ["WITH read_repair_chance = {}".format(model.read_repair_chance)]
+            qs += ['WITH read_repair_chance = {}'.format(model.read_repair_chance)]
             qs = ' '.join(qs)
 
             con.execute(qs)
