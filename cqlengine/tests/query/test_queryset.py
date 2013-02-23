@@ -245,7 +245,6 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         """
         """
 
-
 class TestQuerySetOrdering(BaseQuerySetUsage):
 
     def test_order_by_success_case(self):
@@ -386,7 +385,6 @@ class TestQuerySetConnectionHandling(BaseQuerySetUsage):
         
         del q
         assert ConnectionPool._queue.qsize() == 1
-
 
 
 

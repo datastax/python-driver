@@ -74,7 +74,7 @@ class QueryOperator(object):
         this should return the dict: {'colval':<self.value>}
         SELECT * FROM column_family WHERE colname=:colval
         """
-        return {self.identifier: self.value}
+        return {self.identifier: self.column.to_database(self.value)}
 
     @classmethod
     def get_operator(cls, symbol):
