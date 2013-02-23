@@ -15,7 +15,6 @@ def create_keyspace(name, strategy_class='SimpleStrategy', replication_factor=3,
     """
     with connection_manager() as con:
         if name not in [k.name for k in con.con.client.describe_keyspaces()]:
-
             try:
                 #Try the 1.1 method
                 con.execute("""CREATE KEYSPACE {}
@@ -77,7 +76,13 @@ def create_table(model, create_missing_keyspace=True):
             qs += ['WITH read_repair_chance = {}'.format(model.read_repair_chance)]
             qs = ' '.join(qs)
 
-            con.execute(qs)
+            try:
+                con.execute(qs)
+            except CQLEngineException as ex:
+                # 1.2 doesn't return cf names, so we have to examine the exception
+                # and ignore if it says the column family already exists
+                if "Cannot add already existing column family" not in unicode(ex):
+                    raise
 
         #get existing index names
         ks_info = con.con.client.describe_keyspace(model.keyspace)
