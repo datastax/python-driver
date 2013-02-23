@@ -129,6 +129,8 @@ class QuerySet(object):
         #ordering arguments
         self._order = None
 
+        self._allow_filtering = False
+
         #CQL has a default limit of 10000, it's defined here
         #because explicit is better than implicit
         self._limit = 10000
@@ -180,6 +182,14 @@ class QuerySet(object):
         equal_ops = [w for w in self._where if isinstance(w, EqualsOperator)]
         if not any([w.column.primary_key or w.column.index for w in equal_ops]):
             raise QueryException('Where clauses require either a "=" or "IN" comparison with either a primary key or indexed field')
+
+        if not self._allow_filtering:
+            #if the query is not on an indexed field
+            if not any([w.column.index for w in equal_ops]):
+                if not any([w.column._partition_key for w in equal_ops]):
+                    raise QueryException('Filtering on a clustering key without a partition key is not allowed unless allow_filtering() is called on the querset')
+
+
         #TODO: abuse this to see if we can get cql to raise an exception
 
     def _where_clause(self):
@@ -216,6 +226,9 @@ class QuerySet(object):
 
         if self._limit:
             qs += ['LIMIT {}'.format(self._limit)]
+
+        if self._allow_filtering:
+            qs += ['ALLOW FILTERING']
 
         return ' '.join(qs)
 
@@ -400,6 +413,9 @@ class QuerySet(object):
             qs += ['FROM {}'.format(self.column_family_name)]
             if self._where:
                 qs += ['WHERE {}'.format(self._where_clause())]
+            if self._allow_filtering:
+                qs += ['ALLOW FILTERING']
+
             qs = ' '.join(qs)
     
             with connection_manager() as con:
@@ -423,6 +439,15 @@ class QuerySet(object):
 
         clone = copy.deepcopy(self)
         clone._limit = v
+        return clone
+
+    def allow_filtering(self):
+        """
+        Enables the unwise practive of querying on a clustering
+        key without also defining a partition key
+        """
+        clone = copy.deepcopy(self)
+        clone._allow_filtering = True
         return clone
 
     def _only_or_defer(self, action, fields):

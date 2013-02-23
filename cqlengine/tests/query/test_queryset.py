@@ -165,7 +165,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
             compare_set.remove(val)
         assert len(compare_set) == 0
 
-        q = TestModel.objects(attempt_id=3)
+        q = TestModel.objects(attempt_id=3).allow_filtering()
         assert len(q) == 3
         #tuple of expected test_id, expected_result values
         compare_set = set([(0,20), (1,20), (2,75)])
@@ -240,6 +240,10 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         """
         with self.assertRaises(TestModel.MultipleObjectsReturned):
             TestModel.objects.get(test_id=1)
+
+    def test_allow_filtering_flag(self):
+        """
+        """
 
 
 class TestQuerySetOrdering(BaseQuerySetUsage):

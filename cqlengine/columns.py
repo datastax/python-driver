@@ -59,6 +59,9 @@ class Column(object):
         self.default = default
         self.required = required
 
+        #only the model meta class should touch this
+        self._partition_key = False
+
         #the column name in the model definition
         self.column_name = None
 
