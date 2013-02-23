@@ -1,9 +1,11 @@
+from cqlengine.management import create_table, delete_table
 from cqlengine.tests.base import BaseCassEngTestCase
 
 from cqlengine.connection import ConnectionPool
 
 from mock import Mock
 from cqlengine import management
+from cqlengine.tests.query.test_queryset import TestModel
 
 
 class ConnectionPoolTestCase(BaseCassEngTestCase):
@@ -42,6 +44,14 @@ class CreateKeyspaceTest(BaseCassEngTestCase):
     def test_create_succeeeds(self):
         management.create_keyspace('test_keyspace')
         management.delete_keyspace('test_keyspace')
-    
-    
-    
+
+class DeleteTableTest(BaseCassEngTestCase):
+
+    def test_multiple_deletes_dont_fail(self):
+        """
+
+        """
+        create_table(TestModel)
+
+        delete_table(TestModel)
+        delete_table(TestModel)

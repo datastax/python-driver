@@ -109,11 +109,12 @@ def create_table(model, create_missing_keyspace=True):
 
 
 def delete_table(model):
-    #check that model exists
     cf_name = model.column_family_name()
-    raw_cf_name = model.column_family_name(include_keyspace=False)
     with connection_manager() as con:
-        ks_info = con.con.client.describe_keyspace(model.keyspace)
-        if any([raw_cf_name == cf.name for cf in ks_info.cf_defs]):
+        try:
             con.execute('drop table {};'.format(cf_name))
+        except CQLEngineException as ex:
+            #don't freak out if the table doesn't exist
+            if 'Cannot drop non existing column family' not in unicode(ex):
+                raise
 
