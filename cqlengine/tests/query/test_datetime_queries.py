@@ -45,3 +45,13 @@ class TestDateTimeQueries(BaseCassEngTestCase):
         results = DateTimeQueryTestModel.filter(user=0, day__gte=start, day__lt=end)
         assert  len(results) == 3
 
+    def test_datetime_precision(self):
+        """ Tests that millisecond resolution is preserved when saving datetime objects """
+        now = datetime.now()
+        pk = 1000
+        obj = DateTimeQueryTestModel.create(user=pk, day=now, data='energy cheese')
+        load = DateTimeQueryTestModel.get(user=pk)
+
+        assert abs(now - load.day).total_seconds() < 0.001
+        obj.delete()
+
