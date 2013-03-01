@@ -5,6 +5,7 @@ from time import time
 
 from cqlengine.connection import connection_manager
 from cqlengine.exceptions import CQLEngineException
+from cqlengine.functions import BaseQueryFunction
 
 #CQL 3 reference:
 #http://www.datastax.com/docs/1.1/references/cql/index
@@ -39,7 +40,10 @@ class QueryOperator(object):
         Returns this operator's portion of the WHERE clause
         :param valname: the dict key that this operator's compare value will be found in
         """
-        return '"{}" {} :{}'.format(self.column.db_field_name, self.cql_symbol, self.identifier)
+        if isinstance(self.value, BaseQueryFunction):
+            return '"{}" {} {}'.format(self.column.db_field_name, self.cql_symbol, self.value.to_cql(self.identifier))
+        else:
+            return '"{}" {} :{}'.format(self.column.db_field_name, self.cql_symbol, self.identifier)
 
     def validate_operator(self):
         """

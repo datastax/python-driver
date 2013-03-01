@@ -3,6 +3,7 @@ import re
 
 from cqlengine import columns
 from cqlengine.exceptions import ModelException
+from cqlengine.functions import BaseQueryFunction
 from cqlengine.query import QuerySet, QueryException
 
 class ModelDefinitionException(ModelException): pass
