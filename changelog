@@ -1,5 +1,11 @@
 CHANGELOG
 
+0.1.2 (in progress)
+* adding support for allow filtering flag
+* updating management functions to work with cassandra 1.2
+* fixed a bug querying datetimes
+* modifying datetime serialization to preserver millisecond accuracy
+
 0.1.1
 * fixed a bug occurring when creating tables from the REPL
 
