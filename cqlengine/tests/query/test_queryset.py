@@ -1,6 +1,11 @@
+from datetime import datetime
+import time
+from uuid import uuid1, uuid4
+
 from cqlengine.tests.base import BaseCassEngTestCase
 
 from cqlengine.exceptions import ModelException
+from cqlengine import functions
 from cqlengine.management import create_table
 from cqlengine.management import delete_table
 from cqlengine.models import Model
@@ -385,6 +390,51 @@ class TestQuerySetConnectionHandling(BaseQuerySetUsage):
         
         del q
         assert ConnectionPool._queue.qsize() == 1
+
+class TimeUUIDQueryModel(Model):
+    partition       = columns.UUID(primary_key=True)
+    time            = columns.TimeUUID(primary_key=True)
+    data            = columns.Text(required=False)
+
+class TestMinMaxTimeUUIDFunctions(BaseCassEngTestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestMinMaxTimeUUIDFunctions, cls).setUpClass()
+        create_table(TimeUUIDQueryModel)
+
+    @classmethod
+    def tearDownClass(cls):
+        super(TestMinMaxTimeUUIDFunctions, cls).tearDownClass()
+        delete_table(TimeUUIDQueryModel)
+
+    def test_success_case(self):
+        """ Test that the min and max time uuid functions work as expected """
+        pk = uuid4()
+        TimeUUIDQueryModel.create(partition=pk, time=uuid1(), data='1')
+        time.sleep(0.2)
+        TimeUUIDQueryModel.create(partition=pk, time=uuid1(), data='2')
+        time.sleep(0.2)
+        midpoint = datetime.utcnow()
+        time.sleep(0.2)
+        TimeUUIDQueryModel.create(partition=pk, time=uuid1(), data='3')
+        time.sleep(0.2)
+        TimeUUIDQueryModel.create(partition=pk, time=uuid1(), data='4')
+        time.sleep(0.2)
+
+        q = TimeUUIDQueryModel.filter(partition=pk, time__lte=functions.MaxTimeUUID(midpoint))
+        q = [d for d in q]
+        assert len(q) == 2
+        datas = [d.data for d in q]
+        assert  '1' in datas
+        assert  '2' in datas
+
+        q = TimeUUIDQueryModel.filter(partition=pk, time__gte=functions.MinTimeUUID(midpoint))
+        assert len(q) == 2
+        datas = [d.data for d in q]
+        assert  '3' in datas
+        assert  '4' in datas
+
 
 
 

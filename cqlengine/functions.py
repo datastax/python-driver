@@ -20,6 +20,9 @@ class BaseQueryFunction(object):
         """
         return self._cql_string.format(value_id)
 
+    def get_value(self):
+        raise NotImplementedError
+
 class MinTimeUUID(BaseQueryFunction):
 
     _cql_string = 'MinTimeUUID(:{})'
@@ -33,6 +36,10 @@ class MinTimeUUID(BaseQueryFunction):
             raise ValidationError('datetime instance is required')
         super(MinTimeUUID, self).__init__(value)
 
+    def get_value(self):
+        epoch = datetime(1970, 1, 1)
+        return long((self.value - epoch).total_seconds() * 1000)
+
 class MaxTimeUUID(BaseQueryFunction):
 
     _cql_string = 'MaxTimeUUID(:{})'
@@ -45,4 +52,8 @@ class MaxTimeUUID(BaseQueryFunction):
         if not isinstance(value, datetime):
             raise ValidationError('datetime instance is required')
         super(MaxTimeUUID, self).__init__(value)
+
+    def get_value(self):
+        epoch = datetime(1970, 1, 1)
+        return long((self.value - epoch).total_seconds() * 1000)
 

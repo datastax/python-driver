@@ -1,7 +1,8 @@
 from datetime import datetime
+import time
 
 from cqlengine.tests.base import BaseCassEngTestCase
-from cqlengine import columns
+from cqlengine import columns, Model
 from cqlengine import functions
 from cqlengine import query
 
@@ -28,5 +29,6 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         qry = query.EqualsOperator(col, functions.MinTimeUUID(now))
 
         assert qry.cql == '"time" = MinTimeUUID(:{})'.format(qry.identifier)
+
 
 
