@@ -4,7 +4,8 @@ CHANGELOG
 * adding support for allow filtering flag
 * updating management functions to work with cassandra 1.2
 * fixed a bug querying datetimes
-* modifying datetime serialization to preserver millisecond accuracy
+* modifying datetime serialization to preserve millisecond accuracy
+* adding cql function call generators MaxTimeUUID and MinTimeUUID
 
 0.1.1
 * fixed a bug occurring when creating tables from the REPL
