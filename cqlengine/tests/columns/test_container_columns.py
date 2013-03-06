@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from uuid import uuid4
 
-from cqlengine import Model
+from cqlengine import Model, ValidationError
 from cqlengine import columns
 from cqlengine.management import create_table, delete_table
 from cqlengine.tests.base import BaseCassEngTestCase
@@ -38,6 +38,13 @@ class TestSetColumn(BaseCassEngTestCase):
         assert 'kai' in m2.text_set
         assert 'andreas' in m2.text_set
 
+    def test_type_validation(self):
+        """
+        Tests that attempting to use the wrong types will raise an exception
+        """
+        with self.assertRaises(ValidationError):
+            TestSetModel.create(int_set={'string', True}, text_set={1, 3.0})
+
 
 class TestListModel(Model):
     partition   = columns.UUID(primary_key=True, default=uuid4)
@@ -73,6 +80,13 @@ class TestListColumn(BaseCassEngTestCase):
 
         assert m2.text_list[0] == 'kai'
         assert m2.text_list[1] == 'andreas'
+
+    def test_type_validation(self):
+        """
+        Tests that attempting to use the wrong types will raise an exception
+        """
+        with self.assertRaises(ValidationError):
+            TestListModel.create(int_list=['string', True], text_list=[1, 3.0])
 
 
 class TestMapModel(Model):
@@ -114,3 +128,10 @@ class TestMapColumn(BaseCassEngTestCase):
         assert 'then' in m2.text_map
         assert (now - m2.text_map['now']).total_seconds() < 0.001
         assert (then - m2.text_map['then']).total_seconds() < 0.001
+
+    def test_type_validation(self):
+        """
+        Tests that attempting to use the wrong types will raise an exception
+        """
+        with self.assertRaises(ValidationError):
+            TestMapModel.create(int_map={'key':2,uuid4():'val'}, text_map={2:5})
