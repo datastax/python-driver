@@ -151,6 +151,33 @@ Filtering Operators
             q = Automobile.objects.filter(manufacturer='Tesla')
             q = q.filter(year__lte=2012)  # year <= 2012
 
+
+TimeUUID Functions
+==================
+
+    In addition to querying using regular values, there are two functions you can pass in when querying TimeUUID columns to help make filtering by them easier. Note that these functions don't actually return a value, but instruct the cql interpreter to use the functions in it's query.
+
+    .. class:: MinTimeUUID(datetime)
+
+        returns the minimum time uuid value possible for the given datetime
+
+    .. class:: MaxTimeUUID(datetime)
+
+        returns the maximum time uuid value possible for the given datetime
+
+    *Example*
+
+    .. code-block:: python
+
+        class DataStream(Model):
+            time    = cqlengine.TimeUUID(primary_key=True)
+            data    = cqlengine.Bytes()
+
+        min_time = datetime(1982, 1, 1)
+        max_time = datetime(1982, 3, 9)
+
+        DataStream.filter(time__gt=cqlengine.MinTimeUUID(min_time), time__lt=cqlengine.MaxTimeUUID(max_time))
+
 QuerySets are imutable
 ======================
 
@@ -223,3 +250,7 @@ QuerySet method reference
         :type field_name: string
 
         Sets the field to order on. 
+
+    .. method:: allow_filtering()
+
+        Enables the (usually) unwise practive of querying on a clustering key without also defining a partition key

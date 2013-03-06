@@ -50,11 +50,13 @@ Column Types
     * :class:`~cqlengine.columns.Integer`
     * :class:`~cqlengine.columns.DateTime`
     * :class:`~cqlengine.columns.UUID`
+    * :class:`~cqlengine.columns.TimeUUID`
     * :class:`~cqlengine.columns.Boolean`
     * :class:`~cqlengine.columns.Float`
     * :class:`~cqlengine.columns.Decimal`
-
-    A time uuid field is in the works.
+    * :class:`~cqlengine.columns.Set`
+    * :class:`~cqlengine.columns.List`
+    * :class:`~cqlengine.columns.Map`
 
 Column Options
 --------------

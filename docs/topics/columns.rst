@@ -77,6 +77,65 @@ Columns
 
         columns.Decimal()
 
+Collection Type Columns
+----------------------------
+
+    CQLEngine also supports container column types. Each container column requires a column class argument to specify what type of objects it will hold. The Map column requires 2, one for the key, and the other for the value
+    
+    *Example*
+
+    .. code-block:: python
+        
+        class Person(Model):
+            first_name  = columns.Text()
+            last_name   = columns.Text()
+
+            friends     = columns.Set(columns.Text)
+            enemies     = columns.Set(columns.Text)
+            todo_list   = columns.List(columns.Text)
+            birthdays   = columns.Map(columns.Text, columns.DateTime)
+        
+
+
+.. class:: Set()
+
+    Stores a set of unordered, unique values. Available only with Cassandra 1.2 and above ::
+
+        columns.Set(value_type)
+
+    **options**
+
+        :attr:`~columns.Set.value_type`
+            The type of objects the set will contain
+
+        :attr:`~columns.Set.strict`
+            If True, adding this column will raise an exception during save if the value is not a python `set` instance. If False, it will attempt to coerce the value to a set. Defaults to True.
+
+.. class:: List()
+
+    Stores a list of ordered values. Available only with Cassandra 1.2 and above ::
+
+        columns.List(value_type)
+
+    **options**
+
+        :attr:`~columns.List.value_type`
+            The type of objects the set will contain
+
+.. class:: Map()
+
+    Stores a map (dictionary) collection, available only with Cassandra 1.2 and above ::
+
+        columns.Map(key_type, value_type)
+
+    **options**
+
+        :attr:`~columns.Map.key_type`
+            The type of the map keys
+
+        :attr:`~columns.Map.value_type`
+            The type of the map values
+
 Column Options
 ==============
 
