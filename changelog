@@ -1,6 +1,7 @@
 CHANGELOG
 
 0.1.2 (in progress)
+* adding set, list, and map collection types
 * adding support for allow filtering flag
 * updating management functions to work with cassandra 1.2
 * fixed a bug querying datetimes
