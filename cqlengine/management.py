@@ -62,7 +62,7 @@ def create_table(model, create_missing_keyspace=True):
             pkeys = []
             qtypes = []
             def add_column(col):
-                s = '"{}" {}'.format(col.db_field_name, col.db_type)
+                s = col.get_column_def()
                 if col.primary_key: pkeys.append('"{}"'.format(col.db_field_name))
                 qtypes.append(s)
             for name, col in model._columns.items():
