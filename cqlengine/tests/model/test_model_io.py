@@ -94,7 +94,7 @@ class TestQueryQuoting(BaseCassEngTestCase):
 
         model1 = ReservedWordModel.create(token='1', insert=5)
 
-        model2 = ReservedWordModel.filter(token=1)
+        model2 = ReservedWordModel.filter(token='1')
 
         assert len(model2) == 1
         assert model1.token == model2[0].token
