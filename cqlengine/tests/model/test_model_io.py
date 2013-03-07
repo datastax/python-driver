@@ -62,7 +62,7 @@ class TestModelIO(BaseCassEngTestCase):
 
         tm2 = TestModel.objects(id=tm.pk).first()
         assert tm2.text is None
-        assert tm2._values['text'].initial_value is None
+        assert tm2._values['text'].previous_value is None
 
 
     def test_a_sensical_error_is_raised_if_you_try_to_create_a_table_twice(self):
