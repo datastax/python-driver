@@ -1,4 +1,5 @@
 from unittest import skip
+from uuid import uuid4
 from cqlengine.tests.base import BaseCassEngTestCase
 
 from cqlengine.management import create_table
@@ -70,6 +71,47 @@ class TestModelIO(BaseCassEngTestCase):
         """
         create_table(TestModel)
         create_table(TestModel)
+
+class TestCanUpdate(BaseCassEngTestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestCanUpdate, cls).setUpClass()
+        delete_table(TestModel)
+        create_table(TestModel)
+
+    @classmethod
+    def tearDownClass(cls):
+        super(TestCanUpdate, cls).tearDownClass()
+        delete_table(TestModel)
+
+    def test_success_case(self):
+        tm = TestModel(count=8, text='123456789')
+
+        # object hasn't been saved,
+        # shouldn't be able to update
+        assert not tm._is_persisted
+        assert not tm._can_update()
+
+        tm.save()
+
+        # object has been saved,
+        # should be able to update
+        assert tm._is_persisted
+        assert tm._can_update()
+
+        tm.count = 200
+
+        # primary keys haven't changed,
+        # should still be able to update
+        assert tm._can_update()
+
+        tm.id = uuid4()
+
+        # primary keys have changed,
+        # should not be able to update
+        assert not tm._can_update()
+
 
 class IndexDefinitionModel(Model):
     key     = columns.UUID(primary_key=True)

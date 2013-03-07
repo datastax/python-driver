@@ -32,6 +32,21 @@ class BaseModel(object):
             value_mngr = column.value_manager(self, column, value)
             self._values[name] = value_mngr
 
+        # a flag set by the deserializer to indicate
+        # that update should be used when persisting changes
+        self._is_persisted = False
+
+    def _can_update(self):
+        """
+        Called by the save function to check if this should be
+        persisted with update or insert
+
+        :return:
+        """
+        if not self._is_persisted: return False
+        pks = self._primary_keys.keys()
+        return all([not self._values[k].changed for k in self._primary_keys])
+
     def __eq__(self, other):
         return self.as_dict() == other.as_dict()
 
@@ -101,7 +116,13 @@ class BaseModel(object):
         is_new = self.pk is None
         self.validate()
         self.objects.save(self)
-        #delete any fields that have been deleted / set to none
+
+        #reset the value managers
+        for v in self._values.values():
+            v.previous_value = v.value
+
+        self._is_persisted = True
+
         return self
 
     def delete(self):

@@ -314,7 +314,9 @@ class QuerySet(object):
                 field_dict[db_map[key]] = val
             else:
                 field_dict[key] = val
-        return self.model(**field_dict)
+        instance = self.model(**field_dict)
+        instance._is_persisted = True
+        return instance
 
     def first(self):
         try:
