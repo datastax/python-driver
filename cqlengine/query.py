@@ -511,14 +511,45 @@ class QuerySet(object):
         #construct query string
         field_names = zip(*value_pairs)[0]
         field_values = dict(value_pairs)
-        qs = ["INSERT INTO {}".format(self.column_family_name)]
-        qs += ["({})".format(', '.join(['"{}"'.format(f) for f in field_names]))]
-        qs += ['VALUES']
-        qs += ["({})".format(', '.join([':'+f for f in field_names]))]
+
+        qs = []
+        if instance._can_update():
+            qs += ["UPDATE {}".format(self.column_family_name)]
+            qs += ["SET"]
+
+            set_statements = []
+            #get defined fields and their column names
+            for name, col in self.model._columns.items():
+                if not col.is_primary_key:
+                    val = values.get(name)
+                    if val is None: continue
+                    set_statements += ['"{0}" = :{0}'.format(col.db_field_name)]
+            qs += [', '.join(set_statements)]
+
+            qs += ['WHERE']
+
+            where_statements = []
+            for name, col in self.model._primary_keys.items():
+                where_statements += ['"{0}" = :{0}'.format(col.db_field_name)]
+
+            qs += [' AND '.join(where_statements)]
+
+            # clear the qs if there are not set statements
+            if not set_statements: qs = []
+
+        else:
+            qs += ["INSERT INTO {}".format(self.column_family_name)]
+            qs += ["({})".format(', '.join(['"{}"'.format(f) for f in field_names]))]
+            qs += ['VALUES']
+            qs += ["({})".format(', '.join([':'+f for f in field_names]))]
+
         qs = ' '.join(qs)
 
-        with connection_manager() as con:
-            con.execute(qs, field_values)
+        # skip query execution if it's empty
+        # caused by pointless update queries
+        if qs:
+            with connection_manager() as con:
+                con.execute(qs, field_values)
 
         #delete deleted / nulled columns
         deleted = [k for k,v in instance._values.items() if v.deleted]
@@ -529,7 +560,7 @@ class QuerySet(object):
             qs = ['DELETE {}'.format(', '.join(['"{}"'.format(f) for f in del_fields]))]
             qs += ['FROM {}'.format(self.column_family_name)]
             qs += ['WHERE']
-            eq = lambda col: '{0} = :{0}'.format(v.column.db_field_name)
+            eq = lambda col: '{0} = :{0}'.format(col.db_field_name)
             qs += [' AND '.join([eq(f) for f in pks.values()])]
             qs = ' '.join(qs)
 

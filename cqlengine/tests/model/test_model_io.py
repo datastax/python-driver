@@ -1,5 +1,6 @@
 from unittest import skip
 from uuid import uuid4
+import random
 from cqlengine.tests.base import BaseCassEngTestCase
 
 from cqlengine.management import create_table
@@ -72,6 +73,53 @@ class TestModelIO(BaseCassEngTestCase):
         create_table(TestModel)
         create_table(TestModel)
 
+class TestMultiKeyModel(Model):
+    partition   = columns.Integer(primary_key=True)
+    cluster     = columns.Integer(primary_key=True)
+    count       = columns.Integer(required=False)
+    text        = columns.Text(required=False)
+
+class TestUpdating(BaseCassEngTestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestUpdating, cls).setUpClass()
+        delete_table(TestMultiKeyModel)
+        create_table(TestMultiKeyModel)
+
+    @classmethod
+    def tearDownClass(cls):
+        super(TestUpdating, cls).tearDownClass()
+        delete_table(TestMultiKeyModel)
+
+    def setUp(self):
+        super(TestUpdating, self).setUp()
+        self.instance = TestMultiKeyModel.create(
+            partition=random.randint(0, 1000),
+            cluster=random.randint(0, 1000),
+            count=0,
+            text='happy'
+        )
+
+    def test_vanilla_update(self):
+        self.instance.count = 5
+        self.instance.save()
+
+        check = TestMultiKeyModel.get(partition=self.instance.partition, cluster=self.instance.cluster)
+        assert check.count == 5
+        assert check.text == 'happy'
+
+    def test_deleting_only(self):
+        self.instance.count = None
+        self.instance.text = None
+        self.instance.save()
+
+        check = TestMultiKeyModel.get(partition=self.instance.partition, cluster=self.instance.cluster)
+        assert check.count is None
+        assert check.text is None
+
+
+
 class TestCanUpdate(BaseCassEngTestCase):
 
     @classmethod
@@ -105,6 +153,7 @@ class TestCanUpdate(BaseCassEngTestCase):
         # primary keys haven't changed,
         # should still be able to update
         assert tm._can_update()
+        tm.save()
 
         tm.id = uuid4()
 
