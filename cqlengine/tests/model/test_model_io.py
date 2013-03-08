@@ -73,11 +73,39 @@ class TestModelIO(BaseCassEngTestCase):
         create_table(TestModel)
         create_table(TestModel)
 
+
 class TestMultiKeyModel(Model):
     partition   = columns.Integer(primary_key=True)
     cluster     = columns.Integer(primary_key=True)
     count       = columns.Integer(required=False)
     text        = columns.Text(required=False)
+
+class TestDeleting(BaseCassEngTestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestDeleting, cls).setUpClass()
+        delete_table(TestMultiKeyModel)
+        create_table(TestMultiKeyModel)
+
+    @classmethod
+    def tearDownClass(cls):
+        super(TestDeleting, cls).tearDownClass()
+        delete_table(TestMultiKeyModel)
+
+    def test_deleting_only_deletes_one_object(self):
+        partition = random.randint(0,1000)
+        for i in range(5):
+            TestMultiKeyModel.create(partition=partition, cluster=i, count=i, text=str(i))
+
+        assert TestMultiKeyModel.filter(partition=partition).count() == 5
+
+        TestMultiKeyModel.get(partition=partition, cluster=0).delete()
+
+        assert TestMultiKeyModel.filter(partition=partition).count() == 4
+
+        TestMultiKeyModel.filter(partition=partition).delete()
+
 
 class TestUpdating(BaseCassEngTestCase):
 
