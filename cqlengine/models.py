@@ -4,7 +4,7 @@ import re
 from cqlengine import columns
 from cqlengine.exceptions import ModelException
 from cqlengine.functions import BaseQueryFunction
-from cqlengine.query import QuerySet, QueryException
+from cqlengine.query import QuerySet, QueryException, DMLQuery
 
 class ModelDefinitionException(ModelException): pass
 
@@ -112,10 +112,13 @@ class BaseModel(object):
     def get(cls, **kwargs):
         return cls.objects.get(**kwargs)
 
-    def save(self):
+    def save(self, batch_obj=None):
         is_new = self.pk is None
         self.validate()
-        self.objects.save(self)
+        if batch_obj:
+            DMLQuery(self.__class__, self).batch(batch_obj).save()
+        else:
+            DMLQuery(self.__class__, self).save()
 
         #reset the value managers
         for v in self._values.values():
@@ -127,8 +130,13 @@ class BaseModel(object):
 
     def delete(self):
         """ Deletes this instance """
-        self.objects.delete_instance(self)
+        DMLQuery(self.__class__, self).delete()
 
+    def batch(self, batch_obj):
+        """
+        Returns a batched DML query
+        """
+        return DMLQuery(self.__class__, self).batch(batch_obj)
 
 class ModelMetaClass(type):
 
