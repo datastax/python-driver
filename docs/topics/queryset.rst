@@ -213,6 +213,34 @@ Ordering QuerySets
 
     *For instance, given our Automobile model, year is the only column we can order on.*
 
+Batch Queries
+===============
+
+    cqlengine now supports batch queries using the BatchQuery class. Batch queries can be started and stopped manually, or within a context manager. To add queries to the batch object, you just need to precede the create/save/delete call with a call to batch, and pass in the batch object. 
+    
+    You can only create, update, and delete rows with a batch query, attempting to read rows out of the database with a batch query will fail.
+
+    .. code-block:: python
+        
+        from cqlengine import BatchQuery
+
+        #using a context manager
+        with BatchQuery() as b:
+            now = datetime.now()
+            em1 = ExampleModel.batch(b).create(example_type=0, description="1", created_at=now)
+            em2 = ExampleModel.batch(b).create(example_type=0, description="2", created_at=now)
+            em3 = ExampleModel.batch(b).create(example_type=0, description="3", created_at=now)
+
+        # -- or --
+
+        #manually
+        b = BatchQuery()
+        now = datetime.now()
+        em1 = ExampleModel.batch(b).create(example_type=0, description="1", created_at=now)
+        em2 = ExampleModel.batch(b).create(example_type=0, description="2", created_at=now)
+        em3 = ExampleModel.batch(b).create(example_type=0, description="3", created_at=now)
+        b.execute()
+
 QuerySet method reference
 =========================
 
