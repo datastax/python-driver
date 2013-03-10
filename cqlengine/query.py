@@ -4,6 +4,7 @@ from datetime import datetime
 from hashlib import md5
 from time import time
 from uuid import uuid1
+from cqlengine import BaseContainerColumn
 
 from cqlengine.connection import connection_manager
 from cqlengine.exceptions import CQLEngineException
@@ -641,7 +642,15 @@ class DMLQuery(object):
                 if not col.is_primary_key:
                     val = values.get(name)
                     if val is None: continue
-                    set_statements += ['"{}" = :{}'.format(col.db_field_name, field_ids[col.db_field_name])]
+                    if isinstance(col, BaseContainerColumn):
+                        #remove value from query values, the column will handle it
+                        query_values.pop(field_ids.get(name), None)
+
+                        val_mgr = self.instance._values[name]
+                        set_statements += col.get_update_statement(val, val_mgr.previous_value, query_values)
+                        pass
+                    else:
+                        set_statements += ['"{}" = :{}'.format(col.db_field_name, field_ids[col.db_field_name])]
             qs += [', '.join(set_statements)]
 
             qs += ['WHERE']

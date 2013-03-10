@@ -45,6 +45,32 @@ class TestSetColumn(BaseCassEngTestCase):
         with self.assertRaises(ValidationError):
             TestSetModel.create(int_set={'string', True}, text_set={1, 3.0})
 
+    def test_partial_updates(self):
+        """ Tests that partial udpates work as expected """
+        m1 = TestSetModel.create(int_set={1,2,3,4})
+
+        m1.int_set.add(5)
+        m1.int_set.remove(1)
+        assert m1.int_set == {2,3,4,5}
+
+        m1.save()
+
+        m2 =  TestSetModel.get(partition=m1.partition)
+        assert m2.int_set == {2,3,4,5}
+
+    def test_partial_update_creation(self):
+        """
+        Tests that proper update statements are created for a partial set update
+        :return:
+        """
+        ctx = {}
+        col = columns.Set(columns.Integer, db_field="TEST")
+        statements = col.get_update_statement({1,2,3,4}, {2,3,4,5}, ctx)
+
+        assert len([v for v in ctx.values() if {1} == v.value]) == 1
+        assert len([v for v in ctx.values() if {5} == v.value]) == 1
+        assert len([s for s in statements if '"TEST" = "TEST" -' in s]) == 1
+        assert len([s for s in statements if '"TEST" = "TEST" +' in s]) == 1
 
 class TestListModel(Model):
     partition   = columns.UUID(primary_key=True, default=uuid4)

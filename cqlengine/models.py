@@ -136,8 +136,7 @@ class BaseModel(object):
 
         #reset the value managers
         for v in self._values.values():
-            v.previous_value = v.value
-
+            v.reset_previous_value()
         self._is_persisted = True
 
         return self

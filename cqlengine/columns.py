@@ -29,6 +29,9 @@ class BaseValueManager(object):
         """
         return self.value != self.previous_value
 
+    def reset_previous_value(self):
+        self.previous_value = copy(self.value)
+
     def getval(self):
         return self.value
 
@@ -283,9 +286,6 @@ class Counter(Column):
         super(Counter, self).__init__(**kwargs)
         raise NotImplementedError
 
-class ContainerValueManager(BaseValueManager):
-    pass
-
 class ContainerQuoter(object):
     """
     contains a single value, which will quote itself for CQL insertion statements
@@ -323,6 +323,12 @@ class BaseContainerColumn(Column):
         db_type = self.db_type.format(self.value_type.db_type)
         return '{} {}'.format(self.db_field_name, db_type)
 
+    def get_update_statement(self, val, prev, ctx):
+        """
+        Used to add partial update statements
+        """
+        raise NotImplementedError
+
 class Set(BaseContainerColumn):
     """
     Stores a set of unordered, unique values
@@ -359,7 +365,49 @@ class Set(BaseContainerColumn):
         return {self.value_col.validate(v) for v in val}
 
     def to_database(self, value):
+        if value is None: return None
         return self.Quoter({self.value_col.to_database(v) for v in value})
+
+    def get_update_statement(self, val, prev, ctx):
+        """
+        Returns statements that will be added to an object's update statement
+        also updates the query context
+
+        :param val: the current column value
+        :param prev: the previous column value
+        :param ctx: the values that will be passed to the query
+        :rtype: list
+        """
+
+        # remove from Quoter containers, if applicable
+        if isinstance(val, self.Quoter): val = val.value
+        if isinstance(prev, self.Quoter): prev = prev.value
+
+        if val is None or val == prev:
+            # don't return anything if the new value is the same as
+            # the old one, or if the new value is none
+            return []
+        elif prev is None or not any({v in prev for v in val}):
+            field = uuid1().hex
+            ctx[field] = self.Quoter(val)
+            return ['"{}" = :{}'.format(self.db_field_name, field)]
+        else:
+            # partial update time
+            to_create = val - prev
+            to_delete = prev - val
+            statements = []
+
+            if to_create:
+                field_id = uuid1().hex
+                ctx[field_id] = self.Quoter(to_create)
+                statements += ['"{0}" = "{0}" + :{1}'.format(self.db_field_name, field_id)]
+
+            if to_delete:
+                field_id = uuid1().hex
+                ctx[field_id] = self.Quoter(to_delete)
+                statements += ['"{0}" = "{0}" - :{1}'.format(self.db_field_name, field_id)]
+
+            return statements
 
 class List(BaseContainerColumn):
     """
@@ -383,7 +431,14 @@ class List(BaseContainerColumn):
         return [self.value_col.validate(v) for v in val]
 
     def to_database(self, value):
+        if value is None: return None
         return self.Quoter([self.value_col.to_database(v) for v in value])
+
+    def get_update_statement(self, val, prev, values):
+        """
+        http://en.wikipedia.org/wiki/Boyer%E2%80%93Moore_string_search_algorithm
+        """
+        pass
 
 class Map(BaseContainerColumn):
     """
@@ -438,6 +493,13 @@ class Map(BaseContainerColumn):
             return {self.key_col.to_python(k):self.value_col.to_python(v) for k,v in value.items()}
 
     def to_database(self, value):
+        if value is None: return None
         return self.Quoter({self.key_col.to_database(k):self.value_col.to_database(v) for k,v in value.items()})
+
+    def get_update_statement(self, val, prev, ctx):
+        """
+        http://www.datastax.com/docs/1.2/cql_cli/using/collections_map#deletion
+        """
+        pass
 
 
