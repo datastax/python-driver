@@ -138,7 +138,7 @@ class BatchQuery(object):
     Handles the batching of queries
     """
 
-    def __init__(self, consistency=Consistency.ONE, timestamp=None):
+    def __init__(self, consistency=None, timestamp=None):
         self.queries = []
         self.consistency = consistency
         if timestamp is not None and not isinstance(timestamp, datetime):
@@ -149,18 +149,18 @@ class BatchQuery(object):
         self.queries.append((query, params))
 
     def execute(self):
-        query_list = []
-        parameters = {}
-
-        opener = 'BEGIN BATCH USING CONSISTENCY {}'.format(self.consistency)
+        opener = 'BEGIN BATCH'
+        if self.consistency:
+            opener += ' USING CONSISTENCY {}'.format(self.consistency)
         if self.timestamp:
             epoch = datetime(1970, 1, 1)
             ts = long((self.timestamp - epoch).total_seconds() * 1000)
             opener += ' TIMESTAMP {}'.format(ts)
 
         query_list = [opener]
+        parameters = {}
         for query, params in self.queries:
-            query_list.append(query)
+            query_list.append('  ' + query)
             parameters.update(params)
 
         query_list.append('APPLY BATCH;')
@@ -560,7 +560,7 @@ class QuerySet(object):
         return self._only_or_defer('defer', fields)
 
     def create(self, **kwargs):
-        return self.model(**kwargs).save(batch_obj=self._batch)
+        return self.model(**kwargs).batch(self._batch).save()
 
     #----delete---
     def delete(self, columns=[]):
@@ -590,11 +590,11 @@ class DMLQuery(object):
     unlike the read query object, this is mutable
     """
 
-    def __init__(self, model, instance=None):
+    def __init__(self, model, instance=None, batch=None):
         self.model = model
         self.column_family_name = self.model.column_family_name()
         self.instance = instance
-        self.batch = None
+        self.batch = batch
         pass
 
     def batch(self, batch_obj):

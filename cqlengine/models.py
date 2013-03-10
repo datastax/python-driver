@@ -8,6 +8,22 @@ from cqlengine.query import QuerySet, QueryException, DMLQuery
 
 class ModelDefinitionException(ModelException): pass
 
+class hybrid_classmethod(object):
+    """
+    Allows a method to behave as both a class method and
+    normal instance method depending on how it's called
+    """
+
+    def __init__(self, clsmethod, instmethod):
+        self.clsmethod = clsmethod
+        self.instmethod = instmethod
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self.clsmethod.__get__(owner, owner)
+        else:
+            return self.instmethod.__get__(instance, owner)
+
 class BaseModel(object):
     """
     The base model class, don't inherit from this, inherit from Model, defined below
@@ -35,6 +51,7 @@ class BaseModel(object):
         # a flag set by the deserializer to indicate
         # that update should be used when persisting changes
         self._is_persisted = False
+        self._batch = None
 
     def _can_update(self):
         """
@@ -112,13 +129,10 @@ class BaseModel(object):
     def get(cls, **kwargs):
         return cls.objects.get(**kwargs)
 
-    def save(self, batch_obj=None):
+    def save(self):
         is_new = self.pk is None
         self.validate()
-        if batch_obj:
-            DMLQuery(self.__class__, self).batch(batch_obj).save()
-        else:
-            DMLQuery(self.__class__, self).save()
+        DMLQuery(self.__class__, self, batch=self._batch).save()
 
         #reset the value managers
         for v in self._values.values():
@@ -130,13 +144,19 @@ class BaseModel(object):
 
     def delete(self):
         """ Deletes this instance """
-        DMLQuery(self.__class__, self).delete()
+        DMLQuery(self.__class__, self, batch=self._batch).delete()
 
-    def batch(self, batch_obj):
-        """
-        Returns a batched DML query
-        """
-        return DMLQuery(self.__class__, self).batch(batch_obj)
+    @classmethod
+    def _class_batch(cls, batch):
+        return cls.objects.batch(batch)
+
+    def _inst_batch(self, batch):
+        self._batch = batch
+        return self
+
+    batch = hybrid_classmethod(_class_batch, _inst_batch)
+
+
 
 class ModelMetaClass(type):
 
