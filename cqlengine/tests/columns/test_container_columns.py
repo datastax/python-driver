@@ -114,6 +114,34 @@ class TestListColumn(BaseCassEngTestCase):
         with self.assertRaises(ValidationError):
             TestListModel.create(int_list=['string', True], text_list=[1, 3.0])
 
+    def test_partial_updates(self):
+        """ Tests that partial udpates work as expected """
+        final = range(10)
+        initial = final[3:7]
+        m1 = TestListModel.create(int_list=initial)
+
+        m1.int_list = final
+        m1.save()
+
+        m2 =  TestListModel.get(partition=m1.partition)
+        assert list(m2.int_list) == final
+
+    def test_partial_update_creation(self):
+        """
+        Tests that proper update statements are created for a partial list update
+        :return:
+        """
+        final = range(10)
+        initial = final[3:7]
+
+        ctx = {}
+        col = columns.List(columns.Integer, db_field="TEST")
+        statements = col.get_update_statement(final, initial, ctx)
+
+        assert len([v for v in ctx.values() if [0,1,2] == v.value]) == 1
+        assert len([v for v in ctx.values() if [7,8,9] == v.value]) == 1
+        assert len([s for s in statements if '"TEST" = "TEST" +' in s]) == 1
+        assert len([s for s in statements if '+ "TEST"' in s]) == 1
 
 class TestMapModel(Model):
     partition   = columns.UUID(primary_key=True, default=uuid4)

@@ -436,9 +436,67 @@ class List(BaseContainerColumn):
 
     def get_update_statement(self, val, prev, values):
         """
-        http://en.wikipedia.org/wiki/Boyer%E2%80%93Moore_string_search_algorithm
+        Returns statements that will be added to an object's update statement
+        also updates the query context
         """
-        pass
+        # remove from Quoter containers, if applicable
+        if isinstance(val, self.Quoter): val = val.value
+        if isinstance(prev, self.Quoter): prev = prev.value
+
+        def _insert():
+            field_id = uuid1().hex
+            values[field_id] = self.Quoter(val)
+            return ['"{}" = :{}'.format(self.db_field_name, field_id)]
+
+        if val is None or val == prev:
+            return []
+        elif prev is None:
+            return _insert()
+        elif len(val) < len(prev):
+            return _insert()
+        else:
+            # the prepend and append lists,
+            # if both of these are still None after looking
+            # at both lists, an insert statement will be returned
+            prepend = None
+            append = None
+
+            # the max start idx we want to compare
+            search_space = len(val) - max(0, len(prev)-1)
+
+            # the size of the sub lists we want to look at
+            search_size = len(prev)
+
+            for i in range(search_space):
+                #slice boundary
+                j = i + search_size
+                sub = val[i:j]
+                idx_cmp = lambda idx: prev[idx] == sub[idx]
+                if idx_cmp(0) and idx_cmp(-1) and prev == sub:
+                    prepend = val[:i]
+                    append = val[j:]
+                    break
+
+            # create update statements
+            if prepend is append is None:
+                return _insert()
+
+            statements = []
+            if prepend:
+                field_id = uuid1().hex
+                # CQL seems to prepend element at a time, starting
+                # with the element at idx 0, we can either reverse
+                # it here, or have it inserted in reverse
+                prepend.reverse()
+                values[field_id] = self.Quoter(prepend)
+                statements += ['"{0}" = :{1} + "{0}"'.format(self.db_field_name, field_id)]
+
+            if append:
+                field_id = uuid1().hex
+                values[field_id] = self.Quoter(append)
+                statements += ['"{0}" = "{0}" + :{1}'.format(self.db_field_name, field_id)]
+
+            return statements
 
 class Map(BaseContainerColumn):
     """
