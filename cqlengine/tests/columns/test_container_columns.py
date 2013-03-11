@@ -189,3 +189,40 @@ class TestMapColumn(BaseCassEngTestCase):
         """
         with self.assertRaises(ValidationError):
             TestMapModel.create(int_map={'key':2,uuid4():'val'}, text_map={2:5})
+
+    def test_partial_updates(self):
+        """ Tests that partial udpates work as expected """
+        now = datetime.now()
+        #derez it a bit
+        now = datetime(*now.timetuple()[:-3])
+        early = now - timedelta(minutes=30)
+        earlier = early - timedelta(minutes=30)
+        later = now + timedelta(minutes=30)
+
+        initial = {'now':now, 'early':earlier}
+        final =  {'later':later, 'early':early}
+
+        m1 = TestMapModel.create(text_map=initial)
+
+        m1.text_map = final
+        m1.save()
+
+        m2 =  TestMapModel.get(partition=m1.partition)
+        assert m2.text_map == final
+
+#    def test_partial_update_creation(self):
+#        """
+#        Tests that proper update statements are created for a partial list update
+#        :return:
+#        """
+#        final = range(10)
+#        initial = final[3:7]
+#
+#        ctx = {}
+#        col = columns.List(columns.Integer, db_field="TEST")
+#        statements = col.get_update_statement(final, initial, ctx)
+#
+#        assert len([v for v in ctx.values() if [0,1,2] == v.value]) == 1
+#        assert len([v for v in ctx.values() if [7,8,9] == v.value]) == 1
+#        assert len([s for s in statements if '"TEST" = "TEST" +' in s]) == 1
+#        assert len([s for s in statements if '+ "TEST"' in s]) == 1

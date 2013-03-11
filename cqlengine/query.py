@@ -4,7 +4,7 @@ from datetime import datetime
 from hashlib import md5
 from time import time
 from uuid import uuid1
-from cqlengine import BaseContainerColumn
+from cqlengine import BaseContainerColumn, BaseValueManager, Map
 
 from cqlengine.connection import connection_manager
 from cqlengine.exceptions import CQLEngineException
@@ -681,17 +681,32 @@ class DMLQuery(object):
                 with connection_manager() as con:
                     con.execute(qs, query_values)
 
-        #delete deleted / nulled columns
-        deleted = [k for k,v in self.instance._values.items() if v.deleted]
-        if deleted:
-            del_fields = [self.model._columns[f] for f in deleted]
-            del_fields = [f.db_field_name for f in del_fields if not f.primary_key]
-            pks = self.model._primary_keys
-            qs = ['DELETE {}'.format(', '.join(['"{}"'.format(f) for f in del_fields]))]
+
+        # delete nulled columns and removed map keys
+        qs = ['DELETE']
+        query_values = {}
+
+        del_statements = []
+        for k,v in self.instance._values.items():
+            col = v.column
+            if v.deleted:
+                del_statements += ['"{}"'.format(col.db_field_name)]
+            elif isinstance(col, Map):
+                del_statements += col.get_delete_statement(v.value, v.previous_value, query_values)
+
+        if del_statements:
+            qs += [', '.join(del_statements)]
+
             qs += ['FROM {}'.format(self.column_family_name)]
+
             qs += ['WHERE']
-            eq = lambda col: '"{}" = :{}'.format(col.db_field_name, field_ids[col.db_field_name])
-            qs += [' AND '.join([eq(f) for f in pks.values()])]
+            where_statements = []
+            for name, col in self.model._primary_keys.items():
+                field_id = uuid1().hex
+                query_values[field_id] = field_values[name]
+                where_statements += ['"{}" = :{}'.format(col.db_field_name, field_id)]
+            qs += [' AND '.join(where_statements)]
+
             qs = ' '.join(qs)
 
             if self.batch:

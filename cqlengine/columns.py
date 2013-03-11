@@ -366,6 +366,7 @@ class Set(BaseContainerColumn):
 
     def to_database(self, value):
         if value is None: return None
+        if isinstance(value, self.Quoter): return value
         return self.Quoter({self.value_col.to_database(v) for v in value})
 
     def get_update_statement(self, val, prev, ctx):
@@ -380,6 +381,8 @@ class Set(BaseContainerColumn):
         """
 
         # remove from Quoter containers, if applicable
+        val = self.to_database(val)
+        prev = self.to_database(prev)
         if isinstance(val, self.Quoter): val = val.value
         if isinstance(prev, self.Quoter): prev = prev.value
 
@@ -432,6 +435,7 @@ class List(BaseContainerColumn):
 
     def to_database(self, value):
         if value is None: return None
+        if isinstance(value, self.Quoter): return value
         return self.Quoter([self.value_col.to_database(v) for v in value])
 
     def get_update_statement(self, val, prev, values):
@@ -440,6 +444,8 @@ class List(BaseContainerColumn):
         also updates the query context
         """
         # remove from Quoter containers, if applicable
+        val = self.to_database(val)
+        prev = self.to_database(prev)
         if isinstance(val, self.Quoter): val = val.value
         if isinstance(prev, self.Quoter): prev = prev.value
 
@@ -552,12 +558,55 @@ class Map(BaseContainerColumn):
 
     def to_database(self, value):
         if value is None: return None
+        if isinstance(value, self.Quoter): return value
         return self.Quoter({self.key_col.to_database(k):self.value_col.to_database(v) for k,v in value.items()})
 
     def get_update_statement(self, val, prev, ctx):
         """
         http://www.datastax.com/docs/1.2/cql_cli/using/collections_map#deletion
         """
-        pass
+        # remove from Quoter containers, if applicable
+        val = self.to_database(val)
+        prev = self.to_database(prev)
+        if isinstance(val, self.Quoter): val = val.value
+        if isinstance(prev, self.Quoter): prev = prev.value
+
+        #get the updated map
+        update = {k:v for k,v in val.items() if v != prev.get(k)}
+
+        statements = []
+        for k,v in update.items():
+            key_id = uuid1().hex
+            val_id = uuid1().hex
+            ctx[key_id] = k
+            ctx[val_id] = v
+            statements += ['"{}"[:{}] = :{}'.format(self.db_field_name, key_id, val_id)]
+
+        return statements
+
+    def get_delete_statement(self, val, prev, ctx):
+        """
+        Returns statements that will be added to an object's delete statement
+        also updates the query context, used for removing keys from a map
+        """
+        if val is prev is None:
+            return []
+
+        val = self.to_database(val)
+        prev = self.to_database(prev)
+        if isinstance(val, self.Quoter): val = val.value
+        if isinstance(prev, self.Quoter): prev = prev.value
+
+        old_keys = set(prev.keys())
+        new_keys = set(val.keys())
+        del_keys = old_keys - new_keys
+
+        del_statements = []
+        for key in del_keys:
+            field_id = uuid1().hex
+            ctx[field_id] = key
+            del_statements += ['"{}"[:{}]'.format(self.db_field_name, field_id)]
+
+        return del_statements
 
 
