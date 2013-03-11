@@ -138,7 +138,7 @@ class TestListColumn(BaseCassEngTestCase):
         col = columns.List(columns.Integer, db_field="TEST")
         statements = col.get_update_statement(final, initial, ctx)
 
-        assert len([v for v in ctx.values() if [0,1,2] == v.value]) == 1
+        assert len([v for v in ctx.values() if [2,1,0] == v.value]) == 1
         assert len([v for v in ctx.values() if [7,8,9] == v.value]) == 1
         assert len([s for s in statements if '"TEST" = "TEST" +' in s]) == 1
         assert len([s for s in statements if '+ "TEST"' in s]) == 1
