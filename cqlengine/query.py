@@ -227,6 +227,12 @@ class QuerySet(object):
         for k,v in self.__dict__.items():
             if k in ['_con', '_cur', '_result_cache', '_result_idx']:
                 clone.__dict__[k] = None
+            elif k == '_batch':
+                # we need to keep the same batch instance across
+                # all queryset clones, otherwise the batched queries
+                # fly off into other batch instances which are never
+                # executed, thx @dokai
+                clone.__dict__[k] = self._batch
             else:
                 clone.__dict__[k] = copy.deepcopy(v, memo)
 

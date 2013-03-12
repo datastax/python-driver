@@ -31,8 +31,6 @@ class BatchQueryTests(BaseCassEngTestCase):
         for obj in TestMultiKeyModel.filter(partition=self.pkey):
             obj.delete()
 
-
-
     def test_insert_success_case(self):
 
         b = BatchQuery()
@@ -90,4 +88,18 @@ class BatchQueryTests(BaseCassEngTestCase):
         for i in range(5):
             TestMultiKeyModel.get(partition=self.pkey, cluster=i)
 
+    def test_bulk_delete_success_case(self):
+
+        for i in range(1):
+            for j in range(5):
+                TestMultiKeyModel.create(partition=i, cluster=j, count=i*j, text='{}:{}'.format(i,j))
+
+        with BatchQuery() as b:
+            TestMultiKeyModel.objects.batch(b).filter(partition=0).delete()
+            assert TestMultiKeyModel.filter(partition=0).count() == 5
+
+        assert TestMultiKeyModel.filter(partition=0).count() == 0
+        #cleanup
+        for m in TestMultiKeyModel.all():
+            m.delete()
 
