@@ -14,7 +14,8 @@ def create_keyspace(name, strategy_class='SimpleStrategy', replication_factor=3,
     :param **replication_values: 1.2 only, additional values to ad to the replication data map
     """
     with connection_manager() as con:
-        if name not in [k.name for k in con.con.client.describe_keyspaces()]:
+        if not any([name == k.name for k in con.con.client.describe_keyspaces()]):
+#        if name not in [k.name for k in con.con.client.describe_keyspaces()]:
             try:
                 #Try the 1.1 method
                 con.execute("""CREATE KEYSPACE {}
@@ -50,11 +51,11 @@ def create_table(model, create_missing_keyspace=True):
 
     #create missing keyspace
     if create_missing_keyspace:
-        create_keyspace(model.keyspace)
+        create_keyspace(model._get_keyspace())
 
     with connection_manager() as con:
         #check for an existing column family
-        ks_info = con.con.client.describe_keyspace(model.keyspace)
+        ks_info = con.con.client.describe_keyspace(model._get_keyspace())
         if not any([raw_cf_name == cf.name for cf in ks_info.cf_defs]):
             qs = ['CREATE TABLE {}'.format(cf_name)]
 
@@ -85,7 +86,7 @@ def create_table(model, create_missing_keyspace=True):
                     raise
 
         #get existing index names, skip ones that already exist
-        ks_info = con.con.client.describe_keyspace(model.keyspace)
+        ks_info = con.con.client.describe_keyspace(model._get_keyspace())
         cf_defs = [cf for cf in ks_info.cf_defs if cf.name == raw_cf_name]
         idx_names = [i.index_name for i in  cf_defs[0].column_metadata] if cf_defs else []
         idx_names = filter(None, idx_names)

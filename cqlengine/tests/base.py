@@ -7,7 +7,7 @@ class BaseCassEngTestCase(TestCase):
     def setUpClass(cls):
         super(BaseCassEngTestCase, cls).setUpClass()
         if not connection._hosts:
-            connection.setup(['localhost'])
+            connection.setup(['localhost'], default_keyspace='cqlengine_test')
 
     def assertHasAttr(self, obj, attr):
         self.assertTrue(hasattr(obj, attr), 

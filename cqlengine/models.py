@@ -8,6 +8,8 @@ from cqlengine.query import QuerySet, QueryException, DMLQuery
 
 class ModelDefinitionException(ModelException): pass
 
+DEFAULT_KEYSPACE = 'cqlengine'
+
 class hybrid_classmethod(object):
     """
     Allows a method to behave as both a class method and
@@ -37,7 +39,7 @@ class BaseModel(object):
     table_name = None
 
     #the keyspace for this model 
-    keyspace = 'cqlengine'
+    keyspace = None
     read_repair_chance = 0.1
 
     def __init__(self, **values):
@@ -63,6 +65,11 @@ class BaseModel(object):
         if not self._is_persisted: return False
         pks = self._primary_keys.keys()
         return all([not self._values[k].changed for k in self._primary_keys])
+
+    @classmethod
+    def _get_keyspace(cls):
+        """ Returns the manual keyspace, if set, otherwise the default keyspace """
+        return cls.keyspace or DEFAULT_KEYSPACE
 
     def __eq__(self, other):
         return self.as_dict() == other.as_dict()
@@ -93,7 +100,7 @@ class BaseModel(object):
             cf_name = cf_name.lower()
             cf_name = re.sub(r'^_+', '', cf_name)
         if not include_keyspace: return cf_name
-        return '{}.{}'.format(cls.keyspace, cf_name)
+        return '{}.{}'.format(cls._get_keyspace(), cf_name)
 
     @property
     def pk(self):

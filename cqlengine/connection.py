@@ -23,7 +23,7 @@ _username = None
 _password = None
 _max_connections = 10
 
-def setup(hosts, username=None, password=None, max_connections=10):
+def setup(hosts, username=None, password=None, max_connections=10, default_keyspace=None):
     """
     Records the hosts and connects to one of them
 
@@ -36,7 +36,11 @@ def setup(hosts, username=None, password=None, max_connections=10):
     _username = username
     _password = password
     _max_connections = max_connections
-    
+
+    if default_keyspace:
+        from cqlengine import models
+        models.DEFAULT_KEYSPACE = default_keyspace
+
     for host in hosts:
         host = host.strip()
         host = host.split(':')

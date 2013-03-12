@@ -184,7 +184,6 @@ class QuerySet(object):
     def __init__(self, model):
         super(QuerySet, self).__init__()
         self.model = model
-        self.column_family_name = self.model.column_family_name()
 
         #Where clause filters
         self._where = []
@@ -209,6 +208,10 @@ class QuerySet(object):
         self._result_idx = None
 
         self._batch = None
+
+    @property
+    def column_family_name(self):
+        return self.model.column_family_name()
 
     def __unicode__(self):
         return self._select_query()
