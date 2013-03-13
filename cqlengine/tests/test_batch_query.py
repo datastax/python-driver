@@ -3,7 +3,7 @@ from uuid import uuid4
 import random
 from cqlengine import Model, columns
 from cqlengine.management import delete_table, create_table
-from cqlengine.query import BatchQuery, Consistency
+from cqlengine.query import BatchQuery
 from cqlengine.tests.base import BaseCassEngTestCase
 
 class TestMultiKeyModel(Model):
