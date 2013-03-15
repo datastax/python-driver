@@ -23,7 +23,7 @@ _username = None
 _password = None
 _max_connections = 10
 
-def setup(hosts, username=None, password=None, max_connections=10, default_keyspace=None):
+def setup(hosts, username=None, password=None, max_connections=10, default_keyspace=None, lazy=False):
     """
     Records the hosts and connects to one of them
 
@@ -55,9 +55,10 @@ def setup(hosts, username=None, password=None, max_connections=10, default_keysp
         raise CQLConnectionError("At least one host required")
 
     random.shuffle(_hosts)
-    
-    con = ConnectionPool.get()
-    ConnectionPool.put(con)
+
+    if not lazy:
+        con = ConnectionPool.get()
+        ConnectionPool.put(con)
 
 
 class ConnectionPool(object):
