@@ -230,12 +230,6 @@ class ModelMetaClass(type):
                 raise ModelException("{} defines the column {} more than once".format(name, v.db_field_name))
             col_names.add(v.db_field_name)
 
-        #check for indexes on models with multiple primary keys
-        if len([1 for k,v in column_definitions if v.primary_key]) > 1:
-            if len([1 for k,v in column_definitions if v.index]) > 0:
-                raise ModelDefinitionException(
-                    'Indexes on models with multiple primary keys is not supported')
-
         #create db_name -> model name map for loading
         db_map = {}
         for field_name, col in column_dict.items():

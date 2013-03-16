@@ -95,7 +95,7 @@ def create_table(model, create_missing_keyspace=True):
         if indexes:
             for column in indexes:
                 if column.db_index_name in idx_names: continue
-                qs = ['CREATE INDEX {}'.format(column.db_index_name)]
+                qs = ['CREATE INDEX index_{}_{}'.format(raw_cf_name, column.db_field_name)]
                 qs += ['ON {}'.format(cf_name)]
                 qs += ['("{}")'.format(column.db_field_name)]
                 qs = ' '.join(qs)
