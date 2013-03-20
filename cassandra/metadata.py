@@ -10,7 +10,7 @@ class Metadata(object):
         self.keyspaces = {}
 
     def export_schema_as_string(self):
-        return "\n".join([ks.export_as_string() for ks in self.keyspaces.values()])
+        return "\n".join(ks.export_as_string() for ks in self.keyspaces.values())
 
     def reuild_schema(self, keyspace, table, ks_results, cf_results, col_results):
         cf_def_rows = defaultdict(list)

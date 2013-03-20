@@ -1,7 +1,10 @@
-from threading import RLock
+from threading import Lock, RLock
 
-from policies import RoundRobinPolicy, SimpleConvictionPolicy, ExponentialReconnectionPolicy
 from connection import Connection
+from decoder import QueryMessage
+from metadata import Metadata
+from policies import RoundRobinPolicy, SimpleConvictionPolicy, ExponentialReconnectionPolicy
+from query import SimpleStatement
 
 class Session(object):
 
@@ -15,16 +18,42 @@ class Session(object):
         self._load_balancer = RoundRobinPolicy()
 
     def execute(self, query):
-        pass
+        if isinstance(query, basestring):
+            query = SimpleStatement(query)
+
 
     def execute_async(self, query):
-        pass
+        if isinstance(query, basestring):
+            query = SimpleStatement(query)
+
+        qmsg = QueryMessage(query=query.query, consistencylevel=query.consistency_level)
+        return _execute_query(qmsg, query)
 
     def prepare(self, query):
         pass
 
     def shutdown(self):
-        pass
+        self.cluster.shutdown()
+
+    def _execute_query(message, query):
+        if query.tracing_enabled:
+            # TODO enable tracing on the message
+            pass
+
+        errors = {}
+        query_plan = self._load_balancer.make_query_plan(query)
+        for host in query_plan:
+            try:
+                result = self._query(host)
+                if result:
+                    return
+            except Exception, exc:
+                errors[host] = exc
+
+    def _query(self, host, query):
+        pool = self._pools.get(host)
+        if not pool or pool.is_shutdown:
+            return False
 
 
 class Cluster(object):
@@ -42,20 +71,46 @@ class Cluster(object):
     pooling_options = None
     socket_options = None
 
+    conviction_policy_factory = SimpleConvictionPolicy
+
     def __init__(self, contact_points):
         self.contact_points = contact_points
         self.sessions = set()
-        self.metadata = None
-        self.conviction_policy_factory = SimpleConvictionPolicy
+        self.metadata = Metadata(self)
+
+        # TODO real factory based on config
+        self._connection_factory = Connection
 
         self._is_shutdown = False
+        self._lock = Lock()
 
-    def connect(keyspace=None):
-        return Session()
+        self._control_connection = ControlConnection(self, self.metadata)
+        try:
+            self._control_connection.connect()
+        except:
+            self.shutdown()
+            raise
 
-    def shutdown():
-        pass
+    def connect(self, keyspace=None):
+        # TODO set keyspace if not None
+        return self._new_session()
 
+    def shutdown(self):
+        with self._lock:
+            if self._is_shutdown:
+                return
+            else:
+                self._is_shutdown = True
+
+        self._control_connection.shutdown()
+
+        for session in self.sessions:
+            session.shutdown()
+
+    def _new_session(self):
+        session = Session(self, self.metadata.hosts.values())
+        self.sessions.add(session)
+        return session
 
 class NoHostAvailable(Exception):
     pass

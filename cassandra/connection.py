@@ -1,6 +1,8 @@
 import itertools
 import socket
 
+from threading import RLock
+
 from cassandra.decoder import (OptionsMessage, ReadyMessage, AuthenticateMessage,
                                StartupMessage, ErrorMessage, CredentialsMessage,
                                RegisterMessage, read_frame)
@@ -17,6 +19,9 @@ else:
             return ''
         return snappy.decompress(byts)
     locally_supported_compressions['snappy'] = (snappy.compress, decompress)
+
+
+MAX_STREAM_PER_CONNECTION = 128
 
 
 def warn(msg):
@@ -43,6 +48,8 @@ class Connection(object):
         self.make_reqid = itertools.cycle(xrange(127)).next
         self.responses = {}
         self.waiting = {}
+        self.in_flight = 0
+        self._lock = RLock()
         self.conn_ready = False
         self.compressor = self.decompressor = None
         self.event_watchers = {}
@@ -173,7 +180,6 @@ class Connection(object):
         Given a stream-id, wait until a response arrives with that stream-id,
         and return the msg.
         """
-
         return self.wait_for_results(reqid)[reqid]
 
     def handle_incoming(self, msg):
@@ -197,7 +203,6 @@ class Connection(object):
         upon the arrival of the response packet; it may have to wait until
         something else waits on a result.
         """
-
         try:
             msg = self.responses.pop(reqid)
         except KeyError:
