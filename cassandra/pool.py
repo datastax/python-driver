@@ -108,8 +108,9 @@ class HostConnectionPool(object):
         self._conn_available_condition = Condition()
 
         # TODO potentially use threading.Queue for this
+        core_conns = session.cluster.get_core_connections_per_host(host_distance)
         self._connections = [session.connection_factory.open(host)
-                             for i in range(session.get_core_connections_per_host(host_distance))]
+                             for i in range(core_conns)]
         self._trash = set()
         self._open_count = len(self._connections)
         self._scheduled_for_creation = 0
@@ -120,8 +121,8 @@ class HostConnectionPool(object):
                 raise ConnectionException("Pool is shutdown", self.host)
 
         if not self._connections:
-            # TODO figure out why we're doing this specially if self._connections is empty
-            for i in range(self._session.get_core_connections_per_host(self.host_distance)):
+            core_conns = self._session.cluster.get_core_connections_per_host(self.host_distance)
+            for i in range(core_conns):
                 with self._lock:
                     self._scheduled_for_creation += 1
                     self._session.submit(self._create_new_connection)
@@ -131,8 +132,8 @@ class HostConnectionPool(object):
                 return conn
         else:
             least_busy = min(self._connections, key=lambda c: c.in_flight)
-            max_reqs = self.session.get_max_simultaneous_reqs_per_conn(self.host_distance)
-            max_conns = self.session.get_max_simultaneous_conns_per_host(self.host_distance)
+            max_reqs = self._session.cluster.get_max_requests_per_connection(self.host_distance)
+            max_conns = self._session.cluster.get_max_connections_per_host(self.host_distance)
 
             # if we have too many requests on this connection but we still
             # have space to open a new connection against this host
@@ -161,7 +162,7 @@ class HostConnectionPool(object):
             self._scheduled_for_creation -= 1
 
     def _add_conn_if_under_max(self):
-        max_conns = self._session.get_core_connections_per_host(self.host_distance)
+        max_conns = self._session.cluster.get_max_connections_per_host(self.host_distance)
         with self._lock:
             if self._is_shutdown:
                 return False
@@ -237,15 +238,15 @@ class HostConnectionPool(object):
                     conn.close()
                     return
 
-            core_conns = self.session.get_core_connections_per_host(self.host_distance)
-            min_reqs = self.session.get_min_simultaneous_reqs_per_conn(self.host_distance)
+            core_conns = self._session.cluster.get_core_connections_per_host(self.host_distance)
+            min_reqs = self._session.cluster.get_min_requests_per_connection(self.host_distance)
             if len(self._connections) > core_conns and in_flight <= min_reqs:
                 self._trash_connection(conn)
             else:
                 self._signal_available_conn()
 
     def _trash_connection(self, conn):
-        core_conns = self.session.get_core_connections_per_host(self.host_distance)
+        core_conns = self._session.cluster.get_core_connections_per_host(self.host_distance)
         with self._lock:
             if self._open_count <= core_conns:
                 return False
@@ -298,8 +299,8 @@ class HostConnectionPool(object):
         if self._is_shutdown:
             return
 
-        max_conns = self._session.get_core_connections_per_host(self.host_distance)
-        for i in range(max_conns - self._open_count):
+        core_conns = self._session.cluster.get_core_connections_per_host(self.host_distance)
+        for i in range(core_conns - self._open_count):
             with self._lock:
                 self._scheduled_for_creation += 1
                 self._session.submit(self._create_new_connection)

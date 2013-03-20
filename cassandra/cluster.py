@@ -3,7 +3,7 @@ from threading import Lock, RLock
 from connection import Connection
 from decoder import QueryMessage
 from metadata import Metadata
-from policies import RoundRobinPolicy, SimpleConvictionPolicy, ExponentialReconnectionPolicy
+from policies import RoundRobinPolicy, SimpleConvictionPolicy, ExponentialReconnectionPolicy, HostDistance
 from query import SimpleStatement
 
 class Session(object):
@@ -21,13 +21,12 @@ class Session(object):
         if isinstance(query, basestring):
             query = SimpleStatement(query)
 
-
     def execute_async(self, query):
         if isinstance(query, basestring):
             query = SimpleStatement(query)
 
         qmsg = QueryMessage(query=query.query, consistencylevel=query.consistency_level)
-        return _execute_query(qmsg, query)
+        return self._execute_query(qmsg, query)
 
     def prepare(self, query):
         pass
@@ -35,7 +34,7 @@ class Session(object):
     def shutdown(self):
         self.cluster.shutdown()
 
-    def _execute_query(message, query):
+    def _execute_query(self, message, query):
         if query.tracing_enabled:
             # TODO enable tracing on the message
             pass
@@ -55,6 +54,14 @@ class Session(object):
         if not pool or pool.is_shutdown:
             return False
 
+DEFAULT_MIN_REQUESTS = 25
+DEFAULT_MAX_REQUESTS = 100
+
+DEFAULT_MIN_CONNECTIONS_PER_LOCAL_HOST = 2
+DEFAULT_MAX_CONNECTIONS_PER_LOCAL_HOST = 8
+
+DEFAULT_MIN_CONNECTIONS_PER_REMOTE_HOST = 1
+DEFAULT_MAX_CONNECTIONS_PER_REMOTE_HOST = 2
 
 class Cluster(object):
 
@@ -68,7 +75,6 @@ class Cluster(object):
 
     compression = None
     metrics_enabled = False
-    pooling_options = None
     socket_options = None
 
     conviction_policy_factory = SimpleConvictionPolicy
@@ -77,6 +83,26 @@ class Cluster(object):
         self.contact_points = contact_points
         self.sessions = set()
         self.metadata = Metadata(self)
+
+        self._min_requests_per_connection = {
+            HostDistance.LOCAL: DEFAULT_MIN_REQUESTS,
+            HostDistance.REMOTE: DEFAULT_MIN_REQUESTS
+        }
+
+        self._max_requests_per_connection = {
+            HostDistance.LOCAL: DEFAULT_MAX_REQUESTS,
+            HostDistance.REMOTE: DEFAULT_MAX_REQUESTS
+        }
+
+        self._core_connections_per_host = {
+            HostDistance.LOCAL: DEFAULT_MIN_CONNECTIONS_PER_LOCAL_HOST,
+            HostDistance.REMOTE: DEFAULT_MIN_CONNECTIONS_PER_REMOTE_HOST
+        }
+
+        self._max_connections_per_host = {
+            HostDistance.LOCAL: DEFAULT_MAX_CONNECTIONS_PER_LOCAL_HOST,
+            HostDistance.REMOTE: DEFAULT_MAX_CONNECTIONS_PER_REMOTE_HOST
+        }
 
         # TODO real factory based on config
         self._connection_factory = Connection
@@ -90,6 +116,33 @@ class Cluster(object):
         except:
             self.shutdown()
             raise
+
+    def get_min_requests_per_connection(self, host_distance):
+        return self._min_requests_per_connection[host_distance]
+
+    def set_min_requests_per_connection(self, host_distance, min_requests):
+        self._min_requests_per_connection[host_distance] = min_requests
+
+    def get_max_requests_per_connection(self, host_distance):
+        return self._max_requests_per_connection[host_distance]
+
+    def set_max_requests_per_connection(self, host_distance, max_requests):
+        self._max_requests_per_connection[host_distance] = max_requests
+
+    def get_core_connections_per_host(self, host_distance):
+        return self._core_connections_per_host[host_distance]
+
+    def set_core_connections_per_host(self, host_distance, core_connections):
+        old = self._core_connections_per_host[host_distance]
+        self._core_connections_per_host[host_distance] = core_connections
+        if old < core_connections:
+            self.ensure_pool_sizing()
+
+    def get_max_connections_per_host(self, host_distance):
+        return self._max_connections_per_host[host_distance]
+
+    def set_max_connections_per_host(self, host_distance, max_connections):
+        self._max_connections_per_host[host_distance] = max_connections
 
     def connect(self, keyspace=None):
         # TODO set keyspace if not None
@@ -111,6 +164,7 @@ class Cluster(object):
         session = Session(self, self.metadata.hosts.values())
         self.sessions.add(session)
         return session
+
 
 class NoHostAvailable(Exception):
     pass
@@ -146,7 +200,8 @@ class ControlConnection(object):
     def _connect_to(self, host):
         # TODO create with cluster connection factory
         # connection = self._cluster.connection_factory.open(host)
-        connection = Connection(host)
+        # connection = Connection(host)
+        pass
 
     def shutdown(self):
         self._is_shutdown = True
