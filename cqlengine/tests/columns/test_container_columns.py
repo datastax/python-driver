@@ -95,8 +95,8 @@ class TestListColumn(BaseCassEngTestCase):
         m1 = TestListModel.create(int_list=[1,2], text_list=['kai', 'andreas'])
         m2 = TestListModel.get(partition=m1.partition)
 
-        assert isinstance(m2.int_list, tuple)
-        assert isinstance(m2.text_list, tuple)
+        assert isinstance(m2.int_list, list)
+        assert isinstance(m2.text_list, list)
 
         assert len(m2.int_list) == 2
         assert len(m2.text_list) == 2

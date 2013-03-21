@@ -433,6 +433,10 @@ class List(BaseContainerColumn):
             raise ValidationError('{} is not a list object'.format(val))
         return [self.value_col.validate(v) for v in val]
 
+    def to_python(self, value):
+        if value is None: return None
+        return list(value)
+
     def to_database(self, value):
         if value is None: return None
         if isinstance(value, self.Quoter): return value
