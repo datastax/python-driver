@@ -62,7 +62,7 @@ class Connection(object):
         self.sockfd = s
         self.open_socket = True
         supported = self.wait_for_request(OptionsMessage())
-        self.supported_cql_versions = supported.cqlversions
+        self.supported_cql_versions = supported.cql_versions
         self.remote_supported_compressions = supported.options['COMPRESSION']
 
         if self.cql_version:
@@ -108,7 +108,7 @@ class Connection(object):
                 startup_response = self.wait_for_request(cm)
             elif isinstance(startup_response, ErrorMessage):
                 raise ProgrammingError("Server did not accept credentials. %s"
-                                       % startup_response.summarymsg())
+                                       % startup_response.summary_msg())
             else:
                 raise InternalError("Unexpected response %r during connection setup"
                                     % startup_response)
@@ -225,11 +225,11 @@ class Connection(object):
         """
         Process an incoming message originated by the server.
         """
-        watchers = self.event_watchers.get(msg.eventtype, ())
+        watchers = self.event_watchers.get(msg.event_type, ())
         for cb in watchers:
-            cb(msg.eventargs)
+            cb(msg.event_args)
 
-    def register_watcher(self, eventtype, cb):
+    def register_watcher(self, event_type, callback):
         """
         Request that any events of the given type be passed to the given
         callback when they arrive. Note that the callback may not be called
@@ -248,36 +248,48 @@ class Connection(object):
 
         (For STATUS_CHANGE events:)
 
-          {'changetype': u'DOWN', 'address': ('12.114.19.76', 8000)}
+          {'change_type': u'DOWN', 'address': ('12.114.19.76', 8000)}
 
         (For TOPOLOGY_CHANGE events:)
 
-          {'changetype': u'NEW_NODE', 'address': ('19.10.122.13', 8000)}
+          {'change_type': u'NEW_NODE', 'address': ('19.10.122.13', 8000)}
         """
+        return self.register_watchers({event_type: callback})
 
-        if isinstance(eventtype, str):
-            eventtype = eventtype.decode('utf8')
-        try:
-            watchers = self.event_watchers[eventtype]
-        except KeyError:
-            ans = self.wait_for_request(RegisterMessage(eventlist=(eventtype,)))
+    def register_watchers(self, event_type_callbacks):
+        to_watch = {}
+        to_register = []
+        for event_type, callback in event_type_callbacks.items():
+            if isinstance(event_type, str):
+                event_type = event_type.decode('utf8')
+            try:
+                watchers = self.event_watchers[event_type]
+            except KeyError:
+                to_register.append(event_type)
+                watchers = self.event_watchers.setdefault(event_type, [])
+
+            to_watch[watchers] = callback
+
+        if to_register:
+            ans = self.wait_for_request(RegisterMessage(event_list=to_register))
             if isinstance(ans, ErrorMessage):
-                raise ProgrammingError("Server did not accept registration"
-                                       " for %s events: %s"
-                                       % (eventtype, ans.summarymsg()))
-            watchers = self.event_watchers.setdefault(eventtype, [])
-        watchers.append(cb)
+                raise ProgrammingError(
+                    "Server did not accept registration for events: %s"
+                    % (ans.summary_msg(),))
 
-    def unregister_watcher(self, eventtype, cb):
+            for watchers, callback in to_watch.items():
+                watchers.append(callback)
+
+    def unregister_watcher(self, event_type, cb):
         """
-        Given an eventtype and a callback previously registered with
+        Given an event_type and a callback previously registered with
         register_watcher(), remove that callback from the list of watchers for
         the given event type.
         """
 
-        if isinstance(eventtype, str):
-            eventtype = eventtype.decode('utf8')
-        self.event_watchers[eventtype].remove(cb)
+        if isinstance(event_type, str):
+            event_type = event_type.decode('utf8')
+        self.event_watchers[event_type].remove(cb)
 
     def wait_for_event(self):
         """
@@ -286,15 +298,15 @@ class Connection(object):
         be registered before calling this; otherwise, no events will be
         sent by the server.
         """
-        eventsseen = []
+        events_seen = []
 
         def i_saw_an_event(ev):
-            eventsseen.append(ev)
+            events_seen.append(ev)
 
         wlists = self.event_watchers.values()
         for wlist in wlists:
             wlist.append(i_saw_an_event)
-        while not eventsseen:
+        while not events_seen:
             self.wait_for_result(None)
         for wlist in wlists:
             wlist.remove(i_saw_an_event)

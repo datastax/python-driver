@@ -47,27 +47,36 @@ def warn(msg):
 
 class ConsistencyLevel(object):
 
-    value_to_name = {
-        0: 'ANY',
-        1: 'ONE',
-        2: 'TWO',
-        3: 'THREE',
-        4: 'QUORUM',
-        5: 'ALL',
-        6: 'LOCAL_QUORUM',
-        7: 'EACH_QUORUM'
-    }
+    ANY = 0
+    ONE = 1
+    TWO = 2
+    THREE = 3
+    QUORUM = 4
+    ALL = 5
+    LOCAL_QUORUM = 6
+    EACH_QUORUM = 7
 
-    name_to_value = {
-        'ANY': 0,
-        'ONE': 1,
-        'TWO': 2,
-        'THREE': 3,
-        'QUORUM': 4,
-        'ALL': 5,
-        'LOCAL_QUORUM': 6,
-        'EACH_QUORUM': 7
-    }
+ConsistencyLevel.value_to_name = {
+    ConsistencyLevel.ANY: 'ANY',
+    ConsistencyLevel.ONE: 'ONE',
+    ConsistencyLevel.TWO: 'TWO',
+    ConsistencyLevel.THREE: 'THREE',
+    ConsistencyLevel.QUORUM: 'QUORUM',
+    ConsistencyLevel.ALL: 'ALL',
+    ConsistencyLevel.LOCAL_QUORUM: 'LOCAL_QUORUM',
+    ConsistencyLevel.EACH_QUORUM: 'EACH_QUORUM'
+}
+
+ConsistencyLevel.name_to_value = {
+    'ANY': ConsistencyLevel.ANY,
+    'ONE': ConsistencyLevel.ONE,
+    'TWO': ConsistencyLevel.TWO,
+    'THREE': ConsistencyLevel.THREE,
+    'QUORUM': ConsistencyLevel.QUORUM,
+    'ALL': ConsistencyLevel.ALL,
+    'LOCAL_QUORUM': ConsistencyLevel.LOCAL_QUORUM,
+    'EACH_QUORUM': ConsistencyLevel.EACH_QUORUM
+}
 
 
 class CqlResult:
@@ -77,6 +86,11 @@ class CqlResult:
 
     def __iter__(self):
         return iter(self.rows)
+
+    # TODO this definitely needs to be abstracted at some other level
+    def as_dicts(self):
+        colnames = [c[2] for c in self.column_metadata]
+        return [dict(zip(colnames, row)) for row in self.rows]
 
     def __str__(self):
         return '<CqlResult: column_metadata=%r, rows=%r>' \
@@ -155,8 +169,8 @@ def read_frame(f, decompressor=None):
         flags ^= 0x1
     if flags:
         warn("Unknown protocol flags set: %02x. May cause problems." % flags)
-    msgclass = _message_types_by_opcode[opcode]
-    msg = msgclass.recv_body(StringIO(body))
+    msg_class = _message_types_by_opcode[opcode]
+    msg = msg_class.recv_body(StringIO(body))
     msg.stream_id = stream
     return msg
 
@@ -176,7 +190,7 @@ class ErrorMessage(_MessageType):
         extra_info = subcls.recv_error_info(f)
         return subcls(code=code, message=msg, info=extra_info)
 
-    def summarymsg(self):
+    def summary_msg(self):
         msg = 'code=%04x [%s] message="%s"' \
               % (self.code, self.summary, self.message)
         if self.info is not None:
@@ -184,7 +198,7 @@ class ErrorMessage(_MessageType):
         return msg
 
     def __str__(self):
-        return '<ErrorMessage %s>' % self.summarymsg()
+        return '<ErrorMessage %s>' % self.summary_msg()
     __repr__ = __str__
 
     @staticmethod
@@ -193,12 +207,12 @@ class ErrorMessage(_MessageType):
 
 class ErrorMessageSubclass(_register_msg_type):
     def __init__(cls, name, bases, dct):
-        if cls.errorcode is not None:
-            error_classes[cls.errorcode] = cls
+        if cls.error_code is not None:
+            error_classes[cls.error_code] = cls
 
 class ErrorMessageSub(ErrorMessage):
     __metaclass__ = ErrorMessageSubclass
-    errorcode = None
+    error_code = None
 
 class RequestExecutionException(ErrorMessageSub):
     pass
@@ -208,47 +222,47 @@ class RequestValidationException(ErrorMessageSub):
 
 class ServerError(ErrorMessageSub):
     summary = 'Server error'
-    errorcode = 0x0000
+    error_code = 0x0000
 
 class ProtocolException(ErrorMessageSub):
     summary = 'Protocol error'
-    errorcode = 0x000A
+    error_code = 0x000A
 
 class UnavailableExceptionErrorMessage(RequestExecutionException):
     summary = 'Unavailable exception'
-    errorcode = 0x1000
+    error_code = 0x1000
 
     @staticmethod
     def recv_error_info(f):
         return {
-            'consistencylevel': read_consistencylevel(f),
+            'consistency_level': read_consistency_level(f),
             'required': read_int(f),
             'alive': read_int(f),
         }
 
 class OverloadedErrorMessage(RequestExecutionException):
     summary = 'Coordinator node overloaded'
-    errorcode = 0x1001
+    error_code = 0x1001
 
 class IsBootstrappingErrorMessage(RequestExecutionException):
     summary = 'Coordinator node is bootstrapping'
-    errorcode = 0x1002
+    error_code = 0x1002
 
 class TruncateError(RequestExecutionException):
     summary = 'Error during truncate'
-    errorcode = 0x1003
+    error_code = 0x1003
 
 class RequestTimeoutException(RequestExecutionException):
     pass
 
 class WriteTimeoutErrorMessage(RequestTimeoutException):
     summary = 'Timeout during write request'
-    errorcode = 0x1100
+    error_code = 0x1100
 
     @staticmethod
     def recv_error_info(f):
         return {
-            'consistencylevel': read_consistencylevel(f),
+            'consistency_level': read_consistency_level(f),
             'received': read_int(f),
             'blockfor': read_int(f),
             'writetype': read_string(f),
@@ -256,12 +270,12 @@ class WriteTimeoutErrorMessage(RequestTimeoutException):
 
 class ReadTimeoutErrorMessage(RequestTimeoutException):
     summary = 'Timeout during read request'
-    errorcode = 0x1200
+    error_code = 0x1200
 
     @staticmethod
     def recv_error_info(f):
         return {
-            'consistencylevel': read_consistencylevel(f),
+            'consistency_level': read_consistency_level(f),
             'received': read_int(f),
             'blockfor': read_int(f),
             'data_present': bool(read_byte(f)),
@@ -269,23 +283,23 @@ class ReadTimeoutErrorMessage(RequestTimeoutException):
 
 class SyntaxException(RequestValidationException):
     summary = 'Syntax error in CQL query'
-    errorcode = 0x2000
+    error_code = 0x2000
 
 class UnauthorizedErrorMessage(RequestValidationException):
     summary = 'Unauthorized'
-    errorcode = 0x2100
+    error_code = 0x2100
 
 class InvalidRequestException(RequestValidationException):
     summary = 'Invalid query'
-    errorcode = 0x2200
+    error_code = 0x2200
 
 class ConfigurationException(RequestValidationException):
     summary = 'Query invalid because of configuration issue'
-    errorcode = 0x2300
+    error_code = 0x2300
 
 class AlreadyExistsException(ConfigurationException):
     summary = 'Item already exists'
-    errorcode = 0x2400
+    error_code = 0x2400
 
     @staticmethod
     def recv_error_info(f):
@@ -350,22 +364,22 @@ class OptionsMessage(_MessageType):
 class SupportedMessage(_MessageType):
     opcode = 0x06
     name = 'SUPPORTED'
-    params = ('cqlversions', 'options',)
+    params = ('cql_versions', 'options',)
 
     @classmethod
     def recv_body(cls, f):
         options = read_stringmultimap(f)
-        cqlversions = options.pop('CQL_VERSION')
-        return cls(cqlversions=cqlversions, options=options)
+        cql_versions = options.pop('CQL_VERSION')
+        return cls(cql_versions=cql_versions, options=options)
 
 class QueryMessage(_MessageType):
     opcode = 0x07
     name = 'QUERY'
-    params = ('query', 'consistencylevel',)
+    params = ('query', 'consistency_level',)
 
     def send_body(self, f):
         write_longstring(f, self.query)
-        write_consistencylevel(f, self.consistencylevel)
+        write_consistency_level(f, self.consistency_level)
 
 class ResultMessage(_MessageType):
     opcode = 0x08
@@ -491,54 +505,55 @@ class PrepareMessage(_MessageType):
 class ExecuteMessage(_MessageType):
     opcode = 0x0A
     name = 'EXECUTE'
-    params = ('queryid', 'queryparams', 'consistencylevel',)
+    params = ('queryid', 'query_params', 'consistency_level',)
 
     def send_body(self, f):
         write_int(f, self.queryid)
-        write_short(f, len(self.queryparams))
-        for param in self.queryparams:
+        write_short(f, len(self.query_params))
+        for param in self.query_params:
             write_value(f, param)
-        write_consistencylevel(f, self.consistencylevel)
+        write_consistency_level(f, self.consistency_level)
 
 known_event_types = frozenset((
     'TOPOLOGY_CHANGE',
     'STATUS_CHANGE',
+    'SCHEMA_CHANGE'
 ))
 
 class RegisterMessage(_MessageType):
     opcode = 0x0B
     name = 'REGISTER'
-    params = ('eventlist',)
+    params = ('event_list',)
 
     def send_body(self, f):
-        write_stringlist(f, self.eventlist)
+        write_stringlist(f, self.event_list)
 
 class EventMessage(_MessageType):
     opcode = 0x0C
     name = 'EVENT'
-    params = ('eventtype', 'eventargs')
+    params = ('event_type', 'event_args')
 
     @classmethod
     def recv_body(cls, f):
-        eventtype = read_string(f).upper()
-        if eventtype in known_event_types:
-            readmethod = getattr(cls, 'recv_' + eventtype.lower())
-            return cls(eventtype=eventtype, eventargs=readmethod(f))
-        raise NotSupportedError('Unknown event type %r' % eventtype)
+        event_type = read_string(f).upper()
+        if event_type in known_event_types:
+            read_method = getattr(cls, 'recv_' + event_type.lower())
+            return cls(event_type=event_type, event_args=read_method(f))
+        raise NotSupportedError('Unknown event type %r' % event_type)
 
     @classmethod
     def recv_topology_change(cls, f):
         # "NEW_NODE" or "REMOVED_NODE"
-        changetype = read_string(f)
+        change_type = read_string(f)
         address = read_inet(f)
-        return dict(changetype=changetype, address=address)
+        return dict(change_type=change_type, address=address)
 
     @classmethod
     def recv_status_change(cls, f):
         # "UP" or "DOWN"
-        changetype = read_string(f)
+        change_type = read_string(f)
         address = read_inet(f)
-        return dict(changetype=changetype, address=address)
+        return dict(change_type=change_type, address=address)
 
 
 def read_byte(f):
@@ -559,10 +574,10 @@ def read_short(f):
 def write_short(f, s):
     f.write(uint16_pack(s))
 
-def read_consistencylevel(f):
+def read_consistency_level(f):
     return ConsistencyLevel.value_to_name[read_short(f)]
 
-def write_consistencylevel(f, cl):
+def write_consistency_level(f, cl):
     write_short(f, ConsistencyLevel.name_to_value[cl])
 
 def read_string(f):

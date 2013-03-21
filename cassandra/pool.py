@@ -12,6 +12,10 @@ class ConnectionException(Exception):
     pass
 
 
+class BusyConnectionException(Exception):
+    pass
+
+
 class AuthenticationException(Exception):
     pass
 

@@ -1,18 +1,22 @@
 from collections import defaultdict
+from threading import RLock
+
 import cqltypes
+from pool import Host
 
 class Metadata(object):
 
     def __init__(self, cluster):
         self.cluster = cluster
         self.cluster_name = None
-        self.hosts = {}
         self.keyspaces = {}
+        self._hosts = {}
+        self._hosts_lock = RLock()
 
     def export_schema_as_string(self):
         return "\n".join(ks.export_as_string() for ks in self.keyspaces.values())
 
-    def reuild_schema(self, keyspace, table, ks_results, cf_results, col_results):
+    def rebuild_schema(self, keyspace, table, ks_results, cf_results, col_results):
         cf_def_rows = defaultdict(list)
         col_def_rows = defaultdict(lambda: defaultdict(list))
 
@@ -172,6 +176,30 @@ class Metadata(object):
         index_name = row.get("index_name")
         index_type = row.get("index_type")
         return IndexMetadata(column_metadata, index_name, index_type)
+
+    def rebuild_token_map(self, partitioner, token_map):
+        # TODO
+        pass
+
+    def add_host(self, address):
+        with self._hosts_lock:
+            if address not in self._hosts:
+                new_host = Host(address, self.cluster.conviction_policy_factory)
+                new_host.monitor.register(self.cluster)
+                return new_host
+            else:
+                return None
+
+    def remove_host(self, host):
+        with self._hosts_lock:
+            return bool(self._hosts.pop(host.address, False))
+
+    def get_host(self, address):
+        return self._hosts.get(address)
+
+    def all_hosts(self):
+        with self._hosts_lock:
+            return self.hosts.values()
 
 
 class KeyspaceMetadata(object):
