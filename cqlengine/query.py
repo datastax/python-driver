@@ -110,6 +110,27 @@ class InOperator(EqualsOperator):
     symbol = 'IN'
     cql_symbol = 'IN'
 
+    class Quoter(object):
+        """
+        contains a single value, which will quote itself for CQL insertion statements
+        """
+        def __init__(self, value):
+            self.value = value
+
+        def __str__(self):
+            from cql.query import cql_quote as cq
+            return '(' + ', '.join([cq(v) for v in self.value]) + ')'
+
+    def get_dict(self):
+        if isinstance(self.value, BaseQueryFunction):
+            return {self.identifier: self.column.to_database(self.value.get_value())}
+        else:
+            try:
+                values = [v for v in self.value]
+            except TypeError:
+                raise QueryException("in operator arguments must be iterable, {} found".format(self.value))
+            return {self.identifier: self.Quoter([self.column.to_database(v) for v in self.value])}
+
 class GreaterThanOperator(QueryOperator):
     symbol = "GT"
     cql_symbol = '>'

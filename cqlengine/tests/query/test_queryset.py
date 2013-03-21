@@ -436,7 +436,11 @@ class TestMinMaxTimeUUIDFunctions(BaseCassEngTestCase):
         assert  '4' in datas
 
 
+class TestInOperator(BaseQuerySetUsage):
 
+    def test_success_case(self):
+        q = TestModel.filter(test_id__in=[0,1])
+        assert q.count() == 8
 
 
 
