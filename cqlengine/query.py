@@ -206,7 +206,7 @@ class QuerySet(object):
         self._where = []
 
         #ordering arguments
-        self._order = None
+        self._order = []
 
         self._allow_filtering = False
 
@@ -257,7 +257,7 @@ class QuerySet(object):
 
     def __len__(self):
         return self.count()
-    
+
     def __del__(self):
         if self._con:
             self._con.close()
@@ -313,7 +313,7 @@ class QuerySet(object):
             qs += ['WHERE {}'.format(self._where_clause())]
 
         if self._order:
-            qs += ['ORDER BY {}'.format(self._order)]
+            qs += ['ORDER BY {}'.format(', '.join(self._order))]
 
         if self._limit:
             qs += ['LIMIT {}'.format(self._limit)]
@@ -347,7 +347,7 @@ class QuerySet(object):
                 value_dict = dict(zip(names, values))
                 self._result_idx += 1
                 self._result_cache[self._result_idx] = self._construct_instance(value_dict)
-                
+
             #return the connection to the connection pool if we have all objects
             if self._result_cache and self._result_cache[-1] is not None:
                 self._con.close()
@@ -389,7 +389,7 @@ class QuerySet(object):
             else:
                 self._fill_result_cache_to_idx(s)
                 return self._result_cache[s]
-            
+
 
     def _construct_instance(self, values):
         #translate column names to model names
@@ -476,38 +476,42 @@ class QuerySet(object):
                     '{} objects found'.format(len(self._result_cache)))
         else:
             return self[0]
-        
-    def order_by(self, colname):
+
+    def order_by(self, *colnames):
         """
         orders the result set.
-        ordering can only select one column, and it must be the second column in a composite primary key
+        ordering can only use clustering columns.
 
         Default order is ascending, prepend a '-' to the column name for descending
         """
-        if colname is None:
+        if len(colnames) == 0:
             clone = copy.deepcopy(self)
-            clone._order = None
+            clone._order = []
             return clone
 
-        order_type = 'DESC' if colname.startswith('-') else 'ASC'
-        colname = colname.replace('-', '')
+        conditions = []
+        for colname in colnames:
+            order_type = 'DESC' if colname.startswith('-') else 'ASC'
+            colname = colname.replace('-', '')
 
-        column = self.model._columns.get(colname)
-        if column is None:
-            raise QueryException("Can't resolve the column name: '{}'".format(colname))
+            column = self.model._columns.get(colname)
+            if column is None:
+                raise QueryException("Can't resolve the column name: '{}'".format(colname))
 
-        #validate the column selection
-        if not column.primary_key:
-            raise QueryException(
-                "Can't order on '{}', can only order on (clustered) primary keys".format(colname))
+            #validate the column selection
+            if not column.primary_key:
+                raise QueryException(
+                    "Can't order on '{}', can only order on (clustered) primary keys".format(colname))
 
-        pks = [v for k,v in self.model._columns.items() if v.primary_key]
-        if column == pks[0]:
-            raise QueryException(
-                "Can't order by the first primary key, clustering (secondary) keys only")
+            pks = [v for k, v in self.model._columns.items() if v.primary_key]
+            if column == pks[0]:
+                raise QueryException(
+                    "Can't order by the first primary key (partition key), clustering (secondary) keys only")
+
+            conditions.append('"{}" {}'.format(column.db_field_name, order_type))
 
         clone = copy.deepcopy(self)
-        clone._order = '"{}" {}'.format(column.db_field_name, order_type)
+        clone._order.extend(conditions)
         return clone
 
     def count(self):
