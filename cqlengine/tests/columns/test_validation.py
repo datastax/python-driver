@@ -1,5 +1,6 @@
 #tests the behavior of the column classes
 from datetime import datetime
+from datetime import date
 from decimal import Decimal as D
 from cqlengine import ValidationError
 
@@ -11,6 +12,7 @@ from cqlengine.columns import Ascii
 from cqlengine.columns import Text
 from cqlengine.columns import Integer
 from cqlengine.columns import DateTime
+from cqlengine.columns import Date
 from cqlengine.columns import UUID
 from cqlengine.columns import Boolean
 from cqlengine.columns import Float
@@ -40,6 +42,37 @@ class TestDatetime(BaseCassEngTestCase):
         dt2 = self.DatetimeTest.objects(test_id=0).first()
         assert dt2.created_at.timetuple()[:6] == now.timetuple()[:6]
 
+
+class TestDate(BaseCassEngTestCase):
+    class DateTest(Model):
+        test_id = Integer(primary_key=True)
+        created_at = Date()
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestDate, cls).setUpClass()
+        create_table(cls.DateTest)
+
+    @classmethod
+    def tearDownClass(cls):
+        super(TestDate, cls).tearDownClass()
+        delete_table(cls.DateTest)
+
+    def test_date_io(self):
+        today = date.today()
+        self.DateTest.objects.create(test_id=0, created_at=today)
+        dt2 = self.DateTest.objects(test_id=0).first()
+        assert dt2.created_at.isoformat() == today.isoformat()
+
+    def test_date_io_using_datetime(self):
+        now = datetime.utcnow()
+        self.DateTest.objects.create(test_id=0, created_at=now)
+        dt2 = self.DateTest.objects(test_id=0).first()
+        assert not isinstance(dt2.created_at, datetime)
+        assert isinstance(dt2.created_at, date)
+        assert dt2.created_at.isoformat() == now.date().isoformat()
+
+
 class TestDecimal(BaseCassEngTestCase):
     class DecimalTest(Model):
         test_id = Integer(primary_key=True)
@@ -63,26 +96,26 @@ class TestDecimal(BaseCassEngTestCase):
         dt = self.DecimalTest.objects.create(test_id=0, dec_val=5)
         dt2 = self.DecimalTest.objects(test_id=0).first()
         assert dt2.dec_val == D('5')
-        
+
 class TestTimeUUID(BaseCassEngTestCase):
     class TimeUUIDTest(Model):
         test_id = Integer(primary_key=True)
         timeuuid = TimeUUID()
-        
+
     @classmethod
     def setUpClass(cls):
         super(TestTimeUUID, cls).setUpClass()
         create_table(cls.TimeUUIDTest)
-        
+
     @classmethod
     def tearDownClass(cls):
         super(TestTimeUUID, cls).tearDownClass()
         delete_table(cls.TimeUUIDTest)
-        
+
     def test_timeuuid_io(self):
         t0 = self.TimeUUIDTest.create(test_id=0)
         t1 = self.TimeUUIDTest.get(test_id=0)
-        
+
         assert t1.timeuuid.time == t1.timeuuid.time
 
 class TestInteger(BaseCassEngTestCase):
