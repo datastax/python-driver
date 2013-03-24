@@ -169,6 +169,10 @@ class BatchQuery(object):
         self.queries.append((query, params))
 
     def execute(self):
+        if len(self.queries) == 0:
+            # Empty batch is a no-op
+            return
+
         opener = 'BEGIN ' + (self.batch_type + ' ' if self.batch_type else '') + ' BATCH'
         if self.timestamp:
             epoch = datetime(1970, 1, 1)
@@ -257,7 +261,7 @@ class QuerySet(object):
 
     def __len__(self):
         return self.count()
-    
+
     def __del__(self):
         if self._con:
             self._con.close()
@@ -347,7 +351,7 @@ class QuerySet(object):
                 value_dict = dict(zip(names, values))
                 self._result_idx += 1
                 self._result_cache[self._result_idx] = self._construct_instance(value_dict)
-                
+
             #return the connection to the connection pool if we have all objects
             if self._result_cache and self._result_cache[-1] is not None:
                 self._con.close()
@@ -389,7 +393,7 @@ class QuerySet(object):
             else:
                 self._fill_result_cache_to_idx(s)
                 return self._result_cache[s]
-            
+
 
     def _construct_instance(self, values):
         #translate column names to model names
@@ -476,7 +480,7 @@ class QuerySet(object):
                     '{} objects found'.format(len(self._result_cache)))
         else:
             return self[0]
-        
+
     def order_by(self, colname):
         """
         orders the result set.

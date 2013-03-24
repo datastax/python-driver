@@ -103,3 +103,9 @@ class BatchQueryTests(BaseCassEngTestCase):
         for m in TestMultiKeyModel.all():
             m.delete()
 
+    def test_empty_batch(self):
+        b = BatchQuery()
+        b.execute()
+
+        with BatchQuery() as b:
+            pass
