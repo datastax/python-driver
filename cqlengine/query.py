@@ -604,7 +604,7 @@ class QuerySet(object):
         """
         #validate where clause
         partition_key = self.model._primary_keys.values()[0]
-        if not any([c.column == partition_key for c in self._where]):
+        if not any([c.column.db_field_name == partition_key.db_field_name for c in self._where]):
             raise QueryException("The partition key must be defined on delete queries")
         qs = ['DELETE FROM {}'.format(self.column_family_name)]
         qs += ['WHERE {}'.format(self._where_clause())]
