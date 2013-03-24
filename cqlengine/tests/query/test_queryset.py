@@ -26,6 +26,12 @@ class IndexedTestModel(Model):
     expected_result = columns.Integer()
     test_result = columns.Integer(index=True)
 
+class TestMultiClusteringModel(Model):
+    one = columns.Integer(primary_key=True)
+    two = columns.Integer(primary_key=True)
+    three = columns.Integer(primary_key=True)
+
+
 class TestQuerySetOperation(BaseCassEngTestCase):
 
     def test_query_filter_parsing(self):
@@ -115,6 +121,7 @@ class BaseQuerySetUsage(BaseCassEngTestCase):
         delete_table(IndexedTestModel)
         create_table(TestModel)
         create_table(IndexedTestModel)
+        create_table(TestMultiClusteringModel)
 
         TestModel.objects.create(test_id=0, attempt_id=0, description='try1', expected_result=5, test_result=30)
         TestModel.objects.create(test_id=0, attempt_id=1, description='try2', expected_result=10, test_result=30)
@@ -151,6 +158,7 @@ class BaseQuerySetUsage(BaseCassEngTestCase):
         super(BaseQuerySetUsage, cls).tearDownClass()
         delete_table(TestModel)
         delete_table(IndexedTestModel)
+        delete_table(TestMultiClusteringModel)
 
 class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
 
@@ -179,7 +187,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
             assert val in compare_set
             compare_set.remove(val)
         assert len(compare_set) == 0
-        
+
     def test_multiple_iterations_work_properly(self):
         """ Tests that iterating over a query set more than once works """
         q = TestModel.objects(test_id=0)
@@ -277,6 +285,20 @@ class TestQuerySetOrdering(BaseQuerySetUsage):
         with self.assertRaises(query.QueryException):
             q = IndexedTestModel.objects(test_id=0).order_by('attempt_id')
 
+    def test_ordering_on_multiple_clustering_columns(self):
+        TestMultiClusteringModel.create(one=1, two=1, three=4)
+        TestMultiClusteringModel.create(one=1, two=1, three=2)
+        TestMultiClusteringModel.create(one=1, two=1, three=5)
+        TestMultiClusteringModel.create(one=1, two=1, three=1)
+        TestMultiClusteringModel.create(one=1, two=1, three=3)
+
+        results = TestMultiClusteringModel.objects.filter(one=1, two=1).order_by('-two', '-three')
+        assert [r.three for r in results] == [5, 4, 3, 2, 1]
+
+        results = TestMultiClusteringModel.objects.filter(one=1, two=1).order_by('two', 'three')
+        assert [r.three for r in results] == [1, 2, 3, 4, 5]
+
+
 class TestQuerySetSlicing(BaseQuerySetUsage):
 
     def test_out_of_range_index_raises_error(self):
@@ -344,12 +366,12 @@ class TestQuerySetDelete(BaseQuerySetUsage):
         TestModel.objects.create(test_id=3, attempt_id=1, description='try10', expected_result=60, test_result=40)
         TestModel.objects.create(test_id=3, attempt_id=2, description='try11', expected_result=70, test_result=45)
         TestModel.objects.create(test_id=3, attempt_id=3, description='try12', expected_result=75, test_result=45)
-        
+
         assert TestModel.objects.count() == 16
         assert TestModel.objects(test_id=3).count() == 4
-        
+
         TestModel.objects(test_id=3).delete()
-        
+
         assert TestModel.objects.count() == 12
         assert TestModel.objects(test_id=3).count() == 0
 
@@ -364,7 +386,7 @@ class TestQuerySetDelete(BaseQuerySetUsage):
             TestModel.objects(attempt_id=0).delete()
 
 class TestQuerySetConnectionHandling(BaseQuerySetUsage):
-    
+
     def test_conn_is_returned_after_filling_cache(self):
         """
         Tests that the queryset returns it's connection after it's fetched all of it's results
@@ -376,10 +398,10 @@ class TestQuerySetConnectionHandling(BaseQuerySetUsage):
             val = t.attempt_id, t.expected_result
             assert val in compare_set
             compare_set.remove(val)
-            
+
         assert q._con is None
         assert q._cur is None
-        
+
     def test_conn_is_returned_after_queryset_is_garbage_collected(self):
         """ Tests that the connection is returned to the connection pool after the queryset is gc'd """
         from cqlengine.connection import ConnectionPool
@@ -387,7 +409,7 @@ class TestQuerySetConnectionHandling(BaseQuerySetUsage):
         q = TestModel.objects(test_id=0)
         v = q[0]
         assert ConnectionPool._queue.qsize() == 0
-        
+
         del q
         assert ConnectionPool._queue.qsize() == 1
 
