@@ -230,7 +230,7 @@ class Date(Column):
         elif isinstance(value, date):
             return value
 
-        return date.fromtimestamp(value)
+        return datetime.utcfromtimestamp(value).date()
 
     def to_database(self, value):
         value = super(Date, self).to_database(value)
