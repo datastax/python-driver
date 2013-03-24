@@ -298,6 +298,9 @@ class TestQuerySetOrdering(BaseQuerySetUsage):
         results = TestMultiClusteringModel.objects.filter(one=1, two=1).order_by('two', 'three')
         assert [r.three for r in results] == [1, 2, 3, 4, 5]
 
+        results = TestMultiClusteringModel.objects.filter(one=1, two=1).order_by('two').order_by('three')
+        assert [r.three for r in results] == [1, 2, 3, 4, 5]
+
 
 class TestQuerySetSlicing(BaseQuerySetUsage):
 
