@@ -1,6 +1,7 @@
 #column field types
 from copy import copy
 from datetime import datetime
+from datetime import date
 import re
 from uuid import uuid1, uuid4
 from cql.query import cql_quote
@@ -216,6 +217,31 @@ class DateTime(Column):
         epoch = datetime(1970, 1, 1)
         return long((value - epoch).total_seconds() * 1000)
 
+
+class Date(Column):
+    db_type = 'timestamp'
+
+    def __init__(self, **kwargs):
+        super(Date, self).__init__(**kwargs)
+
+    def to_python(self, value):
+        if isinstance(value, datetime):
+            return value.date()
+        elif isinstance(value, date):
+            return value
+
+        return date.fromtimestamp(value)
+
+    def to_database(self, value):
+        value = super(Date, self).to_database(value)
+        if isinstance(value, datetime):
+            value = value.date()
+        if not isinstance(value, date):
+            raise ValidationError("'{}' is not a date object".format(repr(value)))
+
+        return long((value - date(1970, 1, 1)).total_seconds() * 1000)
+
+
 class UUID(Column):
     """
     Type 1 or 4 UUID
@@ -235,14 +261,14 @@ class UUID(Column):
         if not self.re_uuid.match(val):
             raise ValidationError("{} is not a valid uuid".format(value))
         return _UUID(val)
-    
+
 class TimeUUID(UUID):
     """
     UUID containing timestamp
     """
-    
+
     db_type = 'timeuuid'
-    
+
     def __init__(self, **kwargs):
         kwargs.setdefault('default', lambda: uuid1())
         super(TimeUUID, self).__init__(**kwargs)
