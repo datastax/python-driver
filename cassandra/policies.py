@@ -1,4 +1,4 @@
-from itertools import islice, cycle, groupby
+from itertools import islice, cycle, groupby, repeat
 from random import randint
 from threading import RLock
 
@@ -131,8 +131,8 @@ class ConstantReconnectionPolicy(object):
 
         self.delay = delay
 
-    def get_next_delay(self):
-        return self.delay
+    def new_schedule(self):
+        return repeat(self.delay)
 
 
 class ExponentialReconnectionPolicy(object):
@@ -144,10 +144,11 @@ class ExponentialReconnectionPolicy(object):
         if max_delay < base_delay:
             raise ValueError("Max delay must be greater than base delay")
 
-        self._delay_generator = (min(base_delay * (i ** 2), max_delay) for i in range(64))
+        self.base_delay = base_delay
+        self.max_delay = max_delay
 
-    def get_next_delay(self):
-        return self._delay_generator.next()
+    def new_schedule(self):
+        return (min(self.base_delay * (i ** 2), self.max_delay) for i in xrange(64))
 
 
 class WriteType(object):

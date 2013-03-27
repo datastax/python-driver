@@ -7,9 +7,12 @@ from futures import ThreadPoolExecutor
 from connection import Connection
 from decoder import ConsistencyLevel, QueryMessage
 from metadata import Metadata
-from policies import RoundRobinPolicy, SimpleConvictionPolicy, ExponentialReconnectionPolicy, HostDistance
+from policies import (RoundRobinPolicy, SimpleConvictionPolicy,
+                      ExponentialReconnectionPolicy, HostDistance)
 from query import SimpleStatement
-from pool import ConnectionException, BusyConnectionException
+from pool import (ConnectionException, BusyConnectionException,
+                  AuthenticationException, _ReconnectionHandler,
+                  _HostReconnectionHandler)
 
 # TODO: we might want to make this configurable
 MAX_SCHEMA_AGREEMENT_WAIT_MS = 10000
@@ -111,7 +114,7 @@ class Cluster(object):
     auth_provider = None
 
     load_balancing_policy = None
-    reconnecting_policy = None
+    reconnection_policy = ExponentialReconnectionPolicy(2 * 1000, 5 * 60 * 1000)
     retry_policy = None
 
     compression = None
@@ -213,10 +216,32 @@ class Cluster(object):
         return session
 
     def on_up(self, host):
-        pass
+        reconnector = host.get_and_set_reconnection_handler(None)
+        if reconnector:
+            reconnector.cancel()
+
+        # TODO prepareAllQueries(host)
+
+        self._control_connection.on_up(host)
+        for session in self.sessions:
+            session.on_up(host)
 
     def on_down(self, host):
-        pass
+        self._control_connection.on_down(host)
+        for session in self.sessions:
+            session.on_down(host)
+
+        schedule = self.reconnection_policy.new_schedule()
+        reconnector = _HostReconnectionHandler(
+            host, self._connection_factory, self.scheduler, schedule,
+            callback=host.get_and_set_reconnection_handler,
+            callback_kwargs=dict(new_handler=None))
+
+        old_reconnector = host.get_and_set_reconnection_handler(reconnector)
+        if old_reconnector:
+            old_reconnector.cancel()
+
+        reconnector.start()
 
     def on_add(self, host):
         self.prepare_all_queries(host)
@@ -239,8 +264,34 @@ class Cluster(object):
         if host and self.metdata.remove_host(host):
             self.on_remove(host)
 
+    def ensure_core_connections(self):
+        for session in self.session:
+            for pool in session._pools.values():
+                pool.ensure_core_connections()
+
+
 class NoHostAvailable(Exception):
     pass
+
+
+class _ControlReconnectionHandler(_ReconnectionHandler):
+
+    def __init__(self, control_connection, *args, **kwargs):
+        _ReconnectionHandler.__init__(self, *args, **kwargs)
+        self.control_connection = control_connection
+
+    def try_reconnect(self):
+        return self.control_connection._reconnect_internal()
+
+    def on_reconnection(self, connection):
+        self.control_connection._set_new_connection(connection)
+
+    def on_exception(self, exc, next_delay):
+        # TODO only overridden to add logging, so add logging
+        if isinstance(exc, AuthenticationException):
+            return False
+        else:
+            return True
 
 
 class ControlConnection(object):
@@ -261,7 +312,11 @@ class ControlConnection(object):
         self._balancing_policy.populate(cluster, metadata.all_hosts())
         self._reconnection_policy = ExponentialReconnectionPolicy(2 * 1000, 5 * 60 * 1000)
         self._connection = None
+
         self._lock = RLock()
+
+        self._reconnection_handler = None
+        self._reconnection_lock = RLock()
 
         self._is_shutdown = False
 
@@ -303,6 +358,31 @@ class ControlConnection(object):
         self.refresh_node_list_and_token_map()
         self.refresh_schema()
         return connection
+
+    def reconnect(self):
+        if self._is_shutdown:
+            return
+
+        try:
+            self._set_new_connection(self._reconnect_internal())
+        except NoHostAvailable:
+            schedule = self._reconnection_policy.new_schedule()
+            with self._reconnection_lock:
+                if self._reconnection_handler:
+                    self._reconnection_handler.cancel()
+                self._reconnection_handler = _ControlReconnectionHandler(
+                    self, self._cluster.scheduler, schedule,
+                    callback=self._get_and_set_reconnection_handler,
+                    callback_kwargs=dict(new_handler=None))
+                self._reconnection_handler.start()
+
+    def _get_and_set_reconnection_handler(self, new_handler):
+        with self._reconnection_lock:
+            if self._reconnection_handler:
+                return self._reconnection_handler
+            else:
+                self._reconnection_handler = new_handler
+                return None
 
     def shutdown(self):
         self._is_shutdown = True

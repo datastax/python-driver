@@ -4,7 +4,7 @@
 # - proper threadpool submissions
 
 import time
-from threading import RLock, Condition
+from threading import Lock, RLock, Condition
 
 from connection import MAX_STREAM_PER_CONNECTION
 
@@ -38,9 +38,20 @@ class Host(object):
         self.address = inet_address
         self.monitor = HealthMonitor(conviction_policy(self))
 
+        self._reconnection_handler = None
+        self._reconnection_lock = Lock()
+
     def set_location_info(self, datacenter, rack):
         self._datacenter = datacenter
         self._rack = rack
+
+    def get_and_set_reconnection_handler(self, new_handler):
+        with self._reconnection_lock:
+            if self._reconnection_handler:
+                return self._reconnection_handler
+            else:
+                self._reconnection_handler = new_handler
+                return None
 
     def __eq__(self, other):
         if not isinstance(other, Host):
@@ -50,6 +61,80 @@ class Host(object):
 
     def __str__(self):
         return self.address
+
+
+class _ReconnectionHandler(object):
+
+    def __init__(self, scheduler, schedule, callback, *callback_args, **callback_kwargs):
+        self.scheduler = scheduler
+        self.schedule = schedule
+        self.callback = callback
+        self.callback_args = callback_args
+        self.callback_kwargs = callback_kwargs
+        self._cancelled
+
+    def start(self):
+        if self._cancelled:
+            return
+
+        first_delay = self.schedule.get_next_delay()
+        self.scheduler.schedule(first_delay, self.run)
+        # TODO cancel previous
+
+    def run(self):
+        if self._cancelled:
+            return
+
+        # TODO wait for readyForNext?
+        self.on_reconnection(self.try_reconnect())
+        self.callback(*self.callback_args, **self.callback_kwargs)
+
+    def cancel(self):
+        self._cancelled = True
+
+    def reschedule(self, delay):
+        if self._cancelled:
+            return
+
+        try:
+            self.scheduler.schedule(delay, self.run)
+        except Exception, exc:
+            next_delay = self.schedule.get_next_delay()
+            if self.on_exception(exc, next_delay):
+                self.reschedule(next_delay)
+
+    def try_reconnect(self):
+        raise NotImplemented()
+
+    def on_reconnection(self, connection):
+        raise NotImplemented()
+
+    def on_exception(self, exc, next_delay):
+        if isinstance(exc, AuthenticationException):
+            return False
+        else:
+            return True
+
+
+class _HostReconnectionHandler(_ReconnectionHandler):
+
+    def __init__(self, host, connection_factory, *args, **kwargs):
+        _ReconnectionHandler.__init__(self, *args, **kwargs)
+        self.host = host
+        self.connection_factory = connection_factory
+
+    def try_reconnect(self):
+        return self.connection_factory.open(self.host)
+
+    def on_reconnection(self, connection):
+        self.host.monitor.reset()
+
+    def on_exception(self, exc, next_delay):
+        # TODO only overridden to add logging, so add logging
+        if isinstance(exc, AuthenticationException):
+            return False
+        else:
+            return True
 
 
 class HealthMonitor(object):
