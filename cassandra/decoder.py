@@ -18,7 +18,7 @@ import socket
 try:
     from cStringIO import StringIO
 except ImportError:
-    from StringIO import StringIO
+    from StringIO import StringIO  # ignore flake8 warning: # NOQA
 
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
                                int8_pack, int8_unpack)
@@ -33,12 +33,12 @@ class InternalError(Exception):
     pass
 
 
-PROTOCOL_VERSION             = 0x01
-PROTOCOL_VERSION_MASK        = 0x7f
+PROTOCOL_VERSION = 0x01
+PROTOCOL_VERSION_MASK = 0x7f
 
 HEADER_DIRECTION_FROM_CLIENT = 0x00
-HEADER_DIRECTION_TO_CLIENT   = 0x80
-HEADER_DIRECTION_MASK        = 0x80
+HEADER_DIRECTION_TO_CLIENT = 0x80
+HEADER_DIRECTION_MASK = 0x80
 
 
 def warn(msg):
@@ -130,6 +130,19 @@ class _MessageType(object):
                                  % (self.__class__.__name__, pname))
             setattr(self, pname, pval)
 
+    def to_string(self, stream_id, compression=None):
+        body = StringIO()
+        self.send_body(body)
+        body = body.getvalue()
+        version = PROTOCOL_VERSION | HEADER_DIRECTION_FROM_CLIENT
+        flags = 0
+        if compression is not None and len(body) > 0:
+            body = compression(body)
+            flags |= 0x1
+        msglen = int32_pack(len(body))
+        msg_parts = map(int8_pack, (version, flags, stream_id, self.opcode)) + [msglen, body]
+        return ''.join(msg_parts)
+
     def send(self, f, streamid, compression=None):
         body = StringIO()
         self.send_body(body)
@@ -154,25 +167,30 @@ class _MessageType(object):
 
 def read_frame(f, decompressor=None):
     header = f.read(8)
-    version, flags, stream, opcode = map(int8_unpack, header[:4])
+    version, flags, stream_id, opcode = map(int8_unpack, header[:4])
     body_len = int32_unpack(header[4:])
     assert version & PROTOCOL_VERSION_MASK == PROTOCOL_VERSION, \
             "Unsupported CQL protocol version %d" % version
     assert version & HEADER_DIRECTION_MASK == HEADER_DIRECTION_TO_CLIENT, \
-            "Unexpected request from server with opcode %04x, stream id %r" % (opcode, stream)
+            "Unexpected request from server with opcode %04x, stream id %r" % (opcode, stream_id)
     assert body_len >= 0, "Invalid CQL protocol body_len %r" % body_len
     body = f.read(body_len)
+    return decode_response(stream_id, flags, opcode, body, decompressor)
+
+
+def decode_response(stream_id, flags, opcode, body, decompressor=None):
     if flags & 0x1:
         if decompressor is None:
-            raise ProtocolException("No decompressor available for compressed frame!")
+            raise Exception("No decompressor available for compressed frame!")
         body = decompressor(body)
         flags ^= 0x1
     if flags:
         warn("Unknown protocol flags set: %02x. May cause problems." % flags)
     msg_class = _message_types_by_opcode[opcode]
     msg = msg_class.recv_body(StringIO(body))
-    msg.stream_id = stream
+    msg.stream_id = stream_id
     return msg
+
 
 error_classes = {}
 
@@ -386,10 +404,10 @@ class ResultMessage(_MessageType):
     name = 'RESULT'
     params = ('kind', 'results',)
 
-    KIND_VOID          = 0x0001
-    KIND_ROWS          = 0x0002
-    KIND_SET_KEYSPACE  = 0x0003
-    KIND_PREPARED      = 0x0004
+    KIND_VOID = 0x0001
+    KIND_ROWS = 0x0002
+    KIND_SET_KEYSPACE = 0x0003
+    KIND_PREPARED = 0x0004
     KIND_SCHEMA_CHANGE = 0x0005
 
     type_codes = {

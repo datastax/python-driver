@@ -6,7 +6,7 @@ class Query(object):
 
     retry_policy = None
     tracing_enabled = False
-    consistency_level = ConsistencyLevel.name_to_value["ONE"]
+    consistency_level = ConsistencyLevel.ONE
     routing_key = None
 
 

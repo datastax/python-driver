@@ -1,11 +1,13 @@
+import asynchat
 import itertools
 import socket
 
-from threading import RLock
+from threading import RLock, Event
 
+from cassandra.marshal import (int8_unpack, int32_unpack)
 from cassandra.decoder import (OptionsMessage, ReadyMessage, AuthenticateMessage,
                                StartupMessage, ErrorMessage, CredentialsMessage,
-                               RegisterMessage, read_frame)
+                               decode_response)
 
 locally_supported_compressions = {}
 try:
@@ -23,6 +25,13 @@ else:
 
 MAX_STREAM_PER_CONNECTION = 128
 
+PROTOCOL_VERSION = 0x01
+PROTOCOL_VERSION_MASK = 0x7f
+
+HEADER_DIRECTION_FROM_CLIENT = 0x00
+HEADER_DIRECTION_TO_CLIENT = 0x80
+HEADER_DIRECTION_MASK = 0x80
+
 
 def warn(msg):
     print msg
@@ -36,34 +45,72 @@ class InternalError(Exception):
     pass
 
 
-class Connection(object):
+class Connection(asynchat.async_chat):
 
-    def __init__(self, host='127.0.0.1', port=9042, credentials=None, compression=False, cql_version=None):
+    def __init__(self, host='127.0.0.1', port=9042):
+        asynchat.async_chat.__init__(self)
+        self.cql_version = "3.0.1"
         self.host = host
         self.port = port
-        self.credentials = credentials
-        self.compression = compression
-        self.cql_version = cql_version
 
-        self.make_reqid = itertools.cycle(xrange(127)).next
-        self.responses = {}
-        self.waiting = {}
-        self.in_flight = 0
+        # TODO cleanup, see todo below
+        self.compression = True
+        self._compresstype = None
+        self._compressor = None
+        self.compressor = None
+        self.decompressor = None
+        self.conn_ready = False
+
+        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.connect((host, port))
+
+        self.make_request_id = itertools.cycle(xrange(127)).next
+        self._waiting_callbacks = {}
+        self._waiting_events = {}
+        self._responses = {}
         self._lock = RLock()
-        self.conn_ready = False
-        self.compressor = self.decompressor = None
-        self.event_watchers = {}
 
-    def establish_connection(self):
-        self.conn_ready = False
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect((self.host, self.port))
-        self.socketf = s.makefile(bufsize=0)
-        self.sockfd = s
-        self.open_socket = True
-        supported = self.wait_for_request(OptionsMessage())
-        self.supported_cql_versions = supported.cql_versions
-        self.remote_supported_compressions = supported.options['COMPRESSION']
+    def handle_read(self):
+        # simpler to do here than collect_incoming_data()
+        header = self.recv(8)
+        version, flags, stream_id, opcode = map(int8_unpack, header[:4])
+        body_len = int32_unpack(header[4:])
+        assert version & PROTOCOL_VERSION_MASK == PROTOCOL_VERSION, \
+                "Unsupported CQL protocol version %d" % version
+        assert version & HEADER_DIRECTION_MASK == HEADER_DIRECTION_TO_CLIENT, \
+                "Unexpected request from server with opcode %04x, stream id %r" % (opcode, stream_id)
+        assert body_len >= 0, "Invalid CQL protocol body_len %r" % body_len
+        body = self.recv(body_len)
+
+        if stream_id < 0:
+            self.handle_pushed(stream_id, flags, opcode, body)
+        else:
+            try:
+                cb = self._waiting_callbacks[stream_id]
+            except KeyError:
+                # store the response in a location accessible by other threads
+                self._responses[stream_id] = (flags, opcode, body)
+
+                # signal to the waiting thread that the response is ready
+                self._waiting_events[stream_id].set()
+
+                # clear out the Event's signal  # TODO reuse Event, throw away, what?
+                self._waiting_events[stream_id].clear()
+            else:
+                cb(stream_id, flags, opcode, body)
+
+    def readable(self):
+        # TODO only return True if we have pending responses (except for ControlConnections?)
+        return True
+
+    def handle_connect(self):
+        self.send_msg(OptionsMessage(), self._handle_options_response)
+
+    def _handle_options_response(self, stream_id, flags, opcode, body):
+        options_response = decode_response(stream_id, flags, opcode, body)
+
+        self.supported_cql_versions = options_response.cql_versions
+        self.remote_supported_compressions = options_response.options['COMPRESSION']
 
         if self.cql_version:
             if self.cql_version not in self.supported_cql_versions:
@@ -75,7 +122,7 @@ class Connection(object):
             self.cql_version = self.supported_cql_versions[0]
 
         opts = {}
-        compresstype = None
+        self._compresstype = None
         if self.compression:
             overlap = set(locally_supported_compressions) \
                     & set(self.remote_supported_compressions)
@@ -85,228 +132,66 @@ class Connection(object):
                      % (locally_supported_compressions,
                         self.remote_supported_compressions))
             else:
-                compresstype = iter(overlap).next() # choose any
-                opts['COMPRESSION'] = compresstype
-                compr, decompr = locally_supported_compressions[compresstype]
+                # TODO these compression fields probably don't need to be set
+                # on the object; look at cleaning this up
+                self._compresstype = iter(overlap).next() # choose any
+                opts['COMPRESSION'] = self._compresstype
                 # set the decompressor here, but set the compressor only after
                 # a successful Ready message
-                self.decompressor = decompr
+                self._compressor, self.decompressor = locally_supported_compressions[self._compresstype]
 
         sm = StartupMessage(cqlversion=self.cql_version, options=opts)
-        startup_response = self.wait_for_request(sm)
-        while True:
-            if isinstance(startup_response, ReadyMessage):
-                self.conn_ready = True
-                if compresstype:
-                    self.compressor = compr
-                break
-            if isinstance(startup_response, AuthenticateMessage):
-                self.authenticator = startup_response.authenticator
-                if self.credentials is None:
-                    raise ProgrammingError('Remote end requires authentication.')
-                cm = CredentialsMessage(creds=self.credentials)
-                startup_response = self.wait_for_request(cm)
-            elif isinstance(startup_response, ErrorMessage):
-                raise ProgrammingError("Server did not accept credentials. %s"
-                                       % startup_response.summary_msg())
-            else:
-                raise InternalError("Unexpected response %r during connection setup"
-                                    % startup_response)
+        self.send_msg(sm, cb=self._handle_startup_response)
 
-    def terminate_connection(self):
-        self.socketf.close()
-        self.sockfd.close()
+    def _handle_startup_response(self, stream_id, flags, opcode, body):
+        startup_response = decode_response(
+            stream_id, flags, opcode, body, self.decompressor)
 
-    def wait_for_request(self, msg):
-        """
-        Given a message, send it to the server, wait for a response, and
-        return the response.
-        """
-        return self.wait_for_requests(msg)[0]
-
-    def send_msg(self, msg):
-        reqid = self.make_reqid()
-        msg.send(self.socketf, reqid, compression=self.compressor)
-        return reqid
-
-    def wait_for_requests(self, *msgs):
-        """
-        Given any number of message objects, send them all to the server
-        and wait for responses to each one. Once they arrive, return all
-        of the responses in the same order as the messages to which they
-        respond.
-        """
-        reqids = []
-        for msg in msgs:
-            reqid = self.send_msg(msg)
-            reqids.append(reqid)
-        resultdict = self.wait_for_results(*reqids)
-        return [resultdict[reqid] for reqid in reqids]
-
-    def wait_for_results(self, *reqids):
-        """
-        Given any number of stream-ids, wait until responses have arrived for
-        each one, and return a dictionary mapping the stream-ids to the
-        appropriate results.
-
-        For internal use, None may be passed in place of a reqid, which will
-        be considered satisfied when a message of any kind is received (and, if
-        appropriate, handled).
-        """
-        waiting_for = set(reqids)
-        results = {}
-        for r in reqids:
-            try:
-                result = self.responses.pop(r)
-            except KeyError:
-                pass
-            else:
-                results[r] = result
-                waiting_for.remove(r)
-        while waiting_for:
-            newmsg = read_frame(self.socketf, decompressor=self.decompressor)
-            if newmsg.stream_id in waiting_for:
-                results[newmsg.stream_id] = newmsg
-                waiting_for.remove(newmsg.stream_id)
-            else:
-                self.handle_incoming(newmsg)
-            if None in waiting_for:
-                results[None] = newmsg
-                waiting_for.remove(None)
-        return results
-
-    def wait_for_result(self, reqid):
-        """
-        Given a stream-id, wait until a response arrives with that stream-id,
-        and return the msg.
-        """
-        return self.wait_for_results(reqid)[reqid]
-
-    def handle_incoming(self, msg):
-        if msg.stream_id < 0:
-            self.handle_pushed(msg)
-            return
-        try:
-            cb = self.waiting.pop(msg.stream_id)
-        except KeyError:
-            self.responses[msg.stream_id] = msg
+        if isinstance(startup_response, ReadyMessage):
+            self.conn_ready = True
+            if self._compresstype:
+                self.compressor = self._compressor
+        elif isinstance(startup_response, AuthenticateMessage):
+            self.authenticator = startup_response.authenticator
+            if self.credentials is None:
+                raise ProgrammingError('Remote end requires authentication.')
+            cm = CredentialsMessage(creds=self.credentials)
+            self.send_msg(cm, cb=self._handle_startup_response)
+        elif isinstance(startup_response, ErrorMessage):
+            raise ProgrammingError("Server did not accept credentials. %s"
+                                   % startup_response.summary_msg())
         else:
-            cb(msg)
+            raise InternalError("Unexpected response %r during connection setup"
+                                % startup_response)
 
-    def callback_when(self, reqid, cb):
-        """
-        Callback cb with a message object once a message with a stream-id
-        of reqid is received. The callback may be immediate, if a response
-        is already in the received queue.
+    # def handle_error(self):
+    #     print "got connection error"  # TODO
+    #     self.close()
 
-        Otherwise, note also that the callback may not be called immediately
-        upon the arrival of the response packet; it may have to wait until
-        something else waits on a result.
-        """
-        try:
-            msg = self.responses.pop(reqid)
-        except KeyError:
-            pass
+    def handle_pushed(self, stream_id, flags, opcode, body):
+        pass
+
+    def push(self, data):
+        # overridden to avoid calling initiate_send() at the end of this
+        # and hold the lock
+        sabs = self.ac_out_buffer_size
+        with self._lock:
+            if len(data) > sabs:
+                for i in xrange(0, len(data), sabs):
+                    self.producer_fifo.append(data[i:i + sabs])
+            else:
+                self.producer_fifo.append(data)
+
+    def send_msg(self, msg, cb=None):
+        request_id = self.make_request_id()
+        if cb:
+            self._waiting_callbacks[request_id] = cb
+            event = None
         else:
-            return cb(msg)
-        self.waiting[reqid] = cb
-
-    def request_and_callback(self, msg, cb):
-        """
-        Given a message msg and a callable cb, send the message to the server
-        and call cb with the result once it arrives. Note that the callback
-        may not be called immediately upon the arrival of the response packet;
-        it may have to wait until something else waits on a result.
-        """
-        reqid = self.send_msg(msg)
-        self.callback_when(reqid, cb)
-
-    def handle_pushed(self, msg):
-        """
-        Process an incoming message originated by the server.
-        """
-        watchers = self.event_watchers.get(msg.event_type, ())
-        for cb in watchers:
-            cb(msg.event_args)
-
-    def register_watcher(self, event_type, callback):
-        """
-        Request that any events of the given type be passed to the given
-        callback when they arrive. Note that the callback may not be called
-        immediately upon the arrival of the event packet; it may have to wait
-        until something else waits on a result, or until wait_for_even() is
-        called.
-
-        If the event type has not been registered for already, this may
-        block while a new REGISTER message is sent to the server.
-
-        The available event types are in the cql.native.known_event_types
-        list.
-
-        When an event arrives, a dictionary will be passed to the callback
-        with the info about the event. Some example result dictionaries:
-
-        (For STATUS_CHANGE events:)
-
-          {'change_type': u'DOWN', 'address': ('12.114.19.76', 8000)}
-
-        (For TOPOLOGY_CHANGE events:)
-
-          {'change_type': u'NEW_NODE', 'address': ('19.10.122.13', 8000)}
-        """
-        return self.register_watchers({event_type: callback})
-
-    def register_watchers(self, event_type_callbacks):
-        to_watch = {}
-        to_register = []
-        for event_type, callback in event_type_callbacks.items():
-            if isinstance(event_type, str):
-                event_type = event_type.decode('utf8')
             try:
-                watchers = self.event_watchers[event_type]
+                event = self._waiting_events[request_id]
             except KeyError:
-                to_register.append(event_type)
-                watchers = self.event_watchers.setdefault(event_type, [])
+                event = self._waiting_events.setdefault(request_id, Event())
 
-            to_watch[watchers] = callback
-
-        if to_register:
-            ans = self.wait_for_request(RegisterMessage(event_list=to_register))
-            if isinstance(ans, ErrorMessage):
-                raise ProgrammingError(
-                    "Server did not accept registration for events: %s"
-                    % (ans.summary_msg(),))
-
-            for watchers, callback in to_watch.items():
-                watchers.append(callback)
-
-    def unregister_watcher(self, event_type, cb):
-        """
-        Given an event_type and a callback previously registered with
-        register_watcher(), remove that callback from the list of watchers for
-        the given event type.
-        """
-
-        if isinstance(event_type, str):
-            event_type = event_type.decode('utf8')
-        self.event_watchers[event_type].remove(cb)
-
-    def wait_for_event(self):
-        """
-        Wait for any sort of event to arrive, and handle it via the
-        registered callbacks. It is recommended that some event watchers
-        be registered before calling this; otherwise, no events will be
-        sent by the server.
-        """
-        events_seen = []
-
-        def i_saw_an_event(ev):
-            events_seen.append(ev)
-
-        wlists = self.event_watchers.values()
-        for wlist in wlists:
-            wlist.append(i_saw_an_event)
-        while not events_seen:
-            self.wait_for_result(None)
-        for wlist in wlists:
-            wlist.remove(i_saw_an_event)
+        self.push(msg.to_string(request_id, compression=self.compressor))
+        return event, request_id

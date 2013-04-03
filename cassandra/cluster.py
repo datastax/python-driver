@@ -1,3 +1,4 @@
+import asyncore
 import time
 from threading import Lock, RLock, Thread
 import Queue
@@ -12,10 +13,61 @@ from policies import (RoundRobinPolicy, SimpleConvictionPolicy,
 from query import SimpleStatement
 from pool import (ConnectionException, BusyConnectionException,
                   AuthenticationException, _ReconnectionHandler,
-                  _HostReconnectionHandler)
+                  _HostReconnectionHandler, HostConnectionPool)
 
 # TODO: we might want to make this configurable
 MAX_SCHEMA_AGREEMENT_WAIT_MS = 10000
+
+
+class _RetryingCallback(object):
+
+    def __init__(self, session, query):
+        self.session = session
+        self.query = query
+        self.query_plan = session._load_balancer.new_query_plan(query)
+
+        self._req_id = None
+        self._final_result = None
+        self._final_exception = None
+        self._wait_fn = None
+        self._errors = {}
+
+    def send_request(self):
+        for host in self.query_plan:
+            req_id = self._query(host)
+            if req_id:
+                self._req_id = req_id
+                return
+
+        self._final_exception = NoHostAvailable(self._errors)
+
+    def _query(self, host):
+        pool = self._session._pools.get(host)
+        if not pool or pool.is_shutdown:
+            return None
+
+        try:
+            # TODO get connectTimeout from cluster settings
+            connection = pool.borrow_connection(timeout=2.0)
+            request_id = connection.request_and_callback(self.query, self._set_results)
+            self._wait_fn = connection.wait_for_result
+            return request_id
+        except Exception:
+            return None
+        finally:
+            if connection:
+                pool.return_connection(connection)
+
+    def _set_results(self, response):
+        self._final_result = response
+
+    def deliver(self):
+        if self._final_result:
+            return self._final_result
+        elif self._final_exception:
+            raise self._final_exception
+        else:
+            return self._wait_fn(self._req_id)
 
 class Session(object):
 
@@ -51,8 +103,7 @@ class Session(object):
             pass
 
         errors = {}
-        query_plan = self._load_balancer.make_query_plan(query)
-        for host in query_plan:
+        for host in self._load_balancer.make_query_plan(query):
             try:
                 result = self._query(host)
                 if result:
@@ -64,6 +115,64 @@ class Session(object):
         pool = self._pools.get(host)
         if not pool or pool.is_shutdown:
             return False
+
+    def add_host(self, host):
+        distance = self._load_balancer.distance(host)
+        if distance == HostDistance.IGNORED:
+            return self._pools.get(host)
+        else:
+            try:
+                new_pool = HostConnectionPool(host, distance, self)
+            except AuthenticationException, auth_exc:
+                conn_exc = ConnectionException(str(auth_exc), host=host)
+                host.monitor.signal_connection_failure(conn_exc)
+                return self._pools.get(host)
+            except ConnectionException, conn_exc:
+                host.monitor.signal_connection_failure(conn_exc)
+                return self._pools.get(host)
+
+            previous = self._pools.get(host)
+            self._pools[host] = new_pool
+            return previous
+
+    def on_up(self, host):
+        previous_pool = self.add_host(host)
+        self._load_balancer.on_up(host)
+        if previous_pool:
+            previous_pool.shutdown()
+
+    def on_down(self, host):
+        self._load_balancer.on_down(host)
+        pool = self._pools.pop(host, None)
+        if pool:
+            pool.shutdown()
+
+        for host in self._cluster.metadata.all_hosts():
+            if not host.monitor.is_up:
+                continue
+
+            distance = self._load_balancer.distance(host)
+            if distance != HostDistance.IGNORED:
+                pool = self._pools.get(host)
+                if not pool:
+                    self.add_host(host)
+                else:
+                    pool.host_distance = distance
+
+    def on_add(self, host):
+        previous_pool = self.add_host(host)
+        self._load_balancer.on_add(host)
+        if previous_pool:
+            previous_pool.shutdown()
+
+    def on_remove(self, host):
+        self._load_balancer.on_remove(host)
+        pool = self._pools.pop(host)
+        if pool:
+            pool.shutdown()
+
+    def set_keyspace(self, keyspace):
+        pass
 
 DEFAULT_MIN_REQUESTS = 25
 DEFAULT_MAX_REQUESTS = 100
@@ -105,6 +214,18 @@ class _Scheduler(object):
                 pass
 
             time.sleep(0.1)
+
+
+_loop_started = False
+_loop_lock = Lock()
+def _start_loop():
+    with _loop_lock:
+        global _loop_started
+        if not _loop_started:
+            _loop_started = True
+            t = Thread(target=asyncore.loop, name="Async event loop")
+            t.daemon = True
+            t.start()
 
 
 class Cluster(object):
@@ -157,6 +278,9 @@ class Cluster(object):
 
         self._is_shutdown = False
         self._lock = Lock()
+
+        # start the global event loop
+        _start_loop()
 
         self._control_connection = ControlConnection(self, self.metadata)
         try:

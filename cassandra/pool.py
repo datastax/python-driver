@@ -9,7 +9,10 @@ from threading import Lock, RLock, Condition
 from connection import MAX_STREAM_PER_CONNECTION
 
 class ConnectionException(Exception):
-    pass
+
+    def __init__(self, message, host=None):
+        Exception.__init__(self, message)
+        self.host = host
 
 
 class BusyConnectionException(Exception):
