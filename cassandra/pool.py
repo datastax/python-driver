@@ -65,6 +65,9 @@ class Host(object):
     def __str__(self):
         return self.address
 
+    def __repr__(self):
+        return "<%s: %s>" % (self.__class__.__name__, self.address)
+
 
 class _ReconnectionHandler(object):
 
@@ -127,7 +130,7 @@ class _HostReconnectionHandler(_ReconnectionHandler):
         self.connection_factory = connection_factory
 
     def try_reconnect(self):
-        return self.connection_factory.open(self.host)
+        return self.connection_factory(self.host)
 
     def on_reconnection(self, connection):
         self.host.monitor.reset()
@@ -201,7 +204,7 @@ class HostConnectionPool(object):
 
         # TODO potentially use threading.Queue for this
         core_conns = session.cluster.get_core_connections_per_host(host_distance)
-        self._connections = [session.connection_factory.open(host)
+        self._connections = [session.connection_factory(host)
                              for i in range(core_conns)]
         self._trash = set()
         self._open_count = len(self._connections)
@@ -214,14 +217,15 @@ class HostConnectionPool(object):
 
         if not self._connections:
             core_conns = self._session.cluster.get_core_connections_per_host(self.host_distance)
-            for i in range(core_conns):
-                with self._lock:
+            # TODO look at effects of race condition here
+            with self._lock:
+                for i in range(core_conns):
                     self._scheduled_for_creation += 1
                     self._session.submit(self._create_new_connection)
 
-                conn = self._wait_for_conn(timeout)
-                conn.set_keyspace()  # TODO need to get keyspace from pool
-                return conn
+            conn = self._wait_for_conn(timeout)
+            conn.set_keyspace()  # TODO need to get keyspace from pool
+            return conn
         else:
             least_busy = min(self._connections, key=lambda c: c.in_flight)
             max_reqs = self._session.cluster.get_max_requests_per_connection(self.host_distance)
@@ -265,9 +269,10 @@ class HostConnectionPool(object):
             self._open_count += 1
 
         try:
-            conn = self._session.connection_factory.open(self.host)
+            conn = self._session.connection_factory(self.host)
             with self._lock:
                 self._connections.append(conn)
+            self._signal_available_conn()
         except ConnectionException:
             with self._lock:
                 self._open_count -= 1

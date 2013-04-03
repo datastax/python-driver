@@ -174,6 +174,9 @@ class Session(object):
     def set_keyspace(self, keyspace):
         pass
 
+    def submit(self, task):
+        return self.cluster.executor.submit(task)
+
 DEFAULT_MIN_REQUESTS = 25
 DEFAULT_MAX_REQUESTS = 100
 
@@ -270,7 +273,7 @@ class Cluster(object):
         }
 
         # TODO real factory based on config
-        self._connection_factory = Connection
+        self.connection_factory = Connection.factory
 
         # TODO make the pool size configurable somewhere
         self.executor = ThreadPoolExecutor(max_workers=3)
@@ -281,6 +284,9 @@ class Cluster(object):
 
         # start the global event loop
         _start_loop()
+
+        for address in contact_points:
+            self.add_host(address, signal=False)
 
         self._control_connection = ControlConnection(self, self.metadata)
         try:
@@ -357,7 +363,7 @@ class Cluster(object):
 
         schedule = self.reconnection_policy.new_schedule()
         reconnector = _HostReconnectionHandler(
-            host, self._connection_factory, self.scheduler, schedule,
+            host, self.connection_factory, self.scheduler, schedule,
             callback=host.get_and_set_reconnection_handler,
             callback_kwargs=dict(new_handler=None))
 
@@ -460,7 +466,7 @@ class ControlConnection(object):
 
     def _reconnect_internal(self):
         errors = {}
-        for host in self._balancing_policy:
+        for host in self._balancing_policy.make_query_plan():
             try:
                 return self._try_connect(host)
             except ConnectionException, exc:
@@ -472,7 +478,7 @@ class ControlConnection(object):
         raise NoHostAvailable("Unable to connect to any servers", errors)
 
     def _try_connect(self, host):
-        connection = self._cluster.connection_factory.open(host)
+        connection = self._cluster.connection_factory(host.address)
         connection.register_watchers({
             "TOPOLOGY_CHANGE": self._handle_topology_change,
             "STATUS_CHANGE": self._handle_status_change,

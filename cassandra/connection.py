@@ -47,6 +47,12 @@ class InternalError(Exception):
 
 class Connection(asynchat.async_chat):
 
+    @classmethod
+    def factory(cls, *args, **kwargs):
+        conn = cls(*args, **kwargs)
+        conn.connected_event.wait()
+        return conn
+
     def __init__(self, host='127.0.0.1', port=9042):
         asynchat.async_chat.__init__(self)
         self.cql_version = "3.0.1"
@@ -59,7 +65,8 @@ class Connection(asynchat.async_chat):
         self._compressor = None
         self.compressor = None
         self.decompressor = None
-        self.conn_ready = False
+
+        self.connected_event = Event()
 
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect((host, port))
@@ -93,9 +100,6 @@ class Connection(asynchat.async_chat):
 
                 # signal to the waiting thread that the response is ready
                 self._waiting_events[stream_id].set()
-
-                # clear out the Event's signal  # TODO reuse Event, throw away, what?
-                self._waiting_events[stream_id].clear()
             else:
                 cb(stream_id, flags, opcode, body)
 
@@ -148,9 +152,9 @@ class Connection(asynchat.async_chat):
             stream_id, flags, opcode, body, self.decompressor)
 
         if isinstance(startup_response, ReadyMessage):
-            self.conn_ready = True
             if self._compresstype:
                 self.compressor = self._compressor
+            self.connected_event.set()
         elif isinstance(startup_response, AuthenticateMessage):
             self.authenticator = startup_response.authenticator
             if self.credentials is None:
@@ -186,12 +190,15 @@ class Connection(asynchat.async_chat):
         request_id = self.make_request_id()
         if cb:
             self._waiting_callbacks[request_id] = cb
-            event = None
         else:
-            try:
-                event = self._waiting_events[request_id]
-            except KeyError:
-                event = self._waiting_events.setdefault(request_id, Event())
+            self._waiting_events[request_id] = Event()
 
         self.push(msg.to_string(request_id, compression=self.compressor))
-        return event, request_id
+        return request_id
+
+    def get_response(self, stream_id):
+        """ Blocking wait for a response """
+        # TODO waiting on the event in the loop thread will deadlock
+        self._waiting_events.pop(stream_id).wait()
+        (flags, opcode, body) = self._responses.pop(stream_id)
+        return decode_response(stream_id, flags, opcode, body, self.decompressor)

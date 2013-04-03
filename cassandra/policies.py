@@ -15,7 +15,7 @@ class LoadBalancingPolicy(object):
     def distance(self, host):
         raise NotImplemented()
 
-    def make_query_plan(self, query):
+    def make_query_plan(self, query=None):
         raise NotImplemented()
 
 
@@ -23,20 +23,23 @@ class RoundRobinPolicy(LoadBalancingPolicy):
 
     def populate(self, cluster, hosts):
         self._live_hosts = set(hosts)
-        self._position = randint(0, len(hosts) - 1)
+        if len(hosts) == 1:
+            self._position = 0
+        else:
+            self._position = randint(0, len(hosts) - 1)
         self._lock = RLock()
 
     def distance(self, host):
         return HostDistance.LOCAL
 
-    def make_query_plan(self, query):
+    def make_query_plan(self, query=None):
         with self._lock:
             pos = self._position
             self._position += 1
 
         length = len(self._live_hosts)
         pos %= length
-        return islice(cycle(self._live_hosts, pos, pos + length))
+        return islice(cycle(self._live_hosts), pos, pos + length)
 
     def on_up(self, host):
         self._live_hosts.add(host)
@@ -63,7 +66,10 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
         for dc, hosts in groupby(hosts, lambda h: h.dc):
             self._dc_live_hosts[dc] = set(hosts)
 
-        self._position = randint(0, len(hosts) - 1)
+        if len(hosts) == 1:
+            self._position = 0
+        else:
+            self._position = randint(0, len(hosts) - 1)
 
     def distance(self, host):
         if host.dc == self.local_dc:
@@ -81,7 +87,7 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
             else:
                 return HostDistance.IGNORE
 
-    def make_query_plan(self, query):
+    def make_query_plan(self, query=None):
         with self._lock:
             pos = self._position
             self._position += 1

@@ -185,10 +185,12 @@ class Metadata(object):
         with self._hosts_lock:
             if address not in self._hosts:
                 new_host = Host(address, self.cluster.conviction_policy_factory)
-                new_host.monitor.register(self.cluster)
-                return new_host
+                self._hosts[address] = new_host
             else:
                 return None
+
+        new_host.monitor.register(self.cluster)
+        return new_host
 
     def remove_host(self, host):
         with self._hosts_lock:
@@ -199,7 +201,7 @@ class Metadata(object):
 
     def all_hosts(self):
         with self._hosts_lock:
-            return self.hosts.values()
+            return self._hosts.values()
 
 
 class KeyspaceMetadata(object):
