@@ -79,24 +79,6 @@ ConsistencyLevel.name_to_value = {
 }
 
 
-class CqlResult:
-    def __init__(self, column_metadata, rows):
-        self.column_metadata = column_metadata
-        self.rows = rows
-
-    def __iter__(self):
-        return iter(self.rows)
-
-    # TODO this definitely needs to be abstracted at some other level
-    def as_dicts(self):
-        colnames = [c[2] for c in self.column_metadata]
-        return [dict(zip(colnames, row)) for row in self.rows]
-
-    def __str__(self):
-        return '<CqlResult: column_metadata=%r, rows=%r>' \
-               % (self.column_metadata, self.rows)
-    __repr__ = __str__
-
 class PreparedResult:
     def __init__(self, queryid, param_metadata):
         self.queryid = queryid
@@ -253,9 +235,9 @@ class UnavailableExceptionErrorMessage(RequestExecutionException):
     @staticmethod
     def recv_error_info(f):
         return {
-            'consistency_level': read_consistency_level(f),
-            'required': read_int(f),
-            'alive': read_int(f),
+            'consistency': read_consistency_level(f),
+            'required_replicas': read_int(f),
+            'alive_replicas': read_int(f),
         }
 
 class OverloadedErrorMessage(RequestExecutionException):
@@ -280,10 +262,10 @@ class WriteTimeoutErrorMessage(RequestTimeoutException):
     @staticmethod
     def recv_error_info(f):
         return {
-            'consistency_level': read_consistency_level(f),
-            'received': read_int(f),
-            'blockfor': read_int(f),
-            'writetype': read_string(f),
+            'consistency': read_consistency_level(f),
+            'received_responses': read_int(f),
+            'required_responses': read_int(f),
+            'write_type': read_string(f),
         }
 
 class ReadTimeoutErrorMessage(RequestTimeoutException):
@@ -293,10 +275,10 @@ class ReadTimeoutErrorMessage(RequestTimeoutException):
     @staticmethod
     def recv_error_info(f):
         return {
-            'consistency_level': read_consistency_level(f),
-            'received': read_int(f),
-            'blockfor': read_int(f),
-            'data_present': bool(read_byte(f)),
+            'consistency': read_consistency_level(f),
+            'received_responses': read_int(f),
+            'required_responses': read_int(f),
+            'data_retrieved': bool(read_byte(f)),
         }
 
 class SyntaxException(RequestValidationException):
@@ -455,7 +437,10 @@ class ResultMessage(_MessageType):
         colspecs = cls.recv_results_metadata(f)
         rowcount = read_int(f)
         rows = [cls.recv_row(f, len(colspecs)) for x in xrange(rowcount)]
-        return CqlResult(column_metadata=colspecs, rows=rows)
+        colnames = [c[2] for c in colspecs]
+        coltypes = [c[3] for c in colspecs]
+        return [dict(zip(colnames, [ctype.from_binary(val) for ctype, val in zip(coltypes, row)]))
+                for row in rows]
 
     @classmethod
     def recv_results_prepared(cls, f):
@@ -596,7 +581,7 @@ def read_consistency_level(f):
     return ConsistencyLevel.value_to_name[read_short(f)]
 
 def write_consistency_level(f, cl):
-    write_short(f, ConsistencyLevel.name_to_value[cl])
+    write_short(f, cl)
 
 def read_string(f):
     size = read_short(f)

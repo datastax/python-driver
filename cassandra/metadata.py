@@ -1,3 +1,4 @@
+import json
 from collections import defaultdict
 from threading import RLock
 
@@ -20,10 +21,10 @@ class Metadata(object):
         cf_def_rows = defaultdict(list)
         col_def_rows = defaultdict(lambda: defaultdict(list))
 
-        for row in cf_results:
+        for row in cf_results.results:
             cf_def_rows[row["keyspace_name"]].append(row)
 
-        for row in col_results:
+        for row in col_results.results:
             ksname = row["keyspace_name"]
             cfname = row["columnfamily_name"]
             col_def_rows[ksname][cfname].append(row)
@@ -32,13 +33,13 @@ class Metadata(object):
         if not table:
             # ks_results is not None
             added_keyspaces = set()
-            for row in ks_results:
+            for row in ks_results.results:
                 keyspace_meta = self._build_keyspace_metadata(row)
                 ksname = keyspace_meta.name
                 if ksname in cf_def_rows:
                     for table_row in cf_def_rows[keyspace_meta.name]:
                         table_meta = self._build_table_metadata(
-                                keyspace_meta, table_row, col_def_rows[keyspace_meta.name])
+                            keyspace_meta, table_row, col_def_rows[keyspace_meta.name])
                         keyspace_meta.tables[table_meta.name] = table_meta
 
                 added_keyspaces.add(keyspace_meta.name)
@@ -67,7 +68,7 @@ class Metadata(object):
         name = row["keyspace_name"]
         durable_writes = row["durable_writes"]
         strategy_class = row["strategy_class"]
-        strategy_options = row["strategy_options"]
+        strategy_options = json.loads(row["strategy_options"])
         return KeyspaceMetadata(name, durable_writes, strategy_class, strategy_options)
 
     def _build_table_metadata(self, keyspace_metadata, row, col_rows):
@@ -143,7 +144,7 @@ class Metadata(object):
         # value alias (if present)
         if has_value:
             validator = cqltypes.lookup_casstype(row["default_validator"])
-            if not row.get["key_aliases"]:
+            if not row.get("key_aliases"):
                 value_alias = "value"
             else:
                 value_alias = row["value_alias"]
@@ -156,7 +157,7 @@ class Metadata(object):
                 column_meta = self._build_column_metadata(table_meta, row)
                 table_meta.columns[column_meta.name] = column_meta
 
-        table_meta.options = self._build_table_options(is_compact)
+        table_meta.options = self._build_table_options(row, is_compact)
         return table_meta
 
     def _build_table_options(self, row, is_compact_storage):

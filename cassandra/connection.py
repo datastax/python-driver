@@ -1,13 +1,20 @@
+import asyncore
 import asynchat
+from collections import defaultdict
+from functools import partial
 import itertools
+import logging
 import socket
+from threading import RLock, Event, Lock, Thread
+import traceback
 
-from threading import RLock, Event
 
 from cassandra.marshal import (int8_unpack, int32_unpack)
 from cassandra.decoder import (OptionsMessage, ReadyMessage, AuthenticateMessage,
                                StartupMessage, ErrorMessage, CredentialsMessage,
                                decode_response)
+
+log = logging.getLogger(__name__)
 
 locally_supported_compressions = {}
 try:
@@ -45,6 +52,22 @@ class InternalError(Exception):
     pass
 
 
+_loop_started = False
+_loop_lock = Lock()
+def _start_loop():
+    global _loop_started
+    should_start = False
+    with _loop_lock:
+        if not _loop_started:
+            _loop_started = True
+            should_start = True
+
+    if should_start:
+        t = Thread(target=asyncore.loop, name="async_event_loop", kwargs={"timeout": 0.01})
+        t.daemon = True
+        t.start()
+
+
 class Connection(asynchat.async_chat):
 
     @classmethod
@@ -67,15 +90,18 @@ class Connection(asynchat.async_chat):
         self.decompressor = None
 
         self.connected_event = Event()
-
-        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.connect((host, port))
+        self.in_flight = 0
+        self.is_defunct = False
 
         self.make_request_id = itertools.cycle(xrange(127)).next
-        self._waiting_callbacks = {}
-        self._waiting_events = {}
-        self._responses = {}
+        self._callbacks = {}
+        self._push_watchers = defaultdict(set)
         self._lock = RLock()
+
+        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+        # start the global event loop if needed
+        _start_loop()
+        self.connect((host, port))
 
     def handle_read(self):
         # simpler to do here than collect_incoming_data()
@@ -89,30 +115,62 @@ class Connection(asynchat.async_chat):
         assert body_len >= 0, "Invalid CQL protocol body_len %r" % body_len
         body = self.recv(body_len)
 
+        response = decode_response(stream_id, flags, opcode, body, self.decompressor)
         if stream_id < 0:
-            self.handle_pushed(stream_id, flags, opcode, body)
+            self.handle_pushed(response)
         else:
-            try:
-                cb = self._waiting_callbacks[stream_id]
-            except KeyError:
-                # store the response in a location accessible by other threads
-                self._responses[stream_id] = (flags, opcode, body)
-
-                # signal to the waiting thread that the response is ready
-                self._waiting_events[stream_id].set()
-            else:
-                cb(stream_id, flags, opcode, body)
+            self._callbacks.pop(stream_id)(response)
 
     def readable(self):
-        # TODO only return True if we have pending responses (except for ControlConnections?)
-        return True
+        # TODO this isn't accurate for control connections
+        return bool(self._callbacks)
+
+    def handle_error(self):
+        log.error(traceback.format_exc())
+        self.is_defunct = True
+
+    def handle_pushed(self, response):
+        pass
+        # details = response.recv_body
+        # for cb in self._push_watchers[response]
+
+    def push(self, data):
+        # overridden to avoid calling initiate_send() at the end of this
+        # and hold the lock
+        sabs = self.ac_out_buffer_size
+        with self._lock:
+            if len(data) > sabs:
+                for i in xrange(0, len(data), sabs):
+                    self.producer_fifo.append(data[i:i + sabs])
+            else:
+                self.producer_fifo.append(data)
+
+    def send_msg(self, msg, cb):
+        request_id = self.make_request_id()
+        self._callbacks[request_id] = cb
+        self.push(msg.to_string(request_id, compression=self.compressor))
+        return request_id
+
+    def wait_for_responses(self, *msgs):
+        waiter = ResponseWaiter(len(msgs))
+        for i, msg in enumerate(msgs):
+            self.send_msg(msg, partial(waiter.got_response, index=i))
+        waiter.event.wait()
+        return waiter.responses
+
+    def register_watcher(self, event_type, callback):
+        self._push_watchers[event_type].add(callback)
+
+    def register_watchers(self, type_callback_dict):
+        for event_type, callback in type_callback_dict.items():
+            self.register_watcher(event_type, callback)
 
     def handle_connect(self):
+        log.debug("Sending initial message for new Connection to %s" % self.host)
         self.send_msg(OptionsMessage(), self._handle_options_response)
 
-    def _handle_options_response(self, stream_id, flags, opcode, body):
-        options_response = decode_response(stream_id, flags, opcode, body)
-
+    def _handle_options_response(self, options_response):
+        log.debug("Received options response on new Connection from %s" % self.host)
         self.supported_cql_versions = options_response.cql_versions
         self.remote_supported_compressions = options_response.options['COMPRESSION']
 
@@ -147,58 +205,39 @@ class Connection(asynchat.async_chat):
         sm = StartupMessage(cqlversion=self.cql_version, options=opts)
         self.send_msg(sm, cb=self._handle_startup_response)
 
-    def _handle_startup_response(self, stream_id, flags, opcode, body):
-        startup_response = decode_response(
-            stream_id, flags, opcode, body, self.decompressor)
-
+    def _handle_startup_response(self, startup_response):
         if isinstance(startup_response, ReadyMessage):
+            log.debug("Got ReadyMessage on new Connection from %s" % self.host)
             if self._compresstype:
                 self.compressor = self._compressor
             self.connected_event.set()
         elif isinstance(startup_response, AuthenticateMessage):
+            log.debug("Got AuthenticateMessage on new Connection from %s" % self.host)
             self.authenticator = startup_response.authenticator
             if self.credentials is None:
                 raise ProgrammingError('Remote end requires authentication.')
             cm = CredentialsMessage(creds=self.credentials)
             self.send_msg(cm, cb=self._handle_startup_response)
         elif isinstance(startup_response, ErrorMessage):
+            log.debug("Received ErrorMessage on new Connection from %s" % self.host)
             raise ProgrammingError("Server did not accept credentials. %s"
                                    % startup_response.summary_msg())
         else:
             raise InternalError("Unexpected response %r during connection setup"
                                 % startup_response)
 
-    # def handle_error(self):
-    #     print "got connection error"  # TODO
-    #     self.close()
-
-    def handle_pushed(self, stream_id, flags, opcode, body):
+    def set_keyspace(self, keyspace):
         pass
 
-    def push(self, data):
-        # overridden to avoid calling initiate_send() at the end of this
-        # and hold the lock
-        sabs = self.ac_out_buffer_size
-        with self._lock:
-            if len(data) > sabs:
-                for i in xrange(0, len(data), sabs):
-                    self.producer_fifo.append(data[i:i + sabs])
-            else:
-                self.producer_fifo.append(data)
+class ResponseWaiter(object):
 
-    def send_msg(self, msg, cb=None):
-        request_id = self.make_request_id()
-        if cb:
-            self._waiting_callbacks[request_id] = cb
-        else:
-            self._waiting_events[request_id] = Event()
+    def __init__(self, num_responses):
+        self.pending = num_responses
+        self.responses = [None] * num_responses
+        self.event = Event()
 
-        self.push(msg.to_string(request_id, compression=self.compressor))
-        return request_id
-
-    def get_response(self, stream_id):
-        """ Blocking wait for a response """
-        # TODO waiting on the event in the loop thread will deadlock
-        self._waiting_events.pop(stream_id).wait()
-        (flags, opcode, body) = self._responses.pop(stream_id)
-        return decode_response(stream_id, flags, opcode, body, self.decompressor)
+    def got_response(self, response, index):
+        self.responses[index] = response
+        self.pending -= 1
+        if not self.pending:
+            self.event.set()

@@ -204,7 +204,7 @@ class HostConnectionPool(object):
 
         # TODO potentially use threading.Queue for this
         core_conns = session.cluster.get_core_connections_per_host(host_distance)
-        self._connections = [session.connection_factory(host)
+        self._connections = [session.cluster.connection_factory(host.address)
                              for i in range(core_conns)]
         self._trash = set()
         self._open_count = len(self._connections)
@@ -249,7 +249,7 @@ class HostConnectionPool(object):
                     least_busy = self._wait_for_conn(timeout)
                     break
 
-            least_busy.set_keyspace()  # TODO get keyspace from pool state
+            least_busy.set_keyspace("keyspace")  # TODO get keyspace from pool state
             return least_busy
 
     def _create_new_connection(self):
@@ -283,16 +283,16 @@ class HostConnectionPool(object):
             return False
 
     def _await_available_conn(self, timeout):
-        with self._available_conn_condition:
-            self._available_conn_condition.wait(timeout)
+        with self._conn_available_condition:
+            self._conn_available_condition.wait(timeout)
 
     def _signal_available_conn(self):
-        with self._available_conn_condition:
-            self._available_conn_condition.notify()
+        with self._conn_available_condition:
+            self._conn_available_condition.notify()
 
     def _signal_all_available_conn(self):
-        with self._available_conn_condition:
-            self._available_conn_condition.notify_all()
+        with self._conn_available_condition:
+            self._conn_available_condition.notify_all()
 
     def _wait_for_conn(self, timeout):
         start = time.time()

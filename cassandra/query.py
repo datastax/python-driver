@@ -12,10 +12,8 @@ class Query(object):
 
 class SimpleStatement(Query):
 
-    query = None
-
-    def __init__(self, query):
-        self.query = query
+    def __init__(self, query_string):
+        self._query_string = query_string
         self._routing_key = None
 
     @property
@@ -26,3 +24,7 @@ class SimpleStatement(Query):
     def set_routing_key(self, value):
         self._routing_key = "".join(struct.pack("HsB", len(component), component, 0)
                                     for component in value)
+
+    @property
+    def query_string(self):
+        return self._query_string

@@ -21,13 +21,15 @@ class LoadBalancingPolicy(object):
 
 class RoundRobinPolicy(LoadBalancingPolicy):
 
+    def __init__(self):
+        self._lock = RLock()
+
     def populate(self, cluster, hosts):
         self._live_hosts = set(hosts)
         if len(hosts) == 1:
             self._position = 0
         else:
             self._position = randint(0, len(hosts) - 1)
-        self._lock = RLock()
 
     def distance(self, host):
         return HostDistance.LOCAL

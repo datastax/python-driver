@@ -1,15 +1,18 @@
-import asyncore
 import time
-from threading import Lock, RLock, Thread
+from threading import Lock, RLock, Thread, Event
 import Queue
+import logging
+import traceback
 
 from futures import ThreadPoolExecutor
 
 from connection import Connection
-from decoder import ConsistencyLevel, QueryMessage
+from decoder import (ConsistencyLevel, QueryMessage, ResultMessage, ErrorMessage,
+                     ReadTimeoutErrorMessage, WriteTimeoutErrorMessage, UnavailableExceptionErrorMessage,
+                     OverloadedErrorMessage, IsBootstrappingErrorMessage)
 from metadata import Metadata
 from policies import (RoundRobinPolicy, SimpleConvictionPolicy,
-                      ExponentialReconnectionPolicy, HostDistance)
+                      ExponentialReconnectionPolicy, HostDistance, RetryPolicy)
 from query import SimpleStatement
 from pool import (ConnectionException, BusyConnectionException,
                   AuthenticationException, _ReconnectionHandler,
@@ -18,19 +21,27 @@ from pool import (ConnectionException, BusyConnectionException,
 # TODO: we might want to make this configurable
 MAX_SCHEMA_AGREEMENT_WAIT_MS = 10000
 
+log = logging.getLogger(__name__)
 
-class _RetryingCallback(object):
 
-    def __init__(self, session, query):
+class ResponseFuture(object):
+
+    def __init__(self, session, message, query):
         self.session = session
-        self.query = query
-        self.query_plan = session._load_balancer.new_query_plan(query)
+        self.message = message
+
+        self.query_plan = session._load_balancer.make_query_plan(query)
 
         self._req_id = None
         self._final_result = None
         self._final_exception = None
-        self._wait_fn = None
+        self._current_host = None
+        self._current_pool = None
+        self._connection = None
+        self._event = Event()
         self._errors = {}
+        self._query_retries = 0
+        self._callback = self._errback = None
 
     def send_request(self):
         for host in self.query_plan:
@@ -42,32 +53,122 @@ class _RetryingCallback(object):
         self._final_exception = NoHostAvailable(self._errors)
 
     def _query(self, host):
-        pool = self._session._pools.get(host)
+        pool = self.session._pools.get(host)
         if not pool or pool.is_shutdown:
             return None
 
+        connection = None
         try:
             # TODO get connectTimeout from cluster settings
             connection = pool.borrow_connection(timeout=2.0)
-            request_id = connection.request_and_callback(self.query, self._set_results)
-            self._wait_fn = connection.wait_for_result
+            request_id = connection.send_msg(self.message, cb=self._set_result)
+            self._current_host = host
+            self._current_pool = pool
+            self._connection = connection
             return request_id
-        except Exception:
-            return None
-        finally:
+        except Exception, exc:
+            self._errors[host] = exc
             if connection:
                 pool.return_connection(connection)
+            return None
 
-    def _set_results(self, response):
+    def _set_result(self, response):
+        self._current_pool.return_connection(self._connection)
+
+        if isinstance(response, ResultMessage):
+            self._set_final_result(response)
+        elif isinstance(response, ErrorMessage):
+            retry_policy = self.query.retry_policy # TODO also check manager.configuration
+                                                   # for retry policy if None
+            if isinstance(response, ReadTimeoutErrorMessage):
+                details = response.recv_error_info()
+                retry = retry_policy.on_read_timeout(
+                    self.query, attempt_num=self._query_retries, **details)
+            elif isinstance(response, WriteTimeoutErrorMessage):
+                details = response.recv_error_info()
+                retry = retry_policy.on_write_timeout(
+                    self.query, attempt_num=self._query_retries, **details)
+            elif isinstance(response, UnavailableExceptionErrorMessage):
+                details = response.recv_error_info()
+                retry = retry_policy.on_write_timeout(
+                    self.query, attempt_num=self._query_retries, **details)
+            elif isinstance(response, OverloadedErrorMessage):
+                # need to retry against a different host here
+                self._retry(False, None)
+            elif isinstance(response, IsBootstrappingErrorMessage):
+                # need to retry against a different host here
+                self._retry(False, None)
+            # TODO need to define the PreparedQueryNotFound class
+            # elif isinstance(response, PreparedQueryNotFound):
+            #     pass
+            else:
+                pass
+
+            retry_type, consistency = retry
+            if retry_type == RetryPolicy.RETRY:
+                self._query_retries += 1
+                self._retry(True, consistency)
+            elif retry_type == RetryPolicy.RETHROW:
+                self._set_final_result(response)
+            else:  # IGNORE
+                self._set_final_result(None)
+        else:
+            # we got some other kind of response message
+            self._set_final_result(response)
+
+    def _set_final_result(self, response):
         self._final_result = response
+        self._event.set()
+        if self._callback:
+            fn, args, kwargs = self._callback
+            fn(response, *args, **kwargs)
+
+    def _set_final_exception(self, response):
+        self._final_exception = response
+        self._event.set()
+        if self._errback:
+            fn, args, kwargs = self._errback
+            fn(response, *args, **kwargs)
+
+    def _retry(self, reuse_connection, consistency_level):
+        self.message.consistency_level = consistency_level
+        # don't retry on the event loop thread
+        self.session.submit(self._retry_helper, reuse_connection)
+
+    def _retry_task(self, reuse_connection):
+        if reuse_connection and self._query(self._current_host):
+            return
+
+        # otherwise, move onto another host
+        self.send_request()
 
     def deliver(self):
-        if self._final_result:
-            return self._final_result
-        elif self._final_exception:
+        if self._final_exception:
             raise self._final_exception
+        elif self._final_result:
+            return self._final_result
         else:
-            return self._wait_fn(self._req_id)
+            self._event.wait()
+            if self._final_exception:
+                raise self._final_exception
+            else:
+                return self._final_result
+
+    def addCallback(self, fn, *args, **kwargs):
+        self._callback = (fn, args, kwargs)
+        return self
+
+    def addErrback(self, fn, *args, **kwargs):
+        self._errback = (fn, args, kwargs)
+        return self
+
+    def addCallbacks(self,
+            callback, errback,
+            callback_args=(), callback_kwargs=None,
+            errback_args=(), errback_kwargs=None):
+        self._callback = (callback, callback_args, callback_kwargs | {})
+        self._errback = (errback, errback_args, errback_kwargs | {})
+
 
 class Session(object):
 
@@ -79,42 +180,35 @@ class Session(object):
         self._is_shutdown = False
         self._pools = {}
         self._load_balancer = RoundRobinPolicy()
+        self._load_balancer.populate(cluster, hosts)
+
+        for host in hosts:
+            self.add_host(host)
 
     def execute(self, query):
-        if isinstance(query, basestring):
-            query = SimpleStatement(query)
+        future = self.execute_async(query)
+        return future.deliver()
 
     def execute_async(self, query):
         if isinstance(query, basestring):
             query = SimpleStatement(query)
 
-        qmsg = QueryMessage(query=query.query, consistency_level=query.consistency_level)
-        return self._execute_query(qmsg, query)
+        # TODO bound statements need to be handled differently
+        message = QueryMessage(query=query.query_string, consistency_level=query.consistency_level)
+
+        if query.tracing_enabled:
+            # TODO enable tracing on the message
+            pass
+
+        future = ResponseFuture(self, message, query)
+        future.send_request()
+        return future
 
     def prepare(self, query):
         pass
 
     def shutdown(self):
         self.cluster.shutdown()
-
-    def _execute_query(self, message, query):
-        if query.tracing_enabled:
-            # TODO enable tracing on the message
-            pass
-
-        errors = {}
-        for host in self._load_balancer.make_query_plan(query):
-            try:
-                result = self._query(host)
-                if result:
-                    return
-            except Exception, exc:
-                errors[host] = exc
-
-    def _query(self, host, query):
-        pool = self._pools.get(host)
-        if not pool or pool.is_shutdown:
-            return False
 
     def add_host(self, host):
         distance = self._load_balancer.distance(host)
@@ -174,8 +268,8 @@ class Session(object):
     def set_keyspace(self, keyspace):
         pass
 
-    def submit(self, task):
-        return self.cluster.executor.submit(task)
+    def submit(self, fn, *args, **kwargs):
+        return self.cluster.executor.submit(fn, *args, **kwargs)
 
 DEFAULT_MIN_REQUESTS = 25
 DEFAULT_MAX_REQUESTS = 100
@@ -217,18 +311,6 @@ class _Scheduler(object):
                 pass
 
             time.sleep(0.1)
-
-
-_loop_started = False
-_loop_lock = Lock()
-def _start_loop():
-    with _loop_lock:
-        global _loop_started
-        if not _loop_started:
-            _loop_started = True
-            t = Thread(target=asyncore.loop, name="Async event loop")
-            t.daemon = True
-            t.start()
 
 
 class Cluster(object):
@@ -281,9 +363,6 @@ class Cluster(object):
 
         self._is_shutdown = False
         self._lock = Lock()
-
-        # start the global event loop
-        _start_loop()
 
         for address in contact_points:
             self.add_host(address, signal=False)
@@ -472,13 +551,16 @@ class ControlConnection(object):
             except ConnectionException, exc:
                 errors[host.address] = exc
                 host.monitor.signal_connection_failure(exc)
+                log.error("Error reconnecting control connection: %s", traceback.format_exc())
             except Exception, exc:
                 errors[host.address] = exc
+                log.error("Error reconnecting control connection: %s", traceback.format_exc())
 
         raise NoHostAvailable("Unable to connect to any servers", errors)
 
     def _try_connect(self, host):
         connection = self._cluster.connection_factory(host.address)
+
         connection.register_watchers({
             "TOPOLOGY_CHANGE": self._handle_topology_change,
             "STATUS_CHANGE": self._handle_status_change,
@@ -486,7 +568,7 @@ class ControlConnection(object):
         })
 
         self.refresh_node_list_and_token_map()
-        self.refresh_schema()
+        self._refresh_schema(connection)
         return connection
 
     def reconnect(self):
@@ -521,6 +603,9 @@ class ControlConnection(object):
                 self._connection.close()
 
     def refresh_schema(self, keyspace=None, table=None):
+        return self._refresh_schema(self._connection, keyspace, table)
+
+    def _refresh_schema(self, connection, keyspace=None, table=None):
         where_clause = ""
         if keyspace:
             where_clause = " WHERE keyspace_name = '%s'" % (keyspace,)
@@ -531,15 +616,15 @@ class ControlConnection(object):
         if table:
             ks_query = None
         else:
-            ks_query = QueryMessage(query=self.SELECT_KEYSPACES + where_clause, consistency_level=cl)
-        cf_query = QueryMessage(query=self.SELECT_COLUMN_FAMILIES + where_clause, consistency_level=cl)
-        col_query = QueryMessage(query=self.SELECT_COLUMNS + where_clause, consistency_level=cl)
+            ks_query = QueryMessage(query=self._SELECT_KEYSPACES + where_clause, consistency_level=cl)
+        cf_query = QueryMessage(query=self._SELECT_COLUMN_FAMILIES + where_clause, consistency_level=cl)
+        col_query = QueryMessage(query=self._SELECT_COLUMNS + where_clause, consistency_level=cl)
 
         if ks_query:
-            ks_result, cf_result, col_result = self._connection.wait_for_requests(ks_query, cf_query, col_query)
+            ks_result, cf_result, col_result = connection.wait_for_responses(ks_query, cf_query, col_query)
         else:
             ks_result = None
-            cf_result, col_result = self._connection.wait_for_requests(cf_query, col_query)
+            cf_result, col_result = connection.wait_for_responses(cf_query, col_query)
 
         self._cluster.metadata.rebuild_schema(keyspace, table, ks_result, cf_result, col_result)
 
@@ -549,10 +634,10 @@ class ControlConnection(object):
             return
 
         cl = ConsistencyLevel.ONE
-        peers_query = QueryMessage(query=self.SELECT_PEERS, consistency_level=cl)
-        local_query = QueryMessage(query=self.SELECT_LOCAL, consistency_level=cl)
+        peers_query = QueryMessage(query=self._SELECT_PEERS, consistency_level=cl)
+        local_query = QueryMessage(query=self._SELECT_LOCAL, consistency_level=cl)
         try:
-            peers_result, local_result = conn.wait_for_requests(peers_query, local_query)
+            peers_result, local_result = conn.wait_for_responses(peers_query, local_query)
         except (ConnectionException, BusyConnectionException):
             self.reconnect()
 
@@ -649,9 +734,9 @@ class ControlConnection(object):
         elapsed = 0
         cl = ConsistencyLevel.ONE
         while elapsed < MAX_SCHEMA_AGREEMENT_WAIT_MS:
-            peers_query = QueryMessage(query=self.SELECT_SCHEMA_PEERS, consistency_level=cl)
-            local_query = QueryMessage(query=self.SELECT_SCHEMA_LOCAL, consistency_level=cl)
-            peers_result, local_result = self._connection.wait_for_requests(peers_query, local_query)
+            peers_query = QueryMessage(query=self._SELECT_SCHEMA_PEERS, consistency_level=cl)
+            local_query = QueryMessage(query=self._SELECT_SCHEMA_LOCAL, consistency_level=cl)
+            peers_result, local_result = self._connection.wait_for_responses(peers_query, local_query)
 
             versions = set()
             if local_result and local_result.rows:
