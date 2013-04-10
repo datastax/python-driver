@@ -83,15 +83,15 @@ class ResponseFuture(object):
             if isinstance(response, ReadTimeoutErrorMessage):
                 details = response.recv_error_info()
                 retry = retry_policy.on_read_timeout(
-                    self.query, attempt_num=self._query_retries, **details)
+                    self.query, retry_num=self._query_retries, **details)
             elif isinstance(response, WriteTimeoutErrorMessage):
                 details = response.recv_error_info()
                 retry = retry_policy.on_write_timeout(
-                    self.query, attempt_num=self._query_retries, **details)
+                    self.query, retry_num=self._query_retries, **details)
             elif isinstance(response, UnavailableExceptionErrorMessage):
                 details = response.recv_error_info()
                 retry = retry_policy.on_write_timeout(
-                    self.query, attempt_num=self._query_retries, **details)
+                    self.query, retry_num=self._query_retries, **details)
             elif isinstance(response, OverloadedErrorMessage):
                 # need to retry against a different host here
                 self._retry(False, None)

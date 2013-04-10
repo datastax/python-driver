@@ -177,8 +177,8 @@ class RetryPolicy(object):
     IGNORE = 2
 
     def on_read_timeout(self, query, consistency, required_responses,
-                        received_responses, data_retrieved, attempt_num):
-        if attempt_num != 0:
+                        received_responses, data_retrieved, retry_num):
+        if retry_num != 0:
             return (self.RETHROW, None)
         elif received_responses >= required_responses and not data_retrieved:
             return (self.RETRY, consistency)
@@ -186,15 +186,15 @@ class RetryPolicy(object):
             return (self.RETHROW, None)
 
     def on_write_timeout(self, query, consistency, write_type,
-                         required_responses, received_responses, attempt_num):
-        if attempt_num != 0:
+                         required_responses, received_responses, retry_num):
+        if retry_num != 0:
             return (self.RETHROW, None)
         elif write_type == WriteType.BATCH_LOG:
             return (self.RETRY, consistency)
         else:
             return (self.RETHROW, None)
 
-    def on_unavailable(self, query, consistency, required_replicas, alive_replicas, attempt_num):
+    def on_unavailable(self, query, consistency, required_replicas, alive_replicas, retry_num):
         return (self.RETHROW, None)
 
 
@@ -210,21 +210,21 @@ class FallthroughRetryPolicy(RetryPolicy):
         return (self.RETHROW, None)
 
 
-class FallthroughRetryPolicy(RetryPolicy):
+class DowngradingConsistencyRetryPolicy(RetryPolicy):
 
     def _pick_consistency(self, num_responses):
         if num_responses >= 3:
-            return (self.RETRY, ConsistencyLevel.name_to_value["THREE"])
+            return (self.RETRY, ConsistencyLevel.THREE)
         elif num_responses >= 2:
-            return (self.RETRY, ConsistencyLevel.name_to_value["TWO"])
+            return (self.RETRY, ConsistencyLevel.TWO)
         elif num_responses >= 1:
-            return (self.RETRY, ConsistencyLevel.name_to_value["ONE"])
+            return (self.RETRY, ConsistencyLevel.ONE)
         else:
             return (self.RETHROW, None)
 
     def on_read_timeout(self, query, consistency, required_responses,
-                        received_responses, data_retrieved, attempt_num):
-        if attempt_num != 0:
+                        received_responses, data_retrieved, retry_num):
+        if retry_num != 0:
             return (self.RETHROW, None)
         elif received_responses < required_responses:
             return self._pick_consistency(received_responses)
@@ -234,11 +234,11 @@ class FallthroughRetryPolicy(RetryPolicy):
             return (self.RETHROW, None)
 
     def on_write_timeout(self, query, consistency, write_type,
-                         required_responses, received_responses, attempt_num):
-        if attempt_num != 0:
+                         required_responses, received_responses, retry_num):
+        if retry_num != 0:
             return (self.RETHROW, None)
         elif write_type in (WriteType.SIMPLE, WriteType.BATCH, WriteType.COUNTER):
-            return (self.IGNORED, None)
+            return (self.IGNORE, None)
         elif write_type == WriteType.UNLOGGED_BATCH:
             return self._pick_consistency(received_responses)
         elif write_type == WriteType.BATCH_LOG:
@@ -246,8 +246,8 @@ class FallthroughRetryPolicy(RetryPolicy):
         else:
             return (self.RETHROW, None)
 
-    def on_unavailable(self, query, consistency, required_replicas, alive_replicas, attempt_num):
-        if attempt_num != 0:
+    def on_unavailable(self, query, consistency, required_replicas, alive_replicas, retry_num):
+        if retry_num != 0:
             return (self.RETHROW, None)
         else:
             return self._pick_consistency(alive_replicas)
