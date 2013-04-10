@@ -158,7 +158,7 @@ class ExponentialReconnectionPolicy(object):
         self.max_delay = max_delay
 
     def new_schedule(self):
-        return (min(self.base_delay * (i ** 2), self.max_delay) for i in xrange(64))
+        return (min(self.base_delay * (2 ** i), self.max_delay) for i in xrange(64))
 
 
 class WriteType(object):
