@@ -59,35 +59,37 @@ class RoundRobinPolicy(LoadBalancingPolicy):
 class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
 
     def __init__(self, local_dc, used_hosts_per_remote_dc=0):
-        LoadBalancingPolicy.__init__(self)
         self.local_dc = local_dc
         self.used_hosts_per_remote_dc = used_hosts_per_remote_dc
         self._dc_live_hosts = {}
+        self._lock = RLock()
 
     def populate(self, cluster, hosts):
-        for dc, hosts in groupby(hosts, lambda h: h.dc):
-            self._dc_live_hosts[dc] = set(hosts)
+        for dc, dc_hosts in groupby(hosts, lambda h: h.datacenter):
+            self._dc_live_hosts[dc] = set(dc_hosts)
 
-        if len(hosts) == 1:
+        # position is currently only used for local hosts
+        local_live = self._dc_live_hosts.get(self.local_dc)
+        if len(local_live) == 1:
             self._position = 0
         else:
-            self._position = randint(0, len(hosts) - 1)
+            self._position = randint(0, len(local_live) - 1)
 
     def distance(self, host):
-        if host.dc == self.local_dc:
+        if host.datacenter == self.local_dc:
             return HostDistance.LOCAL
 
         if not self.used_hosts_per_remote_dc:
-            return HostDistance.IGNORE
+            return HostDistance.IGNORED
         else:
-            dc_hosts = self._dc_live_hosts.get(host.dc)
+            dc_hosts = self._dc_live_hosts.get(host.datacenter)
             if not dc_hosts:
-                return HostDistance.IGNORE
+                return HostDistance.IGNORED
 
             if host in list(dc_hosts)[:self.used_hosts_per_remote_dc]:
                 return HostDistance.REMOTE
             else:
-                return HostDistance.IGNORE
+                return HostDistance.IGNORED
 
     def make_query_plan(self, query=None):
         with self._lock:
@@ -96,7 +98,7 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
 
         local_live = list(self._dc_live_hosts.get(self.local_dc))
         pos %= len(local_live)
-        for host in islice(cycle(local_live, pos, pos + len(local_live))):
+        for host in islice(cycle(local_live), pos, pos + len(local_live)):
             yield host
 
         for dc, current_dc_hosts in self._dc_live_hosts.iteritems():
@@ -107,16 +109,16 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
                 yield host
 
     def on_up(self, host):
-        self._dc_live_hosts.setdefault(host.dc, set()).add(host)
+        self._dc_live_hosts.setdefault(host.datacenter, set()).add(host)
 
     def on_down(self, host):
-        self._dc_live_hosts.setdefault(host.dc, set()).discard(host)
+        self._dc_live_hosts.setdefault(host.datacenter, set()).discard(host)
 
     def on_add(self, host):
-        self._dc_live_hosts.setdefault(host.dc, set()).add(host)
+        self._dc_live_hosts.setdefault(host.datacenter, set()).add(host)
 
     def on_remove(self, host):
-        self._dc_live_hosts.setdefault(host.dc, set()).discard(host)
+        self._dc_live_hosts.setdefault(host.datacenter, set()).discard(host)
 
 
 class SimpleConvictionPolicy(object):
@@ -236,7 +238,7 @@ class FallthroughRetryPolicy(RetryPolicy):
         if attempt_num != 0:
             return (self.RETHROW, None)
         elif write_type in (WriteType.SIMPLE, WriteType.BATCH, WriteType.COUNTER):
-            return (self.IGNORE, None)
+            return (self.IGNORED, None)
         elif write_type == WriteType.UNLOGGED_BATCH:
             return self._pick_consistency(received_responses)
         elif write_type == WriteType.BATCH_LOG:

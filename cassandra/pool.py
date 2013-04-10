@@ -44,6 +44,14 @@ class Host(object):
         self._reconnection_handler = None
         self._reconnection_lock = Lock()
 
+    @property
+    def datacenter(self):
+        return self._datacenter
+
+    @property
+    def rack(self):
+        return self._rack
+
     def set_location_info(self, datacenter, rack):
         self._datacenter = datacenter
         self._rack = rack
