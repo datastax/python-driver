@@ -147,19 +147,6 @@ class _MessageType(object):
     __repr__ = __str__
 
 
-def read_frame(f, decompressor=None):
-    header = f.read(8)
-    version, flags, stream_id, opcode = map(int8_unpack, header[:4])
-    body_len = int32_unpack(header[4:])
-    assert version & PROTOCOL_VERSION_MASK == PROTOCOL_VERSION, \
-            "Unsupported CQL protocol version %d" % version
-    assert version & HEADER_DIRECTION_MASK == HEADER_DIRECTION_TO_CLIENT, \
-            "Unexpected request from server with opcode %04x, stream id %r" % (opcode, stream_id)
-    assert body_len >= 0, "Invalid CQL protocol body_len %r" % body_len
-    body = f.read(body_len)
-    return decode_response(stream_id, flags, opcode, body, decompressor)
-
-
 def decode_response(stream_id, flags, opcode, body, decompressor=None):
     if flags & 0x1:
         if decompressor is None:
