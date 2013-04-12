@@ -163,7 +163,7 @@ def decode_response(stream_id, flags, opcode, body, decompressor=None):
 
 error_classes = {}
 
-class ErrorMessage(_MessageType):
+class ErrorMessage(_MessageType, BaseException):
     opcode = 0x00
     name = 'ERROR'
     params = ('code', 'message', 'info')
