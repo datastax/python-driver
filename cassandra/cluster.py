@@ -29,6 +29,7 @@ class ResponseFuture(object):
     def __init__(self, session, message, query):
         self.session = session
         self.message = message
+        self.query = query
 
         self.query_plan = session._load_balancer.make_query_plan(query)
 
@@ -102,7 +103,8 @@ class ResponseFuture(object):
             # elif isinstance(response, PreparedQueryNotFound):
             #     pass
             else:
-                pass
+                self._set_final_exception(response)
+                return
 
             retry_type, consistency = retry
             if retry_type == RetryPolicy.RETRY:
@@ -162,8 +164,8 @@ class ResponseFuture(object):
         self._errback = (fn, args, kwargs)
         return self
 
-    def addCallbacks(self,
-            callback, errback,
+    def addCallbacks(
+            self, callback, errback,
             callback_args=(), callback_kwargs=None,
             errback_args=(), errback_kwargs=None):
         self._callback = (callback, callback_args, callback_kwargs | {})
