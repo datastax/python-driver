@@ -1,11 +1,11 @@
-import asyncore
-import asynchat
-from collections import defaultdict
+import pyev
+import errno
+from collections import defaultdict, deque
 from functools import partial
 import itertools
 import logging
 import socket
-from threading import RLock, Event, Lock, Thread
+from threading import RLock, Event, Lock, Thread, current_thread
 import traceback
 
 
@@ -39,10 +39,7 @@ HEADER_DIRECTION_FROM_CLIENT = 0x00
 HEADER_DIRECTION_TO_CLIENT = 0x80
 HEADER_DIRECTION_MASK = 0x80
 
-
-def warn(msg):
-    print msg
-
+NONBLOCKING = (errno.EAGAIN, errno.EWOULDBLOCK)
 
 class ProgrammingError(Exception):
     pass
@@ -52,32 +49,39 @@ class InternalError(Exception):
     pass
 
 
-_loop_started = False
+_loop = pyev.default_loop()
+_loop_started = None
 _loop_lock = Lock()
 def _start_loop():
     global _loop_started
     should_start = False
     with _loop_lock:
         if not _loop_started:
+            print "starting pyev event loop"
             _loop_started = True
             should_start = True
 
     if should_start:
-        t = Thread(target=asyncore.loop, name="async_event_loop", kwargs={"timeout": 0.01})
+        t = Thread(target=_loop.start, name="async_event_loop")
         t.daemon = True
         t.start()
 
 
-class Connection(asynchat.async_chat):
+class Connection(object):
+
+    in_buffer_size = 1024
+    out_buffer_size = 1024
 
     @classmethod
     def factory(cls, *args, **kwargs):
         conn = cls(*args, **kwargs)
         conn.connected_event.wait()
-        return conn
+        if conn.connect_error:
+            raise conn.connect_error
+        else:
+            return conn
 
     def __init__(self, host='127.0.0.1', port=9042):
-        asynchat.async_chat.__init__(self)
         self.cql_version = "3.0.1"
         self.host = host
         self.port = port
@@ -90,6 +94,7 @@ class Connection(asynchat.async_chat):
         self.decompressor = None
 
         self.connected_event = Event()
+        self.connect_error = None
         self.in_flight = 0
         self.is_defunct = False
 
@@ -98,52 +103,136 @@ class Connection(asynchat.async_chat):
         self._push_watchers = defaultdict(set)
         self._lock = RLock()
 
-        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.deque = deque()
+        self.buf = ""
+        self.total_reqd_bytes = 0
+
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.connect((host, port))
+        self.socket.setblocking(0)
+
+        self.watcher = pyev.Io(self.socket._sock, pyev.EV_WRITE, _loop, self.io_ready)
+        self.watcher.start()
+        self.send_msg(OptionsMessage(), self._handle_options_response)
+
         # start the global event loop if needed
         _start_loop()
-        self.connect((host, port))
+
+    def reset(self, events):
+        self.watcher.stop()
+        self.watcher.set(self.socket, events)
+        self.watcher.start()
+
+    def close(self):
+        self.socket.close()
+        if self.watcher:
+            self.watcher.stop()
+            self.watcher = None
+
+    def io_ready(self, watcher, revents):
+        if revents & pyev.EV_READ:
+            self.handle_read()
+        else:
+            self.handle_write()
+
+    def handle_write(self):
+        print "handle_write"
+        try:
+            next_msg = self.deque.popleft()
+        except IndexError:
+            self.reset(self.watcher.events & pyev.EV_READ)
+            return
+
+        try:
+            sent = self.socket.send(next_msg)
+        except socket.error, err:
+            if (err.args[0] in NONBLOCKING):
+                self.deque.appendleft(next_msg)
+            else:
+                self.handle_error(err)
+            return
+        else:
+            if sent < len(next_msg):
+                self.deque.appendleft(next_msg[sent:])
+
+            if not self.deque:
+                self.reset(pyev.EV_READ)
+            else:
+                self.reset(self.watcher.events | pyev.EV_READ)
 
     def handle_read(self):
-        # simpler to do here than collect_incoming_data()
-        header = self.recv(8)
-        version, flags, stream_id, opcode = map(int8_unpack, header[:4])
-        body_len = int32_unpack(header[4:])
+        print "handle_read"
+        try:
+            buf = self.socket.recv(self.in_buffer_size)
+        except socket.error, err:
+            if err.args[0] not in NONBLOCKING:
+                self.handle_error(err)
+            return
+
+        if buf:
+            self.buf += buf
+            while True:
+                if len(self.buf) < 8:
+                    # we don't have a complete header yet
+                    break
+                elif self.total_reqd_bytes and len(self.buf) < self.total_reqd_bytes:
+                    # we already saw a header, but we don't have a complete message yet
+                    break
+                else:
+                    body_len = int32_unpack(self.buf[4:8])
+                    if len(self.buf) - 8 >= body_len:
+                        msg = self.buf[:8 + body_len]
+                        self.buf = self.buf[8 + body_len:]
+                        self.total_reqd_bytes = 0
+                        self.process_msg(msg, body_len)
+                    else:
+                        self.total_reqd_bytes = body_len + 8
+        else:
+            logging.debug("connection closed by server")
+            self.close()
+
+    def process_msg(self, msg, body_len):
+        print "processing message:", body_len
+        version, flags, stream_id, opcode = map(int8_unpack, msg[:4])
         assert version & PROTOCOL_VERSION_MASK == PROTOCOL_VERSION, \
-                "Unsupported CQL protocol version %d" % version
+            "Unsupported CQL protocol version %d" % version
         assert version & HEADER_DIRECTION_MASK == HEADER_DIRECTION_TO_CLIENT, \
-                "Unexpected request from server with opcode %04x, stream id %r" % (opcode, stream_id)
-        assert body_len >= 0, "Invalid CQL protocol body_len %r" % body_len
-        body = self.recv(body_len)
+            "Unexpected request from server with opcode %04x, stream id %r" % (opcode, stream_id)
+        if body_len > 0:
+            body = msg[8:]
+        elif body_len == 0:
+            body = ""
+        else:
+            assert body_len >= 0, "Invalid CQL protocol body_len %r" % body_len
 
         response = decode_response(stream_id, flags, opcode, body, self.decompressor)
+
         if stream_id < 0:
             self.handle_pushed(response)
         else:
             self._callbacks.pop(stream_id)(response)
-
-    def readable(self):
-        # TODO this isn't accurate for control connections
-        return bool(self._callbacks)
 
     def handle_error(self):
         log.error(traceback.format_exc())
         self.is_defunct = True
 
     def handle_pushed(self, response):
-        pass
         # details = response.recv_body
         # for cb in self._push_watchers[response]
+        pass
 
     def push(self, data):
-        # overridden to avoid calling initiate_send() at the end of this
-        # and hold the lock
-        sabs = self.ac_out_buffer_size
+        sabs = self.out_buffer_size
         with self._lock:
             if len(data) > sabs:
                 for i in xrange(0, len(data), sabs):
-                    self.producer_fifo.append(data[i:i + sabs])
+                    self.deque.append(data[i:i + sabs])
             else:
-                self.producer_fifo.append(data)
+                self.deque.append(data)
+
+            current = self.watcher.events
+            if not current & pyev.EV_WRITE:
+                self.reset(current | pyev.EV_WRITE)
 
     def send_msg(self, msg, cb):
         request_id = self.make_request_id()
@@ -165,11 +254,8 @@ class Connection(asynchat.async_chat):
         for event_type, callback in type_callback_dict.items():
             self.register_watcher(event_type, callback)
 
-    def handle_connect(self):
-        log.debug("Sending initial message for new Connection to %s" % self.host)
-        self.send_msg(OptionsMessage(), self._handle_options_response)
-
     def _handle_options_response(self, options_response):
+        print "handling options response"
         log.debug("Received options response on new Connection from %s" % self.host)
         self.supported_cql_versions = options_response.cql_versions
         self.remote_supported_compressions = options_response.options['COMPRESSION']
@@ -177,22 +263,22 @@ class Connection(asynchat.async_chat):
         if self.cql_version:
             if self.cql_version not in self.supported_cql_versions:
                 raise ProgrammingError(
-                        "cql_version %r is not supported by remote (w/ native "
-                        "protocol). Supported versions: %r"
-                        % (self.cql_version, self.supported_cql_versions))
+                    "cql_version %r is not supported by remote (w/ native "
+                    "protocol). Supported versions: %r"
+                    % (self.cql_version, self.supported_cql_versions))
         else:
             self.cql_version = self.supported_cql_versions[0]
 
         opts = {}
         self._compresstype = None
         if self.compression:
-            overlap = set(locally_supported_compressions) \
-                    & set(self.remote_supported_compressions)
+            overlap = (set(locally_supported_compressions) &
+                       set(self.remote_supported_compressions))
             if len(overlap) == 0:
-                warn("No available compression types supported on both ends."
-                     " locally supported: %r. remotely supported: %r"
-                     % (locally_supported_compressions,
-                        self.remote_supported_compressions))
+                log.debug("No available compression types supported on both ends."
+                          " locally supported: %r. remotely supported: %r"
+                          % (locally_supported_compressions,
+                             self.remote_supported_compressions))
             else:
                 # TODO these compression fields probably don't need to be set
                 # on the object; look at cleaning this up
@@ -202,29 +288,42 @@ class Connection(asynchat.async_chat):
                 # a successful Ready message
                 self._compressor, self.decompressor = locally_supported_compressions[self._compresstype]
 
+        print "sending startup message:", self.cql_version, opts
         sm = StartupMessage(cqlversion=self.cql_version, options=opts)
         self.send_msg(sm, cb=self._handle_startup_response)
 
     def _handle_startup_response(self, startup_response):
+        print "handling startup response"
         if isinstance(startup_response, ReadyMessage):
+            print "got readymessage"
             log.debug("Got ReadyMessage on new Connection from %s" % self.host)
             if self._compresstype:
                 self.compressor = self._compressor
             self.connected_event.set()
         elif isinstance(startup_response, AuthenticateMessage):
             log.debug("Got AuthenticateMessage on new Connection from %s" % self.host)
-            self.authenticator = startup_response.authenticator
+
             if self.credentials is None:
-                raise ProgrammingError('Remote end requires authentication.')
+                self.connect_error = ProgrammingError(
+                    'Remote end requires authentication.')
+                self.connected_event.set()
+
+            self.authenticator = startup_response.authenticator
             cm = CredentialsMessage(creds=self.credentials)
             self.send_msg(cm, cb=self._handle_startup_response)
         elif isinstance(startup_response, ErrorMessage):
+            print "got error message"
             log.debug("Received ErrorMessage on new Connection from %s" % self.host)
-            raise ProgrammingError("Server did not accept credentials. %s"
-                                   % startup_response.summary_msg())
+            self.connect_error = ProgrammingError(
+                "Server did not accept credentials. %s"
+                % startup_response.summary_msg())
+            self.connected_event.set()
         else:
-            raise InternalError("Unexpected response %r during connection setup"
-                                % startup_response)
+            print "got internal error"
+            self.connect_error = InternalError(
+                "Unexpected response %r during connection setup"
+                % (startup_response,))
+            self.connected_event.set()
 
     def set_keyspace(self, keyspace):
         pass
