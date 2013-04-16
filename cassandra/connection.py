@@ -5,7 +5,7 @@ from functools import partial
 import itertools
 import logging
 import socket
-from threading import RLock, Event, Lock, Thread, current_thread
+from threading import RLock, Event, Lock, Thread
 import traceback
 
 
@@ -49,22 +49,42 @@ class InternalError(Exception):
     pass
 
 
-_loop = pyev.default_loop()
+_loop = pyev.default_loop(pyev.EVBACKEND_SELECT)
+
+_loop_notifier = _loop.async(lambda *a, **kw: None)
+_loop_notifier.start()
+
+# prevent _loop_notifier from keeping the loop from returning
+_loop.unref()
+
 _loop_started = None
 _loop_lock = Lock()
+
+def _run_loop():
+    while _loop.start():
+        # there are still active watchers, no deadlock
+        continue
+
+    # all Connections have been closed, no active watchers
+    log.debug("All Connections currently closed, event loop ended")
+    global _loop_started
+    _loop_started = False
+
 def _start_loop():
     global _loop_started
     should_start = False
     with _loop_lock:
         if not _loop_started:
-            print "starting pyev event loop"
+            log.debug("Starting pyev event loop")
             _loop_started = True
             should_start = True
 
     if should_start:
-        t = Thread(target=_loop.start, name="async_event_loop")
-        t.daemon = True
+        t = Thread(target=_run_loop, name="async_event_loop")
+        t.daemon = False
         t.start()
+
+    return should_start
 
 
 class Connection(object):
@@ -111,36 +131,34 @@ class Connection(object):
         self.socket.connect((host, port))
         self.socket.setblocking(0)
 
-        self.watcher = pyev.Io(self.socket._sock, pyev.EV_WRITE, _loop, self.io_ready)
-        self.watcher.start()
+        self.read_watcher = pyev.Io(self.socket._sock, pyev.EV_READ, _loop, self.handle_read)
+        self.write_watcher = pyev.Io(self.socket._sock, pyev.EV_WRITE, _loop, self.handle_write)
+        with _loop_lock:
+            self.read_watcher.start()
+            self.write_watcher.start()
+
         self.send_msg(OptionsMessage(), self._handle_options_response)
 
         # start the global event loop if needed
-        _start_loop()
-
-    def reset(self, events):
-        self.watcher.stop()
-        self.watcher.set(self.socket, events)
-        self.watcher.start()
+        if not _start_loop():
+            # if the loop was already started, notify it
+            with _loop_lock:
+                _loop_notifier.send()
 
     def close(self):
+        if self.read_watcher:
+            self.read_watcher.stop()
+            self.read_watcher = None
+        if self.write_watcher:
+            self.write_watcher.stop()
+            self.write_watcher = None
         self.socket.close()
-        if self.watcher:
-            self.watcher.stop()
-            self.watcher = None
 
-    def io_ready(self, watcher, revents):
-        if revents & pyev.EV_READ:
-            self.handle_read()
-        else:
-            self.handle_write()
-
-    def handle_write(self):
-        print "handle_write"
+    def handle_write(self, watcher, revents):
         try:
             next_msg = self.deque.popleft()
         except IndexError:
-            self.reset(self.watcher.events & pyev.EV_READ)
+            self.write_watcher.stop()
             return
 
         try:
@@ -156,12 +174,9 @@ class Connection(object):
                 self.deque.appendleft(next_msg[sent:])
 
             if not self.deque:
-                self.reset(pyev.EV_READ)
-            else:
-                self.reset(self.watcher.events | pyev.EV_READ)
+                self.write_watcher.stop()
 
-    def handle_read(self):
-        print "handle_read"
+    def handle_read(self, watcher, revents):
         try:
             buf = self.socket.recv(self.in_buffer_size)
         except socket.error, err:
@@ -192,7 +207,6 @@ class Connection(object):
             self.close()
 
     def process_msg(self, msg, body_len):
-        print "processing message:", body_len
         version, flags, stream_id, opcode = map(int8_unpack, msg[:4])
         assert version & PROTOCOL_VERSION_MASK == PROTOCOL_VERSION, \
             "Unsupported CQL protocol version %d" % version
@@ -207,10 +221,13 @@ class Connection(object):
 
         response = decode_response(stream_id, flags, opcode, body, self.decompressor)
 
-        if stream_id < 0:
-            self.handle_pushed(response)
-        else:
-            self._callbacks.pop(stream_id)(response)
+        try:
+            if stream_id < 0:
+                self.handle_pushed(response)
+            else:
+                self._callbacks.pop(stream_id)(response)
+        except:
+            log.error("Callback handler errored, ignoring: %s" % traceback.format_exc())
 
     def handle_error(self):
         log.error(traceback.format_exc())
@@ -230,9 +247,10 @@ class Connection(object):
             else:
                 self.deque.append(data)
 
-            current = self.watcher.events
-            if not current & pyev.EV_WRITE:
-                self.reset(current | pyev.EV_WRITE)
+            if not self.write_watcher.active:
+                with _loop_lock:
+                    self.write_watcher.start()
+                    _loop_notifier.send()
 
     def send_msg(self, msg, cb):
         request_id = self.make_request_id()
@@ -255,7 +273,6 @@ class Connection(object):
             self.register_watcher(event_type, callback)
 
     def _handle_options_response(self, options_response):
-        print "handling options response"
         log.debug("Received options response on new Connection from %s" % self.host)
         self.supported_cql_versions = options_response.cql_versions
         self.remote_supported_compressions = options_response.options['COMPRESSION']
@@ -288,14 +305,11 @@ class Connection(object):
                 # a successful Ready message
                 self._compressor, self.decompressor = locally_supported_compressions[self._compresstype]
 
-        print "sending startup message:", self.cql_version, opts
         sm = StartupMessage(cqlversion=self.cql_version, options=opts)
         self.send_msg(sm, cb=self._handle_startup_response)
 
     def _handle_startup_response(self, startup_response):
-        print "handling startup response"
         if isinstance(startup_response, ReadyMessage):
-            print "got readymessage"
             log.debug("Got ReadyMessage on new Connection from %s" % self.host)
             if self._compresstype:
                 self.compressor = self._compressor
@@ -312,14 +326,13 @@ class Connection(object):
             cm = CredentialsMessage(creds=self.credentials)
             self.send_msg(cm, cb=self._handle_startup_response)
         elif isinstance(startup_response, ErrorMessage):
-            print "got error message"
             log.debug("Received ErrorMessage on new Connection from %s" % self.host)
             self.connect_error = ProgrammingError(
                 "Server did not accept credentials. %s"
                 % startup_response.summary_msg())
             self.connected_event.set()
         else:
-            print "got internal error"
+            log.error("Unexpected response during Connection setup")
             self.connect_error = InternalError(
                 "Unexpected response %r during connection setup"
                 % (startup_response,))
