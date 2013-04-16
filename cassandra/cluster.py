@@ -210,7 +210,14 @@ class Session(object):
         pass
 
     def shutdown(self):
-        self.cluster.shutdown()
+        with self._lock:
+            if self._is_shutdown:
+                return
+            else:
+                self._is_shutdown = True
+
+        for pool in self._pools.values():
+            pool.shutdown()
 
     def add_host(self, host):
         distance = self._load_balancer.distance(host)
@@ -599,10 +606,14 @@ class ControlConnection(object):
                 return None
 
     def shutdown(self):
-        self._is_shutdown = True
         with self._lock:
-            if self._connection:
-                self._connection.close()
+            if self._is_shutdown:
+                return
+            else:
+                self._is_shutdown = True
+
+        if self._connection:
+            self._connection.close()
 
     def refresh_schema(self, keyspace=None, table=None):
         return self._refresh_schema(self._connection, keyspace, table)
