@@ -153,6 +153,8 @@ class Connection(object):
             self.write_watcher.stop()
             self.write_watcher = None
         self.socket.close()
+        with _loop_lock:
+            _loop_notifier.send()
 
     def handle_write(self, watcher, revents):
         try:
