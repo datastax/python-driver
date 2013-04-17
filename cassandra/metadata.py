@@ -1,7 +1,25 @@
+from bisect import bisect_left
 from collections import defaultdict, OrderedDict
 import json
+from hashlib import md5
 import re
+import sys
 from threading import RLock
+
+murmur3 = None
+is_64bit = sys.maxsize > (2 ** 32)
+try:
+    if is_64bit:
+        from smhasher import murmur3_x64_64
+    else:
+        from smhasher import murmur3_x86_64
+except ImportError:
+    pass
+else:
+    if is_64bit:
+        murmur3 = murmur3_x64_64
+    else:
+        murmur3 = murmur3_x86_64
 
 import cassandra.cqltypes as cqltypes
 from cassandra.pool import Host
@@ -27,6 +45,7 @@ class Metadata(object):
         self.cluster = cluster
         self.cluster_name = None
         self.keyspaces = {}
+        self.token_map = None
         self._hosts = {}
         self._hosts_lock = RLock()
 
@@ -202,8 +221,30 @@ class Metadata(object):
             return None
 
     def rebuild_token_map(self, partitioner, token_map):
-        # TODO
-        pass
+        if partitioner.endswith('RandomPartitioner'):
+            token_cls = MD5Token
+        elif partitioner.endswith('Murmur3Partitioner'):
+            token_cls = Murmur3Token
+        elif partitioner.endswith('ByteOrderedPartitioner'):
+            token_cls = BytesToken
+        else:
+            self.token_map = None
+            return
+
+        tokens_to_hosts = defaultdict(set)
+        ring = []
+        for host, token_strings in token_map.iteritems():
+            for token_string in token_strings:
+                token = token_cls(token_string)
+                ring.append(token)
+                tokens_to_hosts[token].add(host)
+
+        ring = sorted(ring)
+        self.token_map = TokenMap(token_cls, tokens_to_hosts, ring)
+
+    def get_replicas(self, key):
+        t = self.token_map
+        return t.get_replicas(t.token_cls.from_key(key))
 
     def add_host(self, address):
         with self._hosts_lock:
@@ -417,3 +458,59 @@ class IndexMetadata(object):
     def as_cql_query(self):
         table = self.column.table
         return "CREATE INDEX %s ON %s.%s (%s)" % (self.name, table.keyspace.name, table.name, self.column.name)
+
+
+class TokenMap(object):
+
+    def __init__(self, token_cls, tokens_to_hosts, ring):
+        self.token_cls = token_cls
+        self.tokens_to_hosts = tokens_to_hosts
+        self.ring = ring
+
+    def get_replicas(self, token):
+        point = bisect_left(self.ring, token)
+        if point == 0 and token != self.ring[0]:
+            return self.tokens_to_hosts[self.ring[-1]]
+        elif point == len(self.ring):
+            return self.tokens_to_hosts[self.ring[0]]
+        else:
+            return self.tokens_to_hosts[self.ring[point]]
+
+
+class Token(object):
+
+    hash_fn = lambda x: x
+
+    @classmethod
+    def from_key(cls, key):
+        return cls(cls.hash_fn(key))
+
+    def __cmp__(self, other):
+        if self.value < other.value:
+            return -1
+        elif self.value == other.value:
+            return 0
+        else:
+            return 1
+
+
+class Murmur3Token(Token):
+
+    hash_fn = murmur3
+
+    def __init__(self, token_string):
+        self.value = int(token_string)
+
+
+class MD5Token(Token):
+
+    hash_fn = md5
+
+    def __init__(self, token_string):
+        self.value = int(token_string)
+
+
+class BytesToken(Token):
+
+    def __init__(self, token_string):
+        self.value = token_string

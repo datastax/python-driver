@@ -338,7 +338,7 @@ class Cluster(object):
 
     conviction_policy_factory = SimpleConvictionPolicy
 
-    def __init__(self, contact_points):
+    def __init__(self, contact_points=("127.0.0.1",)):
         self.contact_points = contact_points
         self.sessions = set()
         self.metadata = Metadata(self)
@@ -380,6 +380,8 @@ class Cluster(object):
         try:
             self._control_connection.connect()
         except:
+            log.error("ControlConnection failed to connect, shutting down Cluster: %s"
+                      % traceback.format_exc())
             self.shutdown()
             raise
 
@@ -570,14 +572,19 @@ class ControlConnection(object):
     def _try_connect(self, host):
         connection = self._cluster.connection_factory(host.address)
 
-        connection.register_watchers({
-            "TOPOLOGY_CHANGE": self._handle_topology_change,
-            "STATUS_CHANGE": self._handle_status_change,
-            "SCHEMA_CHANGE": self._handle_schema_change
-        })
+        try:
+            connection.register_watchers({
+                "TOPOLOGY_CHANGE": self._handle_topology_change,
+                "STATUS_CHANGE": self._handle_status_change,
+                "SCHEMA_CHANGE": self._handle_schema_change
+            })
 
-        self.refresh_node_list_and_token_map()
-        self._refresh_schema(connection)
+            self._refresh_node_list_and_token_map(connection)
+            self._refresh_schema(connection)
+        except:
+            connection.close()
+            raise
+
         return connection
 
     def reconnect(self):
@@ -642,27 +649,29 @@ class ControlConnection(object):
         self._cluster.metadata.rebuild_schema(keyspace, table, ks_result, cf_result, col_result)
 
     def refresh_node_list_and_token_map(self):
-        conn = self._connection
-        if not conn:
+        return self.refresh_node_list_and_token_map(self._connection)
+
+    def _refresh_node_list_and_token_map(self, connection):
+        if not connection:
             return
 
         cl = ConsistencyLevel.ONE
         peers_query = QueryMessage(query=self._SELECT_PEERS, consistency_level=cl)
         local_query = QueryMessage(query=self._SELECT_LOCAL, consistency_level=cl)
         try:
-            peers_result, local_result = conn.wait_for_responses(peers_query, local_query)
+            peers_result, local_result = connection.wait_for_responses(peers_query, local_query)
         except (ConnectionException, BusyConnectionException):
             self.reconnect()
 
         partitioner = None
         token_map = {}
 
-        if local_result and local_result.rows:  # TODO: probably just check local_result.rows
-            local_row = local_result.as_dicts()[0]
+        if local_result and local_result.results:  # TODO: probably just check local_result.rows
+            local_row = local_result.results[0]
             cluster_name = local_row["cluster_name"]
             self._cluster.metadata.cluster_name = cluster_name
 
-            host = self._cluster.metadata.get_host(conn.host)
+            host = self._cluster.metadata.get_host(connection.host)
             if host:
                 host.set_location_info(local_row["data_center"], local_row["rack"])
 
@@ -673,7 +682,7 @@ class ControlConnection(object):
 
         found_hosts = set()
 
-        for row in peers_result.as_dicts():
+        for row in peers_result.results:
             addr = row.get("rpc_address")
             if not addr:
                 addr = row.get("peer")
@@ -692,7 +701,7 @@ class ControlConnection(object):
                 token_map[host] = tokens
 
         for old_host in self._cluster.metadata.all_hosts():
-            if old_host.address != conn.address and \
+            if old_host.address != connection.host and \
                     old_host.address not in found_hosts:
                 self._cluster.remove_host(old_host)
 
