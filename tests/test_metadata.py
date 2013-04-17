@@ -91,6 +91,11 @@ class MetadataTest(unittest.TestCase):
         self.session.execute("DROP TABLE %s.%s" % (self.ksname, self.cfname))
         self.session.execute(recreate)
 
+        # create the table again, but with formatting enabled
+        self.session.execute("DROP TABLE %s.%s" % (self.ksname, self.cfname))
+        recreate = tablemeta.as_cql_query(formatted=True)
+        self.session.execute(recreate)
+
     def get_table_metadata(self):
         self.cluster._control_connection.refresh_schema()
         return self.cluster.metadata.keyspaces[self.ksname].tables[self.cfname]
@@ -242,3 +247,21 @@ class MetadataTest(unittest.TestCase):
         self.session.execute(create_statement)
         tablemeta = self.get_table_metadata()
         self.check_create_statement(tablemeta, create_statement)
+
+    def test_indexes(self):
+        create_statement = self.make_create_statement(["a"], ["b", "c"], ["d", "e", "f"])
+        create_statement += " WITH CLUSTERING ORDER BY (b ASC, c ASC)"
+        self.session.execute(create_statement)
+
+        d_index = "CREATE INDEX d_index ON %s.%s (d)" % (self.ksname, self.cfname)
+        e_index = "CREATE INDEX e_index ON %s.%s (e)" % (self.ksname, self.cfname)
+        self.session.execute(d_index)
+        self.session.execute(e_index)
+
+        tablemeta = self.get_table_metadata()
+        statements = tablemeta.export_as_string().strip()
+        statements = [s.strip() for s in statements.split(';')]
+        statements = filter(bool, statements)
+        self.assertEqual(3, len(statements))
+        self.assertEqual(d_index, statements[1])
+        self.assertEqual(e_index, statements[2])

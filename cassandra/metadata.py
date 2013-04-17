@@ -196,7 +196,10 @@ class Metadata(object):
     def _build_index_metadata(self, column_metadata, row):
         index_name = row.get("index_name")
         index_type = row.get("index_type")
-        return IndexMetadata(column_metadata, index_name, index_type)
+        if index_name or index_type:
+            return IndexMetadata(column_metadata, index_name, index_type)
+        else:
+            return None
 
     def rebuild_token_map(self, partitioner, token_map):
         # TODO
@@ -266,10 +269,13 @@ class TableMetadata(object):
 
     def export_as_string(self):
         ret = self.as_cql_query(formatted=True)
+        ret += ";"
 
         for col_meta in self.columns.values():
             if col_meta.index:
-                ret += "\n%s" % (col_meta.index.as_cql_query(),)
+                ret += "\n%s;" % (col_meta.index.as_cql_query(),)
+
+        return ret
 
     def as_cql_query(self, formatted=False):
         ret = "CREATE TABLE %s.%s (%s" % (self.keyspace.name, self.name, "\n" if formatted else "")
