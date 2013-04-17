@@ -91,6 +91,10 @@ class MetadataTest(unittest.TestCase):
         self.session.execute("DROP TABLE %s.%s" % (self.ksname, self.cfname))
         self.session.execute(recreate)
 
+    def get_table_metadata(self):
+        self.cluster._control_connection.refresh_schema()
+        return self.cluster.metadata.keyspaces[self.ksname].tables[self.cfname]
+
     def test_basic_table_meta_properties(self):
         create_statement = self.make_create_statement(["a"], [], ["b", "c"])
         self.session.execute(create_statement)
@@ -124,9 +128,9 @@ class MetadataTest(unittest.TestCase):
 
     def test_compound_primary_keys(self):
         create_statement = self.make_create_statement(["a"], ["b"], ["c"])
+        create_statement += " WITH CLUSTERING ORDER BY (b ASC)"
         self.session.execute(create_statement)
-        self.cluster._control_connection.refresh_schema()
-        tablemeta = self.cluster.metadata.keyspaces[self.ksname].tables[self.cfname]
+        tablemeta = self.get_table_metadata()
 
         self.assertEqual([u'a'], [c.name for c in tablemeta.partition_key])
         self.assertEqual([u'b'], [c.name for c in tablemeta.clustering_key])
@@ -136,9 +140,9 @@ class MetadataTest(unittest.TestCase):
 
     def test_compound_primary_keys_more_columns(self):
         create_statement = self.make_create_statement(["a"], ["b", "c"], ["d", "e", "f"])
+        create_statement += " WITH CLUSTERING ORDER BY (b ASC, c ASC)"
         self.session.execute(create_statement)
-        self.cluster._control_connection.refresh_schema()
-        tablemeta = self.cluster.metadata.keyspaces[self.ksname].tables[self.cfname]
+        tablemeta = self.get_table_metadata()
 
         self.assertEqual([u'a'], [c.name for c in tablemeta.partition_key])
         self.assertEqual([u'b', u'c'], [c.name for c in tablemeta.clustering_key])
@@ -151,8 +155,7 @@ class MetadataTest(unittest.TestCase):
     def test_composite_primary_key(self):
         create_statement = self.make_create_statement(["a", "b"], [], ["c"])
         self.session.execute(create_statement)
-        self.cluster._control_connection.refresh_schema()
-        tablemeta = self.cluster.metadata.keyspaces[self.ksname].tables[self.cfname]
+        tablemeta = self.get_table_metadata()
 
         self.assertEqual([u'a', u'b'], [c.name for c in tablemeta.partition_key])
         self.assertEqual([], tablemeta.clustering_key)
@@ -162,9 +165,9 @@ class MetadataTest(unittest.TestCase):
 
     def test_composite_in_compound_primary_key(self):
         create_statement = self.make_create_statement(["a", "b"], ["c"], ["d", "e"])
+        create_statement += " WITH CLUSTERING ORDER BY (c ASC)"
         self.session.execute(create_statement)
-        self.cluster._control_connection.refresh_schema()
-        tablemeta = self.cluster.metadata.keyspaces[self.ksname].tables[self.cfname]
+        tablemeta = self.get_table_metadata()
 
         self.assertEqual([u'a', u'b'], [c.name for c in tablemeta.partition_key])
         self.assertEqual([u'c'], [c.name for c in tablemeta.clustering_key])
@@ -174,9 +177,9 @@ class MetadataTest(unittest.TestCase):
 
     def test_compound_primary_keys_compact(self):
         create_statement = self.make_create_statement(["a"], ["b"], ["c"], compact=True)
+        create_statement += " AND CLUSTERING ORDER BY (b ASC)"
         self.session.execute(create_statement)
-        self.cluster._control_connection.refresh_schema()
-        tablemeta = self.cluster.metadata.keyspaces[self.ksname].tables[self.cfname]
+        tablemeta = self.get_table_metadata()
 
         self.assertEqual([u'a'], [c.name for c in tablemeta.partition_key])
         self.assertEqual([u'b'], [c.name for c in tablemeta.clustering_key])
@@ -186,9 +189,9 @@ class MetadataTest(unittest.TestCase):
 
     def test_compound_primary_keys_more_columns_compact(self):
         create_statement = self.make_create_statement(["a"], ["b", "c"], ["d"], compact=True)
+        create_statement += " AND CLUSTERING ORDER BY (b ASC, c ASC)"
         self.session.execute(create_statement)
-        self.cluster._control_connection.refresh_schema()
-        tablemeta = self.cluster.metadata.keyspaces[self.ksname].tables[self.cfname]
+        tablemeta = self.get_table_metadata()
 
         self.assertEqual([u'a'], [c.name for c in tablemeta.partition_key])
         self.assertEqual([u'b', u'c'], [c.name for c in tablemeta.clustering_key])
@@ -199,8 +202,7 @@ class MetadataTest(unittest.TestCase):
     def test_composite_primary_key_compact(self):
         create_statement = self.make_create_statement(["a", "b"], [], ["c"], compact=True)
         self.session.execute(create_statement)
-        self.cluster._control_connection.refresh_schema()
-        tablemeta = self.cluster.metadata.keyspaces[self.ksname].tables[self.cfname]
+        tablemeta = self.get_table_metadata()
 
         self.assertEqual([u'a', u'b'], [c.name for c in tablemeta.partition_key])
         self.assertEqual([], tablemeta.clustering_key)
@@ -210,12 +212,33 @@ class MetadataTest(unittest.TestCase):
 
     def test_composite_in_compound_primary_key_compact(self):
         create_statement = self.make_create_statement(["a", "b"], ["c"], ["d"], compact=True)
+        create_statement += " AND CLUSTERING ORDER BY (c ASC)"
         self.session.execute(create_statement)
-        self.cluster._control_connection.refresh_schema()
-        tablemeta = self.cluster.metadata.keyspaces[self.ksname].tables[self.cfname]
+        tablemeta = self.get_table_metadata()
 
         self.assertEqual([u'a', u'b'], [c.name for c in tablemeta.partition_key])
         self.assertEqual([u'c'], [c.name for c in tablemeta.clustering_key])
         self.assertEqual([u'a', u'b', u'c', u'd'], sorted(tablemeta.columns.keys()))
 
+        self.check_create_statement(tablemeta, create_statement)
+
+    def test_compound_primary_keys_ordering(self):
+        create_statement = self.make_create_statement(["a"], ["b"], ["c"])
+        create_statement += " WITH CLUSTERING ORDER BY (b DESC)"
+        self.session.execute(create_statement)
+        tablemeta = self.get_table_metadata()
+        self.check_create_statement(tablemeta, create_statement)
+
+    def test_compound_primary_keys_more_columns_ordering(self):
+        create_statement = self.make_create_statement(["a"], ["b", "c"], ["d", "e", "f"])
+        create_statement += " WITH CLUSTERING ORDER BY (b DESC, c ASC)"
+        self.session.execute(create_statement)
+        tablemeta = self.get_table_metadata()
+        self.check_create_statement(tablemeta, create_statement)
+
+    def test_composite_in_compound_primary_key_ordering(self):
+        create_statement = self.make_create_statement(["a", "b"], ["c"], ["d", "e"])
+        create_statement += " WITH CLUSTERING ORDER BY (c DESC)"
+        self.session.execute(create_statement)
+        tablemeta = self.get_table_metadata()
         self.check_create_statement(tablemeta, create_statement)
