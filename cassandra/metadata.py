@@ -1,5 +1,5 @@
 import json
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from threading import RLock
 
 import cqltypes
@@ -74,7 +74,7 @@ class Metadata(object):
         cfname = row["columnfamily_name"]
 
         comparator = cqltypes.lookup_casstype(row["comparator"])
-        if isinstance(comparator, cqltypes.CompositeType):
+        if issubclass(comparator, cqltypes.CompositeType):
             column_name_types = comparator.subtypes
             is_composite = True
         else:
@@ -86,13 +86,13 @@ class Metadata(object):
 
         column_aliases = json.loads(row["column_aliases"])
         if is_composite:
-            if isinstance(last_col, cqltypes.ColumnToCollectionType):
+            if issubclass(last_col, cqltypes.ColumnToCollectionType):
                 # collections
                 is_compact = False
                 has_value = False
                 clustering_size = num_column_name_components - 2
             elif (len(column_aliases) == num_column_name_components - 1
-                    and isinstance(last_col, cqltypes.UTF8Type)):
+                    and issubclass(last_col, cqltypes.UTF8Type)):
                 # aliases?
                 is_compact = False
                 has_value = False
@@ -104,7 +104,7 @@ class Metadata(object):
                 clustering_size = num_column_name_components
         else:
             is_compact = True
-            if column_aliases or not col_rows:
+            if column_aliases or not col_rows.get(cfname):
                 has_value = True
                 clustering_size = num_column_name_components
             else:
@@ -118,7 +118,7 @@ class Metadata(object):
         key_aliases = json.loads(key_aliases) if key_aliases else []
 
         key_type = cqltypes.lookup_casstype(row["key_validator"])
-        key_types = key_type.subtypes if isinstance(key_type, cqltypes.CompositeType) else [key_type]
+        key_types = key_type.subtypes if issubclass(key_type, cqltypes.CompositeType) else [key_type]
         for i, col_type in enumerate(key_types):
             if len(key_aliases) > i:
                 column_name = key_aliases[i]
@@ -154,8 +154,8 @@ class Metadata(object):
             table_meta.columns[value_alias] = col
 
         if col_rows:
-            for row in col_rows[cfname]:
-                column_meta = self._build_column_metadata(table_meta, row)
+            for col_row in col_rows[cfname]:
+                column_meta = self._build_column_metadata(table_meta, col_row)
                 table_meta.columns[column_meta.name] = column_meta
 
         table_meta.options = self._build_table_options(row, is_compact)
@@ -230,7 +230,7 @@ class KeyspaceMetadata(object):
 class TableMetadata(object):
 
     recognized_options = (
-            "comment", "read_repair_chance", "local_read_repair_chance",
+            "comment", "read_repair_chance",  # "local_read_repair_chance",
             "replicate_on_write", "gc_grace_seconds", "bloom_filter_fp_chance",
             "caching", "compaction_strategy_class", "compaction_strategy_options",
             "min_compaction_threshold", "max_compression_threshold",
@@ -241,13 +241,13 @@ class TableMetadata(object):
         self.name = name
         self.partition_key = [] if partition_key is None else partition_key
         self.clustering_key = [] if clustering_key is None else clustering_key
-        self.columns = {} if columns is None else columns
+        self.columns = OrderedDict() if columns is None else columns
         self.options = options
 
     def _make_option_str(self, name):
         value = self.options.get(name)
         if value is not None:
-            if name == "comment":
+            if name == "comment" or isinstance(value, basestring):
                 value = "'%s'" % value
             return "%s = %s" % (name, value)
 
@@ -259,35 +259,52 @@ class TableMetadata(object):
                 ret += "\n%s" % (col_meta.index.as_cql_query(),)
 
     def as_cql_query(self, formatted=False):
-        ret = "CREATE TABLE %s (%s" % (self.name, "\n" if formatted else "")
+        ret = "CREATE TABLE %s.%s (%s" % (self.keyspace.name, self.name, "\n" if formatted else "")
 
         if formatted:
-            ret += "\n".join("    %s," % (col,) for col in self.columns.values())
+            column_join = ",\n"
+            padding = "    "
         else:
-            ret += ",".join(map(str, self.columns.values()))
+            column_join = ", "
+            padding = ""
+
+        columns = []
+        for col in self.columns.values():
+            columns.append("%s %s" % (col.name, col.typestring))
+
+        if len(self.partition_key) == 1 and not self.clustering_key:
+            columns[0] += " PRIMARY KEY"
+
+        ret += column_join.join("%s%s" % (padding, col) for col in columns)
 
         # primary key
-        ret += "%sPRIMARY KEY (" % (" " * 4 if formatted else "")
-        if len(self.partition_key) == 1:
-            ret += self.partition_key[0].name
-        else:
-            ret += "(%s)" % ",".join(col.name for col in self.partition_key)
+        if len(self.partition_key) > 1 or self.clustering_key:
+            ret += "%s%sPRIMARY KEY (" % (column_join, padding)
 
-        ret += ", %s)\n" % ",".join(col.name for col in self.clustering_key)
+            if len(self.partition_key) > 1:
+                ret += "(%s)" % ", ".join(col.name for col in self.partition_key)
+            else:
+                ret += self.partition_key[0].name
+
+            if self.clustering_key:
+                ret += ", %s" % ", ".join(col.name for col in self.clustering_key)
+
+            ret += ")"
 
         # options
-        ret += ") WITH "
+        ret += "%s) WITH " % ("\n" if formatted else "")
 
         option_strings = []
         if self.options.get("is_compact_storage"):
             option_strings.append("COMPACT STORAGE")
 
         option_strings.extend(map(self._make_option_str, self.recognized_options))
+        option_strings = filter(lambda x: x is not None, option_strings)
 
         join_str = "\n    AND " if formatted else " AND "
         ret += join_str.join(option_strings)
 
-        return ret + ";"
+        return ret
 
 
 class ColumnMetadata(object):
@@ -297,6 +314,10 @@ class ColumnMetadata(object):
         self.name = column_name
         self.data_type = data_type
         self.index = index_metadata
+
+    @property
+    def typestring(self):
+        return self.data_type.cql_parameterized_type()
 
     def __str__(self):
         return "%s %s" % (self.name, self.data_type)
