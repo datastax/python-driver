@@ -1,11 +1,12 @@
 import unittest
 
 from cassandra.cluster import Cluster
+from cassandra.metadata import TableMetadata
 
 
 class MetadataTest(unittest.TestCase):
 
-    ksname = "MetadataTest"
+    ksname = "metadatatest"
 
     @property
     def cfname(self):
@@ -51,7 +52,7 @@ class MetadataTest(unittest.TestCase):
         finally:
             self.cluster.shutdown()
 
-    def test(self):
+    def test_basic_table_meta_properties(self):
         self.session.execute(
             """
             CREATE TABLE {ksname}.{cfname} (
@@ -62,3 +63,47 @@ class MetadataTest(unittest.TestCase):
             """.format(ksname=self.ksname, cfname=self.cfname))
 
         self.cluster._control_connection.refresh_schema()
+
+        meta = self.cluster.metadata
+        self.assertNotEqual(meta.cluster, None)
+        # self.assertNotEqual(meta.cluster_name, None)  # TODO needs to be fixed
+        self.assertTrue(self.ksname in meta.keyspaces)
+        ksmeta = meta.keyspaces[self.ksname]
+
+        self.assertEqual(ksmeta.name, self.ksname)
+        self.assertTrue(ksmeta.durable_writes)
+        self.assertTrue(ksmeta.replication['class'].endswith('SimpleStrategy'))
+        self.assertEqual(ksmeta.replication['replication_factor'], '1')
+
+        self.assertTrue(self.cfname in ksmeta.tables)
+        tablemeta = ksmeta.tables[self.cfname]
+        self.assertEqual(tablemeta.keyspace, ksmeta)
+        self.assertEqual(tablemeta.name, self.cfname)
+
+        self.assertEqual([u'a'], [c.name for c in tablemeta.partition_key])
+        self.assertEqual([], tablemeta.clustering_key)
+        self.assertEqual([u'a', u'b', u'c'], sorted(tablemeta.columns.keys()))
+
+        for option in TableMetadata.recognized_options:
+            self.assertTrue(option in tablemeta.options)
+
+    def test_compound_primary_keys(self):
+        self.session.execute(
+            """
+            CREATE TABLE {ksname}.{cfname} (
+                a text,
+                b text,
+                c text,
+                PRIMARY KEY (a, b)
+            )
+            """.format(ksname=self.ksname, cfname=self.cfname))
+
+        self.cluster._control_connection.refresh_schema()
+        tablemeta = self.cluster.metadata.keyspaces[self.ksname].tables[self.cfname]
+
+        self.assertEqual([u'a'], [c.name for c in tablemeta.partition_key])
+        self.assertEqual([u'b'], [c.name for c in tablemeta.clustering_key])
+        self.assertEqual([u'a', u'b', u'c'], sorted(tablemeta.columns.keys()))
+
+        for option in TableMetadata.recognized_options:
+            self.assertTrue(option in tablemeta.options)

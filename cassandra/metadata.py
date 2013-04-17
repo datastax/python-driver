@@ -35,7 +35,6 @@ class Metadata(object):
             added_keyspaces = set()
             for row in ks_results.results:
                 keyspace_meta = self._build_keyspace_metadata(row)
-                ksname = keyspace_meta.name
                 if ksname in cf_def_rows:
                     for table_row in cf_def_rows[keyspace_meta.name]:
                         table_meta = self._build_table_metadata(
@@ -85,7 +84,7 @@ class Metadata(object):
         num_column_name_components = len(column_name_types)
         last_col = column_name_types[-1]
 
-        column_aliases = row["column_aliases"]
+        column_aliases = json.loads(row["column_aliases"])
         if is_composite:
             if isinstance(last_col, cqltypes.ColumnToCollectionType):
                 # collections
@@ -115,7 +114,9 @@ class Metadata(object):
         table_meta = TableMetadata(keyspace_metadata, cfname)
 
         # partition key
-        key_aliases = row["key_aliases"] or []
+        key_aliases = row.get("key_aliases")
+        key_aliases = json.loads(key_aliases) if key_aliases else []
+
         key_type = cqltypes.lookup_casstype(row["key_validator"])
         key_types = key_type.subtypes if isinstance(key_type, cqltypes.CompositeType) else [key_type]
         for i, col_type in enumerate(key_types):
@@ -144,7 +145,7 @@ class Metadata(object):
         # value alias (if present)
         if has_value:
             validator = cqltypes.lookup_casstype(row["default_validator"])
-            if not row.get("key_aliases"):
+            if not key_aliases:  # TODO are we checking the right thing here?
                 value_alias = "value"
             else:
                 value_alias = row["value_alias"]
