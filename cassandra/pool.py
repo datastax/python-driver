@@ -78,6 +78,10 @@ class Host(object):
 
 
 class _ReconnectionHandler(object):
+    """
+    Abstract class for attempting reconnections with a given
+    schedule and scheduler.
+    """
 
     def __init__(self, scheduler, schedule, callback, *callback_args, **callback_kwargs):
         self.scheduler = scheduler
@@ -91,9 +95,11 @@ class _ReconnectionHandler(object):
         if self._cancelled:
             return
 
+        # TODO cancel previous reconnection handlers? That's probably the job
+        # of whatever created this.
+
         first_delay = self.schedule.get_next_delay()
         self.scheduler.schedule(first_delay, self.run)
-        # TODO cancel previous
 
     def run(self):
         if self._cancelled:
@@ -118,12 +124,31 @@ class _ReconnectionHandler(object):
                 self.reschedule(next_delay)
 
     def try_reconnect(self):
+        """
+        Subclasses must implement this method.  It should attempt to
+        open a new Connection and return it; if a failure occurs, an
+        Exception should be raised.
+        """
         raise NotImplemented()
 
     def on_reconnection(self, connection):
-        raise NotImplemented()
+        """
+        Called when a new Connection is successfully opened.  Nothing is
+        done by default.
+        """
+        pass
 
     def on_exception(self, exc, next_delay):
+        """
+        Called when an Exception is raised when trying to connect.
+        `exc` is the Exception that was raised and `next_delay` is the
+        number of seconds (as a float) that the handler will wait before
+        attempting to connect again.
+
+        Subclasses should return ``False`` if no more attempts to connection
+        should be made, ``True`` otherwise.  The default behavior is to
+        always retry unless the error is an AuthenticationException.
+        """
         if isinstance(exc, AuthenticationException):
             return False
         else:
