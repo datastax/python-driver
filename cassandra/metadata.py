@@ -3,23 +3,12 @@ from collections import defaultdict, OrderedDict
 import json
 from hashlib import md5
 import re
-import sys
 from threading import RLock
 
-murmur3 = None
-is_64bit = sys.maxsize > (2 ** 32)
 try:
-    if is_64bit:
-        from smhasher import murmur3_x64_64
-    else:
-        from smhasher import murmur3_x86_64
+    import cassandra.murmur3 as murmur3
 except ImportError:
-    pass
-else:
-    if is_64bit:
-        murmur3 = murmur3_x64_64
-    else:
-        murmur3 = murmur3_x86_64
+    murmur3 = None
 
 import cassandra.cqltypes as cqltypes
 from cassandra.pool import Host
