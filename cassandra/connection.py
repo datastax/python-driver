@@ -177,7 +177,7 @@ class Connection(object):
             if (err.args[0] in NONBLOCKING):
                 self.deque.appendleft(next_msg)
             else:
-                self.handle_error(err)
+                self.handle_error()
             return
         else:
             if sent < len(next_msg):
@@ -191,7 +191,7 @@ class Connection(object):
             buf = self.socket.recv(self.in_buffer_size)
         except socket.error, err:
             if err.args[0] not in NONBLOCKING:
-                self.handle_error(err)
+                self.handle_error()
             return
 
         if buf:
