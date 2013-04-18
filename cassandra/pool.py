@@ -89,7 +89,7 @@ class _ReconnectionHandler(object):
         self.callback = callback
         self.callback_args = callback_args
         self.callback_kwargs = callback_kwargs
-        self._cancelled
+        self._cancelled = False
 
     def start(self):
         if self._cancelled:
@@ -106,22 +106,17 @@ class _ReconnectionHandler(object):
             return
 
         # TODO wait for readyForNext?
-        self.on_reconnection(self.try_reconnect())
-        self.callback(*self.callback_args, **self.callback_kwargs)
-
-    def cancel(self):
-        self._cancelled = True
-
-    def reschedule(self, delay):
-        if self._cancelled:
-            return
-
         try:
-            self.scheduler.schedule(delay, self.run)
+            self.on_reconnection(self.try_reconnect())
         except Exception, exc:
             next_delay = self.schedule.get_next_delay()
             if self.on_exception(exc, next_delay):
-                self.reschedule(next_delay)
+                self.scheduler.schedule(next_delay, self.run)
+        else:
+            self.callback(*self.callback_args, **self.callback_kwargs)
+
+    def cancel(self):
+        self._cancelled = True
 
     def try_reconnect(self):
         """
