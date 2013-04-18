@@ -49,6 +49,10 @@ class InternalError(Exception):
     pass
 
 
+class ProtocolError(Exception):
+    pass
+
+
 _loop = pyev.default_loop(pyev.EVBACKEND_SELECT)
 
 _loop_notifier = _loop.async(lambda *a, **kw: None)
@@ -217,16 +221,23 @@ class Connection(object):
 
     def process_msg(self, msg, body_len):
         version, flags, stream_id, opcode = map(int8_unpack, msg[:4])
-        assert version & PROTOCOL_VERSION_MASK == PROTOCOL_VERSION, \
-            "Unsupported CQL protocol version %d" % version
-        assert version & HEADER_DIRECTION_MASK == HEADER_DIRECTION_TO_CLIENT, \
-            "Unexpected request from server with opcode %04x, stream id %r" % (opcode, stream_id)
+
+        # check that the protocol version is supported
+        if version & PROTOCOL_VERSION_MASK != PROTOCOL_VERSION:
+            raise ProtocolError("Unsupported CQL protocol version %d" % version)
+
+        # check that the header direction is correct
+        if version & HEADER_DIRECTION_MASK != HEADER_DIRECTION_TO_CLIENT:
+            raise ProtocolError(
+                "Unexpected request from server with opcode "
+                "%04x, stream id %r" % (opcode, stream_id))
+
         if body_len > 0:
             body = msg[8:]
         elif body_len == 0:
             body = ""
         else:
-            assert body_len >= 0, "Invalid CQL protocol body_len %r" % body_len
+            raise ProtocolError("Got negative body length: %r" % body_len)
 
         response = decode_response(stream_id, flags, opcode, body, self.decompressor)
 
