@@ -151,15 +151,18 @@ class Connection(object):
                 _loop_notifier.send()
 
     def close(self):
-        if self.read_watcher:
-            self.read_watcher.stop()
-            self.read_watcher = None
-        if self.write_watcher:
-            self.write_watcher.stop()
-            self.write_watcher = None
+        self.read_watcher.stop()
+        self.write_watcher.stop()
         self.socket.close()
         with _loop_lock:
             _loop_notifier.send()
+
+    def __del__(self):
+        try:
+            self.close()
+        except:
+            pass
+        object.__del__(self)
 
     def handle_write(self, watcher, revents):
         try:
