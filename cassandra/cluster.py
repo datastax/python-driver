@@ -19,7 +19,7 @@ from pool import (ConnectionException, BusyConnectionException,
                   _HostReconnectionHandler, HostConnectionPool)
 
 # TODO: we might want to make this configurable
-MAX_SCHEMA_AGREEMENT_WAIT_MS = 10000
+MAX_SCHEMA_AGREEMENT_WAIT = 10
 
 log = logging.getLogger(__name__)
 
@@ -376,11 +376,11 @@ class Cluster(object):
         for address in contact_points:
             self.add_host(address, signal=False)
 
-        self._control_connection = ControlConnection(self, self.metadata)
+        self._control_connection = _ControlConnection(self)
         try:
             self._control_connection.connect()
         except:
-            log.error("ControlConnection failed to connect, shutting down Cluster: %s"
+            log.error("Control connection failed to connect, shutting down Cluster: %s"
                       % traceback.format_exc())
             self.shutdown()
             raise
@@ -501,6 +501,7 @@ class _ControlReconnectionHandler(_ReconnectionHandler):
         self.control_connection = control_connection
 
     def try_reconnect(self):
+        # we'll either get back a new Connection or a NoHostAvailable
         return self.control_connection._reconnect_internal()
 
     def on_reconnection(self, connection):
@@ -514,7 +515,7 @@ class _ControlReconnectionHandler(_ReconnectionHandler):
             return True
 
 
-class ControlConnection(object):
+class _ControlConnection(object):
 
     _SELECT_KEYSPACES = "SELECT * FROM system.schema_keyspaces"
     _SELECT_COLUMN_FAMILIES = "SELECT * FROM system.schema_columnfamilies"
@@ -526,10 +527,13 @@ class ControlConnection(object):
     _SELECT_SCHEMA_PEERS = "SELECT rpc_address, schema_version FROM system.peers"
     _SELECT_SCHEMA_LOCAL = "SELECT schema_version FROM system.local WHERE key='local'"
 
-    def __init__(self, cluster, metadata):
+    # for testing purposes
+    _time = time
+
+    def __init__(self, cluster):
         self._cluster = cluster
         self._balancing_policy = RoundRobinPolicy()
-        self._balancing_policy.populate(cluster, metadata.all_hosts())
+        self._balancing_policy.populate(cluster, cluster.metadata.all_hosts())
         self._reconnection_policy = ExponentialReconnectionPolicy(2 * 1000, 5 * 60 * 1000)
         self._connection = None
 
@@ -547,6 +551,9 @@ class ControlConnection(object):
         self._set_new_connection(self._reconnect_internal())
 
     def _set_new_connection(self, conn):
+        """
+        Replace existing connection (if there is one) and close it.
+        """
         with self._lock:
             old = self._connection
             self._connection = conn
@@ -555,6 +562,14 @@ class ControlConnection(object):
             old.close()
 
     def _reconnect_internal(self):
+        """
+        Tries to connect to each host in the query plan until one succeeds
+        or every attempt fails. If successful, a new Connection will be
+        returned.  Otherwise, :exc:`NoHostAvailable` will be raised
+        with an "errors" arg that is a dict mapping host addresses
+        to the exception that was raised when an attempt was made to open
+        a connection to that host.
+        """
         errors = {}
         for host in self._balancing_policy.make_query_plan():
             try:
@@ -570,6 +585,10 @@ class ControlConnection(object):
         raise NoHostAvailable("Unable to connect to any servers", errors)
 
     def _try_connect(self, host):
+        """
+        Creates a new Connection, registers for pushed events, and refreshes
+        node/token and schema metadata.
+        """
         connection = self._cluster.connection_factory(host.address)
 
         try:
@@ -594,17 +613,30 @@ class ControlConnection(object):
         try:
             self._set_new_connection(self._reconnect_internal())
         except NoHostAvailable:
+            # make a retry schedule (which includes backoff)
             schedule = self._reconnection_policy.new_schedule()
+
             with self._reconnection_lock:
+
+                # cancel existing reconnection attempts
                 if self._reconnection_handler:
                     self._reconnection_handler.cancel()
+
+                # when a connection is successfully made, _set_new_connection
+                # will be called with the new connection and then our
+                # _reconnection_handler will be cleared out
                 self._reconnection_handler = _ControlReconnectionHandler(
                     self, self._cluster.scheduler, schedule,
-                    callback=self._get_and_set_reconnection_handler,
-                    callback_kwargs=dict(new_handler=None))
+                    self._get_and_set_reconnection_handler,
+                    new_handler=None)
                 self._reconnection_handler.start()
 
     def _get_and_set_reconnection_handler(self, new_handler):
+        """
+        Called by the _ControlReconnectionHandler when a new connection
+        is successfully created.  Clears out the _reconnection_handler on
+        this ControlConnection.
+        """
         with self._reconnection_lock:
             if self._reconnection_handler:
                 return self._reconnection_handler
@@ -619,6 +651,10 @@ class ControlConnection(object):
             else:
                 self._is_shutdown = True
 
+        # stop trying to reconnect (if we are)
+        if self._reconnection_handler:
+            self._reconnection_handler.cancel()
+
         if self._connection:
             self._connection.close()
 
@@ -626,6 +662,8 @@ class ControlConnection(object):
         return self._refresh_schema(self._connection, keyspace, table)
 
     def _refresh_schema(self, connection, keyspace=None, table=None):
+        self.wait_for_schema_agreement()
+
         where_clause = ""
         if keyspace:
             where_clause = " WHERE keyspace_name = '%s'" % (keyspace,)
@@ -666,7 +704,7 @@ class ControlConnection(object):
         partitioner = None
         token_map = {}
 
-        if local_result and local_result.results:  # TODO: probably just check local_result.rows
+        if local_result.results:
             local_row = local_result.results[0]
             cluster_name = local_row["cluster_name"]
             self._cluster.metadata.cluster_name = cluster_name
@@ -709,11 +747,9 @@ class ControlConnection(object):
             self._cluster.metadata.rebuild_token_map(partitioner, token_map)
 
     def _handle_topology_change(self, event):
-        # TODO schedule on executor
         change_type = event["change_type"]
         addr, port = event["address"]
         if change_type == "NEW_NODE":
-            # TODO check Host constructor
             self._cluster.scheduler.schedule(1, self.add_host, addr, signal=True)
         elif change_type == "REMOVED_NODE":
             host = self._cluster.metadata.get_host(addr)
@@ -738,35 +774,31 @@ class ControlConnection(object):
             pass
 
     def _handle_schema_change(self, event):
-        change_type, ks, cf = event
-        if change_type in ("CREATED", "DROPPED"):
-            if not cf:
-                self._cluster.executor.submit(self.refresh_schema)
-            else:
-                self._cluster.executor.submit(self.refresh_schema, ks)
-        elif change_type == "UPDATED":
-            if not cf:
-                self._cluster.executor.submit(self.refresh_schema, ks)
-            else:
-                self._cluster.executor.submit(self.refresh_schema, ks, cf)
+        keyspace = event['keyspace'] or None
+        table = event['table'] or None
+        if event['change_type'] in ("CREATED", "DROPPED"):
+            keyspace = keyspace if table else None
+            self._cluster.executor.submit(self.refresh_schema, keyspace)
+        elif event['change_type'] == "UPDATED":
+            self._cluster.executor.submit(self.refresh_schema, keyspace, table)
 
     def wait_for_schema_agreement(self):
         # TODO is returning True/False the best option for this? Potentially raise Exception?
-        start = time.time()
+        start = self._time.time()
         elapsed = 0
         cl = ConsistencyLevel.ONE
-        while elapsed < MAX_SCHEMA_AGREEMENT_WAIT_MS:
+        while elapsed < MAX_SCHEMA_AGREEMENT_WAIT:
             peers_query = QueryMessage(query=self._SELECT_SCHEMA_PEERS, consistency_level=cl)
             local_query = QueryMessage(query=self._SELECT_SCHEMA_LOCAL, consistency_level=cl)
             peers_result, local_result = self._connection.wait_for_responses(peers_query, local_query)
 
             versions = set()
-            if local_result and local_result.rows:
-                local_row = local_result.as_dicts()[0]
+            if local_result.results:
+                local_row = local_result.results[0]
                 if local_row.get("schema_version"):
                     versions.add(local_row.get("schema_version"))
 
-            for row in peers_result.as_dicts():
+            for row in peers_result.results:
                 if not row.get("rpc_address") or not row.get("schema_version"):
                     continue
 
@@ -781,8 +813,8 @@ class ControlConnection(object):
             if len(versions) == 1:
                 return True
 
-            time.sleep(0.2)
-            elapsed = time.time() - start
+            self._time.sleep(0.2)
+            elapsed = self._time.time() - start
 
         return False
 
