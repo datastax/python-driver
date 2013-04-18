@@ -61,14 +61,19 @@ _loop_started = None
 _loop_lock = Lock()
 
 def _run_loop():
-    while _loop.start():
+    while True:
+        end_condition = _loop.start()
         # there are still active watchers, no deadlock
-        continue
-
-    # all Connections have been closed, no active watchers
-    log.debug("All Connections currently closed, event loop ended")
-    global _loop_started
-    _loop_started = False
+        with _loop_lock:
+            if end_condition:
+                log.debug("Restarting event loop")
+                continue
+            else:
+                # all Connections have been closed, no active watchers
+                log.debug("All Connections currently closed, event loop ended")
+                global _loop_started
+                _loop_started = False
+                break
 
 def _start_loop():
     global _loop_started
