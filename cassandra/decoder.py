@@ -545,6 +545,14 @@ class EventMessage(_MessageType):
         address = read_inet(f)
         return dict(change_type=change_type, address=address)
 
+    @classmethod
+    def recv_schema_change(cls, f):
+        # "CREATED", "DROPPED", or "UPDATED"
+        change_type = read_string(f)
+        keyspace = read_string(f)
+        table = read_string(f)
+        return dict(change_type=change_type, keyspace=keyspace, table=table)
+
 
 def read_byte(f):
     return int8_unpack(f.read(1))
