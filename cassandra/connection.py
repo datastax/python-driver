@@ -162,7 +162,6 @@ class Connection(object):
             self.close()
         except:
             pass
-        object.__del__(self)
 
     def handle_write(self, watcher, revents):
         try:
