@@ -5,12 +5,14 @@ from hashlib import md5
 import re
 from threading import RLock
 
+murmur3 = None
 try:
     import cassandra.murmur3 as murmur3
 except ImportError:
-    murmur3 = None
+    pass
 
 import cassandra.cqltypes as cqltypes
+from cassandra.marshal import varint_unpack
 from cassandra.pool import Host
 
 keywords = set((
@@ -468,7 +470,9 @@ class TokenMap(object):
 
 class Token(object):
 
-    hash_fn = lambda x: x
+    @classmethod
+    def hash_fn(cls, key):
+        return key
 
     @classmethod
     def from_key(cls, key):
@@ -482,10 +486,15 @@ class Token(object):
         else:
             return 1
 
+MIN_LONG = -(2 ** 63)
+MAX_LONG = (2 ** 63) - 1
 
 class Murmur3Token(Token):
 
-    hash_fn = murmur3
+    @classmethod
+    def hash_fn(cls, key):
+        h = murmur3(key)
+        return h if h != MIN_LONG else MAX_LONG
 
     def __init__(self, token_string):
         self.value = int(token_string)
@@ -493,7 +502,9 @@ class Murmur3Token(Token):
 
 class MD5Token(Token):
 
-    hash_fn = md5
+    @classmethod
+    def hash_fn(cls, key):
+        return abs(varint_unpack(md5('foo').digest()))
 
     def __init__(self, token_string):
         self.value = int(token_string)
