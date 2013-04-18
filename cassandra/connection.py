@@ -254,9 +254,11 @@ class Connection(object):
         self.is_defunct = True
 
     def handle_pushed(self, response):
-        # details = response.recv_body
-        # for cb in self._push_watchers[response]
-        pass
+        for cb in self._push_watchers[response.type]:
+            try:
+                cb(response)
+            except:
+                log.error("Pushed event handler errored, ignoring: %s" % traceback.format_exc())
 
     def push(self, data):
         sabs = self.out_buffer_size
