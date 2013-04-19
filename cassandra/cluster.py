@@ -687,7 +687,7 @@ class _ControlConnection(object):
         self._cluster.metadata.rebuild_schema(keyspace, table, ks_result, cf_result, col_result)
 
     def refresh_node_list_and_token_map(self):
-        return self.refresh_node_list_and_token_map(self._connection)
+        return self._refresh_node_list_and_token_map(self._connection)
 
     def _refresh_node_list_and_token_map(self, connection):
         cl = ConsistencyLevel.ONE
@@ -722,9 +722,9 @@ class _ControlConnection(object):
 
             found_hosts.add(addr)
 
-            host = self._cluster.metadata.getHost(addr)
+            host = self._cluster.metadata.get_host(addr)
             if host is None:
-                host = self._cluster.addHost(addr, True)
+                host = self._cluster.add_host(addr, signal=True)
             host.set_location_info(row.get("data_center"), row.get("rack"))
 
             tokens = row.get("tokens")

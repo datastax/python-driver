@@ -11,9 +11,14 @@ class MockMetadata(object):
 
     def __init__(self):
         self.hosts = {
+            "192.168.1.0": Host("192.168.1.0", SimpleConvictionPolicy),
             "192.168.1.1": Host("192.168.1.1", SimpleConvictionPolicy),
             "192.168.1.2": Host("192.168.1.2", SimpleConvictionPolicy)
         }
+
+        self.cluster_name = None
+        self.partitioner = None
+        self.token_map = {}
 
     def get_host(self, rpc_address):
         return self.hosts.get(rpc_address)
@@ -21,16 +26,30 @@ class MockMetadata(object):
     def all_hosts(self):
         return self.hosts.values()
 
+    def rebuild_token_map(self, partitioner, token_map):
+        self.partitioner = partitioner
+        self.token_map = token_map
+
 
 class MockCluster(object):
 
     def __init__(self):
         self.metadata = MockMetadata()
+        self.added_hosts = []
+        self.removed_hosts = []
 
+    def add_host(self, address, signal=False):
+        host = Host(address, SimpleConvictionPolicy)
+        self.added_hosts.append(host)
+        return host
+
+    def remove_host(self, host):
+        self.removed_hosts.append(host)
 
 class MockConnection(object):
 
     def __init__(self):
+        self.host = "192.168.1.0"
         self.local_results = [
             {
                 "schema_version": "a",
@@ -38,7 +57,7 @@ class MockConnection(object):
                 "data_center": "dc1",
                 "rack": "rack1",
                 "partitioner": "Murmur3Partitioner",
-                "tokens": [0, 100, 200]
+                "tokens": ['0', '100', '200']
             }
         ]
 
@@ -49,7 +68,7 @@ class MockConnection(object):
                 "schema_version": "a",
                 "data_center": "dc1",
                 "rack": "rack1",
-                "tokens": [1, 101, 201]
+                "tokens": ['1', '101', '201']
             },
             {
                 "rpc_address": "192.168.1.2",
@@ -57,7 +76,7 @@ class MockConnection(object):
                 "schema_version": "a",
                 "data_center": "dc1",
                 "rack": "rack1",
-                "tokens": [1, 101, 201]
+                "tokens": ['2', '102', '202']
             }
         ]
 
@@ -150,3 +169,47 @@ class ControlConnectionTest(unittest.TestCase):
         host.monitor.is_up = True
         self.assertFalse(self.control_connection.wait_for_schema_agreement())
         self.assertGreaterEqual(self.time.clock, MAX_SCHEMA_AGREEMENT_WAIT)
+
+    def test_refresh_nodes_and_tokens(self):
+        self.control_connection.refresh_node_list_and_token_map()
+        meta = self.cluster.metadata
+        self.assertEqual(meta.partitioner, 'Murmur3Partitioner')
+        self.assertEqual(meta.cluster_name, 'foocluster')
+
+        # check token map
+        self.assertEqual(sorted(meta.all_hosts()), sorted(meta.token_map.keys()))
+        for token_list in meta.token_map.values():
+            self.assertEqual(3, len(token_list))
+
+        # check datacenter/rack
+        for host in meta.all_hosts():
+            self.assertEqual(host.datacenter, "dc1")
+            self.assertEqual(host.rack, "rack1")
+
+    def test_refresh_nodes_and_tokens_no_partitioner(self):
+        self.connection.local_results[0]["partitioner"] = None
+        self.control_connection.refresh_node_list_and_token_map()
+        meta = self.cluster.metadata
+        self.assertEqual(meta.partitioner, None)
+        self.assertEqual(meta.token_map, {})
+
+    def test_refresh_nodes_and_tokens_add_host(self):
+        self.connection.peer_results.append({
+            "rpc_address": "192.168.1.3",
+            "peer": "10.0.0.3",
+            "schema_version": "a",
+            "data_center": "dc1",
+            "rack": "rack1",
+            "tokens": ['3', '103', '203']
+        })
+        self.control_connection.refresh_node_list_and_token_map()
+        self.assertEqual(1, len(self.cluster.added_hosts))
+        self.assertEqual(self.cluster.added_hosts[0].address, "192.168.1.3")
+        self.assertEqual(self.cluster.added_hosts[0].datacenter, "dc1")
+        self.assertEqual(self.cluster.added_hosts[0].rack, "rack1")
+
+    def test_refresh_nodes_and_tokens_remove_host(self):
+        del self.connection.peer_results[1]
+        self.control_connection.refresh_node_list_and_token_map()
+        self.assertEqual(1, len(self.cluster.removed_hosts))
+        self.assertEqual(self.cluster.removed_hosts[0].address, "192.168.1.2")
