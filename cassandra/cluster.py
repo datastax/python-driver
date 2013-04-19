@@ -14,7 +14,7 @@ from metadata import Metadata
 from policies import (RoundRobinPolicy, SimpleConvictionPolicy,
                       ExponentialReconnectionPolicy, HostDistance, RetryPolicy)
 from query import SimpleStatement
-from pool import (ConnectionException, BusyConnectionException,
+from pool import (ConnectionException,
                   AuthenticationException, _ReconnectionHandler,
                   _HostReconnectionHandler, HostConnectionPool)
 
@@ -690,16 +690,10 @@ class _ControlConnection(object):
         return self.refresh_node_list_and_token_map(self._connection)
 
     def _refresh_node_list_and_token_map(self, connection):
-        if not connection:
-            return
-
         cl = ConsistencyLevel.ONE
         peers_query = QueryMessage(query=self._SELECT_PEERS, consistency_level=cl)
         local_query = QueryMessage(query=self._SELECT_LOCAL, consistency_level=cl)
-        try:
-            peers_result, local_result = connection.wait_for_responses(peers_query, local_query)
-        except (ConnectionException, BusyConnectionException):
-            self.reconnect()
+        peers_result, local_result = connection.wait_for_responses(peers_query, local_query)
 
         partitioner = None
         token_map = {}
@@ -719,12 +713,11 @@ class _ControlConnection(object):
                 token_map[host] = tokens
 
         found_hosts = set()
-
         for row in peers_result.results:
             addr = row.get("rpc_address")
-            if not addr:
-                addr = row.get("peer")
-            elif addr == "0.0.0.0":  # TODO handle ipv6 equivalent
+
+            # TODO handle ipv6 equivalent
+            if not addr or addr == "0.0.0.0":
                 addr = row.get("peer")
 
             found_hosts.add(addr)
@@ -783,7 +776,6 @@ class _ControlConnection(object):
             self._cluster.executor.submit(self.refresh_schema, keyspace, table)
 
     def wait_for_schema_agreement(self):
-        # TODO is returning True/False the best option for this? Potentially raise Exception?
         start = self._time.time()
         elapsed = 0
         cl = ConsistencyLevel.ONE
