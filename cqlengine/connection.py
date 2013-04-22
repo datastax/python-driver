@@ -78,7 +78,7 @@ class ConnectionPool(object):
                 cls._queue.get().close()
         except:
             pass
-    
+
     @classmethod
     def get(cls):
         """
@@ -124,7 +124,7 @@ class ConnectionPool(object):
         global _hosts
         global _username
         global _password
-        
+
         if not _hosts:
             raise CQLConnectionError("At least one host required")
 
@@ -133,7 +133,7 @@ class ConnectionPool(object):
         new_conn = cql.connect(host.name, host.port, user=_username, password=_password)
         new_conn.set_cql_version('3.0.0')
         return new_conn
-        
+
 
 class connection_manager(object):
     """
@@ -145,7 +145,7 @@ class connection_manager(object):
         self.keyspace = None
         self.con = ConnectionPool.get()
         self.cur = None
-        
+
     def close(self):
         if self.cur: self.cur.close()
         ConnectionPool.put(self.con)
@@ -175,7 +175,6 @@ class connection_manager(object):
             except TTransportException:
                 #TODO: check for other errors raised in the event of a connection / server problem
                 #move to the next connection and set the connection pool
-                self.con = None
                 _host_idx += 1
                 _host_idx %= len(_hosts)
                 self.con.close()
