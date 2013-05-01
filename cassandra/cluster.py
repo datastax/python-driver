@@ -1,22 +1,26 @@
+from functools import partial
+from futures import ThreadPoolExecutor
+import logging
 import time
 from threading import Lock, RLock, Thread, Event
-import Queue
-import logging
 import traceback
+import Queue
 
-from futures import ThreadPoolExecutor
-
-from connection import Connection
-from decoder import (ConsistencyLevel, QueryMessage, ResultMessage, ErrorMessage,
-                     ReadTimeoutErrorMessage, WriteTimeoutErrorMessage, UnavailableExceptionErrorMessage,
-                     OverloadedErrorMessage, IsBootstrappingErrorMessage)
-from metadata import Metadata
-from policies import (RoundRobinPolicy, SimpleConvictionPolicy,
-                      ExponentialReconnectionPolicy, HostDistance, RetryPolicy)
-from query import SimpleStatement
-from pool import (ConnectionException,
-                  AuthenticationException, _ReconnectionHandler,
-                  _HostReconnectionHandler, HostConnectionPool)
+from cassandra.connection import Connection
+from cassandra.decoder import (ConsistencyLevel, QueryMessage, ResultMessage,
+                               ErrorMessage, ReadTimeoutErrorMessage,
+                               WriteTimeoutErrorMessage,
+                               UnavailableExceptionErrorMessage,
+                               OverloadedErrorMessage,
+                               IsBootstrappingErrorMessage)
+from cassandra.metadata import Metadata
+from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
+                                ExponentialReconnectionPolicy, HostDistance,
+                                RetryPolicy)
+from cassandra.query import SimpleStatement
+from cassandra.pool import (ConnectionException,
+                            AuthenticationException, _ReconnectionHandler,
+                            _HostReconnectionHandler, HostConnectionPool)
 
 # TODO: we might want to make this configurable
 MAX_SCHEMA_AGREEMENT_WAIT = 10
