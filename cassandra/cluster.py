@@ -83,8 +83,10 @@ class ResponseFuture(object):
         if isinstance(response, ResultMessage):
             self._set_final_result(response)
         elif isinstance(response, ErrorMessage):
-            retry_policy = self.query.retry_policy # TODO also check manager.configuration
-                                                   # for retry policy if None
+            retry_policy = self.query.retry_policy
+            if not retry_policy:
+                retry_policy = self.session.cluster.retry_policy_factory()
+
             if isinstance(response, ReadTimeoutErrorMessage):
                 details = response.recv_error_info()
                 retry = retry_policy.on_read_timeout(
@@ -185,7 +187,7 @@ class Session(object):
         self._lock = RLock()
         self._is_shutdown = False
         self._pools = {}
-        self._load_balancer = RoundRobinPolicy()
+        self._load_balancer = cluster.load_balancing_policy_factory()
         self._load_balancer.populate(cluster, hosts)
 
         for host in hosts:
@@ -330,7 +332,7 @@ class Cluster(object):
 
     # protocol options
     port = 9042
-    compression = None
+    compression = True
 
     auth_provider = None
     """
@@ -338,9 +340,35 @@ class Cluster(object):
     and returns a dict of credentials for that node.
     """
 
-    load_balancing_policy = None
-    reconnection_policy = ExponentialReconnectionPolicy(2 * 1000, 5 * 60 * 1000)
-    retry_policy = None
+    load_balancing_policy_factory = RoundRobinPolicy
+    """
+    A factory function which creates instances of subclasses of
+    :cls:`policies.LoadBalancingPolicy`.  Defaults to
+    :cls:`policies.RoundRobinPolicy`.
+    """
+
+    reconnection_policy_factory = partial(
+        ExponentialReconnectionPolicy, 1.0, 600.0)
+    """
+    A factory function which creates instances of
+    :cls:`policies.ReconnectionPolicy`.  Defaults to a function
+    that will create :cls:`ExponentialReconnectionPolicy` instances with
+    a base delay of one second and a max delay of ten minutes.
+    """
+
+    retry_policy_factory = RetryPolicy
+    """
+    A factory function which creates instances of
+    :cls:`policies.RetryPolicy`.  Defaults to
+    :cls:`policies.RetryPolicy`.
+    """
+
+    conviction_policy_factory = SimpleConvictionPolicy
+    """
+    A factory function which creates instances of
+    :cls:`policies.ConvictionPolicy`.  Defaults to
+    :cls:`policies.SimpleConvictionPolicy`.
+    """
 
     metrics_enabled = False
 
@@ -349,8 +377,6 @@ class Cluster(object):
     An optional list of tuples which will be used as *args to
     ``socket.setsockopt()`` for all created sockets.
     """
-
-    conviction_policy_factory = SimpleConvictionPolicy
 
     def __init__(self, contact_points=("127.0.0.1",), **kwargs):
         self.contact_points = contact_points
@@ -427,6 +453,7 @@ class Cluster(object):
         if self.auth_provider:
             kwargs['credentials'] = self.auth_provider(host)
 
+        kwargs['compression'] = self.compression
         kwargs['sockopts'] = self.sockopts
 
         return Connection.factory(host, *args, **kwargs)
