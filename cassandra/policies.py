@@ -121,10 +121,27 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
         self._dc_live_hosts.setdefault(host.datacenter, set()).discard(host)
 
 
-class SimpleConvictionPolicy(object):
+class ConvictionPolicy(object):
 
     def __init__(self, host):
         self.host = host
+
+    def add_failure(connection_exc):
+        """
+        Implementations should return ``True`` if the host should be
+        convicted, ``False`` otherwise.
+        """
+        raise NotImplemented()
+
+    def reset(self):
+        """
+        Implementations should clear out any convictions or state regarding
+        the host.
+        """
+        raise NotImplemented()
+
+
+class SimpleConvictionPolicy(ConvictionPolicy):
 
     def add_failure(connection_exc):
         return True
