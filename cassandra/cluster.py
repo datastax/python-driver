@@ -708,7 +708,7 @@ class _ControlConnection(object):
         return self._refresh_schema(self._connection, keyspace, table)
 
     def _refresh_schema(self, connection, keyspace=None, table=None):
-        self.wait_for_schema_agreement()
+        self.wait_for_schema_agreement(connection)
 
         where_clause = ""
         if keyspace:
@@ -821,14 +821,17 @@ class _ControlConnection(object):
         elif event['change_type'] == "UPDATED":
             self._cluster.executor.submit(self.refresh_schema, keyspace, table)
 
-    def wait_for_schema_agreement(self):
+    def wait_for_schema_agreement(self, connection=None):
+        if not connection:
+            connection = self._connection
+
         start = self._time.time()
         elapsed = 0
         cl = ConsistencyLevel.ONE
         while elapsed < MAX_SCHEMA_AGREEMENT_WAIT:
             peers_query = QueryMessage(query=self._SELECT_SCHEMA_PEERS, consistency_level=cl)
             local_query = QueryMessage(query=self._SELECT_SCHEMA_LOCAL, consistency_level=cl)
-            peers_result, local_result = self._connection.wait_for_responses(peers_query, local_query)
+            peers_result, local_result = connection.wait_for_responses(peers_query, local_query)
 
             versions = set()
             if local_result.results:
