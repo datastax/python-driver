@@ -115,10 +115,7 @@ class Connection(object):
         self.host = host
         self.port = port
 
-        # TODO cleanup, see todo below
         self.compression = True
-        self._compresstype = None
-        self._compressor = None
         self.compressor = None
         self.decompressor = None
 
@@ -315,7 +312,7 @@ class Connection(object):
             self.cql_version = self.supported_cql_versions[0]
 
         opts = {}
-        self._compresstype = None
+        self._compressor = None
         if self.compression:
             overlap = (set(locally_supported_compressions) &
                        set(self.remote_supported_compressions))
@@ -325,13 +322,12 @@ class Connection(object):
                           % (locally_supported_compressions,
                              self.remote_supported_compressions))
             else:
-                # TODO these compression fields probably don't need to be set
-                # on the object; look at cleaning this up
-                self._compresstype = iter(overlap).next() # choose any
-                opts['COMPRESSION'] = self._compresstype
+                compression_type = iter(overlap).next() # choose any
+                opts['COMPRESSION'] = compression_type
                 # set the decompressor here, but set the compressor only after
                 # a successful Ready message
-                self._compressor, self.decompressor = locally_supported_compressions[self._compresstype]
+                self._compressor, self.decompressor = \
+                    locally_supported_compressions[compression_type]
 
         sm = StartupMessage(cqlversion=self.cql_version, options=opts)
         self.send_msg(sm, cb=self._handle_startup_response)
@@ -339,7 +335,7 @@ class Connection(object):
     def _handle_startup_response(self, startup_response):
         if isinstance(startup_response, ReadyMessage):
             log.debug("Got ReadyMessage on new Connection from %s" % self.host)
-            if self._compresstype:
+            if self._compressor:
                 self.compressor = self._compressor
             self.connected_event.set()
         elif isinstance(startup_response, AuthenticateMessage):
