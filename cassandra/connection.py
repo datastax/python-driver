@@ -126,6 +126,7 @@ class Connection(object):
         self.connect_error = None
         self.in_flight = 0
         self.is_defunct = False
+        self.is_closed = False
 
         self.make_request_id = itertools.cycle(xrange(127)).next
         self._callbacks = {}
@@ -155,6 +156,11 @@ class Connection(object):
                 _loop_notifier.send()
 
     def close(self):
+        with self._lock:
+            if self.is_closed:
+                return
+            self.is_closed = True
+
         self.read_watcher.stop()
         self.write_watcher.stop()
         self.socket.close()

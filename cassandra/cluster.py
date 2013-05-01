@@ -558,7 +558,7 @@ class _ControlConnection(object):
             old = self._connection
             self._connection = conn
 
-        if old and not old.is_closed():  # TODO is_closed() may not exist
+        if old:
             old.close()
 
     def _reconnect_internal(self):
