@@ -12,6 +12,7 @@ import traceback
 from cassandra.marshal import (int8_unpack, int32_unpack)
 from cassandra.decoder import (OptionsMessage, ReadyMessage, AuthenticateMessage,
                                StartupMessage, ErrorMessage, CredentialsMessage,
+                               QueryMessage, ResultMessage, ConsistencyLevel,
                                decode_response)
 
 log = logging.getLogger(__name__)
@@ -40,6 +41,14 @@ HEADER_DIRECTION_TO_CLIENT = 0x80
 HEADER_DIRECTION_MASK = 0x80
 
 NONBLOCKING = (errno.EAGAIN, errno.EWOULDBLOCK)
+
+
+class ConnectionException(Exception):
+
+    def __init__(self, message, host=None):
+        Exception.__init__(self, message)
+        self.host = host
+
 
 class ProgrammingError(Exception):
     pass
@@ -115,6 +124,7 @@ class Connection(object):
         self.host = host
         self.port = port
         self.credentials = credentials
+        self.keyspace = None
 
         self.compression = compression
         self.compressor = None
@@ -372,7 +382,25 @@ class Connection(object):
             self.connected_event.set()
 
     def set_keyspace(self, keyspace):
-        pass
+        if not keyspace:
+            return
+
+        with self._lock:
+            if keyspace == self.keyspace:
+                return
+
+            query = 'USE "%s"' % (keyspace,)
+            try:
+                result = self.wait_for_response(
+                    QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE))
+                if isinstance(result, ResultMessage):
+                    self.keyspace = keyspace
+                else:
+                    self.defunct(ConnectionException(
+                        "Problem while setting keyspace: %r" % (result,), self.host))
+            except Exception, exc:
+                self.defunct(ConnectionException(
+                    "Problem while setting keyspace: %r" % (exc,), self.host))
 
 class ResponseWaiter(object):
 

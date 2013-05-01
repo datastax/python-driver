@@ -6,13 +6,7 @@
 import time
 from threading import Lock, RLock, Condition
 
-from connection import MAX_STREAM_PER_CONNECTION
-
-class ConnectionException(Exception):
-
-    def __init__(self, message, host=None):
-        Exception.__init__(self, message)
-        self.host = host
+from connection import MAX_STREAM_PER_CONNECTION, ConnectionException
 
 
 class BusyConnectionException(Exception):
@@ -252,7 +246,7 @@ class HostConnectionPool(object):
                     self._session.submit(self._create_new_connection)
 
             conn = self._wait_for_conn(timeout)
-            conn.set_keyspace()  # TODO need to get keyspace from pool
+            conn.set_keyspace(self._session.keyspace)
             return conn
         else:
             least_busy = min(self._connections, key=lambda c: c.in_flight)
@@ -277,7 +271,7 @@ class HostConnectionPool(object):
                     least_busy = self._wait_for_conn(timeout)
                     break
 
-            least_busy.set_keyspace("keyspace")  # TODO get keyspace from pool state
+            least_busy.set_keyspace(self._session.keyspace)
             return least_busy
 
     def _create_new_connection(self):

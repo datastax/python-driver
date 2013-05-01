@@ -6,7 +6,7 @@ from threading import Lock, RLock, Thread, Event
 import traceback
 import Queue
 
-from cassandra.connection import Connection
+from cassandra.connection import Connection, ConnectionException
 from cassandra.decoder import (ConsistencyLevel, QueryMessage, ResultMessage,
                                ErrorMessage, ReadTimeoutErrorMessage,
                                WriteTimeoutErrorMessage,
@@ -18,8 +18,7 @@ from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy)
 from cassandra.query import SimpleStatement
-from cassandra.pool import (ConnectionException,
-                            AuthenticationException, _ReconnectionHandler,
+from cassandra.pool import (AuthenticationException, _ReconnectionHandler,
                             _HostReconnectionHandler, HostConnectionPool)
 
 # TODO: we might want to make this configurable
@@ -82,8 +81,7 @@ class ResponseFuture(object):
 
         if isinstance(response, ResultMessage):
             if response.kind == ResultMessage.KIND_SET_KEYSPACE:
-                # TODO set keyspace on session
-                pass
+                self.session.set_keyspace(response.results)
             elif response.kind == ResultMessage.KIND_SCHEMA_CHANGE:
                 # refresh the schema before responding, but do it in another
                 # thread instead of the event loop thread
@@ -201,6 +199,7 @@ class Session(object):
     def __init__(self, cluster, hosts):
         self.cluster = cluster
         self.hosts = hosts
+        self.keyspace = None
 
         self._lock = RLock()
         self._is_shutdown = False
@@ -299,7 +298,8 @@ class Session(object):
             pool.shutdown()
 
     def set_keyspace(self, keyspace):
-        pass
+        self.execute('USE "%s"' % (keyspace,))
+        self.keyspace = keyspace
 
     def submit(self, fn, *args, **kwargs):
         return self.cluster.executor.submit(fn, *args, **kwargs)
@@ -477,8 +477,10 @@ class Cluster(object):
         return Connection.factory(host, *args, **kwargs)
 
     def connect(self, keyspace=None):
-        # TODO set keyspace if not None
-        return self._new_session()
+        session = self._new_session()
+        if keyspace:
+            session.set_keyspace(keyspace)
+        return session
 
     def shutdown(self):
         with self._lock:
