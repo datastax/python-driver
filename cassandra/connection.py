@@ -110,10 +110,11 @@ class Connection(object):
         else:
             return conn
 
-    def __init__(self, host='127.0.0.1', port=9042):
+    def __init__(self, host='127.0.0.1', port=9042, credentials=None):
         self.cql_version = "3.0.1"
         self.host = host
         self.port = port
+        self.credentials = credentials
 
         self.compression = True
         self.compressor = None
@@ -345,6 +346,7 @@ class Connection(object):
                 self.connect_error = ProgrammingError(
                     'Remote end requires authentication.')
                 self.connected_event.set()
+                return
 
             self.authenticator = startup_response.authenticator
             cm = CredentialsMessage(creds=self.credentials)

@@ -363,9 +363,6 @@ class Cluster(object):
             HostDistance.REMOTE: DEFAULT_MAX_CONNECTIONS_PER_REMOTE_HOST
         }
 
-        # TODO real factory based on config
-        self.connection_factory = Connection.factory
-
         # TODO make the pool size configurable somewhere
         self.executor = ThreadPoolExecutor(max_workers=3)
         self.scheduler = _Scheduler(self.executor)
@@ -411,6 +408,12 @@ class Cluster(object):
 
     def set_max_connections_per_host(self, host_distance, max_connections):
         self._max_connections_per_host[host_distance] = max_connections
+
+    def connection_factory(self, host, *args, **kwargs):
+        if self.auth_provider:
+            kwargs['credentials'] = self.auth_provider(host)
+
+        return Connection.factory(host, *args, **kwargs)
 
     def connect(self, keyspace=None):
         # TODO set keyspace if not None
