@@ -133,7 +133,13 @@ class SimpleConvictionPolicy(object):
         pass
 
 
-class ConstantReconnectionPolicy(object):
+class ReconnectionPolicy(object):
+
+    def new_schedule(self):
+        raise NotImplemented()
+
+
+class ConstantReconnectionPolicy(ReconnectionPolicy):
 
     def __init__(self, delay):
         if delay < 0:
@@ -145,9 +151,13 @@ class ConstantReconnectionPolicy(object):
         return repeat(self.delay)
 
 
-class ExponentialReconnectionPolicy(object):
+class ExponentialReconnectionPolicy(ReconnectionPolicy):
 
     def __init__(self, base_delay, max_delay):
+        """
+        `base_delay` and `max_delay` should be in floating point units of
+        seconds.
+        """
         if base_delay < 0 or max_delay < 0:
             raise ValueError("Delays may not be negative")
 
