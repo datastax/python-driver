@@ -98,8 +98,8 @@ def _start_loop():
 
 class Connection(object):
 
-    in_buffer_size = 1024
-    out_buffer_size = 1024
+    in_buffer_size = 4096
+    out_buffer_size = 4096
 
     @classmethod
     def factory(cls, *args, **kwargs):
@@ -110,13 +110,13 @@ class Connection(object):
         else:
             return conn
 
-    def __init__(self, host='127.0.0.1', port=9042, credentials=None, sockopts=None):
+    def __init__(self, host='127.0.0.1', port=9042, credentials=None, sockopts=None, compression=True):
         self.cql_version = "3.0.1"
         self.host = host
         self.port = port
         self.credentials = credentials
 
-        self.compression = True
+        self.compression = compression
         self.compressor = None
         self.decompressor = None
 
