@@ -822,7 +822,8 @@ class _ControlConnection(object):
         self._balancing_policy.on_down(host)
 
         conn = self._connection
-        if conn and conn.address == host.address:  # TODO and reconnection_attempt is None
+        if conn and conn.address == host.address and \
+                self._reconnection_handler is None:
             self.reconnect()
 
     def on_add(self, host):
