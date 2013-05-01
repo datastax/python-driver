@@ -746,7 +746,7 @@ class _ControlConnection(object):
             self._cluster.scheduler.schedule(1, self.add_host, addr, signal=True)
         elif change_type == "REMOVED_NODE":
             host = self._cluster.metadata.get_host(addr)
-            self._cluster.scheduler.schedule(1, self.remove_host, host)
+            self._cluster.scheduler.schedule(0, self.remove_host, host)
         elif change_type == "MOVED_NODE":
             self._cluster.scheduler.schedule(1, self.refresh_node_list_and_token_map)
 
