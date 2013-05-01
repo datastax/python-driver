@@ -110,7 +110,7 @@ class Connection(object):
         else:
             return conn
 
-    def __init__(self, host='127.0.0.1', port=9042, credentials=None):
+    def __init__(self, host='127.0.0.1', port=9042, credentials=None, sockopts=None):
         self.cql_version = "3.0.1"
         self.host = host
         self.port = port
@@ -138,6 +138,10 @@ class Connection(object):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.connect((host, port))
         self.socket.setblocking(0)
+
+        if sockopts:
+            for args in sockopts:
+                self.socket.setsockopt(*args)
 
         self.read_watcher = pyev.Io(self.socket._sock, pyev.EV_READ, _loop, self.handle_read)
         self.write_watcher = pyev.Io(self.socket._sock, pyev.EV_WRITE, _loop, self.handle_write)

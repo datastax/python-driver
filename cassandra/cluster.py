@@ -324,21 +324,31 @@ class _Scheduler(object):
 
 class Cluster(object):
 
+    # protocol options
     port = 9042
+    compression = None
 
     auth_provider = None
+    """
+    An optional function that accepts one argument, the IP address of a node,
+    and returns a dict of credentials for that node.
+    """
 
     load_balancing_policy = None
     reconnection_policy = ExponentialReconnectionPolicy(2 * 1000, 5 * 60 * 1000)
     retry_policy = None
 
-    compression = None
     metrics_enabled = False
-    socket_options = None
+
+    sockopts = None
+    """
+    An optional list of tuples which will be used as *args to
+    ``socket.setsockopt()`` for all created sockets.
+    """
 
     conviction_policy_factory = SimpleConvictionPolicy
 
-    def __init__(self, contact_points=("127.0.0.1",)):
+    def __init__(self, contact_points=("127.0.0.1",), **kwargs):
         self.contact_points = contact_points
         self.sessions = set()
         self.metadata = Metadata(self)
@@ -412,6 +422,8 @@ class Cluster(object):
     def connection_factory(self, host, *args, **kwargs):
         if self.auth_provider:
             kwargs['credentials'] = self.auth_provider(host)
+
+        kwargs['sockopts'] = self.sockopts
 
         return Connection.factory(host, *args, **kwargs)
 
