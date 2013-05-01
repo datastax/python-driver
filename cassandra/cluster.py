@@ -81,7 +81,22 @@ class ResponseFuture(object):
         self._current_pool.return_connection(self._connection)
 
         if isinstance(response, ResultMessage):
-            self._set_final_result(response)
+            if response.kind == ResultMessage.KIND_SET_KEYSPACE:
+                # TODO set keyspace on session
+                pass
+            elif response.kind == ResultMessage.KIND_SCHEMA_CHANGE:
+                # refresh the schema before responding, but do it in another
+                # thread instead of the event loop thread
+                def refresh_schema_and_set_result():
+                    ks, table = response.results['keyspace'], response.results['table']
+                    try:
+                        self.session.cluster._control_connection.refresh_schema(ks, table)
+                    finally:
+                        self._set_final_result(None)
+
+                self.session.cluster.executor.submit(refresh_schema_and_set_result)
+            else:
+                self._set_final_result(response)
         elif isinstance(response, ErrorMessage):
             retry_policy = self.query.retry_policy
             if not retry_policy:
@@ -122,7 +137,10 @@ class ResponseFuture(object):
                 self._set_final_result(None)
         else:
             # we got some other kind of response message
-            self._set_final_result(response)
+            msg = "Got unexpected message: %r" % (response,)
+            exc = ConnectionException(msg, self._current_host)
+            self.current_connection.defunct(exc)
+            self._set_final_exception(exc)
 
     def _set_final_result(self, response):
         self._final_result = response
@@ -535,6 +553,9 @@ class Cluster(object):
             for pool in session._pools.values():
                 pool.ensure_core_connections()
 
+    def submit_schema_refresh(self, keyspace=None, table=None):
+        return self.executor.submit(
+            self._control_connection.refresh_schema, keyspace, table)
 
 class NoHostAvailable(Exception):
     pass

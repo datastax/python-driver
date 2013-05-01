@@ -458,10 +458,10 @@ class ResultMessage(_MessageType):
 
     @classmethod
     def recv_results_schema_change(cls, f):
-        change = read_string(f)
-        ks = read_string(f)
-        cf = read_string(f)
-        return (change, ks, cf)
+        change_type = read_string(f)
+        keyspace = read_string(f)
+        table = read_string(f)
+        return dict(change_type=change_type, keyspace=keyspace, table=table)
 
     @classmethod
     def read_type(cls, f):

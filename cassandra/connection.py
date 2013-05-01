@@ -175,6 +175,9 @@ class Connection(object):
         except:
             pass
 
+    def defunct(self, exc):
+        pass
+
     def handle_write(self, watcher, revents):
         try:
             next_msg = self.deque.popleft()
