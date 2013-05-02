@@ -129,7 +129,7 @@ class ConvictionPolicy(object):
     def __init__(self, host):
         self.host = host
 
-    def add_failure(connection_exc):
+    def add_failure(self, connection_exc):
         """
         Implementations should return ``True`` if the host should be
         convicted, ``False`` otherwise.
@@ -146,7 +146,7 @@ class ConvictionPolicy(object):
 
 class SimpleConvictionPolicy(ConvictionPolicy):
 
-    def add_failure(connection_exc):
+    def add_failure(self, connection_exc):
         return True
 
     def reset(self):
