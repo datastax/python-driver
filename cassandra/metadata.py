@@ -62,11 +62,10 @@ class Metadata(object):
             added_keyspaces = set()
             for row in ks_results.results:
                 keyspace_meta = self._build_keyspace_metadata(row)
-                if ksname in cf_def_rows:
-                    for table_row in cf_def_rows[keyspace_meta.name]:
-                        table_meta = self._build_table_metadata(
-                            keyspace_meta, table_row, col_def_rows[keyspace_meta.name])
-                        keyspace_meta.tables[table_meta.name] = table_meta
+                for table_row in cf_def_rows.get(keyspace_meta.name, []):
+                    table_meta = self._build_table_metadata(
+                        keyspace_meta, table_row, col_def_rows[keyspace_meta.name])
+                    keyspace_meta.tables[table_meta.name] = table_meta
 
                 added_keyspaces.add(keyspace_meta.name)
                 self.keyspaces[keyspace_meta.name] = keyspace_meta
