@@ -20,7 +20,7 @@ class SchemaMetadataTest(unittest.TestCase):
         session = cluster.connect()
         try:
             results = session.execute("SELECT keyspace_name FROM system.schema_keyspaces")
-            existing_keyspaces = [r.values()[0] for r in results.results]
+            existing_keyspaces = [row.values()[0] for row in results]
             if cls.ksname in existing_keyspaces:
                 session.execute("DROP KEYSPACE %s" % cls.ksname)
 
@@ -276,6 +276,7 @@ class TokenMetadataTest(unittest.TestCase):
 
     def test_token(self):
         cluster = Cluster()
+        cluster.connect()
         tmap = cluster.metadata.token_map
         self.assertTrue(issubclass(tmap.token_cls, Token))
         self.assertEqual(1, len(tmap.ring))

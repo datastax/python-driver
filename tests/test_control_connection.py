@@ -1,7 +1,7 @@
 import unittest
 
 from cassandra.decoder import ResultMessage
-from cassandra.cluster import _ControlConnection, MAX_SCHEMA_AGREEMENT_WAIT
+from cassandra.cluster import _ControlConnection, Cluster
 from cassandra.pool import Host
 from cassandra.policies import SimpleConvictionPolicy
 
@@ -32,6 +32,8 @@ class MockMetadata(object):
 
 
 class MockCluster(object):
+
+    max_schema_agreement_wait = Cluster.max_schema_agreement_wait
 
     def __init__(self):
         self.metadata = MockMetadata()
@@ -126,7 +128,7 @@ class ControlConnectionTest(unittest.TestCase):
         self.connection.peer_results[1]["schema_version"] = 'b'
         self.assertFalse(self.control_connection.wait_for_schema_agreement())
         # the control connection should have slept until it hit the limit
-        self.assertGreaterEqual(self.time.clock, MAX_SCHEMA_AGREEMENT_WAIT)
+        self.assertGreaterEqual(self.time.clock, Cluster.max_schema_agreement_wait)
 
     def test_wait_for_schema_agreement_skipping(self):
         """
@@ -168,7 +170,7 @@ class ControlConnectionTest(unittest.TestCase):
         # but once we mark it up, the control connection will care
         host.monitor.is_up = True
         self.assertFalse(self.control_connection.wait_for_schema_agreement())
-        self.assertGreaterEqual(self.time.clock, MAX_SCHEMA_AGREEMENT_WAIT)
+        self.assertGreaterEqual(self.time.clock, Cluster.max_schema_agreement_wait)
 
     def test_refresh_nodes_and_tokens(self):
         self.control_connection.refresh_node_list_and_token_map()
