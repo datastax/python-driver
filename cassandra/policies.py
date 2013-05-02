@@ -40,8 +40,11 @@ class RoundRobinPolicy(LoadBalancingPolicy):
             self._position += 1
 
         length = len(self._live_hosts)
-        pos %= length
-        return islice(cycle(self._live_hosts), pos, pos + length)
+        if length:
+            pos %= length
+            return islice(cycle(self._live_hosts), pos, pos + length)
+        else:
+            return []
 
     def on_up(self, host):
         self._live_hosts.add(host)
