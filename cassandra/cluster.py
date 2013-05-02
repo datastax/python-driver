@@ -385,13 +385,11 @@ class Cluster(object):
     :cls:`policies.RoundRobinPolicy`.
     """
 
-    reconnection_policy_factory = partial(
-        ExponentialReconnectionPolicy, 1.0, 600.0)
+    reconnection_policy = ExponentialReconnectionPolicy(1.0, 600.0)
     """
-    A factory function which creates instances of
-    :cls:`policies.ReconnectionPolicy`.  Defaults to a function
-    that will create :cls:`ExponentialReconnectionPolicy` instances with
-    a base delay of one second and a max delay of ten minutes.
+    An instance of :cls:`policies.ReconnectionPolicy`. Defaults to an instance
+    of :cls:`ExponentialReconnectionPolicy` with a base delay of one second and
+    a max delay of ten minutes.
     """
 
     retry_policy_factory = RetryPolicy
@@ -436,7 +434,7 @@ class Cluster(object):
                 compression=True,
                 auth_provider=None,
                 load_balancing_policy_factory=None,
-                reconnection_policy_factory=None,
+                reconnection_policy=None,
                 retry_policy_factory=None,
                 conviction_policy_factory=None,
                 metrics_enabled=False,
@@ -458,10 +456,8 @@ class Cluster(object):
                 raise ValueError("load_balancing_policy_factory must be callable")
             self.load_balancing_policy_factory = load_balancing_policy_factory
 
-        if reconnection_policy_factory is not None:
-            if not callable(reconnection_policy_factory):
-                raise ValueError("reconnection_policy_factory must be callable")
-            self.reconnection_policy_factory = reconnection_policy_factory
+        if reconnection_policy is not None:
+            self.reconnection_policy = reconnection_policy
 
         if retry_policy_factory is not None:
             if not callable(retry_policy_factory):
