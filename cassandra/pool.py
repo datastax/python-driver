@@ -53,11 +53,9 @@ class Host(object):
 
     def get_and_set_reconnection_handler(self, new_handler):
         with self._reconnection_lock:
-            if self._reconnection_handler:
-                return self._reconnection_handler
-            else:
-                self._reconnection_handler = new_handler
-                return None
+            old = self._reconnection_handler
+            self._reconnection_handler = new_handler
+            return old
 
     def __eq__(self, other):
         if not isinstance(other, Host):
