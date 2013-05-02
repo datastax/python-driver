@@ -26,6 +26,15 @@ from cassandra.pool import (AuthenticationException, _ReconnectionHandler,
 log = logging.getLogger(__name__)
 
 
+def refresh_schema_and_set_result(keyspace, table, control_conn, response_future):
+    try:
+        control_conn.refresh_schema(keyspace, table)
+    except Exception, exc:
+        log.error("Exception refreshing schema in response to schema change: %r", exc)
+    finally:
+        response_future._set_final_result(None)
+
+
 class ResponseFuture(object):
 
     def __init__(self, session, message, query):
@@ -45,6 +54,10 @@ class ResponseFuture(object):
         self._errors = {}
         self._query_retries = 0
         self._callback = self._errback = None
+
+    def __del__(self):
+        if hasattr(self, 'session'):
+            del self.session
 
     def send_request(self):
         for host in self.query_plan:
@@ -84,19 +97,14 @@ class ResponseFuture(object):
             elif response.kind == ResultMessage.KIND_SCHEMA_CHANGE:
                 # refresh the schema before responding, but do it in another
                 # thread instead of the event loop thread
-                def refresh_schema_and_set_result():
-                    ks, table = response.results['keyspace'], response.results['table']
-                    try:
-                        self.session.cluster.control_connection.refresh_schema(ks, table)
-                    except weakref.ReferenceError:
-                        pass
-                    finally:
-                        self._set_final_result(None)
-
                 try:
-                    self.session.cluster.executor.submit(refresh_schema_and_set_result)
+                    control_conn = self.session.cluster.control_connection
+                    executor = self.session.cluster.executor
                 except weakref.ReferenceError:
-                    pass
+                    self._set_final_result(None)
+                else:
+                    ks, table = response.results['keyspace'], response.results['table']
+                    executor.submit(refresh_schema_and_set_result, ks, table, control_conn, self)
             else:
                 self._set_final_result(response.results)
         elif isinstance(response, ErrorMessage):
@@ -150,6 +158,7 @@ class ResponseFuture(object):
             self._set_final_exception(exc)
 
     def _set_final_result(self, response):
+        del self.session  # clear reference cycles
         self._final_result = response
         self._event.set()
         if self._callback:
@@ -157,6 +166,7 @@ class ResponseFuture(object):
             fn(response, *args, **kwargs)
 
     def _set_final_exception(self, response):
+        del self.session  # clear reference cycles
         self._final_exception = response
         self._event.set()
         if self._errback:
@@ -220,8 +230,7 @@ class Session(object):
             self.add_host(host)
 
     def execute(self, query):
-        future = self.execute_async(query)
-        return future.deliver()
+        return self.execute_async(query).deliver()
 
     def execute_async(self, query):
         if isinstance(query, basestring):
@@ -589,7 +598,7 @@ class Cluster(object):
             if self.control_connection:
                 self.control_connection.shutdown()
             if self.executor:
-                self.executor.shutdown()
+                self.executor.shutdown(wait=False)
 
     def _new_session(self):
         session = Session(self, self.metadata.all_hosts())
