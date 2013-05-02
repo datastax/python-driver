@@ -1,4 +1,3 @@
-from functools import partial
 from futures import ThreadPoolExecutor
 import logging
 import time
@@ -287,7 +286,7 @@ class Session(object):
         if pool:
             pool.shutdown()
 
-        for host in self._cluster.metadata.all_hosts():
+        for host in self.cluster.metadata.all_hosts():
             if not host.monitor.is_up:
                 continue
 
@@ -996,7 +995,7 @@ class ControlConnection(object):
         self._balancing_policy.on_down(host)
 
         conn = self._connection
-        if conn and conn.address == host.address and \
+        if conn and conn.host == host.address and \
                 self._reconnection_handler is None:
             self.reconnect()
 
