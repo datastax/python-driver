@@ -34,6 +34,9 @@ unreserved_keywords = set((
 class Metadata(object):
 
     def __init__(self, cluster):
+        # use a weak reference so that the Cluster object can be GC'ed.
+        # Normally the cycle detector would handle this, but implementing
+        # __del__ disables that.
         self.cluster_ref = weakref.ref(cluster)
         self.cluster_name = None
         self.keyspaces = {}

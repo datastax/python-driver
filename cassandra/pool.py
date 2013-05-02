@@ -173,6 +173,9 @@ class HealthMonitor(object):
     def __init__(self, conviction_policy):
         self._conviction_policy = conviction_policy
         self._host = conviction_policy.host
+        # self._listeners will hold, among other things, references to
+        # Cluster objects.  To allow those to be GC'ed (and shutdown) even
+        # though we've implemented __del__, use weak references.
         self._listeners = weakref.WeakSet()
         self._lock = RLock()
 

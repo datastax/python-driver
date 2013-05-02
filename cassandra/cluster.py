@@ -478,6 +478,9 @@ class Cluster(object):
         self.sockopts = sockopts
         self.max_schema_agreement_wait = max_schema_agreement_wait
 
+        # let Session objects be GC'ed (and shutdown) when the user no longer
+        # holds a reference. Normally the cycle detector would handle this,
+        # but implementing __del__ prevents that.
         self.sessions = weakref.WeakSet()
         self.metadata = Metadata(self)
         self.control_connection = None
@@ -697,6 +700,8 @@ class ControlConnection(object):
     _time = time
 
     def __init__(self, cluster):
+        # use a weak reference to allow the Cluster instance to be GC'ed (and
+        # shutdown) since implementing __del__ disables the cycle detector
         self._cluster = weakref.proxy(cluster)
         self._balancing_policy = RoundRobinPolicy()
         self._balancing_policy.populate(cluster, cluster.metadata.all_hosts())
