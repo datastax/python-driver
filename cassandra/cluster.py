@@ -21,8 +21,6 @@ from cassandra.query import SimpleStatement
 from cassandra.pool import (AuthenticationException, _ReconnectionHandler,
                             _HostReconnectionHandler, HostConnectionPool)
 
-# TODO: we might want to make this configurable
-MAX_SCHEMA_AGREEMENT_WAIT = 10
 
 log = logging.getLogger(__name__)
 
@@ -348,9 +346,16 @@ class _Scheduler(object):
 
 class Cluster(object):
 
-    # protocol options
     port = 9042
+    """
+    The server-side port to open connections to. Defaults to 9042.
+    """
+
     compression = True
+    """
+    Whether or not compression should be enabled when possible. Defaults to
+    ``True`` and attempts to use snappy compression.
+    """
 
     auth_provider = None
     """
@@ -389,6 +394,9 @@ class Cluster(object):
     """
 
     metrics_enabled = False
+    """
+    Whether or not metric collection is enabled.
+    """
 
     sockopts = None
     """
@@ -396,8 +404,64 @@ class Cluster(object):
     ``socket.setsockopt()`` for all created sockets.
     """
 
-    def __init__(self, contact_points=("127.0.0.1",), **kwargs):
+    max_schema_agreement_wait = 10
+    """
+    The maximum duration (in seconds) that the driver will wait for schema
+    agreement across the cluster. Defaults to ten seconds.
+    """
+
+    metadata = None
+    """
+    An instance of :cls:`cassandra.metadata.Metadata`.
+    """
+
+    def __init__(self,
+                contact_points=("127.0.0.1",),
+                port=9042,
+                compression=True,
+                auth_provider=None,
+                load_balancing_policy_factory=None,
+                reconnection_policy_factory=None,
+                retry_policy_factory=None,
+                conviction_policy_factory=None,
+                metrics_enabled=False,
+                sockopts=None,
+                executor_threads=2,
+                max_schema_agreement_wait=10):
+
         self.contact_points = contact_points
+        self.port = port
+        self.compression = compression
+
+        if auth_provider is not None:
+            if not callable(auth_provider):
+                raise ValueError("auth_provider must be callable")
+            self.auth_provider = auth_provider
+
+        if load_balancing_policy_factory is not None:
+            if not callable(load_balancing_policy_factory):
+                raise ValueError("load_balancing_policy_factory must be callable")
+            self.load_balancing_policy_factory = load_balancing_policy_factory
+
+        if reconnection_policy_factory is not None:
+            if not callable(reconnection_policy_factory):
+                raise ValueError("reconnection_policy_factory must be callable")
+            self.reconnection_policy_factory = reconnection_policy_factory
+
+        if retry_policy_factory is not None:
+            if not callable(retry_policy_factory):
+                raise ValueError("retry_policy_factory must be callable")
+            self.retry_policy_factory = retry_policy_factory
+
+        if conviction_policy_factory is not None:
+            if not callable(conviction_policy_factory):
+                raise ValueError("conviction_policy_factory must be callable")
+            self.conviction_policy_factory = conviction_policy_factory
+
+        self.metrics_enabled = metrics_enabled
+        self.sockopts = sockopts
+        self.max_schema_agreement_wait = max_schema_agreement_wait
+
         self.sessions = set()
         self.metadata = Metadata(self)
 
@@ -421,8 +485,7 @@ class Cluster(object):
             HostDistance.REMOTE: DEFAULT_MAX_CONNECTIONS_PER_REMOTE_HOST
         }
 
-        # TODO make the pool size configurable somewhere
-        self.executor = ThreadPoolExecutor(max_workers=3)
+        self.executor = ThreadPoolExecutor(max_workers=executor_threads)
         self.scheduler = _Scheduler(self.executor)
 
         self._is_shutdown = False
@@ -851,7 +914,7 @@ class _ControlConnection(object):
         start = self._time.time()
         elapsed = 0
         cl = ConsistencyLevel.ONE
-        while elapsed < MAX_SCHEMA_AGREEMENT_WAIT:
+        while elapsed < self._cluster.max_schema_agreement_wait:
             peers_query = QueryMessage(query=self._SELECT_SCHEMA_PEERS, consistency_level=cl)
             local_query = QueryMessage(query=self._SELECT_SCHEMA_LOCAL, consistency_level=cl)
             peers_result, local_result = connection.wait_for_responses(peers_query, local_query)
