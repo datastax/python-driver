@@ -91,7 +91,7 @@ class _ReconnectionHandler(object):
         # TODO cancel previous reconnection handlers? That's probably the job
         # of whatever created this.
 
-        first_delay = self.schedule.get_next_delay()
+        first_delay = self.schedule.next()
         self.scheduler.schedule(first_delay, self.run)
 
     def run(self):
@@ -102,7 +102,7 @@ class _ReconnectionHandler(object):
         try:
             self.on_reconnection(self.try_reconnect())
         except Exception, exc:
-            next_delay = self.schedule.get_next_delay()
+            next_delay = self.schedule.next()
             if self.on_exception(exc, next_delay):
                 self.scheduler.schedule(next_delay, self.run)
         else:
