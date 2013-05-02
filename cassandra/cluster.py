@@ -5,6 +5,7 @@ import time
 from threading import Lock, RLock, Thread, Event
 import traceback
 import Queue
+import weakref
 
 from cassandra.connection import Connection, ConnectionException
 from cassandra.decoder import (ConsistencyLevel, QueryMessage, ResultMessage,
@@ -86,17 +87,27 @@ class ResponseFuture(object):
                 def refresh_schema_and_set_result():
                     ks, table = response.results['keyspace'], response.results['table']
                     try:
-                        self.session.cluster._control_connection.refresh_schema(ks, table)
+                        self.session.cluster.control_connection.refresh_schema(ks, table)
+                    except weakref.ReferenceError:
+                        pass
                     finally:
                         self._set_final_result(None)
 
-                self.session.cluster.executor.submit(refresh_schema_and_set_result)
+                try:
+                    self.session.cluster.executor.submit(refresh_schema_and_set_result)
+                except weakref.ReferenceError:
+                    pass
             else:
                 self._set_final_result(response.results)
         elif isinstance(response, ErrorMessage):
             retry_policy = self.query.retry_policy
             if not retry_policy:
-                retry_policy = self.session.cluster.retry_policy_factory()
+                try:
+                    retry_policy = self.session.cluster.retry_policy_factory()
+                except weakref.ReferenceError:
+                    # the Cluster object is gone, so we don't know what retry
+                    # policy to use
+                    self.set_final_exception(response)
 
             if isinstance(response, ReadTimeoutErrorMessage):
                 details = response.recv_error_info()
@@ -239,6 +250,9 @@ class Session(object):
 
         for pool in self._pools.values():
             pool.shutdown()
+
+    def __del__(self):
+        self.shutdown()
 
     def add_host(self, host):
         distance = self._load_balancer.distance(host)
@@ -462,8 +476,9 @@ class Cluster(object):
         self.sockopts = sockopts
         self.max_schema_agreement_wait = max_schema_agreement_wait
 
-        self.sessions = set()
+        self.sessions = weakref.WeakSet()
         self.metadata = Metadata(self)
+        self.control_connection = None
 
         self._min_requests_per_connection = {
             HostDistance.LOCAL: DEFAULT_MIN_REQUESTS,
@@ -493,8 +508,6 @@ class Cluster(object):
 
         for address in contact_points:
             self.add_host(address, signal=False)
-
-        self._control_connection = None
 
     def get_min_requests_per_connection(self, host_distance):
         return self._min_requests_per_connection[host_distance]
@@ -537,10 +550,10 @@ class Cluster(object):
             if self._is_shutdown:
                 raise Exception("Cluster is already shut down")
 
-            if not self._control_connection:
-                self._control_connection = _ControlConnection(self)
+            if not self.control_connection:
+                self.control_connection = ControlConnection(self)
                 try:
-                    self._control_connection.connect()
+                    self.control_connection.connect()
                 except:
                     log.error("Control connection failed to connect, shutting down Cluster: %s"
                               % traceback.format_exc())
@@ -559,12 +572,24 @@ class Cluster(object):
             else:
                 self._is_shutdown = True
 
-        self._control_connection.shutdown()
+        if self.control_connection:
+            self.control_connection.shutdown()
 
         for session in self.sessions:
             session.shutdown()
 
         self.executor.shutdown()
+
+    def __del__(self):
+        # we don't use shutdown() because we want to avoid shutting down
+        # Sessions while they are still being used (in case there are no
+        # longer any references to this Cluster object, but there are
+        # still references to the Session object)
+        if not self._is_shutdown:
+            if self.control_connection:
+                self.control_connection.shutdown()
+            if self.executor:
+                self.executor.shutdown()
 
     def _new_session(self):
         session = Session(self, self.metadata.all_hosts())
@@ -578,12 +603,12 @@ class Cluster(object):
 
         # TODO prepareAllQueries(host)
 
-        self._control_connection.on_up(host)
+        self.control_connection.on_up(host)
         for session in self.sessions:
             session.on_up(host)
 
     def on_down(self, host):
-        self._control_connection.on_down(host)
+        self.control_connection.on_down(host)
         for session in self.sessions:
             session.on_down(host)
 
@@ -601,12 +626,12 @@ class Cluster(object):
 
     def on_add(self, host):
         self.prepare_all_queries(host)
-        self._control_connection.on_add(host)
+        self.control_connection.on_add(host)
         for session in self.sessions:  # TODO need to copy/lock?
             session.on_add(host)
 
     def on_remove(self, host):
-        self._control_connection.on_remove(host)
+        self.control_connection.on_remove(host)
         for session in self.sessions:
             session.on_remove(host)
 
@@ -627,7 +652,7 @@ class Cluster(object):
 
     def submit_schema_refresh(self, keyspace=None, table=None):
         return self.executor.submit(
-            self._control_connection.refresh_schema, keyspace, table)
+            self.control_connection.refresh_schema, keyspace, table)
 
 class NoHostAvailable(Exception):
     pass
@@ -654,7 +679,7 @@ class _ControlReconnectionHandler(_ReconnectionHandler):
             return True
 
 
-class _ControlConnection(object):
+class ControlConnection(object):
 
     _SELECT_KEYSPACES = "SELECT * FROM system.schema_keyspaces"
     _SELECT_COLUMN_FAMILIES = "SELECT * FROM system.schema_columnfamilies"
@@ -670,7 +695,7 @@ class _ControlConnection(object):
     _time = time
 
     def __init__(self, cluster):
-        self._cluster = cluster
+        self._cluster = weakref.proxy(cluster)
         self._balancing_policy = RoundRobinPolicy()
         self._balancing_policy.populate(cluster, cluster.metadata.all_hosts())
         self._reconnection_policy = ExponentialReconnectionPolicy(2 * 1000, 5 * 60 * 1000)

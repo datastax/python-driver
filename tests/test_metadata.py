@@ -99,14 +99,14 @@ class SchemaMetadataTest(unittest.TestCase):
         self.session.execute(recreate)
 
     def get_table_metadata(self):
-        self.cluster._control_connection.refresh_schema()
+        self.cluster.control_connection.refresh_schema()
         return self.cluster.metadata.keyspaces[self.ksname].tables[self.cfname]
 
     def test_basic_table_meta_properties(self):
         create_statement = self.make_create_statement(["a"], [], ["b", "c"])
         self.session.execute(create_statement)
 
-        self.cluster._control_connection.refresh_schema()
+        self.cluster.control_connection.refresh_schema()
 
         meta = self.cluster.metadata
         self.assertNotEqual(meta.cluster, None)

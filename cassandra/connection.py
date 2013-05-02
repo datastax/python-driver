@@ -180,10 +180,7 @@ class Connection(object):
             _loop_notifier.send()
 
     def __del__(self):
-        try:
-            self.close()
-        except:
-            pass
+        self.close()
 
     def defunct(self, exc):
         pass

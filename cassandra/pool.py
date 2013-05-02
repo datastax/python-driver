@@ -5,6 +5,7 @@
 
 import time
 from threading import Lock, RLock, Condition
+import weakref
 
 from connection import MAX_STREAM_PER_CONNECTION, ConnectionException
 
@@ -172,7 +173,7 @@ class HealthMonitor(object):
     def __init__(self, conviction_policy):
         self._conviction_policy = conviction_policy
         self._host = conviction_policy.host
-        self._listeners = set()
+        self._listeners = weakref.WeakSet()
         self._lock = RLock()
 
     def register(self, listener):
@@ -219,7 +220,7 @@ class HostConnectionPool(object):
         self.host = host
         self.host_distance = host_distance
 
-        self._session = session
+        self._session = weakref.proxy(session)
         self._is_shutdown = False
         self._lock = RLock()
         self._conn_available_condition = Condition()

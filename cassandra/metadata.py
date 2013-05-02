@@ -4,6 +4,7 @@ import json
 from hashlib import md5
 import re
 from threading import RLock
+import weakref
 
 murmur3 = None
 try:
@@ -33,7 +34,7 @@ unreserved_keywords = set((
 class Metadata(object):
 
     def __init__(self, cluster):
-        self.cluster = cluster
+        self.cluster_ref = weakref.ref(cluster)
         self.cluster_name = None
         self.keyspaces = {}
         self.token_map = None
@@ -238,14 +239,15 @@ class Metadata(object):
         return t.get_replicas(t.token_cls.from_key(key))
 
     def add_host(self, address):
+        cluster = self.cluster_ref()
         with self._hosts_lock:
             if address not in self._hosts:
-                new_host = Host(address, self.cluster.conviction_policy_factory)
+                new_host = Host(address, cluster.conviction_policy_factory)
                 self._hosts[address] = new_host
             else:
                 return None
 
-        new_host.monitor.register(self.cluster)
+        new_host.monitor.register(cluster)
         return new_host
 
     def remove_host(self, host):
