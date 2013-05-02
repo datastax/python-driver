@@ -97,25 +97,18 @@ class ResponseFuture(object):
             elif response.kind == ResultMessage.KIND_SCHEMA_CHANGE:
                 # refresh the schema before responding, but do it in another
                 # thread instead of the event loop thread
-                try:
-                    control_conn = self.session.cluster.control_connection
-                    executor = self.session.cluster.executor
-                except weakref.ReferenceError:
-                    self._set_final_result(None)
-                else:
-                    ks, table = response.results['keyspace'], response.results['table']
-                    executor.submit(refresh_schema_and_set_result, ks, table, control_conn, self)
+                self.session.cluster.executor.submit(
+                    refresh_schema_and_set_result,
+                    response.results['keyspace'],
+                    response.results['table'],
+                    self.session.cluster.control_connection,
+                    self)
             else:
                 self._set_final_result(response.results)
         elif isinstance(response, ErrorMessage):
             retry_policy = self.query.retry_policy
             if not retry_policy:
-                try:
-                    retry_policy = self.session.cluster.retry_policy_factory()
-                except weakref.ReferenceError:
-                    # the Cluster object is gone, so we don't know what retry
-                    # policy to use
-                    self.set_final_exception(response)
+                retry_policy = self.session.cluster.retry_policy_factory()
 
             if isinstance(response, ReadTimeoutErrorMessage):
                 details = response.recv_error_info()
