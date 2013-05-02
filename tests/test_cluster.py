@@ -53,3 +53,20 @@ class ClusterTests(unittest.TestCase):
         future.result()
 
         self.assertIn("newkeyspace", cluster.metadata.keyspaces)
+
+    def test_on_down_and_up(self):
+        cluster = Cluster()
+        session = cluster.connect()
+        host = cluster.metadata.all_hosts()[0]
+        host.monitor.signal_connection_failure(None)
+        cluster.on_down(host)
+        self.assertNotEqual(None, cluster.control_connection._reconnection_handler)
+        self.assertNotIn(host, session._pools)
+        host_reconnector = host._reconnection_handler
+        self.assertNotEqual(None, host_reconnector)
+
+        host.monitor.is_up = True
+        cluster.on_up(host)
+        self.assertEqual(None, host._reconnection_handler)
+        self.assertTrue(host_reconnector._cancelled)
+        self.assertIn(host, session._pools)
