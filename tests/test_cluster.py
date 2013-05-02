@@ -4,7 +4,7 @@ from cassandra.cluster import Cluster
 
 class ClusterTests(unittest.TestCase):
 
-    def testBasic(self):
+    def test_basic(self):
         cluster = Cluster()
         session = cluster.connect()
         result = session.execute(
@@ -35,3 +35,21 @@ class ClusterTests(unittest.TestCase):
         self.assertEquals([{'a': 'a', 'b': 'b', 'c': 'c'}], result)
 
         cluster.shutdown()
+
+    def test_submit_schema_refresh(self):
+        cluster = Cluster()
+        cluster.connect()
+
+        other_cluster = Cluster()
+        session = other_cluster.connect()
+        session.execute(
+            """
+            CREATE KEYSPACE newkeyspace WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
+            """)
+
+        self.assertNotIn("newkeyspace", cluster.metadata.keyspaces)
+
+        future = cluster.submit_schema_refresh()
+        future.result()
+
+        self.assertIn("newkeyspace", cluster.metadata.keyspaces)
