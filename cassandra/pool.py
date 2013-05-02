@@ -297,9 +297,11 @@ class HostConnectionPool(object):
             with self._lock:
                 self._connections.append(conn)
             self._signal_available_conn()
-        except ConnectionException:
+        except ConnectionException, exc:
             with self._lock:
                 self._open_count -= 1
+            if self.host.monitor.signal_connection_failure(exc):
+                self.shutdown()
             return False
         except AuthenticationException:
             with self._lock:
