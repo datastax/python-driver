@@ -92,7 +92,7 @@ class ResponseFuture(object):
 
                 self.session.cluster.executor.submit(refresh_schema_and_set_result)
             else:
-                self._set_final_result(response)
+                self._set_final_result(response.results)
         elif isinstance(response, ErrorMessage):
             retry_policy = self.query.retry_policy
             if not retry_policy:
@@ -494,14 +494,7 @@ class Cluster(object):
         for address in contact_points:
             self.add_host(address, signal=False)
 
-        self._control_connection = _ControlConnection(self)
-        try:
-            self._control_connection.connect()
-        except:
-            log.error("Control connection failed to connect, shutting down Cluster: %s"
-                      % traceback.format_exc())
-            self.shutdown()
-            raise
+        self._control_connection = None
 
     def get_min_requests_per_connection(self, host_distance):
         return self._min_requests_per_connection[host_distance]
@@ -540,6 +533,20 @@ class Cluster(object):
         return Connection.factory(host, *args, **kwargs)
 
     def connect(self, keyspace=None):
+        with self._lock:
+            if self._is_shutdown:
+                raise Exception("Cluster is already shut down")
+
+            if not self._control_connection:
+                self._control_connection = _ControlConnection(self)
+                try:
+                    self._control_connection.connect()
+                except:
+                    log.error("Control connection failed to connect, shutting down Cluster: %s"
+                              % traceback.format_exc())
+                    self.shutdown()
+                    raise
+
         session = self._new_session()
         if keyspace:
             session.set_keyspace(keyspace)
