@@ -10,7 +10,7 @@ from cassandra.connection import Connection, ConnectionException
 from cassandra.decoder import (ConsistencyLevel, QueryMessage, ResultMessage,
                                ErrorMessage, ReadTimeoutErrorMessage,
                                WriteTimeoutErrorMessage,
-                               UnavailableExceptionErrorMessage,
+                               UnavailableErrorMessage,
                                OverloadedErrorMessage,
                                IsBootstrappingErrorMessage)
 from cassandra.metadata import Metadata
@@ -116,11 +116,10 @@ class ResponseFuture(object):
             elif isinstance(response, WriteTimeoutErrorMessage):
                 details = response.recv_error_info()
                 retry = retry_policy.on_write_timeout(
-                    self.query, retry_num=self._query_retries, **details)
-            elif isinstance(response, UnavailableExceptionErrorMessage):
-                details = response.recv_error_info()
-                retry = retry_policy.on_write_timeout(
-                    self.query, retry_num=self._query_retries, **details)
+                    self.query, retry_num=self._query_retries, **response.info)
+            elif isinstance(response, UnavailableErrorMessage):
+                retry = retry_policy.on_unavailable(
+                    self.query, retry_num=self._query_retries, **response.info)
             elif isinstance(response, OverloadedErrorMessage):
                 # need to retry against a different host here
                 self._retry(False, None)

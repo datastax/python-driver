@@ -215,7 +215,7 @@ class ProtocolException(ErrorMessageSub):
     summary = 'Protocol error'
     error_code = 0x000A
 
-class UnavailableExceptionErrorMessage(RequestExecutionException):
+class UnavailableErrorMessage(RequestExecutionException):
     summary = 'Unavailable exception'
     error_code = 0x1000
 
