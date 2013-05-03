@@ -421,6 +421,10 @@ class HostConnectionPool(object):
             conn.close()
             self._open_count -= 1
 
+        reconnector = self.host.get_and_set_reconnection_handler(None)
+        if reconnector:
+            reconnector.cancel()
+
     def ensure_core_connections(self):
         if self._is_shutdown:
             return
