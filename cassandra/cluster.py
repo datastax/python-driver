@@ -34,6 +34,9 @@ def refresh_schema_and_set_result(keyspace, table, control_conn, response_future
         response_future._set_final_result(None)
 
 
+_NO_RESULT_YET = object()
+
+
 class ResponseFuture(object):
 
     def __init__(self, session, message, query):
@@ -44,7 +47,7 @@ class ResponseFuture(object):
         self.query_plan = session._load_balancer.make_query_plan(query)
 
         self._req_id = None
-        self._final_result = None
+        self._final_result = _NO_RESULT_YET
         self._final_exception = None
         self._current_host = None
         self._current_pool = None
@@ -177,13 +180,13 @@ class ResponseFuture(object):
         self.send_request()
 
     def deliver(self):
-        if self._final_exception:
-            raise self._final_exception
-        elif self._final_result:
+        if self._final_result is not _NO_RESULT_YET:
             return self._final_result
         else:
             self._event.wait()
-            if self._final_exception:
+            if self._final_result is not _NO_RESULT_YET:
+                return self._final_result
+            elif self._final_exception:
                 raise self._final_exception
             else:
                 return self._final_result
