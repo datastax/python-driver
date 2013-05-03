@@ -112,11 +112,9 @@ class ResponseFuture(object):
                 retry_policy = self.session.cluster.retry_policy_factory()
 
             if isinstance(response, ReadTimeoutErrorMessage):
-                details = response.recv_error_info()
                 retry = retry_policy.on_read_timeout(
-                    self.query, retry_num=self._query_retries, **details)
+                    self.query, retry_num=self._query_retries, **response.info)
             elif isinstance(response, WriteTimeoutErrorMessage):
-                details = response.recv_error_info()
                 retry = retry_policy.on_write_timeout(
                     self.query, retry_num=self._query_retries, **response.info)
             elif isinstance(response, UnavailableErrorMessage):
