@@ -632,7 +632,7 @@ class Cluster(object):
         if reconnector:
             reconnector.cancel()
 
-        # TODO prepareAllQueries(host)
+        self.prepare_all_queries(host)
 
         self.control_connection.on_up(host)
         for session in self.sessions:
@@ -646,8 +646,7 @@ class Cluster(object):
         schedule = self.reconnection_policy.new_schedule()
         reconnector = _HostReconnectionHandler(
             host, self.connection_factory, self.scheduler, schedule,
-            callback=host.get_and_set_reconnection_handler,
-            callback_kwargs=dict(new_handler=None))
+            host.get_and_set_reconnection_handler, new_handler=None)
 
         old_reconnector = host.get_and_set_reconnection_handler(reconnector)
         if old_reconnector:
@@ -685,6 +684,10 @@ class Cluster(object):
         return self.executor.submit(
             self.control_connection.refresh_schema, keyspace, table)
 
+    def prepare_all_queries(self, host):
+        pass
+
+
 class NoHostAvailable(Exception):
     pass
 
@@ -693,7 +696,7 @@ class _ControlReconnectionHandler(_ReconnectionHandler):
 
     def __init__(self, control_connection, *args, **kwargs):
         _ReconnectionHandler.__init__(self, *args, **kwargs)
-        self.control_connection = control_connection
+        self.control_connection = weakref.proxy(control_connection)
 
     def try_reconnect(self):
         # we'll either get back a new Connection or a NoHostAvailable
@@ -707,6 +710,7 @@ class _ControlReconnectionHandler(_ReconnectionHandler):
         if isinstance(exc, AuthenticationException):
             return False
         else:
+            log.debug("Error trying to reconnect control connection: %r" % (exc,))
             return True
 
 
@@ -774,10 +778,10 @@ class ControlConnection(object):
             except ConnectionException, exc:
                 errors[host.address] = exc
                 host.monitor.signal_connection_failure(exc)
-                log.error("Error reconnecting control connection: %s", traceback.format_exc())
+                log.exception("Error reconnecting control connection:")
             except Exception, exc:
                 errors[host.address] = exc
-                log.error("Error reconnecting control connection: %s", traceback.format_exc())
+                log.exception("Error reconnecting control connection:")
 
         raise NoHostAvailable("Unable to connect to any servers", errors)
 
@@ -835,11 +839,9 @@ class ControlConnection(object):
         this ControlConnection.
         """
         with self._reconnection_lock:
-            if self._reconnection_handler:
-                return self._reconnection_handler
-            else:
-                self._reconnection_handler = new_handler
-                return None
+            old = self._reconnection_handler
+            self._reconnection_handler = new_handler
+            return old
 
     def shutdown(self):
         with self._lock:
