@@ -89,8 +89,8 @@ class Metadata(object):
             if keyspace in cf_def_rows:
                 for table_row in cf_def_rows[keyspace]:
                     table_meta = self._build_table_metadata(
-                            keyspace_meta, table_row, col_def_rows[keyspace])
-                    keyspace.tables[table_meta.name] = table_meta
+                        keyspace_meta, table_row, col_def_rows[keyspace])
+                    keyspace_meta.tables[table_meta.name] = table_meta
 
     def _build_keyspace_metadata(self, row):
         name = row["keyspace_name"]
