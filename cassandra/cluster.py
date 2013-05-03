@@ -49,9 +49,7 @@ class ResponseFuture(object):
         self._req_id = None
         self._final_result = _NO_RESULT_YET
         self._final_exception = None
-        self._current_host = None
-        self._current_pool = None
-        self._connection = None
+        self._current_host = self._current_pool = self._connection = None
         self._event = Event()
         self._errors = {}
         self._query_retries = 0
@@ -99,14 +97,14 @@ class ResponseFuture(object):
             elif response.kind == ResultMessage.KIND_SCHEMA_CHANGE:
                 # refresh the schema before responding, but do it in another
                 # thread instead of the event loop thread
-                self.session.cluster.executor.submit(
+                self.session.submit(
                     refresh_schema_and_set_result,
                     response.results['keyspace'],
                     response.results['table'],
                     self.session.cluster.control_connection,
                     self)
             else:
-                self._set_final_result(response.results)
+                self._set_final_result(getattr(response, 'results', None))
         elif isinstance(response, ErrorMessage):
             retry_policy = self.query.retry_policy
             if not retry_policy:
