@@ -94,6 +94,7 @@ class ResponseFuture(object):
         if isinstance(response, ResultMessage):
             if response.kind == ResultMessage.KIND_SET_KEYSPACE:
                 self.session.set_keyspace(response.results)
+                self._set_final_result(None)
             elif response.kind == ResultMessage.KIND_SCHEMA_CHANGE:
                 # refresh the schema before responding, but do it in another
                 # thread instead of the event loop thread
