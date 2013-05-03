@@ -179,6 +179,8 @@ class ResponseFuture(object):
     def deliver(self):
         if self._final_result is not _NO_RESULT_YET:
             return self._final_result
+        elif self._final_exception:
+            raise self._final_exception
         else:
             self._event.wait()
             if self._final_result is not _NO_RESULT_YET:
@@ -186,22 +188,28 @@ class ResponseFuture(object):
             elif self._final_exception:
                 raise self._final_exception
             else:
-                return self._final_result
+                assert False  # shouldn't get here
 
-    def addCallback(self, fn, *args, **kwargs):
-        self._callback = (fn, args, kwargs)
+    def add_callback(self, fn, *args, **kwargs):
+        if self._final_result is not _NO_RESULT_YET:
+            fn(self._final_result, *args, **kwargs)
+        else:
+            self._callback = (fn, args, kwargs)
         return self
 
-    def addErrback(self, fn, *args, **kwargs):
-        self._errback = (fn, args, kwargs)
+    def add_errback(self, fn, *args, **kwargs):
+        if self._final_exception:
+            fn(self._final_exception, *args, **kwargs)
+        else:
+            self._errback = (fn, args, kwargs)
         return self
 
-    def addCallbacks(
+    def add_callbacks(
             self, callback, errback,
             callback_args=(), callback_kwargs=None,
             errback_args=(), errback_kwargs=None):
-        self._callback = (callback, callback_args, callback_kwargs | {})
-        self._errback = (errback, errback_args, errback_kwargs | {})
+        self.add_callback(callback, *callback_args, **(callback_kwargs | {}))
+        self.add_errback(errback, *errback_args, **(errback_kwargs | {}))
 
 
 class Session(object):
