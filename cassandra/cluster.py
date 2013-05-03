@@ -214,16 +214,23 @@ class ResponseFuture(object):
 
 class Session(object):
 
+    cluster = None
+    hosts = None
+    keyspace = None
+    is_shutdown = False
+
+    _lock = None
+    _pools = None
+    _load_balancer = None
+
     def __init__(self, cluster, hosts):
         self.cluster = cluster
         self.hosts = hosts
-        self.keyspace = None
 
         self._lock = RLock()
-        self._is_shutdown = False
         self._pools = {}
         self._load_balancer = cluster.load_balancing_policy_factory()
-        self._load_balancer.populate(cluster, hosts)
+        self._load_balancer.populate(weakref.proxy(cluster), hosts)
 
         for host in hosts:
             self.add_host(host)
@@ -251,16 +258,17 @@ class Session(object):
 
     def shutdown(self):
         with self._lock:
-            if self._is_shutdown:
+            if self.is_shutdown:
                 return
             else:
-                self._is_shutdown = True
+                self.is_shutdown = True
 
         for pool in self._pools.values():
             pool.shutdown()
 
     def __del__(self):
         self.shutdown()
+        del self.cluster
 
     def add_host(self, host):
         distance = self._load_balancer.distance(host)
@@ -335,6 +343,10 @@ DEFAULT_MAX_CONNECTIONS_PER_REMOTE_HOST = 2
 
 class _Scheduler(object):
 
+    _scheduled = None
+    _executor = None
+    is_shutdown = False
+
     def __init__(self, executor):
         self._scheduled = Queue.PriorityQueue()
         self._executor = executor
@@ -343,24 +355,33 @@ class _Scheduler(object):
         t.daemon = True
         t.start()
 
-    # TODO add a shutdown method to stop processing the queue?
+    def shutdown(self):
+        self.is_shutdown = True
 
     def schedule(self, delay, fn, *args, **kwargs):
-        run_at = time.time() + delay
-        self._scheduled.put_nowait((run_at, (fn, args, kwargs)))
+        if not self.is_shutdown:
+            run_at = time.time() + delay
+            self._scheduled.put_nowait((run_at, (fn, args, kwargs)))
+        else:
+            log.debug("Ignoring scheduled function after shutdown: %r" % fn)
 
     def run(self):
         while True:
+            if self.is_shutdown:
+                return
+
             try:
                 while True:
                     run_at, task = self._scheduled.get(block=True, timeout=None)
+                    if self.is_shutdown:
+                        return
                     if run_at <= time.time():
                         fn, args, kwargs = task
                         self._executor.submit(fn, *args, **kwargs)
                     else:
                         self._scheduled.put_nowait((run_at, task))
                         break
-            except Queue.empty:
+            except Queue.Empty:
                 pass
 
             time.sleep(0.1)
@@ -579,6 +600,8 @@ class Cluster(object):
             else:
                 self._is_shutdown = True
 
+        self.scheduler.shutdown()
+
         if self.control_connection:
             self.control_connection.shutdown()
 
@@ -593,6 +616,7 @@ class Cluster(object):
         # longer any references to this Cluster object, but there are
         # still references to the Session object)
         if not self._is_shutdown:
+            self.scheduler.shutdown()
             if self.control_connection:
                 self.control_connection.shutdown()
             if self.executor:
