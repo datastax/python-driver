@@ -3,11 +3,14 @@
 # - get values from proper config
 # - proper threadpool submissions
 
+import logging
 import time
 from threading import Lock, RLock, Condition
 import weakref
 
 from connection import MAX_STREAM_PER_CONNECTION, ConnectionException
+
+log = logging.getLogger(__name__)
 
 
 class BusyConnectionException(Exception):
@@ -157,10 +160,10 @@ class _HostReconnectionHandler(_ReconnectionHandler):
         self.host.monitor.reset()
 
     def on_exception(self, exc, next_delay):
-        # TODO only overridden to add logging, so add logging
         if isinstance(exc, AuthenticationException):
             return False
         else:
+            log.exception("Error attempting to reconnect to %s" % (self.host,))
             return True
 
 
