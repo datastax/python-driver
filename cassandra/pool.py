@@ -154,7 +154,7 @@ class _HostReconnectionHandler(_ReconnectionHandler):
         self.connection_factory = connection_factory
 
     def try_reconnect(self):
-        return self.connection_factory(self.host)
+        return self.connection_factory(self.host.address)
 
     def on_reconnection(self, connection):
         self.host.monitor.reset()
