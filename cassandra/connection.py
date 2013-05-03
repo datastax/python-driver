@@ -110,6 +110,22 @@ class Connection(object):
     in_buffer_size = 4096
     out_buffer_size = 4096
 
+    cql_version = "3.0.1"
+
+    read_watcher = None
+    write_watcher = None
+    keyspace = None
+    compressor = None
+    decompressor = None
+
+    connect_error = None
+    in_flight = 0
+    is_defunct = False
+    is_closed = False
+
+    buf = ""
+    total_reqd_bytes = 0
+
     @classmethod
     def factory(cls, *args, **kwargs):
         conn = cls(*args, **kwargs)
@@ -120,21 +136,13 @@ class Connection(object):
             return conn
 
     def __init__(self, host='127.0.0.1', port=9042, credentials=None, sockopts=None, compression=True):
-        self.cql_version = "3.0.1"
         self.host = host
         self.port = port
         self.credentials = credentials
-        self.keyspace = None
 
         self.compression = compression
-        self.compressor = None
-        self.decompressor = None
 
         self.connected_event = Event()
-        self.connect_error = None
-        self.in_flight = 0
-        self.is_defunct = False
-        self.is_closed = False
 
         self.make_request_id = itertools.cycle(xrange(127)).next
         self._callbacks = {}
@@ -142,8 +150,6 @@ class Connection(object):
         self._lock = RLock()
 
         self.deque = deque()
-        self.buf = ""
-        self.total_reqd_bytes = 0
 
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.connect((host, port))
