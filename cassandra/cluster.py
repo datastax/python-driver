@@ -134,18 +134,18 @@ class ResponseFuture(object):
                 return
 
             retry_type, consistency = retry
-            if retry_type == RetryPolicy.RETRY:
+            if retry_type is RetryPolicy.RETRY:
                 self._query_retries += 1
                 self._retry(True, consistency)
-            elif retry_type == RetryPolicy.RETHROW:
-                self._set_final_result(response)
+            elif retry_type is RetryPolicy.RETHROW:
+                self._set_final_exception(response)
             else:  # IGNORE
                 self._set_final_result(None)
         else:
             # we got some other kind of response message
             msg = "Got unexpected message: %r" % (response,)
             exc = ConnectionException(msg, self._current_host)
-            self.current_connection.defunct(exc)
+            self._connection.defunct(exc)
             self._set_final_exception(exc)
 
     def _set_final_result(self, response):
@@ -167,7 +167,7 @@ class ResponseFuture(object):
     def _retry(self, reuse_connection, consistency_level):
         self.message.consistency_level = consistency_level
         # don't retry on the event loop thread
-        self.session.submit(self._retry_helper, reuse_connection)
+        self.session.submit(self._retry_task, reuse_connection)
 
     def _retry_task(self, reuse_connection):
         if reuse_connection and self._query(self._current_host):
