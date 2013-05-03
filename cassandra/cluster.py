@@ -28,8 +28,8 @@ log = logging.getLogger(__name__)
 def refresh_schema_and_set_result(keyspace, table, control_conn, response_future):
     try:
         control_conn.refresh_schema(keyspace, table)
-    except Exception, exc:
-        log.error("Exception refreshing schema in response to schema change: %r", exc)
+    except:
+        log.exception("Exception refreshing schema in response to schema change:")
     finally:
         response_future._set_final_result(None)
 
