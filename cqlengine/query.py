@@ -222,6 +222,9 @@ class QuerySet(object):
         self._defer_fields = []
         self._only_fields = []
 
+        self._values_list = False
+        self._flat_values_list = False
+
         #results cache
         self._con = None
         self._cur = None
@@ -340,6 +343,9 @@ class QuerySet(object):
             self._con = connection_manager()
             self._cur = self._con.execute(self._select_query(), self._where_values())
             self._result_cache = [None]*self._cur.rowcount
+            if self._cur.description:
+                names = [i[0] for i in self._cur.description]
+                self._construct_result = self._create_result_constructor(names)
 
     def _fill_result_cache_to_idx(self, idx):
         self._execute_query()
@@ -350,14 +356,12 @@ class QuerySet(object):
         if qty < 1:
             return
         else:
-            names = [i[0] for i in self._cur.description]
             for values in self._cur.fetchmany(qty):
-                value_dict = dict(zip(names, values))
                 self._result_idx += 1
-                self._result_cache[self._result_idx] = self._construct_instance(value_dict)
+                self._result_cache[self._result_idx] = self._construct_result(values)
 
             #return the connection to the connection pool if we have all objects
-            if self._result_cache and self._result_cache[-1] is not None:
+            if self._result_cache and self._result_idx == (len(self._result_cache) - 1):
                 self._con.close()
                 self._con = None
                 self._cur = None
@@ -398,6 +402,17 @@ class QuerySet(object):
                 self._fill_result_cache_to_idx(s)
                 return self._result_cache[s]
 
+    def _create_result_constructor(self, names):
+        if not self._values_list:
+            return (lambda values: self._construct_instance(dict(zip(names, values))))
+
+        db_map = self.model._db_map
+        columns = [self.model._columns[db_map[name]] for name in names]
+        if self._flat_values_list:
+           return (lambda values: columns[0].to_python(values[0]))
+        else:
+            # result_cls = namedtuple("{}Tuple".format(self.model.__name__), names)
+            return (lambda values: map(lambda (c, v): c.to_python(v), zip(columns, values)))
 
     def _construct_instance(self, values):
         #translate column names to model names
@@ -619,6 +634,18 @@ class QuerySet(object):
         else:
             with connection_manager() as con:
                 con.execute(qs, self._where_values())
+
+    def values_list(self, *fields, **kwargs):
+        flat = kwargs.pop('flat', False)
+        if kwargs:
+            raise TypeError('Unexpected keyword arguments to values_list: %s'
+                    % (kwargs.keys(),))
+        if flat and len(fields) > 1:
+            raise TypeError("'flat' is not valid when values_list is called with more than one field.")
+        clone = self.only(fields)
+        clone._values_list = True
+        clone._flat_values_list = flat
+        return clone
 
 class DMLQuery(object):
     """
