@@ -260,7 +260,8 @@ class QuerySet(object):
         return clone
 
     def __len__(self):
-        return self.count()
+        self._execute_query()
+        return len(self._result_cache)
 
     def __del__(self):
         if self._con:
