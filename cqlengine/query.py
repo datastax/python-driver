@@ -8,7 +8,7 @@ from cqlengine import BaseContainerColumn, BaseValueManager, Map
 
 from cqlengine.connection import connection_manager
 from cqlengine.exceptions import CQLEngineException
-from cqlengine.functions import BaseQueryFunction
+from cqlengine.functions import BaseQueryFunction, Token
 
 #CQL 3 reference:
 #http://www.datastax.com/docs/1.1/references/cql/index
@@ -44,7 +44,7 @@ class QueryOperator(object):
         :param valname: the dict key that this operator's compare value will be found in
         """
         if isinstance(self.value, BaseQueryFunction):
-            return '"{}" {} {}'.format(self.column.db_field_name, self.cql_symbol, self.value.to_cql(self.identifier))
+            return self.value.format_cql(self.column.db_field_name, self.cql_symbol, self.identifier)
         else:
             return '"{}" {} :{}'.format(self.column.db_field_name, self.cql_symbol, self.identifier)
 
@@ -275,14 +275,17 @@ class QuerySet(object):
 
         #check that there's either a = or IN relationship with a primary key or indexed field
         equal_ops = [w for w in self._where if isinstance(w, EqualsOperator)]
-        if not any([w.column.primary_key or w.column.index for w in equal_ops]):
+        token_ops = [w for w in self._where if isinstance(w.value, Token)]
+        if not any([w.column.primary_key or w.column.index for w in equal_ops]) and not token_ops:
             raise QueryException('Where clauses require either a "=" or "IN" comparison with either a primary key or indexed field')
 
         if not self._allow_filtering:
             #if the query is not on an indexed field
             if not any([w.column.index for w in equal_ops]):
-                if not any([w.column._partition_key for w in equal_ops]):
+                if not any([w.column._partition_key for w in equal_ops]) and not token_ops:
                     raise QueryException('Filtering on a clustering key without a partition key is not allowed unless allow_filtering() is called on the querset')
+            if any(not w.column._partition_key for w in token_ops):
+                raise QueryException('The token() function is only supported on the partition key')
 
 
         #TODO: abuse this to see if we can get cql to raise an exception

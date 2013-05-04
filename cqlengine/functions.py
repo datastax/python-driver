@@ -23,6 +23,9 @@ class BaseQueryFunction(object):
     def get_value(self):
         raise NotImplementedError
 
+    def format_cql(self, field, operator, value_id):
+        return '"{}" {} {}'.format(field, operator, self.to_cql(value_id))
+
 class MinTimeUUID(BaseQueryFunction):
 
     _cql_string = 'MinTimeUUID(:{})'
@@ -57,3 +60,11 @@ class MaxTimeUUID(BaseQueryFunction):
         epoch = datetime(1970, 1, 1)
         return long((self.value - epoch).total_seconds() * 1000)
 
+class Token(BaseQueryFunction):
+    _cql_string = 'token(:{})'
+
+    def format_cql(self, field, operator, value_id):
+        return 'token("{}") {} {}'.format(field, operator, self.to_cql(value_id))
+
+    def get_value(self):
+        return self.value
