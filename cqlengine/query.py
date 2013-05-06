@@ -403,29 +403,22 @@ class QuerySet(object):
                 return self._result_cache[s]
 
     def _create_result_constructor(self, names):
+        model = self.model
+        db_map = model._db_map
         if not self._values_list:
-            return (lambda values: self._construct_instance(dict(zip(names, values))))
+            def _construct_instance(values):
+                field_dict = dict((db_map.get(k, k), v) for k, v in zip(names, values))
+                instance = model(**field_dict)
+                instance._is_persisted = True
+                return instance
+            return _construct_instance
 
-        db_map = self.model._db_map
-        columns = [self.model._columns[db_map[name]] for name in names]
+        columns = [model._columns[db_map[name]] for name in names]
         if self._flat_values_list:
            return (lambda values: columns[0].to_python(values[0]))
         else:
             # result_cls = namedtuple("{}Tuple".format(self.model.__name__), names)
             return (lambda values: map(lambda (c, v): c.to_python(v), zip(columns, values)))
-
-    def _construct_instance(self, values):
-        #translate column names to model names
-        field_dict = {}
-        db_map = self.model._db_map
-        for key, val in values.items():
-            if key in db_map:
-                field_dict[db_map[key]] = val
-            else:
-                field_dict[key] = val
-        instance = self.model(**field_dict)
-        instance._is_persisted = True
-        return instance
 
     def batch(self, batch_obj):
         """
