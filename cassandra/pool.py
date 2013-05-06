@@ -250,13 +250,14 @@ class HostConnectionPool(object):
                 "Pool for %s is shutdown" % (self.host,), self.host)
 
         if not self._connections:
+            # handled specially just for simpler code
             core_conns = self._session.cluster.get_core_connections_per_host(self.host_distance)
-            # TODO look at effects of race condition here
             with self._lock:
                 for i in range(core_conns):
                     self._scheduled_for_creation += 1
                     self._session.submit(self._create_new_connection)
 
+            # in_flight is incremented by wait_for_conn
             conn = self._wait_for_conn(timeout)
             conn.set_keyspace(self._session.keyspace)
             return conn
@@ -273,7 +274,7 @@ class HostConnectionPool(object):
 
             need_to_wait = False
             with least_busy.lock:
-                if least_busy.in_flight >= min(max_reqs, MAX_STREAM_PER_CONNECTION):
+                if least_busy.in_flight >= MAX_STREAM_PER_CONNECTION:
                     # once we release the lock, wait for another connection
                     need_to_wait = True
                 else:

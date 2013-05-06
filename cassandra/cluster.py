@@ -343,6 +343,7 @@ class Session(object):
     def submit(self, fn, *args, **kwargs):
         return self.cluster.executor.submit(fn, *args, **kwargs)
 
+
 DEFAULT_MIN_REQUESTS = 25
 DEFAULT_MAX_REQUESTS = 100
 
@@ -351,6 +352,7 @@ DEFAULT_MAX_CONNECTIONS_PER_LOCAL_HOST = 8
 
 DEFAULT_MIN_CONNECTIONS_PER_REMOTE_HOST = 1
 DEFAULT_MAX_CONNECTIONS_PER_REMOTE_HOST = 2
+
 
 class _Scheduler(object):
 

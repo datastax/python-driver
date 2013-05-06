@@ -3,7 +3,7 @@ from threading import Thread, Event
 import unittest
 
 from cassandra.cluster import Session
-from cassandra.connection import Connection
+from cassandra.connection import Connection, MAX_STREAM_PER_CONNECTION
 from cassandra.pool import Host, HostConnectionPool, NoConnectionsAvailable
 from cassandra.policies import HostDistance
 
@@ -46,12 +46,11 @@ class HostConnectionPoolTests(unittest.TestCase):
         pool.borrow_connection(timeout=0.01)
         self.assertEqual(1, conn.in_flight)
 
+        conn.in_flight = MAX_STREAM_PER_CONNECTION
+
         # we're already at the max number of requests for this connection,
         # so we this should fail
         self.assertRaises(NoConnectionsAvailable, pool.borrow_connection, 0)
-
-        pool.return_connection(conn)
-        self.assertEqual(0, conn.in_flight)
 
     def test_successful_wait_for_connection(self):
         host = Mock(spec=Host, address='ip1')
@@ -117,3 +116,27 @@ class HostConnectionPoolTests(unittest.TestCase):
 
         t.join()
         self.assertEqual(0, conn.in_flight)
+
+    def test_spawn_when_at_max(self):
+        host = Mock(spec=Host, address='ip1')
+        session = self.make_session()
+        conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=False)
+        session.cluster.connection_factory.return_value = conn
+
+        # core conns = 1, max conns = 2
+        session.cluster.get_max_connections_per_host.return_value = 2
+
+        pool = HostConnectionPool(host, HostDistance.LOCAL, session)
+        session.cluster.connection_factory.assert_called_once_with(host.address)
+
+        pool.borrow_connection(timeout=0.01)
+        self.assertEqual(1, conn.in_flight)
+
+        # make this conn full
+        conn.in_flight = MAX_STREAM_PER_CONNECTION
+
+        # we don't care about making this borrow_connection call succeed for the
+        # purposes of this test, as long as it results in a new connection
+        # creation being scheduled
+        self.assertRaises(NoConnectionsAvailable, pool.borrow_connection, 0)
+        session.submit.assert_called_once_with(pool._create_new_connection)
