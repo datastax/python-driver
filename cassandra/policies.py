@@ -10,6 +10,7 @@ class HostDistance(object):
     LOCAL = 0
     REMOTE = 1
 
+
 class LoadBalancingPolicy(object):
 
     def distance(self, host):

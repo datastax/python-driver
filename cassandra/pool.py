@@ -27,19 +27,22 @@ class NoConnectionsAvailable(Exception):
 
 class Host(object):
 
+    address = None
+    monitor = None
+
+    _datacenter = None
+    _rack = None
+    _reconnection_handler = None
+
     def __init__(self, inet_address, conviction_policy_factory):
         if inet_address is None:
             raise ValueError("inet_address may not be None")
         if conviction_policy_factory is None:
             raise ValueError("conviction_policy_factory may not be None")
 
-        self._datacenter = None
-        self._rack = None
-
         self.address = inet_address
         self.monitor = HealthMonitor(conviction_policy_factory(self))
 
-        self._reconnection_handler = None
         self._reconnection_lock = Lock()
 
     @property
