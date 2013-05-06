@@ -123,10 +123,14 @@ class ResponseFuture(object):
                     self.query, retry_num=self._query_retries, **response.info)
             elif isinstance(response, OverloadedErrorMessage):
                 # need to retry against a different host here
-                self._retry(False, None)
+                log.warn("Host %s is overloaded, retrying against a different "
+                         "host" % (self._current_host))
+                self._retry(reuse_connection=False, consistency_level=None)
+                return
             elif isinstance(response, IsBootstrappingErrorMessage):
                 # need to retry against a different host here
-                self._retry(False, None)
+                self._retry(reuse_connection=False, consistency_level=None)
+                return
             # TODO need to define the PreparedQueryNotFound class
             # elif isinstance(response, PreparedQueryNotFound):
             #     pass
@@ -137,7 +141,7 @@ class ResponseFuture(object):
             retry_type, consistency = retry
             if retry_type is RetryPolicy.RETRY:
                 self._query_retries += 1
-                self._retry(True, consistency)
+                self._retry(reuse_connection=True, consistency_level=consistency)
             elif retry_type is RetryPolicy.RETHROW:
                 self._set_final_exception(response)
             else:  # IGNORE
