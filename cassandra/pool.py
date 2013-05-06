@@ -220,16 +220,16 @@ class HostConnectionPool(object):
     host = None
     host_distance = None
 
+    is_shutdown = False
+
     def __init__(self, host, host_distance, session):
         self.host = host
         self.host_distance = host_distance
 
         self._session = weakref.proxy(session)
-        self._is_shutdown = False
         self._lock = RLock()
         self._conn_available_condition = Condition()
 
-        # TODO potentially use threading.Queue for this
         core_conns = session.cluster.get_core_connections_per_host(host_distance)
         self._connections = [session.cluster.connection_factory(host.address)
                              for i in range(core_conns)]
@@ -238,7 +238,7 @@ class HostConnectionPool(object):
         self._scheduled_for_creation = 0
 
     def borrow_connection(self, timeout):
-        if self._is_shutdown:
+        if self.is_shutdown:
             raise ConnectionException("Pool is shutdown", self.host)
 
         if not self._connections:
@@ -286,7 +286,7 @@ class HostConnectionPool(object):
     def _add_conn_if_under_max(self):
         max_conns = self._session.cluster.get_max_connections_per_host(self.host_distance)
         with self._lock:
-            if self._is_shutdown:
+            if self.is_shutdown:
                 return False
 
             if self._open_count >= max_conns:
@@ -329,7 +329,7 @@ class HostConnectionPool(object):
         while True:
             self._await_available_conn(remaining)
 
-            if self._is_shutdown:
+            if self.is_shutdown:
                 raise ConnectionException("Pool is shutdown")
 
             least_busy = min(self._connections, key=lambda c: c.in_flight)
@@ -401,19 +401,15 @@ class HostConnectionPool(object):
         self._session.submit(conn.close)
 
     @property
-    def is_shutdown(self):
-        return self._is_shutdown
-
-    @property
     def open_count(self):
         return self._open_count
 
     def shutdown(self):
         with self._lock:
-            if self._is_shutdown:
+            if self.is_shutdown:
                 return
             else:
-                self._is_shutdown = True
+                self.is_shutdown = True
 
         self._signal_all_available_conn()
         for conn in self._connections:
@@ -425,7 +421,7 @@ class HostConnectionPool(object):
             reconnector.cancel()
 
     def ensure_core_connections(self):
-        if self._is_shutdown:
+        if self.is_shutdown:
             return
 
         core_conns = self._session.cluster.get_core_connections_per_host(self.host_distance)
