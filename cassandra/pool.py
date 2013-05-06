@@ -266,22 +266,22 @@ class HostConnectionPool(object):
             max_conns = self._session.cluster.get_max_connections_per_host(self.host_distance)
 
             # if we have too many requests on this connection but we still
-            # have space to open a new connection against this host
+            # have space to open a new connection against this host, go ahead
+            # and schedule the creation of a new connection
             if least_busy.in_flight >= max_reqs and len(self._connections) < max_conns:
-                self.maybe_spawn_new_connection()
+                self._maybe_spawn_new_connection()
 
-            while True:
-                need_to_wait = False
-                with least_busy._lock:
-                    if least_busy.in_flight >= MAX_STREAM_PER_CONNECTION:
-                        need_to_wait = True
-                    else:
-                        least_busy.in_flight += 1
-                        break
+            need_to_wait = False
+            with least_busy.lock:
+                if least_busy.in_flight >= min(max_reqs, MAX_STREAM_PER_CONNECTION):
+                    # once we release the lock, wait for another connection
+                    need_to_wait = True
+                else:
+                    least_busy.in_flight += 1
 
-                if need_to_wait:
-                    least_busy = self._wait_for_conn(timeout)
-                    break
+            if need_to_wait:
+                # wait_for_conn will increment in_flight on the conn
+                least_busy = self._wait_for_conn(timeout)
 
             least_busy.set_keyspace(self._session.keyspace)
             return least_busy
