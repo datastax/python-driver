@@ -20,6 +20,7 @@ try:
 except ImportError:
     from StringIO import StringIO  # ignore flake8 warning: # NOQA
 
+from cassandra import ConsistencyLevel
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
                                int8_pack, int8_unpack)
 from cassandra.types import lookup_cqltype
@@ -43,40 +44,6 @@ HEADER_DIRECTION_MASK = 0x80
 
 def warn(msg):
     print msg
-
-
-class ConsistencyLevel(object):
-
-    ANY = 0
-    ONE = 1
-    TWO = 2
-    THREE = 3
-    QUORUM = 4
-    ALL = 5
-    LOCAL_QUORUM = 6
-    EACH_QUORUM = 7
-
-ConsistencyLevel.value_to_name = {
-    ConsistencyLevel.ANY: 'ANY',
-    ConsistencyLevel.ONE: 'ONE',
-    ConsistencyLevel.TWO: 'TWO',
-    ConsistencyLevel.THREE: 'THREE',
-    ConsistencyLevel.QUORUM: 'QUORUM',
-    ConsistencyLevel.ALL: 'ALL',
-    ConsistencyLevel.LOCAL_QUORUM: 'LOCAL_QUORUM',
-    ConsistencyLevel.EACH_QUORUM: 'EACH_QUORUM'
-}
-
-ConsistencyLevel.name_to_value = {
-    'ANY': ConsistencyLevel.ANY,
-    'ONE': ConsistencyLevel.ONE,
-    'TWO': ConsistencyLevel.TWO,
-    'THREE': ConsistencyLevel.THREE,
-    'QUORUM': ConsistencyLevel.QUORUM,
-    'ALL': ConsistencyLevel.ALL,
-    'LOCAL_QUORUM': ConsistencyLevel.LOCAL_QUORUM,
-    'EACH_QUORUM': ConsistencyLevel.EACH_QUORUM
-}
 
 
 class PreparedResult:

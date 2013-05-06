@@ -6,8 +6,9 @@ import Queue
 import weakref
 from functools import partial
 
+from cassandra import ConsistencyLevel
 from cassandra.connection import Connection, ConnectionException
-from cassandra.decoder import (ConsistencyLevel, QueryMessage, ResultMessage,
+from cassandra.decoder import (QueryMessage, ResultMessage,
                                ErrorMessage, ReadTimeoutErrorMessage,
                                WriteTimeoutErrorMessage,
                                UnavailableErrorMessage,

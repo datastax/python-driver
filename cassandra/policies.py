@@ -2,7 +2,7 @@ from itertools import islice, cycle, groupby, repeat
 from random import randint
 from threading import RLock
 
-from decoder import ConsistencyLevel
+from cassandra import ConsistencyLevel
 
 class HostDistance(object):
 

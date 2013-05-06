@@ -1,11 +1,12 @@
 import unittest
 from mock import Mock, ANY
 
+from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster, Session, ResponseFuture, NoHostAvailable
 from cassandra.connection import ConnectionException
 from cassandra.decoder import (ReadTimeoutErrorMessage, WriteTimeoutErrorMessage,
                                UnavailableErrorMessage, ResultMessage, QueryMessage,
-                               OverloadedErrorMessage, ConsistencyLevel)
+                               OverloadedErrorMessage)
 from cassandra.policies import RetryPolicy
 from cassandra.pool import NoConnectionsAvailable
 from cassandra.query import SimpleStatement

@@ -1,6 +1,6 @@
 import struct
 
-from decoder import ConsistencyLevel
+from cassandra import ConsistencyLevel
 
 class Query(object):
 

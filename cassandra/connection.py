@@ -8,12 +8,11 @@ import socket
 from threading import RLock, Event, Lock, Thread
 import traceback
 
-
+from cassandra import ConsistencyLevel
 from cassandra.marshal import (int8_unpack, int32_unpack)
 from cassandra.decoder import (OptionsMessage, ReadyMessage, AuthenticateMessage,
                                StartupMessage, ErrorMessage, CredentialsMessage,
-                               QueryMessage, ResultMessage, ConsistencyLevel,
-                               decode_response)
+                               QueryMessage, ResultMessage, decode_response)
 
 log = logging.getLogger(__name__)
 

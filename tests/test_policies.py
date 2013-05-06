@@ -1,7 +1,7 @@
 import unittest
 from threading import Thread
 
-from cassandra.decoder import ConsistencyLevel
+from cassandra import ConsistencyLevel
 from cassandra.policies import (RoundRobinPolicy, DCAwareRoundRobinPolicy,
                                 SimpleConvictionPolicy, HostDistance,
                                 ExponentialReconnectionPolicy, RetryPolicy,

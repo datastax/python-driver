@@ -2,7 +2,8 @@ import unittest
 from functools import partial
 from threading import Thread, Event
 
-from cassandra.decoder import QueryMessage, ConsistencyLevel
+from cassandra import ConsistencyLevel
+from cassandra.decoder import QueryMessage
 from cassandra.connection import Connection
 
 class ConnectionTest(unittest.TestCase):

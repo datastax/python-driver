@@ -1,7 +1,7 @@
 import unittest
 
 from cassandra.decoder import ResultMessage
-from cassandra.cluster import _ControlConnection, Cluster
+from cassandra.cluster import ControlConnection, Cluster
 from cassandra.pool import Host
 from cassandra.policies import SimpleConvictionPolicy
 
@@ -109,7 +109,7 @@ class ControlConnectionTest(unittest.TestCase):
         self.connection = MockConnection()
         self.time = FakeTime()
 
-        self.control_connection = _ControlConnection(self.cluster)
+        self.control_connection = ControlConnection(self.cluster)
         self.control_connection._connection = self.connection
         self.control_connection._time = self.time
 
