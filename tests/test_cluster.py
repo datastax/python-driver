@@ -1,12 +1,13 @@
 import unittest
 from mock import Mock, ANY
 
-from cassandra.cluster import Cluster, Session, ResponseFuture
+from cassandra.cluster import Cluster, Session, ResponseFuture, NoHostAvailable
 from cassandra.connection import ConnectionException
 from cassandra.decoder import (ReadTimeoutErrorMessage, WriteTimeoutErrorMessage,
                                UnavailableErrorMessage, ResultMessage, QueryMessage,
                                ConsistencyLevel)
 from cassandra.policies import RetryPolicy
+from cassandra.pool import NoConnectionsAvailable
 from cassandra.query import SimpleStatement
 
 class ClusterTests(unittest.TestCase):
@@ -84,21 +85,30 @@ class ClusterTests(unittest.TestCase):
 
 class ResponseFutureTests(unittest.TestCase):
 
+    def make_session(self):
+        session = Mock(spec=Session)
+        session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
+        session._pools.get.return_value.is_shutdown = False
+        return session
+
+    def make_response_future(self, session):
+        query = SimpleStatement("SELECT * FROM foo")
+        message = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
+        return ResponseFuture(session, message, query)
+
     def test_result_message(self):
         session = Mock(spec=Session)
         session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
         pool = session._pools.get.return_value
         pool.is_shutdown = False
 
-        query = SimpleStatement("SELECT * FROM foo")
-        message = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
-        rf = ResponseFuture(session, message, query)
+        rf = self.make_response_future(session)
         rf.send_request()
 
-        session._pools.get.assert_called_once_with('ip1')
+        rf.session._pools.get.assert_called_once_with('ip1')
         pool.borrow_connection.assert_called_once_with(timeout=ANY)
         connection = pool.borrow_connection.return_value
-        connection.send_msg.assert_called_once_with(message, cb=ANY)
+        connection.send_msg.assert_called_once_with(rf.message, cb=ANY)
 
         response = Mock(spec=ResultMessage, kind=ResultMessage.KIND_ROWS, results=[{'col': 'val'}])
         rf._set_result(response)
@@ -107,22 +117,15 @@ class ResponseFutureTests(unittest.TestCase):
         self.assertEqual(result, [{'col': 'val'}])
 
     def test_unknown_result_class(self):
-        session = Mock(spec=Session)
-        session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
-        session._pools.get.return_value.is_shutdown = False
-
-        rf = ResponseFuture(session, Mock(), Mock())
+        session = self.make_session()
+        rf = self.make_response_future(session)
         rf.send_request()
-
         rf._set_result(object())
         self.assertRaises(ConnectionException, rf.deliver)
 
     def test_set_keyspace_result(self):
-        session = Mock(spec=Session)
-        session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
-        session._pools.get.return_value.is_shutdown = False
-
-        rf = ResponseFuture(session, Mock(), Mock())
+        session = self.make_session()
+        rf = self.make_response_future(session)
         rf.send_request()
 
         result = Mock(spec=ResultMessage,
@@ -133,11 +136,8 @@ class ResponseFutureTests(unittest.TestCase):
         session.set_keyspace.assert_called_once_with('keyspace1')
 
     def test_schema_change_result(self):
-        session = Mock(spec=Session)
-        session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
-        session._pools.get.return_value.is_shutdown = False
-
-        rf = ResponseFuture(session, Mock(), Mock())
+        session = self.make_session()
+        rf = self.make_response_future(session)
         rf.send_request()
 
         result = Mock(spec=ResultMessage,
@@ -147,21 +147,14 @@ class ResponseFutureTests(unittest.TestCase):
         session.submit.assert_called_once_with(ANY, 'keyspace1', 'table1', ANY, rf)
 
     def test_other_result_message_kind(self):
-        session = Mock(spec=Session)
-        session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
-        session._pools.get.return_value.is_shutdown = False
-
-        rf = ResponseFuture(session, Mock(), Mock())
+        session = self.make_session()
+        rf = self.make_response_future(session)
         rf.send_request()
-
         rf._set_result(Mock(spec=ResultMessage, kind=999, results="foobar"))
         self.assertEqual('foobar', rf.deliver())
 
     def test_read_timeout_error_message(self):
-        session = Mock(spec=Session)
-        session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
-        session._pools.get.return_value.is_shutdown = False
-
+        session = self.make_session()
         query = SimpleStatement("SELECT * FROM foo")
         query.retry_policy = Mock()
         query.retry_policy.on_read_timeout.return_value = (RetryPolicy.RETHROW, None)
@@ -177,10 +170,7 @@ class ResponseFutureTests(unittest.TestCase):
         self.assertRaises(Exception, rf.deliver)
 
     def test_write_timeout_error_message(self):
-        session = Mock(spec=Session)
-        session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
-        session._pools.get.return_value.is_shutdown = False
-
+        session = self.make_session()
         query = SimpleStatement("INSERT INFO foo (a, b) VALUES (1, 2)")
         query.retry_policy = Mock()
         query.retry_policy.on_write_timeout.return_value = (RetryPolicy.RETHROW, None)
@@ -195,10 +185,7 @@ class ResponseFutureTests(unittest.TestCase):
         self.assertRaises(Exception, rf.deliver)
 
     def test_unavailable_error_message(self):
-        session = Mock(spec=Session)
-        session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
-        session._pools.get.return_value.is_shutdown = False
-
+        session = self.make_session()
         query = SimpleStatement("INSERT INFO foo (a, b) VALUES (1, 2)")
         query.retry_policy = Mock()
         query.retry_policy.on_unavailable.return_value = (RetryPolicy.RETHROW, None)
