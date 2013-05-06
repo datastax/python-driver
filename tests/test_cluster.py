@@ -198,3 +198,49 @@ class ResponseFutureTests(unittest.TestCase):
         result.info = {}
         rf._set_result(result)
         self.assertRaises(Exception, rf.deliver)
+
+    def test_all_pools_shutdown(self):
+        session = Mock(spec=Session)
+        session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
+        session._pools.get.return_value.is_shutdown = True
+
+        rf = ResponseFuture(session, Mock(), Mock())
+        rf.send_request()
+        self.assertRaises(NoHostAvailable, rf.deliver)
+
+    def test_first_pool_shutdown(self):
+        session = Mock(spec=Session)
+        session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
+        # first return a pool with is_shutdown=True, then is_shutdown=False
+        session._pools.get.side_effect = [Mock(is_shutdown=True), Mock(is_shutdown=False)]
+
+        rf = self.make_response_future(session)
+        rf.send_request()
+
+        response = Mock(spec=ResultMessage, kind=ResultMessage.KIND_ROWS, results=[{'col': 'val'}])
+        rf._set_result(response)
+
+        result = rf.deliver()
+        self.assertEqual(result, [{'col': 'val'}])
+
+    def test_timeout_getting_connection_from_pool(self):
+        session = Mock(spec=Session)
+        session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
+
+        # the first pool will raise an exception on borrow_connection()
+        exc = NoConnectionsAvailable()
+        first_pool = Mock(is_shutdown=False)
+        first_pool.borrow_connection.side_effect = exc
+        second_pool = Mock(is_shutdown=False)
+
+        session._pools.get.side_effect = [first_pool, second_pool]
+
+        rf = self.make_response_future(session)
+        rf.send_request()
+
+        response = Mock(spec=ResultMessage, kind=ResultMessage.KIND_ROWS, results=[{'col': 'val'}])
+        rf._set_result(response)
+        self.assertEqual(rf.deliver(), [{'col': 'val'}])
+
+        # make sure the exception is recorded correctly
+        self.assertEqual(rf._errors, {'ip1': exc})
