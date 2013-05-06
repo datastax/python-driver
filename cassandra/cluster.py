@@ -44,7 +44,10 @@ class ResponseFuture(object):
         self.message = message
         self.query = query
 
-        self.query_plan = session._load_balancer.make_query_plan(query)
+        # convert the list/generator/etc to an iterator so that subsequent
+        # calls to send_request (which retries may do) will resume where
+        # they last left off
+        self.query_plan = iter(session._load_balancer.make_query_plan(query))
 
         self._req_id = None
         self._final_result = _NO_RESULT_YET
@@ -56,6 +59,8 @@ class ResponseFuture(object):
         self._callback = self._errback = None
 
     def send_request(self):
+        # query_plan is an iterator, so this will resume where we last left
+        # off if send_request() is called multiple times
         for host in self.query_plan:
             req_id = self._query(host)
             if req_id:
