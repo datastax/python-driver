@@ -111,9 +111,8 @@ class Connection(object):
 
     cql_version = "3.0.1"
 
-    read_watcher = None
-    write_watcher = None
     keyspace = None
+    compression = True
     compressor = None
     decompressor = None
 
@@ -121,9 +120,10 @@ class Connection(object):
     in_flight = 0
     is_defunct = False
     is_closed = False
+    lock = None
 
-    buf = ""
-    total_reqd_bytes = 0
+    _buf = ""
+    _total_reqd_bytes = 0
 
     @classmethod
     def factory(cls, *args, **kwargs):
@@ -146,23 +146,23 @@ class Connection(object):
         self.make_request_id = itertools.cycle(xrange(127)).next
         self._callbacks = {}
         self._push_watchers = defaultdict(set)
-        self._lock = RLock()
+        self.lock = RLock()
 
         self.deque = deque()
 
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.connect((host, port))
-        self.socket.setblocking(0)
+        self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._socket.connect((host, port))
+        self._socket.setblocking(0)
 
         if sockopts:
             for args in sockopts:
-                self.socket.setsockopt(*args)
+                self._socket.setsockopt(*args)
 
-        self.read_watcher = pyev.Io(self.socket._sock, pyev.EV_READ, _loop, self.handle_read)
-        self.write_watcher = pyev.Io(self.socket._sock, pyev.EV_WRITE, _loop, self.handle_write)
+        self._read_watcher = pyev.Io(self._socket._sock, pyev.EV_READ, _loop, self.handle_read)
+        self._write_watcher = pyev.Io(self._socket._sock, pyev.EV_WRITE, _loop, self.handle_write)
         with _loop_lock:
-            self.read_watcher.start()
-            self.write_watcher.start()
+            self._read_watcher.start()
+            self._write_watcher.start()
 
         log.debug("Sending initial options message for new Connection to %s" % (host,))
         self.send_msg(OptionsMessage(), self._handle_options_response)
@@ -174,14 +174,14 @@ class Connection(object):
                 _loop_notifier.send()
 
     def close(self):
-        with self._lock:
+        with self.lock:
             if self.is_closed:
                 return
             self.is_closed = True
 
-        self.read_watcher.stop()
-        self.write_watcher.stop()
-        self.socket.close()
+        self._read_watcher.stop()
+        self._write_watcher.stop()
+        self._socket.close()
         with _loop_lock:
             _loop_notifier.send()
 
@@ -195,11 +195,11 @@ class Connection(object):
         try:
             next_msg = self.deque.popleft()
         except IndexError:
-            self.write_watcher.stop()
+            self._write_watcher.stop()
             return
 
         try:
-            sent = self.socket.send(next_msg)
+            sent = self._socket.send(next_msg)
         except socket.error, err:
             if (err.args[0] in NONBLOCKING):
                 self.deque.appendleft(next_msg)
@@ -211,34 +211,34 @@ class Connection(object):
                 self.deque.appendleft(next_msg[sent:])
 
             if not self.deque:
-                self.write_watcher.stop()
+                self._write_watcher.stop()
 
     def handle_read(self, watcher, revents):
         try:
-            buf = self.socket.recv(self.in_buffer_size)
+            buf = self._socket.recv(self.in_buffer_size)
         except socket.error, err:
             if err.args[0] not in NONBLOCKING:
                 self.handle_error()
             return
 
         if buf:
-            self.buf += buf
+            self._buf += buf
             while True:
-                if len(self.buf) < 8:
+                if len(self._buf) < 8:
                     # we don't have a complete header yet
                     break
-                elif self.total_reqd_bytes and len(self.buf) < self.total_reqd_bytes:
+                elif self._total_reqd_bytes and len(self._buf) < self._total_reqd_bytes:
                     # we already saw a header, but we don't have a complete message yet
                     break
                 else:
-                    body_len = int32_unpack(self.buf[4:8])
-                    if len(self.buf) - 8 >= body_len:
-                        msg = self.buf[:8 + body_len]
-                        self.buf = self.buf[8 + body_len:]
-                        self.total_reqd_bytes = 0
+                    body_len = int32_unpack(self._buf[4:8])
+                    if len(self._buf) - 8 >= body_len:
+                        msg = self._buf[:8 + body_len]
+                        self._buf = self._buf[8 + body_len:]
+                        self._total_reqd_bytes = 0
                         self.process_msg(msg, body_len)
                     else:
-                        self.total_reqd_bytes = body_len + 8
+                        self._total_reqd_bytes = body_len + 8
         else:
             logging.debug("connection closed by server")
             self.close()
@@ -286,16 +286,16 @@ class Connection(object):
 
     def push(self, data):
         sabs = self.out_buffer_size
-        with self._lock:
+        with self.lock:
             if len(data) > sabs:
                 for i in xrange(0, len(data), sabs):
                     self.deque.append(data[i:i + sabs])
             else:
                 self.deque.append(data)
 
-            if not self.write_watcher.active:
+            if not self._write_watcher.active:
                 with _loop_lock:
-                    self.write_watcher.start()
+                    self._write_watcher.start()
                     _loop_notifier.send()
 
     def send_msg(self, msg, cb):
@@ -388,7 +388,7 @@ class Connection(object):
         if not keyspace:
             return
 
-        with self._lock:
+        with self.lock:
             if keyspace == self.keyspace:
                 return
 
