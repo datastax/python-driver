@@ -306,10 +306,10 @@ class HostConnectionPool(object):
             if self.is_shutdown:
                 return False
 
-            if self._open_count >= max_conns:
+            if self.open_count >= max_conns:
                 return False
 
-            self._open_count += 1
+            self.open_count += 1
 
         try:
             conn = self._session.connection_factory(self.host)
@@ -318,13 +318,13 @@ class HostConnectionPool(object):
             self._signal_available_conn()
         except ConnectionException, exc:
             with self._lock:
-                self._open_count -= 1
+                self.open_count -= 1
             if self.host.monitor.signal_connection_failure(exc):
                 self.shutdown()
             return False
         except AuthenticationException:
             with self._lock:
-                self._open_count -= 1
+                self.open_count -= 1
             return False
 
     def _await_available_conn(self, timeout):
@@ -343,83 +343,81 @@ class HostConnectionPool(object):
         start = time.time()
         remaining = timeout
 
-        while True:
+        while remaining > 0:
+            # wait on our condition for the possibility that a connection
+            # is useable
             self._await_available_conn(remaining)
 
+            # self.shutdown() may trigger the above Condition
             if self.is_shutdown:
                 raise ConnectionException("Pool is shutdown")
 
             least_busy = min(self._connections, key=lambda c: c.in_flight)
-            while True:
-                with least_busy._lock:
-                    if least_busy.in_flight >= MAX_STREAM_PER_CONNECTION:
-                        break
-
+            with least_busy.lock:
+                if least_busy.in_flight < MAX_STREAM_PER_CONNECTION:
                     least_busy.in_flight += 1
                     return least_busy
 
             remaining = timeout - (time.time() - start)
-            if remaining <= 0:
-                raise NoConnectionsAvailable()
 
-    def return_connection(self, conn):
-        with conn._lock:
-            conn.in_flight -= 1
-            in_flight = conn.in_flight
+        raise NoConnectionsAvailable()
 
-        if conn.is_defunct:
-            is_down = self.host.monitor.signal_connection_failure(conn.last_exception)
+    def return_connection(self, connection):
+        with connection.lock:
+            connection.in_flight -= 1
+            in_flight = connection.in_flight
+
+        if connection.is_defunct:
+            is_down = self.host.monitor.signal_connection_failure(connection.last_exception)
             if is_down:
                 self.shutdown()
             else:
-                self.replace(conn)
+                self.replace(connection)
         else:
             with self._lock:
-                if conn in self._trash and in_flight == 0:
-                    self._trash.remove(conn)
-                    conn.close()
+                # TODO another thread may have already taken this connection,
+                # think about race condition here
+                if connection in self._trash and in_flight == 0:
+                    self._trash.remove(connection)
+                    connection.close()
                     return
 
             core_conns = self._session.cluster.get_core_connections_per_host(self.host_distance)
             min_reqs = self._session.cluster.get_min_requests_per_connection(self.host_distance)
             if len(self._connections) > core_conns and in_flight <= min_reqs:
-                self._trash_connection(conn)
+                self._trash_connection(connection)
             else:
                 self._signal_available_conn()
 
-    def _trash_connection(self, conn):
+    def _trash_connection(self, connection):
         core_conns = self._session.cluster.get_core_connections_per_host(self.host_distance)
         with self._lock:
-            if self._open_count <= core_conns:
+            if self.open_count <= core_conns:
                 return False
 
-            self._open_count -= 1
+            self.open_count -= 1
 
-            self._connections.remove(conn)
-            with conn._lock:
-                if conn.in_flight == 0:
-                    conn.close()
+            self._connections.remove(connection)
+            with connection.lock:
+                if connection.in_flight == 0:
+                    connection.close()
                 else:
-                    self._trash.add(conn)
+                    self._trash.add(connection)
 
             return True
 
-    def _replace(self, conn):
+    def _replace(self, connection):
         with self._lock:
-            self._connections.remove(conn)
+            self._connections.remove(connection)
 
         def close_and_replace():
-            conn.close()
+            connection.close()
             self._add_conn_if_under_max()
 
         self._session.submit(close_and_replace)
 
-    def _close(self, conn):
-        self._session.submit(conn.close)
-
-    @property
-    def open_count(self):
-        return self._open_count
+    def _close(self, connection):
+        self._session.submit(connection.close)
 
     def shutdown(self):
         with self._lock:
@@ -431,7 +429,7 @@ class HostConnectionPool(object):
         self._signal_all_available_conn()
         for conn in self._connections:
             conn.close()
-            self._open_count -= 1
+            self.open_count -= 1
 
         reconnector = self.host.get_and_set_reconnection_handler(None)
         if reconnector:
@@ -442,7 +440,7 @@ class HostConnectionPool(object):
             return
 
         core_conns = self._session.cluster.get_core_connections_per_host(self.host_distance)
-        for i in range(core_conns - self._open_count):
+        for i in range(core_conns - self.open_count):
             with self._lock:
                 self._scheduled_for_creation += 1
                 self._session.submit(self._create_new_connection)
