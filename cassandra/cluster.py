@@ -55,10 +55,6 @@ class ResponseFuture(object):
         self._query_retries = 0
         self._callback = self._errback = None
 
-    def __del__(self):
-        if hasattr(self, 'session'):
-            del self.session
-
     def send_request(self):
         for host in self.query_plan:
             req_id = self._query(host)
