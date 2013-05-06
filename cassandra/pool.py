@@ -218,12 +218,17 @@ class HealthMonitor(object):
         return is_down
 
 
+_MAX_SIMULTANEOUS_CREATION = 1
+
+
 class HostConnectionPool(object):
 
     host = None
     host_distance = None
 
     is_shutdown = False
+    open_count = 0
+    _scheduled_for_creation = 0
 
     def __init__(self, host, host_distance, session):
         self.host = host
@@ -237,12 +242,12 @@ class HostConnectionPool(object):
         self._connections = [session.cluster.connection_factory(host.address)
                              for i in range(core_conns)]
         self._trash = set()
-        self._open_count = len(self._connections)
-        self._scheduled_for_creation = 0
+        self.open_count = core_conns
 
     def borrow_connection(self, timeout):
         if self.is_shutdown:
-            raise ConnectionException("Pool is shutdown", self.host)
+            raise ConnectionException(
+                "Pool for %s is shutdown" % (self.host,), self.host)
 
         if not self._connections:
             core_conns = self._session.cluster.get_core_connections_per_host(self.host_distance)
