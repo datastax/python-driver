@@ -12,7 +12,7 @@ try:
 except ImportError:
     pass
 
-import cassandra.cqltypes as cqltypes
+import cassandra.types as types
 from cassandra.marshal import varint_unpack
 from cassandra.pool import Host
 
@@ -102,8 +102,8 @@ class Metadata(object):
     def _build_table_metadata(self, keyspace_metadata, row, col_rows):
         cfname = row["columnfamily_name"]
 
-        comparator = cqltypes.lookup_casstype(row["comparator"])
-        if issubclass(comparator, cqltypes.CompositeType):
+        comparator = types.lookup_casstype(row["comparator"])
+        if issubclass(comparator, types.CompositeType):
             column_name_types = comparator.subtypes
             is_composite = True
         else:
@@ -115,13 +115,13 @@ class Metadata(object):
 
         column_aliases = json.loads(row["column_aliases"])
         if is_composite:
-            if issubclass(last_col, cqltypes.ColumnToCollectionType):
+            if issubclass(last_col, types.ColumnToCollectionType):
                 # collections
                 is_compact = False
                 has_value = False
                 clustering_size = num_column_name_components - 2
             elif (len(column_aliases) == num_column_name_components - 1
-                    and issubclass(last_col, cqltypes.UTF8Type)):
+                    and issubclass(last_col, types.UTF8Type)):
                 # aliases?
                 is_compact = False
                 has_value = False
@@ -147,8 +147,8 @@ class Metadata(object):
         key_aliases = row.get("key_aliases")
         key_aliases = json.loads(key_aliases) if key_aliases else []
 
-        key_type = cqltypes.lookup_casstype(row["key_validator"])
-        key_types = key_type.subtypes if issubclass(key_type, cqltypes.CompositeType) else [key_type]
+        key_type = types.lookup_casstype(row["key_validator"])
+        key_types = key_type.subtypes if issubclass(key_type, types.CompositeType) else [key_type]
         for i, col_type in enumerate(key_types):
             if len(key_aliases) > i:
                 column_name = key_aliases[i]
@@ -174,7 +174,7 @@ class Metadata(object):
 
         # value alias (if present)
         if has_value:
-            validator = cqltypes.lookup_casstype(row["default_validator"])
+            validator = types.lookup_casstype(row["default_validator"])
             if not key_aliases:  # TODO are we checking the right thing here?
                 value_alias = "value"
             else:
@@ -200,7 +200,7 @@ class Metadata(object):
 
     def _build_column_metadata(self, table_metadata, row):
         name = row["column_name"]
-        data_type = cqltypes.lookup_casstype(row["validator"])
+        data_type = types.lookup_casstype(row["validator"])
         column_meta = ColumnMetadata(table_metadata, name, data_type)
         index_meta = self._build_index_metadata(column_meta, row)
         column_meta.index = index_meta
@@ -359,14 +359,14 @@ class TableMetadata(object):
             clustering_names = self.protect_names([c.name for c in self.clustering_key])
 
             if self.options.get("is_compact_storage") and \
-                    not issubclass(self.comparator, cqltypes.CompositeType):
+                    not issubclass(self.comparator, types.CompositeType):
                 subtypes = [self.comparator]
             else:
                 subtypes = self.comparator.subtypes
 
             inner = []
             for colname, coltype in zip(clustering_names, subtypes):
-                ordering = "DESC" if issubclass(coltype, cqltypes.ReversedType) else "ASC"
+                ordering = "DESC" if issubclass(coltype, types.ReversedType) else "ASC"
                 inner.append("%s %s" % (colname, ordering))
 
             cluster_str += "(%s)" % ", ".join(inner)
@@ -434,7 +434,7 @@ class ColumnMetadata(object):
 
     @property
     def typestring(self):
-        if issubclass(self.data_type, cqltypes.ReversedType):
+        if issubclass(self.data_type, types.ReversedType):
             return self.data_type.subtypes[0].cql_parameterized_type()
         else:
             return self.data_type.cql_parameterized_type()

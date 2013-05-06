@@ -1,19 +1,3 @@
-# Licensed to the Apache Software Foundation (ASF) under one
-# or more contributor license agreements.  See the NOTICE file
-# distributed with this work for additional information
-# regarding copyright ownership.  The ASF licenses this file
-# to you under the Apache License, Version 2.0 (the
-# "License"); you may not use this file except in compliance
-# with the License.  You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """
 Representation of Cassandra data types. These classes should make it simple for
 the library (and caller software) to deal with Cassandra-style Java class type
@@ -21,12 +5,13 @@ names and CQL type specifiers, and convert between them cleanly. Parameterized
 types are fully supported in both flavors. Once you have the right Type object
 for the type you want, you can use it to serialize, deserialize, or retrieve
 the corresponding CQL or Cassandra type strings.
-
-If/when the need arises for interpret types from CQL string literals in
-different ways (for https://issues.apache.org/jira/browse/CASSANDRA-3799,
-for example), these classes would be a good place to tack on
-.from_cql_literal() and .as_cql_literal() classmethods (or whatever).
 """
+
+# NOTE:
+# If/when the need arises for interpret types from CQL string literals in
+# different ways (for https://issues.apache.org/jira/browse/CASSANDRA-3799,
+# for example), these classes would be a good place to tack on
+# .from_cql_literal() and .as_cql_literal() classmethods (or whatever).
 
 import calendar
 from decimal import Decimal
@@ -38,7 +23,7 @@ from uuid import UUID
 try:
     from cStringIO import StringIO
 except ImportError:
-    from StringIO import StringIO
+    from StringIO import StringIO  # NOQA
 
 from cassandra.marshal import (int8_pack, int8_unpack, uint16_pack, uint16_unpack,
                                int32_pack, int32_unpack, int64_pack, int64_unpack,
@@ -77,11 +62,13 @@ class CassandraTypeType(type):
             _cqltypes[cls.typename] = cls
         return cls
 
+
 casstype_scanner = re.Scanner((
     (r'[()]', lambda s, t: t),
     (r'[a-zA-Z0-9_.:]+', lambda s, t: t),
     (r'[\s,]', None),
 ))
+
 
 def lookup_casstype_simple(casstype):
     """
@@ -93,13 +80,13 @@ def lookup_casstype_simple(casstype):
     nothing with parentheses). Use lookup_casstype() instead if you might need
     that.
     """
-
     shortname = trim_if_startswith(casstype, apache_cassandra_type_prefix)
     try:
         typeclass = _casstypes[shortname]
     except KeyError:
         typeclass = mkUnrecognizedType(casstype)
     return typeclass
+
 
 def parse_casstype_args(typestring):
     tokens, remainder = casstype_scanner.scan(typestring)
@@ -121,9 +108,9 @@ def parse_casstype_args(typestring):
                 tok = tok.rsplit(':', 1)[-1]
             ctype = lookup_casstype_simple(tok)
             args[-1].append(ctype)
-    assert len(args) == 1, args
-    assert len(args[0]) == 1, args[0]
+
     return args[0][0]
+
 
 def lookup_casstype(casstype):
     """
@@ -134,16 +121,16 @@ def lookup_casstype(casstype):
     Example:
 
         >>> lookup_casstype('org.apache.cassandra.db.marshal.MapType(org.apache.cassandra.db.marshal.UTF8Type,org.apache.cassandra.db.marshal.Int32Type)')
-        <class 'cql.cqltypes.MapType(UTF8Type, Int32Type)'>
+        <class 'cassandra.types.MapType(UTF8Type, Int32Type)'>
 
     """
-
     if isinstance(casstype, (CassandraType, CassandraTypeType)):
         return casstype
     try:
         return parse_casstype_args(casstype)
     except (ValueError, AssertionError, IndexError), e:
         raise ValueError("Don't know how to parse type string %r: %s" % (casstype, e))
+
 
 def lookup_cqltype(cqltype):
     """
@@ -156,10 +143,9 @@ def lookup_cqltype(cqltype):
     Example:
 
         >>> lookup_cqltype('map<text, int>')
-        <class 'cql.cqltypes.MapType(UTF8Type, Int32Type)'>
+        <class 'cassandra.types.MapType(UTF8Type, Int32Type)'>
 
     """
-
     if isinstance(cqltype, CassandraType):
         return cqltype
     args = ()
@@ -175,6 +161,7 @@ def lookup_cqltype(cqltype):
     if args:
         typeclass = typeclass.apply_parameters(*args)
     return typeclass
+
 
 class _CassandraType(object):
     __metaclass__ = CassandraTypeType
@@ -196,7 +183,6 @@ class _CassandraType(object):
         for this class. As an example, the BooleanType class uses this
         to convert an incoming value to True or False.
         """
-
         return val
 
     @classmethod
@@ -206,10 +192,7 @@ class _CassandraType(object):
         for more information. This method differs in that if None or the empty
         string is passed in, None may be returned.
         """
-
-        if byts is None:
-            return None
-        if byts == '' and not cls.empty_binary_ok:
+        if byts is None or (byts == '' and not cls.empty_binary_ok):
             return None
         return cls.deserialize(byts)
 
@@ -220,10 +203,7 @@ class _CassandraType(object):
         more information. This method differs in that if None is passed in,
         the result is the empty string.
         """
-
-        if val is None:
-            return ''
-        return cls.serialize(val)
+        return '' if val is None else cls.serialize(val)
 
     @staticmethod
     def deserialize(byts):
@@ -261,7 +241,6 @@ class _CassandraType(object):
             >>> SetType.cass_parameterized_type_with([DecimalType], full=True)
             'org.apache.cassandra.db.marshal.SetType(org.apache.cassandra.db.marshal.DecimalType)'
         """
-
         cname = cls.cassname
         if full and '.' not in cname:
             cname = apache_cassandra_type_prefix + cname
@@ -277,9 +256,8 @@ class _CassandraType(object):
         using them as parameters. This is how composite types are constructed.
 
             >>> MapType.apply_parameters(DateType, BooleanType)
-            <class 'cql.cqltypes.MapType(DateType, BooleanType)'>
+            <class 'cassandra.types.MapType(DateType, BooleanType)'>
         """
-
         if cls.num_subtypes != 'UNKNOWN' and len(subtypes) != cls.num_subtypes:
             raise ValueError("%s types require %d subtypes (%d given)"
                              % (cls.typename, cls.num_subtypes, len(subtypes)))
@@ -292,7 +270,6 @@ class _CassandraType(object):
         Return a CQL type specifier for this type. If this type has parameters,
         they are included in standard CQL <> notation.
         """
-
         if not cls.subtypes:
             return cls.typename
         return '%s<%s>' % (cls.typename, ', '.join(styp.cql_parameterized_type() for styp in cls.subtypes))
@@ -305,17 +282,21 @@ class _CassandraType(object):
         """
         return cls.cass_parameterized_type_with(cls.subtypes, full=full)
 
+
 # it's initially named with a _ to avoid registering it as a real type, but
 # client programs may want to use the name still for isinstance(), etc
 CassandraType = _CassandraType
 
+
 class _UnrecognizedType(_CassandraType):
     num_subtypes = 'UNKNOWN'
+
 
 def mkUnrecognizedType(casstypename):
     return CassandraTypeType(casstypename.encode('utf8'),
                              (_UnrecognizedType,),
                              {'typename': "'%s'" % casstypename})
+
 
 class BytesType(_CassandraType):
     typename = 'blob'
@@ -328,6 +309,7 @@ class BytesType(_CassandraType):
     @staticmethod
     def serialize(val):
         return str(val)
+
 
 class DecimalType(_CassandraType):
     typename = 'decimal'
@@ -352,6 +334,7 @@ class DecimalType(_CassandraType):
         unscaled = varint_pack(unscaled)
         return scale + unscaled
 
+
 class UUIDType(_CassandraType):
     typename = 'uuid'
 
@@ -362,6 +345,7 @@ class UUIDType(_CassandraType):
     @staticmethod
     def serialize(uuid):
         return uuid.bytes
+
 
 class BooleanType(_CassandraType):
     typename = 'boolean'
@@ -378,9 +362,11 @@ class BooleanType(_CassandraType):
     def serialize(truth):
         return int8_pack(bool(truth))
 
+
 class AsciiType(_CassandraType):
     typename = 'ascii'
     empty_binary_ok = True
+
 
 class FloatType(_CassandraType):
     typename = 'float'
@@ -388,11 +374,13 @@ class FloatType(_CassandraType):
     deserialize = staticmethod(float_unpack)
     serialize = staticmethod(float_pack)
 
+
 class DoubleType(_CassandraType):
     typename = 'double'
 
     deserialize = staticmethod(double_unpack)
     serialize = staticmethod(double_pack)
+
 
 class LongType(_CassandraType):
     typename = 'bigint'
@@ -400,17 +388,20 @@ class LongType(_CassandraType):
     deserialize = staticmethod(int64_unpack)
     serialize = staticmethod(int64_pack)
 
+
 class Int32Type(_CassandraType):
     typename = 'int'
 
     deserialize = staticmethod(int32_unpack)
     serialize = staticmethod(int32_pack)
 
+
 class IntegerType(_CassandraType):
     typename = 'varint'
 
     deserialize = staticmethod(varint_unpack)
     serialize = staticmethod(varint_pack)
+
 
 class InetAddressType(_CassandraType):
     typename = 'inet'
@@ -431,11 +422,13 @@ class InetAddressType(_CassandraType):
             fam = socket.AF_INET
         return socket.inet_pton(fam, addr)
 
+
 class CounterColumnType(_CassandraType):
     typename = 'counter'
 
     deserialize = staticmethod(int64_unpack)
     serialize = staticmethod(int64_pack)
+
 
 cql_time_formats = (
     '%Y-%m-%d %H:%M',
@@ -444,6 +437,7 @@ cql_time_formats = (
     '%Y-%m-%dT%H:%M:%S',
     '%Y-%m-%d'
 )
+
 
 class DateType(_CassandraType):
     typename = 'timestamp'
@@ -481,6 +475,7 @@ class DateType(_CassandraType):
     def serialize(timestamp):
         return int64_pack(timestamp * 1000)
 
+
 class TimeUUIDType(DateType):
     typename = 'timeuuid'
 
@@ -495,6 +490,7 @@ class TimeUUIDType(DateType):
     def serialize(timeuuid):
         return timeuuid.bytes
 
+
 class UTF8Type(_CassandraType):
     typename = 'text'
     empty_binary_ok = True
@@ -506,6 +502,7 @@ class UTF8Type(_CassandraType):
     @staticmethod
     def serialize(ustr):
         return ustr.encode('utf8')
+
 
 # name alias
 _cqltypes['varchar'] = _cqltypes['text']
@@ -529,6 +526,7 @@ class _ParameterizedType(_CassandraType):
             raise NotImplementedError("can't serialize unparameterized %s"
                                       % cls.typename)
         return cls.serialize_safe(val)
+
 
 class _SimpleParameterizedType(_ParameterizedType):
     @classmethod
@@ -561,15 +559,18 @@ class _SimpleParameterizedType(_ParameterizedType):
             buf.write(itembytes)
         return buf.getvalue()
 
+
 class ListType(_SimpleParameterizedType):
     typename = 'list'
     num_subtypes = 1
     adapter = tuple
 
+
 class SetType(_SimpleParameterizedType):
     typename = 'set'
     num_subtypes = 1
     adapter = set
+
 
 class MapType(_ParameterizedType):
     typename = 'map'
@@ -614,9 +615,11 @@ class MapType(_ParameterizedType):
             buf.write(valbytes)
         return buf.getvalue()
 
+
 class CompositeType(_ParameterizedType):
     typename = "'org.apache.cassandra.db.marshal.CompositeType'"
     num_subtypes = 'UNKNOWN'
+
 
 class ColumnToCollectionType(_ParameterizedType):
     """
@@ -626,6 +629,7 @@ class ColumnToCollectionType(_ParameterizedType):
     """
     typename = "'org.apache.cassandra.db.marshal.ColumnToCollectionType'"
     num_subtypes = 'UNKNOWN'
+
 
 class ReversedType(_ParameterizedType):
     typename = "'org.apache.cassandra.db.marshal.ReversedType'"
@@ -641,15 +645,17 @@ class ReversedType(_ParameterizedType):
         subtype, = cls.subtypes
         return subtype.to_binary(val)
 
+
 def is_counter_type(t):
     if isinstance(t, basestring):
         t = lookup_casstype(t)
     return issubclass(t, CounterColumnType)
 
-cql_type_to_apache_class = dict([(c, t.cassname) for (c, t) in _cqltypes.items()])
-apache_class_to_cql_type = dict([(n, t.typename) for (n, t) in _casstypes.items()])
 
-cql_types = sorted([t for t in _cqltypes.keys() if not t.startswith("'")])
+cql_type_to_apache_class = dict((c, t.cassname) for (c, t) in _cqltypes.items())
+apache_class_to_cql_type = dict((n, t.typename) for (n, t) in _casstypes.items())
+
+cql_types = sorted(t for t in _cqltypes.keys() if not t.startswith("'"))
 
 def cql_typename(casstypename):
     """

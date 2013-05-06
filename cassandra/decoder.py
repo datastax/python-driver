@@ -22,7 +22,7 @@ except ImportError:
 
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
                                int8_pack, int8_unpack)
-from cassandra.cqltypes import lookup_cqltype
+from cassandra.types import lookup_cqltype
 
 
 class NotSupportedError(Exception):
