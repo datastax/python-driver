@@ -5,7 +5,7 @@ from cassandra.cluster import Cluster, Session, ResponseFuture, NoHostAvailable
 from cassandra.connection import ConnectionException
 from cassandra.decoder import (ReadTimeoutErrorMessage, WriteTimeoutErrorMessage,
                                UnavailableErrorMessage, ResultMessage, QueryMessage,
-                               ConsistencyLevel)
+                               OverloadedErrorMessage, ConsistencyLevel)
 from cassandra.policies import RetryPolicy
 from cassandra.pool import NoConnectionsAvailable
 from cassandra.query import SimpleStatement
@@ -163,8 +163,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf = ResponseFuture(session, message, query)
         rf.send_request()
 
-        result = Mock(spec=ReadTimeoutErrorMessage)
-        result.info = {}
+        result = Mock(spec=ReadTimeoutErrorMessage, info={})
         rf._set_result(result)
 
         self.assertRaises(Exception, rf.deliver)
@@ -179,8 +178,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf = ResponseFuture(session, message, query)
         rf.send_request()
 
-        result = Mock(spec=WriteTimeoutErrorMessage)
-        result.info = {}
+        result = Mock(spec=WriteTimeoutErrorMessage, info={})
         rf._set_result(result)
         self.assertRaises(Exception, rf.deliver)
 
@@ -194,10 +192,91 @@ class ResponseFutureTests(unittest.TestCase):
         rf = ResponseFuture(session, message, query)
         rf.send_request()
 
-        result = Mock(spec=UnavailableErrorMessage)
-        result.info = {}
+        result = Mock(spec=UnavailableErrorMessage, info={})
         rf._set_result(result)
         self.assertRaises(Exception, rf.deliver)
+
+    def test_retry_policy_says_ignore(self):
+        session = self.make_session()
+        query = SimpleStatement("INSERT INFO foo (a, b) VALUES (1, 2)")
+        query.retry_policy = Mock()
+        query.retry_policy.on_unavailable.return_value = (RetryPolicy.IGNORE, None)
+        message = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
+
+        rf = ResponseFuture(session, message, query)
+        rf.send_request()
+
+        result = Mock(spec=UnavailableErrorMessage, info={})
+        rf._set_result(result)
+        self.assertEqual(None, rf.deliver())
+
+    def test_retry_policy_says_retry(self):
+        session = self.make_session()
+        pool = session._pools.get.return_value
+        query = SimpleStatement("INSERT INFO foo (a, b) VALUES (1, 2)")
+        query.retry_policy = Mock()
+        query.retry_policy.on_unavailable.return_value = (RetryPolicy.RETRY, ConsistencyLevel.ONE)
+        message = QueryMessage(query=query, consistency_level=ConsistencyLevel.QUORUM)
+
+        rf = ResponseFuture(session, message, query)
+        rf.send_request()
+
+        rf.session._pools.get.assert_called_once_with('ip1')
+        pool.borrow_connection.assert_called_once_with(timeout=ANY)
+        connection = pool.borrow_connection.return_value
+        connection.send_msg.assert_called_once_with(rf.message, cb=ANY)
+
+        result = Mock(spec=UnavailableErrorMessage, info={})
+        rf._set_result(result)
+
+        session.submit.assert_called_once_with(rf._retry_task, True)
+        self.assertEqual(1, rf._query_retries)
+
+        # simulate the executor running this
+        rf._retry_task(True)
+
+        # it should try again with the same host since this was
+        # an UnavailableException
+        rf.session._pools.get.assert_called_with('ip1')
+        pool.borrow_connection.assert_called_with(timeout=ANY)
+        connection = pool.borrow_connection.return_value
+        connection.send_msg.assert_called_with(rf.message, cb=ANY)
+
+    def test_retry_with_different_host(self):
+        session = self.make_session()
+        pool = session._pools.get.return_value
+        query = SimpleStatement("INSERT INFO foo (a, b) VALUES (1, 2)")
+        query.retry_policy = Mock()
+        query.retry_policy.on_unavailable.return_value = (RetryPolicy.RETRY, ConsistencyLevel.ONE)
+        message = QueryMessage(query=query, consistency_level=ConsistencyLevel.QUORUM)
+
+        rf = ResponseFuture(session, message, query)
+        rf.send_request()
+
+        rf.session._pools.get.assert_called_once_with('ip1')
+        pool.borrow_connection.assert_called_once_with(timeout=ANY)
+        connection = pool.borrow_connection.return_value
+        connection.send_msg.assert_called_once_with(rf.message, cb=ANY)
+        self.assertEqual(ConsistencyLevel.QUORUM, rf.message.consistency_level)
+
+        result = Mock(spec=OverloadedErrorMessage, info={})
+        rf._set_result(result)
+
+        session.submit.assert_called_once_with(rf._retry_task, False)
+        # query_retries does not get incremented for Overloaded/Bootstrapping errors
+        self.assertEqual(0, rf._query_retries)
+
+        # simulate the executor running this
+        rf._retry_task(False)
+
+        # it should try with a different host
+        rf.session._pools.get.assert_called_with('ip2')
+        pool.borrow_connection.assert_called_with(timeout=ANY)
+        connection = pool.borrow_connection.return_value
+        connection.send_msg.assert_called_with(rf.message, cb=ANY)
+
+        # the consistency level should be the same
+        self.assertEqual(ConsistencyLevel.QUORUM, rf.message.consistency_level)
 
     def test_all_pools_shutdown(self):
         session = Mock(spec=Session)
