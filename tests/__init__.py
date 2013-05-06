@@ -18,8 +18,7 @@ def setup_package():
         cluster.set_max_connections_per_host(HostDistance.LOCAL, 1)
         session = cluster.connect()
     except Exception, exc:
-        log.error('Failed to connect to cluster:')
-        log.error(exc)
+        log.exception('Failed to connect to cluster:')
         raise unittest.SkipTest('Failed to connect to cluster: %r' % exc)
 
     try:
@@ -30,8 +29,7 @@ def setup_package():
         try:
             cluster.shutdown()
         except Exception, exc:
-            log.error('Failed to connect to cluster:')
-            log.error(exc)
+            log.exception('Failed to connect to cluster:')
             raise unittest.SkipTest('Failed to connect to cluster: %r' % exc)
 
 
@@ -41,10 +39,9 @@ def teardown_package():
         cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         cluster.set_max_connections_per_host(HostDistance.LOCAL, 1)
         session = cluster.connect()
-    except Exception, exc:
-        log.error('Failed to connect to cluster:')
-        log.error(exc)
-        raise unittest.SkipTest('Failed to connect to cluster: %r' % exc)
+    except Exception:
+        log.exception('Failed to connect to cluster:')
+        return
 
     try:
         if existing_keyspaces:
@@ -57,6 +54,5 @@ def teardown_package():
         try:
             cluster.shutdown()
             _loop.stop()
-        except Exception, exc:
-            log.error('Failed to connect to cluster:')
-            log.error(exc)
+        except:
+            log.exception('Failed to connect to cluster:')
