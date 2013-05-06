@@ -286,6 +286,15 @@ class HostConnectionPool(object):
             least_busy.set_keyspace(self._session.keyspace)
             return least_busy
 
+    def _maybe_spawn_new_connection(self):
+        log.debug("Considering spawning new connection to %s" % (self.host.address,))
+        with self._lock:
+            if self._scheduled_for_creation >= _MAX_SIMULTANEOUS_CREATION:
+                return
+            self._scheduled_for_creation += 1
+
+        self._session.submit(self._create_new_connection)
+
     def _create_new_connection(self):
         self._add_conn_if_under_max()
         with self._lock:
