@@ -312,7 +312,7 @@ class HostConnectionPool(object):
             self.open_count += 1
 
         try:
-            conn = self._session.connection_factory(self.host)
+            conn = self._session.cluster.connection_factory(self.host)
             with self._lock:
                 self._connections.append(conn)
             self._signal_available_conn()
@@ -352,11 +352,12 @@ class HostConnectionPool(object):
             if self.is_shutdown:
                 raise ConnectionException("Pool is shutdown")
 
-            least_busy = min(self._connections, key=lambda c: c.in_flight)
-            with least_busy.lock:
-                if least_busy.in_flight < MAX_STREAM_PER_CONNECTION:
-                    least_busy.in_flight += 1
-                    return least_busy
+            if self._connections:
+                least_busy = min(self._connections, key=lambda c: c.in_flight)
+                with least_busy.lock:
+                    if least_busy.in_flight < MAX_STREAM_PER_CONNECTION:
+                        least_busy.in_flight += 1
+                        return least_busy
 
             remaining = timeout - (time.time() - start)
 
