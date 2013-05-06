@@ -215,10 +215,9 @@ class ResponseFuture(object):
             self._errback = (fn, args, kwargs)
         return self
 
-    def add_callbacks(
-            self, callback, errback,
-            callback_args=(), callback_kwargs=None,
-            errback_args=(), errback_kwargs=None):
+    def add_callbacks(self, callback, errback,
+                      callback_args=(), callback_kwargs=None,
+                      errback_args=(), errback_kwargs=None):
         self.add_callback(callback, *callback_args, **(callback_kwargs | {}))
         self.add_errback(errback, *errback_args, **(errback_kwargs | {}))
 

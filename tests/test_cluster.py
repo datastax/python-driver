@@ -346,3 +346,32 @@ class ResponseFutureTests(unittest.TestCase):
 
         # make sure the exception is recorded correctly
         self.assertEqual(rf._errors, {'ip1': exc})
+
+    def test_callback(self):
+        session = self.make_session()
+        rf = self.make_response_future(session)
+        rf.send_request()
+
+        rf.add_callback(self.assertEqual, [{'col': 'val'}])
+
+        response = Mock(spec=ResultMessage, kind=ResultMessage.KIND_ROWS, results=[{'col': 'val'}])
+        rf._set_result(response)
+
+        result = rf.deliver()
+        self.assertEqual(result, [{'col': 'val'}])
+
+    def test_errback(self):
+        session = self.make_session()
+        query = SimpleStatement("INSERT INFO foo (a, b) VALUES (1, 2)")
+        query.retry_policy = Mock()
+        query.retry_policy.on_unavailable.return_value = (RetryPolicy.RETHROW, None)
+        message = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
+
+        rf = ResponseFuture(session, message, query)
+        rf.send_request()
+
+        rf.add_errback(self.assertIsInstance, Exception)
+
+        result = Mock(spec=UnavailableErrorMessage, info={})
+        rf._set_result(result)
+        self.assertRaises(Exception, rf.deliver)
