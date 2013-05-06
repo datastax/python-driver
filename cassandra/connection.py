@@ -165,6 +165,7 @@ class Connection(object):
             self.read_watcher.start()
             self.write_watcher.start()
 
+        log.debug("Sending initial options message for new Connection to %s" % (host,))
         self.send_msg(OptionsMessage(), self._handle_options_response)
 
         # start the global event loop if needed

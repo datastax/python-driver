@@ -81,8 +81,6 @@ class ClusterTests(unittest.TestCase):
         self.assertTrue(host_reconnector._cancelled)
         self.assertIn(host, session._pools)
 
-        cluster.shutdown()
-
 
 class ResponseFutureTests(unittest.TestCase):
 

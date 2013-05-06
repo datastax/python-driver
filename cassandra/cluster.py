@@ -2,9 +2,9 @@ from futures import ThreadPoolExecutor
 import logging
 import time
 from threading import Lock, RLock, Thread, Event
-import traceback
 import Queue
 import weakref
+from functools import partial
 
 from cassandra.connection import Connection, ConnectionException
 from cassandra.decoder import (ConsistencyLevel, QueryMessage, ResultMessage,
@@ -356,6 +356,7 @@ class _Scheduler(object):
         t.start()
 
     def shutdown(self):
+        log.debug("Shutting down Cluster Scheduler")
         self.is_shutdown = True
 
     def schedule(self, delay, fn, *args, **kwargs):
@@ -374,6 +375,7 @@ class _Scheduler(object):
                 while True:
                     run_at, task = self._scheduled.get(block=True, timeout=None)
                     if self.is_shutdown:
+                        log.debug("Not executing scheduled task due to Scheduler shutdown")
                         return
                     if run_at <= time.time():
                         fn, args, kwargs = task
@@ -573,6 +575,15 @@ class Cluster(object):
 
         return Connection.factory(host, *args, **kwargs)
 
+    def _make_connection_factory(self, host, *args, **kwargs):
+        if self.auth_provider:
+            kwargs['credentials'] = self.auth_provider(host)
+
+        kwargs['compression'] = self.compression
+        kwargs['sockopts'] = self.sockopts
+
+        return partial(Connection.factory, host, *args, **kwargs)
+
     def connect(self, keyspace=None):
         with self._lock:
             if self._is_shutdown:
@@ -583,8 +594,8 @@ class Cluster(object):
                 try:
                     self.control_connection.connect()
                 except:
-                    log.error("Control connection failed to connect, shutting down Cluster: %s"
-                              % traceback.format_exc())
+                    log.exception("Control connection failed to connect, "
+                                  "shutting down Cluster:")
                     self.shutdown()
                     raise
 
@@ -644,8 +655,14 @@ class Cluster(object):
             session.on_down(host)
 
         schedule = self.reconnection_policy.new_schedule()
+
+        # in order to not hold references to this Cluster open and prevent
+        # proper shutdown when the program ends, we'll just make a closure
+        # of the current Cluster attributes to create new Connections with
+        conn_factory = self._make_connection_factory(host)
+
         reconnector = _HostReconnectionHandler(
-            host, self.connection_factory, self.scheduler, schedule,
+            host, conn_factory, self.scheduler, schedule,
             host.get_and_set_reconnection_handler, new_handler=None)
 
         old_reconnector = host.get_and_set_reconnection_handler(reconnector)
@@ -735,7 +752,7 @@ class ControlConnection(object):
         self._cluster = weakref.proxy(cluster)
         self._balancing_policy = RoundRobinPolicy()
         self._balancing_policy.populate(cluster, cluster.metadata.all_hosts())
-        self._reconnection_policy = ExponentialReconnectionPolicy(2 * 1000, 5 * 60 * 1000)
+        self._reconnection_policy = ExponentialReconnectionPolicy(2, 300)
         self._connection = None
 
         self._lock = RLock()
