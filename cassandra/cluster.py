@@ -170,7 +170,9 @@ class ResponseFuture(object):
             fn(response, *args, **kwargs)
 
     def _retry(self, reuse_connection, consistency_level):
-        self.message.consistency_level = consistency_level
+        if consistency_level is not None:
+            self.message.consistency_level = consistency_level
+
         # don't retry on the event loop thread
         self.session.submit(self._retry_task, reuse_connection)
 
