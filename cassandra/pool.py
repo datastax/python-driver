@@ -21,7 +21,7 @@ class AuthenticationException(Exception):
     pass
 
 
-class TimeoutException(Exception):
+class NoConnectionsAvailable(Exception):
     pass
 
 
@@ -238,9 +238,8 @@ class HostConnectionPool(object):
         self._scheduled_for_creation = 0
 
     def borrow_connection(self, timeout):
-        with self._lock:
-            if self._is_shutdown:
-                raise ConnectionException("Pool is shutdown", self.host)
+        if self._is_shutdown:
+            raise ConnectionException("Pool is shutdown", self.host)
 
         if not self._connections:
             core_conns = self._session.cluster.get_core_connections_per_host(self.host_distance)
@@ -344,7 +343,7 @@ class HostConnectionPool(object):
 
             remaining = timeout - (time.time() - start)
             if remaining <= 0:
-                raise TimeoutException()
+                raise NoConnectionsAvailable()
 
     def return_connection(self, conn):
         with conn._lock:
