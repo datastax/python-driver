@@ -278,6 +278,37 @@ class ResponseFutureTests(unittest.TestCase):
         # the consistency level should be the same
         self.assertEqual(ConsistencyLevel.QUORUM, rf.message.consistency_level)
 
+    def test_all_retries_fail(self):
+        session = self.make_session()
+        query = SimpleStatement("INSERT INFO foo (a, b) VALUES (1, 2)")
+        query.retry_policy = Mock()
+        query.retry_policy.on_unavailable.return_value = (RetryPolicy.RETRY, ConsistencyLevel.ONE)
+        message = QueryMessage(query=query, consistency_level=ConsistencyLevel.QUORUM)
+
+        # rf = self.make_response_future(session)
+        rf = ResponseFuture(session, message, query)
+        rf.send_request()
+        rf.session._pools.get.assert_called_once_with('ip1')
+
+        result = Mock(spec=OverloadedErrorMessage, info={})
+        rf._set_result(result)
+
+        # simulate the executor running this
+        session.submit.assert_called_once_with(rf._retry_task, False)
+        rf._retry_task(False)
+
+        # it should try with a different host
+        rf.session._pools.get.assert_called_with('ip2')
+
+        result = Mock(spec=OverloadedErrorMessage, info={})
+        rf._set_result(result)
+
+        # simulate the executor running this
+        session.submit.assert_called_with(rf._retry_task, False)
+        rf._retry_task(False)
+
+        self.assertRaises(NoHostAvailable, rf.deliver)
+
     def test_all_pools_shutdown(self):
         session = Mock(spec=Session)
         session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
