@@ -245,12 +245,9 @@ class ResponseFutureTests(unittest.TestCase):
     def test_retry_with_different_host(self):
         session = self.make_session()
         pool = session._pools.get.return_value
-        query = SimpleStatement("INSERT INFO foo (a, b) VALUES (1, 2)")
-        query.retry_policy = Mock()
-        query.retry_policy.on_unavailable.return_value = (RetryPolicy.RETRY, ConsistencyLevel.ONE)
-        message = QueryMessage(query=query, consistency_level=ConsistencyLevel.QUORUM)
 
-        rf = ResponseFuture(session, message, query)
+        rf = self.make_response_future(session)
+        rf.message.consistency_level = ConsistencyLevel.QUORUM
         rf.send_request()
 
         rf.session._pools.get.assert_called_once_with('ip1')
@@ -280,13 +277,8 @@ class ResponseFutureTests(unittest.TestCase):
 
     def test_all_retries_fail(self):
         session = self.make_session()
-        query = SimpleStatement("INSERT INFO foo (a, b) VALUES (1, 2)")
-        query.retry_policy = Mock()
-        query.retry_policy.on_unavailable.return_value = (RetryPolicy.RETRY, ConsistencyLevel.ONE)
-        message = QueryMessage(query=query, consistency_level=ConsistencyLevel.QUORUM)
 
-        # rf = self.make_response_future(session)
-        rf = ResponseFuture(session, message, query)
+        rf = self.make_response_future(session)
         rf.send_request()
         rf.session._pools.get.assert_called_once_with('ip1')
 

@@ -58,6 +58,10 @@ class ResponseFuture(object):
         self._query_retries = 0
         self._callback = self._errback = None
 
+    def __del__(self):
+        if hasattr(self, 'session'):
+            del self.session
+
     def send_request(self):
         # query_plan is an iterator, so this will resume where we last left
         # off if send_request() is called multiple times
