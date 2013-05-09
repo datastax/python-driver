@@ -210,6 +210,26 @@ class TestMapColumn(BaseCassEngTestCase):
         m2 =  TestMapModel.get(partition=m1.partition)
         assert m2.text_map == final
 
+    def test_updates_from_none(self):
+        """ Tests that updates from None work as expected """
+        m = TestMapModel.create(int_map=None)
+        expected = {1:uuid4()}
+        m.int_map = expected
+        m.save()
+
+        m2 = TestMapModel.get(partition=m.partition)
+        assert m2.int_map == expected
+
+
+    def test_updates_to_none(self):
+        """ Tests that setting the field to None works as expected """
+        m = TestMapModel.create(int_map={1:uuid4()})
+        m.int_map = None
+        m.save()
+
+        m2 = TestMapModel.get(partition=m.partition)
+        assert m2.int_map is None
+
 #    def test_partial_update_creation(self):
 #        """
 #        Tests that proper update statements are created for a partial list update
