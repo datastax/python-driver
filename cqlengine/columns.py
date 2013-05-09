@@ -214,8 +214,12 @@ class DateTime(Column):
         value = super(DateTime, self).to_database(value)
         if not isinstance(value, datetime):
             raise ValidationError("'{}' is not a datetime object".format(value))
-        epoch = datetime(1970, 1, 1)
-        return long((value - epoch).total_seconds() * 1000)
+        epoch = datetime(1970, 1, 1, tzinfo=value.tzinfo)
+        offset = 0
+        if epoch.tzinfo:
+            offset_delta = epoch.tzinfo.utcoffset(epoch)
+            offset = offset_delta.days*24*3600 + offset_delta.seconds
+        return long(((value  - epoch).total_seconds() - offset) * 1000)
 
 
 class Date(Column):
