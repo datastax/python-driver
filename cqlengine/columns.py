@@ -627,8 +627,8 @@ class Map(BaseContainerColumn):
         if isinstance(val, self.Quoter): val = val.value
         if isinstance(prev, self.Quoter): prev = prev.value
 
-        old_keys = set(prev.keys())
-        new_keys = set(val.keys())
+        old_keys = set(prev.keys()) if prev else set()
+        new_keys = set(val.keys()) if val else set()
         del_keys = old_keys - new_keys
 
         del_statements = []
