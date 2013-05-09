@@ -600,6 +600,8 @@ class Map(BaseContainerColumn):
         prev = self.to_database(prev)
         if isinstance(val, self.Quoter): val = val.value
         if isinstance(prev, self.Quoter): prev = prev.value
+        val = val or {}
+        prev = prev or {}
 
         #get the updated map
         update = {k:v for k,v in val.items() if v != prev.get(k)}
