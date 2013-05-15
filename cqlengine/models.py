@@ -261,3 +261,15 @@ class Model(BaseModel):
     __metaclass__ = ModelMetaClass
 
 
+class CounterBaseModel(BaseModel):
+    def _can_update(self):
+        # INSERT is not allowed for counter column families
+        return True
+
+
+class CounterModel(CounterBaseModel):
+    """
+    the db name for the column family can be set as the attribute db_name, or
+    it will be genertaed from the class name
+    """
+    __metaclass__ = ModelMetaClass

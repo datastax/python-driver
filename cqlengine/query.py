@@ -4,7 +4,7 @@ from datetime import datetime
 from hashlib import md5
 from time import time
 from uuid import uuid1
-from cqlengine import BaseContainerColumn, BaseValueManager, Map
+from cqlengine import BaseContainerColumn, BaseValueManager, Map, Counter
 
 from cqlengine.connection import connection_manager
 from cqlengine.exceptions import CQLEngineException
@@ -676,7 +676,18 @@ class DMLQuery(object):
                 if not col.is_primary_key:
                     val = values.get(name)
                     if val is None: continue
-                    if isinstance(col, BaseContainerColumn):
+                    if isinstance(col, Counter):
+                        field_ids.pop(name)
+                        value = field_values.pop(name)
+                        if value == 0:
+                            # Don't increment  that column
+                            continue
+                        elif value < 0:
+                            sign = '-'
+                        else:
+                            sign = '+'
+                        set_statements += ['{0} = {0} {1} {2}'.format(col.db_field_name, sign, abs(value))]
+                    elif isinstance(col, BaseContainerColumn):
                         #remove value from query values, the column will handle it
                         query_values.pop(field_ids.get(name), None)
 

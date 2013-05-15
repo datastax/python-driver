@@ -310,11 +310,13 @@ class Float(Column):
 class Decimal(Column):
     db_type = 'decimal'
 
-class Counter(Column):
-    #TODO: counter field
+class Counter(Integer):
+    """ Validates like an integer, goes into the database as a counter
+    """
+    db_type = 'counter'
+
     def __init__(self, **kwargs):
         super(Counter, self).__init__(**kwargs)
-        raise NotImplementedError
 
 class ContainerQuoter(object):
     """
