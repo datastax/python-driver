@@ -606,6 +606,8 @@ class Map(BaseContainerColumn):
         prev = self.to_database(prev)
         if isinstance(val, self.Quoter): val = val.value
         if isinstance(prev, self.Quoter): prev = prev.value
+        val = val or {}
+        prev = prev or {}
 
         #get the updated map
         update = {k:v for k,v in val.items() if v != prev.get(k)}
@@ -633,8 +635,8 @@ class Map(BaseContainerColumn):
         if isinstance(val, self.Quoter): val = val.value
         if isinstance(prev, self.Quoter): prev = prev.value
 
-        old_keys = set(prev.keys())
-        new_keys = set(val.keys())
+        old_keys = set(prev.keys()) if prev else set()
+        new_keys = set(val.keys()) if val else set()
         del_keys = old_keys - new_keys
 
         del_statements = []

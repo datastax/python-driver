@@ -1,4 +1,3 @@
-from unittest import skip
 from uuid import uuid4
 import random
 from cqlengine.tests.base import BaseCassEngTestCase
@@ -11,6 +10,7 @@ from cqlengine import columns
 class TestModel(Model):
     count   = columns.Integer()
     text    = columns.Text(required=False)
+    a_bool  = columns.Boolean(default=False)
 
 class TestModelIO(BaseCassEngTestCase):
 
@@ -41,10 +41,12 @@ class TestModelIO(BaseCassEngTestCase):
         tm = TestModel.objects.create(count=8, text='123456789')
 
         tm.count = 100
+        tm.a_bool = True
         tm.save()
 
         tm2 = TestModel.objects(id=tm.pk).first()
         self.assertEquals(tm.count, tm2.count)
+        self.assertEquals(tm.a_bool, tm2.a_bool)
 
     def test_model_deleting_works_properly(self):
         """

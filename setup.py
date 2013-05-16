@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 #python setup.py register
 #python setup.py sdist upload
 
-version = '0.1.2'
+version = '0.2'
 
 long_desc = """
 cqlengine is a Cassandra CQL ORM for Python in the style of the Django orm and mongoengine
@@ -16,8 +16,6 @@ cqlengine is a Cassandra CQL ORM for Python in the style of the Django orm and m
 [Users Mailing List](https://groups.google.com/forum/?fromgroups#!forum/cqlengine-users)
 
 [Dev Mailing List](https://groups.google.com/forum/?fromgroups#!forum/cqlengine-dev)
-
-**NOTE: cqlengine is in alpha and under development, some features may change. Make sure to check the changelog and test your app before upgrading**
 """
 
 setup(

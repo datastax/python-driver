@@ -1,6 +1,10 @@
 CHANGELOG
 
-0.1.2 (in progress)
+0.2.1 (in progress)
+* adding support for datetimes with tzinfo (thanks @gdoermann)
+* fixing bug in saving map updates (thanks @pandu-rao)
+
+0.2
 * expanding internal save function to use update where appropriate
 * adding set, list, and map collection types
 * adding support for allow filtering flag
