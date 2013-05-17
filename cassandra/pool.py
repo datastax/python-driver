@@ -391,7 +391,7 @@ class HostConnectionPool(object):
             in_flight = connection.in_flight
 
         if connection.is_defunct:
-            is_down = self.host.monitor.signal_connection_failure(connection.last_exception)
+            is_down = self.host.monitor.signal_connection_failure(connection.last_error)
             if is_down:
                 self.shutdown()
             else:
@@ -473,5 +473,5 @@ class HostConnectionPool(object):
         with self._lock:
             to_create = core_conns - (len(self._connections) + self._scheduled_for_creation)
             for i in range(to_create):
-                    self._scheduled_for_creation += 1
-                    self._session.submit(self._create_new_connection)
+                self._scheduled_for_creation += 1
+                self._session.submit(self._create_new_connection)

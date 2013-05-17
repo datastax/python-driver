@@ -4,7 +4,7 @@ import unittest
 
 from cassandra.cluster import Session
 from cassandra.connection import Connection, MAX_STREAM_PER_CONNECTION
-from cassandra.pool import Host, HostConnectionPool, NoConnectionsAvailable
+from cassandra.pool import Host, HostConnectionPool, NoConnectionsAvailable, HealthMonitor
 from cassandra.policies import HostDistance
 
 class HostConnectionPoolTests(unittest.TestCase):
@@ -140,3 +140,43 @@ class HostConnectionPoolTests(unittest.TestCase):
         # creation being scheduled
         self.assertRaises(NoConnectionsAvailable, pool.borrow_connection, 0)
         session.submit.assert_called_once_with(pool._create_new_connection)
+
+    def test_return_defunct_connection(self):
+        host = Mock(spec=Host, address='ip1')
+        session = self.make_session()
+        conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=False)
+        session.cluster.connection_factory.return_value = conn
+
+        pool = HostConnectionPool(host, HostDistance.LOCAL, session)
+        session.cluster.connection_factory.assert_called_once_with(host.address)
+
+        pool.borrow_connection(timeout=0.01)
+        conn.is_defunct = True
+        host.monitor.signal_connection_failure.return_value = False
+        pool.return_connection(conn)
+
+        # the connection should be closed a new creation scheduled
+        conn.close.assert_called_once()
+        session.submit.assert_called_once()
+        self.assertFalse(pool.is_shutdown)
+
+    def test_return_defunct_connection_on_down_host(self):
+        host = Mock(spec=Host, address='ip1')
+        host.monitor = Mock(spec=HealthMonitor)
+        session = self.make_session()
+        conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=False)
+        session.cluster.connection_factory.return_value = conn
+
+        pool = HostConnectionPool(host, HostDistance.LOCAL, session)
+        session.cluster.connection_factory.assert_called_once_with(host.address)
+
+        pool.borrow_connection(timeout=0.01)
+        conn.is_defunct = True
+        host.monitor.signal_connection_failure.return_value = True
+        pool.return_connection(conn)
+
+        # the connection should be closed a new creation scheduled
+        host.monitor.signal_connection_failure.assert_called_once()
+        conn.close.assert_called_once()
+        self.assertFalse(session.submit.called)
+        self.assertTrue(pool.is_shutdown)

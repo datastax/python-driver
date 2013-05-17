@@ -116,7 +116,7 @@ class Connection(object):
     compressor = None
     decompressor = None
 
-    connect_error = None
+    last_error = None
     in_flight = 0
     is_defunct = False
     is_closed = False
@@ -132,8 +132,8 @@ class Connection(object):
     def factory(cls, *args, **kwargs):
         conn = cls(*args, **kwargs)
         conn.connected_event.wait()
-        if conn.connect_error:
-            raise conn.connect_error
+        if conn.last_error:
+            raise conn.last_error
         else:
             return conn
 
@@ -368,7 +368,7 @@ class Connection(object):
             log.debug("Got AuthenticateMessage on new Connection from %s" % self.host)
 
             if self.credentials is None:
-                self.connect_error = ProgrammingError(
+                self.last_error = ProgrammingError(
                     'Remote end requires authentication.')
                 self.connected_event.set()
                 return
@@ -378,13 +378,13 @@ class Connection(object):
             self.send_msg(cm, cb=self._handle_startup_response)
         elif isinstance(startup_response, ErrorMessage):
             log.debug("Received ErrorMessage on new Connection from %s" % self.host)
-            self.connect_error = ProgrammingError(
+            self.last_error = ProgrammingError(
                 "Server did not accept credentials. %s"
                 % startup_response.summary_msg())
             self.connected_event.set()
         else:
             log.error("Unexpected response during Connection setup")
-            self.connect_error = InternalError(
+            self.last_error = InternalError(
                 "Unexpected response %r during connection setup"
                 % (startup_response,))
             self.connected_event.set()
