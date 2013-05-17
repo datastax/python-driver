@@ -3,8 +3,9 @@ import re
 
 from cqlengine import columns
 from cqlengine.exceptions import ModelException
-from cqlengine.functions import BaseQueryFunction
+from cqlengine.functions import BaseQueryFunction, NotSet
 from cqlengine.query import QuerySet, QueryException, DMLQuery
+
 
 class ModelDefinitionException(ModelException): pass
 
@@ -38,12 +39,20 @@ class BaseModel(object):
     #however, you can also define them manually here
     table_name = None
 
+    #DEFAULT_TTL must be an integer seconds for the default time to live on any insert on the table
+    #this can be overridden on any given query, but you can set a default on the model
+    DEFAULT_TTL = None
+
     #the keyspace for this model 
     keyspace = None
     read_repair_chance = 0.1
 
-    def __init__(self, **values):
+    def __init__(self,  ttl=NotSet, **values):
         self._values = {}
+        if ttl == NotSet:
+            self.ttl = self.DEFAULT_TTL
+        else:
+            self.ttl = ttl
         for name, column in self._columns.items():
             value =  values.get(name, None)
             if value is not None: value = column.to_python(value)
@@ -136,10 +145,12 @@ class BaseModel(object):
     def get(cls, **kwargs):
         return cls.objects.get(**kwargs)
 
-    def save(self):
+    def save(self, ttl=NotSet, timestamp=None):
+        if ttl == NotSet:
+            ttl = self.ttl
         is_new = self.pk is None
         self.validate()
-        DMLQuery(self.__class__, self, batch=self._batch).save()
+        DMLQuery(self.__class__, self, batch=self._batch).save(ttl, timestamp)
 
         #reset the value managers
         for v in self._values.values():

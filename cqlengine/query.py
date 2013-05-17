@@ -8,7 +8,7 @@ from cqlengine import BaseContainerColumn, BaseValueManager, Map, Counter
 
 from cqlengine.connection import connection_manager
 from cqlengine.exceptions import CQLEngineException
-from cqlengine.functions import BaseQueryFunction
+from cqlengine.functions import BaseQueryFunction, format_timestamp
 
 #CQL 3 reference:
 #http://www.datastax.com/docs/1.1/references/cql/index
@@ -175,8 +175,7 @@ class BatchQuery(object):
 
         opener = 'BEGIN ' + (self.batch_type + ' ' if self.batch_type else '') + ' BATCH'
         if self.timestamp:
-            epoch = datetime(1970, 1, 1)
-            ts = long((self.timestamp - epoch).total_seconds() * 1000)
+            ts = format_timestamp(self.timestamp)
             opener += ' USING TIMESTAMP {}'.format(ts)
 
         query_list = [opener]
@@ -638,7 +637,7 @@ class DMLQuery(object):
         self.batch = batch_obj
         return self
 
-    def save(self):
+    def save(self, ttl=None, timestamp=None):
         """
         Creates / updates a row.
         This is a blind insert call.
@@ -666,8 +665,25 @@ class DMLQuery(object):
         query_values = {field_ids[n]:field_values[n] for n in field_names}
 
         qs = []
+
+        using = []
+        if ttl is not None:
+            ttl = int(ttl)
+            using.append('TTL {} '.format(ttl))
+        if timestamp:
+            ts = format_timestamp(timestamp)
+            using.append('TIMESTAMP {} '.format(ts))
+
+        usings = ''
+        if using:
+            using = 'AND '.join(using).strip()
+            usings = ' USING {}'.format(using)
+
+
         if self.instance._can_update():
             qs += ["UPDATE {}".format(self.column_family_name)]
+            if usings:
+                qs += [usings]
             qs += ["SET"]
 
             set_statements = []
@@ -714,6 +730,8 @@ class DMLQuery(object):
             qs += ["({})".format(', '.join(['"{}"'.format(f) for f in field_names]))]
             qs += ['VALUES']
             qs += ["({})".format(', '.join([':'+field_ids[f] for f in field_names]))]
+            if usings:
+                qs += [usings]
 
         qs = ' '.join(qs)
 

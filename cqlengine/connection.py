@@ -156,13 +156,15 @@ class connection_manager(object):
     def __exit__(self, type, value, traceback):
         self.close()
 
-    def execute(self, query, params={}):
+    def execute(self, query, params=None):
         """
         Gets a connection from the pool and executes the given query, returns the cursor
 
         if there's a connection problem, this will silently create a new connection pool
         from the available hosts, and remove the problematic host from the host list
         """
+        if params is None:
+            params = {}
         global _host_idx
 
         for i in range(len(_hosts)):

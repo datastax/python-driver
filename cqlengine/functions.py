@@ -57,3 +57,18 @@ class MaxTimeUUID(BaseQueryFunction):
         epoch = datetime(1970, 1, 1)
         return long((self.value - epoch).total_seconds() * 1000)
 
+
+class NotSet(object):
+    """
+    Different from None, so you know when it just wasn't set compared to passing in None
+    """
+    pass
+
+
+def format_timestamp(timestamp):
+    if isinstance(timestamp, datetime):
+        epoch = datetime(1970, 1, 1)
+        ts = long((timestamp - epoch).total_seconds() * 1000)
+    else :
+        ts = long(timestamp)
+    return ts
