@@ -1,8 +1,3 @@
-# TODO:
-# - review locking, race conditions, deadlock
-# - get values from proper config
-# - proper threadpool submissions
-
 import logging
 import time
 from threading import Lock, RLock, Condition
@@ -253,7 +248,11 @@ class HostConnectionPool(object):
             # handled specially just for simpler code
             core_conns = self._session.cluster.get_core_connections_per_host(self.host_distance)
             with self._lock:
-                for i in range(core_conns):
+                # we check the length of self._connections again
+                # along with self._scheduled_for_creation while holding the lock
+                # in case multiple threads hit this condition at the same time
+                to_create = core_conns - (len(self._connections) + self._scheduled_for_creation)
+                for i in range(to_create):
                     self._scheduled_for_creation += 1
                     self._session.submit(self._create_new_connection)
 
@@ -262,23 +261,39 @@ class HostConnectionPool(object):
             conn.set_keyspace(self._session.keyspace)
             return conn
         else:
-            least_busy = min(self._connections, key=lambda c: c.in_flight)
+            # note: it would be nice to push changes to these config settings
+            # to pools instead of doing a new lookup on every
+            # borrow_connection() call
             max_reqs = self._session.cluster.get_max_requests_per_connection(self.host_distance)
             max_conns = self._session.cluster.get_max_connections_per_host(self.host_distance)
 
-            # if we have too many requests on this connection but we still
-            # have space to open a new connection against this host, go ahead
-            # and schedule the creation of a new connection
-            if least_busy.in_flight >= max_reqs and len(self._connections) < max_conns:
-                self._maybe_spawn_new_connection()
+            least_busy = None
+            try:
+                # conns could be removed from self._connections could change while
+                # this is finding a min, so hold the lock
+                with self._lock:
+                    least_busy = min(self._connections, key=lambda c: c.in_flight)
+                    # to avoid another thread closing this connection while
+                    # trashing it (through the return_connection process), hold
+                    # the connection lock from this point until we've incremented
+                    # its in_flight count
+                    least_busy.lock.acquire()
 
-            need_to_wait = False
-            with least_busy.lock:
+                # if we have too many requests on this connection but we still
+                # have space to open a new connection against this host, go ahead
+                # and schedule the creation of a new connection
+                if least_busy.in_flight >= max_reqs and len(self._connections) < max_conns:
+                    self._maybe_spawn_new_connection()
+
                 if least_busy.in_flight >= MAX_STREAM_PER_CONNECTION:
                     # once we release the lock, wait for another connection
                     need_to_wait = True
                 else:
+                    need_to_wait = False
                     least_busy.in_flight += 1
+            finally:
+                if least_busy:
+                    least_busy.lock.release()
 
             if need_to_wait:
                 # wait_for_conn will increment in_flight on the conn
@@ -317,6 +332,7 @@ class HostConnectionPool(object):
             with self._lock:
                 self._connections.append(conn)
             self._signal_available_conn()
+            return True
         except ConnectionException, exc:
             with self._lock:
                 self.open_count -= 1
@@ -354,11 +370,16 @@ class HostConnectionPool(object):
                 raise ConnectionException("Pool is shutdown")
 
             if self._connections:
-                least_busy = min(self._connections, key=lambda c: c.in_flight)
-                with least_busy.lock:
-                    if least_busy.in_flight < MAX_STREAM_PER_CONNECTION:
-                        least_busy.in_flight += 1
-                        return least_busy
+                with self._lock:
+                    try:
+                        least_busy = min(self._connections, key=lambda c: c.in_flight)
+                    except ValueError:
+                        pass  # self._connections may have become empty
+                    else:
+                        with least_busy.lock:
+                            if least_busy.in_flight < MAX_STREAM_PER_CONNECTION:
+                                least_busy.in_flight += 1
+                                return least_busy
 
             remaining = timeout - (time.time() - start)
 
@@ -374,52 +395,59 @@ class HostConnectionPool(object):
             if is_down:
                 self.shutdown()
             else:
-                self.replace(connection)
+                self._replace(connection)
         else:
-            with self._lock:
-                # TODO another thread may have already taken this connection,
-                # think about race condition here
-                if connection in self._trash and in_flight == 0:
-                    self._trash.remove(connection)
-                    connection.close()
-                    return
+            if connection in self._trash:
+                with connection.lock:
+                    if in_flight == 0:
+                        with self._lock:
+                            self._trash.remove(connection)
+                        connection.close()
+                return
 
             core_conns = self._session.cluster.get_core_connections_per_host(self.host_distance)
             min_reqs = self._session.cluster.get_min_requests_per_connection(self.host_distance)
+            # we can use in_flight here without holding the connection lock
+            # because the fact that in_flight dipped below the min at some
+            # point is enough to start the trashing procedure
             if len(self._connections) > core_conns and in_flight <= min_reqs:
-                self._trash_connection(connection)
+                self._maybe_trash_connection(connection)
             else:
                 self._signal_available_conn()
 
-    def _trash_connection(self, connection):
+    def _maybe_trash_connection(self, connection):
         core_conns = self._session.cluster.get_core_connections_per_host(self.host_distance)
         with self._lock:
-            if self.open_count <= core_conns:
-                return False
+            if self.open_count > core_conns:
+                self.open_count -= 1
+                self._connections.remove(connection)
 
-            self.open_count -= 1
+                with connection.lock:
+                    if connection.in_flight == 0:
+                        connection.close()
 
-            self._connections.remove(connection)
-            with connection.lock:
-                if connection.in_flight == 0:
-                    connection.close()
-                else:
-                    self._trash.add(connection)
+                    # skip adding it to the trash if we're already closing it
+                    return
 
-            return True
+                self._trash.add(connection)
 
     def _replace(self, connection):
+        should_replace = False
         with self._lock:
-            self._connections.remove(connection)
+            if connection in self._connections:
+                self._connections.remove(connection)
+                self.open_count -= 1
+                should_replace = True
 
-        def close_and_replace():
+        if should_replace:
+            def close_and_replace():
+                connection.close()
+                self._add_conn_if_under_max()
+
+            self._session.submit(close_and_replace)
+        else:
+            # just close it
             connection.close()
-            self._add_conn_if_under_max()
-
-        self._session.submit(close_and_replace)
-
-    def _close(self, connection):
-        self._session.submit(connection.close)
 
     def shutdown(self):
         with self._lock:
@@ -442,7 +470,8 @@ class HostConnectionPool(object):
             return
 
         core_conns = self._session.cluster.get_core_connections_per_host(self.host_distance)
-        for i in range(core_conns - self.open_count):
-            with self._lock:
-                self._scheduled_for_creation += 1
-                self._session.submit(self._create_new_connection)
+        with self._lock:
+            to_create = core_conns - (len(self._connections) + self._scheduled_for_creation)
+            for i in range(to_create):
+                    self._scheduled_for_creation += 1
+                    self._session.submit(self._create_new_connection)

@@ -124,6 +124,9 @@ class Connection(object):
 
     _buf = ""
     _total_reqd_bytes = 0
+    _read_watcher = None
+    _write_watcher = None
+    _socket = None
 
     @classmethod
     def factory(cls, *args, **kwargs):
@@ -179,8 +182,10 @@ class Connection(object):
                 return
             self.is_closed = True
 
-        self._read_watcher.stop()
-        self._write_watcher.stop()
+        if self._read_watcher:
+            self._read_watcher.stop()
+        if self._write_watcher:
+            self._write_watcher.stop()
         self._socket.close()
         with _loop_lock:
             _loop_notifier.send()

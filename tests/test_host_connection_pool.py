@@ -87,7 +87,7 @@ class HostConnectionPoolTests(unittest.TestCase):
         # trash the only connection
         pool = HostConnectionPool(host, HostDistance.LOCAL, session)
         session.cluster.get_core_connections_per_host.return_value = 0
-        pool._trash_connection(conn)
+        pool._maybe_trash_connection(conn)
         session.cluster.get_core_connections_per_host.return_value = 1
 
         submit_called = Event()
