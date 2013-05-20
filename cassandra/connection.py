@@ -199,6 +199,7 @@ class Connection(object):
                 return
             self.is_closed = True
 
+        log.debug("Closing connection to %s" % (self.host,))
         if self._read_watcher:
             self._read_watcher.stop()
         if self._write_watcher:
@@ -352,6 +353,9 @@ class Connection(object):
         self._callbacks[request_id] = cb
         self.push(msg.to_string(request_id, compression=self.compressor))
         return request_id
+
+    def wait_for_response(self, msg):
+        return self.wait_for_responses(msg)[0]
 
     def wait_for_responses(self, *msgs):
         waiter = ResponseWaiter(len(msgs))
