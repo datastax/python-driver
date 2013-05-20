@@ -16,7 +16,7 @@ import cassandra.types as types
 from cassandra.marshal import varint_unpack
 from cassandra.pool import Host
 
-keywords = set((
+_keywords = set((
     'select', 'from', 'where', 'and', 'key', 'insert', 'update', 'with',
     'limit', 'using', 'use', 'count', 'set',
     'begin', 'apply', 'batch', 'truncate', 'delete', 'in', 'create',
@@ -26,21 +26,33 @@ keywords = set((
     'token', 'writetime', 'map', 'list', 'to'
 ))
 
-unreserved_keywords = set((
+_unreserved_keywords = set((
     'key', 'clustering', 'ttl', 'compact', 'storage', 'type', 'values'
 ))
 
 
 class Metadata(object):
+    """
+    Holds a representation of the cluster schema and topology.
+    """
+
+    cluster_name = None
+    """ The string name of the cluster. """
+
+    keyspaces = None
+    """
+    A map from keyspace names to matching :cls:`~.KeyspaceMetadata` instances.
+    """
+
+    token_map = None
+    """ A :cls:`~.TokenMap` instance. """
 
     def __init__(self, cluster):
         # use a weak reference so that the Cluster object can be GC'ed.
         # Normally the cycle detector would handle this, but implementing
         # __del__ disables that.
         self.cluster_ref = weakref.ref(cluster)
-        self.cluster_name = None
         self.keyspaces = {}
-        self.token_map = None
         self._hosts = {}
         self._hosts_lock = RLock()
 
@@ -265,6 +277,30 @@ class Metadata(object):
 
 
 class KeyspaceMetadata(object):
+    """
+    A representation of the schema for a single keyspace.
+    """
+
+    name = None
+    """ The string name of the keyspace """
+
+    durable_writes = True
+    """
+    A boolean indicating whether durable writes are enabled for this keyspace
+    or not
+    """
+
+    replication = None
+    """
+    A dict holding the replication settings for this keyspace. Typically,
+    there will be a "class" entry with the name of the replication strategy
+    class.
+    """
+
+    tables = None
+    """
+    A map from table names to instances of :cls:`~.TableMetadata`.
+    """
 
     def __init__(self, name, durable_writes, strategy_class, strategy_options):
         self.name = name
@@ -286,6 +322,21 @@ class KeyspaceMetadata(object):
 
 
 class TableMetadata(object):
+    """
+    A representation of the schema for a single table.
+    """
+
+    keyspace = None
+    """ An instance of :cls:`~.KeyspaceMetadata` """
+
+    name = None
+    """ The string name of the table """
+
+    # TODO docstrings for these
+    partition_key = None
+    clustering_key = None
+    columns = None
+    options = None
 
     recognized_options = (
             "comment", "read_repair_chance",  # "local_read_repair_chance",
@@ -411,7 +462,7 @@ class TableMetadata(object):
     def is_valid_name(self, name):
         if name is None:
             return False
-        if name.lower() in keywords - unreserved_keywords:
+        if name.lower() in _keywords - _unreserved_keywords:
             return False
         return self.valid_cql3_word_re.match(name) is not None
 
