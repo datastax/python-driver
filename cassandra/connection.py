@@ -284,9 +284,9 @@ class Connection(object):
         response = decode_response(stream_id, flags, opcode, body, self.decompressor)
 
         try:
-            if callback is None:
+            if stream_id < 0:
                 self.handle_pushed(response)
-            else:
+            elif callback is not None:
                 callback(response)
         except:
             log.exception("Callback handler errored, ignoring:")
