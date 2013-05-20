@@ -346,7 +346,6 @@ class Session(object):
 
     def set_keyspace(self, keyspace):
         self.execute('USE "%s"' % (keyspace,))
-        self.keyspace = keyspace
 
     def submit(self, fn, *args, **kwargs):
         return self.cluster.executor.submit(fn, *args, **kwargs)
