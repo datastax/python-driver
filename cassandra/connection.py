@@ -2,11 +2,11 @@ import pyev
 import errno
 from collections import defaultdict, deque
 from functools import partial
-import itertools
 import logging
 import socket
 from threading import RLock, Event, Lock, Thread
 import traceback
+from Queue import Queue
 
 from cassandra import ConsistencyLevel
 from cassandra.marshal import (int8_unpack, int32_unpack)
@@ -47,6 +47,10 @@ class ConnectionException(Exception):
     def __init__(self, message, host=None):
         Exception.__init__(self, message)
         self.host = host
+
+
+class ConnectionBusy(ConnectionException):
+    pass
 
 
 class ProgrammingError(Exception):
@@ -146,10 +150,14 @@ class Connection(object):
 
         self.connected_event = Event()
 
-        self.make_request_id = itertools.cycle(xrange(127)).next
+        self._id_queue = Queue(MAX_STREAM_PER_CONNECTION)
+        for i in range(MAX_STREAM_PER_CONNECTION):
+            self._id_queue.put_nowait(i)
+
         self._callbacks = {}
         self._push_watchers = defaultdict(set)
         self.lock = RLock()
+        self.id_lock = Lock()
 
         self.deque = deque()
 
@@ -250,6 +258,11 @@ class Connection(object):
 
     def process_msg(self, msg, body_len):
         version, flags, stream_id, opcode = map(int8_unpack, msg[:4])
+        if stream_id < 0:
+            callback = None
+        else:
+            callback = self._callbacks.pop(stream_id)
+            self._id_queue.put_nowait(stream_id)
 
         # check that the protocol version is supported
         if version & PROTOCOL_VERSION_MASK != PROTOCOL_VERSION:
@@ -271,12 +284,12 @@ class Connection(object):
         response = decode_response(stream_id, flags, opcode, body, self.decompressor)
 
         try:
-            if stream_id < 0:
+            if callback is None:
                 self.handle_pushed(response)
             else:
-                self._callbacks.pop(stream_id)(response)
+                callback(response)
         except:
-            log.error("Callback handler errored, ignoring: %s" % traceback.format_exc())
+            log.exception("Callback handler errored, ignoring:")
 
     def handle_error(self):
         log.error(traceback.format_exc())
@@ -304,7 +317,12 @@ class Connection(object):
                     _loop_notifier.send()
 
     def send_msg(self, msg, cb):
-        request_id = self.make_request_id()
+        try:
+            request_id = self._id_queue.get_nowait()
+        except Queue.EMPTY:
+            raise ConnectionBusy(
+                "Connection to %s is at the max number of requests" % self.host)
+
         self._callbacks[request_id] = cb
         self.push(msg.to_string(request_id, compression=self.compressor))
         return request_id
