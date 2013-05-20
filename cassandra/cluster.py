@@ -888,7 +888,11 @@ class ControlConnection(object):
             self._connection.close()
 
     def refresh_schema(self, keyspace=None, table=None):
-        return self._refresh_schema(self._connection, keyspace, table)
+        try:
+            return self._refresh_schema(self._connection, keyspace, table)
+        except:
+            log.exception("[control connection] Error refreshing schema:")
+            self._signal_error()
 
     def _refresh_schema(self, connection, keyspace=None, table=None):
         self.wait_for_schema_agreement(connection)
@@ -916,7 +920,11 @@ class ControlConnection(object):
         self._cluster.metadata.rebuild_schema(keyspace, table, ks_result, cf_result, col_result)
 
     def refresh_node_list_and_token_map(self):
-        return self._refresh_node_list_and_token_map(self._connection)
+        try:
+            return self._refresh_node_list_and_token_map(self._connection)
+        except:
+            log.exception("[control connection] Error refreshing node list and token map:")
+            self._signal_error()
 
     def _refresh_node_list_and_token_map(self, connection):
         cl = ConsistencyLevel.ONE
@@ -1041,6 +1049,21 @@ class ControlConnection(object):
             elapsed = self._time.time() - start
 
         return False
+
+    def _signal_error(self):
+        # try just signaling the host monitor, as this will trigger a reconnect
+        # as part of marking the host down
+        if self._connection and self._connection.is_defunct:
+            host = self._cluster.metadata.get_host(self._connection.host)
+            # host may be None if it's already been removed, but that indicates
+            # that errors have already been reported, so we're fine
+            if host:
+                host.monitor.signal_connection_failure(self._connection.last_error)
+                return
+
+        # if the connection is not defunct or the host already left, reconnect
+        # manually
+        self.reconnect()
 
     @property
     def is_open(self):
