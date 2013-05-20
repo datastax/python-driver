@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections import namedtuple, OrderedDict
 import socket
 try:
     from cStringIO import StringIO
@@ -44,6 +45,23 @@ HEADER_DIRECTION_MASK = 0x80
 
 def warn(msg):
     print msg
+
+
+def tuple_factory(colnames, rows):
+    return rows
+
+
+def named_tuple_factory(colnames, rows):
+    Row = namedtuple('Row', colnames)
+    return [Row(*row) for row in rows]
+
+
+def dict_factory(colnames, rows):
+    return [dict(zip(colnames, row)) for row in rows]
+
+
+def ordered_dict_factory(colnames, rows):
+    return [OrderedDict(zip(colnames, row)) for row in rows]
 
 
 class PreparedResult:
@@ -393,8 +411,8 @@ class ResultMessage(_MessageType):
         rows = [cls.recv_row(f, len(colspecs)) for x in xrange(rowcount)]
         colnames = [c[2] for c in colspecs]
         coltypes = [c[3] for c in colspecs]
-        return [dict(zip(colnames, [ctype.from_binary(val) for ctype, val in zip(coltypes, row)]))
-                for row in rows]
+        return (colnames, [tuple(ctype.from_binary(val) for ctype, val in zip(coltypes, row))
+                           for row in rows])
 
     @classmethod
     def recv_results_prepared(cls, f):

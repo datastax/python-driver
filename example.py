@@ -15,7 +15,7 @@ def main():
     s = c.connect()
 
     rows = s.execute("SELECT keyspace_name FROM system.schema_keyspaces")
-    if KEYSPACE in [row.values()[0] for row in rows]:
+    if KEYSPACE in [row[0] for row in rows]:
         print "dropping existing keyspace..."
         s.execute("DROP KEYSPACE " + KEYSPACE)
 
@@ -55,7 +55,7 @@ def main():
         log.exeception()
 
     for row in rows:
-        print '\t'.join(row.values())
+        print '\t'.join(row)
 
     s.execute("DROP KEYSPACE " + KEYSPACE)
 

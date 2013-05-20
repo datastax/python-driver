@@ -63,10 +63,10 @@ class Metadata(object):
         cf_def_rows = defaultdict(list)
         col_def_rows = defaultdict(lambda: defaultdict(list))
 
-        for row in cf_results.results:
+        for row in cf_results:
             cf_def_rows[row["keyspace_name"]].append(row)
 
-        for row in col_results.results:
+        for row in col_results:
             ksname = row["keyspace_name"]
             cfname = row["columnfamily_name"]
             col_def_rows[ksname][cfname].append(row)
@@ -75,7 +75,7 @@ class Metadata(object):
         if not table:
             # ks_results is not None
             added_keyspaces = set()
-            for row in ks_results.results:
+            for row in ks_results:
                 keyspace_meta = self._build_keyspace_metadata(row)
                 for table_row in cf_def_rows.get(keyspace_meta.name, []):
                     table_meta = self._build_table_metadata(

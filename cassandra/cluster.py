@@ -13,7 +13,8 @@ from cassandra.decoder import (QueryMessage, ResultMessage,
                                WriteTimeoutErrorMessage,
                                UnavailableErrorMessage,
                                OverloadedErrorMessage,
-                               IsBootstrappingErrorMessage)
+                               IsBootstrappingErrorMessage, named_tuple_factory,
+                               dict_factory)
 from cassandra.metadata import Metadata
 from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
@@ -430,6 +431,19 @@ class Session(object):
     keyspace = None
     is_shutdown = False
 
+    row_factory = staticmethod(named_tuple_factory)
+    """
+    The format to return row results in.  By default, each
+    returned row will be a named tuple.  You can alternatively
+    use any of the following:
+
+      - :func:`cassandra.decoder.tuple_factory`
+      - :func:`cassandra.decoder.named_tuple_factory`
+      - :func:`cassandra.decoder.dict_factory`
+      - :func:`cassandra.decoder.ordered_dict_factory`
+
+    """
+
     _lock = None
     _pools = None
     _load_balancer = None
@@ -798,9 +812,14 @@ class ControlConnection(object):
 
         if ks_query:
             ks_result, cf_result, col_result = connection.wait_for_responses(ks_query, cf_query, col_query)
+            ks_result = dict_factory(*ks_result.results)
+            cf_result = dict_factory(*cf_result.results)
+            col_result = dict_factory(*col_result.results)
         else:
             ks_result = None
             cf_result, col_result = connection.wait_for_responses(cf_query, col_query)
+            cf_result = dict_factory(*cf_result.results)
+            col_result = dict_factory(*col_result.results)
 
         self._cluster.metadata.rebuild_schema(keyspace, table, ks_result, cf_result, col_result)
 
@@ -817,12 +836,14 @@ class ControlConnection(object):
         peers_query = QueryMessage(query=self._SELECT_PEERS, consistency_level=cl)
         local_query = QueryMessage(query=self._SELECT_LOCAL, consistency_level=cl)
         peers_result, local_result = connection.wait_for_responses(peers_query, local_query)
+        peers_result = dict_factory(*peers_result.results)
 
         partitioner = None
         token_map = {}
 
         if local_result.results:
-            local_row = local_result.results[0]
+            local_rows = dict_factory(*(local_result.results))
+            local_row = local_rows[0]
             cluster_name = local_row["cluster_name"]
             self._cluster.metadata.cluster_name = cluster_name
 
@@ -836,7 +857,7 @@ class ControlConnection(object):
                 token_map[host] = tokens
 
         found_hosts = set()
-        for row in peers_result.results:
+        for row in peers_result:
             addr = row.get("rpc_address")
 
             # TODO handle ipv6 equivalent
@@ -909,14 +930,15 @@ class ControlConnection(object):
             peers_query = QueryMessage(query=self._SELECT_SCHEMA_PEERS, consistency_level=cl)
             local_query = QueryMessage(query=self._SELECT_SCHEMA_LOCAL, consistency_level=cl)
             peers_result, local_result = connection.wait_for_responses(peers_query, local_query)
+            peers_result = dict_factory(*peers_result.results)
 
             versions = set()
             if local_result.results:
-                local_row = local_result.results[0]
+                local_row = dict_factory(*local_result.results)[0]
                 if local_row.get("schema_version"):
                     versions.add(local_row.get("schema_version"))
 
-            for row in peers_result.results:
+            for row in peers_result:
                 if not row.get("rpc_address") or not row.get("schema_version"):
                     continue
 
@@ -1074,6 +1096,7 @@ class ResponseFuture(object):
 
     def __init__(self, session, message, query):
         self.session = session
+        self.row_factory = session.row_factory
         self.message = message
         self.query = query
 
@@ -1149,7 +1172,10 @@ class ResponseFuture(object):
                     self.session.cluster.control_connection,
                     self)
             else:
-                self._set_final_result(getattr(response, 'results', None))
+                results = getattr(response, 'results', None)
+                if results:
+                    results = self.row_factory(*results)
+                self._set_final_result(results)
         elif isinstance(response, ErrorMessage):
             retry_policy = self.query.retry_policy
             if not retry_policy:
