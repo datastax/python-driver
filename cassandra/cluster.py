@@ -96,11 +96,14 @@ class ResponseFuture(object):
             return None
 
     def _set_result(self, response):
-        self._current_pool.return_connection(self._connection)
+        if self._current_pool:
+            self._current_pool.return_connection(self._connection)
 
         if isinstance(response, ResultMessage):
             if response.kind == ResultMessage.KIND_SET_KEYSPACE:
-                self.session.set_keyspace(response.results)
+                session = getattr(self, 'session', None)
+                if session:
+                    session.keyspace = response.results
                 self._set_final_result(None)
             elif response.kind == ResultMessage.KIND_SCHEMA_CHANGE:
                 # refresh the schema before responding, but do it in another
@@ -162,7 +165,8 @@ class ResponseFuture(object):
             self._set_final_exception(exc)
 
     def _set_final_result(self, response):
-        del self.session  # clear reference cycles
+        if hasattr(self, 'session'):
+            del self.session  # clear reference cycles
         self._final_result = response
         self._event.set()
         if self._callback:
@@ -170,7 +174,8 @@ class ResponseFuture(object):
             fn(response, *args, **kwargs)
 
     def _set_final_exception(self, response):
-        del self.session  # clear reference cycles
+        if hasattr(self, 'session'):
+            del self.session  # clear reference cycles
         self._final_exception = response
         self._event.set()
         if self._errback:
