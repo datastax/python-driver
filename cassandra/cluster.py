@@ -77,6 +77,7 @@ class ResponseFuture(object):
     def _query(self, host):
         pool = self.session._pools.get(host)
         if not pool or pool.is_shutdown:
+            self._errors[host] = ConnectionException("Pool is shutdown")
             return None
 
         connection = None
