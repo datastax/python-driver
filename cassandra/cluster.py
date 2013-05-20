@@ -68,7 +68,7 @@ class ResponseFuture(object):
         # off if send_request() is called multiple times
         for host in self.query_plan:
             req_id = self._query(host)
-            if req_id:
+            if req_id is not None:
                 self._req_id = req_id
                 return
 
