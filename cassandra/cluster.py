@@ -896,7 +896,8 @@ class ControlConnection(object):
 
     def refresh_schema(self, keyspace=None, table=None):
         try:
-            return self._refresh_schema(self._connection, keyspace, table)
+            if self._connection:
+                self._refresh_schema(self._connection, keyspace, table)
         except:
             log.exception("[control connection] Error refreshing schema:")
             self._signal_error()
@@ -928,7 +929,8 @@ class ControlConnection(object):
 
     def refresh_node_list_and_token_map(self):
         try:
-            return self._refresh_node_list_and_token_map(self._connection)
+            if self._connection:
+                self._refresh_node_list_and_token_map(self._connection)
         except:
             log.exception("[control connection] Error refreshing node list and token map:")
             self._signal_error()
