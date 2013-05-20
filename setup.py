@@ -7,4 +7,6 @@ setup(
     version='0.1',
     description='Python driver for Cassandra',
     packages=["cassandra"],
-    ext_modules=[murmur3])
+    ext_modules=[murmur3],
+    install_requires=['pyev', 'python-snappy'],
+    test_requires=['nose', 'mock'])
