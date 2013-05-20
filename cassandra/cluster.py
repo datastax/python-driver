@@ -151,6 +151,8 @@ class ResponseFuture(object):
                 self._set_final_exception(response)
             else:  # IGNORE
                 self._set_final_result(None)
+        elif isinstance(response, Exception):
+            self._set_final_exception(response)
         else:
             # we got some other kind of response message
             msg = "Got unexpected message: %r" % (response,)
