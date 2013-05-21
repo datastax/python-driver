@@ -48,38 +48,22 @@ class MockCluster(object):
     def remove_host(self, host):
         self.removed_hosts.append(host)
 
+
 class MockConnection(object):
+
+    is_defunct = False
 
     def __init__(self):
         self.host = "192.168.1.0"
         self.local_results = [
-            {
-                "schema_version": "a",
-                "cluster_name": "foocluster",
-                "data_center": "dc1",
-                "rack": "rack1",
-                "partitioner": "Murmur3Partitioner",
-                "tokens": ['0', '100', '200']
-            }
+            ["schema_version", "cluster_name", "data_center", "rack", "partitioner", "tokens"],
+            [["a", "foocluster", "dc1", "rack1", "Murmur3Partitioner", ["0", "100", "200"]]]
         ]
 
         self.peer_results = [
-            {
-                "rpc_address": "192.168.1.1",
-                "peer": "10.0.0.1",
-                "schema_version": "a",
-                "data_center": "dc1",
-                "rack": "rack1",
-                "tokens": ['1', '101', '201']
-            },
-            {
-                "rpc_address": "192.168.1.2",
-                "peer": "10.0.0.2",
-                "schema_version": "a",
-                "data_center": "dc1",
-                "rack": "rack1",
-                "tokens": ['2', '102', '202']
-            }
+            ["rpc_address", "peer", "schema_version", "data_center", "rack", "tokens"],
+            [["192.168.1.1", "10.0.0.1", "a", "dc1", "rack1", ["1", "101", "201"]],
+             ["192.168.1.2", "10.0.0.2", "a", "dc1", "rack1", ["2", "102", "202"]]]
         ]
 
     def wait_for_responses(self, peer_query, local_query):
@@ -125,7 +109,8 @@ class ControlConnectionTest(unittest.TestCase):
         """
         Make sure the control connection sleeps and retries
         """
-        self.connection.peer_results[1]["schema_version"] = 'b'
+        # change the schema version on one node
+        self.connection.peer_results[1][1][2] = 'b'
         self.assertFalse(self.control_connection.wait_for_schema_agreement())
         # the control connection should have slept until it hit the limit
         self.assertGreaterEqual(self.time.clock, Cluster.max_schema_agreement_wait)
@@ -134,16 +119,17 @@ class ControlConnectionTest(unittest.TestCase):
         """
         If rpc_address or schema_version isn't set, the host should be skipped
         """
-        self.connection.peer_results.append({
-            "rpc_address": "192.168.1.3",
-            "schema_version": None
-        })
-        self.connection.peer_results.append({
-            "rpc_address": None,
-            "schema_version": "b"
-        })
+        # an entry with no schema_version
+        self.connection.peer_results[1].append(
+            ["192.168.1.3", "10.0.0.3", None, "dc1", "rack1", ["3", "103", "203"]]
+        )
+        # an entry with a different schema_version and no rpc_address
+        self.connection.peer_results[1].append(
+            [None, None, "b", "dc1", "rack1", ["4", "104", "204"]]
+        )
 
-        self.connection.peer_results[0]['schema_version'] = 'c'
+        # change the schema version on one of the existing entries
+        self.connection.peer_results[1][1][3] = 'c'
         self.cluster.metadata.get_host('192.168.1.1').monitor.is_up = False
 
         self.assertTrue(self.control_connection.wait_for_schema_agreement())
@@ -153,11 +139,9 @@ class ControlConnectionTest(unittest.TestCase):
         """
         If the rpc_address is 0.0.0.0, the "peer" column should be used instead.
         """
-        self.connection.peer_results.append({
-            "rpc_address": "0.0.0.0",
-            "schema_version": "b",
-            "peer": PEER_IP
-        })
+        self.connection.peer_results[1].append(
+            ["0.0.0.0", PEER_IP, "b", "dc1", "rack1", ["3", "103", "203"]]
+        )
         host = Host("0.0.0.0", SimpleConvictionPolicy)
         self.cluster.metadata.hosts[PEER_IP] = host
         host.monitor.is_up = False
@@ -189,21 +173,20 @@ class ControlConnectionTest(unittest.TestCase):
             self.assertEqual(host.rack, "rack1")
 
     def test_refresh_nodes_and_tokens_no_partitioner(self):
-        self.connection.local_results[0]["partitioner"] = None
+        """
+        Test handling of an unknown partitioner.
+        """
+        # set the partitioner column to None
+        self.connection.local_results[1][0][4] = None
         self.control_connection.refresh_node_list_and_token_map()
         meta = self.cluster.metadata
         self.assertEqual(meta.partitioner, None)
         self.assertEqual(meta.token_map, {})
 
     def test_refresh_nodes_and_tokens_add_host(self):
-        self.connection.peer_results.append({
-            "rpc_address": "192.168.1.3",
-            "peer": "10.0.0.3",
-            "schema_version": "a",
-            "data_center": "dc1",
-            "rack": "rack1",
-            "tokens": ['3', '103', '203']
-        })
+        self.connection.peer_results[1].append(
+            ["192.168.1.3", "10.0.0.3", "a", "dc1", "rack1", ["3", "103", "203"]]
+        )
         self.control_connection.refresh_node_list_and_token_map()
         self.assertEqual(1, len(self.cluster.added_hosts))
         self.assertEqual(self.cluster.added_hosts[0].address, "192.168.1.3")
@@ -211,7 +194,7 @@ class ControlConnectionTest(unittest.TestCase):
         self.assertEqual(self.cluster.added_hosts[0].rack, "rack1")
 
     def test_refresh_nodes_and_tokens_remove_host(self):
-        del self.connection.peer_results[1]
+        del self.connection.peer_results[1][1]
         self.control_connection.refresh_node_list_and_token_map()
         self.assertEqual(1, len(self.cluster.removed_hosts))
         self.assertEqual(self.cluster.removed_hosts[0].address, "192.168.1.2")
