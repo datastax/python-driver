@@ -99,7 +99,7 @@ def _start_loop():
 
     if should_start:
         t = Thread(target=_run_loop, name="async_event_loop")
-        t.daemon = False
+        t.daemon = True
         t.start()
 
     return should_start
