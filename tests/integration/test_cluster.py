@@ -32,7 +32,7 @@ class ClusterTests(unittest.TestCase):
         self.assertEquals(None, result)
 
         result = session.execute("SELECT * FROM clustertests.cf0")
-        self.assertEquals([{'a': 'a', 'b': 'b', 'c': 'c'}], result)
+        self.assertEquals([('a', 'b', 'c')], result)
 
         cluster.shutdown()
 

@@ -21,7 +21,7 @@ def setup_package():
     try:
         global existing_keyspaces
         results = session.execute("SELECT keyspace_name FROM system.schema_keyspaces")
-        existing_keyspaces = set([row.values()[0] for row in results])
+        existing_keyspaces = set([row[0] for row in results])
     finally:
         try:
             cluster.shutdown()
@@ -43,7 +43,7 @@ def teardown_package():
     try:
         if existing_keyspaces:
             results = session.execute("SELECT keyspace_name FROM system.schema_keyspaces")
-            current_keyspaces = set([row.values()[0] for row in results])
+            current_keyspaces = set([row[0] for row in results])
             for keyspace in current_keyspaces - existing_keyspaces:
                 session.execute("DROP KEYSPACE %s" % (keyspace,))
 

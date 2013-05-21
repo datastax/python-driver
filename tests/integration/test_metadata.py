@@ -20,7 +20,7 @@ class SchemaMetadataTest(unittest.TestCase):
         session = cluster.connect()
         try:
             results = session.execute("SELECT keyspace_name FROM system.schema_keyspaces")
-            existing_keyspaces = [row.values()[0] for row in results]
+            existing_keyspaces = [row[0] for row in results]
             if cls.ksname in existing_keyspaces:
                 session.execute("DROP KEYSPACE %s" % cls.ksname)
 

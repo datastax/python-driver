@@ -1173,7 +1173,7 @@ class ResponseFuture(object):
                     self)
             else:
                 results = getattr(response, 'results', None)
-                if results:
+                if results is not None and response.kind == ResultMessage.KIND_ROWS:
                     results = self.row_factory(*results)
                 self._set_final_result(results)
         elif isinstance(response, ErrorMessage):

@@ -13,8 +13,11 @@ from cassandra.query import SimpleStatement
 
 class ResponseFutureTests(unittest.TestCase):
 
+    def make_basic_session(self):
+        return Mock(spec=Session, row_factory=lambda *x: list(x))
+
     def make_session(self):
-        session = Mock(spec=Session)
+        session = self.make_basic_session()
         session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
         session._pools.get.return_value.is_shutdown = False
         return session
@@ -25,7 +28,7 @@ class ResponseFutureTests(unittest.TestCase):
         return ResponseFuture(session, message, query)
 
     def test_result_message(self):
-        session = Mock(spec=Session)
+        session = self.make_basic_session()
         session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
         pool = session._pools.get.return_value
         pool.is_shutdown = False
@@ -61,7 +64,7 @@ class ResponseFutureTests(unittest.TestCase):
                       results="keyspace1")
         rf._set_result(result)
         self.assertEqual(None, rf.deliver())
-        session.set_keyspace.assert_called_once_with('keyspace1')
+        self.assertEqual(session.keyspace, 'keyspace1')
 
     def test_schema_change_result(self):
         session = self.make_session()
@@ -78,8 +81,9 @@ class ResponseFutureTests(unittest.TestCase):
         session = self.make_session()
         rf = self.make_response_future(session)
         rf.send_request()
-        rf._set_result(Mock(spec=ResultMessage, kind=999, results="foobar"))
-        self.assertEqual('foobar', rf.deliver())
+        result = object()
+        rf._set_result(Mock(spec=ResultMessage, kind=999, results=result))
+        self.assertIs(result, rf.deliver())
 
     def test_read_timeout_error_message(self):
         session = self.make_session()
@@ -230,7 +234,7 @@ class ResponseFutureTests(unittest.TestCase):
         self.assertRaises(NoHostAvailable, rf.deliver)
 
     def test_all_pools_shutdown(self):
-        session = Mock(spec=Session)
+        session = self.make_basic_session()
         session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
         session._pools.get.return_value.is_shutdown = True
 
@@ -239,7 +243,7 @@ class ResponseFutureTests(unittest.TestCase):
         self.assertRaises(NoHostAvailable, rf.deliver)
 
     def test_first_pool_shutdown(self):
-        session = Mock(spec=Session)
+        session = self.make_basic_session()
         session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
         # first return a pool with is_shutdown=True, then is_shutdown=False
         session._pools.get.side_effect = [Mock(is_shutdown=True), Mock(is_shutdown=False)]
@@ -254,7 +258,7 @@ class ResponseFutureTests(unittest.TestCase):
         self.assertEqual(result, [{'col': 'val'}])
 
     def test_timeout_getting_connection_from_pool(self):
-        session = Mock(spec=Session)
+        session = self.make_basic_session()
         session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
 
         # the first pool will raise an exception on borrow_connection()
