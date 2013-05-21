@@ -38,12 +38,13 @@ def main():
         )
         """)
 
+    query = """
+            INSERT INTO mytable (thekey, col1, col2)
+            VALUES (%(key)s, %(a)s, %(b)s)
+            """
     for i in range(10):
         print "inserting row", i
-        s.execute("""
-            INSERT INTO mytable (thekey, col1, col2)
-            VALUES ('key%d', 'a', 'b')
-            """ % i)
+        s.execute(query, dict(key="key%d" % i, a='a', b='b'))
 
     future = s.execute_async("SELECT * FROM mytable")
     print "key\tcol1\tcol2"

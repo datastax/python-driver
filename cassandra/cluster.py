@@ -19,7 +19,7 @@ from cassandra.metadata import Metadata
 from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy)
-from cassandra.query import SimpleStatement
+from cassandra.query import SimpleStatement, bind_params
 from cassandra.pool import (AuthenticationException, _ReconnectionHandler,
                             _HostReconnectionHandler, HostConnectionPool)
 
@@ -460,8 +460,7 @@ class Session(object):
         for host in hosts:
             self.add_host(host)
 
-    # TODO query parameter binding
-    def execute(self, query):
+    def execute(self, query, parameters=None):
         """
         Execute the given query and synchronously wait for the response.
 
@@ -469,11 +468,15 @@ class Session(object):
         will be raised.
 
         `query` may be a query string or an instance of :cls:`cassandra.query.Query`.
-        """
-        return self.execute_async(query).deliver()
 
-    # TODO query parameter binding
-    def execute_async(self, query):
+        `parameters` may be a sequence or dict of parameters to bind.  If a
+        sequence is used, '%s' should be used the placeholder for each
+        argument.  If a dict is used, '%(name)s' style placeholders must
+        be used.
+        """
+        return self.execute_async(query, parameters).deliver()
+
+    def execute_async(self, query, parameters=None):
         """
         Execute the given query and return a :cls:`~.ResponseFuture` object
         which callbacks may be attached to for asynchronous response
@@ -511,7 +514,10 @@ class Session(object):
             query = SimpleStatement(query)
 
         # TODO bound statements need to be handled differently
-        message = QueryMessage(query=query.query_string, consistency_level=query.consistency_level)
+        query_string = query.query_string
+        if parameters:
+            query_string = bind_params(query.query_string, parameters)
+        message = QueryMessage(query=query_string, consistency_level=query.consistency_level)
 
         if query.tracing_enabled:
             # TODO enable tracing on the message

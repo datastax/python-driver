@@ -1,6 +1,10 @@
 import struct
 
 from cassandra import ConsistencyLevel
+from cassandra.decoder import (cql_encoders, cql_encode_object,
+                               cql_encode_map_collection,
+                               cql_encode_set_collection,
+                               cql_encode_list_collection)
 
 class Query(object):
 
@@ -28,3 +32,27 @@ class SimpleStatement(Query):
     @property
     def query_string(self):
         return self._query_string
+
+
+class ColumnCollection(object):
+
+    def __init__(self, sequence):
+        self.sequence = sequence
+
+    def __str__(self):
+        s = self.sequence
+        if isinstance(s, dict):
+            return cql_encode_map_collection(s)
+        elif isinstance(s, (set, frozenset)):
+            return cql_encode_set_collection(s)
+        else:
+            return cql_encode_list_collection(s)
+
+
+def bind_params(query, params):
+    if isinstance(params, dict):
+        return query % dict((k, cql_encoders.get(type(v), cql_encode_object)(v))
+                            for k, v in params.iteritems())
+    else:
+        return query % [cql_encoders.get(type(v), cql_encode_object)(v)
+                        for v in params]

@@ -15,7 +15,9 @@
 # limitations under the License.
 
 from collections import namedtuple, OrderedDict
+import datetime
 import socket
+from uuid import UUID
 try:
     from cStringIO import StringIO
 except ImportError:
@@ -657,3 +659,59 @@ def write_inet(f, addrtuple):
     write_byte(f, len(addrbytes))
     f.write(addrbytes)
     write_int(f, port)
+
+
+def cql_quote(term):
+    if isinstance(term, unicode):
+        return "'%s'" % term.encode('utf8').replace("'", "''")
+    elif isinstance(term, (str, bool)):
+        return "'%s'" % str(term).replace("'", "''")
+    else:
+        return str(term)
+
+
+def cql_encode_none(val):
+    return 'NULL'
+
+
+def cql_encode_unicode(val):
+    return cql_quote(val.encode('utf-8'))
+
+
+def cql_encode_str(val):
+    return cql_quote(val)
+
+
+def cql_encode_object(val):
+    return str(val)
+
+def cql_encode_sequence(val):
+    return '( %s )' % ' , '.join(cql_encoders.get(type(v), cql_encode_object)(v)
+                                 for v in val)
+
+def cql_encode_map_collection(val):
+    return '{ %s }' % ' , '.join('%s : %s' % (cql_quote(k), cql_quote(v))
+                                 for k, v in val.iteritems())
+
+def cql_encode_list_collection(val):
+    return '[ %s ]' % ' , '.join(map(cql_quote, val))
+
+
+def cql_encode_set_collection(val):
+    return '{ %s }' % ' , '.join(map(cql_quote, val))
+
+
+cql_encoders = {
+    float: cql_encode_object,
+    str: cql_encode_str,
+    type(None): cql_encode_none,
+    int: cql_encode_object,
+    long: cql_encode_object,
+    UUID: cql_encode_object,
+    datetime.datetime: cql_encode_object,
+    datetime.date: cql_encode_object,
+    dict: cql_encode_map_collection,
+    list: cql_encode_sequence,
+    tuple: cql_encode_sequence,
+    set: cql_encode_sequence
+}
