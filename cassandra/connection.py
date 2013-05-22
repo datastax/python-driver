@@ -374,6 +374,8 @@ class Connection(object):
 
     @defunct_on_error
     def _handle_options_response(self, options_response):
+        if self.is_defunct:
+            return
         log.debug("Received options response on new Connection from %s" % self.host)
         self.supported_cql_versions = options_response.cql_versions
         self.remote_supported_compressions = options_response.options['COMPRESSION']
@@ -410,6 +412,8 @@ class Connection(object):
 
     @defunct_on_error
     def _handle_startup_response(self, startup_response):
+        if self.is_defunct:
+            return
         if isinstance(startup_response, ReadyMessage):
             log.debug("Got ReadyMessage on new Connection from %s" % self.host)
             if self._compressor:
