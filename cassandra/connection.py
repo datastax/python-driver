@@ -291,14 +291,15 @@ class Connection(object):
             self._id_queue.put_nowait(stream_id)
 
         # check that the protocol version is supported
-        if version & PROTOCOL_VERSION_MASK != PROTOCOL_VERSION:
-            raise ProtocolError("Unsupported CQL protocol version %d" % version)
+        given_version = version & PROTOCOL_VERSION_MASK
+        if given_version != PROTOCOL_VERSION:
+            raise ProtocolError("Unsupported CQL protocol version: %d" % given_version)
 
         # check that the header direction is correct
         if version & HEADER_DIRECTION_MASK != HEADER_DIRECTION_TO_CLIENT:
             raise ProtocolError(
-                "Unexpected request from server with opcode "
-                "%04x, stream id %r" % (opcode, stream_id))
+                "Header direction in response is incorrect; opcode %04x, stream id %r"
+                % (opcode, stream_id))
 
         if body_len > 0:
             body = msg[8:]
@@ -379,7 +380,7 @@ class Connection(object):
 
         if self.cql_version:
             if self.cql_version not in self.supported_cql_versions:
-                raise ProgrammingError(
+                raise ProtocolError(
                     "cql_version %r is not supported by remote (w/ native "
                     "protocol). Supported versions: %r"
                     % (self.cql_version, self.supported_cql_versions))
@@ -389,12 +390,12 @@ class Connection(object):
         opts = {}
         self._compressor = None
         if self.compression:
-            overlap = (set(locally_supported_compressions) &
+            overlap = (set(locally_supported_compressions.keys()) &
                        set(self.remote_supported_compressions))
             if len(overlap) == 0:
                 log.debug("No available compression types supported on both ends."
                           " locally supported: %r. remotely supported: %r"
-                          % (locally_supported_compressions,
+                          % (locally_supported_compressions.keys(),
                              self.remote_supported_compressions))
             else:
                 compression_type = iter(overlap).next() # choose any
@@ -424,10 +425,11 @@ class Connection(object):
             cm = CredentialsMessage(creds=self.credentials)
             self.send_msg(cm, cb=self._handle_startup_response)
         elif isinstance(startup_response, ErrorMessage):
-            log.debug("Received ErrorMessage on new Connection from %s" % self.host)
-            raise ProgrammingError(
-                "Server did not accept credentials. %s"
-                % startup_response.summary_msg())
+            log.debug("Received ErrorMessage on new Connection from %s: %s"
+                      % (self.host, startup_response.summary_msg()))
+            raise ConnectionException(
+                "Failed to initialize new connection to %s: %s"
+                % (self.host, startup_response.summary_msg()))
         else:
             msg = "Unexpected response during Connection setup: %r" % (startup_response,)
             log.error(msg)
