@@ -26,7 +26,7 @@ except ImportError:
 from cassandra import ConsistencyLevel
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
                                int8_pack, int8_unpack)
-from cassandra.types import lookup_cqltype
+from cassandra.cqltypes import lookup_cqltype
 
 
 class NotSupportedError(Exception):
@@ -700,11 +700,10 @@ def cql_encode_list_collection(val):
 def cql_encode_set_collection(val):
     return '{ %s }' % ' , '.join(map(cql_quote, val))
 
-
 cql_encoders = {
     float: cql_encode_object,
     str: cql_encode_str,
-    type(None): cql_encode_none,
+    NoneType: cql_encode_none,
     int: cql_encode_object,
     long: cql_encode_object,
     UUID: cql_encode_object,
@@ -713,5 +712,6 @@ cql_encoders = {
     dict: cql_encode_map_collection,
     list: cql_encode_sequence,
     tuple: cql_encode_sequence,
-    set: cql_encode_sequence
+    set: cql_encode_sequence,
+    GeneratorType: cql_encode_sequence
 }

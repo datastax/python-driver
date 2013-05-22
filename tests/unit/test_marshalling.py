@@ -2,7 +2,7 @@ import unittest
 from decimal import Decimal
 from uuid import UUID
 
-from cassandra.types import lookup_casstype
+from cassandra.cqltypes import lookup_casstype
 
 marshalled_value_pairs = (
     ('lorem ipsum dolor sit amet', 'AsciiType', 'lorem ipsum dolor sit amet'),

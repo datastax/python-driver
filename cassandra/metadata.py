@@ -12,7 +12,7 @@ try:
 except ImportError:
     pass
 
-import cassandra.types as types
+import cassandra.cqltypes as types
 from cassandra.marshal import varint_unpack
 from cassandra.pool import Host
 
