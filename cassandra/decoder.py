@@ -17,6 +17,7 @@
 from collections import namedtuple, OrderedDict
 import datetime
 import socket
+import types
 from uuid import UUID
 try:
     from cStringIO import StringIO
@@ -703,7 +704,7 @@ def cql_encode_set_collection(val):
 cql_encoders = {
     float: cql_encode_object,
     str: cql_encode_str,
-    NoneType: cql_encode_none,
+    types.NoneType: cql_encode_none,
     int: cql_encode_object,
     long: cql_encode_object,
     UUID: cql_encode_object,
@@ -713,5 +714,5 @@ cql_encoders = {
     list: cql_encode_sequence,
     tuple: cql_encode_sequence,
     set: cql_encode_sequence,
-    GeneratorType: cql_encode_sequence
+    types.GeneratorType: cql_encode_sequence
 }
