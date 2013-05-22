@@ -54,5 +54,5 @@ def bind_params(query, params):
         return query % dict((k, cql_encoders.get(type(v), cql_encode_object)(v))
                             for k, v in params.iteritems())
     else:
-        return query % [cql_encoders.get(type(v), cql_encode_object)(v)
-                        for v in params]
+        return query % tuple(cql_encoders.get(type(v), cql_encode_object)(v)
+                             for v in params)
