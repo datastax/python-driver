@@ -6,8 +6,11 @@ import unittest
 from mock import patch, Mock
 
 from cassandra.connection import (Connection, PROTOCOL_VERSION,
-                                  HEADER_DIRECTION_TO_CLIENT, ProtocolError)
-from cassandra.decoder import write_stringmultimap, SupportedMessage, ReadyMessage
+                                  HEADER_DIRECTION_TO_CLIENT,
+                                  HEADER_DIRECTION_FROM_CLIENT, ProtocolError,
+                                  ConnectionException)
+from cassandra.decoder import (write_stringmultimap, write_int, write_string,
+                               SupportedMessage, ReadyMessage, ServerError)
 from cassandra.marshal import uint8_pack, uint32_pack, int32_pack
 
 @patch('socket.socket')
@@ -36,6 +39,12 @@ class ConnectionTest(unittest.TestCase):
             'COMPRESSION': []
         })
         return options_buf.getvalue()
+
+    def make_error_body(self, code, msg):
+        buf = StringIO()
+        write_int(buf, code)
+        write_string(buf, msg)
+        return buf.getvalue()
 
     def make_msg(self, header, body=""):
         return header + uint32_pack(len(body)) + body
@@ -69,6 +78,28 @@ class ConnectionTest(unittest.TestCase):
 
         # read in a SupportedMessage response
         header = self.make_header_prefix(SupportedMessage, version=0x04)
+        options = self.make_options_body()
+        c._socket.recv.return_value = self.make_msg(header, options)
+        c.handle_read(None, None)
+
+        # make sure it errored correctly
+        self.assertTrue(c.is_defunct)
+        self.assertTrue(isinstance(c.last_error, ProtocolError))
+        self.assertTrue(c.connected_event.is_set())
+
+    def test_bad_header_direction(self, *args):
+        c = self.make_connection()
+
+        # let it write the OptionsMessage
+        c.handle_write(None, None)
+
+        # read in a SupportedMessage response
+        header = ''.join(map(uint8_pack, [
+            0xff & (HEADER_DIRECTION_FROM_CLIENT | PROTOCOL_VERSION),
+            0,  # flags (compression)
+            0,
+            SupportedMessage.opcode  # opcode
+        ]))
         options = self.make_options_body()
         c._socket.recv.return_value = self.make_msg(header, options)
         c.handle_read(None, None)
@@ -117,6 +148,31 @@ class ConnectionTest(unittest.TestCase):
         # make sure it errored correctly
         self.assertTrue(c.is_defunct)
         self.assertTrue(isinstance(c.last_error, ProtocolError))
+        self.assertTrue(c.connected_event.is_set())
+
+    def test_error_message_on_startup(self, *args):
+        c = self.make_connection()
+
+        # let it write the OptionsMessage
+        c.handle_write(None, None)
+
+        # read in a SupportedMessage response
+        header = self.make_header_prefix(SupportedMessage)
+        options = self.make_options_body()
+        c._socket.recv.return_value = self.make_msg(header, options)
+        c.handle_read(None, None)
+
+        # let it write out a StartupMessage
+        c.handle_write(None, None)
+
+        header = self.make_header_prefix(ServerError, stream_id=1)
+        body = self.make_error_body(ServerError.error_code, ServerError.summary)
+        c._socket.recv.return_value = self.make_msg(header, body)
+        c.handle_read(None, None)
+
+        # make sure it errored correctly
+        self.assertTrue(c.is_defunct)
+        self.assertTrue(isinstance(c.last_error, ConnectionException))
         self.assertTrue(c.connected_event.is_set())
 
     def test_socket_error_on_write(self, *args):
