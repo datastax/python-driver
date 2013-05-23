@@ -1,6 +1,6 @@
 import unittest
 
-from cassandra.query import bind_params
+from cassandra.query import bind_params, ColumnCollection
 
 class ParamBindingTest(unittest.TestCase):
 
@@ -23,3 +23,15 @@ class ParamBindingTest(unittest.TestCase):
     def test_none_param(self):
         result = bind_params("%s", (None,))
         self.assertEquals(result, "NULL")
+
+    def test_list_collection(self):
+        result = bind_params("%s", (ColumnCollection(['a', 'b', 'c']),))
+        self.assertEquals(result, "[ 'a' , 'b' , 'c' ]")
+
+    def test_set_collection(self):
+        result = bind_params("%s", (ColumnCollection({'a', 'b', 'c'}),))
+        self.assertEquals(result, "{ 'a' , 'c' , 'b' }")
+
+    def test_map_collection(self):
+        result = bind_params("%s", (ColumnCollection({'a': 'a', 'b': 'b'}),))
+        self.assertEquals(result, "{ 'a' : 'a' , 'b' : 'b' }")
