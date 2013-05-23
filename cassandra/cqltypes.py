@@ -18,6 +18,7 @@ from decimal import Decimal
 import re
 import socket
 import time
+from datetime import datetime
 from uuid import UUID
 
 try:
@@ -469,7 +470,7 @@ class DateType(_CassandraType):
 
     @staticmethod
     def deserialize(byts):
-        return int64_unpack(byts) / 1000.0
+        return datetime.utcfromtimestamp(int64_unpack(byts) / 1000.0)
 
     @staticmethod
     def serialize(timestamp):
