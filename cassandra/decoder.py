@@ -686,6 +686,12 @@ def cql_encode_str(val):
 def cql_encode_object(val):
     return str(val)
 
+def cql_encode_datetime(val):
+    return "'%s'" % val.strftime('%Y-%m-%d %H:%M:%S-0000')
+
+def cql_encode_date(val):
+    return "'%s'" % val.strftime('%Y-%m-%d-0000')
+
 def cql_encode_sequence(val):
     return '( %s )' % ' , '.join(cql_encoders.get(type(v), cql_encode_object)(v)
                                  for v in val)
@@ -708,8 +714,8 @@ cql_encoders = {
     int: cql_encode_object,
     long: cql_encode_object,
     UUID: cql_encode_object,
-    datetime.datetime: cql_encode_object,
-    datetime.date: cql_encode_object,
+    datetime.datetime: cql_encode_datetime,
+    datetime.date: cql_encode_date,
     dict: cql_encode_map_collection,
     list: cql_encode_sequence,
     tuple: cql_encode_sequence,
