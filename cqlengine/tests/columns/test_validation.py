@@ -1,6 +1,7 @@
 #tests the behavior of the column classes
-from datetime import datetime
+from datetime import datetime, timedelta
 from datetime import date
+from datetime import tzinfo
 from decimal import Decimal as D
 from cqlengine import ValidationError
 
@@ -41,6 +42,18 @@ class TestDatetime(BaseCassEngTestCase):
         dt = self.DatetimeTest.objects.create(test_id=0, created_at=now)
         dt2 = self.DatetimeTest.objects(test_id=0).first()
         assert dt2.created_at.timetuple()[:6] == now.timetuple()[:6]
+
+    def test_datetime_tzinfo_io(self):
+        class TZ(tzinfo):
+            def utcoffset(self, date_time):
+                return timedelta(hours=-1)
+            def dst(self, date_time):
+                return None
+
+        now = datetime(1982, 1, 1, tzinfo=TZ())
+        dt = self.DatetimeTest.objects.create(test_id=0, created_at=now)
+        dt2 = self.DatetimeTest.objects(test_id=0).first()
+        assert dt2.created_at.timetuple()[:6] == (now + timedelta(hours=1)).timetuple()[:6]
 
 
 class TestDate(BaseCassEngTestCase):

@@ -408,13 +408,15 @@ class TestQuerySetConnectionHandling(BaseQuerySetUsage):
     def test_conn_is_returned_after_queryset_is_garbage_collected(self):
         """ Tests that the connection is returned to the connection pool after the queryset is gc'd """
         from cqlengine.connection import ConnectionPool
-        assert ConnectionPool._queue.qsize() == 1
+        # The queue size can be 1 if we just run this file's tests
+        # It will be 2 when we run 'em all
+        initial_size = ConnectionPool._queue.qsize()
         q = TestModel.objects(test_id=0)
         v = q[0]
-        assert ConnectionPool._queue.qsize() == 0
+        assert ConnectionPool._queue.qsize() == initial_size - 1
 
         del q
-        assert ConnectionPool._queue.qsize() == 1
+        assert ConnectionPool._queue.qsize() == initial_size
 
 class TimeUUIDQueryModel(Model):
     partition       = columns.UUID(primary_key=True)
