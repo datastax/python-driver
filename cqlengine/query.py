@@ -102,6 +102,19 @@ class QueryOperator(object):
         except KeyError:
             raise QueryOperatorException("{} doesn't map to a QueryOperator".format(symbol))
 
+    # equality operator, used by tests
+
+    def __eq__(self, op):
+        return self.__class__ is op.__class__ and \
+                self.column.db_field_name == op.column.db_field_name and \
+                self.value == op.value
+
+    def __ne__(self, op):
+        return not (self == op)
+
+    def __hash__(self):
+        return hash(self.column.db_field_name) ^ hash(self.value)
+
 class EqualsOperator(QueryOperator):
     symbol = 'EQ'
     cql_symbol = '='
@@ -439,9 +452,7 @@ class QuerySet(object):
             return None
 
     def all(self):
-        clone = copy.deepcopy(self)
-        clone._where = []
-        return clone
+        return copy.deepcopy(self)
 
     def _parse_filter_arg(self, arg):
         """
@@ -639,6 +650,13 @@ class QuerySet(object):
         clone._values_list = True
         clone._flat_values_list = flat
         return clone
+
+
+    def __eq__(self, q):
+        return set(self._where) == set(q._where)
+
+    def __ne__(self, q):
+        return not (self != q)
 
 class DMLQuery(object):
     """
