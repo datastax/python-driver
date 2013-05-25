@@ -214,8 +214,12 @@ class DateTime(Column):
         value = super(DateTime, self).to_database(value)
         if not isinstance(value, datetime):
             raise ValidationError("'{}' is not a datetime object".format(value))
-        epoch = datetime(1970, 1, 1)
-        return long((value - epoch).total_seconds() * 1000)
+        epoch = datetime(1970, 1, 1, tzinfo=value.tzinfo)
+        offset = 0
+        if epoch.tzinfo:
+            offset_delta = epoch.tzinfo.utcoffset(epoch)
+            offset = offset_delta.days*24*3600 + offset_delta.seconds
+        return long(((value  - epoch).total_seconds() - offset) * 1000)
 
 
 class Date(Column):
@@ -600,6 +604,8 @@ class Map(BaseContainerColumn):
         prev = self.to_database(prev)
         if isinstance(val, self.Quoter): val = val.value
         if isinstance(prev, self.Quoter): prev = prev.value
+        val = val or {}
+        prev = prev or {}
 
         #get the updated map
         update = {k:v for k,v in val.items() if v != prev.get(k)}
@@ -627,8 +633,8 @@ class Map(BaseContainerColumn):
         if isinstance(val, self.Quoter): val = val.value
         if isinstance(prev, self.Quoter): prev = prev.value
 
-        old_keys = set(prev.keys())
-        new_keys = set(val.keys())
+        old_keys = set(prev.keys()) if prev else set()
+        new_keys = set(val.keys()) if val else set()
         del_keys = old_keys - new_keys
 
         del_statements = []

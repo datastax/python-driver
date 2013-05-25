@@ -1,0 +1,14 @@
+language: python
+python:
+  - "2.7"
+services:
+  - cassandra
+before_install:
+  - sudo sh -c "echo 'JVM_OPTS=\"\${JVM_OPTS} -Djava.net.preferIPv4Stack=false\"' >> /usr/local/cassandra/conf/cassandra-env.sh"
+  - sudo service cassandra start
+install:
+  - "pip install -r requirements.txt --use-mirrors"
+  - "pip install pytest --use-mirrors"
+script:
+  - while [ ! -f /var/run/cassandra.pid ] ; do sleep 1 ; done # wait until cassandra is ready
+  - "py.test cqlengine/tests/"
