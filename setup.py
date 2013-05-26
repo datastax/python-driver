@@ -25,7 +25,6 @@ setup(
     dependency_links = ['https://github.com/bdeggleston/cqlengine/archive/{0}.tar.gz#egg=cqlengine-{0}'.format(version)],
     long_description=long_desc,
     classifiers = [
-        "Development Status :: 3 - Alpha",
         "Environment :: Web Environment",
         "Environment :: Plugins",
         "License :: OSI Approved :: BSD License",
