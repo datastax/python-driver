@@ -7,7 +7,7 @@ from setuptools import setup, find_packages
 version = '0.2'
 
 long_desc = """
-cqlengine is a Cassandra CQL ORM for Python in the style of the Django orm and mongoengine
+cqlengine is a Cassandra CQL Object Mapper for Python in the style of the Django orm and mongoengine
 
 [Documentation](https://cqlengine.readthedocs.org/en/latest/)
 
@@ -25,7 +25,6 @@ setup(
     dependency_links = ['https://github.com/bdeggleston/cqlengine/archive/{0}.tar.gz#egg=cqlengine-{0}'.format(version)],
     long_description=long_desc,
     classifiers = [
-        "Development Status :: 3 - Alpha",
         "Environment :: Web Environment",
         "Environment :: Plugins",
         "License :: OSI Approved :: BSD License",

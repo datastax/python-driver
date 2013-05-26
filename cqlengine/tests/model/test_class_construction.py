@@ -140,6 +140,17 @@ class TestModelClassFunction(BaseCassEngTestCase):
         obj = ModelWithPartitionKeys(p1='a', p2='b')
         self.assertEquals(obj.pk, ('a', 'b'))
 
+    def test_del_attribute_is_assigned_properly(self):
+        """ Tests that columns that can be deleted have the del attribute """
+        class DelModel(Model):
+            key = columns.Integer(primary_key=True)
+            data = columns.Integer(required=False)
+
+        model = DelModel(key=4, data=5)
+        del model.data
+        with self.assertRaises(AttributeError):
+            del model.key
+
 class TestManualTableNaming(BaseCassEngTestCase):
     
     class RenamedTest(cqlengine.Model):

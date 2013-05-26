@@ -64,7 +64,7 @@ Getting Started
         >>> q.count()
         4
         >>> for instance in q:
-        >>>     print q.description
+        >>>     print instance.description
         example5
         example6
         example7
@@ -78,7 +78,7 @@ Getting Started
         >>> q2.count()
         1
         >>> for instance in q2:
-        >>>     print q.description
+        >>>     print instance.description
         example5
 
 
