@@ -192,9 +192,9 @@ class ModelMetaClass(type):
             _set = lambda self, val: self._values[col_name].setval(val)
             _del = lambda self: self._values[col_name].delval()
             if col_obj.can_delete:
-                attrs[col_name] = property(_get, _set)
-            else:
                 attrs[col_name] = property(_get, _set, _del)
+            else:
+                attrs[col_name] = property(_get, _set)
 
         column_definitions = [(k,v) for k,v in attrs.items() if isinstance(v, columns.Column)]
         column_definitions = sorted(column_definitions, lambda x,y: cmp(x[1].position, y[1].position))
