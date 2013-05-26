@@ -117,7 +117,18 @@ class TestModelClassFunction(BaseCassEngTestCase):
         """
         Test that metadata defined in one class, is not inherited by subclasses
         """
-        
+
+    def test_del_attribute_is_assigned_properly(self):
+        """ Tests that columns that can be deleted have the del attribute """
+        class DelModel(Model):
+            key = columns.Integer(primary_key=True)
+            data = columns.Integer(required=False)
+
+        model = DelModel(key=4, data=5)
+        del model.data
+        with self.assertRaises(AttributeError):
+            del model.key
+
 class TestManualTableNaming(BaseCassEngTestCase):
     
     class RenamedTest(cqlengine.Model):
