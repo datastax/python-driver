@@ -89,9 +89,9 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         query2 = query1.filter(expected_result__gte=1)
         assert len(query2._where) == 2
 
-    def test_the_all_method_clears_where_filter(self):
+    def test_the_all_method_duplicates_queryset(self):
         """
-        Tests that calling all on a queryset with previously defined filters returns a queryset with no filters
+        Tests that calling all on a queryset with previously defined filters duplicates queryset
         """
         query1 = TestModel.objects(test_id=5)
         assert len(query1._where) == 1
@@ -100,7 +100,7 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         assert len(query2._where) == 2
 
         query3 = query2.all()
-        assert len(query3._where) == 0
+        assert query3 == query2
 
     def test_defining_only_and_defer_fails(self):
         """
