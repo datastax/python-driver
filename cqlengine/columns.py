@@ -60,7 +60,7 @@ class Column(object):
 
     instance_counter = 0
 
-    def __init__(self, primary_key=False, index=False, db_field=None, default=None, required=True):
+    def __init__(self, primary_key=False, partition_key=False, index=False, db_field=None, default=None, required=True, clustering_order=None):
         """
         :param primary_key: bool flag, indicates this column is a primary key. The first primary key defined
         on a model is the partition key, all others are cluster keys
@@ -69,15 +69,13 @@ class Column(object):
         :param default: the default value, can be a value or a callable (no args)
         :param required: boolean, is the field required?
         """
-        self.primary_key = primary_key
+        self.partition_key = partition_key
+        self.primary_key = partition_key or primary_key
         self.index = index
         self.db_field = db_field
         self.default = default
         self.required = required
-
-        #only the model meta class should touch this
-        self._partition_key = False
-
+        self.clustering_order = clustering_order
         #the column name in the model definition
         self.column_name = None
 
@@ -137,7 +135,7 @@ class Column(object):
         """
         Returns a column definition for CQL table definition
         """
-        return '"{}" {}'.format(self.db_field_name, self.db_type)
+        return '{} {}'.format(self.cql, self.db_type)
 
     def set_column_name(self, name):
         """
@@ -155,6 +153,13 @@ class Column(object):
     def db_index_name(self):
         """ Returns the name of the cql index """
         return 'index_{}'.format(self.db_field_name)
+
+    @property
+    def cql(self):
+        return self.get_cql()
+
+    def get_cql(self):
+        return '"{}"'.format(self.db_field_name)
 
 class Bytes(Column):
     db_type = 'blob'
@@ -645,4 +650,26 @@ class Map(BaseContainerColumn):
 
         return del_statements
 
+class _PartitionKeys(Column):
+    class value_manager(BaseValueManager):
+        pass
+
+    def __init__(self, model):
+        self.model = model
+
+class _PartitionKeysToken(Column):
+    """
+    virtual column representing token of partition columns.
+    Used by filter(pk__token=Token(...)) filters
+    """
+
+    def __init__(self, model):
+        self.partition_columns = model._partition_keys.values()
+        super(_PartitionKeysToken, self).__init__(partition_key=True)
+
+    def to_database(self, value):
+        raise NotImplementedError
+
+    def get_cql(self):
+        return "token({})".format(", ".join(c.cql for c in self.partition_columns))
 

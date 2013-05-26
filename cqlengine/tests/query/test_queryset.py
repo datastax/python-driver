@@ -64,12 +64,12 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         Tests the where clause creation
         """
         query1 = TestModel.objects(test_id=5)
-        ids = [o.identifier for o in query1._where]
+        ids = [o.query_value.identifier for o in query1._where]
         where = query1._where_clause()
         assert where == '"test_id" = :{}'.format(*ids)
 
         query2 = query1.filter(expected_result__gte=1)
-        ids = [o.identifier for o in query2._where]
+        ids = [o.query_value.identifier for o in query2._where]
         where = query2._where_clause()
         assert where == '"test_id" = :{} AND "expected_result" >= :{}'.format(*ids)
 
@@ -470,5 +470,12 @@ class TestInOperator(BaseQuerySetUsage):
         assert q.count() == 8
 
 
+class TestValuesList(BaseQuerySetUsage):
+    def test_values_list(self):
+        q = TestModel.objects.filter(test_id=0, attempt_id=1)
+        item = q.values_list('test_id', 'attempt_id', 'description', 'expected_result', 'test_result').first()
+        assert item == [0, 1, 'try2', 10, 30]
 
+        item = q.values_list('expected_result', flat=True).first()
+        assert item == 10
 

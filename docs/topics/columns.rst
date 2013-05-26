@@ -145,12 +145,16 @@ Column Options
 
         If True, this column is created as a primary key field. A model can have multiple primary keys. Defaults to False.
 
-        *In CQL, there are 2 types of primary keys: partition keys and clustering keys. As with CQL, the first primary key is the partition key, and all others are clustering keys.*
+        *In CQL, there are 2 types of primary keys: partition keys and clustering keys. As with CQL, the first primary key is the partition key, and all others are clustering keys, unless partition keys are specified manually using* :attr:`BaseColumn.partition_key`
+
+    .. attribute:: BaseColumn.partition_key
+
+        If True, this column is created as partition primary key. There may be many partition keys defined, forming *composite partition key*
 
     .. attribute:: BaseColumn.index
 
         If True, an index will be created for this column. Defaults to False.
-        
+
         *Note: Indexes can only be created on models with one primary key*
 
     .. attribute:: BaseColumn.db_field
@@ -165,3 +169,6 @@ Column Options
 
         If True, this model cannot be saved without a value defined for this column. Defaults to True. Primary key fields cannot have their required fields set to False.
 
+    .. attribute:: BaseColumn.clustering_order
+
+        Defines CLUSTERING ORDER for this column (valid choices are "asc" (default) or "desc"). It may be specified only for clustering primary keys - more: http://www.datastax.com/docs/1.2/cql_cli/cql/CREATE_TABLE#using-clustering-order

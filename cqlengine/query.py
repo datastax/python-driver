@@ -4,11 +4,11 @@ from datetime import datetime
 from hashlib import md5
 from time import time
 from uuid import uuid1
-from cqlengine import BaseContainerColumn, BaseValueManager, Map
+from cqlengine import BaseContainerColumn, BaseValueManager, Map, columns
 
 from cqlengine.connection import connection_manager
 from cqlengine.exceptions import CQLEngineException
-from cqlengine.functions import BaseQueryFunction, Token
+from cqlengine.functions import QueryValue, Token
 
 #CQL 3 reference:
 #http://www.datastax.com/docs/1.1/references/cql/index
@@ -24,14 +24,16 @@ class QueryOperator(object):
     # The comparator symbol this operator uses in cql
     cql_symbol = None
 
+    QUERY_VALUE_WRAPPER = QueryValue
+
     def __init__(self, column, value):
         self.column = column
         self.value = value
 
-        #the identifier is a unique key that will be used in string
-        #replacement on query strings, it's created from a hash
-        #of this object's id and the time
-        self.identifier = uuid1().hex
+        if isinstance(value, QueryValue):
+            self.query_value = value
+        else:
+            self.query_value = self.QUERY_VALUE_WRAPPER(value)
 
         #perform validation on this operator
         self.validate_operator()
@@ -41,12 +43,8 @@ class QueryOperator(object):
     def cql(self):
         """
         Returns this operator's portion of the WHERE clause
-        :param valname: the dict key that this operator's compare value will be found in
         """
-        if isinstance(self.value, BaseQueryFunction):
-            return self.value.format_cql(self.column.db_field_name, self.cql_symbol, self.identifier)
-        else:
-            return '"{}" {} :{}'.format(self.column.db_field_name, self.cql_symbol, self.identifier)
+        return '{} {} {}'.format(self.column.cql, self.cql_symbol, self.query_value.cql)
 
     def validate_operator(self):
         """
@@ -81,10 +79,7 @@ class QueryOperator(object):
         this should return the dict: {'colval':<self.value>}
         SELECT * FROM column_family WHERE colname=:colval
         """
-        if isinstance(self.value, BaseQueryFunction):
-            return {self.identifier: self.column.to_database(self.value.get_value())}
-        else:
-            return {self.identifier: self.column.to_database(self.value)}
+        return self.query_value.get_dict(self.column)
 
     @classmethod
     def get_operator(cls, symbol):
@@ -102,34 +97,34 @@ class QueryOperator(object):
         except KeyError:
             raise QueryOperatorException("{} doesn't map to a QueryOperator".format(symbol))
 
+    def __eq__(self, op):
+        return self.__class__ is op.__class__ and self.column == op.column and self.value == op.value
+
+    def __ne__(self, op):
+        return not (self == op)
+
 class EqualsOperator(QueryOperator):
     symbol = 'EQ'
     cql_symbol = '='
+
+class IterableQueryValue(QueryValue):
+    def __init__(self, value):
+        try:
+            super(IterableQueryValue, self).__init__(value, [uuid1().hex for i in value])
+        except TypeError:
+            raise QueryException("in operator arguments must be iterable, {} found".format(value))
+
+    def get_dict(self, column):
+        return dict((i, column.to_database(v)) for (i, v) in zip(self.identifier, self.value))
+
+    def get_cql(self):
+        return '({})'.format(', '.join(':{}'.format(i) for i in self.identifier))
 
 class InOperator(EqualsOperator):
     symbol = 'IN'
     cql_symbol = 'IN'
 
-    class Quoter(object):
-        """
-        contains a single value, which will quote itself for CQL insertion statements
-        """
-        def __init__(self, value):
-            self.value = value
-
-        def __str__(self):
-            from cql.query import cql_quote as cq
-            return '(' + ', '.join([cq(v) for v in self.value]) + ')'
-
-    def get_dict(self):
-        if isinstance(self.value, BaseQueryFunction):
-            return {self.identifier: self.column.to_database(self.value.get_value())}
-        else:
-            try:
-                values = [v for v in self.value]
-            except TypeError:
-                raise QueryException("in operator arguments must be iterable, {} found".format(self.value))
-            return {self.identifier: self.Quoter([self.column.to_database(v) for v in self.value])}
+    QUERY_VALUE_WRAPPER = IterableQueryValue
 
 class GreaterThanOperator(QueryOperator):
     symbol = "GT"
@@ -286,9 +281,9 @@ class QuerySet(object):
         if not self._allow_filtering:
             #if the query is not on an indexed field
             if not any([w.column.index for w in equal_ops]):
-                if not any([w.column._partition_key for w in equal_ops]) and not token_ops:
+                if not any([w.column.partition_key for w in equal_ops]) and not token_ops:
                     raise QueryException('Filtering on a clustering key without a partition key is not allowed unless allow_filtering() is called on the querset')
-            if any(not w.column._partition_key for w in token_ops):
+            if any(not w.column.partition_key for w in token_ops):
                 raise QueryException('The token() function is only supported on the partition key')
 
 
@@ -314,7 +309,7 @@ class QuerySet(object):
         if self._defer_fields:
             fields = [f for f in fields if f not in self._defer_fields]
         elif self._only_fields:
-            fields = [f for f in fields if f in self._only_fields]
+            fields = self._only_fields
         db_fields = [self.model._columns[f].db_field_name for f in fields]
 
         qs = ['SELECT {}'.format(', '.join(['"{}"'.format(f) for f in db_fields]))]
@@ -449,7 +444,7 @@ class QuerySet(object):
         <colname>__<op>
         :returns: colname, op tuple
         """
-        statement = arg.split('__')
+        statement = arg.rsplit('__', 1)
         if len(statement) == 1:
             return arg, None
         elif len(statement) == 2:
@@ -466,7 +461,10 @@ class QuerySet(object):
             try:
                 column = self.model._columns[col_name]
             except KeyError:
-                raise QueryException("Can't resolve column name: '{}'".format(col_name))
+                if col_name == 'pk__token':
+                    column = columns._PartitionKeysToken(self.model)
+                else:
+                    raise QueryException("Can't resolve column name: '{}'".format(col_name))
 
             #get query operator, or use equals if not supplied
             operator_class = QueryOperator.get_operator(col_op or 'EQ')
@@ -639,6 +637,12 @@ class QuerySet(object):
         clone._values_list = True
         clone._flat_values_list = flat
         return clone
+
+    def __eq__(self, q):
+        return self._where == q._where
+
+    def __ne__(self, q):
+        return not (self != q)
 
 class DMLQuery(object):
     """
