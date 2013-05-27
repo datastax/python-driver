@@ -479,3 +479,11 @@ class TestValuesList(BaseQuerySetUsage):
         item = q.values_list('expected_result', flat=True).first()
         assert item == 10
 
+class TestObjectsProperty(BaseQuerySetUsage):
+
+    def test_objects_property_returns_fresh_queryset(self):
+        assert TestModel.objects._result_cache is None
+        len(TestModel.objects) # evaluate queryset
+        assert TestModel.objects._result_cache is None
+
+
