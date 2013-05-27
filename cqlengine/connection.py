@@ -7,11 +7,13 @@ import Queue
 import random
 
 import cql
+import logging
 
 from cqlengine.exceptions import CQLEngineException
 
 from thrift.transport.TTransport import TTransportException
 
+LOG = logging.getLogger('cqlengine.cql')
 
 class CQLConnectionError(CQLEngineException): pass
 
@@ -167,6 +169,7 @@ class connection_manager(object):
 
         for i in range(len(_hosts)):
             try:
+                LOG.debug('{} {}'.format(query, repr(params)))
                 self.cur = self.con.cursor()
                 self.cur.execute(query, params)
                 return self.cur
