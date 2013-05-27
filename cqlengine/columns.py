@@ -183,6 +183,7 @@ class Text(Column):
                 raise ValidationError('{} is shorter than {} characters'.format(self.column_name, self.min_length))
         return value
 
+
 class Integer(Column):
     db_type = 'int'
 
@@ -200,20 +201,27 @@ class Integer(Column):
     def to_database(self, value):
         return self.validate(value)
 
+
 class DateTime(Column):
     db_type = 'timestamp'
+
     def __init__(self, **kwargs):
         super(DateTime, self).__init__(**kwargs)
 
     def to_python(self, value):
         if isinstance(value, datetime):
             return value
+        elif isinstance(value, date):
+            return datetime(*(value.timetuple()[:6]))
         return datetime.utcfromtimestamp(value)
 
     def to_database(self, value):
         value = super(DateTime, self).to_database(value)
         if not isinstance(value, datetime):
-            raise ValidationError("'{}' is not a datetime object".format(value))
+            if isinstance(value, date):
+                value = datetime(value.year, value.month, value.day)
+            else:
+                raise ValidationError("'{}' is not a datetime object".format(value))
         epoch = datetime(1970, 1, 1, tzinfo=value.tzinfo)
         offset = 0
         if epoch.tzinfo:
@@ -325,6 +333,7 @@ class ContainerQuoter(object):
 
     def __str__(self):
         raise NotImplementedError
+
 
 class BaseContainerColumn(Column):
     """

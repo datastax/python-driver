@@ -55,6 +55,12 @@ class TestDatetime(BaseCassEngTestCase):
         dt2 = self.DatetimeTest.objects(test_id=0).first()
         assert dt2.created_at.timetuple()[:6] == (now + timedelta(hours=1)).timetuple()[:6]
 
+    def test_datetime_date_support(self):
+        today = date.today()
+        self.DatetimeTest.objects.create(test_id=0, created_at=today)
+        dt2 = self.DatetimeTest.objects(test_id=0).first()
+        assert dt2.created_at.isoformat() == datetime(today.year, today.month, today.day).isoformat()
+
 
 class TestDate(BaseCassEngTestCase):
     class DateTest(Model):
