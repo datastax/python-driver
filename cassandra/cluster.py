@@ -237,7 +237,7 @@ class Cluster(object):
         old = self._core_connections_per_host[host_distance]
         self._core_connections_per_host[host_distance] = core_connections
         if old < core_connections:
-            self.ensure_pool_sizing()
+            self.ensure_core_connections()
 
     def get_max_connections_per_host(self, host_distance):
         return self._max_connections_per_host[host_distance]
