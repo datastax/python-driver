@@ -36,6 +36,11 @@ class BaseQueryFunction(QueryValue):
     """
 
 class MinTimeUUID(BaseQueryFunction):
+    """
+    return a fake timeuuid corresponding to the smallest possible timeuuid for the given timestamp
+
+    http://cassandra.apache.org/doc/cql3/CQL.html#timeuuidFun
+    """
 
     _cql_string = 'MinTimeUUID(:{})'
 
@@ -53,6 +58,11 @@ class MinTimeUUID(BaseQueryFunction):
         return long((self.value - epoch).total_seconds() * 1000)
 
 class MaxTimeUUID(BaseQueryFunction):
+    """
+    return a fake timeuuid corresponding to the largest possible timeuuid for the given timestamp
+
+    http://cassandra.apache.org/doc/cql3/CQL.html#timeuuidFun
+    """
 
     _cql_string = 'MaxTimeUUID(:{})'
 
@@ -70,6 +80,11 @@ class MaxTimeUUID(BaseQueryFunction):
         return long((self.value - epoch).total_seconds() * 1000)
 
 class Token(BaseQueryFunction):
+    """
+    compute the token for a given partition key
+
+    http://cassandra.apache.org/doc/cql3/CQL.html#tokenFun
+    """
 
     def __init__(self, *values):
         if len(values) == 1 and isinstance(values[0], (list, tuple)):
