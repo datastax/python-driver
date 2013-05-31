@@ -64,12 +64,12 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         Tests the where clause creation
         """
         query1 = TestModel.objects(test_id=5)
-        ids = [o.identifier for o in query1._where]
+        ids = [o.query_value.identifier for o in query1._where]
         where = query1._where_clause()
         assert where == '"test_id" = :{}'.format(*ids)
 
         query2 = query1.filter(expected_result__gte=1)
-        ids = [o.identifier for o in query2._where]
+        ids = [o.query_value.identifier for o in query2._where]
         where = query2._where_clause()
         assert where == '"test_id" = :{} AND "expected_result" >= :{}'.format(*ids)
 
@@ -89,9 +89,9 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         query2 = query1.filter(expected_result__gte=1)
         assert len(query2._where) == 2
 
-    def test_the_all_method_clears_where_filter(self):
+    def test_the_all_method_duplicates_queryset(self):
         """
-        Tests that calling all on a queryset with previously defined filters returns a queryset with no filters
+        Tests that calling all on a queryset with previously defined filters duplicates queryset
         """
         query1 = TestModel.objects(test_id=5)
         assert len(query1._where) == 1
@@ -100,7 +100,7 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         assert len(query2._where) == 2
 
         query3 = query2.all()
-        assert len(query3._where) == 0
+        assert query3 == query2
 
     def test_defining_only_and_defer_fails(self):
         """
@@ -470,5 +470,20 @@ class TestInOperator(BaseQuerySetUsage):
         assert q.count() == 8
 
 
+class TestValuesList(BaseQuerySetUsage):
+    def test_values_list(self):
+        q = TestModel.objects.filter(test_id=0, attempt_id=1)
+        item = q.values_list('test_id', 'attempt_id', 'description', 'expected_result', 'test_result').first()
+        assert item == [0, 1, 'try2', 10, 30]
+
+        item = q.values_list('expected_result', flat=True).first()
+        assert item == 10
+
+class TestObjectsProperty(BaseQuerySetUsage):
+
+    def test_objects_property_returns_fresh_queryset(self):
+        assert TestModel.objects._result_cache is None
+        len(TestModel.objects) # evaluate queryset
+        assert TestModel.objects._result_cache is None
 
 

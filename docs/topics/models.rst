@@ -66,7 +66,10 @@ Column Options
     :attr:`~cqlengine.columns.BaseColumn.primary_key`
         If True, this column is created as a primary key field. A model can have multiple primary keys. Defaults to False.
 
-        *In CQL, there are 2 types of primary keys: partition keys and clustering keys. As with CQL, the first primary key is the partition key, and all others are clustering keys.*
+        *In CQL, there are 2 types of primary keys: partition keys and clustering keys. As with CQL, the first primary key is the partition key, and all others are clustering keys, unless partition keys are specified manually using* :attr:`~cqlengine.columns.BaseColumn.partition_key`
+
+    :attr:`~cqlengine.columns.BaseColumn.partition_key`
+        If True, this column is created as partition primary key. There may be many partition keys defined, forming *composite partition key*
 
     :attr:`~cqlengine.columns.BaseColumn.index`
         If True, an index will be created for this column. Defaults to False.

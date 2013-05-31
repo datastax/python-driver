@@ -26,6 +26,10 @@ class hybrid_classmethod(object):
         else:
             return self.instmethod.__get__(instance, owner)
 
+class QuerySetDescriptor(object):
+    def __get__(self, obj, model):
+        return QuerySet(model)
+
 class BaseModel(object):
     """
     The base model class, don't inherit from this, inherit from Model, defined below
@@ -33,6 +37,8 @@ class BaseModel(object):
     
     class DoesNotExist(QueryException): pass
     class MultipleObjectsReturned(QueryException): pass
+
+    objects = QuerySetDescriptor()
 
     #table names will be generated automatically from it's model and package name
     #however, you can also define them manually here
@@ -102,10 +108,10 @@ class BaseModel(object):
         if not include_keyspace: return cf_name
         return '{}.{}'.format(cls._get_keyspace(), cf_name)
 
-    @property
-    def pk(self):
-        """ Returns the object's primary key """
-        return getattr(self, self._pk_name)
+    #@property
+    #def pk(self):
+    #    """ Returns the object's primary key """
+    #    return getattr(self, self._pk_name)
 
     def validate(self):
         """ Cleans and validates the field values """
@@ -174,7 +180,6 @@ class ModelMetaClass(type):
         column_dict = OrderedDict()
         primary_keys = OrderedDict()
         pk_name = None
-        primary_key = None
 
         #get inherited properties
         inherited_columns = OrderedDict()
@@ -210,24 +215,40 @@ class ModelMetaClass(type):
             k,v = 'id', columns.UUID(primary_key=True)
             column_definitions = [(k,v)] + column_definitions
 
+        has_partition_keys = any(v.partition_key for (k, v) in column_definitions)
+
         #TODO: check that the defined columns don't conflict with any of the Model API's existing attributes/methods
         #transform column definitions
         for k,v in column_definitions:
-            if pk_name is None and v.primary_key:
-                pk_name = k
-                primary_key = v
-                v._partition_key = True
+            if not has_partition_keys and v.primary_key:
+                v.partition_key = True
+                has_partition_keys = True
             _transform_column(k,v)
-        
-        #setup primary key shortcut
-        if pk_name != 'pk':
-            attrs['pk'] = attrs[pk_name]
 
-        #check for duplicate column names
+        partition_keys = OrderedDict(k for k in primary_keys.items() if k[1].partition_key)
+        clustering_keys = OrderedDict(k for k in primary_keys.items() if not k[1].partition_key)
+
+        #setup partition key shortcut
+        assert partition_keys
+        if len(partition_keys) == 1:
+            pk_name = partition_keys.keys()[0]
+            attrs['pk'] = attrs[pk_name]
+        else:
+            # composite partition key case
+            _get = lambda self: tuple(self._values[c].getval() for c in partition_keys.keys())
+            _set = lambda self, val: tuple(self._values[c].setval(v) for (c, v) in zip(partition_keys.keys(), val))
+            attrs['pk'] = property(_get, _set)
+
+        # some validation
         col_names = set()
         for v in column_dict.values():
+            # check for duplicate column names
             if v.db_field_name in col_names:
                 raise ModelException("{} defines the column {} more than once".format(name, v.db_field_name))
+            if v.clustering_order and not (v.primary_key and not v.partition_key):
+                raise ModelException("clustering_order may be specified only for clustering primary keys")
+            if v.clustering_order and v.clustering_order.lower() not in ('asc', 'desc'):
+                raise ModelException("invalid clustering order {} for column {}".format(repr(v.clustering_order), v.db_field_name))
             col_names.add(v.db_field_name)
 
         #create db_name -> model name map for loading
@@ -244,12 +265,13 @@ class ModelMetaClass(type):
         attrs['_defined_columns'] = defined_columns
         attrs['_db_map'] = db_map
         attrs['_pk_name'] = pk_name
-        attrs['_primary_key'] = primary_key
         attrs['_dynamic_columns'] = {}
+
+        attrs['_partition_keys'] = partition_keys
+        attrs['_clustering_keys'] = clustering_keys
 
         #create the class and add a QuerySet to it
         klass = super(ModelMetaClass, cls).__new__(cls, name, bases, attrs)
-        klass.objects = QuerySet(klass)
         return klass
 
 

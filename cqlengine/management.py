@@ -61,20 +61,29 @@ def create_table(model, create_missing_keyspace=True):
 
             #add column types
             pkeys = []
+            ckeys = []
             qtypes = []
             def add_column(col):
                 s = col.get_column_def()
-                if col.primary_key: pkeys.append('"{}"'.format(col.db_field_name))
+                if col.primary_key:
+                    keys = (pkeys if col.partition_key else ckeys)
+                    keys.append('"{}"'.format(col.db_field_name))
                 qtypes.append(s)
             for name, col in model._columns.items():
                 add_column(col)
 
-            qtypes.append('PRIMARY KEY ({})'.format(', '.join(pkeys)))
+            qtypes.append('PRIMARY KEY (({}){})'.format(', '.join(pkeys), ckeys and ', ' + ', '.join(ckeys) or ''))
             
             qs += ['({})'.format(', '.join(qtypes))]
-            
+
+            with_qs = ['read_repair_chance = {}'.format(model.read_repair_chance)]
+
+            _order = ["%s %s" % (c.db_field_name, c.clustering_order or 'ASC') for c in model._clustering_keys.values()]
+            if _order:
+                with_qs.append("clustering order by ({})".format(', '.join(_order)))
+
             # add read_repair_chance
-            qs += ['WITH read_repair_chance = {}'.format(model.read_repair_chance)]
+            qs += ['WITH {}'.format(' AND '.join(with_qs))]
             qs = ' '.join(qs)
 
             try:

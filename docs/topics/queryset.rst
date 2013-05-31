@@ -178,6 +178,26 @@ TimeUUID Functions
 
         DataStream.filter(time__gt=cqlengine.MinTimeUUID(min_time), time__lt=cqlengine.MaxTimeUUID(max_time))
 
+Token Function
+==============
+
+    Token functon may be used only on special, virtual column pk__token, representing token of partition key (it also works for composite partition keys).
+    Cassandra orders returned items by value of partition key token, so using cqlengine.Token we can easy paginate through all table rows.
+
+    *Example*
+
+    .. code-block:: python
+
+        class Items(Model):
+            id      = cqlengine.Text(primary_key=True)
+            data    = cqlengine.Bytes()
+
+        query = Items.objects.all().limit(10)
+
+        first_page = list(query);
+        last = first_page[-1]
+        next_page = list(query.filter(pk__token__gt=cqlengine.Token(last.pk)))
+
 QuerySets are imutable
 ======================
 
@@ -212,6 +232,13 @@ Ordering QuerySets
     *Note: Cassandra only supports ordering on a clustering key. In other words, to support ordering results, your model must have more than one primary key, and you must order on a primary key, excluding the first one.*
 
     *For instance, given our Automobile model, year is the only column we can order on.*
+
+Values Lists
+============
+
+    There is a special QuerySet's method ``.values_list()`` - when called, QuerySet returns lists of values instead of model instances. It may significantly speedup things with lower memory footprint for large responses.
+    Each tuple contains the value from the respective field passed into the ``values_list()`` call — so the first item is the first field, etc. For example:
+
 
 Batch Queries
 ===============

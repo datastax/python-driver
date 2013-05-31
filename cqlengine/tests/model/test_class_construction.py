@@ -118,6 +118,28 @@ class TestModelClassFunction(BaseCassEngTestCase):
         Test that metadata defined in one class, is not inherited by subclasses
         """
 
+    def test_partition_keys(self):
+        """
+        Test compound partition key definition
+        """
+        class ModelWithPartitionKeys(cqlengine.Model):
+            c1 = cqlengine.Text(primary_key=True)
+            p1 = cqlengine.Text(partition_key=True)
+            p2 = cqlengine.Text(partition_key=True)
+
+        cols = ModelWithPartitionKeys._columns
+
+        self.assertTrue(cols['c1'].primary_key)
+        self.assertFalse(cols['c1'].partition_key)
+
+        self.assertTrue(cols['p1'].primary_key)
+        self.assertTrue(cols['p1'].partition_key)
+        self.assertTrue(cols['p2'].primary_key)
+        self.assertTrue(cols['p2'].partition_key)
+
+        obj = ModelWithPartitionKeys(p1='a', p2='b')
+        self.assertEquals(obj.pk, ('a', 'b'))
+
     def test_del_attribute_is_assigned_properly(self):
         """ Tests that columns that can be deleted have the del attribute """
         class DelModel(Model):
