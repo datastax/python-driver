@@ -18,25 +18,18 @@ LOG = logging.getLogger('cqlengine.cql')
 class CQLConnectionError(CQLEngineException): pass
 
 Host = namedtuple('Host', ['name', 'port'])
-_hosts = []
-_host_idx = 0
-_conn= None
-_username = None
-_password = None
-_max_connections = 10
 
-def setup(hosts, username=None, password=None, max_connections=10, default_keyspace=None, lazy=False):
+_max_connections = 10
+_connection_pool = None
+
+def setup(hosts, username=None, password=None, max_connections=10, default_keyspace=None, lazy=True):
     """
     Records the hosts and connects to one of them
 
     :param hosts: list of hosts, strings in the <hostname>:<port>, or just <hostname>
     """
-    global _hosts
-    global _username
-    global _password
     global _max_connections
-    _username = username
-    _password = password
+    global _connection_pool
     _max_connections = max_connections
 
     if default_keyspace:
@@ -56,11 +49,11 @@ def setup(hosts, username=None, password=None, max_connections=10, default_keysp
     if not _hosts:
         raise CQLConnectionError("At least one host required")
 
-    random.shuffle(_hosts)
+    _connection_pool = ConnectionPool(_hosts)
 
     if not lazy:
-        con = ConnectionPool.get()
-        ConnectionPool.put(con)
+        con = _connection_pool.get()
+        _connection_pool.put(con)
 
 
 class ConnectionPool(object):
@@ -69,8 +62,11 @@ class ConnectionPool(object):
     # Connection pool queue
     _queue = None
 
-    def __init__(self, hosts):
+    def __init__(self, hosts, username, password):
         self._hosts = hosts
+        self._username = username
+        self._password = password
+
         self._queue = Queue.Queue(maxsize=_max_connections)
 
     def clear(self):
