@@ -14,6 +14,7 @@ def create_keyspace(name, strategy_class='SimpleStrategy', replication_factor=3,
     :param **replication_values: 1.2 only, additional values to ad to the replication data map
     """
     with connection_manager() as con:
+        #TODO: check system tables instead of using cql thrifteries
         if not any([name == k.name for k in con.con.client.describe_keyspaces()]):
 #        if name not in [k.name for k in con.con.client.describe_keyspaces()]:
             try:
@@ -55,6 +56,7 @@ def create_table(model, create_missing_keyspace=True):
 
     with connection_manager() as con:
         #check for an existing column family
+        #TODO: check system tables instead of using cql thrifteries
         ks_info = con.con.client.describe_keyspace(model._get_keyspace())
         if not any([raw_cf_name == cf.name for cf in ks_info.cf_defs]):
             qs = ['CREATE TABLE {}'.format(cf_name)]
