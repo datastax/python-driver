@@ -903,18 +903,20 @@ class ControlConnection(object):
     def _handle_status_change(self, event):
         change_type = event["change_type"]
         addr, port = event["address"]
+        host = self._cluster.metadata.get_host(addr)
         if change_type == "UP":
-            host = self._cluster.metadata.get_host(addr)
-            if not host:
-                self._cluster.scheduler.schedule(1, self.add_host, addr, signal=True)
+            if host is None:
+                # this is the first time we've seen the node
+                self._cluster.scheduler.schedule(1, self._cluster.add_host, addr, signal=True)
             else:
-                self._cluster.scheduler.schedule(1, self.on_up, host)
+                self._cluster.scheduler.schedule(1, host.monitor.set_up)
         elif change_type == "DOWN":
-            # Ignore down event. Connection will realize a node is dead quicly
-            # enough when it writes to it, and there is no point in taking the
-            # risk of marking the node down mistakenly because we didn't
-            # receive the event in a timely fashion
-            pass
+            # Note that there is a slight risk we can receive the event late and thus
+            # mark the host down even though we already had reconnected successfully.
+            # But it is unlikely, and don't have too much consequence since we'll try reconnecting
+            # right away, so we favor the detection to make the Host.is_up more accurate.
+            if host is not None:
+                self._cluster.scheduler.schedule(1, host.monitor.set_down)
 
     def _handle_schema_change(self, event):
         keyspace = event['keyspace'] or None

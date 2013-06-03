@@ -223,3 +223,37 @@ class ControlConnectionTest(unittest.TestCase):
         }
         self.control_connection._handle_topology_change(event)
         self.cluster.scheduler.schedule.assert_called_with(ANY, self.control_connection.refresh_node_list_and_token_map)
+
+    def test_handle_status_change(self):
+        event = {
+            'change_type': 'UP',
+            'address': ('1.2.3.4', 9000)
+        }
+        self.control_connection._handle_status_change(event)
+        self.cluster.scheduler.schedule.assert_called_with(ANY, self.cluster.add_host, '1.2.3.4', signal=True)
+
+        # do the same with a known Host
+        event = {
+            'change_type': 'UP',
+            'address': ('192.168.1.0', 9000)
+        }
+        self.control_connection._handle_status_change(event)
+        host = self.cluster.metadata.hosts['192.168.1.0']
+        self.cluster.scheduler.schedule.assert_called_with(ANY, host.monitor.set_up)
+
+        self.cluster.scheduler.schedule.reset_mock()
+        event = {
+            'change_type': 'DOWN',
+            'address': ('1.2.3.4', 9000)
+        }
+        self.control_connection._handle_status_change(event)
+        self.assertFalse(self.cluster.scheduler.schedule.called)
+
+        # do the same with a known Host
+        event = {
+            'change_type': 'DOWN',
+            'address': ('192.168.1.0', 9000)
+        }
+        self.control_connection._handle_status_change(event)
+        host = self.cluster.metadata.hosts['192.168.1.0']
+        self.cluster.scheduler.schedule.assert_called_with(ANY, host.monitor.set_down)

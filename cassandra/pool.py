@@ -186,6 +186,17 @@ class HealthMonitor(object):
         with self._lock:
             self._listeners.remove(listener)
 
+    def set_up(self):
+        self._conviction_policy.reset()
+
+        with self._lock:
+            listeners = self._listeners.copy()
+
+        for listener in listeners:
+            listener.on_up(self._host)
+
+        self.is_up = True
+
     def set_down(self):
         self.is_up = False
 
@@ -196,15 +207,7 @@ class HealthMonitor(object):
             listener.on_down(self._host)
 
     def reset(self):
-        self._conviction_policy.reset()
-
-        with self._lock:
-            listeners = self._listeners.copy()
-
-        for listener in listeners:
-            listener.on_up(self._host)
-
-        self.is_up = True
+        return self.set_up()
 
     def signal_connection_failure(self, connection_exc):
         is_down = self._conviction_policy.add_failure(connection_exc)
