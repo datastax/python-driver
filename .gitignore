@@ -2,3 +2,5 @@
 *.swp
 *.swo
 build
+MANIFEST
+dist
