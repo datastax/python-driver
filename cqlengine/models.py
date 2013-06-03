@@ -220,6 +220,8 @@ class ModelMetaClass(type):
         #TODO: check that the defined columns don't conflict with any of the Model API's existing attributes/methods
         #transform column definitions
         for k,v in column_definitions:
+            # this will mark the first primary key column as a partition
+            # key, if one hasn't been set already
             if not has_partition_keys and v.primary_key:
                 v.partition_key = True
                 has_partition_keys = True
@@ -234,7 +236,7 @@ class ModelMetaClass(type):
             pk_name = partition_keys.keys()[0]
             attrs['pk'] = attrs[pk_name]
         else:
-            # composite partition key case
+            # composite partition key case, get/set a tuple of values
             _get = lambda self: tuple(self._values[c].getval() for c in partition_keys.keys())
             _set = lambda self, val: tuple(self._values[c].setval(v) for (c, v) in zip(partition_keys.keys(), val))
             attrs['pk'] = property(_get, _set)

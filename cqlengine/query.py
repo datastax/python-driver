@@ -405,6 +405,9 @@ class QuerySet(object):
                 return self._result_cache[s]
 
     def _create_result_constructor(self, names):
+        """
+        Returns a function that will be used to instantiate query results
+        """
         model = self.model
         db_map = model._db_map
         if not self._values_list:
@@ -632,6 +635,7 @@ class QuerySet(object):
                 con.execute(qs, self._where_values())
 
     def values_list(self, *fields, **kwargs):
+        """ Instructs the query set to return tuples, not model instance """
         flat = kwargs.pop('flat', False)
         if kwargs:
             raise TypeError('Unexpected keyword arguments to values_list: %s'
