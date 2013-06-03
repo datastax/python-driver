@@ -184,6 +184,8 @@ Token Function
     Token functon may be used only on special, virtual column pk__token, representing token of partition key (it also works for composite partition keys).
     Cassandra orders returned items by value of partition key token, so using cqlengine.Token we can easy paginate through all table rows.
 
+    See http://cassandra.apache.org/doc/cql3/CQL.html#tokenFun
+
     *Example*
 
     .. code-block:: python
