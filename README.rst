@@ -1,6 +1,11 @@
 python-driver
 =============
-Python Native Protocol CQL Driver (Work in Progress)
+Python Native Protocol Driver (Work in Progress)
+
+**Warning**
+This driver is currently under heavy development, so the API and layout of
+packages, modules, classes, and functions are subject to change.
+
 
 Features to be Added
 --------------------
