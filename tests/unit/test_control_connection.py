@@ -2,6 +2,8 @@ import unittest
 
 from mock import Mock, ANY
 
+from futures import ThreadPoolExecutor
+
 from cassandra.decoder import ResultMessage
 from cassandra.cluster import ControlConnection, Cluster, _Scheduler
 from cassandra.pool import Host
@@ -42,6 +44,7 @@ class MockCluster(object):
         self.added_hosts = []
         self.removed_hosts = []
         self.scheduler = Mock(spec=_Scheduler)
+        self.executor = Mock(spec=ThreadPoolExecutor)
 
     def add_host(self, address, signal=False):
         host = Host(address, SimpleConvictionPolicy)
@@ -257,3 +260,30 @@ class ControlConnectionTest(unittest.TestCase):
         self.control_connection._handle_status_change(event)
         host = self.cluster.metadata.hosts['192.168.1.0']
         self.cluster.scheduler.schedule.assert_called_with(ANY, host.monitor.set_down)
+
+    def test_handle_schema_change(self):
+
+        for change_type in ('CREATED', 'DROPPED'):
+            event = {
+                'change_type': change_type,
+                'keyspace': 'ks1',
+                'table': 'table1'
+            }
+            self.control_connection._handle_schema_change(event)
+            self.cluster.executor.submit.assert_called_with(self.control_connection.refresh_schema, 'ks1')
+
+            event['table'] = None
+            self.control_connection._handle_schema_change(event)
+            self.cluster.executor.submit.assert_called_with(self.control_connection.refresh_schema, None)
+
+        event = {
+            'change_type': 'UPDATED',
+            'keyspace': 'ks1',
+            'table': 'table1'
+        }
+        self.control_connection._handle_schema_change(event)
+        self.cluster.executor.submit.assert_called_with(self.control_connection.refresh_schema, 'ks1', 'table1')
+
+        event['table'] = None
+        self.control_connection._handle_schema_change(event)
+        self.cluster.executor.submit.assert_called_with(self.control_connection.refresh_schema, 'ks1', None)
