@@ -383,7 +383,7 @@ class Cluster(object):
 
     def remove_host(self, host):
         """ Internal method """
-        if host and self.metdata.remove_host(host):
+        if host and self.metadata.remove_host(host):
             self.on_remove(host)
 
     def ensure_core_connections(self):
