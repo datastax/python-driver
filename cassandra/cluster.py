@@ -1339,3 +1339,8 @@ class ResponseFuture(object):
         """
         self.add_callback(callback, *callback_args, **(callback_kwargs or {}))
         self.add_errback(errback, *errback_args, **(errback_kwargs or {}))
+
+    def __str__(self):
+        query = self.query.query_string
+        return "<ResponseFuture: query='%s' request_id=%s result=%s exception=%s host=%s>" \
+               % (query, self._req_id, self._final_result, self._final_exception, self._current_host)
