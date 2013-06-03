@@ -1321,5 +1321,5 @@ class ResponseFuture(object):
         A convenient combination of :meth:`~.ResultFuture.add_callback()` and
         :meth:`~.ResultFuture.add_errback()``.
         """
-        self.add_callback(callback, *callback_args, **(callback_kwargs | {}))
-        self.add_errback(errback, *errback_args, **(errback_kwargs | {}))
+        self.add_callback(callback, *callback_args, **(callback_kwargs or {}))
+        self.add_errback(errback, *errback_args, **(errback_kwargs or {}))
