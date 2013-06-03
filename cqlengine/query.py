@@ -14,6 +14,10 @@ from cqlengine.functions import QueryValue, Token
 #http://www.datastax.com/docs/1.1/references/cql/index
 
 class QueryException(CQLEngineException): pass
+class DoesNotExist(QueryException): pass
+class MultipleObjectsReturned(QueryException): pass
+
+
 class QueryOperatorException(QueryException): pass
 
 class QueryOperator(object):

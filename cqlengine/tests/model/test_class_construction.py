@@ -151,6 +151,37 @@ class TestModelClassFunction(BaseCassEngTestCase):
         with self.assertRaises(AttributeError):
             del model.key
 
+    def test_does_not_exist_exceptions_are_not_shared_between_model(self):
+        """ Tests that DoesNotExist exceptions are not the same exception between models """
+
+        class Model1(Model):
+            pass
+        class Model2(Model):
+            pass
+
+        try:
+            raise Model1.DoesNotExist
+        except Model2.DoesNotExist:
+            assert False, "Model1 exception should not be caught by Model2"
+        except Model1.DoesNotExist:
+            #expected
+            pass
+
+    def test_does_not_exist_inherits_from_superclass(self):
+        """ Tests that a DoesNotExist exception can be caught by it's parent class DoesNotExist """
+        class Model1(Model):
+            pass
+        class Model2(Model1):
+            pass
+
+        try:
+            raise Model2.DoesNotExist
+        except Model1.DoesNotExist:
+            #expected
+            pass
+        except Exception:
+            assert False, "Model2 exception should not be caught by Model1"
+
 class TestManualTableNaming(BaseCassEngTestCase):
     
     class RenamedTest(cqlengine.Model):

@@ -3,8 +3,9 @@ import re
 
 from cqlengine import columns
 from cqlengine.exceptions import ModelException
-from cqlengine.functions import BaseQueryFunction
-from cqlengine.query import QuerySet, QueryException, DMLQuery
+from cqlengine.query import QuerySet, DMLQuery
+from cqlengine.query import DoesNotExist as _DoesNotExist
+from cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
 
 class ModelDefinitionException(ModelException): pass
 
@@ -35,8 +36,8 @@ class BaseModel(object):
     The base model class, don't inherit from this, inherit from Model, defined below
     """
     
-    class DoesNotExist(QueryException): pass
-    class MultipleObjectsReturned(QueryException): pass
+    class DoesNotExist(_DoesNotExist): pass
+    class MultipleObjectsReturned(_MultipleObjectsReturned): pass
 
     objects = QuerySetDescriptor()
 
@@ -182,6 +183,7 @@ class ModelMetaClass(type):
             for k,v in getattr(base, '_defined_columns', {}).items():
                 inherited_columns.setdefault(k,v)
 
+
         def _transform_column(col_name, col_obj):
             column_dict[col_name] = col_obj
             if col_obj.primary_key:
@@ -266,6 +268,21 @@ class ModelMetaClass(type):
 
         attrs['_partition_keys'] = partition_keys
         attrs['_clustering_keys'] = clustering_keys
+
+        #setup class exceptions
+        DoesNotExistBase = None
+        for base in bases:
+            DoesNotExistBase = getattr(base, 'DoesNotExist', None)
+            if DoesNotExistBase is not None: break
+        DoesNotExistBase = DoesNotExistBase or attrs.pop('DoesNotExist', BaseModel.DoesNotExist)
+        attrs['DoesNotExist'] = type('DoesNotExist', (DoesNotExistBase,), {})
+
+        MultipleObjectsReturnedBase = None
+        for base in bases:
+            MultipleObjectsReturnedBase = getattr(base, 'MultipleObjectsReturned', None)
+            if MultipleObjectsReturnedBase is not None: break
+        MultipleObjectsReturnedBase = DoesNotExistBase or attrs.pop('MultipleObjectsReturned', BaseModel.MultipleObjectsReturned)
+        attrs['MultipleObjectsReturned'] = type('MultipleObjectsReturned', (MultipleObjectsReturnedBase,), {})
 
         #create the class and add a QuerySet to it
         klass = super(ModelMetaClass, cls).__new__(cls, name, bases, attrs)
