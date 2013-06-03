@@ -108,11 +108,6 @@ class BaseModel(object):
         if not include_keyspace: return cf_name
         return '{}.{}'.format(cls._get_keyspace(), cf_name)
 
-    #@property
-    #def pk(self):
-    #    """ Returns the object's primary key """
-    #    return getattr(self, self._pk_name)
-
     def validate(self):
         """ Cleans and validates the field values """
         for name, col in self._columns.items():
