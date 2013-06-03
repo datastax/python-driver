@@ -1,6 +1,5 @@
 from itertools import islice, cycle, groupby, repeat
 from random import randint
-from threading import RLock
 
 from cassandra import ConsistencyLevel
 
@@ -22,9 +21,6 @@ class LoadBalancingPolicy(object):
 
 class RoundRobinPolicy(LoadBalancingPolicy):
 
-    def __init__(self):
-        self._lock = RLock()
-
     def populate(self, cluster, hosts):
         self._live_hosts = set(hosts)
         if len(hosts) <= 1:
@@ -36,9 +32,10 @@ class RoundRobinPolicy(LoadBalancingPolicy):
         return HostDistance.LOCAL
 
     def make_query_plan(self, query=None):
-        with self._lock:
-            pos = self._position
-            self._position += 1
+        # not thread-safe, but we don't care much about lost increments
+        # for the purposes of load balancing
+        pos = self._position
+        self._position += 1
 
         length = len(self._live_hosts)
         if length:
@@ -66,7 +63,6 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
         self.local_dc = local_dc
         self.used_hosts_per_remote_dc = used_hosts_per_remote_dc
         self._dc_live_hosts = {}
-        self._lock = RLock()
 
     def populate(self, cluster, hosts):
         for dc, dc_hosts in groupby(hosts, lambda h: h.datacenter):
@@ -96,9 +92,10 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
                 return HostDistance.IGNORED
 
     def make_query_plan(self, query=None):
-        with self._lock:
-            pos = self._position
-            self._position += 1
+        # not thread-safe, but we don't care much about lost increments
+        # for the purposes of load balancing
+        pos = self._position
+        self._position += 1
 
         local_live = list(self._dc_live_hosts.get(self.local_dc))
         pos %= len(local_live)
