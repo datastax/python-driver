@@ -35,3 +35,7 @@ class ParamBindingTest(unittest.TestCase):
     def test_map_collection(self):
         result = bind_params("%s", (ColumnCollection({'a': 'a', 'b': 'b'}),))
         self.assertEquals(result, "{ 'a' : 'a' , 'b' : 'b' }")
+
+    def  test_quote_escaping(self):
+        result = bind_params("%s", ("""'ef''ef"ef""ef'""",))
+        self.assertEquals(result, """'''ef''''ef"ef""ef'''""")
