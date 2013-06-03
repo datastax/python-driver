@@ -236,6 +236,7 @@ class DateTime(Column):
 
     def to_database(self, value):
         value = super(DateTime, self).to_database(value)
+        if value is None: return
         if not isinstance(value, datetime):
             if isinstance(value, date):
                 value = datetime(value.year, value.month, value.day)
