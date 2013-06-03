@@ -137,19 +137,25 @@ class Cluster(object):
     An instance of :cls:`cassandra.metadata.Metadata`.
     """
 
+    sessions = None
+    control_connection = None
+    scheduler = None
+    executor = None
+    _is_shutdown = False
+
     def __init__(self,
-                contact_points=("127.0.0.1",),
-                port=9042,
-                compression=True,
-                auth_provider=None,
-                load_balancing_policy_factory=None,
-                reconnection_policy=None,
-                retry_policy_factory=None,
-                conviction_policy_factory=None,
-                metrics_enabled=False,
-                sockopts=None,
-                executor_threads=2,
-                max_schema_agreement_wait=10):
+                 contact_points=("127.0.0.1",),
+                 port=9042,
+                 compression=True,
+                 auth_provider=None,
+                 load_balancing_policy_factory=None,
+                 reconnection_policy=None,
+                 retry_policy_factory=None,
+                 conviction_policy_factory=None,
+                 metrics_enabled=False,
+                 sockopts=None,
+                 executor_threads=2,
+                 max_schema_agreement_wait=10):
 
         self.contact_points = contact_points
         self.port = port
@@ -212,7 +218,6 @@ class Cluster(object):
         self.executor = ThreadPoolExecutor(max_workers=executor_threads)
         self.scheduler = _Scheduler(self.executor)
 
-        self._is_shutdown = False
         self._lock = RLock()
 
         for address in contact_points:
@@ -299,15 +304,18 @@ class Cluster(object):
             else:
                 self._is_shutdown = True
 
-        self.scheduler.shutdown()
+        if self.scheduler:
+            self.scheduler.shutdown()
 
         if self.control_connection:
             self.control_connection.shutdown()
 
-        for session in self.sessions:
-            session.shutdown()
+        if self.sessions:
+            for session in self.sessions:
+                session.shutdown()
 
-        self.executor.shutdown()
+        if self.executor:
+            self.executor.shutdown()
 
     def __del__(self):
         # we don't use shutdown() because we want to avoid shutting down
@@ -315,7 +323,8 @@ class Cluster(object):
         # longer any references to this Cluster object, but there are
         # still references to the Session object)
         if not self._is_shutdown:
-            self.scheduler.shutdown()
+            if self.scheduler:
+                self.scheduler.shutdown()
             if self.control_connection:
                 self.control_connection.shutdown()
             if self.executor:
