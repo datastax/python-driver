@@ -22,7 +22,7 @@ Host = namedtuple('Host', ['name', 'port'])
 _max_connections = 10
 _connection_pool = None
 
-def setup(hosts, username=None, password=None, max_connections=10, default_keyspace=None, lazy=True):
+def setup(hosts, username=None, password=None, max_connections=10, default_keyspace=None):
     """
     Records the hosts and connects to one of them
 
@@ -36,6 +36,7 @@ def setup(hosts, username=None, password=None, max_connections=10, default_keysp
         from cqlengine import models
         models.DEFAULT_KEYSPACE = default_keyspace
 
+    _hosts = []
     for host in hosts:
         host = host.strip()
         host = host.split(':')
@@ -50,10 +51,6 @@ def setup(hosts, username=None, password=None, max_connections=10, default_keysp
         raise CQLConnectionError("At least one host required")
 
     _connection_pool = ConnectionPool(_hosts)
-
-    if not lazy:
-        con = _connection_pool.get()
-        _connection_pool.put(con)
 
 
 class ConnectionPool(object):
@@ -101,14 +98,10 @@ class ConnectionPool(object):
         :param conn: The connection to be released
         :type conn: connection
         """
-        try:
-            if self._queue.full():
-                conn.close()
-            else:
-                self._queue.put(conn)
-        except:
-            if not self._queue:
-                self._queue =
+
+        if self._queue.full():
+            conn.close()
+        else:
             self._queue.put(conn)
 
     def _create_connection(self):
@@ -117,11 +110,7 @@ class ConnectionPool(object):
 
         should only return a valid connection that it's actually connected to
         """
-        global _hosts
-        global _username
-        global _password
-
-        if not _hosts:
+        if not self._hosts:
             raise CQLConnectionError("At least one host required")
 
         host = _hosts[_host_idx]
