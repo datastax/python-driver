@@ -122,6 +122,8 @@ class ConnectionPool(object):
     def _create_connection(cls):
         """
         Creates a new connection for the connection pool.
+
+        should only return a valid connection that it's actually connected to
         """
         global _hosts
         global _username
