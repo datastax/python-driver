@@ -1,7 +1,9 @@
 import unittest
 
+from mock import Mock, ANY
+
 from cassandra.decoder import ResultMessage
-from cassandra.cluster import ControlConnection, Cluster
+from cassandra.cluster import ControlConnection, Cluster, _Scheduler
 from cassandra.pool import Host
 from cassandra.policies import SimpleConvictionPolicy
 
@@ -39,6 +41,7 @@ class MockCluster(object):
         self.metadata = MockMetadata()
         self.added_hosts = []
         self.removed_hosts = []
+        self.scheduler = Mock(spec=_Scheduler)
 
     def add_host(self, address, signal=False):
         host = Host(address, SimpleConvictionPolicy)
@@ -198,3 +201,25 @@ class ControlConnectionTest(unittest.TestCase):
         self.control_connection.refresh_node_list_and_token_map()
         self.assertEqual(1, len(self.cluster.removed_hosts))
         self.assertEqual(self.cluster.removed_hosts[0].address, "192.168.1.2")
+
+    def test_handle_topology_change(self):
+        event = {
+            'change_type': 'NEW_NODE',
+            'address': ('1.2.3.4', 9000)
+        }
+        self.control_connection._handle_topology_change(event)
+        self.cluster.scheduler.schedule.assert_called_with(ANY, self.cluster.add_host, '1.2.3.4', signal=True)
+
+        event = {
+            'change_type': 'REMOVED_NODE',
+            'address': ('1.2.3.4', 9000)
+        }
+        self.control_connection._handle_topology_change(event)
+        self.cluster.scheduler.schedule.assert_called_with(ANY, self.cluster.remove_host, None)
+
+        event = {
+            'change_type': 'MOVED_NODE',
+            'address': ('1.2.3.4', 9000)
+        }
+        self.control_connection._handle_topology_change(event)
+        self.cluster.scheduler.schedule.assert_called_with(ANY, self.control_connection.refresh_node_list_and_token_map)
