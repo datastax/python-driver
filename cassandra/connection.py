@@ -327,12 +327,15 @@ class Connection(object):
 
     def push(self, data):
         sabs = self.out_buffer_size
+        if len(data) > sabs:
+            chunks = []
+            for i in xrange(0, len(data), sabs):
+                chunks.append(data[i:i + sabs])
+        else:
+            chunks = [data]
+
         with self.lock:
-            if len(data) > sabs:
-                for i in xrange(0, len(data), sabs):
-                    self.deque.append(data[i:i + sabs])
-            else:
-                self.deque.append(data)
+            self.deque.extend(chunks)
 
             if not self._write_watcher.active:
                 with _loop_lock:
