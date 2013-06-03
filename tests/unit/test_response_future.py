@@ -292,6 +292,9 @@ class ResponseFutureTests(unittest.TestCase):
         result = rf.deliver()
         self.assertEqual(result, [{'col': 'val'}])
 
+        # this should get called immediately now that the result is set
+        rf.add_callback(self.assertEqual, [{'col': 'val'}])
+
     def test_errback(self):
         session = self.make_session()
         query = SimpleStatement("INSERT INFO foo (a, b) VALUES (1, 2)")
@@ -307,6 +310,9 @@ class ResponseFutureTests(unittest.TestCase):
         result = Mock(spec=UnavailableErrorMessage, info={})
         rf._set_result(result)
         self.assertRaises(Exception, rf.deliver)
+
+        # this should get called immediately now that the error is set
+        rf.add_errback(self.assertIsInstance, Exception)
 
     def test_add_callbacks(self):
         session = self.make_session()
