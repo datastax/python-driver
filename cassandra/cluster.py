@@ -1170,75 +1170,80 @@ class ResponseFuture(object):
             return None
 
     def _set_result(self, response):
-        if self._current_pool:
-            self._current_pool.return_connection(self._connection)
+        try:
+            if self._current_pool: # and self._connection:
+                self._current_pool.return_connection(self._connection)
 
-        if isinstance(response, ResultMessage):
-            if response.kind == ResultMessage.KIND_SET_KEYSPACE:
-                session = getattr(self, 'session', None)
-                if session:
-                    session.keyspace = response.results
-                self._set_final_result(None)
-            elif response.kind == ResultMessage.KIND_SCHEMA_CHANGE:
-                # refresh the schema before responding, but do it in another
-                # thread instead of the event loop thread
-                self.session.submit(
-                    refresh_schema_and_set_result,
-                    response.results['keyspace'],
-                    response.results['table'],
-                    self.session.cluster.control_connection,
-                    self)
-            else:
-                results = getattr(response, 'results', None)
-                if results is not None and response.kind == ResultMessage.KIND_ROWS:
-                    results = self.row_factory(*results)
-                self._set_final_result(results)
-        elif isinstance(response, ErrorMessage):
-            retry_policy = self.query.retry_policy
-            if not retry_policy:
-                retry_policy = self.session.cluster.retry_policy_factory()
+            if isinstance(response, ResultMessage):
+                if response.kind == ResultMessage.KIND_SET_KEYSPACE:
+                    session = getattr(self, 'session', None)
+                    if session:
+                        session.keyspace = response.results
+                    self._set_final_result(None)
+                elif response.kind == ResultMessage.KIND_SCHEMA_CHANGE:
+                    # refresh the schema before responding, but do it in another
+                    # thread instead of the event loop thread
+                    self.session.submit(
+                        refresh_schema_and_set_result,
+                        response.results['keyspace'],
+                        response.results['table'],
+                        self.session.cluster.control_connection,
+                        self)
+                else:
+                    results = getattr(response, 'results', None)
+                    if results is not None and response.kind == ResultMessage.KIND_ROWS:
+                        results = self.row_factory(*results)
+                    self._set_final_result(results)
+            elif isinstance(response, ErrorMessage):
+                retry_policy = self.query.retry_policy
+                if not retry_policy:
+                    retry_policy = self.session.cluster.retry_policy_factory()
 
-            if isinstance(response, ReadTimeoutErrorMessage):
-                retry = retry_policy.on_read_timeout(
-                    self.query, retry_num=self._query_retries, **response.info)
-            elif isinstance(response, WriteTimeoutErrorMessage):
-                retry = retry_policy.on_write_timeout(
-                    self.query, retry_num=self._query_retries, **response.info)
-            elif isinstance(response, UnavailableErrorMessage):
-                retry = retry_policy.on_unavailable(
-                    self.query, retry_num=self._query_retries, **response.info)
-            elif isinstance(response, OverloadedErrorMessage):
-                # need to retry against a different host here
-                log.warn("Host %s is overloaded, retrying against a different "
-                         "host" % (self._current_host))
-                self._retry(reuse_connection=False, consistency_level=None)
-                return
-            elif isinstance(response, IsBootstrappingErrorMessage):
-                # need to retry against a different host here
-                self._retry(reuse_connection=False, consistency_level=None)
-                return
-            # TODO need to define the PreparedQueryNotFound class
-            # elif isinstance(response, PreparedQueryNotFound):
-            #     pass
-            else:
+                if isinstance(response, ReadTimeoutErrorMessage):
+                    retry = retry_policy.on_read_timeout(
+                        self.query, retry_num=self._query_retries, **response.info)
+                elif isinstance(response, WriteTimeoutErrorMessage):
+                    retry = retry_policy.on_write_timeout(
+                        self.query, retry_num=self._query_retries, **response.info)
+                elif isinstance(response, UnavailableErrorMessage):
+                    retry = retry_policy.on_unavailable(
+                        self.query, retry_num=self._query_retries, **response.info)
+                elif isinstance(response, OverloadedErrorMessage):
+                    # need to retry against a different host here
+                    log.warn("Host %s is overloaded, retrying against a different "
+                             "host" % (self._current_host))
+                    self._retry(reuse_connection=False, consistency_level=None)
+                    return
+                elif isinstance(response, IsBootstrappingErrorMessage):
+                    # need to retry against a different host here
+                    self._retry(reuse_connection=False, consistency_level=None)
+                    return
+                # TODO need to define the PreparedQueryNotFound class
+                # elif isinstance(response, PreparedQueryNotFound):
+                #     pass
+                else:
+                    self._set_final_exception(response)
+                    return
+
+                retry_type, consistency = retry
+                if retry_type is RetryPolicy.RETRY:
+                    self._query_retries += 1
+                    self._retry(reuse_connection=True, consistency_level=consistency)
+                elif retry_type is RetryPolicy.RETHROW:
+                    self._set_final_exception(response)
+                else:  # IGNORE
+                    self._set_final_result(None)
+            elif isinstance(response, Exception):
                 self._set_final_exception(response)
-                return
-
-            retry_type, consistency = retry
-            if retry_type is RetryPolicy.RETRY:
-                self._query_retries += 1
-                self._retry(reuse_connection=True, consistency_level=consistency)
-            elif retry_type is RetryPolicy.RETHROW:
-                self._set_final_exception(response)
-            else:  # IGNORE
-                self._set_final_result(None)
-        elif isinstance(response, Exception):
-            self._set_final_exception(response)
-        else:
-            # we got some other kind of response message
-            msg = "Got unexpected message: %r" % (response,)
-            exc = ConnectionException(msg, self._current_host)
-            self._connection.defunct(exc)
+            else:
+                # we got some other kind of response message
+                msg = "Got unexpected message: %r" % (response,)
+                exc = ConnectionException(msg, self._current_host)
+                self._connection.defunct(exc)
+                self._set_final_exception(exc)
+        except Exception, exc:
+            # almost certainly caused by a bug, but we need to set something here
+            log.exception("Unexpected exception while handling result in ResponseFuture:")
             self._set_final_exception(exc)
 
     def _set_final_result(self, response):
