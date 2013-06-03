@@ -1,4 +1,5 @@
 import unittest
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -15,7 +16,7 @@ marshalled_value_pairs = (
     ('\x7f\xff\xff\xff\xff\xff\xff\xff', 'CounterColumnType', 9223372036854775807),
     ('\x80\x00\x00\x00\x00\x00\x00\x00', 'CounterColumnType', -9223372036854775808),
     ('', 'CounterColumnType', None),
-    ('\x00\x00\x013\x7fb\xeey', 'DateType', 1320692149.881),
+    ('\x00\x00\x013\x7fb\xeey', 'DateType', datetime(2011, 11, 7, 18, 55, 49, 881000)),
     ('', 'DateType', None),
     ('\x00\x00\x00\r\nJ\x04"^\x91\x04\x8a\xb1\x18\xfe', 'DecimalType', Decimal('1243878957943.1234124191998')),
     ('\x00\x00\x00\x06\xe5\xde]\x98Y', 'DecimalType', Decimal('-112233.441191')),

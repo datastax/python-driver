@@ -33,6 +33,8 @@ from cassandra.marshal import (int8_pack, int8_unpack, uint16_pack, uint16_unpac
 
 apache_cassandra_type_prefix = 'org.apache.cassandra.db.marshal.'
 
+_number_types = frozenset((int, long, float))
+
 def trim_if_startswith(s, prefix):
     if s.startswith(prefix):
         return s[len(prefix):]
@@ -473,9 +475,18 @@ class DateType(_CassandraType):
         return datetime.utcfromtimestamp(int64_unpack(byts) / 1000.0)
 
     @staticmethod
-    def serialize(timestamp):
-        return int64_pack(timestamp * 1000)
+    def serialize(v):
+        try:
+            converted = calendar.timegm(v.utctimetuple())
+            converted = converted * 1e3 + getattr(v, 'microsecond', 0) / 1e3
+        except AttributeError:
+            # Ints and floats are valid timestamps too
+            if type(v) not in _number_types:
+                raise TypeError('DateType arguments must be a datetime or timestamp')
 
+            converted = v * 1e3
+
+        return int64_pack(long(converted))
 
 class TimeUUIDType(DateType):
     typename = 'timeuuid'
