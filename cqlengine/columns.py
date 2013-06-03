@@ -52,6 +52,20 @@ class BaseValueManager(object):
         else:
             return property(_get, _set)
 
+class ValueQuoter(object):
+    """
+    contains a single value, which will quote itself for CQL insertion statements
+    """
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        raise NotImplementedError
+
+    def __repr__(self):
+        return self.__str__()
+
+
 class Column(object):
 
     #the cassandra type this column maps to
@@ -293,11 +307,16 @@ class TimeUUID(UUID):
 class Boolean(Column):
     db_type = 'boolean'
 
+    class Quoter(ValueQuoter):
+        """ Cassandra 1.2.5 is stricter about boolean values """
+        def __str__(self):
+            return 'true' if self.value else 'false'
+
     def to_python(self, value):
         return bool(value)
 
     def to_database(self, value):
-        return bool(value)
+        return self.Quoter(bool(value))
 
 class Float(Column):
     db_type = 'double'
@@ -328,19 +347,6 @@ class Counter(Column):
     def __init__(self, **kwargs):
         super(Counter, self).__init__(**kwargs)
         raise NotImplementedError
-
-class ContainerQuoter(object):
-    """
-    contains a single value, which will quote itself for CQL insertion statements
-    """
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        raise NotImplementedError
-
-    def __repr__(self):
-        return self.__str__()
 
 class BaseContainerColumn(Column):
     """
@@ -383,7 +389,7 @@ class Set(BaseContainerColumn):
     """
     db_type = 'set<{}>'
 
-    class Quoter(ContainerQuoter):
+    class Quoter(ValueQuoter):
 
         def __str__(self):
             cq = cql_quote
@@ -466,7 +472,7 @@ class List(BaseContainerColumn):
     """
     db_type = 'list<{}>'
 
-    class Quoter(ContainerQuoter):
+    class Quoter(ValueQuoter):
 
         def __str__(self):
             cq = cql_quote
@@ -563,7 +569,7 @@ class Map(BaseContainerColumn):
 
     db_type = 'map<{}, {}>'
 
-    class Quoter(ContainerQuoter):
+    class Quoter(ValueQuoter):
 
         def __str__(self):
             cq = cql_quote
