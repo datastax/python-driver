@@ -1,6 +1,15 @@
 CHANGELOG
 
-0.2.1 (in progress)
+0.3
+* added support for Token function (thanks @mrk-its)
+* added support for compound partition key (thanks @mrk-its)s
+* added support for defining clustering key ordering (thanks @mrk-its)
+* added values_list to Query class, bypassing object creation if desired (thanks @mrk-its)
+* fixed bug with Model.objects caching values (thanks @mrk-its)
+* fixed Cassandra 1.2.5 compatibility bug
+* updated model exception inheritance
+
+0.2.1
 * adding support for datetimes with tzinfo (thanks @gdoermann)
 * fixing bug in saving map updates (thanks @pandu-rao)
 
