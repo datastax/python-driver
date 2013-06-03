@@ -57,6 +57,9 @@ class MinTimeUUID(BaseQueryFunction):
         epoch = datetime(1970, 1, 1)
         return long((self.value - epoch).total_seconds() * 1000)
 
+    def get_dict(self, column):
+        return {self.identifier: self.get_value()}
+
 class MaxTimeUUID(BaseQueryFunction):
     """
     return a fake timeuuid corresponding to the largest possible timeuuid for the given timestamp
@@ -78,6 +81,9 @@ class MaxTimeUUID(BaseQueryFunction):
     def get_value(self):
         epoch = datetime(1970, 1, 1)
         return long((self.value - epoch).total_seconds() * 1000)
+
+    def get_dict(self, column):
+        return {self.identifier: self.get_value()}
 
 class Token(BaseQueryFunction):
     """
