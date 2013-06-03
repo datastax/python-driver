@@ -6,7 +6,7 @@ from cassandra.cluster import Session, ResponseFuture, NoHostAvailable
 from cassandra.connection import ConnectionException
 from cassandra.decoder import (ReadTimeoutErrorMessage, WriteTimeoutErrorMessage,
                                UnavailableErrorMessage, ResultMessage, QueryMessage,
-                               OverloadedErrorMessage)
+                               OverloadedErrorMessage, IsBootstrappingErrorMessage)
 from cassandra.policies import RetryPolicy
 from cassandra.pool import NoConnectionsAvailable
 from cassandra.query import SimpleStatement
@@ -214,7 +214,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf.send_request()
         rf.session._pools.get.assert_called_once_with('ip1')
 
-        result = Mock(spec=OverloadedErrorMessage, info={})
+        result = Mock(spec=IsBootstrappingErrorMessage, info={})
         rf._set_result(result)
 
         # simulate the executor running this
@@ -224,7 +224,7 @@ class ResponseFutureTests(unittest.TestCase):
         # it should try with a different host
         rf.session._pools.get.assert_called_with('ip2')
 
-        result = Mock(spec=OverloadedErrorMessage, info={})
+        result = Mock(spec=IsBootstrappingErrorMessage, info={})
         rf._set_result(result)
 
         # simulate the executor running this
