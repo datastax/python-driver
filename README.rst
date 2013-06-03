@@ -16,6 +16,7 @@ Features to be Added
 * Connection pool metrics
 * Twisted, gevent support
 * Python 3 support
+* IPv6 Support
 
 License
 -------
