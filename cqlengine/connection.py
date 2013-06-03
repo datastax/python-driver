@@ -69,38 +69,35 @@ class ConnectionPool(object):
     # Connection pool queue
     _queue = None
 
-    @classmethod
-    def clear(cls):
+    def __init__(self, hosts):
+        self._hosts = hosts
+        self._queue = Queue.Queue(maxsize=_max_connections)
+
+    def clear(self):
         """
         Force the connection pool to be cleared. Will close all internal
         connections.
         """
         try:
-            while not cls._queue.empty():
-                cls._queue.get().close()
+            while not self._queue.empty():
+                self._queue.get().close()
         except:
             pass
 
-    @classmethod
-    def get(cls):
+    def get(self):
         """
         Returns a usable database connection. Uses the internal queue to
         determine whether to return an existing connection or to create
         a new one.
         """
         try:
-            if cls._queue.empty():
-                return cls._create_connection()
-            return cls._queue.get()
+            if self._queue.empty():
+                return self._create_connection()
+            return self._queue.get()
         except CQLConnectionError as cqle:
             raise cqle
-        except:
-            if not cls._queue:
-                cls._queue = Queue.Queue(maxsize=_max_connections)
-            return cls._create_connection()
 
-    @classmethod
-    def put(cls, conn):
+    def put(self, conn):
         """
         Returns a connection to the queue freeing it up for other queries to
         use.
@@ -109,17 +106,16 @@ class ConnectionPool(object):
         :type conn: connection
         """
         try:
-            if cls._queue.full():
+            if self._queue.full():
                 conn.close()
             else:
-                cls._queue.put(conn)
+                self._queue.put(conn)
         except:
-            if not cls._queue:
-                cls._queue = Queue.Queue(maxsize=_max_connections)
-            cls._queue.put(conn)
+            if not self._queue:
+                self._queue =
+            self._queue.put(conn)
 
-    @classmethod
-    def _create_connection(cls):
+    def _create_connection(self):
         """
         Creates a new connection for the connection pool.
 
