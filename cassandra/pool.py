@@ -237,6 +237,9 @@ class HostConnectionPool(object):
         self._conn_available_condition = Condition()
 
         core_conns = session.cluster.get_core_connections_per_host(host_distance)
+        # TODO: instead of holding a lock when scanning self._connections, replace
+        # the entire list at once and only hold the lock when updating the list
+        # of connections
         self._connections = [session.cluster._connection_factory(host.address)
                              for i in range(core_conns)]
         self._trash = set()
