@@ -661,13 +661,6 @@ class Map(BaseContainerColumn):
 
         return del_statements
 
-class _PartitionKeys(Column):
-    class value_manager(BaseValueManager):
-        pass
-
-    def __init__(self, model):
-        self.model = model
-
 class _PartitionKeysToken(Column):
     """
     virtual column representing token of partition columns.
