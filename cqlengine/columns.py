@@ -294,6 +294,12 @@ class UUID(Column):
             raise ValidationError("{} is not a valid uuid".format(value))
         return _UUID(val)
 
+    def to_python(self, value):
+        return self.validate(value)
+
+    def to_database(self, value):
+        return self.validate(value)
+
 class TimeUUID(UUID):
     """
     UUID containing timestamp
@@ -342,6 +348,22 @@ class Float(Column):
 
 class Decimal(Column):
     db_type = 'decimal'
+
+    def validate(self, value):
+        from decimal import Decimal as _Decimal
+        from decimal import InvalidOperation
+        val = super(Decimal, self).validate(value)
+        if val is None: return
+        try:
+            return _Decimal(val)
+        except InvalidOperation:
+            raise ValidationError("'{}' can't be coerced to decimal".format(val))
+
+    def to_python(self, value):
+        return self.validate(value)
+
+    def to_database(self, value):
+        return self.validate(value)
 
 class Counter(Column):
     #TODO: counter field
