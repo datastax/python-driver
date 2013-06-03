@@ -1,6 +1,6 @@
 import unittest
 
-from cassandra.cluster import Cluster
+from cassandra.cluster import Cluster, NoHostAvailable
 
 class ClusterTests(unittest.TestCase):
 
@@ -35,6 +35,10 @@ class ClusterTests(unittest.TestCase):
         self.assertEquals([('a', 'b', 'c')], result)
 
         cluster.shutdown()
+
+    def test_connect_to_bad_hosts(self):
+        cluster = Cluster(['127.1.2.9', '127.1.2.10'])
+        self.assertRaises(NoHostAvailable, cluster.connect)
 
     def test_submit_schema_refresh(self):
         cluster = Cluster()
