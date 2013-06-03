@@ -1,7 +1,7 @@
 from futures import ThreadPoolExecutor
 import logging
 import time
-from threading import Lock, RLock, Thread, Event
+from threading import RLock, Thread, Event
 import Queue
 import weakref
 from functools import partial
@@ -213,7 +213,7 @@ class Cluster(object):
         self.scheduler = _Scheduler(self.executor)
 
         self._is_shutdown = False
-        self._lock = Lock()
+        self._lock = RLock()
 
         for address in contact_points:
             self.add_host(address, signal=False)
