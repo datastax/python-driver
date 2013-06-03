@@ -74,3 +74,7 @@ example8
 >>>     print instance.description
 example5
 ```
+
+## Contributing
+
+If you'd like to contribute to cqlengine, please read the [contributor guidelines](https://github.com/bdeggleston/cqlengine/blob/master/CONTRIBUTING.md)
