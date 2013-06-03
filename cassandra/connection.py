@@ -122,7 +122,7 @@ class Connection(object):
     in_buffer_size = 4096
     out_buffer_size = 4096
 
-    cql_version = "3.0.1"
+    cql_version = None
 
     keyspace = None
     compression = True
@@ -150,12 +150,12 @@ class Connection(object):
         else:
             return conn
 
-    def __init__(self, host='127.0.0.1', port=9042, credentials=None, sockopts=None, compression=True):
+    def __init__(self, host='127.0.0.1', port=9042, credentials=None, sockopts=None, compression=True, cql_version=None):
         self.host = host
         self.port = port
         self.credentials = credentials
-
         self.compression = compression
+        self.cql_version = cql_version
 
         self.connected_event = Event()
 
