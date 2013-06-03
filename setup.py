@@ -9,4 +9,18 @@ setup(
     packages=["cassandra"],
     ext_modules=[murmur3],
     install_requires=['pyev', 'python-snappy', 'futures'],
-    test_requires=['nose', 'mock'])
+    test_requires=['nose', 'mock'],
+    classifiers=[
+        'Development Status :: 3 - Alpha',
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: Apache Software License',
+        'Natural Language :: English',
+        'Operating System :: OS Independent',
+        'Programming Language :: Python',
+        'Programming Language :: Python :: 2',
+        'Programming Language :: Python :: 2.6',
+        'Programming Language :: Python :: 2.7',
+        'Topic :: Software Development :: Libraries :: Python Modules'
+    ]
+
+)
