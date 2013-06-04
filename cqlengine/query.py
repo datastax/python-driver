@@ -6,7 +6,8 @@ from time import time
 from uuid import uuid1
 from cqlengine import BaseContainerColumn, BaseValueManager, Map, columns
 
-from cqlengine.connection import connection_manager
+from cqlengine.connection import connection_pool, connection_manager, execute
+
 from cqlengine.exceptions import CQLEngineException
 from cqlengine.functions import QueryValue, Token
 
@@ -193,8 +194,7 @@ class BatchQuery(object):
 
         query_list.append('APPLY BATCH;')
 
-        with connection_manager() as con:
-            con.execute('\n'.join(query_list), parameters)
+        execute('\n'.join(query_list), parameters)
 
         self.queries = []
 
@@ -346,8 +346,7 @@ class QuerySet(object):
         if self._batch:
             raise CQLEngineException("Only inserts, updates, and deletes are available in batch mode")
         if self._result_cache is None:
-            self._con = connection_manager()
-            self._cur = self._con.execute(self._select_query(), self._where_values())
+            self._cur = execute(self._select_query(), self._where_values())
             self._result_cache = [None]*self._cur.rowcount
             if self._cur.description:
                 names = [i[0] for i in self._cur.description]
@@ -368,7 +367,6 @@ class QuerySet(object):
 
             #return the connection to the connection pool if we have all objects
             if self._result_cache and self._result_idx == (len(self._result_cache) - 1):
-                self._con.close()
                 self._con = None
                 self._cur = None
 
@@ -555,9 +553,8 @@ class QuerySet(object):
 
             qs = ' '.join(qs)
 
-            with connection_manager() as con:
-                cur = con.execute(qs, self._where_values())
-                return cur.fetchone()[0]
+            cur = execute(qs, self._where_values())
+            return cur.fetchone()[0]
         else:
             return len(self._result_cache)
 
@@ -635,8 +632,7 @@ class QuerySet(object):
         if self._batch:
             self._batch.add_query(qs, self._where_values())
         else:
-            with connection_manager() as con:
-                con.execute(qs, self._where_values())
+            execute(qs, self._where_values())
 
     def values_list(self, *fields, **kwargs):
         """ Instructs the query set to return tuples, not model instance """
@@ -753,8 +749,7 @@ class DMLQuery(object):
             if self.batch:
                 self.batch.add_query(qs, query_values)
             else:
-                with connection_manager() as con:
-                    con.execute(qs, query_values)
+                execute(qs, query_values)
 
 
         # delete nulled columns and removed map keys
@@ -787,8 +782,7 @@ class DMLQuery(object):
             if self.batch:
                 self.batch.add_query(qs, query_values)
             else:
-                with connection_manager() as con:
-                    con.execute(qs, query_values)
+                execute(qs, query_values)
 
     def delete(self):
         """ Deletes one instance """
@@ -809,7 +803,6 @@ class DMLQuery(object):
         if self.batch:
             self.batch.add_query(qs, field_values)
         else:
-            with connection_manager() as con:
-                con.execute(qs, field_values)
+            execute(qs, field_values)
 
 

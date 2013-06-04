@@ -39,3 +39,6 @@ html/
 #Mr Developer
 .mr.developer.cfg
 .noseids
+/commitlog
+/data
+

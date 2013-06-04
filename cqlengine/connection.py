@@ -9,7 +9,10 @@ import random
 import cql
 import logging
 
+from copy import copy
 from cqlengine.exceptions import CQLEngineException
+
+from contextlib import contextmanager
 
 from thrift.transport.TTransport import TTransportException
 
@@ -18,31 +21,27 @@ LOG = logging.getLogger('cqlengine.cql')
 class CQLConnectionError(CQLEngineException): pass
 
 Host = namedtuple('Host', ['name', 'port'])
-_hosts = []
-_host_idx = 0
-_conn= None
-_username = None
-_password = None
+
 _max_connections = 10
 
-def setup(hosts, username=None, password=None, max_connections=10, default_keyspace=None, lazy=False):
+# global connection pool
+connection_pool = None
+
+def setup(hosts, username=None, password=None, max_connections=10, default_keyspace=None):
     """
     Records the hosts and connects to one of them
 
     :param hosts: list of hosts, strings in the <hostname>:<port>, or just <hostname>
     """
-    global _hosts
-    global _username
-    global _password
     global _max_connections
-    _username = username
-    _password = password
+    global connection_pool
     _max_connections = max_connections
 
     if default_keyspace:
         from cqlengine import models
         models.DEFAULT_KEYSPACE = default_keyspace
 
+    _hosts = []
     for host in hosts:
         host = host.strip()
         host = host.split(':')
@@ -56,51 +55,44 @@ def setup(hosts, username=None, password=None, max_connections=10, default_keysp
     if not _hosts:
         raise CQLConnectionError("At least one host required")
 
-    random.shuffle(_hosts)
-
-    if not lazy:
-        con = ConnectionPool.get()
-        ConnectionPool.put(con)
+    connection_pool = ConnectionPool(_hosts, username, password)
 
 
 class ConnectionPool(object):
     """Handles pooling of database connections."""
 
-    # Connection pool queue
-    _queue = None
+    def __init__(self, hosts, username=None, password=None):
+        self._hosts = hosts
+        self._username = username
+        self._password = password
 
-    @classmethod
-    def clear(cls):
+        self._queue = Queue.Queue(maxsize=_max_connections)
+
+    def clear(self):
         """
         Force the connection pool to be cleared. Will close all internal
         connections.
         """
         try:
-            while not cls._queue.empty():
-                cls._queue.get().close()
+            while not self._queue.empty():
+                self._queue.get().close()
         except:
             pass
 
-    @classmethod
-    def get(cls):
+    def get(self):
         """
         Returns a usable database connection. Uses the internal queue to
         determine whether to return an existing connection or to create
         a new one.
         """
         try:
-            if cls._queue.empty():
-                return cls._create_connection()
-            return cls._queue.get()
+            if self._queue.empty():
+                return self._create_connection()
+            return self._queue.get()
         except CQLConnectionError as cqle:
             raise cqle
-        except:
-            if not cls._queue:
-                cls._queue = Queue.Queue(maxsize=_max_connections)
-            return cls._create_connection()
 
-    @classmethod
-    def put(cls, conn):
+    def put(self, conn):
         """
         Returns a connection to the queue freeing it up for other queries to
         use.
@@ -108,80 +100,55 @@ class ConnectionPool(object):
         :param conn: The connection to be released
         :type conn: connection
         """
-        try:
-            if cls._queue.full():
-                conn.close()
-            else:
-                cls._queue.put(conn)
-        except:
-            if not cls._queue:
-                cls._queue = Queue.Queue(maxsize=_max_connections)
-            cls._queue.put(conn)
 
-    @classmethod
-    def _create_connection(cls):
+        if self._queue.full():
+            conn.close()
+        else:
+            self._queue.put(conn)
+
+    def _create_connection(self):
         """
         Creates a new connection for the connection pool.
-        """
-        global _hosts
-        global _username
-        global _password
 
-        if not _hosts:
+        should only return a valid connection that it's actually connected to
+        """
+        if not self._hosts:
             raise CQLConnectionError("At least one host required")
 
-        host = _hosts[_host_idx]
+        hosts = copy(self._hosts)
+        random.shuffle(hosts)
 
-        new_conn = cql.connect(host.name, host.port, user=_username, password=_password)
-        new_conn.set_cql_version('3.0.0')
-        return new_conn
-
-
-class connection_manager(object):
-    """
-    Connection failure tolerant connection manager. Written to be used in a 'with' block for connection pooling
-    """
-    def __init__(self):
-        if not _hosts:
-            raise CQLConnectionError("No connections have been configured, call cqlengine.connection.setup")
-        self.keyspace = None
-        self.con = ConnectionPool.get()
-        self.cur = None
-
-    def close(self):
-        if self.cur: self.cur.close()
-        ConnectionPool.put(self.con)
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, type, value, traceback):
-        self.close()
-
-    def execute(self, query, params={}):
-        """
-        Gets a connection from the pool and executes the given query, returns the cursor
-
-        if there's a connection problem, this will silently create a new connection pool
-        from the available hosts, and remove the problematic host from the host list
-        """
-        global _host_idx
-
-        for i in range(len(_hosts)):
+        for host in hosts:
             try:
-                LOG.debug('{} {}'.format(query, repr(params)))
-                self.cur = self.con.cursor()
-                self.cur.execute(query, params)
-                return self.cur
-            except cql.ProgrammingError as ex:
-                raise CQLEngineException(unicode(ex))
-            except TTransportException:
-                #TODO: check for other errors raised in the event of a connection / server problem
-                #move to the next connection and set the connection pool
-                _host_idx += 1
-                _host_idx %= len(_hosts)
-                self.con.close()
-                self.con = ConnectionPool._create_connection()
+                new_conn = cql.connect(host.name, host.port, user=self._username, password=self._password)
+                new_conn.set_cql_version('3.0.0')
+                return new_conn
+            except Exception as e:
+                logging.debug("Could not establish connection to {}:{}".format(host.name, host.port))
+                pass
 
-        raise CQLConnectionError("couldn't reach a Cassandra server")
+        raise CQLConnectionError("Could not connect to any server in cluster")
 
+    def execute(self, query, params):
+        try:
+            con = self.get()
+            cur = con.cursor()
+            cur.execute(query, params)
+            self.put(con)
+            return cur
+        except cql.ProgrammingError as ex:
+            raise CQLEngineException(unicode(ex))
+        except TTransportException:
+            pass
+
+        raise CQLEngineException("Could not execute query against the cluster")
+
+def execute(query, params={}):
+    return connection_pool.execute(query, params)
+
+@contextmanager
+def connection_manager():
+    global connection_pool
+    tmp = connection_pool.get()
+    yield tmp
+    connection_pool.put(tmp)
