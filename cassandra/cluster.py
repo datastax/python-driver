@@ -27,7 +27,7 @@ from cassandra.pool import (AuthenticationException, _ReconnectionHandler,
 log = logging.getLogger(__name__)
 
 
-DEFAULT_MIN_REQUESTS = 25
+DEFAULT_MIN_REQUESTS = 5
 DEFAULT_MAX_REQUESTS = 100
 
 DEFAULT_MIN_CONNECTIONS_PER_LOCAL_HOST = 2
