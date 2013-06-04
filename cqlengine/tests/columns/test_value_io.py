@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import uuid1, uuid4, UUID
-from unittest import SkipTest
 from cqlengine.tests.base import BaseCassEngTestCase
 
 from cqlengine.management import create_table
@@ -10,31 +9,35 @@ from cqlengine.models import Model
 from cqlengine import columns
 
 class BaseColumnIOTest(BaseCassEngTestCase):
+    """ Tests that values are come out of cassandra in the format we expect """
 
-    TEST_MODEL = None
+    # The generated test model is assigned here
+    _test_model = None
+
+    # the column we want to test
     TEST_COLUMN = None
 
-    @property
-    def PKEY_VAL(self):
-        raise NotImplementedError
-
-    @property
-    def DATA_VAL(self):
-        raise NotImplementedError
+    # the values we want to test against, you can
+    # use a single value, or multiple comma separated values
+    PKEY_VAL = None
+    DATA_VAL = None
 
     @classmethod
     def setUpClass(cls):
         super(BaseColumnIOTest, cls).setUpClass()
+
+        #if the test column hasn't been defined, bail out
         if not cls.TEST_COLUMN: return
+
+        # create a table with the given column
         class IOTestModel(Model):
             table_name = cls.TEST_COLUMN.db_type + "_io_test_model_{}".format(uuid4().hex[:8])
             pkey = cls.TEST_COLUMN(primary_key=True)
             data = cls.TEST_COLUMN()
+        cls._test_model = IOTestModel
+        create_table(cls._test_model)
 
-        cls.TEST_MODEL = IOTestModel
-        create_table(cls.TEST_MODEL)
-
-        #tupleify
+        #tupleify the tested values
         if not isinstance(cls.PKEY_VAL, tuple):
             cls.PKEY_VAL = cls.PKEY_VAL,
         if not isinstance(cls.DATA_VAL, tuple):
@@ -44,7 +47,7 @@ class BaseColumnIOTest(BaseCassEngTestCase):
     def tearDownClass(cls):
         super(BaseColumnIOTest, cls).tearDownClass()
         if not cls.TEST_COLUMN: return
-        delete_table(cls.TEST_MODEL)
+        delete_table(cls._test_model)
 
     def comparator_converter(self, val):
         """ If you want to convert the original value used to compare the model vales """
@@ -55,15 +58,15 @@ class BaseColumnIOTest(BaseCassEngTestCase):
         if not self.TEST_COLUMN: return
         for pkey, data in zip(self.PKEY_VAL, self.DATA_VAL):
             #create
-            m1 = self.TEST_MODEL.create(pkey=pkey, data=data)
+            m1 = self._test_model.create(pkey=pkey, data=data)
 
             #get
-            m2 = self.TEST_MODEL.get(pkey=pkey)
+            m2 = self._test_model.get(pkey=pkey)
             assert m1.pkey == m2.pkey == self.comparator_converter(pkey), self.TEST_COLUMN
             assert m1.data == m2.data == self.comparator_converter(data), self.TEST_COLUMN
 
             #delete
-            self.TEST_MODEL.filter(pkey=pkey).delete()
+            self._test_model.filter(pkey=pkey).delete()
 
 class TestTextIO(BaseColumnIOTest):
 
