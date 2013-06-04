@@ -25,6 +25,9 @@ class ConnectionPoolFailoverTestCase(BaseCassEngTestCase):
                 self.pool.execute("select * from system.peers", {})
 
     def test_dead_node(self):
+        """
+        tests that a single dead node doesn't mess up the pool
+        """
         self.pool._hosts.append(self.host)
 
         # cursor mock needed so set_cql_version doesn't crap out
