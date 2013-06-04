@@ -290,9 +290,9 @@ class UUID(Column):
         if val is None: return
         from uuid import UUID as _UUID
         if isinstance(val, _UUID): return val
-        if not self.re_uuid.match(val):
-            raise ValidationError("{} is not a valid uuid".format(value))
-        return _UUID(val)
+        if isinstance(val, basestring) and self.re_uuid.match(val):
+                return _UUID(val)
+        raise ValidationError("{} is not a valid uuid".format(value))
 
     def to_python(self, value):
         return self.validate(value)
