@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import uuid1, uuid4, UUID
+
 from cqlengine.tests.base import BaseCassEngTestCase
 
 from cqlengine.management import create_table
@@ -17,10 +18,10 @@ class BaseColumnIOTest(BaseCassEngTestCase):
     """
 
     # The generated test model is assigned here
-    _test_model = None
+    _generated_model = None
 
     # the column we want to test
-    test_column = None
+    column = None
 
     # the values we want to test against, you can
     # use a single value, or multiple comma separated values
@@ -32,15 +33,15 @@ class BaseColumnIOTest(BaseCassEngTestCase):
         super(BaseColumnIOTest, cls).setUpClass()
 
         #if the test column hasn't been defined, bail out
-        if not cls.test_column: return
+        if not cls.column: return
 
         # create a table with the given column
         class IOTestModel(Model):
-            table_name = cls.test_column.db_type + "_io_test_model_{}".format(uuid4().hex[:8])
-            pkey = cls.test_column(primary_key=True)
-            data = cls.test_column()
-        cls._test_model = IOTestModel
-        create_table(cls._test_model)
+            table_name = cls.column.db_type + "_io_test_model_{}".format(uuid4().hex[:8])
+            pkey = cls.column(primary_key=True)
+            data = cls.column()
+        cls._generated_model = IOTestModel
+        create_table(cls._generated_model)
 
         #tupleify the tested values
         if not isinstance(cls.pkey_val, tuple):
@@ -51,8 +52,8 @@ class BaseColumnIOTest(BaseCassEngTestCase):
     @classmethod
     def tearDownClass(cls):
         super(BaseColumnIOTest, cls).tearDownClass()
-        if not cls.test_column: return
-        delete_table(cls._test_model)
+        if not cls.column: return
+        delete_table(cls._generated_model)
 
     def comparator_converter(self, val):
         """ If you want to convert the original value used to compare the model vales """
@@ -60,34 +61,34 @@ class BaseColumnIOTest(BaseCassEngTestCase):
 
     def test_column_io(self):
         """ Tests the given models class creates and retrieves values as expected """
-        if not self.test_column: return
+        if not self.column: return
         for pkey, data in zip(self.pkey_val, self.data_val):
             #create
-            m1 = self._test_model.create(pkey=pkey, data=data)
+            m1 = self._generated_model.create(pkey=pkey, data=data)
 
             #get
-            m2 = self._test_model.get(pkey=pkey)
-            assert m1.pkey == m2.pkey == self.comparator_converter(pkey), self.test_column
-            assert m1.data == m2.data == self.comparator_converter(data), self.test_column
+            m2 = self._generated_model.get(pkey=pkey)
+            assert m1.pkey == m2.pkey == self.comparator_converter(pkey), self.column
+            assert m1.data == m2.data == self.comparator_converter(data), self.column
 
             #delete
-            self._test_model.filter(pkey=pkey).delete()
+            self._generated_model.filter(pkey=pkey).delete()
 
 class TestTextIO(BaseColumnIOTest):
 
-    test_column = columns.Text
+    column = columns.Text
     pkey_val = 'bacon'
     data_val = 'monkey'
 
 class TestInteger(BaseColumnIOTest):
 
-    test_column = columns.Integer
+    column = columns.Integer
     pkey_val = 5
     data_val = 6
 
 class TestDateTime(BaseColumnIOTest):
 
-    test_column = columns.DateTime
+    column = columns.DateTime
 
     now = datetime(*datetime.now().timetuple()[:6])
     pkey_val = now
@@ -95,7 +96,7 @@ class TestDateTime(BaseColumnIOTest):
 
 class TestDate(BaseColumnIOTest):
 
-    test_column = columns.Date
+    column = columns.Date
 
     now = datetime.now().date()
     pkey_val = now
@@ -103,7 +104,7 @@ class TestDate(BaseColumnIOTest):
 
 class TestUUID(BaseColumnIOTest):
 
-    test_column = columns.UUID
+    column = columns.UUID
 
     pkey_val = str(uuid4()), uuid4()
     data_val = str(uuid4()), uuid4()
@@ -113,7 +114,7 @@ class TestUUID(BaseColumnIOTest):
 
 class TestTimeUUID(BaseColumnIOTest):
 
-    test_column = columns.TimeUUID
+    column = columns.TimeUUID
 
     pkey_val = str(uuid1()), uuid1()
     data_val = str(uuid1()), uuid1()
@@ -123,21 +124,21 @@ class TestTimeUUID(BaseColumnIOTest):
 
 class TestBooleanIO(BaseColumnIOTest):
 
-    test_column = columns.Boolean
+    column = columns.Boolean
 
     pkey_val = True
     data_val = False
 
 class TestFloatIO(BaseColumnIOTest):
 
-    test_column = columns.Float
+    column = columns.Float
 
     pkey_val = 3.14
     data_val = -1982.11
 
 class TestDecimalIO(BaseColumnIOTest):
 
-    test_column = columns.Decimal
+    column = columns.Decimal
 
     pkey_val = Decimal('1.35'), 5, '2.4'
     data_val = Decimal('0.005'), 3.5, '8'
