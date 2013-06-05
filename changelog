@@ -1,5 +1,11 @@
 CHANGELOG
 
+0.3.3
+* added abstract base class models
+
+0.3.2
+* comprehesive rewrite of connection management (thanks @rustyrazorblade)
+
 0.3
 * added support for Token function (thanks @mrk-its)
 * added support for compound partition key (thanks @mrk-its)s
