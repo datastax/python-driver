@@ -46,6 +46,10 @@ def delete_keyspace(name):
             execute("DROP KEYSPACE {}".format(name))
 
 def create_table(model, create_missing_keyspace=True):
+
+    if model.__abstract__:
+        raise CQLEngineException("cannot create table from abstract model")
+
     #construct query string
     cf_name = model.column_family_name()
     raw_cf_name = model.column_family_name(include_keyspace=False)

@@ -2,7 +2,7 @@ from collections import OrderedDict
 import re
 
 from cqlengine import columns
-from cqlengine.exceptions import ModelException
+from cqlengine.exceptions import ModelException, CQLEngineException
 from cqlengine.query import QuerySet, DMLQuery
 from cqlengine.query import DoesNotExist as _DoesNotExist
 from cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
@@ -29,6 +29,8 @@ class hybrid_classmethod(object):
 
 class QuerySetDescriptor(object):
     def __get__(self, obj, model):
+        if model.__abstract__:
+            raise CQLEngineException('cannot execute queries against abstract models')
         return QuerySet(model)
 
 class BaseModel(object):
@@ -183,6 +185,8 @@ class ModelMetaClass(type):
             for k,v in getattr(base, '_defined_columns', {}).items():
                 inherited_columns.setdefault(k,v)
 
+        #short circuit __abstract__ inheritance
+        is_abstract = attrs['__abstract__'] = attrs.get('__abstract__', False)
 
         def _transform_column(col_name, col_obj):
             column_dict[col_name] = col_obj
@@ -208,7 +212,7 @@ class ModelMetaClass(type):
         defined_columns = OrderedDict(column_definitions)
 
         #prepend primary key if one hasn't been defined
-        if not any([v.primary_key for k,v in column_definitions]):
+        if not is_abstract and not any([v.primary_key for k,v in column_definitions]):
             k,v = 'id', columns.UUID(primary_key=True)
             column_definitions = [(k,v)] + column_definitions
 
@@ -228,7 +232,9 @@ class ModelMetaClass(type):
         clustering_keys = OrderedDict(k for k in primary_keys.items() if not k[1].partition_key)
 
         #setup partition key shortcut
-        assert partition_keys
+        if len(partition_keys) == 0:
+            if not is_abstract:
+                raise ModelException("at least one partition key must be defined")
         if len(partition_keys) == 1:
             pk_name = partition_keys.keys()[0]
             attrs['pk'] = attrs[pk_name]
@@ -294,6 +300,7 @@ class Model(BaseModel):
     the db name for the column family can be set as the attribute db_name, or
     it will be genertaed from the class name
     """
+    __abstract__ = True
     __metaclass__ = ModelMetaClass
 
 

@@ -1,6 +1,7 @@
+from cqlengine.query import QueryException
 from cqlengine.tests.base import BaseCassEngTestCase
 
-from cqlengine.exceptions import ModelException
+from cqlengine.exceptions import ModelException, CQLEngineException
 from cqlengine.models import Model
 from cqlengine import columns
 import cqlengine
@@ -199,8 +200,79 @@ class TestManualTableNaming(BaseCassEngTestCase):
         class InheritedTest(self.RenamedTest): pass
         assert InheritedTest.table_name is None
 
+class AbstractModel(Model):
+    __abstract__ = True
 
+class ConcreteModel(AbstractModel):
+    pkey = columns.Integer(primary_key=True)
+    data = columns.Integer()
 
+class AbstractModelWithCol(Model):
+    __abstract__ = True
+    pkey = columns.Integer(primary_key=True)
+
+class ConcreteModelWithCol(AbstractModelWithCol):
+    data = columns.Integer()
+
+class AbstractModelWithFullCols(Model):
+    __abstract__ = True
+    pkey = columns.Integer(primary_key=True)
+    data = columns.Integer()
+
+class TestAbstractModelClasses(BaseCassEngTestCase):
+
+    def test_id_field_is_not_created(self):
+        """ Tests that an id field is not automatically generated on abstract classes """
+        assert not hasattr(AbstractModel, 'id')
+        assert not hasattr(AbstractModelWithCol, 'id')
+
+    def test_id_field_is_not_created_on_subclass(self):
+        assert not hasattr(ConcreteModel, 'id')
+
+    def test_abstract_attribute_is_not_inherited(self):
+        """ Tests that __abstract__ attribute is not inherited """
+        assert not ConcreteModel.__abstract__
+        assert not ConcreteModelWithCol.__abstract__
+
+    def test_attempting_to_save_abstract_model_fails(self):
+        """ Attempting to save a model from an abstract model should fail """
+        with self.assertRaises(CQLEngineException):
+            AbstractModelWithFullCols.create(pkey=1, data=2)
+
+    def test_attempting_to_create_abstract_table_fails(self):
+        """ Attempting to create a table from an abstract model should fail """
+        from cqlengine.management import create_table
+        with self.assertRaises(CQLEngineException):
+            create_table(AbstractModelWithFullCols)
+
+    def test_attempting_query_on_abstract_model_fails(self):
+        """ Tests attempting to execute query with an abstract model fails """
+        with self.assertRaises(CQLEngineException):
+            iter(AbstractModelWithFullCols.objects(pkey=5)).next()
+
+    def test_abstract_columns_are_inherited(self):
+        """ Tests that columns defined in the abstract class are inherited into the concrete class """
+        assert hasattr(ConcreteModelWithCol, 'pkey')
+        assert isinstance(ConcreteModelWithCol.pkey, property)
+        assert isinstance(ConcreteModelWithCol._columns['pkey'], columns.Column)
+
+    def test_concrete_class_table_creation_cycle(self):
+        """ Tests that models with inherited abstract classes can be created, and have io performed """
+        from cqlengine.management import create_table, delete_table
+        create_table(ConcreteModelWithCol)
+
+        w1 = ConcreteModelWithCol.create(pkey=5, data=6)
+        w2 = ConcreteModelWithCol.create(pkey=6, data=7)
+
+        r1 = ConcreteModelWithCol.get(pkey=5)
+        r2 = ConcreteModelWithCol.get(pkey=6)
+
+        assert w1.pkey == r1.pkey
+        assert w1.data == r1.data
+        assert w2.pkey == r2.pkey
+        assert w2.data == r2.data
+
+        delete_table(ConcreteModelWithCol)
 
 
 
