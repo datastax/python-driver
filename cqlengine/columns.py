@@ -65,6 +65,11 @@ class ValueQuoter(object):
     def __repr__(self):
         return self.__str__()
 
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return repr(self) == repr(other)
+        return False
+
 
 class Column(object):
 

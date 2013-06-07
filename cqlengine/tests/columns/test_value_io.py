@@ -7,7 +7,10 @@ from cqlengine.tests.base import BaseCassEngTestCase
 from cqlengine.management import create_table
 from cqlengine.management import delete_table
 from cqlengine.models import Model
+from cqlengine.columns import ValueQuoter
 from cqlengine import columns
+import unittest
+
 
 class BaseColumnIOTest(BaseCassEngTestCase):
     """
@@ -145,3 +148,11 @@ class TestDecimalIO(BaseColumnIOTest):
 
     def comparator_converter(self, val):
         return Decimal(val)
+
+class TestQuoter(unittest.TestCase):
+
+    def test_equals(self):
+        assert ValueQuoter(False) == ValueQuoter(False)
+        assert ValueQuoter(1) == ValueQuoter(1)
+        assert ValueQuoter("foo") == ValueQuoter("foo")
+        assert ValueQuoter(1.55) == ValueQuoter(1.55)
