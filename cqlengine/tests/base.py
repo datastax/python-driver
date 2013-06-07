@@ -1,5 +1,5 @@
 from unittest import TestCase
-from cqlengine import  connection
+from cqlengine import connection
 
 class BaseCassEngTestCase(TestCase):
 

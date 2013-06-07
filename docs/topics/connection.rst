@@ -7,10 +7,19 @@ Connection
 The setup function in `cqlengine.connection` records the Cassandra servers to connect to.
 If there is a problem with one of the servers, cqlengine will try to connect to each of the other connections before failing.
 
-.. function:: setup(hosts [, username=None, password=None])
+.. function:: setup(hosts [, username=None, password=None, consistency='ONE'])
 
     :param hosts: list of hosts, strings in the <hostname>:<port>, or just <hostname>
     :type hosts: list
+
+    :param username: a username, if required
+    :type username: str
+
+    :param password: a password, if required
+    :type password: str
+
+    :param consistency: the consistency level of the connection, defaults to 'ONE'
+    :type consistency: str
 
     Records the hosts and connects to one of them
 
