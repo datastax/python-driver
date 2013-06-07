@@ -27,11 +27,24 @@ class hybrid_classmethod(object):
         else:
             return self.instmethod.__get__(instance, owner)
 
+    def __call__(self, *args, **kwargs):
+        """ Just a hint to IDEs that it's ok to call this """
+        raise NotImplementedError
+
 class QuerySetDescriptor(object):
+    """
+    returns a fresh queryset for the given model
+    it's declared on everytime it's accessed
+    """
+
     def __get__(self, obj, model):
         if model.__abstract__:
             raise CQLEngineException('cannot execute queries against abstract models')
         return QuerySet(model)
+
+    def __call__(self, *args, **kwargs):
+        """ Just a hint to IDEs that it's ok to call this """
+        raise NotImplementedError
 
 class BaseModel(object):
     """
