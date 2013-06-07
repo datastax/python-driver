@@ -30,6 +30,12 @@ def create_keyspace(name, strategy_class='SimpleStrategy', replication_factor=3,
                 }
                 replication_map.update(replication_values)
 
+                if strategy_class.lower() != 'simplestrategy':
+                    # Although the Cassandra documentation states for `replication_factor`
+                    # that it is "Required if class is SimpleStrategy; otherwise,
+                    # not used." we get an error if it is present.
+                    replication_map.pop('replication_factor', None)
+
                 query = """
                 CREATE KEYSPACE {}
                 WITH REPLICATION = {}
