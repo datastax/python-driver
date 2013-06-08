@@ -149,7 +149,7 @@ Column Options
 
     .. attribute:: BaseColumn.partition_key
 
-        If True, this column is created as partition primary key. There may be many partition keys defined, forming *composite partition key*
+        If True, this column is created as partition primary key. There may be many partition keys defined, forming a *composite partition key*
 
     .. attribute:: BaseColumn.index
 

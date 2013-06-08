@@ -74,14 +74,26 @@ class Column(object):
 
     instance_counter = 0
 
-    def __init__(self, primary_key=False, partition_key=False, index=False, db_field=None, default=None, required=True, clustering_order=None):
+    def __init__(self,
+                 primary_key=False,
+                 partition_key=False,
+                 index=False,
+                 db_field=None,
+                 default=None,
+                 required=True,
+                 clustering_order=None):
         """
         :param primary_key: bool flag, indicates this column is a primary key. The first primary key defined
-        on a model is the partition key, all others are cluster keys
+            on a model is the partition key (unless partition keys are set), all others are cluster keys
+        :param partition_key: indicates that this column should be the partition key, defining
+            more than one partition key column creates a compound partition key
         :param index: bool flag, indicates an index should be created for this column
         :param db_field: the fieldname this field will map to in the database
         :param default: the default value, can be a value or a callable (no args)
-        :param required: boolean, is the field required?
+        :param required: boolean, is the field required? Model validation will raise and
+            exception if required is set to True and there is a None value assigned
+        :param clustering_order: only applicable on clustering keys (primary keys that are not partition keys)
+            determines the order that the clustering keys are sorted on disk
         """
         self.partition_key = partition_key
         self.primary_key = partition_key or primary_key
