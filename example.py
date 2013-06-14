@@ -51,7 +51,7 @@ def main():
     print "---\t----\t----"
 
     try:
-        rows = future.deliver()
+        rows = future.result()
     except:
         log.exeception()
 

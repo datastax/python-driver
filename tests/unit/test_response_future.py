@@ -44,7 +44,7 @@ class ResponseFutureTests(unittest.TestCase):
         response = Mock(spec=ResultMessage, kind=ResultMessage.KIND_ROWS, results=[{'col': 'val'}])
         rf._set_result(response)
 
-        result = rf.deliver()
+        result = rf.result()
         self.assertEqual(result, [{'col': 'val'}])
 
     def test_unknown_result_class(self):
@@ -52,7 +52,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf = self.make_response_future(session)
         rf.send_request()
         rf._set_result(object())
-        self.assertRaises(ConnectionException, rf.deliver)
+        self.assertRaises(ConnectionException, rf.result)
 
     def test_set_keyspace_result(self):
         session = self.make_session()
@@ -63,7 +63,7 @@ class ResponseFutureTests(unittest.TestCase):
                       kind=ResultMessage.KIND_SET_KEYSPACE,
                       results="keyspace1")
         rf._set_result(result)
-        self.assertEqual(None, rf.deliver())
+        self.assertEqual(None, rf.result())
         self.assertEqual(session.keyspace, 'keyspace1')
 
     def test_schema_change_result(self):
@@ -83,7 +83,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf.send_request()
         result = object()
         rf._set_result(Mock(spec=ResultMessage, kind=999, results=result))
-        self.assertIs(result, rf.deliver())
+        self.assertIs(result, rf.result())
 
     def test_read_timeout_error_message(self):
         session = self.make_session()
@@ -98,7 +98,7 @@ class ResponseFutureTests(unittest.TestCase):
         result = Mock(spec=ReadTimeoutErrorMessage, info={})
         rf._set_result(result)
 
-        self.assertRaises(Exception, rf.deliver)
+        self.assertRaises(Exception, rf.result)
 
     def test_write_timeout_error_message(self):
         session = self.make_session()
@@ -112,7 +112,7 @@ class ResponseFutureTests(unittest.TestCase):
 
         result = Mock(spec=WriteTimeoutErrorMessage, info={})
         rf._set_result(result)
-        self.assertRaises(Exception, rf.deliver)
+        self.assertRaises(Exception, rf.result)
 
     def test_unavailable_error_message(self):
         session = self.make_session()
@@ -126,7 +126,7 @@ class ResponseFutureTests(unittest.TestCase):
 
         result = Mock(spec=UnavailableErrorMessage, info={})
         rf._set_result(result)
-        self.assertRaises(Exception, rf.deliver)
+        self.assertRaises(Exception, rf.result)
 
     def test_retry_policy_says_ignore(self):
         session = self.make_session()
@@ -140,7 +140,7 @@ class ResponseFutureTests(unittest.TestCase):
 
         result = Mock(spec=UnavailableErrorMessage, info={})
         rf._set_result(result)
-        self.assertEqual(None, rf.deliver())
+        self.assertEqual(None, rf.result())
 
     def test_retry_policy_says_retry(self):
         session = self.make_session()
@@ -231,7 +231,7 @@ class ResponseFutureTests(unittest.TestCase):
         session.submit.assert_called_with(rf._retry_task, False)
         rf._retry_task(False)
 
-        self.assertRaises(NoHostAvailable, rf.deliver)
+        self.assertRaises(NoHostAvailable, rf.result)
 
     def test_all_pools_shutdown(self):
         session = self.make_basic_session()
@@ -240,7 +240,7 @@ class ResponseFutureTests(unittest.TestCase):
 
         rf = ResponseFuture(session, Mock(), Mock())
         rf.send_request()
-        self.assertRaises(NoHostAvailable, rf.deliver)
+        self.assertRaises(NoHostAvailable, rf.result)
 
     def test_first_pool_shutdown(self):
         session = self.make_basic_session()
@@ -254,7 +254,7 @@ class ResponseFutureTests(unittest.TestCase):
         response = Mock(spec=ResultMessage, kind=ResultMessage.KIND_ROWS, results=[{'col': 'val'}])
         rf._set_result(response)
 
-        result = rf.deliver()
+        result = rf.result()
         self.assertEqual(result, [{'col': 'val'}])
 
     def test_timeout_getting_connection_from_pool(self):
@@ -274,7 +274,7 @@ class ResponseFutureTests(unittest.TestCase):
 
         response = Mock(spec=ResultMessage, kind=ResultMessage.KIND_ROWS, results=[{'col': 'val'}])
         rf._set_result(response)
-        self.assertEqual(rf.deliver(), [{'col': 'val'}])
+        self.assertEqual(rf.result(), [{'col': 'val'}])
 
         # make sure the exception is recorded correctly
         self.assertEqual(rf._errors, {'ip1': exc})
@@ -289,7 +289,7 @@ class ResponseFutureTests(unittest.TestCase):
         response = Mock(spec=ResultMessage, kind=ResultMessage.KIND_ROWS, results=[{'col': 'val'}])
         rf._set_result(response)
 
-        result = rf.deliver()
+        result = rf.result()
         self.assertEqual(result, [{'col': 'val'}])
 
         # this should get called immediately now that the result is set
@@ -309,7 +309,7 @@ class ResponseFutureTests(unittest.TestCase):
 
         result = Mock(spec=UnavailableErrorMessage, info={})
         rf._set_result(result)
-        self.assertRaises(Exception, rf.deliver)
+        self.assertRaises(Exception, rf.result)
 
         # this should get called immediately now that the error is set
         rf.add_errback(self.assertIsInstance, Exception)
@@ -331,7 +331,7 @@ class ResponseFutureTests(unittest.TestCase):
 
         result = Mock(spec=UnavailableErrorMessage, info={})
         rf._set_result(result)
-        self.assertRaises(Exception, rf.deliver)
+        self.assertRaises(Exception, rf.result)
 
         # test callback
         rf = ResponseFuture(session, message, query)
@@ -343,4 +343,4 @@ class ResponseFutureTests(unittest.TestCase):
 
         response = Mock(spec=ResultMessage, kind=ResultMessage.KIND_ROWS, results=[{'col': 'val'}])
         rf._set_result(response)
-        self.assertEqual(rf.deliver(), [{'col': 'val'}])
+        self.assertEqual(rf.result(), [{'col': 'val'}])

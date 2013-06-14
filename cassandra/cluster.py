@@ -483,13 +483,13 @@ class Session(object):
         argument.  If a dict is used, '%(name)s' style placeholders must
         be used.
         """
-        return self.execute_async(query, parameters).deliver()
+        return self.execute_async(query, parameters).result()
 
     def execute_async(self, query, parameters=None):
         """
         Execute the given query and return a :cls:`~.ResponseFuture` object
         which callbacks may be attached to for asynchronous response
-        delivery.  You may also call :meth:`~.ResponseFuture.deliver()`
+        delivery.  You may also call :meth:`~.ResponseFuture.result()`
         on the ``ResponseFuture`` to syncronously block for results at
         any time.
 
@@ -514,7 +514,7 @@ class Session(object):
             >>> # do other stuff...
             >>>
             >>> try:
-            ...     results = future.deliver()
+            ...     results = future.result()
             ... except:
             ...     print "operation failed!"
 
@@ -1082,7 +1082,7 @@ class ResponseFuture(object):
 
     There are two ways for results to be delivered:
      - Asynchronously, by attaching callback and errback functions
-     - Synchronously, by calling :meth:`~.ResponseFuture.deliver()`
+     - Synchronously, by calling :meth:`~.ResponseFuture.result()`
 
     Callback and errback example::
 
@@ -1098,14 +1098,14 @@ class ResponseFuture(object):
         >>>
         >>> future.add_callbacks(print_results, handle_error)
 
-    Example of using ``deliver()`` to synchronously wait for results::
+    Example of using ``result()`` to synchronously wait for results::
 
         >>> future = session.execute_async("SELECT * FROM mycf")
         >>>
         >>> # do other stuff...
         >>>
         >>> try:
-        ...     results = future.deliver()
+        ...     results = future.result()
         ... except:
         ...     print "operation failed!"
 
@@ -1278,7 +1278,7 @@ class ResponseFuture(object):
         # otherwise, move onto another host
         self.send_request()
 
-    def deliver(self):
+    def result(self):
         """
         Return the final result or raise an Exception if errors were
         encountered.  If the final result or error has not been set
