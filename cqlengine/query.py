@@ -154,6 +154,66 @@ class LessThanOrEqualOperator(QueryOperator):
     symbol = "LTE"
     cql_symbol = '<='
 
+class AbstractColumnDescriptor(object):
+    """
+    exposes cql query operators through pythons
+    builtin comparator symbols
+    """
+
+    def _get_column(self):
+        raise NotImplementedError
+
+    def __eq__(self, other):
+        return EqualsOperator(self._get_column(), other)
+
+    def __contains__(self, item):
+        return InOperator(self._get_column(), item)
+
+    def __gt__(self, other):
+        return GreaterThanOperator(self._get_column(), other)
+
+    def __ge__(self, other):
+        return GreaterThanOrEqualOperator(self._get_column(), other)
+
+    def __lt__(self, other):
+        return LessThanOperator(self._get_column(), other)
+
+    def __le__(self, other):
+        return LessThanOrEqualOperator(self._get_column(), other)
+
+
+class NamedColumnDescriptor(AbstractColumnDescriptor):
+    """ describes a named cql column """
+
+    def __init__(self, name):
+        self.name = name
+
+C = NamedColumnDescriptor
+
+class TableDescriptor(object):
+    """ describes a cql table """
+
+    def __init__(self, keyspace, name):
+        self.keyspace = keyspace
+        self.name = name
+
+T = TableDescriptor
+
+class KeyspaceDescriptor(object):
+    """ Describes a cql keyspace """
+
+    def __init__(self, name):
+        self.name = name
+
+    def table(self, name):
+        """
+        returns a table descriptor with the given
+        name that belongs to this keyspace
+        """
+        return TableDescriptor(self.name, name)
+
+K = KeyspaceDescriptor
+
 class BatchType(object):
     Unlogged    = 'UNLOGGED'
     Counter     = 'COUNTER'
