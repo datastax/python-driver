@@ -505,7 +505,7 @@ class Session(object):
             >>> def handle_error(exc):
             >>>     print exc
             >>>
-            >>> future.addCallbacks(print_results, handle_error)
+            >>> future.add_callbacks(print_results, handle_error)
 
         Async execution with blocking wait for results::
 
@@ -1096,7 +1096,7 @@ class ResponseFuture(object):
         >>> def handle_error(exc):
         >>>     print exc
         >>>
-        >>> future.addCallbacks(print_results, handle_error)
+        >>> future.add_callbacks(print_results, handle_error)
 
     Example of using ``deliver()`` to synchronously wait for results::
 
