@@ -443,13 +443,10 @@ class Connection(object):
             raise ProtocolError(msg)
 
     def set_keyspace(self, keyspace):
-        if not keyspace:
+        if not keyspace or keyspace == self.keyspace:
             return
 
         with self.lock:
-            if keyspace == self.keyspace:
-                return
-
             query = 'USE "%s"' % (keyspace,)
             try:
                 result = self.wait_for_response(
