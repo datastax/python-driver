@@ -118,7 +118,7 @@ class _ReconnectionHandler(object):
         open a new Connection and return it; if a failure occurs, an
         Exception should be raised.
         """
-        raise NotImplemented()
+        raise NotImplementedError()
 
     def on_reconnection(self, connection):
         """

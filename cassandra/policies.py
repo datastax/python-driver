@@ -13,10 +13,10 @@ class HostDistance(object):
 class LoadBalancingPolicy(object):
 
     def distance(self, host):
-        raise NotImplemented()
+        raise NotImplementedError()
 
     def make_query_plan(self, query=None):
-        raise NotImplemented()
+        raise NotImplementedError()
 
 
 class RoundRobinPolicy(LoadBalancingPolicy):
@@ -132,14 +132,14 @@ class ConvictionPolicy(object):
         Implementations should return ``True`` if the host should be
         convicted, ``False`` otherwise.
         """
-        raise NotImplemented()
+        raise NotImplementedError()
 
     def reset(self):
         """
         Implementations should clear out any convictions or state regarding
         the host.
         """
-        raise NotImplemented()
+        raise NotImplementedError()
 
 
 class SimpleConvictionPolicy(ConvictionPolicy):
@@ -154,7 +154,7 @@ class SimpleConvictionPolicy(ConvictionPolicy):
 class ReconnectionPolicy(object):
 
     def new_schedule(self):
-        raise NotImplemented()
+        raise NotImplementedError()
 
 
 class ConstantReconnectionPolicy(ReconnectionPolicy):

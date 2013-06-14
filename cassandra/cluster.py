@@ -537,7 +537,7 @@ class Session(object):
         return future
 
     def prepare(self, query):
-        raise NotImplemented
+        raise NotImplementedError()
 
     def shutdown(self):
         """
