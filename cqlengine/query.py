@@ -188,6 +188,13 @@ class NamedColumnDescriptor(AbstractColumnDescriptor):
     def __init__(self, name):
         self.name = name
 
+    @property
+    def cql(self):
+        return self.name
+
+    def to_database(self, val):
+        return val
+
 C = NamedColumnDescriptor
 
 class TableDescriptor(object):
@@ -543,6 +550,12 @@ class QuerySet(object):
             clone._where.append(operator)
 
         return clone
+
+    def query(self, *args):
+        """
+        Same end result as filter, but uses the new comparator style args
+        ie: Model.column == val
+        """
 
     def get(self, **kwargs):
         """
