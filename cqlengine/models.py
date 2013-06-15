@@ -1,9 +1,10 @@
 from collections import OrderedDict
 import re
+import cqlengine
 
 from cqlengine import columns
 from cqlengine.exceptions import ModelException, CQLEngineException
-from cqlengine.query import QuerySet, DMLQuery
+from cqlengine.query import QuerySet, DMLQuery, AbstractColumnDescriptor
 from cqlengine.query import DoesNotExist as _DoesNotExist
 from cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
 
@@ -45,6 +46,56 @@ class QuerySetDescriptor(object):
     def __call__(self, *args, **kwargs):
         """ Just a hint to IDEs that it's ok to call this """
         raise NotImplementedError
+
+class ColumnDescriptor(AbstractColumnDescriptor):
+    """
+    Handles the reading and writing of column values to and from
+    a model instance's value manager, as well as creating
+    comparator queries
+    """
+
+    def __init__(self, column):
+        """
+        :param column:
+        :type column: columns.Column
+        :return:
+        """
+        self.column = column
+
+    def __get__(self, instance, owner):
+        """
+        Returns either the value or column, depending
+        on if an instance is provided or not
+
+        :param instance: the model instance
+        :type instance: Model
+        """
+
+        if instance:
+            return instance._values[self.column.column_name].getval()
+        else:
+            return self.column
+
+    def __set__(self, instance, value):
+        """
+        Sets the value on an instance, raises an exception with classes
+        TODO: use None instance to create update statements
+        """
+        if instance:
+            return instance._values[self.column.column_name].setval(value)
+        else:
+            raise AttributeError('cannot reassign column values')
+
+    def __delete__(self, instance):
+        """
+        Sets the column value to None, if possible
+        """
+        if instance:
+            if self.column.can_delete:
+                instance._values[self.column.column_name].delval()
+            else:
+                raise AttributeError('cannot delete {} columns'.format(self.column.column_name))
+
 
 class BaseModel(object):
     """
@@ -180,7 +231,6 @@ class BaseModel(object):
     batch = hybrid_classmethod(_class_batch, _inst_batch)
 
 
-
 class ModelMetaClass(type):
 
     def __new__(cls, name, bases, attrs):
@@ -207,13 +257,7 @@ class ModelMetaClass(type):
                 primary_keys[col_name] = col_obj
             col_obj.set_column_name(col_name)
             #set properties
-            _get = lambda self: self._values[col_name].getval()
-            _set = lambda self, val: self._values[col_name].setval(val)
-            _del = lambda self: self._values[col_name].delval()
-            if col_obj.can_delete:
-                attrs[col_name] = property(_get, _set, _del)
-            else:
-                attrs[col_name] = property(_get, _set)
+            attrs[col_name] = ColumnDescriptor(col_obj)
 
         column_definitions = [(k,v) for k,v in attrs.items() if isinstance(v, columns.Column)]
         column_definitions = sorted(column_definitions, lambda x,y: cmp(x[1].position, y[1].position))
