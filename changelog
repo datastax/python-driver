@@ -5,6 +5,7 @@ CHANGELOG
 * explicit primary key is required (automatic id removed)
 * added validation on keyname types on .create()
 * changed table_name to __table_name__, read_repair_chance to __read_repair_chance__, keyspace to __keyspace__
+* changed internal implementation of model value get/set
 
 0.3.3
 * added abstract base class models
