@@ -218,12 +218,21 @@ class BaseQuerySetUsage(BaseCassEngTestCase):
 class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
 
     def test_count(self):
+        """ Tests that adding filtering statements affects the count query as expected """
         assert TestModel.objects.count() == 12
 
         q = TestModel.objects(test_id=0)
         assert q.count() == 4
 
+    def test_query_method_count(self):
+        """ Tests that adding query statements affects the count query as expected """
+        assert TestModel.objects.count() == 12
+
+        q = TestModel.query(TestModel.test_id == 0)
+        assert q.count() == 4
+
     def test_iteration(self):
+        """ Tests that iterating over a query set pulls back all of the expected results """
         q = TestModel.objects(test_id=0)
         #tuple of expected attempt_id, expected_result values
         compare_set = set([(0,5), (1,10), (2,15), (3,20)])
@@ -233,7 +242,19 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
             compare_set.remove(val)
         assert len(compare_set) == 0
 
+        # test with regular filtering
         q = TestModel.objects(attempt_id=3).allow_filtering()
+        assert len(q) == 3
+        #tuple of expected test_id, expected_result values
+        compare_set = set([(0,20), (1,20), (2,75)])
+        for t in q:
+            val = t.test_id, t.expected_result
+            assert val in compare_set
+            compare_set.remove(val)
+        assert len(compare_set) == 0
+
+        # test with query method
+        q = TestModel.query(TestModel.attempt_id == 3).allow_filtering()
         assert len(q) == 3
         #tuple of expected test_id, expected_result values
         compare_set = set([(0,20), (1,20), (2,75)])
@@ -245,34 +266,36 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
 
     def test_multiple_iterations_work_properly(self):
         """ Tests that iterating over a query set more than once works """
-        q = TestModel.objects(test_id=0)
-        #tuple of expected attempt_id, expected_result values
-        compare_set = set([(0,5), (1,10), (2,15), (3,20)])
-        for t in q:
-            val = t.attempt_id, t.expected_result
-            assert val in compare_set
-            compare_set.remove(val)
-        assert len(compare_set) == 0
+        # test with both the filtering method and the query method
+        for q in (TestModel.objects(test_id=0), TestModel.query(TestModel.test_id==0)):
+            #tuple of expected attempt_id, expected_result values
+            compare_set = set([(0,5), (1,10), (2,15), (3,20)])
+            for t in q:
+                val = t.attempt_id, t.expected_result
+                assert val in compare_set
+                compare_set.remove(val)
+            assert len(compare_set) == 0
 
-        #try it again
-        compare_set = set([(0,5), (1,10), (2,15), (3,20)])
-        for t in q:
-            val = t.attempt_id, t.expected_result
-            assert val in compare_set
-            compare_set.remove(val)
-        assert len(compare_set) == 0
+            #try it again
+            compare_set = set([(0,5), (1,10), (2,15), (3,20)])
+            for t in q:
+                val = t.attempt_id, t.expected_result
+                assert val in compare_set
+                compare_set.remove(val)
+            assert len(compare_set) == 0
 
     def test_multiple_iterators_are_isolated(self):
         """
         tests that the use of one iterator does not affect the behavior of another
         """
-        q = TestModel.objects(test_id=0).order_by('attempt_id')
-        expected_order = [0,1,2,3]
-        iter1 = iter(q)
-        iter2 = iter(q)
-        for attempt_id in expected_order:
-            assert iter1.next().attempt_id == attempt_id
-            assert iter2.next().attempt_id == attempt_id
+        for q in (TestModel.objects(test_id=0), TestModel.query(TestModel.test_id==0)):
+            q = q.order_by('attempt_id')
+            expected_order = [0,1,2,3]
+            iter1 = iter(q)
+            iter2 = iter(q)
+            for attempt_id in expected_order:
+                assert iter1.next().attempt_id == attempt_id
+                assert iter2.next().attempt_id == attempt_id
 
     def test_get_success_case(self):
         """
