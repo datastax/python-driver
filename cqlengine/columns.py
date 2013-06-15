@@ -236,9 +236,6 @@ class Integer(Column):
 class DateTime(Column):
     db_type = 'timestamp'
 
-    def __init__(self, **kwargs):
-        super(DateTime, self).__init__(**kwargs)
-
     def to_python(self, value):
         if isinstance(value, datetime):
             return value
@@ -265,8 +262,6 @@ class DateTime(Column):
 class Date(Column):
     db_type = 'timestamp'
 
-    def __init__(self, **kwargs):
-        super(Date, self).__init__(**kwargs)
 
     def to_python(self, value):
         if isinstance(value, datetime):
@@ -294,9 +289,6 @@ class UUID(Column):
 
     re_uuid = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
 
-    def __init__(self, default=lambda:uuid4(), **kwargs):
-        super(UUID, self).__init__(default=default, **kwargs)
-
     def validate(self, value):
         val = super(UUID, self).validate(value)
         if val is None: return
@@ -318,10 +310,6 @@ class TimeUUID(UUID):
     """
 
     db_type = 'timeuuid'
-
-    def __init__(self, **kwargs):
-        kwargs.setdefault('default', lambda: uuid1())
-        super(TimeUUID, self).__init__(**kwargs)
 
 class Boolean(Column):
     db_type = 'boolean'

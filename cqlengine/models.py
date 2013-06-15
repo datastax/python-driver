@@ -2,7 +2,7 @@ from collections import OrderedDict
 import re
 
 from cqlengine import columns
-from cqlengine.exceptions import ModelException, CQLEngineException
+from cqlengine.exceptions import ModelException, CQLEngineException, ValidationError
 from cqlengine.query import QuerySet, DMLQuery
 from cqlengine.query import DoesNotExist as _DoesNotExist
 from cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
@@ -50,7 +50,7 @@ class BaseModel(object):
     """
     The base model class, don't inherit from this, inherit from Model, defined below
     """
-    
+
     class DoesNotExist(_DoesNotExist): pass
     class MultipleObjectsReturned(_MultipleObjectsReturned): pass
 
@@ -60,12 +60,17 @@ class BaseModel(object):
     #however, you can also define them manually here
     table_name = None
 
-    #the keyspace for this model 
+    #the keyspace for this model
     keyspace = None
     read_repair_chance = 0.1
 
     def __init__(self, **values):
         self._values = {}
+
+        extra_columns = set(values.keys()) - set(self._columns.keys())
+        if extra_columns:
+            raise ValidationError("Incorrect columns passed: {}".format(extra_columns))
+
         for name, column in self._columns.items():
             value =  values.get(name, None)
             if value is not None: value = column.to_python(value)
@@ -111,11 +116,11 @@ class BaseModel(object):
         else:
             camelcase = re.compile(r'([a-z])([A-Z])')
             ccase = lambda s: camelcase.sub(lambda v: '{}_{}'.format(v.group(1), v.group(2).lower()), s)
-    
+
             module = cls.__module__.split('.')
             if module:
                 cf_name = ccase(module[-1]) + '_'
-    
+
             cf_name += ccase(cls.__name__)
             #trim to less than 48 characters or cassandra will complain
             cf_name = cf_name[-48:]
@@ -140,15 +145,15 @@ class BaseModel(object):
     @classmethod
     def create(cls, **kwargs):
         return cls.objects.create(**kwargs)
-    
+
     @classmethod
     def all(cls):
         return cls.objects.all()
-    
+
     @classmethod
     def filter(cls, **kwargs):
         return cls.objects.filter(**kwargs)
-    
+
     @classmethod
     def get(cls, **kwargs):
         return cls.objects.get(**kwargs)
@@ -226,8 +231,7 @@ class ModelMetaClass(type):
 
         #prepend primary key if one hasn't been defined
         if not is_abstract and not any([v.primary_key for k,v in column_definitions]):
-            k,v = 'id', columns.UUID(primary_key=True)
-            column_definitions = [(k,v)] + column_definitions
+            raise ModelDefinitionException("At least 1 primary key is required.")
 
         has_partition_keys = any(v.partition_key for (k, v) in column_definitions)
 

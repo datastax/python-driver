@@ -1,4 +1,5 @@
 from unittest import skip
+from uuid import uuid4
 from cqlengine.tests.base import BaseCassEngTestCase
 
 from cqlengine.management import create_table
@@ -7,6 +8,7 @@ from cqlengine.models import Model
 from cqlengine import columns
 
 class TestModel(Model):
+    id      = columns.UUID(primary_key=True, default=lambda:uuid4())
     count   = columns.Integer()
     text    = columns.Text(required=False)
 

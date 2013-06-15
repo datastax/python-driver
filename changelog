@@ -1,5 +1,9 @@
 CHANGELOG
 
+0.4.0
+* removed default values from all column types
+* explicit primary key is required (automatic id removed)
+
 0.3.3
 * added abstract base class models
 
