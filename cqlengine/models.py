@@ -34,6 +34,7 @@ class hybrid_classmethod(object):
         """
         raise NotImplementedError
 
+
 class QuerySetDescriptor(object):
     """
     returns a fresh queryset for the given model
@@ -54,25 +55,6 @@ class QuerySetDescriptor(object):
         """
         raise NotImplementedError
 
-class QueryExpressionDescriptor(object):
-    """
-    returns a fresh queryset /query method for the given model
-    it's declared on everytime it's accessed
-    """
-
-    def __get__(self, obj, model):
-        """ :rtype: QuerySet """
-        if model.__abstract__:
-            raise CQLEngineException('cannot execute queries against abstract models')
-        return QuerySet(model).query
-
-    def __call__(self, *args, **kwargs):
-        """
-        Just a hint to IDEs that it's ok to call this
-
-        :rtype: QuerySet
-        """
-        raise NotImplementedError
 
 class ColumnQueryEvaluator(AbstractColumnDescriptor):
 
@@ -142,7 +124,6 @@ class BaseModel(object):
     class MultipleObjectsReturned(_MultipleObjectsReturned): pass
 
     objects = QuerySetDescriptor()
-    query = QueryExpressionDescriptor()
 
     #table names will be generated automatically from it's model and package name
     #however, you can also define them manually here
@@ -239,12 +220,12 @@ class BaseModel(object):
         return cls.objects.all()
 
     @classmethod
-    def filter(cls, **kwargs):
-        return cls.objects.filter(**kwargs)
+    def filter(cls, *args, **kwargs):
+        return cls.objects.filter(*args, **kwargs)
 
     @classmethod
-    def get(cls, **kwargs):
-        return cls.objects.get(**kwargs)
+    def get(cls, *args, **kwargs):
+        return cls.objects.get(*args, **kwargs)
 
     def save(self):
         is_new = self.pk is None
