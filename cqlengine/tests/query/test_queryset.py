@@ -103,7 +103,7 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         where = query2._where_clause()
         assert where == '"test_id" = :{} AND "expected_result" >= :{}'.format(*ids)
 
-    def test_query_method_where_clause_generation(self):
+    def test_query_expression_where_clause_generation(self):
         """
         Tests the where clause creation
         """
@@ -130,17 +130,6 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         assert len(query1._where) == 1
 
         query2 = query1.filter(expected_result__gte=1)
-        assert len(query2._where) == 2
-        assert len(query1._where) == 1
-
-    def test_querymethod_queryset_is_immutable(self):
-        """
-        Tests that calling a queryset function that changes it's state returns a new queryset
-        """
-        query1 = TestModel.objects(TestModel.test_id == 5)
-        assert len(query1._where) == 1
-
-        query2 = query1.filter(TestModel.expected_result >= 1)
         assert len(query2._where) == 2
         assert len(query1._where) == 1
 
@@ -224,7 +213,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         q = TestModel.objects(test_id=0)
         assert q.count() == 4
 
-    def test_query_method_count(self):
+    def test_query_expression_count(self):
         """ Tests that adding query statements affects the count query as expected """
         assert TestModel.objects.count() == 12
 
@@ -267,7 +256,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
     def test_multiple_iterations_work_properly(self):
         """ Tests that iterating over a query set more than once works """
         # test with both the filtering method and the query method
-        for q in (TestModel.objects(test_id=0), TestModel.objects(TestModel.test_id==0)):
+        for q in (TestModel.objects(test_id=0), TestModel.objects(TestModel.test_id == 0)):
             #tuple of expected attempt_id, expected_result values
             compare_set = set([(0,5), (1,10), (2,15), (3,20)])
             for t in q:
@@ -288,7 +277,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         """
         tests that the use of one iterator does not affect the behavior of another
         """
-        for q in (TestModel.objects(test_id=0), TestModel.objects(TestModel.test_id==0)):
+        for q in (TestModel.objects(test_id=0), TestModel.objects(TestModel.test_id == 0)):
             q = q.order_by('attempt_id')
             expected_order = [0,1,2,3]
             iter1 = iter(q)
@@ -314,6 +303,27 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
 
         q = TestModel.objects(test_id=0)
         m = q.get(attempt_id=0)
+        assert isinstance(m, TestModel)
+        assert m.test_id == 0
+        assert m.attempt_id == 0
+
+    def test_query_expression_get_success_case(self):
+        """
+        Tests that the .get() method works on new and existing querysets
+        """
+        m = TestModel.get(TestModel.test_id == 0, TestModel.attempt_id == 0)
+        assert isinstance(m, TestModel)
+        assert m.test_id == 0
+        assert m.attempt_id == 0
+
+        q = TestModel.objects(TestModel.test_id == 0, TestModel.attempt_id == 0)
+        m = q.get()
+        assert isinstance(m, TestModel)
+        assert m.test_id == 0
+        assert m.attempt_id == 0
+
+        q = TestModel.objects(TestModel.test_id == 0)
+        m = q.get(TestModel.attempt_id == 0)
         assert isinstance(m, TestModel)
         assert m.test_id == 0
         assert m.attempt_id == 0

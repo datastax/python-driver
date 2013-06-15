@@ -570,7 +570,9 @@ class QuerySet(object):
         A DoesNotExistError will be raised if there are no rows matching the query
         A MultipleObjectsFoundError will be raised if there is more than one row matching the queyr
         """
-        if kwargs: return self.filter(*args, **kwargs).get()
+        if args or kwargs:
+            return self.filter(*args, **kwargs).get()
+
         self._execute_query()
         if len(self._result_cache) == 0:
             raise self.model.DoesNotExist
