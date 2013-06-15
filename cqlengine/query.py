@@ -154,7 +154,7 @@ class LessThanOrEqualOperator(QueryOperator):
     symbol = "LTE"
     cql_symbol = '<='
 
-class AbstractColumnDescriptor(object):
+class AbstractQueryableColumn(object):
     """
     exposes cql query operators through pythons
     builtin comparator symbols
@@ -187,7 +187,7 @@ class AbstractColumnDescriptor(object):
         return LessThanOrEqualOperator(self._get_column(), other)
 
 
-class NamedColumnDescriptor(AbstractColumnDescriptor):
+class NamedColumnDescriptor(AbstractQueryableColumn):
     """ describes a named cql column """
 
     def __init__(self, name):

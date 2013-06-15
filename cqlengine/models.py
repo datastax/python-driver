@@ -1,10 +1,9 @@
 from collections import OrderedDict
 import re
-import cqlengine
 
 from cqlengine import columns
 from cqlengine.exceptions import ModelException, CQLEngineException, ValidationError
-from cqlengine.query import QuerySet, DMLQuery, AbstractColumnDescriptor
+from cqlengine.query import QuerySet, DMLQuery, AbstractQueryableColumn
 from cqlengine.query import DoesNotExist as _DoesNotExist
 from cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
 
@@ -56,7 +55,14 @@ class QuerySetDescriptor(object):
         raise NotImplementedError
 
 
-class ColumnQueryEvaluator(AbstractColumnDescriptor):
+class ColumnQueryEvaluator(AbstractQueryableColumn):
+    """
+    Wraps a column and allows it to be used in comparator
+    expressions, returning query operators
+
+    ie:
+    Model.column == 5
+    """
 
     def __init__(self, column):
         self.column = column
