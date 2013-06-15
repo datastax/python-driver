@@ -53,6 +53,25 @@ class QuerySetDescriptor(object):
         :rtype: QuerySet
         """
         raise NotImplementedError
+
+class QueryExpressionDescriptor(object):
+    """
+    returns a fresh queryset /query method for the given model
+    it's declared on everytime it's accessed
+    """
+
+    def __get__(self, obj, model):
+        """ :rtype: QuerySet """
+        if model.__abstract__:
+            raise CQLEngineException('cannot execute queries against abstract models')
+        return QuerySet(model).query
+
+    def __call__(self, *args, **kwargs):
+        """
+        Just a hint to IDEs that it's ok to call this
+
+        :rtype: QuerySet
+        """
         raise NotImplementedError
 
 class ColumnDescriptor(AbstractColumnDescriptor):

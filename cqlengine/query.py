@@ -530,6 +530,13 @@ class QuerySet(object):
             raise QueryException("Can't parse '{}'".format(arg))
 
     def filter(self, **kwargs):
+        """
+        Adds WHERE arguments to the queryset, returning a new queryset
+
+        #TODO: show examples
+
+        :rtype: QuerySet
+        """
         #add arguments to the where clause filters
         clone = copy.deepcopy(self)
         for arg, val in kwargs.items():
@@ -555,7 +562,16 @@ class QuerySet(object):
         """
         Same end result as filter, but uses the new comparator style args
         ie: Model.column == val
+
+        #TODO: show examples
+
+        :rtype: QuerySet
         """
+        clone = copy.deepcopy(self)
+        for operator in args:
+            clone._where.append(operator)
+
+        return clone
 
     def get(self, **kwargs):
         """
