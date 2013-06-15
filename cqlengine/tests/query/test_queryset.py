@@ -89,7 +89,7 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         with self.assertRaises(query.QueryException):
             TestModel.query(5)
 
-    def test_where_clause_generation(self):
+    def test_filter_method_where_clause_generation(self):
         """
         Tests the where clause creation
         """
@@ -103,6 +103,19 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         where = query2._where_clause()
         assert where == '"test_id" = :{} AND "expected_result" >= :{}'.format(*ids)
 
+    def test_query_method_where_clause_generation(self):
+        """
+        Tests the where clause creation
+        """
+        query1 = TestModel.query(TestModel.test_id == 5)
+        ids = [o.query_value.identifier for o in query1._where]
+        where = query1._where_clause()
+        assert where == '"test_id" = :{}'.format(*ids)
+
+        query2 = query1.query(TestModel.expected_result >= 1)
+        ids = [o.query_value.identifier for o in query2._where]
+        where = query2._where_clause()
+        assert where == '"test_id" = :{} AND "expected_result" >= :{}'.format(*ids)
 
     def test_querystring_generation(self):
         """
@@ -118,6 +131,18 @@ class TestQuerySetOperation(BaseCassEngTestCase):
 
         query2 = query1.filter(expected_result__gte=1)
         assert len(query2._where) == 2
+        assert len(query1._where) == 1
+
+    def test_querymethod_queryset_is_immutable(self):
+        """
+        Tests that calling a queryset function that changes it's state returns a new queryset
+        """
+        query1 = TestModel.query(TestModel.test_id == 5)
+        assert len(query1._where) == 1
+
+        query2 = query1.query(TestModel.expected_result >= 1)
+        assert len(query2._where) == 2
+        assert len(query1._where) == 1
 
     def test_the_all_method_duplicates_queryset(self):
         """
