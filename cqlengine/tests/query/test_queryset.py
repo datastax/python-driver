@@ -52,6 +52,22 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         assert isinstance(op, query.GreaterThanOrEqualOperator)
         assert op.value == 1
 
+    def test_query_expression_parsing(self):
+        """ Tests that query experessions are evaluated properly """
+        query1 = TestModel.query(TestModel.test_id == 5)
+        assert len(query1._where) == 1
+
+        op = query1._where[0]
+        assert isinstance(op, query.EqualsOperator)
+        assert op.value == 5
+
+        query2 = query1.query(TestModel.expected_result >= 1)
+        assert len(query2._where) == 2
+
+        op = query2._where[1]
+        assert isinstance(op, query.GreaterThanOrEqualOperator)
+        assert op.value == 1
+
     def test_using_invalid_column_names_in_filter_kwargs_raises_error(self):
         """
         Tests that using invalid or nonexistant column names for filter args raises an error
