@@ -3,7 +3,7 @@ from cqlengine.query import QueryException
 from cqlengine.tests.base import BaseCassEngTestCase
 
 from cqlengine.exceptions import ModelException, CQLEngineException
-from cqlengine.models import Model, ModelDefinitionException
+from cqlengine.models import Model, ModelDefinitionException, ColumnQueryEvaluator
 from cqlengine import columns
 import cqlengine
 
@@ -270,7 +270,7 @@ class TestAbstractModelClasses(BaseCassEngTestCase):
     def test_abstract_columns_are_inherited(self):
         """ Tests that columns defined in the abstract class are inherited into the concrete class """
         assert hasattr(ConcreteModelWithCol, 'pkey')
-        assert isinstance(ConcreteModelWithCol.pkey, columns.Column)
+        assert isinstance(ConcreteModelWithCol.pkey, ColumnQueryEvaluator)
         assert isinstance(ConcreteModelWithCol._columns['pkey'], columns.Column)
 
     def test_concrete_class_table_creation_cycle(self):

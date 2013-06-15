@@ -74,7 +74,15 @@ class QueryExpressionDescriptor(object):
         """
         raise NotImplementedError
 
-class ColumnDescriptor(AbstractColumnDescriptor):
+class ColumnQueryEvaluator(AbstractColumnDescriptor):
+
+    def __init__(self, column):
+        self.column = column
+
+    def _get_column(self):
+        return self.column
+
+class ColumnDescriptor(object):
     """
     Handles the reading and writing of column values to and from
     a model instance's value manager, as well as creating
@@ -88,6 +96,7 @@ class ColumnDescriptor(AbstractColumnDescriptor):
         :return:
         """
         self.column = column
+        self.query_evaluator = ColumnQueryEvaluator(self.column)
 
     def __get__(self, instance, owner):
         """
@@ -101,7 +110,7 @@ class ColumnDescriptor(AbstractColumnDescriptor):
         if instance:
             return instance._values[self.column.column_name].getval()
         else:
-            return self.column
+            return self.query_evaluator
 
     def __set__(self, instance, value):
         """
@@ -133,6 +142,7 @@ class BaseModel(object):
     class MultipleObjectsReturned(_MultipleObjectsReturned): pass
 
     objects = QuerySetDescriptor()
+    query = QueryExpressionDescriptor()
 
     #table names will be generated automatically from it's model and package name
     #however, you can also define them manually here
