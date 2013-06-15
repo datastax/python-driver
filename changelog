@@ -4,6 +4,7 @@ CHANGELOG
 * removed default values from all column types
 * explicit primary key is required (automatic id removed)
 * added validation on keyname types on .create()
+* changed table_name to __table_name__, read_repair_chance to __read_repair_chance__, keyspace to __keyspace__
 
 0.3.3
 * added abstract base class models
