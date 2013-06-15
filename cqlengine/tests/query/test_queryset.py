@@ -573,7 +573,7 @@ class TestInOperator(BaseQuerySetUsage):
 
     def test_query_expression_success_case(self):
         """ Tests the in operator works with the query expression query method """
-        q = TestModel.filter(TestModel.test_id in [0, 1])
+        q = TestModel.filter(TestModel.test_id.in_([0, 1]))
         assert q.count() == 8
 
 

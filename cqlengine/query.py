@@ -163,11 +163,16 @@ class AbstractColumnDescriptor(object):
     def _get_column(self):
         raise NotImplementedError
 
+    def in_(self, item):
+        """
+        Returns an in operator
+
+        used in where you'd typically want to use python's `in` operator
+        """
+        return InOperator(self._get_column(), item)
+
     def __eq__(self, other):
         return EqualsOperator(self._get_column(), other)
-
-    def __contains__(self, item):
-        return InOperator(self._get_column(), item)
 
     def __gt__(self, other):
         return GreaterThanOperator(self._get_column(), other)
@@ -195,7 +200,6 @@ class NamedColumnDescriptor(AbstractColumnDescriptor):
     def to_database(self, val):
         return val
 
-C = NamedColumnDescriptor
 
 class TableDescriptor(object):
     """ describes a cql table """
@@ -204,7 +208,6 @@ class TableDescriptor(object):
         self.keyspace = keyspace
         self.name = name
 
-T = TableDescriptor
 
 class KeyspaceDescriptor(object):
     """ Describes a cql keyspace """
@@ -219,7 +222,6 @@ class KeyspaceDescriptor(object):
         """
         return TableDescriptor(self.name, name)
 
-K = KeyspaceDescriptor
 
 class BatchType(object):
     Unlogged    = 'UNLOGGED'
