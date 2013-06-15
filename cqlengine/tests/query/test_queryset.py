@@ -361,9 +361,13 @@ class TestQuerySetOrdering(BaseQuerySetUsage):
             assert model.attempt_id == expect
 
     def test_ordering_by_non_second_primary_keys_fail(self):
-
+        # kwarg filtering
         with self.assertRaises(query.QueryException):
             q = TestModel.objects(test_id=0).order_by('test_id')
+
+        # kwarg filtering
+        with self.assertRaises(query.QueryException):
+            q = TestModel.objects(TestModel.test_id == 0).order_by('test_id')
 
     def test_ordering_by_non_primary_keys_fails(self):
         with self.assertRaises(query.QueryException):
@@ -431,7 +435,7 @@ class TestQuerySetValidation(BaseQuerySetUsage):
         """
         with self.assertRaises(query.QueryException):
             q = TestModel.objects(test_result=25)
-            [i for i in q]
+            list([i for i in q])
 
     def test_primary_key_or_index_must_have_equal_relation_filter(self):
         """
@@ -439,7 +443,7 @@ class TestQuerySetValidation(BaseQuerySetUsage):
         """
         with self.assertRaises(query.QueryException):
             q = TestModel.objects(test_id__gt=0)
-            [i for i in q]
+            list([i for i in q])
 
 
     def test_indexed_field_can_be_queried(self):
@@ -447,7 +451,6 @@ class TestQuerySetValidation(BaseQuerySetUsage):
         Tests that queries on an indexed field will work without any primary key relations specified
         """
         q = IndexedTestModel.objects(test_result=25)
-        count = q.count()
         assert q.count() == 4
 
 class TestQuerySetDelete(BaseQuerySetUsage):
@@ -526,6 +529,7 @@ class TestMinMaxTimeUUIDFunctions(BaseCassEngTestCase):
         TimeUUIDQueryModel.create(partition=pk, time=uuid1(), data='4')
         time.sleep(0.2)
 
+        # test kwarg filtering
         q = TimeUUIDQueryModel.filter(partition=pk, time__lte=functions.MaxTimeUUID(midpoint))
         q = [d for d in q]
         assert len(q) == 2
@@ -539,11 +543,37 @@ class TestMinMaxTimeUUIDFunctions(BaseCassEngTestCase):
         assert  '3' in datas
         assert  '4' in datas
 
+        # test query expression filtering
+        q = TimeUUIDQueryModel.filter(
+            TimeUUIDQueryModel.partition == pk,
+            TimeUUIDQueryModel.time <= functions.MaxTimeUUID(midpoint)
+        )
+        q = [d for d in q]
+        assert len(q) == 2
+        datas = [d.data for d in q]
+        assert  '1' in datas
+        assert  '2' in datas
+
+        q = TimeUUIDQueryModel.filter(
+            TimeUUIDQueryModel.partition == pk,
+            TimeUUIDQueryModel.time >= functions.MinTimeUUID(midpoint)
+        )
+        assert len(q) == 2
+        datas = [d.data for d in q]
+        assert  '3' in datas
+        assert  '4' in datas
+
 
 class TestInOperator(BaseQuerySetUsage):
 
-    def test_success_case(self):
+    def test_kwarg_success_case(self):
+        """ Tests the in operator works with the kwarg query method """
         q = TestModel.filter(test_id__in=[0,1])
+        assert q.count() == 8
+
+    def test_query_expression_success_case(self):
+        """ Tests the in operator works with the query expression query method """
+        q = TestModel.filter(TestModel.test_id in [0, 1])
         assert q.count() == 8
 
 
