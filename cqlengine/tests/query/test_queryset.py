@@ -73,7 +73,21 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         Tests that using invalid or nonexistant column names for filter args raises an error
         """
         with self.assertRaises(query.QueryException):
-            query0 = TestModel.objects(nonsense=5)
+            TestModel.objects(nonsense=5)
+
+    def test_using_nonexistant_column_names_in_query_args_raises_error(self):
+        """
+        Tests that using invalid or nonexistant columns for query args raises an error
+        """
+        with self.assertRaises(AttributeError):
+            TestModel.query(TestModel.nonsense == 5)
+
+    def test_using_non_query_operators_in_query_args_raises_error(self):
+        """
+        Tests that providing query args that are not query operator instances raises an error
+        """
+        with self.assertRaises(query.QueryException):
+            TestModel.query(5)
 
     def test_where_clause_generation(self):
         """

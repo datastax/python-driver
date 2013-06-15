@@ -569,6 +569,8 @@ class QuerySet(object):
         """
         clone = copy.deepcopy(self)
         for operator in args:
+            if not isinstance(operator, QueryOperator):
+                raise QueryException('{} is not a valid query operator'.format(operator))
             clone._where.append(operator)
 
         return clone
