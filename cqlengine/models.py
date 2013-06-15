@@ -29,7 +29,9 @@ class hybrid_classmethod(object):
             return self.instmethod.__get__(instance, owner)
 
     def __call__(self, *args, **kwargs):
-        """ Just a hint to IDEs that it's ok to call this """
+        """
+        Just a hint to IDEs that it's ok to call this
+        """
         raise NotImplementedError
 
 class QuerySetDescriptor(object):
@@ -39,12 +41,18 @@ class QuerySetDescriptor(object):
     """
 
     def __get__(self, obj, model):
+        """ :rtype: QuerySet """
         if model.__abstract__:
             raise CQLEngineException('cannot execute queries against abstract models')
         return QuerySet(model)
 
     def __call__(self, *args, **kwargs):
-        """ Just a hint to IDEs that it's ok to call this """
+        """
+        Just a hint to IDEs that it's ok to call this
+
+        :rtype: QuerySet
+        """
+        raise NotImplementedError
         raise NotImplementedError
 
 class ColumnDescriptor(AbstractColumnDescriptor):
