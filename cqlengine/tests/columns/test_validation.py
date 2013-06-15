@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from datetime import date
 from datetime import tzinfo
 from decimal import Decimal as D
+from uuid import uuid4, uuid1
 from cqlengine import ValidationError
 
 from cqlengine.tests.base import BaseCassEngTestCase
@@ -119,7 +120,7 @@ class TestDecimal(BaseCassEngTestCase):
 class TestTimeUUID(BaseCassEngTestCase):
     class TimeUUIDTest(Model):
         test_id = Integer(primary_key=True)
-        timeuuid = TimeUUID()
+        timeuuid = TimeUUID(default=uuid1())
 
     @classmethod
     def setUpClass(cls):
@@ -132,6 +133,10 @@ class TestTimeUUID(BaseCassEngTestCase):
         delete_table(cls.TimeUUIDTest)
 
     def test_timeuuid_io(self):
+        """
+        ensures that
+        :return:
+        """
         t0 = self.TimeUUIDTest.create(test_id=0)
         t1 = self.TimeUUIDTest.get(test_id=0)
 
@@ -139,8 +144,8 @@ class TestTimeUUID(BaseCassEngTestCase):
 
 class TestInteger(BaseCassEngTestCase):
     class IntegerTest(Model):
-        test_id = UUID(primary_key=True)
-        value   = Integer(default=0)
+        test_id = UUID(primary_key=True, default=lambda:uuid4())
+        value   = Integer(default=0, required=True)
 
     def test_default_zero_fields_validate(self):
         """ Tests that integer columns with a default value of 0 validate """
@@ -180,7 +185,7 @@ class TestText(BaseCassEngTestCase):
         Text().validate(bytearray('bytearray'))
 
         with self.assertRaises(ValidationError):
-            Text().validate(None)
+            Text(required=True).validate(None)
 
         with self.assertRaises(ValidationError):
             Text().validate(5)
@@ -190,7 +195,13 @@ class TestText(BaseCassEngTestCase):
 
 
 
+class TestExtraFieldsRaiseException(BaseCassEngTestCase):
+    class TestModel(Model):
+        id = UUID(primary_key=True, default=uuid4)
 
+    def test_extra_field(self):
+        with self.assertRaises(ValidationError):
+            self.TestModel.create(bacon=5000)
 
 
 

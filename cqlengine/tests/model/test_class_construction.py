@@ -1,8 +1,9 @@
+from uuid import uuid4
 from cqlengine.query import QueryException
 from cqlengine.tests.base import BaseCassEngTestCase
 
 from cqlengine.exceptions import ModelException, CQLEngineException
-from cqlengine.models import Model
+from cqlengine.models import Model, ModelDefinitionException
 from cqlengine import columns
 import cqlengine
 
@@ -18,6 +19,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         """
 
         class TestModel(Model):
+            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
             text = columns.Text()
 
         #check class attibutes
@@ -38,6 +40,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         -the db_map allows columns
         """
         class WildDBNames(Model):
+            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
             content = columns.Text(db_field='words_and_whatnot')
             numbers = columns.Integer(db_field='integers_etc')
 
@@ -61,17 +64,26 @@ class TestModelClassFunction(BaseCassEngTestCase):
         """
 
         class Stuff(Model):
+            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
             words = columns.Text()
             content = columns.Text()
             numbers = columns.Integer()
 
         self.assertEquals(Stuff._columns.keys(), ['id', 'words', 'content', 'numbers'])
 
+    def test_exception_raised_when_creating_class_without_pk(self):
+        with self.assertRaises(ModelDefinitionException):
+            class TestModel(Model):
+                count   = columns.Integer()
+                text    = columns.Text(required=False)
+
+
     def test_value_managers_are_keeping_model_instances_isolated(self):
         """
         Tests that instance value managers are isolated from other instances
         """
         class Stuff(Model):
+            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
             num = columns.Integer()
 
         inst1 = Stuff(num=5)
@@ -86,6 +98,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         Tests that fields defined on the super class are inherited properly
         """
         class TestModel(Model):
+            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
             text = columns.Text()
 
         class InheritedModel(TestModel):
@@ -124,6 +137,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         Test compound partition key definition
         """
         class ModelWithPartitionKeys(cqlengine.Model):
+            id = columns.UUID(primary_key=True, default=lambda:uuid4())
             c1 = cqlengine.Text(primary_key=True)
             p1 = cqlengine.Text(partition_key=True)
             p2 = cqlengine.Text(partition_key=True)
@@ -144,6 +158,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
     def test_del_attribute_is_assigned_properly(self):
         """ Tests that columns that can be deleted have the del attribute """
         class DelModel(Model):
+            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
             key = columns.Integer(primary_key=True)
             data = columns.Integer(required=False)
 
@@ -156,9 +171,10 @@ class TestModelClassFunction(BaseCassEngTestCase):
         """ Tests that DoesNotExist exceptions are not the same exception between models """
 
         class Model1(Model):
-            pass
+            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
+
         class Model2(Model):
-            pass
+            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
 
         try:
             raise Model1.DoesNotExist
@@ -171,7 +187,8 @@ class TestModelClassFunction(BaseCassEngTestCase):
     def test_does_not_exist_inherits_from_superclass(self):
         """ Tests that a DoesNotExist exception can be caught by it's parent class DoesNotExist """
         class Model1(Model):
-            pass
+            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
+
         class Model2(Model1):
             pass
 
@@ -184,14 +201,14 @@ class TestModelClassFunction(BaseCassEngTestCase):
             assert False, "Model2 exception should not be caught by Model1"
 
 class TestManualTableNaming(BaseCassEngTestCase):
-    
+
     class RenamedTest(cqlengine.Model):
         keyspace = 'whatever'
         table_name = 'manual_name'
-        
+
         id = cqlengine.UUID(primary_key=True)
         data = cqlengine.Text()
-        
+
     def test_proper_table_naming(self):
         assert self.RenamedTest.column_family_name(include_keyspace=False) == 'manual_name'
         assert self.RenamedTest.column_family_name(include_keyspace=True) == 'whatever.manual_name'

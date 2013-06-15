@@ -1,5 +1,10 @@
 CHANGELOG
 
+0.4.0 (in progress)
+* removed default values from all column types
+* explicit primary key is required (automatic id removed)
+* added validation on keyname types on .create()
+
 0.3.3
 * added abstract base class models
 
