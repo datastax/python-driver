@@ -80,7 +80,7 @@ class Column(object):
                  index=False,
                  db_field=None,
                  default=None,
-                 required=True,
+                 required=False,
                  clustering_order=None):
         """
         :param primary_key: bool flag, indicates this column is a primary key. The first primary key defined

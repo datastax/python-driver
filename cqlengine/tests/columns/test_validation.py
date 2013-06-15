@@ -185,7 +185,7 @@ class TestText(BaseCassEngTestCase):
         Text().validate(bytearray('bytearray'))
 
         with self.assertRaises(ValidationError):
-            Text().validate(None)
+            Text(required=True).validate(None)
 
         with self.assertRaises(ValidationError):
             Text().validate(5)
