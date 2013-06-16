@@ -649,6 +649,17 @@ class AbstractQuerySet(object):
     def __ne__(self, q):
         return not (self != q)
 
+class ResultObject(dict):
+    """
+    adds attribute access to a dictionary
+    """
+
+    def __getattr__(self, item):
+        try:
+            return self[item]
+        except KeyError:
+            raise AttributeError
+
 class SimpleQuerySet(AbstractQuerySet):
     """
 
@@ -663,7 +674,7 @@ class SimpleQuerySet(AbstractQuerySet):
         Returns a function that will be used to instantiate query results
         """
         def _construct_instance(values):
-            return dict(zip(names, values))
+            return ResultObject(zip(names, values))
         return _construct_instance
 
 class ModelQuerySet(AbstractQuerySet):
