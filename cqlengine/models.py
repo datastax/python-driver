@@ -173,6 +173,17 @@ class BaseModel(object):
         """ Returns the manual keyspace, if set, otherwise the default keyspace """
         return cls.keyspace or DEFAULT_KEYSPACE
 
+    @classmethod
+    def _get_column(cls, name):
+        """
+        Returns the column matching the given name, raising a key error if
+        it doesn't exist
+
+        :param name: the name of the column to return
+        :rtype: Column
+        """
+        return cls._columns[name]
+
     def __eq__(self, other):
         return self.as_dict() == other.as_dict()
 

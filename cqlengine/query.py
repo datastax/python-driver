@@ -494,7 +494,7 @@ class SimpleQuerySet(object):
             col_name, col_op = self._parse_filter_arg(arg)
             #resolve column and operator
             try:
-                column = self.model._columns[col_name]
+                column = self.model._get_column(col_name)
             except KeyError:
                 if col_name == 'pk__token':
                     column = columns._PartitionKeysToken(self.model)
