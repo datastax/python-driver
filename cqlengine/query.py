@@ -240,10 +240,10 @@ class BatchQuery(object):
         self.execute()
 
 
-class SimpleQuerySet(object):
+class AbstractQuerySet(object):
 
     def __init__(self, model):
-        super(SimpleQuerySet, self).__init__()
+        super(AbstractQuerySet, self).__init__()
         self.model = model
 
         #Where clause filters
@@ -325,16 +325,15 @@ class SimpleQuerySet(object):
             values.update(where.get_dict())
         return values
 
+    def _get_select_fields(self):
+        """ Returns the fields to be returned by the select query """
+        raise NotImplementedError
+
     def _select_query(self):
         """
         Returns a select clause based on the given filter args
         """
-        fields = self.model._columns.keys()
-        if self._defer_fields:
-            fields = [f for f in fields if f not in self._defer_fields]
-        elif self._only_fields:
-            fields = self._only_fields
-        db_fields = [self.model._columns[f].db_field_name for f in fields]
+        db_fields = self._get_select_fields()
 
         qs = ['SELECT {}'.format(', '.join(['"{}"'.format(f) for f in db_fields]))]
         qs += ['FROM {}'.format(self.column_family_name)]
@@ -481,7 +480,7 @@ class SimpleQuerySet(object):
 
         #TODO: show examples
 
-        :rtype: SimpleQuerySet
+        :rtype: AbstractQuerySet
         """
         #add arguments to the where clause filters
         clone = copy.deepcopy(self)
@@ -680,8 +679,17 @@ class SimpleQuerySet(object):
     def __ne__(self, q):
         return not (self != q)
 
+class SimpleQuerySet(AbstractQuerySet):
+    """
 
-class ModelQuerySet(SimpleQuerySet):
+    """
+
+    def _get_select_fields(self):
+        """ Returns the fields to be returned by the select query """
+        return ['*']
+
+
+class ModelQuerySet(AbstractQuerySet):
     """
 
     """
@@ -709,6 +717,15 @@ class ModelQuerySet(SimpleQuerySet):
         """ Returns a where clause based on the given filter args """
         self._validate_where_syntax()
         return super(ModelQuerySet, self)._where_clause()
+
+    def _get_select_fields(self):
+        """ Returns the fields to be returned by the select query """
+        fields = self.model._columns.keys()
+        if self._defer_fields:
+            fields = [f for f in fields if f not in self._defer_fields]
+        elif self._only_fields:
+            fields = self._only_fields
+        return [self.model._columns[f].db_field_name for f in fields]
 
 
 class DMLQuery(object):
