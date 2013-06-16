@@ -1,7 +1,26 @@
-from collections import defaultdict, namedtuple
+from cqlengine.exceptions import CQLEngineException
+from cqlengine.query import AbstractQueryableColumn, SimpleQuerySet
 
-from cqlengine.models import QuerySetDescriptor
-from cqlengine.query import AbstractQueryableColumn
+
+class QuerySetDescriptor(object):
+    """
+    returns a fresh queryset for the given model
+    it's declared on everytime it's accessed
+    """
+
+    def __get__(self, obj, model):
+        """ :rtype: ModelQuerySet """
+        if model.__abstract__:
+            raise CQLEngineException('cannot execute queries against abstract models')
+        return SimpleQuerySet(model)
+
+    def __call__(self, *args, **kwargs):
+        """
+        Just a hint to IDEs that it's ok to call this
+
+        :rtype: ModelQuerySet
+        """
+        raise NotImplementedError
 
 
 class NamedColumn(AbstractQueryableColumn):
@@ -26,13 +45,6 @@ class NamedTable(object):
 
     __abstract__ = False
 
-    class ColumnContainer(dict):
-        def __missing__(self, name):
-            column = NamedColumn(name)
-            self[name] = column
-            return column
-    _columns = ColumnContainer()
-
     objects = QuerySetDescriptor()
 
     def __init__(self, keyspace, name):
@@ -42,6 +54,15 @@ class NamedTable(object):
     @classmethod
     def column(cls, name):
         return NamedColumn(name)
+
+    @classmethod
+    def _get_column(cls, name):
+        """
+        Returns the column matching the given name
+
+        :rtype: Column
+        """
+        return cls.column(name)
 
     # @classmethod
     # def create(cls, **kwargs):
