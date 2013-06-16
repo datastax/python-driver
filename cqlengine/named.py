@@ -12,7 +12,7 @@ class QuerySetDescriptor(object):
         """ :rtype: ModelQuerySet """
         if model.__abstract__:
             raise CQLEngineException('cannot execute queries against abstract models')
-        return SimpleQuerySet(model)
+        return SimpleQuerySet(obj)
 
     def __call__(self, *args, **kwargs):
         """
@@ -58,11 +58,19 @@ class NamedTable(object):
         self.keyspace = keyspace
         self.name = name
 
-    @classmethod
     def column(cls, name):
         return NamedColumn(name)
 
-    @classmethod
+    def column_family_name(self, include_keyspace=True):
+        """
+        Returns the column family name if it's been defined
+        otherwise, it creates it from the module and class name
+        """
+        if include_keyspace:
+            return '{}.{}'.format(self.keyspace, self.name)
+        else:
+            return self.name
+
     def _get_column(cls, name):
         """
         Returns the column matching the given name
@@ -75,15 +83,12 @@ class NamedTable(object):
     # def create(cls, **kwargs):
     #     return cls.objects.create(**kwargs)
 
-    @classmethod
     def all(cls):
         return cls.objects.all()
 
-    @classmethod
     def filter(cls, *args, **kwargs):
         return cls.objects.filter(*args, **kwargs)
 
-    @classmethod
     def get(cls, *args, **kwargs):
         return cls.objects.get(*args, **kwargs)
 
