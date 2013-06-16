@@ -29,9 +29,9 @@ Retrieving objects with filters
     That can be accomplished with the QuerySet's ``.filter(\*\*)`` method.
 
     For example, given the model definition:
-    
+
     .. code-block:: python
-        
+
         class Automobile(Model):
             manufacturer = columns.Text(primary_key=True)
             year = columns.Integer(primary_key=True)
@@ -40,10 +40,16 @@ Retrieving objects with filters
 
     ...and assuming the Automobile table contains a record of every car model manufactured in the last 20 years or so, we can retrieve only the cars made by a single manufacturer like this:
 
-    
+
     .. code-block:: python
 
         q = Automobile.objects.filter(manufacturer='Tesla')
+
+    You can also use the more convenient syntax:
+
+    .. code-block:: python
+
+        q = Automobile.objects(Automobile.manufacturer == 'Tesla')
 
     We can then further filter our query with another call to **.filter**
 
@@ -123,12 +129,17 @@ Filtering Operators
             q = Automobile.objects.filter(manufacturer='Tesla')
             q = q.filter(year__in=[2011, 2012])
 
+
     :attr:`> (__gt) <query.QueryOperator.GreaterThanOperator>`
 
         .. code-block:: python
 
             q = Automobile.objects.filter(manufacturer='Tesla')
             q = q.filter(year__gt=2010)  # year > 2010
+
+            # or the nicer syntax
+
+            q.filter(Automobile.year > 2010)
 
     :attr:`>= (__gte) <query.QueryOperator.GreaterThanOrEqualOperator>`
 
@@ -137,6 +148,10 @@ Filtering Operators
             q = Automobile.objects.filter(manufacturer='Tesla')
             q = q.filter(year__gte=2010)  # year >= 2010
 
+            # or the nicer syntax
+
+            Automobile.objects.filter(Automobile.manufacturer == 'Tesla')
+
     :attr:`< (__lt) <query.QueryOperator.LessThanOperator>`
 
         .. code-block:: python
@@ -144,12 +159,18 @@ Filtering Operators
             q = Automobile.objects.filter(manufacturer='Tesla')
             q = q.filter(year__lt=2012)  # year < 2012
 
+            # or...
+
+            q.filter(Automobile.year < 2012)
+
     :attr:`<= (__lte) <query.QueryOperator.LessThanOrEqualOperator>`
 
         .. code-block:: python
 
             q = Automobile.objects.filter(manufacturer='Tesla')
             q = q.filter(year__lte=2012)  # year <= 2012
+
+            q.filter(Automobile.year <= 2012)
 
 
 TimeUUID Functions
@@ -220,7 +241,7 @@ Ordering QuerySets
 
     Since Cassandra is essentially a distributed hash table on steroids, the order you get records back in will not be particularly predictable.
 
-    However, you can set a column to order on with the ``.order_by(column_name)`` method. 
+    However, you can set a column to order on with the ``.order_by(column_name)`` method.
 
     *Example*
 
@@ -245,12 +266,12 @@ Values Lists
 Batch Queries
 ===============
 
-    cqlengine now supports batch queries using the BatchQuery class. Batch queries can be started and stopped manually, or within a context manager. To add queries to the batch object, you just need to precede the create/save/delete call with a call to batch, and pass in the batch object. 
-    
+    cqlengine now supports batch queries using the BatchQuery class. Batch queries can be started and stopped manually, or within a context manager. To add queries to the batch object, you just need to precede the create/save/delete call with a call to batch, and pass in the batch object.
+
     You can only create, update, and delete rows with a batch query, attempting to read rows out of the database with a batch query will fail.
 
     .. code-block:: python
-        
+
         from cqlengine import BatchQuery
 
         #using a context manager
@@ -298,7 +319,7 @@ QuerySet method reference
     .. method:: limit(num)
 
         Limits the number of results returned by Cassandra.
-        
+
         *Note that CQL's default limit is 10,000, so all queries without a limit set explicitly will have an implicit limit of 10,000*
 
     .. method:: order_by(field_name)
@@ -306,7 +327,7 @@ QuerySet method reference
         :param field_name: the name of the field to order on. *Note: the field_name must be a clustering key*
         :type field_name: string
 
-        Sets the field to order on. 
+        Sets the field to order on.
 
     .. method:: allow_filtering()
 

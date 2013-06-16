@@ -83,7 +83,7 @@ def create_table(model, create_missing_keyspace=True):
 
         qs += ['({})'.format(', '.join(qtypes))]
 
-        with_qs = ['read_repair_chance = {}'.format(model.read_repair_chance)]
+        with_qs = ['read_repair_chance = {}'.format(model.__read_repair_chance__)]
 
         _order = ["%s %s" % (c.db_field_name, c.clustering_order or 'ASC') for c in model._clustering_keys.values()]
         if _order:
