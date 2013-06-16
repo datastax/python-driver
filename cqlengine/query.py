@@ -154,7 +154,7 @@ class LessThanOrEqualOperator(QueryOperator):
     symbol = "LTE"
     cql_symbol = '<='
 
-class AbstractColumnDescriptor(object):
+class AbstractQueryableColumn(object):
     """
     exposes cql query operators through pythons
     builtin comparator symbols
@@ -185,42 +185,6 @@ class AbstractColumnDescriptor(object):
 
     def __le__(self, other):
         return LessThanOrEqualOperator(self._get_column(), other)
-
-
-class NamedColumnDescriptor(AbstractColumnDescriptor):
-    """ describes a named cql column """
-
-    def __init__(self, name):
-        self.name = name
-
-    @property
-    def cql(self):
-        return self.name
-
-    def to_database(self, val):
-        return val
-
-
-class TableDescriptor(object):
-    """ describes a cql table """
-
-    def __init__(self, keyspace, name):
-        self.keyspace = keyspace
-        self.name = name
-
-
-class KeyspaceDescriptor(object):
-    """ Describes a cql keyspace """
-
-    def __init__(self, name):
-        self.name = name
-
-    def table(self, name):
-        """
-        returns a table descriptor with the given
-        name that belongs to this keyspace
-        """
-        return TableDescriptor(self.name, name)
 
 
 class BatchType(object):
@@ -275,10 +239,11 @@ class BatchQuery(object):
         if exc_type is not None: return
         self.execute()
 
-class QuerySet(object):
+
+class AbstractQuerySet(object):
 
     def __init__(self, model):
-        super(QuerySet, self).__init__()
+        super(AbstractQuerySet, self).__init__()
         self.model = model
 
         #Where clause filters
@@ -349,29 +314,8 @@ class QuerySet(object):
 
     #----query generation / execution----
 
-    def _validate_where_syntax(self):
-        """ Checks that a filterset will not create invalid cql """
-
-        #check that there's either a = or IN relationship with a primary key or indexed field
-        equal_ops = [w for w in self._where if isinstance(w, EqualsOperator)]
-        token_ops = [w for w in self._where if isinstance(w.value, Token)]
-        if not any([w.column.primary_key or w.column.index for w in equal_ops]) and not token_ops:
-            raise QueryException('Where clauses require either a "=" or "IN" comparison with either a primary key or indexed field')
-
-        if not self._allow_filtering:
-            #if the query is not on an indexed field
-            if not any([w.column.index for w in equal_ops]):
-                if not any([w.column.partition_key for w in equal_ops]) and not token_ops:
-                    raise QueryException('Filtering on a clustering key without a partition key is not allowed unless allow_filtering() is called on the querset')
-            if any(not w.column.partition_key for w in token_ops):
-                raise QueryException('The token() function is only supported on the partition key')
-
-
-        #TODO: abuse this to see if we can get cql to raise an exception
-
     def _where_clause(self):
         """ Returns a where clause based on the given filter args """
-        self._validate_where_syntax()
         return ' AND '.join([f.cql for f in self._where])
 
     def _where_values(self):
@@ -381,18 +325,15 @@ class QuerySet(object):
             values.update(where.get_dict())
         return values
 
+    def _get_select_statement(self):
+        """ returns the select portion of this queryset's cql statement """
+        raise NotImplementedError
+
     def _select_query(self):
         """
         Returns a select clause based on the given filter args
         """
-        fields = self.model._columns.keys()
-        if self._defer_fields:
-            fields = [f for f in fields if f not in self._defer_fields]
-        elif self._only_fields:
-            fields = self._only_fields
-        db_fields = [self.model._columns[f].db_field_name for f in fields]
-
-        qs = ['SELECT {}'.format(', '.join(['"{}"'.format(f) for f in db_fields]))]
+        qs = [self._get_select_statement()]
         qs += ['FROM {}'.format(self.column_family_name)]
 
         if self._where:
@@ -479,22 +420,7 @@ class QuerySet(object):
         """
         Returns a function that will be used to instantiate query results
         """
-        model = self.model
-        db_map = model._db_map
-        if not self._values_list:
-            def _construct_instance(values):
-                field_dict = dict((db_map.get(k, k), v) for k, v in zip(names, values))
-                instance = model(**field_dict)
-                instance._is_persisted = True
-                return instance
-            return _construct_instance
-
-        columns = [model._columns[db_map[name]] for name in names]
-        if self._flat_values_list:
-           return (lambda values: columns[0].to_python(values[0]))
-        else:
-            # result_cls = namedtuple("{}Tuple".format(self.model.__name__), names)
-            return (lambda values: map(lambda (c, v): c.to_python(v), zip(columns, values)))
+        raise NotImplementedError
 
     def batch(self, batch_obj):
         """
@@ -537,7 +463,7 @@ class QuerySet(object):
 
         #TODO: show examples
 
-        :rtype: QuerySet
+        :rtype: AbstractQuerySet
         """
         #add arguments to the where clause filters
         clone = copy.deepcopy(self)
@@ -550,7 +476,7 @@ class QuerySet(object):
             col_name, col_op = self._parse_filter_arg(arg)
             #resolve column and operator
             try:
-                column = self.model._columns[col_name]
+                column = self.model._get_column(col_name)
             except KeyError:
                 if col_name == 'pk__token':
                     column = columns._PartitionKeysToken(self.model)
@@ -584,6 +510,12 @@ class QuerySet(object):
         else:
             return self[0]
 
+    def _get_ordering_condition(self, colname):
+        order_type = 'DESC' if colname.startswith('-') else 'ASC'
+        colname = colname.replace('-', '')
+
+        return colname, order_type
+
     def order_by(self, *colnames):
         """
         orders the result set.
@@ -598,24 +530,7 @@ class QuerySet(object):
 
         conditions = []
         for colname in colnames:
-            order_type = 'DESC' if colname.startswith('-') else 'ASC'
-            colname = colname.replace('-', '')
-
-            column = self.model._columns.get(colname)
-            if column is None:
-                raise QueryException("Can't resolve the column name: '{}'".format(colname))
-
-            #validate the column selection
-            if not column.primary_key:
-                raise QueryException(
-                    "Can't order on '{}', can only order on (clustered) primary keys".format(colname))
-
-            pks = [v for k, v in self.model._columns.items() if v.primary_key]
-            if column == pks[0]:
-                raise QueryException(
-                    "Can't order by the first primary key (partition key), clustering (secondary) keys only")
-
-            conditions.append('"{}" {}'.format(column.db_field_name, order_type))
+            conditions.append('"{}" {}'.format(*self._get_ordering_condition(colname)))
 
         clone = copy.deepcopy(self)
         clone._order.extend(conditions)
@@ -717,12 +632,125 @@ class QuerySet(object):
         else:
             execute(qs, self._where_values())
 
+    def __eq__(self, q):
+        return set(self._where) == set(q._where)
+
+    def __ne__(self, q):
+        return not (self != q)
+
+class ResultObject(dict):
+    """
+    adds attribute access to a dictionary
+    """
+
+    def __getattr__(self, item):
+        try:
+            return self[item]
+        except KeyError:
+            raise AttributeError
+
+class SimpleQuerySet(AbstractQuerySet):
+    """
+
+    """
+
+    def _get_select_statement(self):
+        """ Returns the fields to be returned by the select query """
+        return 'SELECT *'
+
+    def _create_result_constructor(self, names):
+        """
+        Returns a function that will be used to instantiate query results
+        """
+        def _construct_instance(values):
+            return ResultObject(zip(names, values))
+        return _construct_instance
+
+class ModelQuerySet(AbstractQuerySet):
+    """
+
+    """
+    def _validate_where_syntax(self):
+        """ Checks that a filterset will not create invalid cql """
+
+        #check that there's either a = or IN relationship with a primary key or indexed field
+        equal_ops = [w for w in self._where if isinstance(w, EqualsOperator)]
+        token_ops = [w for w in self._where if isinstance(w.value, Token)]
+        if not any([w.column.primary_key or w.column.index for w in equal_ops]) and not token_ops:
+            raise QueryException('Where clauses require either a "=" or "IN" comparison with either a primary key or indexed field')
+
+        if not self._allow_filtering:
+            #if the query is not on an indexed field
+            if not any([w.column.index for w in equal_ops]):
+                if not any([w.column.partition_key for w in equal_ops]) and not token_ops:
+                    raise QueryException('Filtering on a clustering key without a partition key is not allowed unless allow_filtering() is called on the querset')
+            if any(not w.column.partition_key for w in token_ops):
+                raise QueryException('The token() function is only supported on the partition key')
+
+
+                #TODO: abuse this to see if we can get cql to raise an exception
+
+    def _where_clause(self):
+        """ Returns a where clause based on the given filter args """
+        self._validate_where_syntax()
+        return super(ModelQuerySet, self)._where_clause()
+
+    def _get_select_statement(self):
+        """ Returns the fields to be returned by the select query """
+        fields = self.model._columns.keys()
+        if self._defer_fields:
+            fields = [f for f in fields if f not in self._defer_fields]
+        elif self._only_fields:
+            fields = self._only_fields
+        db_fields = [self.model._columns[f].db_field_name for f in fields]
+        return 'SELECT {}'.format(', '.join(['"{}"'.format(f) for f in db_fields]))
+
+    def _create_result_constructor(self, names):
+        """
+        Returns a function that will be used to instantiate query results
+        """
+        model = self.model
+        db_map = model._db_map
+        if not self._values_list:
+            def _construct_instance(values):
+                field_dict = dict((db_map.get(k, k), v) for k, v in zip(names, values))
+                instance = model(**field_dict)
+                instance._is_persisted = True
+                return instance
+            return _construct_instance
+
+        columns = [model._columns[db_map[name]] for name in names]
+        if self._flat_values_list:
+            return (lambda values: columns[0].to_python(values[0]))
+        else:
+            # result_cls = namedtuple("{}Tuple".format(self.model.__name__), names)
+            return (lambda values: map(lambda (c, v): c.to_python(v), zip(columns, values)))
+
+    def _get_ordering_condition(self, colname):
+        colname, order_type = super(ModelQuerySet, self)._get_ordering_condition(colname)
+
+        column = self.model._columns.get(colname)
+        if column is None:
+            raise QueryException("Can't resolve the column name: '{}'".format(colname))
+
+        #validate the column selection
+        if not column.primary_key:
+            raise QueryException(
+                "Can't order on '{}', can only order on (clustered) primary keys".format(colname))
+
+        pks = [v for k, v in self.model._columns.items() if v.primary_key]
+        if column == pks[0]:
+            raise QueryException(
+                "Can't order by the first primary key (partition key), clustering (secondary) keys only")
+
+        return column.db_field_name, order_type
+
     def values_list(self, *fields, **kwargs):
         """ Instructs the query set to return tuples, not model instance """
         flat = kwargs.pop('flat', False)
         if kwargs:
             raise TypeError('Unexpected keyword arguments to values_list: %s'
-                    % (kwargs.keys(),))
+                            % (kwargs.keys(),))
         if flat and len(fields) > 1:
             raise TypeError("'flat' is not valid when values_list is called with more than one field.")
         clone = self.only(fields)
@@ -730,11 +758,6 @@ class QuerySet(object):
         clone._flat_values_list = flat
         return clone
 
-    def __eq__(self, q):
-        return set(self._where) == set(q._where)
-
-    def __ne__(self, q):
-        return not (self != q)
 
 class DMLQuery(object):
     """

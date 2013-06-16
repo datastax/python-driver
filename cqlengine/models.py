@@ -1,10 +1,9 @@
 from collections import OrderedDict
 import re
-import cqlengine
 
 from cqlengine import columns
 from cqlengine.exceptions import ModelException, CQLEngineException, ValidationError
-from cqlengine.query import QuerySet, DMLQuery, AbstractColumnDescriptor
+from cqlengine.query import ModelQuerySet, DMLQuery, AbstractQueryableColumn
 from cqlengine.query import DoesNotExist as _DoesNotExist
 from cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
 
@@ -42,21 +41,28 @@ class QuerySetDescriptor(object):
     """
 
     def __get__(self, obj, model):
-        """ :rtype: QuerySet """
+        """ :rtype: ModelQuerySet """
         if model.__abstract__:
             raise CQLEngineException('cannot execute queries against abstract models')
-        return QuerySet(model)
+        return ModelQuerySet(model)
 
     def __call__(self, *args, **kwargs):
         """
         Just a hint to IDEs that it's ok to call this
 
-        :rtype: QuerySet
+        :rtype: ModelQuerySet
         """
         raise NotImplementedError
 
 
-class ColumnQueryEvaluator(AbstractColumnDescriptor):
+class ColumnQueryEvaluator(AbstractQueryableColumn):
+    """
+    Wraps a column and allows it to be used in comparator
+    expressions, returning query operators
+
+    ie:
+    Model.column == 5
+    """
 
     def __init__(self, column):
         self.column = column
@@ -167,6 +173,17 @@ class BaseModel(object):
     def _get_keyspace(cls):
         """ Returns the manual keyspace, if set, otherwise the default keyspace """
         return cls.__keyspace__ or DEFAULT_KEYSPACE
+
+    @classmethod
+    def _get_column(cls, name):
+        """
+        Returns the column matching the given name, raising a key error if
+        it doesn't exist
+
+        :param name: the name of the column to return
+        :rtype: Column
+        """
+        return cls._columns[name]
 
     def __eq__(self, other):
         return self.as_dict() == other.as_dict()
