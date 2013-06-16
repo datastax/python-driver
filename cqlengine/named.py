@@ -36,7 +36,10 @@ class NamedColumn(AbstractQueryableColumn):
 
     @property
     def cql(self):
-        return self.name
+        return self.get_cql()
+
+    def get_cql(self):
+        return '"{}"'.format(self.name)
 
     def to_database(self, val):
         return val
