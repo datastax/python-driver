@@ -43,9 +43,9 @@ class NamedTable(object):
     def column(cls, name):
         return NamedColumn(name)
 
-    @classmethod
-    def create(cls, **kwargs):
-        return cls.objects.create(**kwargs)
+    # @classmethod
+    # def create(cls, **kwargs):
+    #     return cls.objects.create(**kwargs)
 
     @classmethod
     def all(cls):
