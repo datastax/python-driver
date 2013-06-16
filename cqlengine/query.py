@@ -325,17 +325,15 @@ class AbstractQuerySet(object):
             values.update(where.get_dict())
         return values
 
-    def _get_select_fields(self):
-        """ Returns the fields to be returned by the select query """
+    def _get_select_statement(self):
+        """ returns the select portion of this queryset's cql statement """
         raise NotImplementedError
 
     def _select_query(self):
         """
         Returns a select clause based on the given filter args
         """
-        db_fields = self._get_select_fields()
-
-        qs = ['SELECT {}'.format(', '.join(['"{}"'.format(f) for f in db_fields]))]
+        qs = [self._get_select_statement()]
         qs += ['FROM {}'.format(self.column_family_name)]
 
         if self._where:
@@ -684,9 +682,9 @@ class SimpleQuerySet(AbstractQuerySet):
 
     """
 
-    def _get_select_fields(self):
+    def _get_select_statement(self):
         """ Returns the fields to be returned by the select query """
-        return ['*']
+        return 'SELECT *'
 
 
 class ModelQuerySet(AbstractQuerySet):
@@ -718,14 +716,15 @@ class ModelQuerySet(AbstractQuerySet):
         self._validate_where_syntax()
         return super(ModelQuerySet, self)._where_clause()
 
-    def _get_select_fields(self):
+    def _get_select_statement(self):
         """ Returns the fields to be returned by the select query """
         fields = self.model._columns.keys()
         if self._defer_fields:
             fields = [f for f in fields if f not in self._defer_fields]
         elif self._only_fields:
             fields = self._only_fields
-        return [self.model._columns[f].db_field_name for f in fields]
+        db_fields = [self.model._columns[f].db_field_name for f in fields]
+        return 'SELECT {}'.format(', '.join(['"{}"'.format(f) for f in db_fields]))
 
 
 class DMLQuery(object):
