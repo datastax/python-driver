@@ -187,42 +187,6 @@ class AbstractQueryableColumn(object):
         return LessThanOrEqualOperator(self._get_column(), other)
 
 
-class NamedColumnDescriptor(AbstractQueryableColumn):
-    """ describes a named cql column """
-
-    def __init__(self, name):
-        self.name = name
-
-    @property
-    def cql(self):
-        return self.name
-
-    def to_database(self, val):
-        return val
-
-
-class TableDescriptor(object):
-    """ describes a cql table """
-
-    def __init__(self, keyspace, name):
-        self.keyspace = keyspace
-        self.name = name
-
-
-class KeyspaceDescriptor(object):
-    """ Describes a cql keyspace """
-
-    def __init__(self, name):
-        self.name = name
-
-    def table(self, name):
-        """
-        returns a table descriptor with the given
-        name that belongs to this keyspace
-        """
-        return TableDescriptor(self.name, name)
-
-
 class BatchType(object):
     Unlogged    = 'UNLOGGED'
     Counter     = 'COUNTER'
