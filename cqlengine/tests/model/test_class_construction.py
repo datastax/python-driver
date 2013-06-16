@@ -107,6 +107,14 @@ class TestModelClassFunction(BaseCassEngTestCase):
         assert 'text' in InheritedModel._columns
         assert 'numbers' in InheritedModel._columns
 
+    def test_column_family_name_generation(self):
+        """ Tests that auto column family name generation works as expected """
+        class TestModel(Model):
+            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
+            text = columns.Text()
+
+        assert TestModel.column_family_name(include_keyspace=False) == 'test_model'
+
     def test_normal_fields_can_be_defined_between_primary_keys(self):
         """
         Tests tha non primary key fields can be defined between primary key fields
