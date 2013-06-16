@@ -24,7 +24,9 @@ class QuerySetDescriptor(object):
 
 
 class NamedColumn(AbstractQueryableColumn):
-    """ describes a named cql column """
+    """
+    A column that is not coupled to a model class, or type
+    """
 
     def __init__(self, name):
         self.name = name
@@ -41,7 +43,9 @@ class NamedColumn(AbstractQueryableColumn):
 
 
 class NamedTable(object):
-    """ describes a cql table """
+    """
+    A Table that is not coupled to a model class
+    """
 
     __abstract__ = False
 
@@ -82,7 +86,9 @@ class NamedTable(object):
 
 
 class NamedKeyspace(object):
-    """ Describes a cql keyspace """
+    """
+    A keyspace
+    """
 
     def __init__(self, name):
         self.name = name
