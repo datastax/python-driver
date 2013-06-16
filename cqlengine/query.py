@@ -239,10 +239,11 @@ class BatchQuery(object):
         if exc_type is not None: return
         self.execute()
 
-class ModelQuerySet(object):
+
+class SimpleQuerySet(object):
 
     def __init__(self, model):
-        super(ModelQuerySet, self).__init__()
+        super(SimpleQuerySet, self).__init__()
         self.model = model
 
         #Where clause filters
@@ -501,7 +502,7 @@ class ModelQuerySet(object):
 
         #TODO: show examples
 
-        :rtype: ModelQuerySet
+        :rtype: SimpleQuerySet
         """
         #add arguments to the where clause filters
         clone = copy.deepcopy(self)
@@ -699,6 +700,13 @@ class ModelQuerySet(object):
 
     def __ne__(self, q):
         return not (self != q)
+
+
+class ModelQuerySet(SimpleQuerySet):
+    """
+
+    """
+
 
 class DMLQuery(object):
     """
