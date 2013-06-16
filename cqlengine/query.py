@@ -314,29 +314,8 @@ class SimpleQuerySet(object):
 
     #----query generation / execution----
 
-    def _validate_where_syntax(self):
-        """ Checks that a filterset will not create invalid cql """
-
-        #check that there's either a = or IN relationship with a primary key or indexed field
-        equal_ops = [w for w in self._where if isinstance(w, EqualsOperator)]
-        token_ops = [w for w in self._where if isinstance(w.value, Token)]
-        if not any([w.column.primary_key or w.column.index for w in equal_ops]) and not token_ops:
-            raise QueryException('Where clauses require either a "=" or "IN" comparison with either a primary key or indexed field')
-
-        if not self._allow_filtering:
-            #if the query is not on an indexed field
-            if not any([w.column.index for w in equal_ops]):
-                if not any([w.column.partition_key for w in equal_ops]) and not token_ops:
-                    raise QueryException('Filtering on a clustering key without a partition key is not allowed unless allow_filtering() is called on the querset')
-            if any(not w.column.partition_key for w in token_ops):
-                raise QueryException('The token() function is only supported on the partition key')
-
-
-        #TODO: abuse this to see if we can get cql to raise an exception
-
     def _where_clause(self):
         """ Returns a where clause based on the given filter args """
-        self._validate_where_syntax()
         return ' AND '.join([f.cql for f in self._where])
 
     def _where_values(self):
@@ -706,6 +685,30 @@ class ModelQuerySet(SimpleQuerySet):
     """
 
     """
+    def _validate_where_syntax(self):
+        """ Checks that a filterset will not create invalid cql """
+
+        #check that there's either a = or IN relationship with a primary key or indexed field
+        equal_ops = [w for w in self._where if isinstance(w, EqualsOperator)]
+        token_ops = [w for w in self._where if isinstance(w.value, Token)]
+        if not any([w.column.primary_key or w.column.index for w in equal_ops]) and not token_ops:
+            raise QueryException('Where clauses require either a "=" or "IN" comparison with either a primary key or indexed field')
+
+        if not self._allow_filtering:
+            #if the query is not on an indexed field
+            if not any([w.column.index for w in equal_ops]):
+                if not any([w.column.partition_key for w in equal_ops]) and not token_ops:
+                    raise QueryException('Filtering on a clustering key without a partition key is not allowed unless allow_filtering() is called on the querset')
+            if any(not w.column.partition_key for w in token_ops):
+                raise QueryException('The token() function is only supported on the partition key')
+
+
+                #TODO: abuse this to see if we can get cql to raise an exception
+
+    def _where_clause(self):
+        """ Returns a where clause based on the given filter args """
+        self._validate_where_syntax()
+        return super(ModelQuerySet, self)._where_clause()
 
 
 class DMLQuery(object):
