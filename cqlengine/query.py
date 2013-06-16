@@ -420,22 +420,7 @@ class AbstractQuerySet(object):
         """
         Returns a function that will be used to instantiate query results
         """
-        model = self.model
-        db_map = model._db_map
-        if not self._values_list:
-            def _construct_instance(values):
-                field_dict = dict((db_map.get(k, k), v) for k, v in zip(names, values))
-                instance = model(**field_dict)
-                instance._is_persisted = True
-                return instance
-            return _construct_instance
-
-        columns = [model._columns[db_map[name]] for name in names]
-        if self._flat_values_list:
-           return (lambda values: columns[0].to_python(values[0]))
-        else:
-            # result_cls = namedtuple("{}Tuple".format(self.model.__name__), names)
-            return (lambda values: map(lambda (c, v): c.to_python(v), zip(columns, values)))
+        raise NotImplementedError
 
     def batch(self, batch_obj):
         """
@@ -658,19 +643,6 @@ class AbstractQuerySet(object):
         else:
             execute(qs, self._where_values())
 
-    def values_list(self, *fields, **kwargs):
-        """ Instructs the query set to return tuples, not model instance """
-        flat = kwargs.pop('flat', False)
-        if kwargs:
-            raise TypeError('Unexpected keyword arguments to values_list: %s'
-                    % (kwargs.keys(),))
-        if flat and len(fields) > 1:
-            raise TypeError("'flat' is not valid when values_list is called with more than one field.")
-        clone = self.only(fields)
-        clone._values_list = True
-        clone._flat_values_list = flat
-        return clone
-
     def __eq__(self, q):
         return set(self._where) == set(q._where)
 
@@ -686,6 +658,13 @@ class SimpleQuerySet(AbstractQuerySet):
         """ Returns the fields to be returned by the select query """
         return 'SELECT *'
 
+    def _create_result_constructor(self, names):
+        """
+        Returns a function that will be used to instantiate query results
+        """
+        def _construct_instance(values):
+            return dict(zip(names, values))
+        return _construct_instance
 
 class ModelQuerySet(AbstractQuerySet):
     """
@@ -725,6 +704,40 @@ class ModelQuerySet(AbstractQuerySet):
             fields = self._only_fields
         db_fields = [self.model._columns[f].db_field_name for f in fields]
         return 'SELECT {}'.format(', '.join(['"{}"'.format(f) for f in db_fields]))
+
+    def _create_result_constructor(self, names):
+        """
+        Returns a function that will be used to instantiate query results
+        """
+        model = self.model
+        db_map = model._db_map
+        if not self._values_list:
+            def _construct_instance(values):
+                field_dict = dict((db_map.get(k, k), v) for k, v in zip(names, values))
+                instance = model(**field_dict)
+                instance._is_persisted = True
+                return instance
+            return _construct_instance
+
+        columns = [model._columns[db_map[name]] for name in names]
+        if self._flat_values_list:
+            return (lambda values: columns[0].to_python(values[0]))
+        else:
+            # result_cls = namedtuple("{}Tuple".format(self.model.__name__), names)
+            return (lambda values: map(lambda (c, v): c.to_python(v), zip(columns, values)))
+
+    def values_list(self, *fields, **kwargs):
+        """ Instructs the query set to return tuples, not model instance """
+        flat = kwargs.pop('flat', False)
+        if kwargs:
+            raise TypeError('Unexpected keyword arguments to values_list: %s'
+                            % (kwargs.keys(),))
+        if flat and len(fields) > 1:
+            raise TypeError("'flat' is not valid when values_list is called with more than one field.")
+        clone = self.only(fields)
+        clone._values_list = True
+        clone._flat_values_list = flat
+        return clone
 
 
 class DMLQuery(object):
