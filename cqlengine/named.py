@@ -1,6 +1,8 @@
 from cqlengine.exceptions import CQLEngineException
 from cqlengine.query import AbstractQueryableColumn, SimpleQuerySet
 
+from cqlengine.query import DoesNotExist as _DoesNotExist
+from cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
 
 class QuerySetDescriptor(object):
     """
@@ -53,6 +55,9 @@ class NamedTable(object):
     __abstract__ = False
 
     objects = QuerySetDescriptor()
+
+    class DoesNotExist(_DoesNotExist): pass
+    class MultipleObjectsReturned(_MultipleObjectsReturned): pass
 
     def __init__(self, keyspace, name):
         self.keyspace = keyspace
