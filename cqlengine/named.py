@@ -1,3 +1,5 @@
+from collections import defaultdict, namedtuple
+
 from cqlengine.models import QuerySetDescriptor
 from cqlengine.query import AbstractQueryableColumn
 
@@ -22,15 +24,24 @@ class NamedColumn(AbstractQueryableColumn):
 class NamedTable(object):
     """ describes a cql table """
 
+    __abstract__ = False
+
+    class ColumnContainer(dict):
+        def __missing__(self, name):
+            column = NamedColumn(name)
+            self[name] = column
+            return column
+    _columns = ColumnContainer()
+
+    objects = QuerySetDescriptor()
+
     def __init__(self, keyspace, name):
         self.keyspace = keyspace
         self.name = name
 
-    def column(self, name):
+    @classmethod
+    def column(cls, name):
         return NamedColumn(name)
-
-    __abstract__ = False
-    objects = QuerySetDescriptor()
 
     @classmethod
     def create(cls, **kwargs):
