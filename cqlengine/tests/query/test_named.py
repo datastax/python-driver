@@ -1,6 +1,6 @@
 from cqlengine import query
 from cqlengine.named import NamedKeyspace
-from cqlengine.tests.query.test_queryset import TestModel
+from cqlengine.tests.query.test_queryset import TestModel, BaseQuerySetUsage
 from cqlengine.tests.base import BaseCassEngTestCase
 
 
@@ -74,5 +74,29 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         where = query2._where_clause()
         assert where == '"test_id" = :{} AND "expected_result" >= :{}'.format(*ids)
 
+
+class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestQuerySetCountSelectionAndIteration, cls).setUpClass()
+        ks,tn = TestModel.column_family_name().split('.')
+        cls.keyspace = NamedKeyspace(ks)
+        cls.table = cls.keyspace.table(tn)
+
+
+    def test_count(self):
+        """ Tests that adding filtering statements affects the count query as expected """
+        assert self.table.objects.count() == 12
+
+        q = self.table.objects(test_id=0)
+        assert q.count() == 4
+
+    def test_query_expression_count(self):
+        """ Tests that adding query statements affects the count query as expected """
+        assert self.table.objects.count() == 12
+
+        q = self.table.objects(self.table.column('test_id') == 0)
+        assert q.count() == 4
 
 
