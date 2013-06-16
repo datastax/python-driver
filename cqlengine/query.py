@@ -239,10 +239,10 @@ class BatchQuery(object):
         if exc_type is not None: return
         self.execute()
 
-class QuerySet(object):
+class ModelQuerySet(object):
 
     def __init__(self, model):
-        super(QuerySet, self).__init__()
+        super(ModelQuerySet, self).__init__()
         self.model = model
 
         #Where clause filters
@@ -501,7 +501,7 @@ class QuerySet(object):
 
         #TODO: show examples
 
-        :rtype: QuerySet
+        :rtype: ModelQuerySet
         """
         #add arguments to the where clause filters
         clone = copy.deepcopy(self)

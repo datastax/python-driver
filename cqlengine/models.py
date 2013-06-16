@@ -3,7 +3,7 @@ import re
 
 from cqlengine import columns
 from cqlengine.exceptions import ModelException, CQLEngineException, ValidationError
-from cqlengine.query import QuerySet, DMLQuery, AbstractQueryableColumn
+from cqlengine.query import ModelQuerySet, DMLQuery, AbstractQueryableColumn
 from cqlengine.query import DoesNotExist as _DoesNotExist
 from cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
 
@@ -41,16 +41,16 @@ class QuerySetDescriptor(object):
     """
 
     def __get__(self, obj, model):
-        """ :rtype: QuerySet """
+        """ :rtype: ModelQuerySet """
         if model.__abstract__:
             raise CQLEngineException('cannot execute queries against abstract models')
-        return QuerySet(model)
+        return ModelQuerySet(model)
 
     def __call__(self, *args, **kwargs):
         """
         Just a hint to IDEs that it's ok to call this
 
-        :rtype: QuerySet
+        :rtype: ModelQuerySet
         """
         raise NotImplementedError
 
