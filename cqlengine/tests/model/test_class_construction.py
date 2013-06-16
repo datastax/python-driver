@@ -203,8 +203,8 @@ class TestModelClassFunction(BaseCassEngTestCase):
 class TestManualTableNaming(BaseCassEngTestCase):
 
     class RenamedTest(cqlengine.Model):
-        keyspace = 'whatever'
-        table_name = 'manual_name'
+        __keyspace__ = 'whatever'
+        __table_name__ = 'manual_name'
 
         id = cqlengine.UUID(primary_key=True)
         data = cqlengine.Text()

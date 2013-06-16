@@ -127,11 +127,12 @@ class BaseModel(object):
 
     #table names will be generated automatically from it's model and package name
     #however, you can also define them manually here
-    table_name = None
+    __table_name__ = None
 
     #the keyspace for this model
-    keyspace = None
-    read_repair_chance = 0.1
+    __keyspace__ = None
+
+    __read_repair_chance__ = 0.1
 
     def __init__(self, **values):
         self._values = {}
@@ -165,7 +166,7 @@ class BaseModel(object):
     @classmethod
     def _get_keyspace(cls):
         """ Returns the manual keyspace, if set, otherwise the default keyspace """
-        return cls.keyspace or DEFAULT_KEYSPACE
+        return cls.__keyspace__ or DEFAULT_KEYSPACE
 
     def __eq__(self, other):
         return self.as_dict() == other.as_dict()
@@ -180,8 +181,8 @@ class BaseModel(object):
         otherwise, it creates it from the module and class name
         """
         cf_name = ''
-        if cls.table_name:
-            cf_name = cls.table_name.lower()
+        if cls.__table_name__:
+            cf_name = cls.__table_name__.lower()
         else:
             camelcase = re.compile(r'([a-z])([A-Z])')
             ccase = lambda s: camelcase.sub(lambda v: '{}_{}'.format(v.group(1), v.group(2).lower()), s)
@@ -341,7 +342,7 @@ class ModelMetaClass(type):
             db_map[col.db_field_name] = field_name
 
         #short circuit table_name inheritance
-        attrs['table_name'] = attrs.get('table_name')
+        attrs['table_name'] = attrs.get('__table_name__')
 
         #add management members to the class
         attrs['_columns'] = column_dict
