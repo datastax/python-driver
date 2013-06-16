@@ -1,3 +1,4 @@
+from cqlengine.models import QuerySetDescriptor
 from cqlengine.query import AbstractQueryableColumn
 
 
@@ -6,6 +7,9 @@ class NamedColumn(AbstractQueryableColumn):
 
     def __init__(self, name):
         self.name = name
+
+    def _get_column(self):
+        return self
 
     @property
     def cql(self):
@@ -24,6 +28,25 @@ class NamedTable(object):
 
     def column(self, name):
         return NamedColumn(name)
+
+    __abstract__ = False
+    objects = QuerySetDescriptor()
+
+    @classmethod
+    def create(cls, **kwargs):
+        return cls.objects.create(**kwargs)
+
+    @classmethod
+    def all(cls):
+        return cls.objects.all()
+
+    @classmethod
+    def filter(cls, *args, **kwargs):
+        return cls.objects.filter(*args, **kwargs)
+
+    @classmethod
+    def get(cls, *args, **kwargs):
+        return cls.objects.get(*args, **kwargs)
 
 
 class NamedKeyspace(object):
