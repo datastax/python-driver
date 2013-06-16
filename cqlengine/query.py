@@ -510,6 +510,12 @@ class AbstractQuerySet(object):
         else:
             return self[0]
 
+    def _get_ordering_condition(self, colname):
+        order_type = 'DESC' if colname.startswith('-') else 'ASC'
+        colname = colname.replace('-', '')
+
+        return colname, order_type
+
     def order_by(self, *colnames):
         """
         orders the result set.
@@ -524,24 +530,7 @@ class AbstractQuerySet(object):
 
         conditions = []
         for colname in colnames:
-            order_type = 'DESC' if colname.startswith('-') else 'ASC'
-            colname = colname.replace('-', '')
-
-            column = self.model._columns.get(colname)
-            if column is None:
-                raise QueryException("Can't resolve the column name: '{}'".format(colname))
-
-            #validate the column selection
-            if not column.primary_key:
-                raise QueryException(
-                    "Can't order on '{}', can only order on (clustered) primary keys".format(colname))
-
-            pks = [v for k, v in self.model._columns.items() if v.primary_key]
-            if column == pks[0]:
-                raise QueryException(
-                    "Can't order by the first primary key (partition key), clustering (secondary) keys only")
-
-            conditions.append('"{}" {}'.format(column.db_field_name, order_type))
+            conditions.append('"{}" {}'.format(*self._get_ordering_condition(colname)))
 
         clone = copy.deepcopy(self)
         clone._order.extend(conditions)
@@ -736,6 +725,25 @@ class ModelQuerySet(AbstractQuerySet):
         else:
             # result_cls = namedtuple("{}Tuple".format(self.model.__name__), names)
             return (lambda values: map(lambda (c, v): c.to_python(v), zip(columns, values)))
+
+    def _get_ordering_condition(self, colname):
+        colname, order_type = super(ModelQuerySet, self)._get_ordering_condition(colname)
+
+        column = self.model._columns.get(colname)
+        if column is None:
+            raise QueryException("Can't resolve the column name: '{}'".format(colname))
+
+        #validate the column selection
+        if not column.primary_key:
+            raise QueryException(
+                "Can't order on '{}', can only order on (clustered) primary keys".format(colname))
+
+        pks = [v for k, v in self.model._columns.items() if v.primary_key]
+        if column == pks[0]:
+            raise QueryException(
+                "Can't order by the first primary key (partition key), clustering (secondary) keys only")
+
+        return column.db_field_name, order_type
 
     def values_list(self, *fields, **kwargs):
         """ Instructs the query set to return tuples, not model instance """
