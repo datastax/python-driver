@@ -58,7 +58,7 @@ class NamedTable(object):
         self.keyspace = keyspace
         self.name = name
 
-    def column(cls, name):
+    def column(self, name):
         return NamedColumn(name)
 
     def column_family_name(self, include_keyspace=True):
@@ -71,26 +71,25 @@ class NamedTable(object):
         else:
             return self.name
 
-    def _get_column(cls, name):
+    def _get_column(self, name):
         """
         Returns the column matching the given name
 
         :rtype: Column
         """
-        return cls.column(name)
+        return self.column(name)
 
-    # @classmethod
-    # def create(cls, **kwargs):
-    #     return cls.objects.create(**kwargs)
+    # def create(self, **kwargs):
+    #     return self.objects.create(**kwargs)
 
-    def all(cls):
-        return cls.objects.all()
+    def all(self):
+        return self.objects.all()
 
-    def filter(cls, *args, **kwargs):
-        return cls.objects.filter(*args, **kwargs)
+    def filter(self, *args, **kwargs):
+        return self.objects.filter(*args, **kwargs)
 
-    def get(cls, *args, **kwargs):
-        return cls.objects.get(*args, **kwargs)
+    def get(self, *args, **kwargs):
+        return self.objects.get(*args, **kwargs)
 
 
 class NamedKeyspace(object):
