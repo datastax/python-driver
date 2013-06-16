@@ -163,11 +163,16 @@ class AbstractColumnDescriptor(object):
     def _get_column(self):
         raise NotImplementedError
 
+    def in_(self, item):
+        """
+        Returns an in operator
+
+        used in where you'd typically want to use python's `in` operator
+        """
+        return InOperator(self._get_column(), item)
+
     def __eq__(self, other):
         return EqualsOperator(self._get_column(), other)
-
-    def __contains__(self, item):
-        return InOperator(self._get_column(), item)
 
     def __gt__(self, other):
         return GreaterThanOperator(self._get_column(), other)
@@ -195,7 +200,6 @@ class NamedColumnDescriptor(AbstractColumnDescriptor):
     def to_database(self, val):
         return val
 
-C = NamedColumnDescriptor
 
 class TableDescriptor(object):
     """ describes a cql table """
@@ -204,7 +208,6 @@ class TableDescriptor(object):
         self.keyspace = keyspace
         self.name = name
 
-T = TableDescriptor
 
 class KeyspaceDescriptor(object):
     """ Describes a cql keyspace """
@@ -219,7 +222,6 @@ class KeyspaceDescriptor(object):
         """
         return TableDescriptor(self.name, name)
 
-K = KeyspaceDescriptor
 
 class BatchType(object):
     Unlogged    = 'UNLOGGED'
@@ -316,8 +318,8 @@ class QuerySet(object):
     def __str__(self):
         return str(self.__unicode__())
 
-    def __call__(self, **kwargs):
-        return self.filter(**kwargs)
+    def __call__(self, *args, **kwargs):
+        return self.filter(*args, **kwargs)
 
     def __deepcopy__(self, memo):
         clone = self.__class__(self.model)
@@ -529,9 +531,21 @@ class QuerySet(object):
         else:
             raise QueryException("Can't parse '{}'".format(arg))
 
-    def filter(self, **kwargs):
+    def filter(self, *args, **kwargs):
+        """
+        Adds WHERE arguments to the queryset, returning a new queryset
+
+        #TODO: show examples
+
+        :rtype: QuerySet
+        """
         #add arguments to the where clause filters
         clone = copy.deepcopy(self)
+        for operator in args:
+            if not isinstance(operator, QueryOperator):
+                raise QueryException('{} is not a valid query operator'.format(operator))
+            clone._where.append(operator)
+
         for arg, val in kwargs.items():
             col_name, col_op = self._parse_filter_arg(arg)
             #resolve column and operator
@@ -551,20 +565,16 @@ class QuerySet(object):
 
         return clone
 
-    def query(self, *args):
-        """
-        Same end result as filter, but uses the new comparator style args
-        ie: Model.column == val
-        """
-
-    def get(self, **kwargs):
+    def get(self, *args, **kwargs):
         """
         Returns a single instance matching this query, optionally with additional filter kwargs.
 
         A DoesNotExistError will be raised if there are no rows matching the query
         A MultipleObjectsFoundError will be raised if there is more than one row matching the queyr
         """
-        if kwargs: return self.filter(**kwargs).get()
+        if args or kwargs:
+            return self.filter(*args, **kwargs).get()
+
         self._execute_query()
         if len(self._result_cache) == 0:
             raise self.model.DoesNotExist

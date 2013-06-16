@@ -29,8 +29,11 @@ class hybrid_classmethod(object):
             return self.instmethod.__get__(instance, owner)
 
     def __call__(self, *args, **kwargs):
-        """ Just a hint to IDEs that it's ok to call this """
+        """
+        Just a hint to IDEs that it's ok to call this
+        """
         raise NotImplementedError
+
 
 class QuerySetDescriptor(object):
     """
@@ -39,15 +42,29 @@ class QuerySetDescriptor(object):
     """
 
     def __get__(self, obj, model):
+        """ :rtype: QuerySet """
         if model.__abstract__:
             raise CQLEngineException('cannot execute queries against abstract models')
         return QuerySet(model)
 
     def __call__(self, *args, **kwargs):
-        """ Just a hint to IDEs that it's ok to call this """
+        """
+        Just a hint to IDEs that it's ok to call this
+
+        :rtype: QuerySet
+        """
         raise NotImplementedError
 
-class ColumnDescriptor(AbstractColumnDescriptor):
+
+class ColumnQueryEvaluator(AbstractColumnDescriptor):
+
+    def __init__(self, column):
+        self.column = column
+
+    def _get_column(self):
+        return self.column
+
+class ColumnDescriptor(object):
     """
     Handles the reading and writing of column values to and from
     a model instance's value manager, as well as creating
@@ -61,6 +78,7 @@ class ColumnDescriptor(AbstractColumnDescriptor):
         :return:
         """
         self.column = column
+        self.query_evaluator = ColumnQueryEvaluator(self.column)
 
     def __get__(self, instance, owner):
         """
@@ -74,7 +92,7 @@ class ColumnDescriptor(AbstractColumnDescriptor):
         if instance:
             return instance._values[self.column.column_name].getval()
         else:
-            return self.column
+            return self.query_evaluator
 
     def __set__(self, instance, value):
         """
@@ -203,12 +221,12 @@ class BaseModel(object):
         return cls.objects.all()
 
     @classmethod
-    def filter(cls, **kwargs):
-        return cls.objects.filter(**kwargs)
+    def filter(cls, *args, **kwargs):
+        return cls.objects.filter(*args, **kwargs)
 
     @classmethod
-    def get(cls, **kwargs):
-        return cls.objects.get(**kwargs)
+    def get(cls, *args, **kwargs):
+        return cls.objects.get(*args, **kwargs)
 
     def save(self):
         is_new = self.pk is None
