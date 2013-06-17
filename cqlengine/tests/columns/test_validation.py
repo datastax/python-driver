@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from datetime import date
 from datetime import tzinfo
 from decimal import Decimal as D
+from unittest import TestCase
 from uuid import uuid4, uuid1
 from cqlengine import ValidationError
 
@@ -204,10 +205,18 @@ class TestExtraFieldsRaiseException(BaseCassEngTestCase):
             self.TestModel.create(bacon=5000)
 
 
+class TestTimeUUIDFromDatetime(TestCase):
+    def test_conversion_specific_date(self):
+        dt = datetime(1981, 7, 11, microsecond=555000)
 
+        uuid = TimeUUID.from_datetime(dt)
 
+        from uuid import UUID
+        assert isinstance(uuid, UUID)
 
+        ts = (uuid.time - 0x01b21dd213814000) / 1e7 # back to a timestamp
+        new_dt = datetime.utcfromtimestamp(ts)
 
-
-
+        # checks that we created a UUID1 with the proper timestamp
+        assert new_dt == dt
 

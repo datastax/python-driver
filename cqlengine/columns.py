@@ -304,12 +304,59 @@ class UUID(Column):
     def to_database(self, value):
         return self.validate(value)
 
+_last_timestamp = None
+from uuid import UUID as pyUUID, getnode
+
 class TimeUUID(UUID):
     """
     UUID containing timestamp
     """
 
     db_type = 'timeuuid'
+
+    @classmethod
+    def from_datetime(self, dt):
+        """
+        generates a UUID for a given datetime
+
+        :param dt: datetime
+        :type dt: datetime
+        :return:
+        """
+        global _last_timestamp
+
+        epoch = datetime(1970, 1, 1, tzinfo=dt.tzinfo)
+
+        offset = 0
+        if epoch.tzinfo:
+            offset_delta = epoch.tzinfo.utcoffset(epoch)
+            offset = offset_delta.days*24*3600 + offset_delta.seconds
+
+        timestamp = (dt  - epoch).total_seconds() - offset
+
+        node = None
+        clock_seq = None
+
+        nanoseconds = int(timestamp * 1e9)
+        timestamp = int(nanoseconds // 100) + 0x01b21dd213814000L
+
+        if _last_timestamp is not None and timestamp <= _last_timestamp:
+            timestamp = _last_timestamp + 1
+        _last_timestamp = timestamp
+        if clock_seq is None:
+            import random
+            clock_seq = random.randrange(1 << 14L)  # instead of stable storage
+        time_low = timestamp & 0xffffffffL
+        time_mid = (timestamp >> 32L) & 0xffffL
+        time_hi_version = (timestamp >> 48L) & 0x0fffL
+        clock_seq_low = clock_seq & 0xffL
+        clock_seq_hi_variant = (clock_seq >> 8L) & 0x3fL
+        if node is None:
+            node = getnode()
+        return pyUUID(fields=(time_low, time_mid, time_hi_version,
+                            clock_seq_hi_variant, clock_seq_low, node), version=1)
+
+
 
 class Boolean(Column):
     db_type = 'boolean'
@@ -324,6 +371,7 @@ class Boolean(Column):
 
     def to_database(self, value):
         return self.Quoter(bool(value))
+
 
 class Float(Column):
     db_type = 'double'
