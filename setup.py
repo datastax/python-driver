@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 #python setup.py register
 #python setup.py sdist upload
 
-version = '0.3.3'
+version = '0.4'
 
 long_desc = """
 Cassandra CQL 3 Object Mapper for Python
