@@ -88,8 +88,6 @@ Getting Started
 
 `Dev Mailing List <https://groups.google.com/forum/?fromgroups#!forum/cqlengine-dev>`_
 
-**NOTE: cqlengine is in alpha and under development, some features may change. Make sure to check the changelog and test your app before upgrading**
-
 
 Indices and tables
 ==================
