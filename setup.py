@@ -7,7 +7,7 @@ from setuptools import setup, find_packages
 version = '0.3.3'
 
 long_desc = """
-cqlengine is a Cassandra CQL Object Mapper for Python in the style of the Django orm and mongoengine
+Cassandra CQL 3 Object Mapper for Python
 
 [Documentation](https://cqlengine.readthedocs.org/en/latest/)
 
@@ -21,8 +21,7 @@ cqlengine is a Cassandra CQL Object Mapper for Python in the style of the Django
 setup(
     name='cqlengine',
     version=version,
-    description='Cassandra CQL ORM for Python in the style of the Django orm and mongoengine',
-    dependency_links = ['https://github.com/bdeggleston/cqlengine/archive/{0}.tar.gz#egg=cqlengine-{0}'.format(version)],
+    description='Cassandra CQL 3 Object Mapper for Python',
     long_description=long_desc,
     classifiers = [
         "Environment :: Web Environment",
@@ -38,7 +37,7 @@ setup(
     install_requires = ['cql'],
     author='Blake Eggleston',
     author_email='bdeggleston@gmail.com',
-    url='https://github.com/bdeggleston/cqlengine',
+    url='https://github.com/cqlengine/cqlengine',
     license='BSD',
     packages=find_packages(),
     include_package_data=True,
