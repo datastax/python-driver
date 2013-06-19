@@ -2,6 +2,12 @@
 Models
 ======
 
+**Users of versions < 0.4, please read this post before upgrading:** `Breaking Changes`_
+
+.. _Breaking Changes: https://groups.google.com/forum/?fromgroups#!topic/cqlengine-users/erkSNe1JwuU
+
+.. module:: cqlengine.connection
+
 .. module:: cqlengine.models
 
 A model is a python class representing a CQL table.
