@@ -6,17 +6,12 @@ from cqlengine import columns
 from cqlengine.management import create_table, delete_table
 from cqlengine.tests.base import BaseCassEngTestCase
 
-class TestClassConstruction(BaseCassEngTestCase):
-    """
-    Tests around the instantiation of container columns
-    """
-
-
 
 class TestSetModel(Model):
     partition   = columns.UUID(primary_key=True, default=uuid4)
     int_set     = columns.Set(columns.Integer, required=False)
     text_set    = columns.Set(columns.Text, required=False)
+
 
 class TestSetColumn(BaseCassEngTestCase):
 
@@ -94,10 +89,12 @@ class TestSetColumn(BaseCassEngTestCase):
         column = columns.Set(columns.Text(min_length=100))
         assert isinstance(column.value_col, columns.Text)
 
+
 class TestListModel(Model):
     partition   = columns.UUID(primary_key=True, default=uuid4)
     int_list    = columns.List(columns.Integer, required=False)
     text_list   = columns.List(columns.Text, required=False)
+
 
 class TestListColumn(BaseCassEngTestCase):
 
@@ -180,10 +177,12 @@ class TestListColumn(BaseCassEngTestCase):
         column = columns.List(columns.Text(min_length=100))
         assert isinstance(column.value_col, columns.Text)
 
+
 class TestMapModel(Model):
     partition   = columns.UUID(primary_key=True, default=uuid4)
     int_map     = columns.Map(columns.Integer, columns.UUID, required=False)
     text_map    = columns.Map(columns.Text, columns.DateTime, required=False)
+
 
 class TestMapColumn(BaseCassEngTestCase):
 
