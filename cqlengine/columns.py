@@ -653,15 +653,20 @@ class Map(BaseContainerColumn):
         :param key_type: a column class indicating the types of the key
         :param value_type: a column class indicating the types of the value
         """
-        if not issubclass(value_type, Column):
+        inheritance_comparator = issubclass if isinstance(key_type, type) else isinstance
+        if not inheritance_comparator(key_type, Column):
             raise ValidationError('key_type must be a column class')
-        if issubclass(value_type, BaseContainerColumn):
+        if inheritance_comparator(key_type, BaseContainerColumn):
             raise ValidationError('container types cannot be nested')
         if key_type.db_type is None:
             raise ValidationError('key_type cannot be an abstract column type')
 
-        self.key_type = key_type
-        self.key_col = self.key_type()
+        if isinstance(key_type, type):
+            self.key_type = key_type
+            self.key_col = self.key_type()
+        else:
+            self.key_col = key_type
+            self.key_type = self.key_col.__class__
         super(Map, self).__init__(value_type, **kwargs)
 
     def get_column_def(self):
