@@ -304,7 +304,6 @@ class UUID(Column):
     def to_database(self, value):
         return self.validate(value)
 
-_last_timestamp = None
 from uuid import UUID as pyUUID, getnode
 
 class TimeUUID(UUID):
@@ -340,9 +339,6 @@ class TimeUUID(UUID):
         nanoseconds = int(timestamp * 1e9)
         timestamp = int(nanoseconds // 100) + 0x01b21dd213814000L
 
-        if _last_timestamp is not None and timestamp <= _last_timestamp:
-            timestamp = _last_timestamp + 1
-        _last_timestamp = timestamp
         if clock_seq is None:
             import random
             clock_seq = random.randrange(1 << 14L)  # instead of stable storage
