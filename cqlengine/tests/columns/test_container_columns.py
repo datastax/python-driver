@@ -6,6 +6,27 @@ from cqlengine import columns
 from cqlengine.management import create_table, delete_table
 from cqlengine.tests.base import BaseCassEngTestCase
 
+class TestClassConstruction(BaseCassEngTestCase):
+    """
+    Tests around the instantiation of container columns
+    """
+
+    def test_instantiation_with_column_class(self):
+        """
+        Tests that columns instantiated with a column class work properly
+        and that the class is instantiated in the constructor
+        """
+        column = columns.List(columns.Text)
+        assert isinstance(column.value_col, columns.Text)
+
+    def test_instantiation_with_column_instance(self):
+        """
+        Tests that columns instantiated with a column instance work properly
+        """
+        column = columns.List(columns.Text(min_length=100))
+        assert isinstance(column.value_col, columns.Text)
+
+
 class TestSetModel(Model):
     partition   = columns.UUID(primary_key=True, default=uuid4)
     int_set     = columns.Set(columns.Integer, required=False)

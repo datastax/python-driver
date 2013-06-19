@@ -424,15 +424,21 @@ class BaseContainerColumn(Column):
         """
         :param value_type: a column class indicating the types of the value
         """
-        if not issubclass(value_type, Column):
+        inheritance_comparator = issubclass if isinstance(value_type, type) else isinstance
+        if not inheritance_comparator(value_type, Column):
             raise ValidationError('value_type must be a column class')
-        if issubclass(value_type, BaseContainerColumn):
+        if inheritance_comparator(value_type, BaseContainerColumn):
             raise ValidationError('container types cannot be nested')
         if value_type.db_type is None:
             raise ValidationError('value_type cannot be an abstract column type')
 
-        self.value_type = value_type
-        self.value_col = self.value_type()
+        if isinstance(value_type, type):
+            self.value_type = value_type
+            self.value_col = self.value_type()
+        else:
+            self.value_col = value_type
+            self.value_type = self.value_col.__class__
+
         super(BaseContainerColumn, self).__init__(**kwargs)
 
     def get_column_def(self):
