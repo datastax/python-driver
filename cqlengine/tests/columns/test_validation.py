@@ -194,6 +194,12 @@ class TestText(BaseCassEngTestCase):
         with self.assertRaises(ValidationError):
             Text().validate(True)
 
+    def test_non_required_validation(self):
+        """ Tests that validation is ok on none and blank values if required is False """
+        Text().validate('')
+        Text().validate(None)
+
+
 
 
 class TestExtraFieldsRaiseException(BaseCassEngTestCase):
