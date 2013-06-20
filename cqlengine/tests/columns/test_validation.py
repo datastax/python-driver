@@ -158,9 +158,7 @@ class TestText(BaseCassEngTestCase):
     def test_min_length(self):
         #min len defaults to 1
         col = Text()
-
-        with self.assertRaises(ValidationError):
-            col.validate('')
+        col.validate('')
 
         col.validate('b')
 
