@@ -1,5 +1,8 @@
 CHANGELOG
 
+0.4.3
+* fixed bug with Text column validation
+
 0.4.2
 * added support for instantiating container columns with column instances
 
