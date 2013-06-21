@@ -291,6 +291,15 @@ Batch Queries
         em3 = ExampleModel.batch(b).create(example_type=0, description="3", created_at=now)
         b.execute()
 
+        # updating in a batch
+
+        b = BatchQuery()
+        em1.description = "new description"
+        em1.batch(b).save()
+        em2.description = "another new description"
+        em2.batch(b).save()
+        b.execute()
+
 QuerySet method reference
 =========================
 
