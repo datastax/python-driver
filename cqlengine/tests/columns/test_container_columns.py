@@ -6,10 +6,12 @@ from cqlengine import columns
 from cqlengine.management import create_table, delete_table
 from cqlengine.tests.base import BaseCassEngTestCase
 
+
 class TestSetModel(Model):
     partition   = columns.UUID(primary_key=True, default=uuid4)
     int_set     = columns.Set(columns.Integer, required=False)
     text_set    = columns.Set(columns.Text, required=False)
+
 
 class TestSetColumn(BaseCassEngTestCase):
 
@@ -72,10 +74,27 @@ class TestSetColumn(BaseCassEngTestCase):
         assert len([s for s in statements if '"TEST" = "TEST" -' in s]) == 1
         assert len([s for s in statements if '"TEST" = "TEST" +' in s]) == 1
 
+    def test_instantiation_with_column_class(self):
+        """
+        Tests that columns instantiated with a column class work properly
+        and that the class is instantiated in the constructor
+        """
+        column = columns.Set(columns.Text)
+        assert isinstance(column.value_col, columns.Text)
+
+    def test_instantiation_with_column_instance(self):
+        """
+        Tests that columns instantiated with a column instance work properly
+        """
+        column = columns.Set(columns.Text(min_length=100))
+        assert isinstance(column.value_col, columns.Text)
+
+
 class TestListModel(Model):
     partition   = columns.UUID(primary_key=True, default=uuid4)
     int_list    = columns.List(columns.Integer, required=False)
     text_list   = columns.List(columns.Text, required=False)
+
 
 class TestListColumn(BaseCassEngTestCase):
 
@@ -143,10 +162,27 @@ class TestListColumn(BaseCassEngTestCase):
         assert len([s for s in statements if '"TEST" = "TEST" +' in s]) == 1
         assert len([s for s in statements if '+ "TEST"' in s]) == 1
 
+    def test_instantiation_with_column_class(self):
+        """
+        Tests that columns instantiated with a column class work properly
+        and that the class is instantiated in the constructor
+        """
+        column = columns.List(columns.Text)
+        assert isinstance(column.value_col, columns.Text)
+
+    def test_instantiation_with_column_instance(self):
+        """
+        Tests that columns instantiated with a column instance work properly
+        """
+        column = columns.List(columns.Text(min_length=100))
+        assert isinstance(column.value_col, columns.Text)
+
+
 class TestMapModel(Model):
     partition   = columns.UUID(primary_key=True, default=uuid4)
     int_map     = columns.Map(columns.Integer, columns.UUID, required=False)
     text_map    = columns.Map(columns.Text, columns.DateTime, required=False)
+
 
 class TestMapColumn(BaseCassEngTestCase):
 
@@ -229,6 +265,23 @@ class TestMapColumn(BaseCassEngTestCase):
 
         m2 = TestMapModel.get(partition=m.partition)
         assert m2.int_map is None
+
+    def test_instantiation_with_column_class(self):
+        """
+        Tests that columns instantiated with a column class work properly
+        and that the class is instantiated in the constructor
+        """
+        column = columns.Map(columns.Text, columns.Integer)
+        assert isinstance(column.key_col, columns.Text)
+        assert isinstance(column.value_col, columns.Integer)
+
+    def test_instantiation_with_column_instance(self):
+        """
+        Tests that columns instantiated with a column instance work properly
+        """
+        column = columns.Map(columns.Text(min_length=100), columns.Integer())
+        assert isinstance(column.key_col, columns.Text)
+        assert isinstance(column.value_col, columns.Integer)
 
 #    def test_partial_update_creation(self):
 #        """
