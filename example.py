@@ -6,7 +6,9 @@ log = logging.getLogger()
 log.setLevel('DEBUG')
 log.addHandler(logging.StreamHandler())
 
+from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster
+from cassandra.query import Query
 
 KEYSPACE = "testkeyspace"
 
@@ -38,10 +40,10 @@ def main():
         )
         """)
 
-    query = """
-            INSERT INTO mytable (thekey, col1, col2)
-            VALUES (%(key)s, %(a)s, %(b)s)
-            """
+    query = Query("""
+                  INSERT INTO mytable (thekey, col1, col2)
+                  VALUES (%(key)s, %(a)s, %(b)s)
+                  """, consistency_level=ConsistencyLevel.ONE)
     for i in range(10):
         log.info("inserting row %d" % i)
         s.execute(query, dict(key="key%d" % i, a='a', b='b'))
