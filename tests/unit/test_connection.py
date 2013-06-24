@@ -128,6 +128,7 @@ class ConnectionTest(unittest.TestCase):
 
     def test_unsupported_cql_version(self, *args):
         c = self.make_connection()
+        c.cql_version = "3.0.3"
 
         # let it write the OptionsMessage
         c.handle_write(None, None)
