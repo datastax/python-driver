@@ -16,19 +16,19 @@ def main():
 
     rows = s.execute("SELECT keyspace_name FROM system.schema_keyspaces")
     if KEYSPACE in [row[0] for row in rows]:
-        print "dropping existing keyspace..."
+        log.info("dropping existing keyspace...")
         s.execute("DROP KEYSPACE " + KEYSPACE)
 
-    print "creating keyspace..."
+    log.info("creating keyspace...")
     s.execute("""
         CREATE KEYSPACE %s
         WITH replication = { 'class': 'SimpleStrategy', 'replication_factor': '1' }
         """ % KEYSPACE)
 
-    print "setting keyspace..."
+    log.info("setting keyspace...")
     s.set_keyspace(KEYSPACE)
 
-    print "creating table..."
+    log.info("creating table...")
     s.execute("""
         CREATE TABLE mytable (
             thekey text,
@@ -43,12 +43,12 @@ def main():
             VALUES (%(key)s, %(a)s, %(b)s)
             """
     for i in range(10):
-        print "inserting row", i
+        log.info("inserting row %d" % i)
         s.execute(query, dict(key="key%d" % i, a='a', b='b'))
 
     future = s.execute_async("SELECT * FROM mytable")
-    print "key\tcol1\tcol2"
-    print "---\t----\t----"
+    log.info("key\tcol1\tcol2")
+    log.info("---\t----\t----")
 
     try:
         rows = future.result()
@@ -56,7 +56,7 @@ def main():
         log.exeception()
 
     for row in rows:
-        print '\t'.join(row)
+        log.info('\t'.join(row))
 
     s.execute("DROP KEYSPACE " + KEYSPACE)
 
