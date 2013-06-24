@@ -13,13 +13,14 @@ from cassandra.decoder import (QueryMessage, ResultMessage,
                                WriteTimeoutErrorMessage,
                                UnavailableErrorMessage,
                                OverloadedErrorMessage,
+                               PrepareMessage,
                                IsBootstrappingErrorMessage, named_tuple_factory,
                                dict_factory)
 from cassandra.metadata import Metadata
 from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy)
-from cassandra.query import SimpleStatement, bind_params
+from cassandra.query import SimpleStatement, PreparedStatement, bind_params
 from cassandra.pool import (AuthenticationException, _ReconnectionHandler,
                             _HostReconnectionHandler, HostConnectionPool)
 
@@ -142,6 +143,7 @@ class Cluster(object):
     scheduler = None
     executor = None
     _is_shutdown = False
+    _prepared_queries = None
 
     def __init__(self,
                  contact_points=("127.0.0.1",),
@@ -194,6 +196,7 @@ class Cluster(object):
         self.sessions = weakref.WeakSet()
         self.metadata = Metadata(self)
         self.control_connection = None
+        self._prepared_statements = {}
 
         self._min_requests_per_connection = {
             HostDistance.LOCAL: DEFAULT_MIN_REQUESTS,
@@ -400,7 +403,7 @@ class Cluster(object):
         If any host has fewer than the configured number of core connections
         open, attempt to open connections until that number is met.
         """
-        for session in self.session:
+        for session in self.sessions:
             for pool in session._pools.values():
                 pool.ensure_core_connections()
 
@@ -415,6 +418,12 @@ class Cluster(object):
 
     def prepare_all_queries(self, host):
         pass
+
+    def prepare_on_all_sessions(self, query_id, prepared_statement, excluded_host):
+        """ Internal """
+        self._prepared_statements[query_id] = prepared_statement
+        for session in self.sessions:
+            session.prepare_on_all_hosts(prepared_statement.query_string, excluded_host)
 
 
 class Session(object):
@@ -537,7 +546,29 @@ class Session(object):
         return future
 
     def prepare(self, query):
-        raise NotImplementedError()
+        message = PrepareMessage(query)
+
+        def run_prepare():
+            future = self.execute_async(message)
+            query_id, col_specs = future.result()
+
+            prepared_statement = PreparedStatement(
+                col_specs, self.cluster.metadata, query, self.keyspace)
+
+            host = future._current_host
+            self.cluster.prepare_on_all_sessions(query_id, prepared_statement, host)
+
+        future = self.submit(self.execute, run_prepare)
+        return future.result()
+
+    def prepare_on_all_hosts(self, query, excluded_host):
+        """ Internal """
+        for host, pool in self._pools.items():
+            if host != excluded_host:
+                try:
+                    self.execute(PrepareMessage(query))
+                except:
+                    log.exception("Error preparing query for host %s:" % (host,))
 
     def shutdown(self):
         """

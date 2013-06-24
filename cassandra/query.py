@@ -34,6 +34,13 @@ class SimpleStatement(Query):
         return self._query_string
 
 
+class PreparedStatement(Query):
+
+    @classmethod
+    def from_message(cls, col_specs, metadata, query, keyspace):
+        pass
+
+
 class ColumnCollection(object):
 
     def __init__(self, sequence):
