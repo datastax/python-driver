@@ -141,6 +141,7 @@ class ConnectionPool(object):
             con = self.get()
             cur = con.cursor()
             cur.execute(query, params)
+            LOG.debug('{} {}'.format(query, repr(params)))
             self.put(con)
             return cur
         except cql.ProgrammingError as ex:
