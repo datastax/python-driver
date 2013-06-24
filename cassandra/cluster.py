@@ -13,14 +13,14 @@ from cassandra.decoder import (QueryMessage, ResultMessage,
                                WriteTimeoutErrorMessage,
                                UnavailableErrorMessage,
                                OverloadedErrorMessage,
-                               PrepareMessage,
+                               PrepareMessage, ExecuteMessage,
                                IsBootstrappingErrorMessage, named_tuple_factory,
                                dict_factory)
 from cassandra.metadata import Metadata
 from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy)
-from cassandra.query import SimpleStatement, PreparedStatement, bind_params
+from cassandra.query import SimpleStatement, PreparedStatement, BoundStatement, bind_params
 from cassandra.pool import (AuthenticationException, _ReconnectionHandler,
                             _HostReconnectionHandler, HostConnectionPool)
 
@@ -531,11 +531,16 @@ class Session(object):
         if isinstance(query, basestring):
             query = SimpleStatement(query)
 
-        # TODO bound statements need to be handled differently
-        query_string = query.query_string
-        if parameters:
-            query_string = bind_params(query.query_string, parameters)
-        message = QueryMessage(query=query_string, consistency_level=query.consistency_level)
+        if isinstance(query, BoundStatement):
+            message = ExecuteMessage(
+                query_id=query.prepared_statement.query_id,
+                query_params=query.values,
+                consistency_level=query.consistency_level)
+        else:
+            query_string = query.query_string
+            if parameters:
+                query_string = bind_params(query.query_string, parameters)
+            message = QueryMessage(query=query_string, consistency_level=query.consistency_level)
 
         if query.tracing_enabled:
             # TODO enable tracing on the message
@@ -550,10 +555,10 @@ class Session(object):
 
         def run_prepare():
             future = self.execute_async(message)
-            query_id, col_specs = future.result()
+            query_id, column_metadata = future.result()
 
-            prepared_statement = PreparedStatement(
-                col_specs, self.cluster.metadata, query, self.keyspace)
+            prepared_statement = PreparedStatement.from_message(
+                query_id, column_metadata, self.cluster.metadata, query, self.keyspace)
 
             host = future._current_host
             self.cluster.prepare_on_all_sessions(query_id, prepared_statement, host)

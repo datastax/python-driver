@@ -41,7 +41,6 @@ class PreparedStatement(object):
     query = None
     keyspace = None
 
-    routing_key = None
     routing_key_indexes = None
 
     consistency_level = None
@@ -80,6 +79,49 @@ class PreparedStatement(object):
                           # statement; just leave routing_key_indexes as None
 
         return PreparedStatement(column_metadata, query_id, routing_key_indexes, query, keyspace)
+
+
+class BoundStatement(Query):
+
+    prepared_statement = None
+    values = None
+    _routing_key = None
+
+    def __init__(self, prepared_statement):
+        self.prepared_statement = prepared_statement
+        self.consistency_level = prepared_statement.consistency_level
+        self.values = []
+
+    def bind(self, values):
+        col_meta = self.prepared_statement.column_metadata
+        if len(values) > len(col_meta):
+            raise ValueError(
+                "Too many arguments provided to bind() (got %d, expected %d)" %
+                (len(values), len(col_meta)))
+
+        self.values = []
+        for value, col_spec in zip(values, col_meta):
+            if value is None:
+                self.values.append(None)
+            else:
+                col_type = col_spec[-1]
+                self.values.append(col_type.serialize(value))
+
+    @property
+    def routing_key(self):
+        if not self.prepared_statement.routing_key_indexes:
+            return None
+
+        if self._routing_key is not None:
+            return self._routing_key
+
+        components = []
+        for statement_index in self.prepared_statement.routing_key_indexes:
+            val = self.values[statement_index]
+            components.append(struct.pack("HsB", len(val), val, 0))
+
+        self._routing_key = "".join(components)
+        return self._routing_key
 
 
 class ColumnCollection(object):

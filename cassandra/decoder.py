@@ -68,13 +68,13 @@ def ordered_dict_factory(colnames, rows):
 
 
 class PreparedResult:
-    def __init__(self, queryid, param_metadata):
-        self.queryid = queryid
-        self.param_metadata = param_metadata
+    def __init__(self, query_id, column_metadata):
+        self.query_id = query_id
+        self.column_metadata = column_metadata
 
     def __str__(self):
-        return '<PreparedResult: queryid=%r, column_metadata=%r>' \
-               % (self.queryid, self.column_metadata)
+        return '<PreparedResult: query_id=%r, column_metadata=%r>' \
+               % (self.query_id, self.column_metadata)
     __repr__ = __str__
 
 
@@ -409,19 +409,19 @@ class ResultMessage(_MessageType):
 
     @classmethod
     def recv_results_rows(cls, f):
-        colspecs = cls.recv_results_metadata(f)
+        column_metadata = cls.recv_results_metadata(f)
         rowcount = read_int(f)
-        rows = [cls.recv_row(f, len(colspecs)) for x in xrange(rowcount)]
-        colnames = [c[2] for c in colspecs]
-        coltypes = [c[3] for c in colspecs]
+        rows = [cls.recv_row(f, len(column_metadata)) for x in xrange(rowcount)]
+        colnames = [c[2] for c in column_metadata]
+        coltypes = [c[3] for c in column_metadata]
         return (colnames, [tuple(ctype.from_binary(val) for ctype, val in zip(coltypes, row))
                            for row in rows])
 
     @classmethod
     def recv_results_prepared(cls, f):
-        queryid = read_int(f)
-        colspecs = cls.recv_results_metadata(f)
-        return (queryid, colspecs)
+        query_id = read_int(f)
+        column_metadata = cls.recv_results_metadata(f)
+        return (query_id, column_metadata)
 
     @classmethod
     def recv_results_metadata(cls, f):
@@ -431,7 +431,7 @@ class ResultMessage(_MessageType):
         if glob_tblspec:
             ksname = read_string(f)
             cfname = read_string(f)
-        colspecs = []
+        column_metadata = []
         for x in xrange(colcount):
             if glob_tblspec:
                 colksname = ksname
@@ -441,8 +441,8 @@ class ResultMessage(_MessageType):
                 colcfname = read_string(f)
             colname = read_string(f)
             coltype = cls.read_type(f)
-            colspecs.append((colksname, colcfname, colname, coltype))
-        return colspecs
+            column_metadata.append((colksname, colcfname, colname, coltype))
+        return column_metadata
 
     @classmethod
     def recv_results_schema_change(cls, f):
@@ -483,10 +483,10 @@ class PrepareMessage(_MessageType):
 class ExecuteMessage(_MessageType):
     opcode = 0x0A
     name = 'EXECUTE'
-    params = ('queryid', 'query_params', 'consistency_level',)
+    params = ('query_id', 'query_params', 'consistency_level',)
 
     def send_body(self, f):
-        write_int(f, self.queryid)
+        write_int(f, self.query_id)
         write_short(f, len(self.query_params))
         for param in self.query_params:
             write_value(f, param)
