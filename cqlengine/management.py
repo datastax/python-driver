@@ -14,36 +14,30 @@ def create_keyspace(name, strategy_class='SimpleStrategy', replication_factor=3,
     :param **replication_values: 1.2 only, additional values to ad to the replication data map
     """
     with connection_manager() as con:
-        #TODO: check system tables instead of using cql thrifteries
-        if not any([name == k.name for k in con.client.describe_keyspaces()]):
-    #        if name not in [k.name for k in con.con.client.describe_keyspaces()]:
-            try:
-                #Try the 1.1 method
-                execute("""CREATE KEYSPACE {}
-                   WITH strategy_class = '{}'
-                   AND strategy_options:replication_factor={};""".format(name, strategy_class, replication_factor))
-            except CQLEngineException:
-                #try the 1.2 method
-                replication_map = {
-                    'class': strategy_class,
-                    'replication_factor':replication_factor
-                }
-                replication_map.update(replication_values)
+        keyspaces = con.execute("""SELECT keyspace_name FROM system.schema_keyspaces""", {})
+        if name not in [r['keyspace_name'] for r in keyspaces]:
+            #try the 1.2 method
+            replication_map = {
+                'class': strategy_class,
+                'replication_factor':replication_factor
+            }
+            replication_map.update(replication_values)
 
-                query = """
-                CREATE KEYSPACE {}
-                WITH REPLICATION = {}
-                """.format(name, json.dumps(replication_map).replace('"', "'"))
+            query = """
+            CREATE KEYSPACE {}
+            WITH REPLICATION = {}
+            """.format(name, json.dumps(replication_map).replace('"', "'"))
 
-                if strategy_class != 'SimpleStrategy':
-                    query += " AND DURABLE_WRITES = {}".format('true' if durable_writes else 'false')
+            if strategy_class != 'SimpleStrategy':
+                query += " AND DURABLE_WRITES = {}".format('true' if durable_writes else 'false')
 
-                execute(query)
+            execute(query)
 
 
 def delete_keyspace(name):
     with connection_manager() as con:
-        if name in [k.name for k in con.client.describe_keyspaces()]:
+        keyspaces = con.execute("""SELECT keyspace_name FROM system.schema_keyspaces""", {})
+        if name in [r['keyspace_name'] for r in keyspaces]:
             execute("DROP KEYSPACE {}".format(name))
 
 
@@ -56,16 +50,17 @@ def create_table(model, create_missing_keyspace=True):
     cf_name = model.column_family_name()
     raw_cf_name = model.column_family_name(include_keyspace=False)
 
+    ks_name = model._get_keyspace()
     #create missing keyspace
     if create_missing_keyspace:
-        create_keyspace(model._get_keyspace())
+        create_keyspace(ks_name)
 
     with connection_manager() as con:
-        ks_info = con.client.describe_keyspace(model._get_keyspace())
+        tables = con.execute("SELECT columnfamily_name from system.schema_columnfamilies WHERE keyspace_name = %s", [ks_name])
 
     #check for an existing column family
     #TODO: check system tables instead of using cql thrifteries
-    if not any([raw_cf_name == cf.name for cf in ks_info.cf_defs]):
+    if raw_cf_name not in tables:
         qs = ['CREATE TABLE {}'.format(cf_name)]
 
         #add column types
@@ -105,10 +100,9 @@ def create_table(model, create_missing_keyspace=True):
 
     #get existing index names, skip ones that already exist
     with connection_manager() as con:
-        ks_info = con.client.describe_keyspace(model._get_keyspace())
+        idx_names = con.execute("SELECT index_name from system.\"IndexInfo\" WHERE table_name=%s", [raw_cf_name])
 
-    cf_defs = [cf for cf in ks_info.cf_defs if cf.name == raw_cf_name]
-    idx_names = [i.index_name for i in  cf_defs[0].column_metadata] if cf_defs else []
+    idx_names = [i['index_name'] for i in idx_names]
     idx_names = filter(None, idx_names)
 
     indexes = [c for n,c in model._columns.items() if c.index]
@@ -120,22 +114,19 @@ def create_table(model, create_missing_keyspace=True):
             qs += ['("{}")'.format(column.db_field_name)]
             qs = ' '.join(qs)
 
-            try:
-                execute(qs)
-            except CQLEngineException as ex:
-                # 1.2 doesn't return cf names, so we have to examine the exception
-                # and ignore if it says the index already exists
-                if "Index already exists" not in unicode(ex):
-                    raise
+            execute(qs)
 
 
 def delete_table(model):
-    cf_name = model.column_family_name()
 
-    try:
-        execute('drop table {};'.format(cf_name))
-    except CQLEngineException as ex:
-        #don't freak out if the table doesn't exist
-        if 'Cannot drop non existing column family' not in unicode(ex):
-            raise
+    # don't try to delete non existant tables
+    ks_name = model._get_keyspace()
+    with connection_manager() as con:
+        tables = con.execute("SELECT columnfamily_name from system.schema_columnfamilies WHERE keyspace_name = %s", [ks_name])
+    raw_cf_name = model.column_family_name(include_keyspace=False)
+    if raw_cf_name not in [t['columnfamily_name'] for t in tables]:
+        return
+
+    cf_name = model.column_family_name()
+    execute('drop table {};'.format(cf_name))
 
