@@ -1,5 +1,9 @@
 CHANGELOG
 
+0.4.4
+* adding query logging back
+* fixed bug updating an empty list column
+
 0.4.3
 * fixed bug with Text column validation
 
