@@ -794,7 +794,7 @@ class DMLQuery(object):
 
         #organize data
         value_pairs = []
-        values = self.instance.as_dict()
+        values = self.instance._as_dict()
 
         #get defined fields and their column names
         for name, col in self.model._columns.items():

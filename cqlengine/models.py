@@ -232,7 +232,7 @@ class BaseModel(object):
             val = col.validate(getattr(self, name))
             setattr(self, name, val)
 
-    def as_dict(self):
+    def _as_dict(self):
         """ Returns a map of column names to cleaned values """
         values = self._dynamic_columns or {}
         for name, col in self._columns.items():
