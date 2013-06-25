@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import json
 from uuid import uuid4
 
 from cqlengine import Model, ValidationError
@@ -12,6 +13,20 @@ class TestSetModel(Model):
     int_set = columns.Set(columns.Integer, required=False)
     text_set = columns.Set(columns.Text, required=False)
 
+
+class JsonTestColumn(columns.Column):
+    db_type = 'text'
+
+    def to_python(self, value):
+        if value is None: return
+        if isinstance(value, basestring):
+            return json.loads(value)
+        else:
+            return value
+
+    def to_database(self, value):
+        if value is None: return
+        return json.dumps(value)
 
 class TestSetColumn(BaseCassEngTestCase):
     @classmethod
@@ -113,6 +128,15 @@ class TestSetColumn(BaseCassEngTestCase):
         """
         column = columns.Set(columns.Text(min_length=100))
         assert isinstance(column.value_col, columns.Text)
+
+    def test_to_python(self):
+        """ Tests that to_python of value column is called """
+        column = columns.Set(JsonTestColumn)
+        val = {1, 2, 3}
+        db_val = column.to_database(val)
+        assert db_val.value == {json.dumps(v) for v in val}
+        py_val = column.to_python(db_val.value)
+        assert py_val == val
 
 
 class TestListModel(Model):
@@ -224,6 +248,14 @@ class TestListColumn(BaseCassEngTestCase):
         column = columns.List(columns.Text(min_length=100))
         assert isinstance(column.value_col, columns.Text)
 
+    def test_to_python(self):
+        """ Tests that to_python of value column is called """
+        column = columns.List(JsonTestColumn)
+        val = [1, 2, 3]
+        db_val = column.to_database(val)
+        assert db_val.value == [json.dumps(v) for v in val]
+        py_val = column.to_python(db_val.value)
+        assert py_val == val
 
 class TestMapModel(Model):
     partition = columns.UUID(primary_key=True, default=uuid4)
@@ -328,6 +360,15 @@ class TestMapColumn(BaseCassEngTestCase):
         column = columns.Map(columns.Text(min_length=100), columns.Integer())
         assert isinstance(column.key_col, columns.Text)
         assert isinstance(column.value_col, columns.Integer)
+
+    def test_to_python(self):
+        """ Tests that to_python of value column is called """
+        column = columns.Map(JsonTestColumn, JsonTestColumn)
+        val = {1: 2, 3: 4, 5: 6}
+        db_val = column.to_database(val)
+        assert db_val.value == {json.dumps(k):json.dumps(v) for k,v in val.items()}
+        py_val = column.to_python(db_val.value)
+        assert py_val == val
 
 #    def test_partial_update_creation(self):
 #        """

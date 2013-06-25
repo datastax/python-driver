@@ -489,6 +489,10 @@ class Set(BaseContainerColumn):
 
         return {self.value_col.validate(v) for v in val}
 
+    def to_python(self, value):
+        if value is None: return None
+        return {self.value_col.to_python(v) for v in value}
+
     def to_database(self, value):
         if value is None: return None
         if isinstance(value, self.Quoter): return value
@@ -560,7 +564,7 @@ class List(BaseContainerColumn):
 
     def to_python(self, value):
         if value is None: return None
-        return list(value)
+        return [self.value_col.to_python(v) for v in value]
 
     def to_database(self, value):
         if value is None: return None
@@ -643,6 +647,7 @@ class List(BaseContainerColumn):
 
             return statements
 
+
 class Map(BaseContainerColumn):
     """
     Stores a key -> value map (dictionary)
@@ -698,7 +703,7 @@ class Map(BaseContainerColumn):
 
     def to_python(self, value):
         if value is not None:
-            return {self.key_col.to_python(k):self.value_col.to_python(v) for k,v in value.items()}
+            return {self.key_col.to_python(k): self.value_col.to_python(v) for k,v in value.items()}
 
     def to_database(self, value):
         if value is None: return None
