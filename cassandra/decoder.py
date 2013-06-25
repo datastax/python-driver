@@ -428,7 +428,7 @@ class ResultMessage(_MessageType):
 
     @classmethod
     def recv_results_prepared(cls, f):
-        query_id = read_int(f)
+        query_id = read_short(f)
         column_metadata = cls.recv_results_metadata(f)
         return (query_id, column_metadata)
 
