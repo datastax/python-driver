@@ -8,13 +8,12 @@ from cqlengine.tests.base import BaseCassEngTestCase
 
 
 class TestSetModel(Model):
-    partition   = columns.UUID(primary_key=True, default=uuid4)
-    int_set     = columns.Set(columns.Integer, required=False)
-    text_set    = columns.Set(columns.Text, required=False)
+    partition = columns.UUID(primary_key=True, default=uuid4)
+    int_set = columns.Set(columns.Integer, required=False)
+    text_set = columns.Set(columns.Text, required=False)
 
 
 class TestSetColumn(BaseCassEngTestCase):
-
     @classmethod
     def setUpClass(cls):
         super(TestSetColumn, cls).setUpClass()
@@ -28,7 +27,7 @@ class TestSetColumn(BaseCassEngTestCase):
 
     def test_io_success(self):
         """ Tests that a basic usage works as expected """
-        m1 = TestSetModel.create(int_set={1,2}, text_set={'kai', 'andreas'})
+        m1 = TestSetModel.create(int_set={1, 2}, text_set={'kai', 'andreas'})
         m2 = TestSetModel.get(partition=m1.partition)
 
         assert isinstance(m2.int_set, set)
@@ -49,16 +48,16 @@ class TestSetColumn(BaseCassEngTestCase):
 
     def test_partial_updates(self):
         """ Tests that partial udpates work as expected """
-        m1 = TestSetModel.create(int_set={1,2,3,4})
+        m1 = TestSetModel.create(int_set={1, 2, 3, 4})
 
         m1.int_set.add(5)
         m1.int_set.remove(1)
-        assert m1.int_set == {2,3,4,5}
+        assert m1.int_set == {2, 3, 4, 5}
 
         m1.save()
 
-        m2 =  TestSetModel.get(partition=m1.partition)
-        assert m2.int_set == {2,3,4,5}
+        m2 = TestSetModel.get(partition=m1.partition)
+        assert m2.int_set == {2, 3, 4, 5}
 
     def test_partial_update_creation(self):
         """
@@ -67,7 +66,7 @@ class TestSetColumn(BaseCassEngTestCase):
         """
         ctx = {}
         col = columns.Set(columns.Integer, db_field="TEST")
-        statements = col.get_update_statement({1,2,3,4}, {2,3,4,5}, ctx)
+        statements = col.get_update_statement({1, 2, 3, 4}, {2, 3, 4, 5}, ctx)
 
         assert len([v for v in ctx.values() if {1} == v.value]) == 1
         assert len([v for v in ctx.values() if {5} == v.value]) == 1
@@ -78,26 +77,26 @@ class TestSetColumn(BaseCassEngTestCase):
         """ Tests that updating an 'None' list creates a straight insert statement """
         ctx = {}
         col = columns.Set(columns.Integer, db_field="TEST")
-        statements = col.get_update_statement({1,2,3,4}, None, ctx)
+        statements = col.get_update_statement({1, 2, 3, 4}, None, ctx)
 
         #only one variable /statement should be generated
         assert len(ctx) == 1
         assert len(statements) == 1
 
-        assert ctx.values()[0].value == {1,2,3,4}
+        assert ctx.values()[0].value == {1, 2, 3, 4}
         assert statements[0] == '"TEST" = :{}'.format(ctx.keys()[0])
 
     def test_update_from_empty(self):
         """ Tests that updating an empty list creates a straight insert statement """
         ctx = {}
         col = columns.Set(columns.Integer, db_field="TEST")
-        statements = col.get_update_statement({1,2,3,4}, set(), ctx)
+        statements = col.get_update_statement({1, 2, 3, 4}, set(), ctx)
 
         #only one variable /statement should be generated
         assert len(ctx) == 1
         assert len(statements) == 1
 
-        assert ctx.values()[0].value == {1,2,3,4}
+        assert ctx.values()[0].value == {1, 2, 3, 4}
         assert statements[0] == '"TEST" = :{}'.format(ctx.keys()[0])
 
     def test_instantiation_with_column_class(self):
@@ -117,13 +116,12 @@ class TestSetColumn(BaseCassEngTestCase):
 
 
 class TestListModel(Model):
-    partition   = columns.UUID(primary_key=True, default=uuid4)
-    int_list    = columns.List(columns.Integer, required=False)
-    text_list   = columns.List(columns.Text, required=False)
+    partition = columns.UUID(primary_key=True, default=uuid4)
+    int_list = columns.List(columns.Integer, required=False)
+    text_list = columns.List(columns.Text, required=False)
 
 
 class TestListColumn(BaseCassEngTestCase):
-
     @classmethod
     def setUpClass(cls):
         super(TestListColumn, cls).setUpClass()
@@ -137,7 +135,7 @@ class TestListColumn(BaseCassEngTestCase):
 
     def test_io_success(self):
         """ Tests that a basic usage works as expected """
-        m1 = TestListModel.create(int_list=[1,2], text_list=['kai', 'andreas'])
+        m1 = TestListModel.create(int_list=[1, 2], text_list=['kai', 'andreas'])
         m2 = TestListModel.get(partition=m1.partition)
 
         assert isinstance(m2.int_list, list)
@@ -168,7 +166,7 @@ class TestListColumn(BaseCassEngTestCase):
         m1.int_list = final
         m1.save()
 
-        m2 =  TestListModel.get(partition=m1.partition)
+        m2 = TestListModel.get(partition=m1.partition)
         assert list(m2.int_list) == final
 
     def test_partial_update_creation(self):
@@ -180,8 +178,8 @@ class TestListColumn(BaseCassEngTestCase):
         col = columns.List(columns.Integer, db_field="TEST")
         statements = col.get_update_statement(final, initial, ctx)
 
-        assert len([v for v in ctx.values() if [2,1,0] == v.value]) == 1
-        assert len([v for v in ctx.values() if [7,8,9] == v.value]) == 1
+        assert len([v for v in ctx.values() if [2, 1, 0] == v.value]) == 1
+        assert len([v for v in ctx.values() if [7, 8, 9] == v.value]) == 1
         assert len([s for s in statements if '"TEST" = "TEST" +' in s]) == 1
         assert len([s for s in statements if '+ "TEST"' in s]) == 1
 
@@ -208,7 +206,7 @@ class TestListColumn(BaseCassEngTestCase):
         assert len(ctx) == 1
         assert len(statements) == 1
 
-        assert ctx.values()[0].value == [1,2,3]
+        assert ctx.values()[0].value == [1, 2, 3]
         assert statements[0] == '"TEST" = :{}'.format(ctx.keys()[0])
 
     def test_instantiation_with_column_class(self):
@@ -228,13 +226,12 @@ class TestListColumn(BaseCassEngTestCase):
 
 
 class TestMapModel(Model):
-    partition   = columns.UUID(primary_key=True, default=uuid4)
-    int_map     = columns.Map(columns.Integer, columns.UUID, required=False)
-    text_map    = columns.Map(columns.Text, columns.DateTime, required=False)
+    partition = columns.UUID(primary_key=True, default=uuid4)
+    int_map = columns.Map(columns.Integer, columns.UUID, required=False)
+    text_map = columns.Map(columns.Text, columns.DateTime, required=False)
 
 
 class TestMapColumn(BaseCassEngTestCase):
-
     @classmethod
     def setUpClass(cls):
         super(TestMapColumn, cls).setUpClass()
@@ -252,7 +249,7 @@ class TestMapColumn(BaseCassEngTestCase):
         k2 = uuid4()
         now = datetime.now()
         then = now + timedelta(days=1)
-        m1 = TestMapModel.create(int_map={1:k1,2:k2}, text_map={'now':now, 'then':then})
+        m1 = TestMapModel.create(int_map={1: k1, 2: k2}, text_map={'now': now, 'then': then})
         m2 = TestMapModel.get(partition=m1.partition)
 
         assert isinstance(m2.int_map, dict)
@@ -273,7 +270,7 @@ class TestMapColumn(BaseCassEngTestCase):
         Tests that attempting to use the wrong types will raise an exception
         """
         with self.assertRaises(ValidationError):
-            TestMapModel.create(int_map={'key':2,uuid4():'val'}, text_map={2:5})
+            TestMapModel.create(int_map={'key': 2, uuid4(): 'val'}, text_map={2: 5})
 
     def test_partial_updates(self):
         """ Tests that partial udpates work as expected """
@@ -284,21 +281,21 @@ class TestMapColumn(BaseCassEngTestCase):
         earlier = early - timedelta(minutes=30)
         later = now + timedelta(minutes=30)
 
-        initial = {'now':now, 'early':earlier}
-        final =  {'later':later, 'early':early}
+        initial = {'now': now, 'early': earlier}
+        final = {'later': later, 'early': early}
 
         m1 = TestMapModel.create(text_map=initial)
 
         m1.text_map = final
         m1.save()
 
-        m2 =  TestMapModel.get(partition=m1.partition)
+        m2 = TestMapModel.get(partition=m1.partition)
         assert m2.text_map == final
 
     def test_updates_from_none(self):
         """ Tests that updates from None work as expected """
         m = TestMapModel.create(int_map=None)
-        expected = {1:uuid4()}
+        expected = {1: uuid4()}
         m.int_map = expected
         m.save()
 
@@ -308,7 +305,7 @@ class TestMapColumn(BaseCassEngTestCase):
 
     def test_updates_to_none(self):
         """ Tests that setting the field to None works as expected """
-        m = TestMapModel.create(int_map={1:uuid4()})
+        m = TestMapModel.create(int_map={1: uuid4()})
         m.int_map = None
         m.save()
 
