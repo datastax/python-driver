@@ -186,7 +186,21 @@ class BaseModel(object):
         return cls._columns[name]
 
     def __eq__(self, other):
-        return self.as_dict() == other.as_dict()
+        if self.__class__ != other.__class__:
+            return False
+
+        # check attribute keys
+        keys = set(self._columns.keys())
+        other_keys = set(self._columns.keys())
+        if keys != other_keys:
+            return False
+
+        # check that all of the attributes match
+        for key in other_keys:
+            if getattr(self, key, None) != getattr(other, key, None):
+                return False
+
+        return True
 
     def __ne__(self, other):
         return not self.__eq__(other)
