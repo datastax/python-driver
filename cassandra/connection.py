@@ -217,7 +217,7 @@ class Connection(object):
         self.close()
 
     def defunct(self, exc):
-        log.debug("Defuncting connection to %s: %s %s" %
+        log.debug("Defuncting connection to %s: %s\n%s" %
                   (self.host, exc, traceback.format_exc(exc)))
         self.last_error = exc
         self.is_defunct = True
@@ -290,25 +290,32 @@ class Connection(object):
             callback = self._callbacks.pop(stream_id)
             self._id_queue.put_nowait(stream_id)
 
-        # check that the protocol version is supported
-        given_version = version & PROTOCOL_VERSION_MASK
-        if given_version != PROTOCOL_VERSION:
-            raise ProtocolError("Unsupported CQL protocol version: %d" % given_version)
+        try:
+            # check that the protocol version is supported
+            given_version = version & PROTOCOL_VERSION_MASK
+            if given_version != PROTOCOL_VERSION:
+                raise ProtocolError("Unsupported CQL protocol version: %d" % given_version)
 
-        # check that the header direction is correct
-        if version & HEADER_DIRECTION_MASK != HEADER_DIRECTION_TO_CLIENT:
-            raise ProtocolError(
-                "Header direction in response is incorrect; opcode %04x, stream id %r"
-                % (opcode, stream_id))
+            # check that the header direction is correct
+            if version & HEADER_DIRECTION_MASK != HEADER_DIRECTION_TO_CLIENT:
+                raise ProtocolError(
+                    "Header direction in response is incorrect; opcode %04x, stream id %r"
+                    % (opcode, stream_id))
 
-        if body_len > 0:
-            body = msg[8:]
-        elif body_len == 0:
-            body = ""
-        else:
-            raise ProtocolError("Got negative body length: %r" % body_len)
+            if body_len > 0:
+                body = msg[8:]
+            elif body_len == 0:
+                body = ""
+            else:
+                raise ProtocolError("Got negative body length: %r" % body_len)
 
-        response = decode_response(stream_id, flags, opcode, body, self.decompressor)
+            response = decode_response(stream_id, flags, opcode, body, self.decompressor)
+        except Exception, exc:
+            log.exception("Error decoding response from Cassandra. "
+                          "Opcode: 0x%X, message contents: %r" % (opcode, body))
+            callback(exc)
+            self.defunct(exc)
+            return
 
         try:
             if stream_id < 0:
