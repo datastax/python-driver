@@ -67,7 +67,7 @@ class ValueQuoter(object):
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
-            return repr(self) == repr(other)
+            return self.value == other.value
         return False
 
 
