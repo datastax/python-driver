@@ -585,10 +585,20 @@ class List(BaseContainerColumn):
 
         if val is None or val == prev:
             return []
+
         elif prev is None:
             return _insert()
+
         elif len(val) < len(prev):
+            # if elements have been removed,
+            # rewrite the whole list
             return _insert()
+
+        elif len(prev) == 0:
+            # if we're updating from an empty
+            # list, do a complete insert
+            return _insert()
+
         else:
             # the prepend and append lists,
             # if both of these are still None after looking

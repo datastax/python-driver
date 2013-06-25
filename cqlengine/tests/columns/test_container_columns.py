@@ -146,10 +146,7 @@ class TestListColumn(BaseCassEngTestCase):
         assert list(m2.int_list) == final
 
     def test_partial_update_creation(self):
-        """
-        Tests that proper update statements are created for a partial list update
-        :return:
-        """
+        """ Tests that proper update statements are created for a partial list update """
         final = range(10)
         initial = final[3:7]
 
@@ -161,6 +158,32 @@ class TestListColumn(BaseCassEngTestCase):
         assert len([v for v in ctx.values() if [7,8,9] == v.value]) == 1
         assert len([s for s in statements if '"TEST" = "TEST" +' in s]) == 1
         assert len([s for s in statements if '+ "TEST"' in s]) == 1
+
+    def test_update_from_none(self):
+        """ Tests that updating an 'None' list creates a straight insert statement """
+        ctx = {}
+        col = columns.List(columns.Integer, db_field="TEST")
+        statements = col.get_update_statement([1, 2, 3], None, ctx)
+
+        #only one variable /statement should be generated
+        assert len(ctx) == 1
+        assert len(statements) == 1
+
+        assert str(ctx.values()[0]) == str([1, 2, 3])
+        assert statements[0] == '"TEST" = :{}'.format(ctx.keys()[0])
+
+    def test_update_from_empty(self):
+        """ Tests that updating an empty list creates a straight insert statement """
+        ctx = {}
+        col = columns.List(columns.Integer, db_field="TEST")
+        statements = col.get_update_statement([1, 2, 3], [], ctx)
+
+        #only one variable /statement should be generated
+        assert len(ctx) == 1
+        assert len(statements) == 1
+
+        assert str(ctx.values()[0]) == str([1,2,3])
+        assert statements[0] == '"TEST" = :{}'.format(ctx.keys()[0])
 
     def test_instantiation_with_column_class(self):
         """
