@@ -74,6 +74,32 @@ class TestSetColumn(BaseCassEngTestCase):
         assert len([s for s in statements if '"TEST" = "TEST" -' in s]) == 1
         assert len([s for s in statements if '"TEST" = "TEST" +' in s]) == 1
 
+    def test_update_from_none(self):
+        """ Tests that updating an 'None' list creates a straight insert statement """
+        ctx = {}
+        col = columns.Set(columns.Integer, db_field="TEST")
+        statements = col.get_update_statement({1,2,3,4}, None, ctx)
+
+        #only one variable /statement should be generated
+        assert len(ctx) == 1
+        assert len(statements) == 1
+
+        assert ctx.values()[0].value == {1,2,3,4}
+        assert statements[0] == '"TEST" = :{}'.format(ctx.keys()[0])
+
+    def test_update_from_empty(self):
+        """ Tests that updating an empty list creates a straight insert statement """
+        ctx = {}
+        col = columns.Set(columns.Integer, db_field="TEST")
+        statements = col.get_update_statement({1,2,3,4}, set(), ctx)
+
+        #only one variable /statement should be generated
+        assert len(ctx) == 1
+        assert len(statements) == 1
+
+        assert ctx.values()[0].value == {1,2,3,4}
+        assert statements[0] == '"TEST" = :{}'.format(ctx.keys()[0])
+
     def test_instantiation_with_column_class(self):
         """
         Tests that columns instantiated with a column class work properly
@@ -169,7 +195,7 @@ class TestListColumn(BaseCassEngTestCase):
         assert len(ctx) == 1
         assert len(statements) == 1
 
-        assert str(ctx.values()[0]) == str([1, 2, 3])
+        assert ctx.values()[0].value == [1, 2, 3]
         assert statements[0] == '"TEST" = :{}'.format(ctx.keys()[0])
 
     def test_update_from_empty(self):
@@ -182,7 +208,7 @@ class TestListColumn(BaseCassEngTestCase):
         assert len(ctx) == 1
         assert len(statements) == 1
 
-        assert str(ctx.values()[0]) == str([1,2,3])
+        assert ctx.values()[0].value == [1,2,3]
         assert statements[0] == '"TEST" = :{}'.format(ctx.keys()[0])
 
     def test_instantiation_with_column_class(self):
