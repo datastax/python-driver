@@ -14,6 +14,7 @@ from cassandra.decoder import (QueryMessage, ResultMessage,
                                UnavailableErrorMessage,
                                OverloadedErrorMessage,
                                PrepareMessage, ExecuteMessage,
+                               PreparedQueryNotFound,
                                IsBootstrappingErrorMessage, named_tuple_factory,
                                dict_factory)
 from cassandra.metadata import Metadata
@@ -143,7 +144,7 @@ class Cluster(object):
     scheduler = None
     executor = None
     _is_shutdown = False
-    _prepared_queries = None
+    _prepared_statements = None
 
     def __init__(self,
                  contact_points=("127.0.0.1",),
@@ -1254,9 +1255,29 @@ class ResponseFuture(object):
                     # need to retry against a different host here
                     self._retry(reuse_connection=False, consistency_level=None)
                     return
-                # TODO need to define the PreparedQueryNotFound class
-                # elif isinstance(response, PreparedQueryNotFound):
-                #     pass
+                elif isinstance(response, PreparedQueryNotFound):
+                    query_id = response.result
+                    try:
+                        prepared_statement = self.session.cluster._prepared_statements[query_id]
+                    except KeyError:
+                        log.error("Tried to execute unknown prepared statement %d" % (query_id,))
+                        self._set_final_exception(response)
+
+                    current_keyspace = self._connection.keyspace
+                    prepared_keyspace = prepared_statement.keyspace
+                    if current_keyspace != prepared_keyspace:
+                        self._set_final_exception(
+                            ValueError("The Session's current keyspace (%s) does "
+                                       "not match the keyspace the statement was "
+                                       "prepared with (%s)" %
+                                       (current_keyspace, prepared_keyspace)))
+
+                    prepare_message = PrepareMessage(self.query.query_string)
+                    # since this might block, run on the executor to avoid hanging
+                    # the event loop thread
+                    self.session.submit(self._connection.send_msg,
+                                        prepare_message,
+                                        cb=self._execute_after_prepare)
                 else:
                     self._set_final_exception(response)
                     return
@@ -1281,6 +1302,27 @@ class ResponseFuture(object):
             # almost certainly caused by a bug, but we need to set something here
             log.exception("Unexpected exception while handling result in ResponseFuture:")
             self._set_final_exception(exc)
+
+    def _execute_after_prepare(self, response):
+        """
+        Handle the response to our attempt to prepare a statement.
+        If it succeeded, run the original query again against the same host.
+        """
+        if isinstance(response, ResultMessage):
+            if response.kind == ResultMessage.KIND_PREPARED:
+                # use self._query to re-use the same host and
+                # at the same time properly borrow the connection
+                self._query(self._current_host)
+            else:
+                self._set_final_exception(ConnectionException(
+                    "Got unexpected response when preparing statement "
+                    "on host %s: %s" % (self._host, response)))
+        elif isinstance(response, ErrorMessage):
+            self._set_final_exception(response)
+        else:
+            self._set_final_exception(ConnectionException(
+                "Got unexpected response type when preparing "
+                "statement on host %s: %s" % (self._host, response)))
 
     def _set_final_result(self, response):
         if hasattr(self, 'session'):

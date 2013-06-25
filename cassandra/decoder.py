@@ -272,6 +272,15 @@ class ConfigurationException(RequestValidationException):
     summary = 'Query invalid because of configuration issue'
     error_code = 0x2300
 
+class PreparedQueryNotFound(RequestValidationException):
+    summary = 'Matching prepared statement not found on this node'
+    error_code = 0x2500
+
+    @staticmethod
+    def recv_error_info(f):
+        # return the prepared query ID
+        return read_short(f)
+
 class AlreadyExistsException(ConfigurationException):
     summary = 'Item already exists'
     error_code = 0x2400
