@@ -1,5 +1,8 @@
 CHANGELOG
 
+0.4.5
+* fixed bug where container columns would not call their child to_python method, this only really affected columns with special to_python logic
+
 0.4.4
 * adding query logging back
 * fixed bug updating an empty list column
