@@ -278,7 +278,8 @@ class PreparedQueryNotFound(RequestValidationException):
 
     @staticmethod
     def recv_error_info(f):
-        # return the MD5 ID for the prepared query
+        # read the query_id, but ignore and just return the MD5
+        read_short(f)
         return f.read(16)
 
 class AlreadyExistsException(ConfigurationException):
