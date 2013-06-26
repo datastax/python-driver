@@ -7,10 +7,8 @@ Python Native Protocol Driver (Work in Progress)
 This driver is currently under heavy development, so the API and layout of
 packages, modules, classes, and functions are subject to change.
 
-
 Features to be Added
 --------------------
-* Prepared statement support
 * C extension for encoding/decoding messages
 * Tracing support
 * Connection pool metrics
@@ -18,6 +16,16 @@ Features to be Added
 * Twisted, gevent support
 * Python 3 support
 * IPv6 Support
+
+Installation
+------------
+The driver currently depends on pyev for its core event loop. The pyev library
+depends on libev.  If you're on Linux, you should be able to install libev
+through a package manager.  For example, on Debian/Ubuntu:
+
+    .. code-block:: bash
+
+      $ sudo apt-get install libev-dev
 
 License
 -------
