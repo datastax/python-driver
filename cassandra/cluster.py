@@ -629,7 +629,7 @@ class Session(object):
                 conn_exc = ConnectionException(str(auth_exc), host=host)
                 host.monitor.signal_connection_failure(conn_exc)
                 return self._pools.get(host)
-            except ConnectionException, conn_exc:
+            except Exception, conn_exc:
                 host.monitor.signal_connection_failure(conn_exc)
                 return self._pools.get(host)
 
