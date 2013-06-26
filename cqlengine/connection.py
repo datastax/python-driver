@@ -31,7 +31,8 @@ connection_pool = None
 class CQLConnectionError(CQLEngineException): pass
 
 
-class RowResult(tuple): pass
+class RowResult(tuple):
+    pass
 
 
 def _column_tuple_factory(colnames, values):

@@ -365,11 +365,9 @@ class AbstractQuerySet(object):
         if qty < 1:
             return
         else:
-            start = max(0, self._result_idx)
-            stop = start + qty
-            for values in self._result_cache[start:stop]:
+            for idx in range(qty):
                 self._result_idx += 1
-                self._result_cache[self._result_idx] = self._construct_result(values)
+                self._result_cache[self._result_idx] = self._construct_result(self._result_cache[self._result_idx])
 
             #return the connection to the connection pool if we have all objects
             if self._result_cache and self._result_idx == (len(self._result_cache) - 1):
