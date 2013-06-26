@@ -389,7 +389,7 @@ class HostConnectionPool(object):
             connection.in_flight -= 1
             in_flight = connection.in_flight
 
-        if connection.is_defunct:
+        if connection.is_defunct or connection.is_closed:
             is_down = self.host.monitor.signal_connection_failure(connection.last_error)
             if is_down:
                 self.shutdown()
