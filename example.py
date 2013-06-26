@@ -4,16 +4,18 @@ import logging
 
 log = logging.getLogger()
 log.setLevel('DEBUG')
-log.addHandler(logging.StreamHandler())
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
+log.addHandler(handler)
 
 from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster
-from cassandra.query import Query
+from cassandra.query import SimpleStatement
 
 KEYSPACE = "testkeyspace"
 
 def main():
-    c = Cluster()
+    c = Cluster(['127.0.0.1', '127.0.0.2'])
     s = c.connect()
 
     rows = s.execute("SELECT keyspace_name FROM system.schema_keyspaces")
@@ -40,7 +42,7 @@ def main():
         )
         """)
 
-    query = Query("""
+    query = SimpleStatement("""
                   INSERT INTO mytable (thekey, col1, col2)
                   VALUES (%(key)s, %(a)s, %(b)s)
                   """, consistency_level=ConsistencyLevel.ONE)
