@@ -11,14 +11,13 @@ class Query(object):
     retry_policy = None
     tracing_enabled = False
     consistency_level = ConsistencyLevel.ONE
-    routing_key = None
+    _routing_key = None
 
-
-class SimpleStatement(Query):
-
-    def __init__(self, query_string):
-        self._query_string = query_string
-        self._routing_key = None
+    def __init__(self, retry_policy=None, tracing_enabled=False, consistency_level=ConsistencyLevel.ONE, routing_key=None):
+        self.retry_policy = retry_policy
+        self.tracing_enabled = tracing_enabled
+        self.consistency_level = consistency_level
+        self._routing_key = routing_key
 
     @property
     def routing_key(self):
@@ -28,6 +27,13 @@ class SimpleStatement(Query):
     def set_routing_key(self, value):
         self._routing_key = "".join(struct.pack("HsB", len(component), component, 0)
                                     for component in value)
+
+class SimpleStatement(Query):
+
+    def __init__(self, query_string, *args, **kwargs):
+        Query.__init__(self, *args, **kwargs)
+        self._query_string = query_string
+        self._routing_key = None
 
     @property
     def query_string(self):
@@ -92,7 +98,8 @@ class BoundStatement(Query):
     values = None
     _routing_key = None
 
-    def __init__(self, prepared_statement):
+    def __init__(self, prepared_statement, *args, **kwargs):
+        Query.__init__(self, *args, **kwargs)
         self.prepared_statement = prepared_statement
         self.consistency_level = prepared_statement.consistency_level
         self.values = []
