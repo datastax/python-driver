@@ -421,9 +421,9 @@ class Cluster(object):
     def prepare_all_queries(self, host):
         pass
 
-    def prepare_on_all_sessions(self, query_id, prepared_statement, excluded_host):
+    def prepare_on_all_sessions(self, md5_id, prepared_statement, excluded_host):
         """ Internal """
-        self._prepared_statements[query_id] = prepared_statement
+        self._prepared_statements[md5_id] = prepared_statement
         for session in self.sessions:
             session.prepare_on_all_hosts(prepared_statement.query_string, excluded_host)
 
@@ -568,7 +568,7 @@ class Session(object):
 
         host = future._current_host
         try:
-            self.cluster.prepare_on_all_sessions(query_id, prepared_statement, host)
+            self.cluster.prepare_on_all_sessions(md5_id, prepared_statement, host)
         except:
             log.exception("Error preparing query on all hosts:")
 
@@ -578,9 +578,24 @@ class Session(object):
         """ Internal """
         for host, pool in self._pools.items():
             if host != excluded_host:
+                future = ResponseFuture(self, PrepareMessage(query), None)
+
+                # we don't care about errors preparing against specific hosts,
+                # since we can always prepare them as needed when the prepared
+                # statement is used.  Just log errors and continue on.
                 try:
-                    # TODO this needs to use a specific host
-                    self.execute(PrepareMessage(query))
+                    request_id = ResponseFuture._query(host)
+                except:
+                    log.exception("Error preparing query for host %s:" % (host,))
+                    continue
+
+                if request_id is None:
+                    # the error has already been logged by ResponsFuture
+                    log.debug("Failed to prepare query for host %s" % (host,))
+                    continue
+
+                try:
+                    future.result()
                 except:
                     log.exception("Error preparing query for host %s:" % (host,))
 
@@ -1217,7 +1232,7 @@ class ResponseFuture(object):
 
     def _set_result(self, response):
         try:
-            if self._current_pool: # and self._connection:
+            if self._current_pool:
                 self._current_pool.return_connection(self._connection)
 
             if isinstance(response, ResultMessage):
