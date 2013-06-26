@@ -429,8 +429,9 @@ class ResultMessage(_MessageType):
     @classmethod
     def recv_results_prepared(cls, f):
         query_id = read_short(f)
+        md5_id = f.read(16)
         column_metadata = cls.recv_results_metadata(f)
-        return (query_id, column_metadata)
+        return (query_id, md5_id, column_metadata)
 
     @classmethod
     def recv_results_metadata(cls, f):
@@ -492,10 +493,11 @@ class PrepareMessage(_MessageType):
 class ExecuteMessage(_MessageType):
     opcode = 0x0A
     name = 'EXECUTE'
-    params = ('query_id', 'query_params', 'consistency_level',)
+    params = ('query_id', 'md5_id', 'query_params', 'consistency_level',)
 
     def send_body(self, f):
-        write_int(f, self.query_id)
+        write_short(f, self.query_id)
+        f.write(self.md5_id)
         write_short(f, len(self.query_params))
         for param in self.query_params:
             write_value(f, param)
