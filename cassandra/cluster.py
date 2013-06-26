@@ -578,7 +578,7 @@ class Session(object):
         """ Internal """
         for host, pool in self._pools.items():
             if host != excluded_host:
-                future = ResponseFuture(self, PrepareMessage(query), None)
+                future = ResponseFuture(self, PrepareMessage(query=query), None)
 
                 # we don't care about errors preparing against specific hosts,
                 # since we can always prepare them as needed when the prepared
@@ -1200,8 +1200,10 @@ class ResponseFuture(object):
         self._errors = {}
 
     def __del__(self):
-        if hasattr(self, 'session'):
+        try:
             del self.session
+        except AttributeError:
+            pass
 
     def send_request(self):
         """ Internal """
@@ -1294,7 +1296,7 @@ class ResponseFuture(object):
                     try:
                         prepared_statement = self.session.cluster._prepared_statements[md5_id]
                     except KeyError:
-                        log.error("Tried to execute unknown prepared statement %d" % (md5_id,))
+                        log.error("Tried to execute unknown prepared statement %s" % (md5_id.encode('hex'),))
                         self._set_final_exception(response)
                         return
 
