@@ -6,6 +6,7 @@ import traceback
 import Queue
 import weakref
 from functools import partial
+from itertools import groupby
 
 from cassandra import ConsistencyLevel
 from cassandra.connection import Connection, ConnectionException
@@ -419,7 +420,40 @@ class Cluster(object):
             self.control_connection.refresh_schema, keyspace, table)
 
     def prepare_all_queries(self, host):
-        pass
+        if not self._prepared_statements:
+            return
+
+        log.debug("Preparing all known prepared statements against host %s" % (host,))
+        try:
+            connection = self._connection_factory(host.address)
+            try:
+                self.control_connection.wait_for_schema_agreement(connection)
+            except:
+                pass
+
+            statements = self._prepared_statements.values()
+            for keyspace, ks_statements in groupby(statements, lambda s: s.keyspace):
+                if keyspace is not None:
+                    connection.set_keyspace(keyspace)
+
+                # note: we could potentially prepare some of these in parallel,
+                # but at the same time, we don't want to put too much load on
+                # the server at once
+                for statement in ks_statements:
+                    message = PrepareMessage(query=statement.query_string)
+                    try:
+                        response = connection.wait_for_response(message)
+                        if (not isinstance(response, ResultMessage) or
+                            response.kind != ResultMessage.KIND_PREPARED):
+                            log.debug("Got unexpected response when preparing "
+                                      "statement on host %s: %r" % (host, response))
+                    except:
+                        log.exception("Error trying to prepare statement on "
+                                      "host %s" % (host,))
+
+        except:
+            # log and ignore
+            log.exception("Error trying to prepare all statements on host %s" % (host,))
 
     def prepare_on_all_sessions(self, md5_id, prepared_statement, excluded_host):
         """ Internal """
