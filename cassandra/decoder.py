@@ -278,8 +278,8 @@ class PreparedQueryNotFound(RequestValidationException):
 
     @staticmethod
     def recv_error_info(f):
-        # return the prepared query ID
-        return read_short(f)
+        # return the MD5 ID for the prepared query
+        return f.read(16)
 
 class AlreadyExistsException(ConfigurationException):
     summary = 'Item already exists'

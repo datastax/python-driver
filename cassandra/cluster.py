@@ -1170,6 +1170,20 @@ class ResponseFuture(object):
         ...     print "operation failed!"
 
     """
+    session = None
+    row_factory = None
+    message = None
+    query = None
+
+    _req_id = None
+    _final_result = _NO_RESULT_YET
+    _final_exception = None
+    _callback = None
+    _errback = None
+    _current_host = None
+    _current_pool = None
+    _connection = None
+    _query_retries = 0
 
     def __init__(self, session, message, query):
         self.session = session
@@ -1182,14 +1196,8 @@ class ResponseFuture(object):
         # they last left off
         self.query_plan = iter(session._load_balancer.make_query_plan(query))
 
-        self._req_id = None
-        self._final_result = _NO_RESULT_YET
-        self._final_exception = None
-        self._current_host = self._current_pool = self._connection = None
         self._event = Event()
         self._errors = {}
-        self._query_retries = 0
-        self._callback = self._errback = None
 
     def __del__(self):
         if hasattr(self, 'session'):
@@ -1282,12 +1290,13 @@ class ResponseFuture(object):
                     self._retry(reuse_connection=False, consistency_level=None)
                     return
                 elif isinstance(response, PreparedQueryNotFound):
-                    query_id = response.result
+                    md5_id = response.info
                     try:
-                        prepared_statement = self.session.cluster._prepared_statements[query_id]
+                        prepared_statement = self.session.cluster._prepared_statements[md5_id]
                     except KeyError:
-                        log.error("Tried to execute unknown prepared statement %d" % (query_id,))
+                        log.error("Tried to execute unknown prepared statement %d" % (md5_id,))
                         self._set_final_exception(response)
+                        return
 
                     current_keyspace = self._connection.keyspace
                     prepared_keyspace = prepared_statement.keyspace
@@ -1297,13 +1306,15 @@ class ResponseFuture(object):
                                        "not match the keyspace the statement was "
                                        "prepared with (%s)" %
                                        (current_keyspace, prepared_keyspace)))
+                        return
 
-                    prepare_message = PrepareMessage(query=self.query.query_string)
+                    prepare_message = PrepareMessage(query=prepared_statement.query_string)
                     # since this might block, run on the executor to avoid hanging
                     # the event loop thread
                     self.session.submit(self._connection.send_msg,
                                         prepare_message,
                                         cb=self._execute_after_prepare)
+                    return
                 else:
                     self._set_final_exception(response)
                     return

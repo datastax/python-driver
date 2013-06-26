@@ -1,12 +1,13 @@
 import unittest
-from mock import Mock, ANY
+from mock import Mock, MagicMock, ANY
 
 from cassandra import ConsistencyLevel
 from cassandra.cluster import Session, ResponseFuture, NoHostAvailable
 from cassandra.connection import ConnectionException
 from cassandra.decoder import (ReadTimeoutErrorMessage, WriteTimeoutErrorMessage,
                                UnavailableErrorMessage, ResultMessage, QueryMessage,
-                               OverloadedErrorMessage, IsBootstrappingErrorMessage)
+                               OverloadedErrorMessage, IsBootstrappingErrorMessage,
+                               PreparedQueryNotFound, PrepareMessage)
 from cassandra.policies import RetryPolicy
 from cassandra.pool import NoConnectionsAvailable
 from cassandra.query import SimpleStatement
@@ -344,3 +345,37 @@ class ResponseFutureTests(unittest.TestCase):
         response = Mock(spec=ResultMessage, kind=ResultMessage.KIND_ROWS, results=[{'col': 'val'}])
         rf._set_result(response)
         self.assertEqual(rf.result(), [{'col': 'val'}])
+
+    def test_prepared_query_not_found(self):
+        session = self.make_session()
+        rf = self.make_response_future(session)
+        rf.send_request()
+
+        session.cluster._prepared_statements = MagicMock(dict)
+        prepared_statement = session.cluster._prepared_statements.__getitem__.return_value
+        prepared_statement.query_string = "SELECT * FROM foobar"
+        prepared_statement.keyspace = "FooKeyspace"
+        rf._connection.keyspace = "FooKeyspace"
+
+        result = Mock(spec=PreparedQueryNotFound, info='a' * 16)
+        rf._set_result(result)
+
+        session.submit.assert_called_once()
+        args, kwargs = session.submit.call_args
+        self.assertIsInstance(args[-1], PrepareMessage)
+        self.assertEquals(args[-1].query, "SELECT * FROM foobar")
+
+    def test_prepared_query_not_found_bad_keyspace(self):
+        session = self.make_session()
+        rf = self.make_response_future(session)
+        rf.send_request()
+
+        session.cluster._prepared_statements = MagicMock(dict)
+        prepared_statement = session.cluster._prepared_statements.__getitem__.return_value
+        prepared_statement.query_string = "SELECT * FROM foobar"
+        prepared_statement.keyspace = "FooKeyspace"
+        rf._connection.keyspace = "BarKeyspace"
+
+        result = Mock(spec=PreparedQueryNotFound, info='a' * 16)
+        rf._set_result(result)
+        self.assertRaises(ValueError, rf.result)
