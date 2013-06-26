@@ -169,7 +169,7 @@ class ErrorMessage(_MessageType, Exception):
         msg = 'code=%04x [%s] message="%s"' \
               % (self.code, self.summary, self.message)
         if self.info is not None:
-            msg += (' info=' + str(self.info))
+            msg += (' info=' + repr(self.info))
         return msg
 
     def __str__(self):
