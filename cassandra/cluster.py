@@ -256,14 +256,14 @@ class Cluster(object):
     def set_max_connections_per_host(self, host_distance, max_connections):
         self._max_connections_per_host[host_distance] = max_connections
 
-    def _connection_factory(self, host, *args, **kwargs):
+    def _connection_factory(self, address, *args, **kwargs):
         if self.auth_provider:
-            kwargs['credentials'] = self.auth_provider(host)
+            kwargs['credentials'] = self.auth_provider(address)
 
         kwargs['compression'] = self.compression
         kwargs['sockopts'] = self.sockopts
 
-        return Connection.factory(host, *args, **kwargs)
+        return Connection.factory(address, *args, **kwargs)
 
     def _make_connection_factory(self, host, *args, **kwargs):
         if self.auth_provider:
