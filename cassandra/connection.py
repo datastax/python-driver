@@ -290,6 +290,7 @@ class Connection(object):
             callback = self._callbacks.pop(stream_id)
             self._id_queue.put_nowait(stream_id)
 
+        body = None
         try:
             # check that the protocol version is supported
             given_version = version & PROTOCOL_VERSION_MASK
@@ -312,7 +313,7 @@ class Connection(object):
             response = decode_response(stream_id, flags, opcode, body, self.decompressor)
         except Exception, exc:
             log.exception("Error decoding response from Cassandra. "
-                          "Opcode: 0x%X, message contents: %r" % (opcode, body))
+                          "opcode: %04x; message contents: %r" % (opcode, body))
             callback(exc)
             self.defunct(exc)
             return
