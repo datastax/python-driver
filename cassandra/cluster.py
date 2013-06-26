@@ -1074,12 +1074,12 @@ class ControlConnection(object):
             self.reconnect()
 
     def on_add(self, host):
-        log.debug("[control connection] Adding host %s and refreshing topology" % (host,))
+        log.debug("[control connection] Adding host %r and refreshing topology" % (host,))
         self._balancing_policy.on_add(host)
         self.refresh_node_list_and_token_map()
 
     def on_remove(self, host):
-        log.debug("[control connection] Removing host %s and refreshing topology" % (host,))
+        log.debug("[control connection] Removing host %r and refreshing topology" % (host,))
         self._balancing_policy.on_remove(host)
         self.refresh_node_list_and_token_map()
 
