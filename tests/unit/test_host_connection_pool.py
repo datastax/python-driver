@@ -180,3 +180,21 @@ class HostConnectionPoolTests(unittest.TestCase):
         conn.close.assert_called_once()
         self.assertFalse(session.submit.called)
         self.assertTrue(pool.is_shutdown)
+
+    def test_return_closed_connection(self):
+        host = Mock(spec=Host, address='ip1')
+        session = self.make_session()
+        conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=True)
+        session.cluster._connection_factory.return_value = conn
+
+        pool = HostConnectionPool(host, HostDistance.LOCAL, session)
+        session.cluster._connection_factory.assert_called_once_with(host.address)
+
+        pool.borrow_connection(timeout=0.01)
+        conn.is_closed = True
+        host.monitor.signal_connection_failure.return_value = False
+        pool.return_connection(conn)
+
+        # the connection should be closed a new creation scheduled
+        session.submit.assert_called_once()
+        self.assertFalse(pool.is_shutdown)
