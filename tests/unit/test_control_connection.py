@@ -7,7 +7,8 @@ from futures import ThreadPoolExecutor
 from cassandra.decoder import ResultMessage
 from cassandra.cluster import ControlConnection, Cluster, _Scheduler
 from cassandra.pool import Host
-from cassandra.policies import SimpleConvictionPolicy
+from cassandra.policies import (SimpleConvictionPolicy, RoundRobinPolicy,
+                                ConstantReconnectionPolicy)
 
 PEER_IP = "foobar"
 
@@ -38,6 +39,8 @@ class MockMetadata(object):
 class MockCluster(object):
 
     max_schema_agreement_wait = Cluster.max_schema_agreement_wait
+    load_balancing_policy_factory = RoundRobinPolicy
+    reconnection_policy = ConstantReconnectionPolicy(2)
 
     def __init__(self):
         self.metadata = MockMetadata()

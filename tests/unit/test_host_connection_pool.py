@@ -195,6 +195,6 @@ class HostConnectionPoolTests(unittest.TestCase):
         host.monitor.signal_connection_failure.return_value = False
         pool.return_connection(conn)
 
-        # the connection should be closed a new creation scheduled
+        # a new creation should be scheduled
         session.submit.assert_called_once()
         self.assertFalse(pool.is_shutdown)
