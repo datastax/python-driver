@@ -584,7 +584,7 @@ class Session(object):
                 # since we can always prepare them as needed when the prepared
                 # statement is used.  Just log errors and continue on.
                 try:
-                    request_id = ResponseFuture._query(host)
+                    request_id = future._query(host)
                 except:
                     log.exception("Error preparing query for host %s:" % (host,))
                     continue
