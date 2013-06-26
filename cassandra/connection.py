@@ -278,7 +278,7 @@ class Connection(object):
                     else:
                         self._total_reqd_bytes = body_len + 8
         else:
-            logging.debug("connection closed by server")
+            log.debug("connection closed by server")
             self.close()
 
     @defunct_on_error
