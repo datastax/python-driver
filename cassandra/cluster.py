@@ -225,9 +225,9 @@ class Cluster(object):
 
         self._lock = RLock()
 
-        for address in contact_points:
-            self.add_host(address, signal=False)
         self.control_connection = ControlConnection(self)
+        for address in contact_points:
+            self.add_host(address, signal=True)
 
     def get_min_requests_per_connection(self, host_distance):
         return self._min_requests_per_connection[host_distance]
@@ -284,7 +284,7 @@ class Cluster(object):
             if self._is_shutdown:
                 raise Exception("Cluster is already shut down")
 
-            if not self.control_connection:
+            if self.control_connection:
                 try:
                     self.control_connection.connect()
                 except:
@@ -795,6 +795,8 @@ class ControlConnection(object):
         """
         connection = self._cluster._connection_factory(host.address)
 
+        log.debug("[control connection] Established new connection, registering "
+                  "watchers and refreshing schema and topology")
         try:
             connection.register_watchers({
                 "TOPOLOGY_CHANGE": self._handle_topology_change,
@@ -907,11 +909,13 @@ class ControlConnection(object):
             self._signal_error()
 
     def _refresh_node_list_and_token_map(self, connection):
+        log.debug("[control connection] Refreshing node list and token map")
         cl = ConsistencyLevel.ONE
         peers_query = QueryMessage(query=self._SELECT_PEERS, consistency_level=cl)
         local_query = QueryMessage(query=self._SELECT_LOCAL, consistency_level=cl)
         peers_result, local_result = connection.wait_for_responses(peers_query, local_query)
         peers_result = dict_factory(*peers_result.results)
+        log.debug("[control connection] Got system table results to refresh node list and token map")
 
         partitioner = None
         token_map = {}
@@ -943,6 +947,7 @@ class ControlConnection(object):
 
             host = self._cluster.metadata.get_host(addr)
             if host is None:
+                log.debug("[control connection] Found new host to connect to: %s" % (addr,))
                 host = self._cluster.add_host(addr, signal=True)
             host.set_location_info(row.get("data_center"), row.get("rack"))
 
@@ -1056,9 +1061,11 @@ class ControlConnection(object):
         return bool(conn and conn.is_open)
 
     def on_up(self, host):
+        log.debug("[control connection] Host %s is considered up" % (host,))
         self._balancing_policy.on_up(host)
 
     def on_down(self, host):
+        log.debug("[control connection] Host %s is considered down" % (host,))
         self._balancing_policy.on_down(host)
 
         conn = self._connection
@@ -1067,10 +1074,12 @@ class ControlConnection(object):
             self.reconnect()
 
     def on_add(self, host):
+        log.debug("[control connection] Adding host %s and refreshing topology" % (host,))
         self._balancing_policy.on_add(host)
         self.refresh_node_list_and_token_map()
 
     def on_remove(self, host):
+        log.debug("[control connection] Removing host %s and refreshing topology" % (host,))
         self._balancing_policy.on_remove(host)
         self.refresh_node_list_and_token_map()
 
