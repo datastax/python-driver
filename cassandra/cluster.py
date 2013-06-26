@@ -227,6 +227,7 @@ class Cluster(object):
 
         for address in contact_points:
             self.add_host(address, signal=False)
+        self.control_connection = ControlConnection(self)
 
     def get_min_requests_per_connection(self, host_distance):
         return self._min_requests_per_connection[host_distance]
@@ -284,7 +285,6 @@ class Cluster(object):
                 raise Exception("Cluster is already shut down")
 
             if not self.control_connection:
-                self.control_connection = ControlConnection(self)
                 try:
                     self.control_connection.connect()
                 except:
@@ -736,9 +736,9 @@ class ControlConnection(object):
         # use a weak reference to allow the Cluster instance to be GC'ed (and
         # shutdown) since implementing __del__ disables the cycle detector
         self._cluster = weakref.proxy(cluster)
-        self._balancing_policy = RoundRobinPolicy()
-        self._balancing_policy.populate(cluster, cluster.metadata.all_hosts())
-        self._reconnection_policy = ExponentialReconnectionPolicy(2, 300)
+        self._balancing_policy = cluster.load_balancing_policy_factory()
+        self._balancing_policy.populate(cluster, [])
+        self._reconnection_policy = cluster.reconnection_policy
         self._connection = None
 
         self._lock = RLock()
