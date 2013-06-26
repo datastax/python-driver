@@ -40,7 +40,7 @@ class RoundRobinPolicy(LoadBalancingPolicy):
         length = len(self._live_hosts)
         if length:
             pos %= length
-            return islice(cycle(self._live_hosts), pos, pos + length)
+            return list(islice(cycle(self._live_hosts), pos, pos + length))
         else:
             return []
 
