@@ -272,7 +272,7 @@ class Cluster(object):
         kwargs['compression'] = self.compression
         kwargs['sockopts'] = self.sockopts
 
-        return partial(Connection.factory, host, *args, **kwargs)
+        return partial(Connection.factory, host.address, *args, **kwargs)
 
     def connect(self, keyspace=None):
         """
