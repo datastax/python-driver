@@ -2,6 +2,7 @@ from futures import ThreadPoolExecutor
 import logging
 import time
 from threading import RLock, Thread, Event
+import traceback
 import Queue
 import weakref
 from functools import partial
@@ -535,6 +536,7 @@ class Session(object):
         if isinstance(query, BoundStatement):
             message = ExecuteMessage(
                 query_id=query.prepared_statement.query_id,
+                md5_id=query.prepared_statement.md5_id,
                 query_params=query.values,
                 consistency_level=query.consistency_level)
         else:
@@ -552,26 +554,32 @@ class Session(object):
         return future
 
     def prepare(self, query):
-        message = PrepareMessage(query)
+        message = PrepareMessage(query=query)
+        future = ResponseFuture(self, message, query=None)
+        try:
+            future.send_request()
+            query_id, md5_id, column_metadata = future.result()
+        except:
+            log.exception("Error preparing query:")
+            raise
 
-        def run_prepare():
-            future = self.execute_async(message)
-            query_id, column_metadata = future.result()
+        prepared_statement = PreparedStatement.from_message(
+            query_id, md5_id, column_metadata, self.cluster.metadata, query, self.keyspace)
 
-            prepared_statement = PreparedStatement.from_message(
-                query_id, column_metadata, self.cluster.metadata, query, self.keyspace)
-
-            host = future._current_host
+        host = future._current_host
+        try:
             self.cluster.prepare_on_all_sessions(query_id, prepared_statement, host)
+        except:
+            log.exception("Error preparing query on all hosts:")
 
-        future = self.submit(self.execute, run_prepare)
-        return future.result()
+        return prepared_statement
 
     def prepare_on_all_hosts(self, query, excluded_host):
         """ Internal """
         for host, pool in self._pools.items():
             if host != excluded_host:
                 try:
+                    # TODO this needs to use a specific host
                     self.execute(PrepareMessage(query))
                 except:
                     log.exception("Error preparing query for host %s:" % (host,))
@@ -1201,6 +1209,7 @@ class ResponseFuture(object):
             self._connection = connection
             return request_id
         except Exception, exc:
+            log.debug("Error querying host %s: %s", host, traceback.format_exc(exc))
             self._errors[host] = exc
             if connection:
                 pool.return_connection(connection)
@@ -1232,7 +1241,9 @@ class ResponseFuture(object):
                         results = self.row_factory(*results)
                     self._set_final_result(results)
             elif isinstance(response, ErrorMessage):
-                retry_policy = self.query.retry_policy
+                retry_policy = None
+                if self.query:
+                    retry_policy = self.query.retry_policy
                 if not retry_policy:
                     retry_policy = self.session.cluster.retry_policy_factory()
 
@@ -1272,7 +1283,7 @@ class ResponseFuture(object):
                                        "prepared with (%s)" %
                                        (current_keyspace, prepared_keyspace)))
 
-                    prepare_message = PrepareMessage(self.query.query_string)
+                    prepare_message = PrepareMessage(query=self.query.query_string)
                     # since this might block, run on the executor to avoid hanging
                     # the event loop thread
                     self.session.submit(self._connection.send_msg,
