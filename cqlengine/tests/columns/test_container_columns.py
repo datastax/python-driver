@@ -40,6 +40,16 @@ class TestSetColumn(BaseCassEngTestCase):
         super(TestSetColumn, cls).tearDownClass()
         delete_table(TestSetModel)
 
+
+    def test_empty_set_initial(self):
+        """
+        tests that sets are set() by default, should never be none
+        :return:
+        """
+        m = TestSetModel.create()
+        m.int_set.add(5)
+        m.save()
+
     def test_io_success(self):
         """ Tests that a basic usage works as expected """
         m1 = TestSetModel.create(int_set={1, 2}, text_set={'kai', 'andreas'})
@@ -129,6 +139,8 @@ class TestSetColumn(BaseCassEngTestCase):
         column = columns.Set(columns.Text(min_length=100))
         assert isinstance(column.value_col, columns.Text)
 
+
+
     def test_to_python(self):
         """ Tests that to_python of value column is called """
         column = columns.Set(JsonTestColumn)
@@ -156,6 +168,10 @@ class TestListColumn(BaseCassEngTestCase):
     def tearDownClass(cls):
         super(TestListColumn, cls).tearDownClass()
         delete_table(TestListModel)
+
+    def test_initial(self):
+        tmp = TestListModel.create()
+        tmp.int_list.append(1)
 
     def test_io_success(self):
         """ Tests that a basic usage works as expected """
@@ -274,6 +290,10 @@ class TestMapColumn(BaseCassEngTestCase):
     def tearDownClass(cls):
         super(TestMapColumn, cls).tearDownClass()
         delete_table(TestMapModel)
+
+    def test_empty_default(self):
+        tmp = TestMapModel.create()
+        tmp.int_map['blah'] = 1
 
     def test_io_success(self):
         """ Tests that a basic usage works as expected """

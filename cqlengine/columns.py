@@ -473,14 +473,15 @@ class Set(BaseContainerColumn):
             cq = cql_quote
             return '{' + ', '.join([cq(v) for v in self.value]) + '}'
 
-    def __init__(self, value_type, strict=True, **kwargs):
+    def __init__(self, value_type, strict=True, default=set, **kwargs):
         """
         :param value_type: a column class indicating the types of the value
         :param strict: sets whether non set values will be coerced to set
             type on validation, or raise a validation error, defaults to True
         """
         self.strict = strict
-        super(Set, self).__init__(value_type, **kwargs)
+
+        super(Set, self).__init__(value_type, default=default, **kwargs)
 
     def validate(self, value):
         val = super(Set, self).validate(value)
@@ -495,11 +496,12 @@ class Set(BaseContainerColumn):
         return {self.value_col.validate(v) for v in val}
 
     def to_python(self, value):
-        if value is None: return None
+        if value is None: return set()
         return {self.value_col.to_python(v) for v in value}
 
     def to_database(self, value):
         if value is None: return None
+
         if isinstance(value, self.Quoter): return value
         return self.Quoter({self.value_col.to_database(v) for v in value})
 
@@ -559,6 +561,9 @@ class List(BaseContainerColumn):
         def __str__(self):
             cq = cql_quote
             return '[' + ', '.join([cq(v) for v in self.value]) + ']'
+
+    def __init__(self, value_type, default=set, **kwargs):
+        return super(List, self).__init__(value_type=value_type, default=default, **kwargs)
 
     def validate(self, value):
         val = super(List, self).validate(value)
@@ -668,7 +673,7 @@ class Map(BaseContainerColumn):
             cq = cql_quote
             return '{' + ', '.join([cq(k) + ':' + cq(v) for k,v in self.value.items()]) + '}'
 
-    def __init__(self, key_type, value_type, **kwargs):
+    def __init__(self, key_type, value_type, default=dict, **kwargs):
         """
         :param key_type: a column class indicating the types of the key
         :param value_type: a column class indicating the types of the value
@@ -687,7 +692,7 @@ class Map(BaseContainerColumn):
         else:
             self.key_col = key_type
             self.key_type = self.key_col.__class__
-        super(Map, self).__init__(value_type, **kwargs)
+        super(Map, self).__init__(value_type, default=default, **kwargs)
 
     def get_column_def(self):
         """
