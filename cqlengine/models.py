@@ -149,7 +149,8 @@ class BaseModel(object):
 
         for name, column in self._columns.items():
             value =  values.get(name, None)
-            if value is not None: value = column.to_python(value)
+            if value is not None or isinstance(column, columns.BaseContainerColumn):
+                value = column.to_python(value)
             value_mngr = column.value_manager(self, column, value)
             self._values[name] = value_mngr
 

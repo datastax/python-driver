@@ -573,7 +573,7 @@ class List(BaseContainerColumn):
         return [self.value_col.validate(v) for v in val]
 
     def to_python(self, value):
-        if value is None: return None
+        if value is None: return []
         return [self.value_col.to_python(v) for v in value]
 
     def to_database(self, value):
@@ -712,6 +712,8 @@ class Map(BaseContainerColumn):
         return {self.key_col.validate(k):self.value_col.validate(v) for k,v in val.items()}
 
     def to_python(self, value):
+        if value is None:
+            return {}
         if value is not None:
             return {self.key_col.to_python(k): self.value_col.to_python(v) for k,v in value.items()}
 

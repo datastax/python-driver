@@ -50,6 +50,11 @@ class TestSetColumn(BaseCassEngTestCase):
         m.int_set.add(5)
         m.save()
 
+    def test_empty_set_retrieval(self):
+        m = TestSetModel.create()
+        m2 = TestSetModel.get(partition=m.partition)
+        m2.int_set.add(3)
+
     def test_io_success(self):
         """ Tests that a basic usage works as expected """
         m1 = TestSetModel.create(int_set={1, 2}, text_set={'kai', 'andreas'})
@@ -173,6 +178,11 @@ class TestListColumn(BaseCassEngTestCase):
         tmp = TestListModel.create()
         tmp.int_list.append(1)
 
+    def test_initial(self):
+        tmp = TestListModel.create()
+        tmp2 = TestListModel.get(partition=tmp.partition)
+        tmp2.int_list.append(1)
+
     def test_io_success(self):
         """ Tests that a basic usage works as expected """
         m1 = TestListModel.create(int_list=[1, 2], text_list=['kai', 'andreas'])
@@ -295,6 +305,13 @@ class TestMapColumn(BaseCassEngTestCase):
         tmp = TestMapModel.create()
         tmp.int_map['blah'] = 1
 
+    def test_empty_retrieve(self):
+        tmp = TestMapModel.create()
+        tmp2 = TestMapModel.get(partition=tmp.partition)
+        tmp2.int_map['blah'] = 1
+
+
+
     def test_io_success(self):
         """ Tests that a basic usage works as expected """
         k1 = uuid4()
@@ -362,7 +379,7 @@ class TestMapColumn(BaseCassEngTestCase):
         m.save()
 
         m2 = TestMapModel.get(partition=m.partition)
-        assert m2.int_map is None
+        assert m2.int_map == {}
 
     def test_instantiation_with_column_class(self):
         """
