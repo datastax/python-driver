@@ -3,5 +3,7 @@ from cqlengine.functions import *
 from cqlengine.models import Model
 from cqlengine.query import BatchQuery
 
-__version__ = '0.4.7'
+__cqlengine_version_path__ = os.path.realpath(__file__ + '/../VERSION')
+__version__ = open(__cqlengine_version_path__, 'r').readline().strip()
+
 
