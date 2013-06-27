@@ -306,6 +306,12 @@ Batch Queries
         em2.batch(b).save()
         b.execute()
 
+        # deleting in a batch
+        b = BatchQuery()
+        ExampleModel.objects(id=some_id).batch(b).delete()
+        ExampleModel.objects(id=some_id2).batch(b).delete()
+        b.execute()
+
 QuerySet method reference
 =========================
 
