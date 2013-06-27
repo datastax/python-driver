@@ -1,5 +1,8 @@
 CHANGELOG
 
+0.4.7
+* adding support for passing None into query batch methods to clear any batch objects
+
 0.4.6
 * fixing the way models are compared
 
