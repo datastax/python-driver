@@ -428,8 +428,8 @@ class AbstractQuerySet(object):
         :param batch_obj:
         :return:
         """
-        if not isinstance(batch_obj, BatchQuery):
-            raise CQLEngineException('batch_obj must be a BatchQuery instance')
+        if batch_obj is not None and not isinstance(batch_obj, BatchQuery):
+            raise CQLEngineException('batch_obj must be a BatchQuery instance or None')
         clone = copy.deepcopy(self)
         clone._batch = batch_obj
         return clone
@@ -772,13 +772,13 @@ class DMLQuery(object):
         self.model = model
         self.column_family_name = self.model.column_family_name()
         self.instance = instance
-        self.batch = batch
+        self._batch = batch
         pass
 
     def batch(self, batch_obj):
-        if not isinstance(batch_obj, BatchQuery):
-            raise CQLEngineException('batch_obj must be a BatchQuery instance')
-        self.batch = batch_obj
+        if batch_obj is not None and not isinstance(batch_obj, BatchQuery):
+            raise CQLEngineException('batch_obj must be a BatchQuery instance or None')
+        self._batch = batch_obj
         return self
 
     def save(self):
@@ -852,8 +852,8 @@ class DMLQuery(object):
         # skip query execution if it's empty
         # caused by pointless update queries
         if qs:
-            if self.batch:
-                self.batch.add_query(qs, query_values)
+            if self._batch:
+                self._batch.add_query(qs, query_values)
             else:
                 execute(qs, query_values)
 
@@ -885,8 +885,8 @@ class DMLQuery(object):
 
             qs = ' '.join(qs)
 
-            if self.batch:
-                self.batch.add_query(qs, query_values)
+            if self._batch:
+                self._batch.add_query(qs, query_values)
             else:
                 execute(qs, query_values)
 
@@ -906,8 +906,8 @@ class DMLQuery(object):
         qs += [' AND '.join(where_statements)]
         qs = ' '.join(qs)
 
-        if self.batch:
-            self.batch.add_query(qs, field_values)
+        if self._batch:
+            self._batch.add_query(qs, field_values)
         else:
             execute(qs, field_values)
 

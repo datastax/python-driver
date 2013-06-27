@@ -4,7 +4,7 @@ from uuid import uuid4
 import random
 from cqlengine import Model, columns
 from cqlengine.management import delete_table, create_table
-from cqlengine.query import BatchQuery
+from cqlengine.query import BatchQuery, DMLQuery
 from cqlengine.tests.base import BaseCassEngTestCase
 
 class TestMultiKeyModel(Model):
@@ -104,3 +104,22 @@ class BatchQueryTests(BaseCassEngTestCase):
         for m in TestMultiKeyModel.all():
             m.delete()
 
+    def test_none_success_case(self):
+        """ Tests that passing None into the batch call clears any batch object """
+        b = BatchQuery()
+
+        q = TestMultiKeyModel.objects.batch(b)
+        assert q._batch == b
+
+        q = q.batch(None)
+        assert q._batch is None
+
+    def test_dml_none_success_case(self):
+        """ Tests that passing None into the batch call clears any batch object """
+        b = BatchQuery()
+
+        q = DMLQuery(TestMultiKeyModel, batch=b)
+        assert q._batch == b
+
+        q.batch(None)
+        assert q._batch is None
