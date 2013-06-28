@@ -76,6 +76,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
                 self.socket.setsockopt(*args)
 
         self._writable = True
+        self._have_listeners = False
 
         # start the global event loop if needed
         _start_loop()
@@ -208,7 +209,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         return self._writable
 
     def readable(self):
-        return self._readable
+        return self._have_listeners or self._readable
 
     def send_msg(self, msg, cb):
         if self.is_defunct:
@@ -238,6 +239,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
 
     def register_watcher(self, event_type, callback):
         self._push_watchers[event_type].add(callback)
+        self._have_listeners = True
 
     def register_watchers(self, type_callback_dict):
         for event_type, callback in type_callback_dict.items():
