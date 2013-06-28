@@ -3,7 +3,6 @@ log = logging.getLogger(__name__)
 import unittest
 
 from cassandra.cluster import Cluster
-from cassandra.connection import _loop
 from cassandra.policies import HostDistance
 
 existing_keyspaces = None
@@ -50,6 +49,5 @@ def teardown_package():
     finally:
         try:
             cluster.shutdown()
-            _loop.stop()
         except:
             log.exception('Failed to connect to cluster:')

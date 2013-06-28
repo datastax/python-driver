@@ -48,6 +48,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
     _total_reqd_bytes = 0
     _writable = False
     _readable = False
+    _have_listeners = False
 
     @classmethod
     def factory(cls, *args, **kwargs):
@@ -76,7 +77,6 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
                 self.socket.setsockopt(*args)
 
         self._writable = True
-        self._have_listeners = False
 
         # start the global event loop if needed
         _start_loop()

@@ -4,15 +4,18 @@ from threading import Thread, Event
 
 from cassandra import ConsistencyLevel
 from cassandra.decoder import QueryMessage
-from cassandra.connection import Connection
+from cassandra.io.asyncorereactor import AsyncoreConnection
+from cassandra.io.pyevreactor import PyevConnection
 
-class ConnectionTest(unittest.TestCase):
+class ConnectionTest(object):
+
+    klass = None
 
     def test_single_connection(self):
         """
         Test a single connection with sequential requests.
         """
-        conn = Connection.factory()
+        conn = self.klass.factory()
         query = "SELECT keyspace_name FROM system.schema_keyspaces LIMIT 1"
         event = Event()
 
@@ -35,7 +38,7 @@ class ConnectionTest(unittest.TestCase):
         """
         Test a single connection with pipelined requests.
         """
-        conn = Connection.factory()
+        conn = self.klass.factory()
         query = "SELECT keyspace_name FROM system.schema_keyspaces LIMIT 1"
         responses = [False] * 100
         event = Event()
@@ -57,7 +60,7 @@ class ConnectionTest(unittest.TestCase):
         """
         Test multiple connections with pipelined requests.
         """
-        conns = [Connection.factory() for i in range(5)]
+        conns = [self.klass.factory() for i in range(5)]
         events = [Event() for i in range(5)]
         query = "SELECT keyspace_name FROM system.schema_keyspaces LIMIT 1"
 
@@ -88,7 +91,7 @@ class ConnectionTest(unittest.TestCase):
         num_threads = 5
         event = Event()
 
-        conn = Connection.factory()
+        conn = self.klass.factory()
         query = "SELECT keyspace_name FROM system.schema_keyspaces LIMIT 1"
 
         def cb(all_responses, thread_responses, request_num, *args, **kwargs):
@@ -145,7 +148,7 @@ class ConnectionTest(unittest.TestCase):
 
         threads = []
         for i in range(num_conns):
-            conn = Connection.factory()
+            conn = self.klass.factory()
             t = Thread(target=send_msgs, args=(conn, events[i]))
             threads.append(t)
 
@@ -154,3 +157,13 @@ class ConnectionTest(unittest.TestCase):
 
         for t in threads:
             t.join()
+
+
+class AsyncoreConnectionTest(ConnectionTest, unittest.TestCase):
+
+    klass = AsyncoreConnection
+
+
+class PyevConnectionTest(ConnectionTest, unittest.TestCase):
+
+    klass = PyevConnection
