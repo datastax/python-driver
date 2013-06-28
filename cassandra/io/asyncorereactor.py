@@ -102,7 +102,6 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         # don't leave in-progress operations hanging
         self.connected_event.set()
         if not self.is_defunct:
-            log.debug("Erroring all callbacks")
             self._error_all_callbacks(
                 ConnectionException("Connection to %s was closed" % self.host))
 
@@ -129,8 +128,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         self._send_options_message()
 
     def handle_error(self):
-        t, v, tbinfo = sys.exc_info()
-        self.defunct(v)
+        self.defunct(sys.exc_info()[1])
 
     def handle_close(self):
         log.debug("connection closed by server")
