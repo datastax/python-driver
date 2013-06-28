@@ -89,5 +89,5 @@ def benchmark(run_fn):
             teardown()
 
         total = end - start
-        log.info("Total time: %0.4f" % total)
-        log.info("Average throughput: %0.4f/sec" % (NUM_QUERIES / total))
+        log.info("Total time: %0.2fs" % total)
+        log.info("Average throughput: %0.2f/sec" % (NUM_QUERIES / total))
