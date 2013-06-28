@@ -143,6 +143,17 @@ class Cluster(object):
     """
 
     connection_class = AsyncoreConnection
+    """
+    This determines what event loop system will be used for managing
+    I/O with Cassandra.  These are the current options:
+        * :class:`cassandra.io.asyncorereactor.AsyncoreConnection`
+        * :class:`cassandra.io.pyevreactor.PyevConnection`
+
+    By default, ``AsyncoreConnection`` will be used, which uses
+    the ``asyncore`` module in the Python standard library.  The
+    performance slightly worse than with ``pyev``, but it is
+    supported on a wider range of systems.
+    """
 
     sessions = None
     control_connection = None
@@ -161,6 +172,7 @@ class Cluster(object):
                  retry_policy_factory=None,
                  conviction_policy_factory=None,
                  metrics_enabled=False,
+                 connection_class=None,
                  sockopts=None,
                  executor_threads=2,
                  max_schema_agreement_wait=10):
@@ -191,6 +203,9 @@ class Cluster(object):
             if not callable(conviction_policy_factory):
                 raise ValueError("conviction_policy_factory must be callable")
             self.conviction_policy_factory = conviction_policy_factory
+
+        if connection_class is not None:
+            self.connection_class = connection_class
 
         self.metrics_enabled = metrics_enabled
         self.sockopts = sockopts
