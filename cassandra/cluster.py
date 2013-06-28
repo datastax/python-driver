@@ -1414,7 +1414,10 @@ class ResponseFuture(object):
 
     def _set_final_result(self, response):
         if hasattr(self, 'session'):
-            del self.session  # clear reference cycles
+            try:
+                del self.session  # clear reference cycles
+            except AttributeError:
+                pass
         self._final_result = response
         self._event.set()
         if self._callback:
@@ -1422,8 +1425,10 @@ class ResponseFuture(object):
             fn(response, *args, **kwargs)
 
     def _set_final_exception(self, response):
-        if hasattr(self, 'session'):
+        try:
             del self.session  # clear reference cycles
+        except AttributeError:
+            pass
         self._final_exception = response
         self._event.set()
         if self._errback:
