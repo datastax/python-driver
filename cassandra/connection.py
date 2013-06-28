@@ -106,7 +106,7 @@ class Connection(object):
     def close(self):
         raise NotImplementedError()
 
-    def defunct(self):
+    def defunct(self, exc):
         raise NotImplementedError()
 
     def send_msg(self, msg, cb):
