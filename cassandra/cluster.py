@@ -9,7 +9,7 @@ from functools import partial
 from itertools import groupby
 
 from cassandra import ConsistencyLevel
-from cassandra.connection import Connection, ConnectionException
+from cassandra.connection import ConnectionException
 from cassandra.decoder import (QueryMessage, ResultMessage,
                                ErrorMessage, ReadTimeoutErrorMessage,
                                WriteTimeoutErrorMessage,
@@ -19,6 +19,7 @@ from cassandra.decoder import (QueryMessage, ResultMessage,
                                PreparedQueryNotFound,
                                IsBootstrappingErrorMessage, named_tuple_factory,
                                dict_factory)
+from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.metadata import Metadata
 from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
@@ -140,6 +141,8 @@ class Cluster(object):
     """
     An instance of :cls:`cassandra.metadata.Metadata`.
     """
+
+    connection_class = AsyncoreConnection
 
     sessions = None
     control_connection = None
@@ -264,7 +267,7 @@ class Cluster(object):
         kwargs['compression'] = self.compression
         kwargs['sockopts'] = self.sockopts
 
-        return Connection.factory(address, *args, **kwargs)
+        return self.connection_class.factory(address, *args, **kwargs)
 
     def _make_connection_factory(self, host, *args, **kwargs):
         if self.auth_provider:
@@ -273,7 +276,7 @@ class Cluster(object):
         kwargs['compression'] = self.compression
         kwargs['sockopts'] = self.sockopts
 
-        return partial(Connection.factory, host.address, *args, **kwargs)
+        return partial(self.connection_class.factory, host.address, *args, **kwargs)
 
     def connect(self, keyspace=None):
         """
@@ -288,6 +291,7 @@ class Cluster(object):
             if self.control_connection:
                 try:
                     self.control_connection.connect()
+                    log.debug("Control connection created")
                 except:
                     log.exception("Control connection failed to connect, "
                                   "shutting down Cluster:")
@@ -1036,6 +1040,7 @@ class ControlConnection(object):
             self._cluster.executor.submit(self.refresh_schema, keyspace, table)
 
     def wait_for_schema_agreement(self, connection=None):
+        log.debug("[control connection] Waiting for schema agreement")
         if not connection:
             connection = self._connection
 
@@ -1069,6 +1074,7 @@ class ControlConnection(object):
             if len(versions) == 1:
                 return True
 
+            log.debug("[control connection] Schemas mismatched, trying again")
             self._time.sleep(0.2)
             elapsed = self._time.time() - start
 
