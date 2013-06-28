@@ -3,14 +3,14 @@ from functools import partial
 import logging
 import socket
 import sys
-from threading import RLock, Event, Lock, Thread
+from threading import Event, Lock, Thread
 import traceback
 from Queue import Queue
 
 import asyncore
 
 from cassandra.connection import (Connection, ResponseWaiter, ConnectionException,
-                                  ConnectionBusy, MAX_STREAM_PER_CONNECTION, NONBLOCKING)
+                                  ConnectionBusy, NONBLOCKING)
 from cassandra.marshal import int32_unpack
 
 log = logging.getLogger(__name__)
@@ -64,20 +64,12 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
 
         self.connected_event = Event()
 
-        self._id_queue = Queue(MAX_STREAM_PER_CONNECTION)
-        for i in range(MAX_STREAM_PER_CONNECTION):
-            self._id_queue.put_nowait(i)
-
         self._callbacks = {}
         self._push_watchers = defaultdict(set)
-        self.lock = RLock()
-        self.id_lock = Lock()
-
         self.deque = deque()
 
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect((self.host, self.port))
-        # self.setblocking(0)
 
         if self.sockopts:
             for args in self.sockopts:

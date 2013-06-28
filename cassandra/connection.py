@@ -1,7 +1,8 @@
 import errno
 from functools import wraps
 import logging
-from threading import Event
+from threading import Event, Lock, RLock
+from Queue import Queue
 
 from cassandra import ConsistencyLevel
 from cassandra.marshal import int8_unpack
@@ -87,10 +88,6 @@ class Connection(object):
     is_closed = False
     lock = None
 
-    @classmethod
-    def factory(cls, *args, **kwargs):
-        raise NotImplementedError()
-
     def __init__(self, host='127.0.0.1', port=9042, credentials=None, sockopts=None, compression=True, cql_version=None):
         self.host = host
         self.port = port
@@ -98,6 +95,13 @@ class Connection(object):
         self.sockopts = sockopts
         self.compression = compression
         self.cql_version = cql_version
+
+        self._id_queue = Queue(MAX_STREAM_PER_CONNECTION)
+        for i in range(MAX_STREAM_PER_CONNECTION):
+            self._id_queue.put_nowait(i)
+
+        self.lock = RLock()
+        self.id_lock = Lock()
 
     def close(self):
         raise NotImplementedError()
