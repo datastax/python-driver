@@ -1,13 +1,11 @@
 from base import benchmark
 
 import logging
-from collections import deque
 from itertools import count
 from threading import Event
 
 log = logging.getLogger(__name__)
 
-futures = deque()
 initial = object()
 
 def execute(session, query, values, num_queries):

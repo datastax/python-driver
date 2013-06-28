@@ -65,7 +65,7 @@ def teardown():
 def benchmark(run_fn):
     for conn_class in supported_reactors:
         setup()
-        log.info("Testing %s" % (conn_class.__name__,))
+        log.info("==== %s ====" % (conn_class.__name__,))
 
         cluster = Cluster(['127.0.0.1'])
         cluster.connection_class = conn_class
