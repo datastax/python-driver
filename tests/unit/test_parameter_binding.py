@@ -1,6 +1,6 @@
 import unittest
 
-from cassandra.query import bind_params, KeySequence
+from cassandra.query import bind_params, ValueSequence
 
 class ParamBindingTest(unittest.TestCase):
 
@@ -13,7 +13,7 @@ class ParamBindingTest(unittest.TestCase):
         self.assertEquals(result, "1 'a' 2.0")
 
     def test_sequence_param(self):
-        result = bind_params("%s", (KeySequence((1, "a", 2.0)),))
+        result = bind_params("%s", (ValueSequence((1, "a", 2.0)),))
         self.assertEquals(result, "( 1 , 'a' , 2.0 )")
 
     def test_generator_param(self):

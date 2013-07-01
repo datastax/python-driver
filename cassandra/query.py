@@ -5,10 +5,32 @@ from cassandra.decoder import (cql_encoders, cql_encode_object,
                                cql_encode_sequence)
 
 class Query(object):
+    """
+    An abstract class representing a single query. There are two subclasses:
+    :class:`.SimpleStatement` and :class:`.BoundStatement`.  These can
+    be passed to :meth:`.Session.execute()`.
+    """
 
     retry_policy = None
+    """
+    An instance of a :class:`cassandra.policies.RetryPolicy` or one of its
+    subclasses.  This controls when a query will be retried and how it
+    will be retried.
+    """
+
     tracing_enabled = False
+    """
+    A boolean flag that may be set to ``True`` to enable tracing on this
+    query only.
+
+    **Note**: query tracing is not yet supported by this driver
+    """
+
     consistency_level = ConsistencyLevel.ONE
+    """
+    The :class:`.ConsistencyLevel` to be used for this operation.  Defaults
+    to :attr:`.ConsistencyLevel.ONE`.
+    """
     _routing_key = None
 
     def __init__(self, retry_policy=None, tracing_enabled=False, consistency_level=ConsistencyLevel.ONE, routing_key=None):
@@ -22,16 +44,27 @@ class Query(object):
         return self._routing_key
 
     @routing_key.setter
-    def set_routing_key(self, value):
-        self._routing_key = "".join(struct.pack("HsB", len(component), component, 0)
-                                    for component in value)
+    def set_routing_key(self, *key_components):
+        if len(key_components) == 1:
+            self._routing_key = key_components[0]
+        else:
+            self._routing_key = "".join(struct.pack("HsB", len(component), component, 0)
+                                        for component in key_components)
 
 class SimpleStatement(Query):
+    """
+    A simple, un-prepared query.  All attributes of :class:`Query` apply
+    to this class as well.
+    """
 
     def __init__(self, query_string, *args, **kwargs):
+        """
+        `query_string` should be a literal CQL statement with the exception
+        of parameter placeholders that will be filled through the
+        `parameters` argument of :meth:`.Session.execute()`.
+        """
         Query.__init__(self, *args, **kwargs)
         self._query_string = query_string
-        self._routing_key = None
 
     @property
     def query_string(self):
@@ -39,6 +72,11 @@ class SimpleStatement(Query):
 
 
 class PreparedStatement(object):
+    """
+    A statement that has been prepared against at least one Cassandra node.
+    Instances of this class should not be created directly, but through
+    :meth:`.Session.prepare()`.
+    """
 
     column_metadata = None
     query_id = None
@@ -87,22 +125,49 @@ class PreparedStatement(object):
         return PreparedStatement(column_metadata, query_id, md5_id, routing_key_indexes, query, keyspace)
 
     def bind(self, values):
+        """
+        Creates and returns a :class:`BoundStatement` instance using `values`.
+        The `values` parameter *must* be a sequence, such as a tuple or list,
+        even if there is only one value to bind.
+        """
         return BoundStatement(self).bind(values)
 
 
 class BoundStatement(Query):
+    """
+    A prepared statement that has been bound to a particular set of values.
+    These may be created directly or through :meth:`.PreparedStatement.bind()`.
+
+    All attributes of :class:`Query` apply to this class as well.
+    """
 
     prepared_statement = None
+    """
+    The :class:`PreparedStatement` instance that this was created from.
+    """
+
     values = None
-    _routing_key = None
+    """
+    The sequence of values that were bound to the prepared statement.
+    """
 
     def __init__(self, prepared_statement, *args, **kwargs):
-        Query.__init__(self, *args, **kwargs)
-        self.prepared_statement = prepared_statement
+        """
+        `prepared_statement` should be an instance of :class:`PreparedStatement`.
+        All other ``*args`` and ``**kwargs`` will be passed to :class:`.Query`.
+        """
         self.consistency_level = prepared_statement.consistency_level
+        self.prepared_statement = prepared_statement
         self.values = []
 
+        Query.__init__(self, *args, **kwargs)
+
     def bind(self, values):
+        """
+        Binds a sequence of values for the prepared statement parameters
+        and returns this instance.  Note that `values` *must* be a
+        sequence, even if you are only binding one value.
+        """
         col_meta = self.prepared_statement.column_metadata
         if len(values) > len(col_meta):
             raise ValueError(
@@ -136,7 +201,20 @@ class BoundStatement(Query):
         return self._routing_key
 
 
-class KeySequence(object):
+class ValueSequence(object):
+    """
+    A wrapper class that is used to specify that a sequence of values should
+    be treated as a CQL list of values instead of a single column collection when used
+    as part of the `parameters` argument for :meth:`.Session.execute()`.
+
+    This is typically needed when supplying a list of keys to select.
+    For example::
+
+        >>> my_user_ids = ('alice', 'bob', 'charles')
+        >>> query = "SELECT * FROM users WHERE user_id IN ?"
+        >>> session.execute(query, parameters=[ValueSequence(my_user_ids)])
+
+    """
 
     def __init__(self, sequence):
         self.sequence = sequence

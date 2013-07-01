@@ -601,6 +601,8 @@ class Session(object):
         """
         if isinstance(query, basestring):
             query = SimpleStatement(query)
+        elif isinstance(query, PreparedStatement):
+            query = query.bind(parameters)
 
         if isinstance(query, BoundStatement):
             message = ExecuteMessage(
