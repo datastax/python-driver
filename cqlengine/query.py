@@ -1,6 +1,9 @@
 import copy
 from datetime import datetime
 from uuid import uuid4
+from hashlib import md5
+from time import time
+from uuid import uuid1
 from cqlengine import BaseContainerColumn, BaseValueManager, Map, columns
 
 from cqlengine.connection import connection_manager, execute, RowResult
@@ -545,8 +548,8 @@ class AbstractQuerySet(object):
 
             qs = ' '.join(qs)
 
-            cur = execute(qs, self._where_values())
-            return cur.fetchone()[0]
+            result = execute(qs, self._where_values(), row_factory=decoder.tuple_factory)
+            return result[0][0]
         else:
             return len(self._result_cache)
 
