@@ -153,9 +153,11 @@ class ConnectionPool(object):
             con = self.get()
             cur = con.cursor()
             cur.execute(query, params)
+            columns = [i[0] for i in cur.description or []]
+            results = [RowResult(r) for r in cur.fetchall()]
             LOG.debug('{} {}'.format(query, repr(params)))
             self.put(con)
-            return cur
+            return columns, results
         except cql.ProgrammingError as ex:
             raise CQLEngineException(unicode(ex))
         except TTransportException:
@@ -163,8 +165,10 @@ class ConnectionPool(object):
 
         raise CQLEngineException("Could not execute query against the cluster")
 
+
 def execute(query, params={}):
     return connection_pool.execute(query, params)
+
 
 @contextmanager
 def connection_manager():
