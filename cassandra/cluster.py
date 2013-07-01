@@ -1387,7 +1387,10 @@ class ResponseFuture(object):
                                         cb=self._execute_after_prepare)
                     return
                 else:
-                    self._set_final_exception(response)
+                    if hasattr(response, 'to_exception'):
+                        self._set_final_exception(response.to_exception())
+                    else:
+                        self._set_final_exception(response)
                     return
 
                 retry_type, consistency = retry

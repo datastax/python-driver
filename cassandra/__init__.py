@@ -89,8 +89,12 @@ class AlreadyExists(Exception):
         if table:
             message = "Table '%s.%s' already exists" % (keyspace, table)
         else:
-            message = "Keyspace '%s' already exists" % (table,)
+            message = "Keyspace '%s' already exists" % (keyspace,)
 
         Exception.__init__(self, message)
         self.keyspace = keyspace
         self.table = table
+
+
+class InvalidRequest(Exception):
+    pass

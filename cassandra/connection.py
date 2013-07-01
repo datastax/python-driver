@@ -8,7 +8,8 @@ from cassandra import ConsistencyLevel
 from cassandra.marshal import int8_unpack
 from cassandra.decoder import (ReadyMessage, AuthenticateMessage, OptionsMessage,
                                StartupMessage, ErrorMessage, CredentialsMessage,
-                               QueryMessage, ResultMessage, decode_response)
+                               QueryMessage, ResultMessage, decode_response,
+                               InvalidRequestException)
 
 
 log = logging.getLogger(__name__)
@@ -255,6 +256,9 @@ class Connection(object):
                 else:
                     raise self.defunct(ConnectionException(
                         "Problem while setting keyspace: %r" % (result,), self.host))
+            except InvalidRequestException, ire:
+                # the keyspace probably doesn't exist
+                raise ire.to_exception()
             except Exception, exc:
                 raise self.defunct(ConnectionException(
                     "Problem while setting keyspace: %r" % (exc,), self.host))
