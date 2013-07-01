@@ -4,7 +4,6 @@ from uuid import uuid1, uuid4
 import unittest
 
 from cassandra.cluster import Cluster
-from cassandra.query import ColumnCollection
 
 class TypeTests(unittest.TestCase):
 
@@ -57,9 +56,9 @@ class TypeTests(unittest.TestCase):
             1.25,  # float
             "1.2.3.4",  # inet
             12345,  # int
-            ColumnCollection(['a', 'b', 'c']),  # list<text> collection
-            ColumnCollection({1, 2, 3}),  # set<int> collection
-            ColumnCollection({'a': 1, 'b': 2}),  # map<text, int> collection
+            ['a', 'b', 'c'],  # list<text> collection
+            {1, 2, 3},  # set<int> collection
+            {'a': 1, 'b': 2},  # map<text, int> collection
             "text",  # text
             mydatetime,  # timestamp
             v4_uuid,  # uuid
