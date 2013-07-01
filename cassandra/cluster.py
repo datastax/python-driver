@@ -846,6 +846,7 @@ class ControlConnection(object):
         Creates a new Connection, registers for pushed events, and refreshes
         node/token and schema metadata.
         """
+        log.debug("[control connection] Opening new connection to %s" % (host,))
         connection = self._cluster._connection_factory(host.address)
 
         log.debug("[control connection] Established new connection, registering "
@@ -869,6 +870,7 @@ class ControlConnection(object):
         if self._is_shutdown:
             return
 
+        log.debug("[control connection] Attempting to reconnect")
         try:
             self._set_new_connection(self._reconnect_internal())
         except NoHostAvailable:
@@ -889,6 +891,9 @@ class ControlConnection(object):
                     self._get_and_set_reconnection_handler,
                     new_handler=None)
                 self._reconnection_handler.start()
+        except:
+            log.exception("[control connection] error reconnecting")
+            raise
 
     def _get_and_set_reconnection_handler(self, new_handler):
         """
@@ -1390,11 +1395,17 @@ class ResponseFuture(object):
                     self._query_retries += 1
                     self._retry(reuse_connection=True, consistency_level=consistency)
                 elif retry_type is RetryPolicy.RETHROW:
-                    self._set_final_exception(response)
+                    self._set_final_exception(response.to_exception())
                 else:  # IGNORE
                     self._set_final_result(None)
+            elif isinstance(response, ConnectionException):
+                self._connection.defunct(response)
+                self._retry(reuse_connection=False, consistency_level=None)
             elif isinstance(response, Exception):
-                self._set_final_exception(response)
+                if hasattr(response, 'to_exception'):
+                    self._set_final_exception(response.to_exception())
+                else:
+                    self._set_final_exception(response)
             else:
                 # we got some other kind of response message
                 msg = "Got unexpected message: %r" % (response,)

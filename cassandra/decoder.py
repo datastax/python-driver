@@ -24,7 +24,8 @@ try:
 except ImportError:
     from StringIO import StringIO  # ignore flake8 warning: # NOQA
 
-from cassandra import ConsistencyLevel
+from cassandra import (ConsistencyLevel, Unavailable, WriteTimeout, ReadTimeout,
+                       AlreadyExists)
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
                                int8_pack, int8_unpack)
 from cassandra.cqltypes import lookup_cqltype
@@ -67,17 +68,6 @@ def ordered_dict_factory(colnames, rows):
     return [OrderedDict(zip(colnames, row)) for row in rows]
 
 
-class PreparedResult:
-    def __init__(self, query_id, column_metadata):
-        self.query_id = query_id
-        self.column_metadata = column_metadata
-
-    def __str__(self):
-        return '<PreparedResult: query_id=%r, column_metadata=%r>' \
-               % (self.query_id, self.column_metadata)
-    __repr__ = __str__
-
-
 _message_types_by_name = {}
 _message_types_by_opcode = {}
 
@@ -86,6 +76,7 @@ class _register_msg_type(type):
         if not name.startswith('_'):
             _message_types_by_name[cls.name] = cls
             _message_types_by_opcode[cls.opcode] = cls
+
 
 class _MessageType(object):
     __metaclass__ = _register_msg_type
@@ -180,28 +171,38 @@ class ErrorMessage(_MessageType, Exception):
     def recv_error_info(f):
         pass
 
+    def to_exception(self):
+        return self
+
+
 class ErrorMessageSubclass(_register_msg_type):
     def __init__(cls, name, bases, dct):
         if cls.error_code is not None:
             error_classes[cls.error_code] = cls
 
+
 class ErrorMessageSub(ErrorMessage):
     __metaclass__ = ErrorMessageSubclass
     error_code = None
 
+
 class RequestExecutionException(ErrorMessageSub):
     pass
 
+
 class RequestValidationException(ErrorMessageSub):
     pass
+
 
 class ServerError(ErrorMessageSub):
     summary = 'Server error'
     error_code = 0x0000
 
+
 class ProtocolException(ErrorMessageSub):
     summary = 'Protocol error'
     error_code = 0x000A
+
 
 class UnavailableErrorMessage(RequestExecutionException):
     summary = 'Unavailable exception'
@@ -215,22 +216,26 @@ class UnavailableErrorMessage(RequestExecutionException):
             'alive_replicas': read_int(f),
         }
 
+    def to_exception(self):
+        return Unavailable(self.summary_msg(), **self.info)
+
+
 class OverloadedErrorMessage(RequestExecutionException):
     summary = 'Coordinator node overloaded'
     error_code = 0x1001
+
 
 class IsBootstrappingErrorMessage(RequestExecutionException):
     summary = 'Coordinator node is bootstrapping'
     error_code = 0x1002
 
+
 class TruncateError(RequestExecutionException):
     summary = 'Error during truncate'
     error_code = 0x1003
 
-class RequestTimeoutException(RequestExecutionException):
-    pass
 
-class WriteTimeoutErrorMessage(RequestTimeoutException):
+class WriteTimeoutErrorMessage(RequestExecutionException):
     summary = 'Timeout during write request'
     error_code = 0x1100
 
@@ -243,7 +248,11 @@ class WriteTimeoutErrorMessage(RequestTimeoutException):
             'write_type': read_string(f),
         }
 
-class ReadTimeoutErrorMessage(RequestTimeoutException):
+    def to_exception(self):
+        return WriteTimeout(self.summary_msg(), **self.info)
+
+
+class ReadTimeoutErrorMessage(RequestExecutionException):
     summary = 'Timeout during read request'
     error_code = 0x1200
 
@@ -256,21 +265,29 @@ class ReadTimeoutErrorMessage(RequestTimeoutException):
             'data_retrieved': bool(read_byte(f)),
         }
 
+    def to_exception(self):
+        return ReadTimeout(self.summary_msg(), **self.info)
+
+
 class SyntaxException(RequestValidationException):
     summary = 'Syntax error in CQL query'
     error_code = 0x2000
+
 
 class UnauthorizedErrorMessage(RequestValidationException):
     summary = 'Unauthorized'
     error_code = 0x2100
 
+
 class InvalidRequestException(RequestValidationException):
     summary = 'Invalid query'
     error_code = 0x2200
 
+
 class ConfigurationException(RequestValidationException):
     summary = 'Query invalid because of configuration issue'
     error_code = 0x2300
+
 
 class PreparedQueryNotFound(RequestValidationException):
     summary = 'Matching prepared statement not found on this node'
@@ -282,6 +299,7 @@ class PreparedQueryNotFound(RequestValidationException):
         read_short(f)
         return f.read(16)
 
+
 class AlreadyExistsException(ConfigurationException):
     summary = 'Item already exists'
     error_code = 0x2400
@@ -292,6 +310,10 @@ class AlreadyExistsException(ConfigurationException):
             'keyspace': read_string(f),
             'table': read_string(f),
         }
+
+    def to_exception(self):
+        return AlreadyExists(**self.info)
+
 
 class StartupMessage(_MessageType):
     opcode = 0x01
@@ -308,6 +330,7 @@ class StartupMessage(_MessageType):
         optmap['CQL_VERSION'] = self.cqlversion
         write_stringmap(f, optmap)
 
+
 class ReadyMessage(_MessageType):
     opcode = 0x02
     name = 'READY'
@@ -316,6 +339,7 @@ class ReadyMessage(_MessageType):
     @classmethod
     def recv_body(cls, f):
         return cls()
+
 
 class AuthenticateMessage(_MessageType):
     opcode = 0x03
@@ -326,6 +350,7 @@ class AuthenticateMessage(_MessageType):
     def recv_body(cls, f):
         authname = read_string(f)
         return cls(authenticator=authname)
+
 
 class CredentialsMessage(_MessageType):
     opcode = 0x04
@@ -338,6 +363,7 @@ class CredentialsMessage(_MessageType):
             write_string(f, credkey)
             write_string(f, credval)
 
+
 class OptionsMessage(_MessageType):
     opcode = 0x05
     name = 'OPTIONS'
@@ -345,6 +371,7 @@ class OptionsMessage(_MessageType):
 
     def send_body(self, f):
         pass
+
 
 class SupportedMessage(_MessageType):
     opcode = 0x06
@@ -357,6 +384,7 @@ class SupportedMessage(_MessageType):
         cql_versions = options.pop('CQL_VERSION')
         return cls(cql_versions=cql_versions, options=options)
 
+
 class QueryMessage(_MessageType):
     opcode = 0x07
     name = 'QUERY'
@@ -365,6 +393,7 @@ class QueryMessage(_MessageType):
     def send_body(self, f):
         write_longstring(f, self.query)
         write_consistency_level(f, self.consistency_level)
+
 
 class ResultMessage(_MessageType):
     opcode = 0x08
@@ -483,6 +512,7 @@ class ResultMessage(_MessageType):
     def recv_row(f, colcount):
         return [read_value(f) for x in xrange(colcount)]
 
+
 class PrepareMessage(_MessageType):
     opcode = 0x09
     name = 'PREPARE'
@@ -490,6 +520,7 @@ class PrepareMessage(_MessageType):
 
     def send_body(self, f):
         write_longstring(f, self.query)
+
 
 class ExecuteMessage(_MessageType):
     opcode = 0x0A
@@ -504,11 +535,13 @@ class ExecuteMessage(_MessageType):
             write_value(f, param)
         write_consistency_level(f, self.consistency_level)
 
+
 known_event_types = frozenset((
     'TOPOLOGY_CHANGE',
     'STATUS_CHANGE',
     'SCHEMA_CHANGE'
 ))
+
 
 class RegisterMessage(_MessageType):
     opcode = 0x0B
@@ -517,6 +550,7 @@ class RegisterMessage(_MessageType):
 
     def send_body(self, f):
         write_stringlist(f, self.event_list)
+
 
 class EventMessage(_MessageType):
     opcode = 0x0C
@@ -557,31 +591,40 @@ class EventMessage(_MessageType):
 def read_byte(f):
     return int8_unpack(f.read(1))
 
+
 def write_byte(f, b):
     f.write(int8_pack(b))
+
 
 def read_int(f):
     return int32_unpack(f.read(4))
 
+
 def write_int(f, i):
     f.write(int32_pack(i))
+
 
 def read_short(f):
     return uint16_unpack(f.read(2))
 
+
 def write_short(f, s):
     f.write(uint16_pack(s))
+
 
 def read_consistency_level(f):
     return ConsistencyLevel.value_to_name[read_short(f)]
 
+
 def write_consistency_level(f, cl):
     write_short(f, cl)
+
 
 def read_string(f):
     size = read_short(f)
     contents = f.read(size)
     return contents.decode('utf8')
+
 
 def write_string(f, s):
     if isinstance(s, unicode):
@@ -589,10 +632,12 @@ def write_string(f, s):
     write_short(f, len(s))
     f.write(s)
 
+
 def read_longstring(f):
     size = read_int(f)
     contents = f.read(size)
     return contents.decode('utf8')
+
 
 def write_longstring(f, s):
     if isinstance(s, unicode):
@@ -600,14 +645,17 @@ def write_longstring(f, s):
     write_int(f, len(s))
     f.write(s)
 
+
 def read_stringlist(f):
     numstrs = read_short(f)
     return [read_string(f) for x in xrange(numstrs)]
+
 
 def write_stringlist(f, stringlist):
     write_short(f, len(stringlist))
     for s in stringlist:
         write_string(f, s)
+
 
 def read_stringmap(f):
     numpairs = read_short(f)
@@ -617,11 +665,13 @@ def read_stringmap(f):
         strmap[k] = read_string(f)
     return strmap
 
+
 def write_stringmap(f, strmap):
     write_short(f, len(strmap))
     for k, v in strmap.items():
         write_string(f, k)
         write_string(f, v)
+
 
 def read_stringmultimap(f):
     numkeys = read_short(f)
@@ -631,11 +681,13 @@ def read_stringmultimap(f):
         strmmap[k] = read_stringlist(f)
     return strmmap
 
+
 def write_stringmultimap(f, strmmap):
     write_short(f, len(strmmap))
     for k, v in strmmap.items():
         write_string(f, k)
         write_stringlist(f, v)
+
 
 def read_value(f):
     size = read_int(f)
@@ -643,12 +695,14 @@ def read_value(f):
         return None
     return f.read(size)
 
+
 def write_value(f, v):
     if v is None:
         write_int(f, -1)
     else:
         write_int(f, len(v))
         f.write(v)
+
 
 def read_inet(f):
     size = read_byte(f)
@@ -661,6 +715,7 @@ def read_inet(f):
     else:
         raise InternalError("bad inet address: %r" % (addrbytes,))
     return (socket.inet_ntop(addrfam, addrbytes), port)
+
 
 def write_inet(f, addrtuple):
     addr, port = addrtuple
@@ -698,19 +753,24 @@ def cql_encode_str(val):
 def cql_encode_object(val):
     return str(val)
 
+
 def cql_encode_datetime(val):
     return "'%s'" % val.strftime('%Y-%m-%d %H:%M:%S-0000')
 
+
 def cql_encode_date(val):
     return "'%s'" % val.strftime('%Y-%m-%d-0000')
+
 
 def cql_encode_sequence(val):
     return '( %s )' % ' , '.join(cql_encoders.get(type(v), cql_encode_object)(v)
                                  for v in val)
 
+
 def cql_encode_map_collection(val):
     return '{ %s }' % ' , '.join('%s : %s' % (cql_quote(k), cql_quote(v))
                                  for k, v in val.iteritems())
+
 
 def cql_encode_list_collection(val):
     return '[ %s ]' % ' , '.join(map(cql_quote, val))
@@ -718,6 +778,7 @@ def cql_encode_list_collection(val):
 
 def cql_encode_set_collection(val):
     return '{ %s }' % ' , '.join(map(cql_quote, val))
+
 
 cql_encoders = {
     float: cql_encode_object,
