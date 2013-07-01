@@ -156,7 +156,8 @@ def execute(query, params={}):
 
 @contextmanager
 def connection_manager():
+    """ :rtype: ConnectionPool """
     global connection_pool
-    tmp = connection_pool.get()
-    yield tmp
-    connection_pool.put(tmp)
+    # tmp = connection_pool.get()
+    yield connection_pool
+    # connection_pool.put(tmp)
