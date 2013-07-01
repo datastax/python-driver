@@ -410,6 +410,7 @@ class Cluster(object):
 
     def add_host(self, address, signal):
         """ Internal method """
+        log.info("Now considering host %s for new connections", address)
         new_host = self.metadata.add_host(address)
         if new_host and signal:
             self.on_add(new_host)
@@ -417,6 +418,7 @@ class Cluster(object):
 
     def remove_host(self, host):
         """ Internal method """
+        log.info("Host %s will no longer be considered for new connections", host)
         if host and self.metadata.remove_host(host):
             self.on_remove(host)
 
