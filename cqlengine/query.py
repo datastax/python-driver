@@ -1,9 +1,6 @@
-from collections import namedtuple
 import copy
 from datetime import datetime
-from hashlib import md5
-from time import time
-from uuid import uuid1
+from uuid import uuid4
 from cqlengine import BaseContainerColumn, BaseValueManager, Map, columns
 
 from cqlengine.connection import connection_pool, connection_manager, execute
@@ -122,7 +119,7 @@ class EqualsOperator(QueryOperator):
 class IterableQueryValue(QueryValue):
     def __init__(self, value):
         try:
-            super(IterableQueryValue, self).__init__(value, [uuid1().hex for i in value])
+            super(IterableQueryValue, self).__init__(value, [uuid4().hex for i in value])
         except TypeError:
             raise QueryException("in operator arguments must be iterable, {} found".format(value))
 
@@ -804,7 +801,7 @@ class DMLQuery(object):
 
         #construct query string
         field_names = zip(*value_pairs)[0]
-        field_ids = {n:uuid1().hex for n in field_names}
+        field_ids = {n:uuid4().hex for n in field_names}
         field_values = dict(value_pairs)
         query_values = {field_ids[n]:field_values[n] for n in field_names}
 
@@ -878,7 +875,7 @@ class DMLQuery(object):
             qs += ['WHERE']
             where_statements = []
             for name, col in self.model._primary_keys.items():
-                field_id = uuid1().hex
+                field_id = uuid4().hex
                 query_values[field_id] = field_values[name]
                 where_statements += ['"{}" = :{}'.format(col.db_field_name, field_id)]
             qs += [' AND '.join(where_statements)]
@@ -899,7 +896,7 @@ class DMLQuery(object):
         qs += ['WHERE']
         where_statements = []
         for name, col in self.model._primary_keys.items():
-            field_id = uuid1().hex
+            field_id = uuid4().hex
             field_values[field_id] = col.to_database(getattr(self.instance, name))
             where_statements += ['"{}" = :{}'.format(col.db_field_name, field_id)]
 
