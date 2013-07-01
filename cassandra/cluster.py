@@ -870,6 +870,9 @@ class ControlConnection(object):
         if self._is_shutdown:
             return
 
+        self._cluster.executor.submit(self._reconnect)
+
+    def _reconnect(self):
         log.debug("[control connection] Attempting to reconnect")
         try:
             self._set_new_connection(self._reconnect_internal())
