@@ -1,6 +1,7 @@
 import logging
 import time
 from threading import Lock, RLock, Condition
+import traceback
 import weakref
 
 from connection import MAX_STREAM_PER_CONNECTION, ConnectionException
@@ -161,7 +162,8 @@ class _HostReconnectionHandler(_ReconnectionHandler):
         if isinstance(exc, AuthenticationException):
             return False
         else:
-            log.exception("Error attempting to reconnect to %s" % (self.host,))
+            log.warn("Error attempting to reconnect to %s: %s", self.host, exc)
+            log.debug(traceback.format_exc(exc))
             return True
 
 
@@ -187,7 +189,11 @@ class HealthMonitor(object):
             self._listeners.remove(listener)
 
     def set_up(self):
+        if self.is_up:
+            return
+
         self._conviction_policy.reset()
+        log.info("Host %s is considered up", self._host)
 
         with self._lock:
             listeners = self._listeners.copy()
@@ -198,7 +204,11 @@ class HealthMonitor(object):
         self.is_up = True
 
     def set_down(self):
+        if not self.is_up:
+            return
+
         self.is_up = False
+        log.info("Host %s is considered down", self._host)
 
         with self._lock:
             listeners = self._listeners.copy()
