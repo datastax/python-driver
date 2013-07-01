@@ -247,7 +247,7 @@ class HostConnectionPool(object):
         self._conn_available_condition = Condition()
 
         core_conns = session.cluster.get_core_connections_per_host(host_distance)
-        self._connections = [session.cluster._connection_factory(host.address)
+        self._connections = [session.cluster.connection_factory(host.address)
                              for i in range(core_conns)]
         self._trash = set()
         self.open_count = core_conns
@@ -339,7 +339,7 @@ class HostConnectionPool(object):
             self.open_count += 1
 
         try:
-            conn = self._session.cluster._connection_factory(self.host.address)
+            conn = self._session.cluster.connection_factory(self.host.address)
             with self._lock:
                 new_connections = self._connections[:] + [conn]
                 self._connections = new_connections

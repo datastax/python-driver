@@ -63,6 +63,8 @@ class NoHostAvailable(Exception):
 class Cluster(object):
     """
     The main class to use when interacting with a Cassandra cluster.
+    Typically, one instance of this class will be created for each
+    separate Cassandra cluster that your application interacts with.
 
     Example usage::
 
@@ -95,29 +97,29 @@ class Cluster(object):
     load_balancing_policy_factory = RoundRobinPolicy
     """
     A factory function which creates instances of subclasses of
-    :cls:`policies.LoadBalancingPolicy`.  Defaults to
-    :cls:`policies.RoundRobinPolicy`.
+    :class:`policies.LoadBalancingPolicy`.  Defaults to
+    :class:`policies.RoundRobinPolicy`.
     """
 
     reconnection_policy = ExponentialReconnectionPolicy(1.0, 600.0)
     """
-    An instance of :cls:`policies.ReconnectionPolicy`. Defaults to an instance
-    of :cls:`ExponentialReconnectionPolicy` with a base delay of one second and
+    An instance of :class:`policies.ReconnectionPolicy`. Defaults to an instance
+    of :class:`ExponentialReconnectionPolicy` with a base delay of one second and
     a max delay of ten minutes.
     """
 
     retry_policy_factory = RetryPolicy
     """
     A factory function which creates instances of
-    :cls:`policies.RetryPolicy`.  Defaults to
-    :cls:`policies.RetryPolicy`.
+    :class:`policies.RetryPolicy`.  Defaults to
+    :class:`policies.RetryPolicy`.
     """
 
     conviction_policy_factory = SimpleConvictionPolicy
     """
     A factory function which creates instances of
-    :cls:`policies.ConvictionPolicy`.  Defaults to
-    :cls:`policies.SimpleConvictionPolicy`.
+    :class:`policies.ConvictionPolicy`.  Defaults to
+    :class:`policies.SimpleConvictionPolicy`.
     """
 
     metrics_enabled = False
@@ -127,7 +129,7 @@ class Cluster(object):
 
     sockopts = None
     """
-    An optional list of tuples which will be used as *args to
+    An optional list of tuples which will be used as arguments to
     ``socket.setsockopt()`` for all created sockets.
     """
 
@@ -139,7 +141,7 @@ class Cluster(object):
 
     metadata = None
     """
-    An instance of :cls:`cassandra.metadata.Metadata`.
+    An instance of :class:`cassandra.metadata.Metadata`.
     """
 
     connection_class = AsyncoreConnection
@@ -151,7 +153,7 @@ class Cluster(object):
 
     By default, ``AsyncoreConnection`` will be used, which uses
     the ``asyncore`` module in the Python standard library.  The
-    performance slightly worse than with ``pyev``, but it is
+    performance is slightly worse than with ``pyev``, but it is
     supported on a wider range of systems.
     """
 
@@ -176,6 +178,10 @@ class Cluster(object):
                  sockopts=None,
                  executor_threads=2,
                  max_schema_agreement_wait=10):
+        """
+        Any of the mutable Cluster attributes may be set as keyword arguments
+        to the constructor.
+        """
 
         self.contact_points = contact_points
         self.port = port
@@ -275,7 +281,11 @@ class Cluster(object):
     def set_max_connections_per_host(self, host_distance, max_connections):
         self._max_connections_per_host[host_distance] = max_connections
 
-    def _connection_factory(self, address, *args, **kwargs):
+    def connection_factory(self, address, *args, **kwargs):
+        """
+        Called to create a new connection with proper configuration.
+        Intended for internal use only.
+        """
         if self.auth_provider:
             kwargs['credentials'] = self.auth_provider(address)
 
@@ -295,7 +305,7 @@ class Cluster(object):
 
     def connect(self, keyspace=None):
         """
-        Creates and returns a new :cls:`~.Session` object.  If `keyspace`
+        Creates and returns a new :class:`~.Session` object.  If `keyspace`
         is specified, that keyspace will be the default keyspace for
         operations on the ``Session``.
         """
@@ -361,19 +371,25 @@ class Cluster(object):
         return session
 
     def on_up(self, host):
-        """ Internal method """
+        """
+        Called when a host is marked up by its :class:`~.HealthMonitor`.
+        Intended for internal use only.
+        """
         reconnector = host.get_and_set_reconnection_handler(None)
         if reconnector:
             reconnector.cancel()
 
-        self.prepare_all_queries(host)
+        self._prepare_all_queries(host)
 
         self.control_connection.on_up(host)
         for session in self.sessions:
             session.on_up(host)
 
     def on_down(self, host):
-        """ Internal method """
+        """
+        Called when a host is marked down by its :class:`~.HealthMonitor`.
+        Intended for internal use only.
+        """
         self.control_connection.on_down(host)
         for session in self.sessions:
             session.on_down(host)
@@ -395,32 +411,32 @@ class Cluster(object):
 
         reconnector.start()
 
-    def on_add(self, host):
-        """ Internal method """
-        self.prepare_all_queries(host)
-        self.control_connection.on_add(host)
-        for session in self.sessions:  # TODO need to copy/lock?
-            session.on_add(host)
-
-    def on_remove(self, host):
-        """ Internal method """
-        self.control_connection.on_remove(host)
-        for session in self.sessions:
-            session.on_remove(host)
-
     def add_host(self, address, signal):
-        """ Internal method """
+        """
+        Called when adding initial contact points and when the control
+        connection subsequently discovers a new node.  Intended for internal
+        use only.
+        """
         log.info("Now considering host %s for new connections", address)
         new_host = self.metadata.add_host(address)
         if new_host and signal:
-            self.on_add(new_host)
+            self._prepare_all_queries(new_host)
+            self.control_connection.on_add(new_host)
+            for session in self.sessions:  # TODO need to copy/lock?
+                session.on_add(new_host)
+
         return new_host
 
     def remove_host(self, host):
-        """ Internal method """
+        """
+        Called when the control connection observes that a node has left the
+        ring.  Intended for internal use only.
+        """
         log.info("Host %s will no longer be considered for new connections", host)
         if host and self.metadata.remove_host(host):
-            self.on_remove(host)
+            self.control_connection.on_remove(host)
+            for session in self.sessions:
+                session.on_remove(host)
 
     def ensure_core_connections(self):
         """
@@ -440,13 +456,13 @@ class Cluster(object):
         return self.executor.submit(
             self.control_connection.refresh_schema, keyspace, table)
 
-    def prepare_all_queries(self, host):
+    def _prepare_all_queries(self, host):
         if not self._prepared_statements:
             return
 
         log.debug("Preparing all known prepared statements against host %s" % (host,))
         try:
-            connection = self._connection_factory(host.address)
+            connection = self.connection_factory(host.address)
             try:
                 self.control_connection.wait_for_schema_agreement(connection)
             except:
@@ -477,7 +493,6 @@ class Cluster(object):
             log.exception("Error trying to prepare all statements on host %s" % (host,))
 
     def prepare_on_all_sessions(self, md5_id, prepared_statement, excluded_host):
-        """ Internal """
         self._prepared_statements[md5_id] = prepared_statement
         for session in self.sessions:
             session.prepare_on_all_hosts(prepared_statement.query_string, excluded_host)
@@ -487,7 +502,7 @@ class Session(object):
     """
     A collection of connection pools for each host in the cluster.
     Instances of this class should not be created directly, only
-    using :meth:`~.Cluster.connect()`.
+    using :meth:`.Cluster.connect()`.
 
     Queries and statements can be executed through ``Session`` instances
     using the :meth:`~.Session.execute()` and :meth:`~.Session.execute_async()`
@@ -542,18 +557,18 @@ class Session(object):
         If an error is encountered while executing the query, an Exception
         will be raised.
 
-        `query` may be a query string or an instance of :cls:`cassandra.query.Query`.
+        `query` may be a query string or an instance of :class:`cassandra.query.Query`.
 
         `parameters` may be a sequence or dict of parameters to bind.  If a
-        sequence is used, '%s' should be used the placeholder for each
-        argument.  If a dict is used, '%(name)s' style placeholders must
+        sequence is used, ``%s`` should be used the placeholder for each
+        argument.  If a dict is used, ``%(name)s`` style placeholders must
         be used.
         """
         return self.execute_async(query, parameters).result()
 
     def execute_async(self, query, parameters=None):
         """
-        Execute the given query and return a :cls:`~.ResponseFuture` object
+        Execute the given query and return a :class:`~.ResponseFuture` object
         which callbacks may be attached to for asynchronous response
         delivery.  You may also call :meth:`~.ResponseFuture.result()`
         on the ``ResponseFuture`` to syncronously block for results at
@@ -563,26 +578,25 @@ class Session(object):
 
             >>> session = cluster.connect()
             >>> future = session.execute_async("SELECT * FROM mycf")
-            >>>
-            >>> def print_results(results):
+
+            >>> def log_results(results):
             ...     for row in results:
-            ...         print row
-            >>>
-            >>> def handle_error(exc):
-            >>>     print exc
-            >>>
-            >>> future.add_callbacks(print_results, handle_error)
+            ...         log.info("Results: %s", row)
+
+            >>> def log_error(exc):
+            >>>     log.error("Operation failed: %s", exc)
+
+            >>> future.add_callbacks(log_results, log_error)
 
         Async execution with blocking wait for results::
 
             >>> future = session.execute_async("SELECT * FROM mycf")
-            >>>
             >>> # do other stuff...
-            >>>
+
             >>> try:
             ...     results = future.result()
             ... except:
-            ...     print "operation failed!"
+            ...     log.exception("Operation failed:")
 
         """
         if isinstance(query, basestring):
@@ -609,6 +623,16 @@ class Session(object):
         return future
 
     def prepare(self, query):
+        """
+        Prepares a query string, returing a :class:`~cassandra.query.PreparedStatement`
+        instance which can be used as follows::
+
+            >>> session = cluster.connect("mykeyspace")
+            >>> query = "INSERT INTO users (id, name, age) VALUES (?, ?, ?)"
+            >>> prepared = session.prepare(query)
+            >>> session.execute(prepared.bind((user.id, user.name, user.age)))
+
+        """
         message = PrepareMessage(query=query)
         future = ResponseFuture(self, message, query=None)
         try:
@@ -630,7 +654,10 @@ class Session(object):
         return prepared_statement
 
     def prepare_on_all_hosts(self, query, excluded_host):
-        """ Internal """
+        """
+        Prepare the given query on all hosts, excluding ``excluded_host``.
+        Intended for internal use only.
+        """
         for host, pool in self._pools.items():
             if host != excluded_host:
                 future = ResponseFuture(self, PrepareMessage(query=query), None)
@@ -693,14 +720,20 @@ class Session(object):
             return previous
 
     def on_up(self, host):
-        """ Internal """
+        """
+        Called by the parent Cluster instance when a host's :class:`HealthMonitor`
+        marks it up.  Only intended for internal use.
+        """
         previous_pool = self.add_host(host)
         self._load_balancer.on_up(host)
         if previous_pool:
             previous_pool.shutdown()
 
     def on_down(self, host):
-        """ Internal """
+        """
+        Called by the parent Cluster instance when a host's :class:`HealthMonitor`
+        marks it down.  Only intended for internal use.
+        """
         self._load_balancer.on_down(host)
         pool = self._pools.pop(host, None)
         if pool:
@@ -849,7 +882,7 @@ class ControlConnection(object):
         node/token and schema metadata.
         """
         log.debug("[control connection] Opening new connection to %s" % (host,))
-        connection = self._cluster._connection_factory(host.address)
+        connection = self._cluster.connection_factory(host.address)
 
         log.debug("[control connection] Established new connection, registering "
                   "watchers and refreshing schema and topology")
@@ -1212,37 +1245,13 @@ _NO_RESULT_YET = object()
 class ResponseFuture(object):
     """
     An asynchronous response delivery mechanism that is returned from calls
-    to :meth:`~.Session.execute_async()`.
+    to :meth:`.Session.execute_async()`.
 
     There are two ways for results to be delivered:
-     - Asynchronously, by attaching callback and errback functions
-     - Synchronously, by calling :meth:`~.ResponseFuture.result()`
-
-    Callback and errback example::
-
-        >>> session = cluster.connect()
-        >>> future = session.execute_async("SELECT * FROM mycf")
-        >>>
-        >>> def print_results(results):
-        ...     for row in results:
-        ...         print row
-        >>>
-        >>> def handle_error(exc):
-        >>>     print exc
-        >>>
-        >>> future.add_callbacks(print_results, handle_error)
-
-    Example of using ``result()`` to synchronously wait for results::
-
-        >>> future = session.execute_async("SELECT * FROM mycf")
-        >>>
-        >>> # do other stuff...
-        >>>
-        >>> try:
-        ...     results = future.result()
-        ... except:
-        ...     print "operation failed!"
-
+     - Synchronously, by calling :meth:`.result()`
+     - Asynchronously, by attaching callback and errback functions via
+       :meth:`.add_callback()`, :meth:`.add_errback()`, and
+       :meth:`.add_callbacks()`.
     """
     session = None
     row_factory = None
@@ -1488,6 +1497,19 @@ class ResponseFuture(object):
         Return the final result or raise an Exception if errors were
         encountered.  If the final result or error has not been set
         yet, this method will block until that time.
+
+        Example usage::
+
+            >>> future = session.execute_async("SELECT * FROM mycf")
+            >>> # do other stuff...
+
+            >>> try:
+            ...     rows = future.result()
+            ...     for row in rows:
+            ...         ... # process results
+            ... except:
+            ...     log.exception("Operation failed:")
+
         """
         if self._final_result is not _NO_RESULT_YET:
             return self._final_result
@@ -1511,11 +1533,24 @@ class ResponseFuture(object):
         through as additional positional or keyword arguments to `fn`.
 
         If an error is hit while executing the operation, a callback attached
-        here will not be called.  Use ``add_errback`` or ``add_callbacks``
+        here will not be called.  Use :meth:`.add_errback()` or :meth:`add_callbacks()`
         if you wish to handle that case.
 
         If the final result has already been seen when this method is called,
         the callback will be called immediately (before this method returns).
+
+        Usage example::
+
+            >>> session = cluster.connect("mykeyspace")
+
+            >>> def handle_results(rows, start_time, should_log=False):
+            ...     if should_log:
+            ...         log.info("Total time: %f", time.time() - start_time)
+            ...     ...
+
+            >>> future = session.execute_async("SELECT * FROM users")
+            >>> future.add_callback(handle_results, time.time(), should_log=True)
+
         """
         if self._final_result is not _NO_RESULT_YET:
             fn(self._final_result, *args, **kwargs)
@@ -1525,7 +1560,7 @@ class ResponseFuture(object):
 
     def add_errback(self, fn, *args, **kwargs):
         """
-        Like :meth:`~.ResultFuture.add_callback()`, but handles error cases.
+        Like :meth:`.add_callback()`, but handles error cases.
         An Exception instance will be passed as the first positional argument
         to `fn`.
         """
@@ -1539,8 +1574,26 @@ class ResponseFuture(object):
                       callback_args=(), callback_kwargs=None,
                       errback_args=(), errback_kwargs=None):
         """
-        A convenient combination of :meth:`~.ResultFuture.add_callback()` and
-        :meth:`~.ResultFuture.add_errback()``.
+        A convenient combination of :meth:`.add_callback()` and
+        :meth:`.add_errback()`.
+
+        Example usage::
+
+            >>> session = cluster.connect()
+            >>> query = "SELECT * FROM mycf"
+            >>> future = session.execute_async(query)
+
+            >>> def log_results(results, level='debug'):
+            ...     for row in results:
+            ...         log.log(level, "Result: %s", row)
+
+            >>> def log_error(exc, query):
+            ...     log.error("Query '%s' failed: %s", query, exc)
+
+            >>> future.add_callbacks(
+            ...     callback=log_results, callback_kwargs={'level': 'info'},
+            ...     errback=log_error, errback_args=(query,))
+
         """
         self.add_callback(callback, *callback_args, **(callback_kwargs or {}))
         self.add_errback(errback, *errback_args, **(errback_kwargs or {}))

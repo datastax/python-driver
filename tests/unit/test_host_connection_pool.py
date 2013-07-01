@@ -20,10 +20,10 @@ class HostConnectionPoolTests(unittest.TestCase):
         host = Mock(spec=Host, address='ip1')
         session = self.make_session()
         conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=False)
-        session.cluster._connection_factory.return_value = conn
+        session.cluster.connection_factory.return_value = conn
 
         pool = HostConnectionPool(host, HostDistance.LOCAL, session)
-        session.cluster._connection_factory.assert_called_once_with(host.address)
+        session.cluster.connection_factory.assert_called_once_with(host.address)
 
         c = pool.borrow_connection(timeout=0.01)
         self.assertIs(c, conn)
@@ -38,10 +38,10 @@ class HostConnectionPoolTests(unittest.TestCase):
         host = Mock(spec=Host, address='ip1')
         session = self.make_session()
         conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=False)
-        session.cluster._connection_factory.return_value = conn
+        session.cluster.connection_factory.return_value = conn
 
         pool = HostConnectionPool(host, HostDistance.LOCAL, session)
-        session.cluster._connection_factory.assert_called_once_with(host.address)
+        session.cluster.connection_factory.assert_called_once_with(host.address)
 
         pool.borrow_connection(timeout=0.01)
         self.assertEqual(1, conn.in_flight)
@@ -56,10 +56,10 @@ class HostConnectionPoolTests(unittest.TestCase):
         host = Mock(spec=Host, address='ip1')
         session = self.make_session()
         conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=False)
-        session.cluster._connection_factory.return_value = conn
+        session.cluster.connection_factory.return_value = conn
 
         pool = HostConnectionPool(host, HostDistance.LOCAL, session)
-        session.cluster._connection_factory.assert_called_once_with(host.address)
+        session.cluster.connection_factory.assert_called_once_with(host.address)
 
         pool.borrow_connection(timeout=0.01)
         self.assertEqual(1, conn.in_flight)
@@ -80,7 +80,7 @@ class HostConnectionPoolTests(unittest.TestCase):
         host = Mock(spec=Host, address='ip1')
         session = self.make_session()
         conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=False)
-        session.cluster._connection_factory.return_value = conn
+        session.cluster.connection_factory.return_value = conn
         session.cluster.get_core_connections_per_host.return_value = 1
 
         # manipulate the core connection setting so that we can
@@ -121,13 +121,13 @@ class HostConnectionPoolTests(unittest.TestCase):
         host = Mock(spec=Host, address='ip1')
         session = self.make_session()
         conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=False)
-        session.cluster._connection_factory.return_value = conn
+        session.cluster.connection_factory.return_value = conn
 
         # core conns = 1, max conns = 2
         session.cluster.get_max_connections_per_host.return_value = 2
 
         pool = HostConnectionPool(host, HostDistance.LOCAL, session)
-        session.cluster._connection_factory.assert_called_once_with(host.address)
+        session.cluster.connection_factory.assert_called_once_with(host.address)
 
         pool.borrow_connection(timeout=0.01)
         self.assertEqual(1, conn.in_flight)
@@ -145,10 +145,10 @@ class HostConnectionPoolTests(unittest.TestCase):
         host = Mock(spec=Host, address='ip1')
         session = self.make_session()
         conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=False)
-        session.cluster._connection_factory.return_value = conn
+        session.cluster.connection_factory.return_value = conn
 
         pool = HostConnectionPool(host, HostDistance.LOCAL, session)
-        session.cluster._connection_factory.assert_called_once_with(host.address)
+        session.cluster.connection_factory.assert_called_once_with(host.address)
 
         pool.borrow_connection(timeout=0.01)
         conn.is_defunct = True
@@ -165,10 +165,10 @@ class HostConnectionPoolTests(unittest.TestCase):
         host.monitor = Mock(spec=HealthMonitor)
         session = self.make_session()
         conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=False)
-        session.cluster._connection_factory.return_value = conn
+        session.cluster.connection_factory.return_value = conn
 
         pool = HostConnectionPool(host, HostDistance.LOCAL, session)
-        session.cluster._connection_factory.assert_called_once_with(host.address)
+        session.cluster.connection_factory.assert_called_once_with(host.address)
 
         pool.borrow_connection(timeout=0.01)
         conn.is_defunct = True
@@ -185,10 +185,10 @@ class HostConnectionPoolTests(unittest.TestCase):
         host = Mock(spec=Host, address='ip1')
         session = self.make_session()
         conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=True)
-        session.cluster._connection_factory.return_value = conn
+        session.cluster.connection_factory.return_value = conn
 
         pool = HostConnectionPool(host, HostDistance.LOCAL, session)
-        session.cluster._connection_factory.assert_called_once_with(host.address)
+        session.cluster.connection_factory.assert_called_once_with(host.address)
 
         pool.borrow_connection(timeout=0.01)
         conn.is_closed = True

@@ -6,3 +6,4 @@ MANIFEST
 dist
 .coverage
 cover/
+docs/_build/

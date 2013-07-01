@@ -3,15 +3,51 @@ __version__ = '.'.join(map(str, __version_info__))
 
 
 class ConsistencyLevel(object):
+    """
+    Spcifies how many replicas must respond for an operation to be considered
+    a success.  By default, ``ONE`` is used for all operations.
+    """
 
     ANY = 0
+    """
+    Only requires that one replica receives the write *or* the coordinator
+    stores a hint to replay later. Valid only for writes.
+    """
+
     ONE = 1
+    """
+    Only one replica needs to respond to consider the operation a success
+    """
+
     TWO = 2
+    """
+    Two replicas must respond to consider the operation a success
+    """
+
     THREE = 3
+    """
+    Three replicas must respond to consider the operation a success
+    """
+
     QUORUM = 4
+    """
+    ``ceil(RF/2)`` replicas must respond to consider the operation a success
+    """
+
     ALL = 5
+    """
+    All replicas must respond to consider the operation a success
+    """
+
     LOCAL_QUORUM = 6
+    """
+    Requires a quorum of replicas in the local datacenter
+    """
+
     EACH_QUORUM = 7
+    """
+    Requires a quorum of replicas in each datacenter
+    """
 
 ConsistencyLevel.value_to_name = {
     ConsistencyLevel.ANY: 'ANY',
@@ -37,10 +73,20 @@ ConsistencyLevel.name_to_value = {
 
 
 class Unavailable(Exception):
+    """
+    There were not enough live replicas to satisfy the requested consistency
+    level, so the coordinator node immediately failed the request without
+    forwarding it to any replicas.
+    """
 
     consistency = None
+    """ The requested :class:`ConsistencyLevel` """
+
     required_replicas = None
+    """ The number of replicas that needed to be live to complete the operation """
+
     alive_replicas = None
+    """ The number of replicas that were actually alive """
 
     def __init__(self, message, consistency=None, required_replicas=None, alive_replicas=None):
         Exception.__init__(self, message)
@@ -50,10 +96,21 @@ class Unavailable(Exception):
 
 
 class Timeout(Exception):
+    """
+    Replicas failed to respond to the coordinator node before timing out.
+    """
 
     consistency = None
+    """ The requested :class:`ConsistencyLevel` """
+
     required_responses = None
+    """ The number of required replica responses """
+
     received_responses = None
+    """
+    The number of replicas that responded before the coordinator timed out
+    the operation
+    """
 
     def __init__(self, message, consistency=None, required_responses=None, received_responses=None):
         Exception.__init__(self, message)
@@ -63,8 +120,16 @@ class Timeout(Exception):
 
 
 class ReadTimeout(Timeout):
+    """
+    A subclass of :exc:`Timeout` for read operations.
+    """
 
     data_retrieved = None
+    """
+    A boolean indicating whether the requested data was retrieved
+    by the coordinator from any replicas before it timed out the
+    operation
+    """
 
     def __init__(self, message, data_retrieved=None, **kwargs):
         Timeout.__init__(self, message, **kwargs)
@@ -72,8 +137,14 @@ class ReadTimeout(Timeout):
 
 
 class WriteTimeout(Timeout):
+    """
+    A subclass of :exc:`Timeout` for write operations.
+    """
 
     write_type = None
+    """
+    The type of write operation, enum on :class:`~cassandra.policies.WriteType`
+    """
 
     def __init__(self, message, write_type=None, **kwargs):
         Timeout.__init__(self, message, **kwargs)
