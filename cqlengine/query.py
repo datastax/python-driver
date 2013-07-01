@@ -3,7 +3,7 @@ from datetime import datetime
 from uuid import uuid4
 from cqlengine import BaseContainerColumn, BaseValueManager, Map, columns
 
-from cqlengine.connection import connection_pool, connection_manager, execute
+from cqlengine.connection import connection_manager, execute, RowResult
 
 from cqlengine.exceptions import CQLEngineException
 from cqlengine.functions import QueryValue, Token
@@ -353,11 +353,8 @@ class AbstractQuerySet(object):
         if self._batch:
             raise CQLEngineException("Only inserts, updates, and deletes are available in batch mode")
         if self._result_cache is None:
-            self._cur = execute(self._select_query(), self._where_values())
-            self._result_cache = [None]*self._cur.rowcount
-            if self._cur.description:
-                names = [i[0] for i in self._cur.description]
-                self._construct_result = self._create_result_constructor(names)
+            columns, self._result_cache = execute(self._select_query(), self._where_values())
+            self._construct_result = self._create_result_constructor(columns)
 
     def _fill_result_cache_to_idx(self, idx):
         self._execute_query()
@@ -368,7 +365,9 @@ class AbstractQuerySet(object):
         if qty < 1:
             return
         else:
-            for values in self._cur.fetchmany(qty):
+            start = max(0, self._result_idx)
+            stop = start + qty
+            for values in self._result_cache[start:stop]:
                 self._result_idx += 1
                 self._result_cache[self._result_idx] = self._construct_result(values)
 
@@ -382,7 +381,7 @@ class AbstractQuerySet(object):
 
         for idx in range(len(self._result_cache)):
             instance = self._result_cache[idx]
-            if instance is None:
+            if isinstance(instance, RowResult):
                 self._fill_result_cache_to_idx(idx)
             yield self._result_cache[idx]
 
@@ -716,7 +715,6 @@ class ModelQuerySet(AbstractQuerySet):
                 return instance
             return _construct_instance
 
-        columns = [model._columns[db_map[name]] for name in names]
         if self._flat_values_list:
             return (lambda values: columns[0].to_python(values[0]))
         else:

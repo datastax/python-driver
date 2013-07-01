@@ -40,10 +40,12 @@ def create_keyspace(name, strategy_class='SimpleStrategy', replication_factor=3,
 
                 execute(query)
 
+
 def delete_keyspace(name):
     with connection_manager() as con:
         if name in [k.name for k in con.client.describe_keyspaces()]:
             execute("DROP KEYSPACE {}".format(name))
+
 
 def create_table(model, create_missing_keyspace=True):
 
