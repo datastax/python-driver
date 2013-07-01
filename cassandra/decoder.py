@@ -793,8 +793,9 @@ cql_encoders = {
     datetime.datetime: cql_encode_datetime,
     datetime.date: cql_encode_date,
     dict: cql_encode_map_collection,
-    list: cql_encode_sequence,
-    tuple: cql_encode_sequence,
-    set: cql_encode_sequence,
+    list: cql_encode_list_collection,
+    tuple: cql_encode_list_collection,
+    set: cql_encode_set_collection,
+    frozenset: cql_encode_set_collection,
     types.GeneratorType: cql_encode_sequence
 }

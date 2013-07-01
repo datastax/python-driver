@@ -1,6 +1,6 @@
 import unittest
 
-from cassandra.query import bind_params, ColumnCollection
+from cassandra.query import bind_params, KeySequence
 
 class ParamBindingTest(unittest.TestCase):
 
@@ -13,7 +13,7 @@ class ParamBindingTest(unittest.TestCase):
         self.assertEquals(result, "1 'a' 2.0")
 
     def test_sequence_param(self):
-        result = bind_params("%s", ((1, "a", 2.0),))
+        result = bind_params("%s", (KeySequence((1, "a", 2.0)),))
         self.assertEquals(result, "( 1 , 'a' , 2.0 )")
 
     def test_generator_param(self):
@@ -25,15 +25,15 @@ class ParamBindingTest(unittest.TestCase):
         self.assertEquals(result, "NULL")
 
     def test_list_collection(self):
-        result = bind_params("%s", (ColumnCollection(['a', 'b', 'c']),))
+        result = bind_params("%s", (['a', 'b', 'c'],))
         self.assertEquals(result, "[ 'a' , 'b' , 'c' ]")
 
     def test_set_collection(self):
-        result = bind_params("%s", (ColumnCollection({'a', 'b', 'c'}),))
+        result = bind_params("%s", ({'a', 'b', 'c'},))
         self.assertEquals(result, "{ 'a' , 'c' , 'b' }")
 
     def test_map_collection(self):
-        result = bind_params("%s", (ColumnCollection({'a': 'a', 'b': 'b'}),))
+        result = bind_params("%s", ({'a': 'a', 'b': 'b'},))
         self.assertEquals(result, "{ 'a' : 'a' , 'b' : 'b' }")
 
     def  test_quote_escaping(self):

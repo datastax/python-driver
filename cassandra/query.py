@@ -2,9 +2,7 @@ import struct
 
 from cassandra import ConsistencyLevel
 from cassandra.decoder import (cql_encoders, cql_encode_object,
-                               cql_encode_map_collection,
-                               cql_encode_set_collection,
-                               cql_encode_list_collection)
+                               cql_encode_sequence)
 
 class Query(object):
 
@@ -138,19 +136,13 @@ class BoundStatement(Query):
         return self._routing_key
 
 
-class ColumnCollection(object):
+class KeySequence(object):
 
     def __init__(self, sequence):
         self.sequence = sequence
 
     def __str__(self):
-        s = self.sequence
-        if isinstance(s, dict):
-            return cql_encode_map_collection(s)
-        elif isinstance(s, (set, frozenset)):
-            return cql_encode_set_collection(s)
-        else:
-            return cql_encode_list_collection(s)
+        return cql_encode_sequence(self.sequence)
 
 
 def bind_params(query, params):
