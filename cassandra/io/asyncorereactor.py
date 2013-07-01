@@ -35,7 +35,7 @@ def _start_loop():
             should_start = True
 
     if should_start:
-        t = Thread(target=_run_loop, name="async_event_loop")
+        t = Thread(target=_run_loop, name="event_loop")
         t.daemon = True
         t.start()
 
