@@ -306,12 +306,6 @@ class AbstractQuerySet(object):
         self._execute_query()
         return len(self._result_cache)
 
-    def __del__(self):
-        if self._con:
-            self._con.close()
-            self._con = None
-            self._cur = None
-
     #----query generation / execution----
 
     def _where_clause(self):

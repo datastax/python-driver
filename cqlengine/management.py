@@ -14,8 +14,8 @@ def create_keyspace(name, strategy_class='SimpleStrategy', replication_factor=3,
     :param **replication_values: 1.2 only, additional values to ad to the replication data map
     """
     with connection_manager() as con:
-        keyspaces = con.execute("""SELECT keyspace_name FROM system.schema_keyspaces""", {})
-        if name not in [r['keyspace_name'] for r in keyspaces]:
+        _, keyspaces = con.execute("""SELECT keyspace_name FROM system.schema_keyspaces""", {})
+        if name not in [r[0] for r in keyspaces]:
             #try the 1.2 method
             replication_map = {
                 'class': strategy_class,
@@ -103,12 +103,12 @@ def create_table(model, create_missing_keyspace=True):
 
     #get existing index names, skip ones that already exist
     with connection_manager() as con:
-        idx_names = con.execute(
+        _, idx_names = con.execute(
             "SELECT index_name from system.\"IndexInfo\" WHERE table_name=:table_name",
             {'table_name': raw_cf_name}
         )
 
-    idx_names = [i['index_name'] for i in idx_names]
+    idx_names = [i[0] for i in idx_names]
     idx_names = filter(None, idx_names)
 
     indexes = [c for n,c in model._columns.items() if c.index]
@@ -128,12 +128,12 @@ def delete_table(model):
     # don't try to delete non existant tables
     ks_name = model._get_keyspace()
     with connection_manager() as con:
-        tables = con.execute(
+        _, tables = con.execute(
             "SELECT columnfamily_name from system.schema_columnfamilies WHERE keyspace_name = :ks_name",
             {'ks_name': ks_name}
         )
     raw_cf_name = model.column_family_name(include_keyspace=False)
-    if raw_cf_name not in [t['columnfamily_name'] for t in tables]:
+    if raw_cf_name not in [t[0] for t in tables]:
         return
 
     cf_name = model.column_family_name()
