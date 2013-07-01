@@ -834,10 +834,10 @@ class ControlConnection(object):
             except ConnectionException, exc:
                 errors[host.address] = exc
                 host.monitor.signal_connection_failure(exc)
-                log.exception("Error reconnecting control connection:")
+                log.warn("[control connection] Error connecting to %s: %s", host, exc)
             except Exception, exc:
                 errors[host.address] = exc
-                log.exception("Error reconnecting control connection:")
+                log.warn("[control connection] Error connecting to %s: %s", host, exc)
 
         raise NoHostAvailable("Unable to connect to any servers", errors)
 
