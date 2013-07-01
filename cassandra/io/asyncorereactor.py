@@ -69,6 +69,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         self._push_watchers = defaultdict(set)
         self.deque = deque()
 
+        log.debug("Opening socket to %s", self.host)
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect((self.host, self.port))
 
@@ -77,6 +78,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
                 self.socket.setsockopt(*args)
 
         self._writable = True
+        self._readable = True
 
         # start the global event loop if needed
         _start_loop()
@@ -91,6 +93,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         self._writable = False
         self._readable = False
         asyncore.dispatcher.close(self)
+        log.debug("Closed socket to %s" % (self.host,))
 
         # don't leave in-progress operations hanging
         self.connected_event.set()
@@ -209,7 +212,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         return self._writable
 
     def readable(self):
-        return self._have_listeners or self._readable
+        return self._readable or (self._have_listeners and not self.is_defunct or self.is_closed)
 
     def send_msg(self, msg, cb):
         if self.is_defunct:

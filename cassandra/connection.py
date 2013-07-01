@@ -171,7 +171,7 @@ class Connection(object):
 
     @defunct_on_error
     def _send_options_message(self):
-        log.debug("Sending initial options message for new Connection to %s" % (self.host,))
+        log.debug("Sending initial options message for new Connection to %s", self.host)
         self.send_msg(OptionsMessage(), self._handle_options_response)
 
     @defunct_on_error
