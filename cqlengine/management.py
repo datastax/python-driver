@@ -36,8 +36,8 @@ def create_keyspace(name, strategy_class='SimpleStrategy', replication_factor=3,
 
 def delete_keyspace(name):
     with connection_manager() as con:
-        keyspaces = con.execute("""SELECT keyspace_name FROM system.schema_keyspaces""", {})
-        if name in [r['keyspace_name'] for r in keyspaces]:
+        _, keyspaces = con.execute("""SELECT keyspace_name FROM system.schema_keyspaces""", {})
+        if name in [r[0] for r in keyspaces]:
             execute("DROP KEYSPACE {}".format(name))
 
 
@@ -120,7 +120,11 @@ def create_table(model, create_missing_keyspace=True):
             qs += ['("{}")'.format(column.db_field_name)]
             qs = ' '.join(qs)
 
-            execute(qs)
+            try:
+                execute(qs)
+            except CQLEngineException:
+                # index already exists
+                pass
 
 
 def delete_table(model):

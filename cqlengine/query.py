@@ -542,7 +542,7 @@ class AbstractQuerySet(object):
 
             qs = ' '.join(qs)
 
-            result = execute(qs, self._where_values(), row_factory=decoder.tuple_factory)
+            _, result = execute(qs, self._where_values())
             return result[0][0]
         else:
             return len(self._result_cache)
@@ -710,6 +710,7 @@ class ModelQuerySet(AbstractQuerySet):
                 return instance
             return _construct_instance
 
+        columns = [model._columns[n] for n in names]
         if self._flat_values_list:
             return (lambda values: columns[0].to_python(values[0]))
         else:
