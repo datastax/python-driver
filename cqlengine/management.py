@@ -56,7 +56,10 @@ def create_table(model, create_missing_keyspace=True):
         create_keyspace(ks_name)
 
     with connection_manager() as con:
-        tables = con.execute("SELECT columnfamily_name from system.schema_columnfamilies WHERE keyspace_name = %s", [ks_name])
+        tables = con.execute(
+            "SELECT columnfamily_name from system.schema_columnfamilies WHERE keyspace_name = :ks_name",
+            {'ks_name': ks_name}
+        )
 
     #check for an existing column family
     #TODO: check system tables instead of using cql thrifteries
@@ -100,7 +103,10 @@ def create_table(model, create_missing_keyspace=True):
 
     #get existing index names, skip ones that already exist
     with connection_manager() as con:
-        idx_names = con.execute("SELECT index_name from system.\"IndexInfo\" WHERE table_name=%s", [raw_cf_name])
+        idx_names = con.execute(
+            "SELECT index_name from system.\"IndexInfo\" WHERE table_name=:table_name",
+            {'table_name': raw_cf_name}
+        )
 
     idx_names = [i['index_name'] for i in idx_names]
     idx_names = filter(None, idx_names)
@@ -122,7 +128,10 @@ def delete_table(model):
     # don't try to delete non existant tables
     ks_name = model._get_keyspace()
     with connection_manager() as con:
-        tables = con.execute("SELECT columnfamily_name from system.schema_columnfamilies WHERE keyspace_name = %s", [ks_name])
+        tables = con.execute(
+            "SELECT columnfamily_name from system.schema_columnfamilies WHERE keyspace_name = :ks_name",
+            {'ks_name': ks_name}
+        )
     raw_cf_name = model.column_family_name(include_keyspace=False)
     if raw_cf_name not in [t['columnfamily_name'] for t in tables]:
         return
