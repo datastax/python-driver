@@ -1,5 +1,8 @@
 CHANGELOG
 
+0.4.10
+* changing query parameter placeholders from uuid1 to uuid4
+
 0.4.7
 * adding support for passing None into query batch methods to clear any batch objects
 
