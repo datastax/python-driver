@@ -1,3 +1,8 @@
+"""
+This module houses the main classes you will interact with,
+:class:`.Cluster` and :class:`.Session`.
+"""
+
 from futures import ThreadPoolExecutor
 import logging
 import time
@@ -148,8 +153,9 @@ class Cluster(object):
     """
     This determines what event loop system will be used for managing
     I/O with Cassandra.  These are the current options:
-        * :class:`cassandra.io.asyncorereactor.AsyncoreConnection`
-        * :class:`cassandra.io.pyevreactor.PyevConnection`
+
+    * :class:`cassandra.io.asyncorereactor.AsyncoreConnection`
+    * :class:`cassandra.io.pyevreactor.PyevConnection`
 
     By default, ``AsyncoreConnection`` will be used, which uses
     the ``asyncore`` module in the Python standard library.  The

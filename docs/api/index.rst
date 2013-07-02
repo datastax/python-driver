@@ -9,6 +9,7 @@ Cassandra Modules
 
    cassandra
    cassandra/cluster
+   cassandra/policies
    cassandra/metadata
    cassandra/query
    cassandra/pool

@@ -1,3 +1,9 @@
+"""
+This module holds classes for working with prepared statements and
+specifying consistency levels and retry policies for individual
+queries.
+"""
+
 import struct
 
 from cassandra import ConsistencyLevel

@@ -4,22 +4,121 @@ from random import randint
 from cassandra import ConsistencyLevel
 
 class HostDistance(object):
+    """
+    A measure of how "distant" a node is from the client, which
+    may influence how the load balancer distributes requests
+    and how many connections are opened to the node.
+    """
 
     IGNORED = -1
+    """
+    A node with this distance should never be queried or have
+    connections opened to it.
+    """
+
     LOCAL = 0
+    """
+    Nodes with ``LOCAL`` distance will be preferred for operations
+    under some load balancing policies (such as :class:`.DCAwareRoundRobinPolicy`)
+    and will have a greater number of connections opened against
+    them by default.
+
+    This distance is typically used for nodes within the same
+    datacenter as the client.
+    """
+
     REMOTE = 1
+    """
+    Nodes with ``REMOTE`` distance will be treated as a last resort
+    by some load balancing policies (such as :class:`.DCAwareRoundRobinPolicy`)
+    and will have a smaller number of connections opened against
+    them by default.
+
+    This distance is typically used for nodes outside of the
+    datacenter that the client is running in.
+    """
 
 
 class LoadBalancingPolicy(object):
+    """
+    Load balancing policies are used to decide how to distribute
+    requests among all possible coordinator nodes in the cluster.
+
+    In particular, they may focus on querying "near" nodes (those
+    in a local datacenter) or on querying nodes who happen to
+    be replicas for the requested data.
+
+    You may also use subclasses of :class:`.LoadBalancingPolicy` for
+    custom behavior.
+    """
 
     def distance(self, host):
+        """
+        Returns a measure of how remote a :class:`~.pool.Host` is in
+        terms of the :class:`.HostDistance` enums.
+        """
+        raise NotImplementedError()
+
+    def populate(self, cluster, hosts):
+        """
+        This method is called to initialize the load balancing
+        policy with a set of :class:`.Host` instances before its
+        first use.  The `cluster` parameter is an instance of
+        :class:`.Cluster`.
+        """
         raise NotImplementedError()
 
     def make_query_plan(self, query=None):
+        """
+        Given a :class:`~.query.Query` instance, return a iterable
+        of :class:`.Host` instances which should be queried in that
+        order.  A generator may work well for custom implementations
+        of this method.
+
+        Note that the `query` argument may be ``None`` when preparing
+        statements.
+        """
+        raise NotImplementedError()
+
+    def on_up(self, host):
+        """
+        Called when a :class:`~.pool.Host`'s :class:`~.HealthMonitor`
+        marks the node up.
+        """
+        raise NotImplementedError()
+
+    def on_down(self, host):
+        """
+        Called when a :class:`~.pool.Host`'s :class:`~.HealthMonitor`
+        marks the node down.
+        """
+        raise NotImplementedError()
+
+    def on_add(self, host):
+        """
+        Called when a :class:`.Cluster` instance is first created and
+        the initial contact points are added as well as when a new
+        :class:`~.pool.Host` is discovered in the cluster, which may
+        happen the first time the ring topology is examined or when
+        a new node joins the cluster.
+        """
+        raise NotImplementedError()
+
+    def on_remove(self, host):
+        """
+        Called when a :class:`~.pool.Host` leaves the cluster.
+        """
         raise NotImplementedError()
 
 
 class RoundRobinPolicy(LoadBalancingPolicy):
+    """
+    A subclass of :class:`.LoadBalancingPolicy` which evenly
+    distributes queries across all nodes in the cluster,
+    regardless of what datacenter the nodes may be in.
+
+    This load balancing policy is used by default.
+    """
 
     def populate(self, cluster, hosts):
         self._live_hosts = set(hosts)
@@ -58,8 +157,28 @@ class RoundRobinPolicy(LoadBalancingPolicy):
 
 
 class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
+    """
+    Similar to :class:`.RoundRobinPolicy`, but prefers hosts
+    in the local datacenter and only uses nodes in remote
+    datacenters as a last resort.
+    """
+
+    local_dc = None
+    used_hosts_per_remote_dc = 0
 
     def __init__(self, local_dc, used_hosts_per_remote_dc=0):
+        """
+        The `local_dc` parameter should be the name of the datacenter
+        (such as is reported by ``nodetool ring``) that should
+        be considered local.
+
+        `used_hosts_per_remote_dc` controls how many nodes in
+        each remote datacenter will have connections opened
+        against them. In other words, `used_hosts_per_remote_dc` hosts
+        will be considered :data:`.HostDistance.REMOTE` and the
+        rest will be considered :data:`.HostDistance.IGNORED`.
+        By default, all remote hosts are ignored.
+        """
         self.local_dc = local_dc
         self.used_hosts_per_remote_dc = used_hosts_per_remote_dc
         self._dc_live_hosts = {}
@@ -106,7 +225,7 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
             if dc == self.local_dc:
                 continue
 
-            for host in current_dc_hosts:
+            for host in current_dc_hosts[:self.used_hosts_per_remote_dc]:
                 yield host
 
     def on_up(self, host):
@@ -123,8 +242,17 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
 
 
 class ConvictionPolicy(object):
+    """
+    A policy which decides when hosts should be considered down
+    based on the types of failures and the number of failures.
+
+    If custom behavior is needed, this class may be subclassed.
+    """
 
     def __init__(self, host):
+        """
+        `host` is an instance of :class:`.Host`.
+        """
         self.host = host
 
     def add_failure(self, connection_exc):
@@ -143,6 +271,11 @@ class ConvictionPolicy(object):
 
 
 class SimpleConvictionPolicy(ConvictionPolicy):
+    """
+    The default implementation of :class:`ConvictionPolicy`,
+    which simply marks a host as down after the first failure
+    of any kind.
+    """
 
     def add_failure(self, connection_exc):
         return True
@@ -152,24 +285,54 @@ class SimpleConvictionPolicy(ConvictionPolicy):
 
 
 class ReconnectionPolicy(object):
+    """
+    This class and its subclasses govern how frequently an attempt is made
+    to reconnect to nodes that are marked dead.
+
+    If custom behavior is needed, this class may be subclassed.
+    """
 
     def new_schedule(self):
+        """
+        This should return a finite or infinite iterable of delays (each as a
+        floating point number of seconds) inbetween each failed reconnection
+        attempt.  Note that if the iterable is finite, reconnection attempts
+        will cease once the iterable is exhausted.
+        """
         raise NotImplementedError()
 
 
 class ConstantReconnectionPolicy(ReconnectionPolicy):
+    """
+    A :class:`.ReconnectionPolicy` subclass which sleeps for a fixed delay
+    inbetween each reconnection attempt.
+    """
 
-    def __init__(self, delay):
+    def __init__(self, delay, max_attempts=64):
+        """
+        `delay` should be a floating point number of seconds to wait inbetween
+        each attempt.
+
+        `max_attempts` should be a total number of attempts to be made before
+        giving up, or ``None`` to continue reconnection attempts forever.
+        The default is 64.
+        """
         if delay < 0:
             raise ValueError("Delay may not be negative")
 
         self.delay = delay
+        self.max_attempts = max_attempts
 
     def new_schedule(self):
-        return repeat(self.delay)
+        return repeat(self.delay, self.max_attempts)
 
 
 class ExponentialReconnectionPolicy(ReconnectionPolicy):
+    """
+    A :class:`.ReconnectionPolicy` subclass which exponentially increases
+    the length of the delay inbetween each reconnection attempt up to
+    a set maximum delay.
+    """
 
     def __init__(self, base_delay, max_delay):
         """
@@ -190,22 +353,103 @@ class ExponentialReconnectionPolicy(ReconnectionPolicy):
 
 
 class WriteType(object):
+    """
+    For usage with :class:`.RetryPolicy`, this describe a type
+    of write operation.
+    """
 
     SIMPLE = 0
+    """
+    A write to a single partition key. Such writes are guaranteed to be atomic
+    and isolated.
+    """
+
     BATCH = 1
+    """
+    A write to multiple partition keys that used the distributed batch log to
+    ensure atomicity.
+    """
+
     UNLOGGED_BATCH = 2
+    """
+    A write to multiple partition keys that did not use the distributed batch
+    log. Atomicity for such writes is not guaranteed.
+    """
+
     COUNTER = 3
+    """
+    A counter write (for one or multiple partition keys). Such writes should
+    not be replayed in order to avoid overcount.
+    """
+
     BATCH_LOG = 4
+    """
+    The initial write to the distributed batch log that Cassandra performs
+    internally before a BATCH write.
+    """
 
 
 class RetryPolicy(object):
+    """
+    A policy that describes whether to retry, rethrow, or ignore timeout
+    and unavailable failures.
+
+    To specify a default retry policy, set the
+    :attr:`.Cluster.retry_policy_factory` attribute to this class,
+    one of its subclasses, or a function that returns instances of this
+    class or a subclass.
+
+    To specify a retry policy per query, set the :attr:`.Query.retry_policy`
+    attribute to an instance of this class or one of its subclasses.
+
+    If custom behavior is needed for retrying certain operations,
+    this class may be subclassed.
+    """
 
     RETRY = 0
+    """
+    This should be returned from the below methods if the operation
+    should be retried on the same connection.
+    """
+
     RETHROW = 1
+    """
+    This should be returned from the below methods if the failure
+    should be propagated and no more retries attempted.
+    """
+
     IGNORE = 2
+    """
+    This should be returned from the below methods if the failure
+    should be ignored but no more retries should be attempted.
+    """
 
     def on_read_timeout(self, query, consistency, required_responses,
                         received_responses, data_retrieved, retry_num):
+        """
+        This is called when a read operation times out from the coordinator's
+        perspective (i.e. a replica did not respond to the coordinator in time).
+        It should return a tuple with two items: one of the class enums (such
+        as :attr:`.RETRY`) and a :class:`.ConsistencyLevel` to retry the
+        operation at or ``None`` to keep the same consistency level.
+
+        `query` is the :class:`.Query` that timed out.
+
+        `consistency` is the :class:`.ConsistencyLevel` that the operation was
+        attempted at.
+
+        The `required_responses` and `received_responses` parameters describe
+        how many replicas needed to respond to meet the requested consistency
+        level and how many actually did respond before the coordinator timed
+        out the request. `data_retrieved` is a boolean indicating whether
+        any of those responses contained data (as opposed to just a checksum).
+
+        `retry_num` counts how many times the operation has been retried, so
+        the first time this method is called, `retry_num` will be 0.
+
+        By default, operations will be retried at most once, and only if
+        a sufficient number of replicas responded (with checksums).
+        """
         if retry_num != 0:
             return (self.RETHROW, None)
         elif received_responses >= required_responses and not data_retrieved:
@@ -215,6 +459,30 @@ class RetryPolicy(object):
 
     def on_write_timeout(self, query, consistency, write_type,
                          required_responses, received_responses, retry_num):
+        """
+        This is called when a write operation times out from the coordinator's
+        perspective (i.e. a replica did not respond to the coordinator in time).
+
+        `query` is the :class:`.Query` that timed out.
+
+        `consistency` is the :class:`.ConsistencyLevel` that the operation was
+        attempted at.
+
+        `write_type` is one of the :class:`.WriteType` enums describing the
+        type of write operation.
+
+        The `required_responses` and `received_responses` parameters describe
+        how many replicas needed to acknowledge the write to meet the requested
+        consistency level and how many replicas actually did acknowledge the
+        write before the coordinator timed out the request.
+
+        `retry_num` counts how many times the operation has been retried, so
+        the first time this method is called, `retry_num` will be 0.
+
+        By default, failed write operations will retried at most once, and
+        they will only be retried if the `write_type` was
+        :attr:`~.WriteType.BATCH_LOG`.
+        """
         if retry_num != 0:
             return (self.RETHROW, None)
         elif write_type == WriteType.BATCH_LOG:
@@ -223,10 +491,36 @@ class RetryPolicy(object):
             return (self.RETHROW, None)
 
     def on_unavailable(self, query, consistency, required_replicas, alive_replicas, retry_num):
+        """
+        This is called when the coordinator node determines that a read or
+        write operation cannot be successful because the number of live
+        replicas are too low to meet the requested :class:`.ConsistencyLevel`.
+        This means that the read or write operation was never forwared to
+        any replicas.
+
+        `query` is the :class:`.Query` that failed.
+
+        `consistency` is the :class:`.ConsistencyLevel` that the operation was
+        attempted at.
+
+        `required_replicas` is the number of replicas that would have needed to
+        acknowledge the operation to meet the requested consistency level.
+        `alive_replicas` is the number of replicas that the coordinator
+        considered alive at the time of the request.
+
+        `retry_num` counts how many times the operation has been retried, so
+        the first time this method is called, `retry_num` will be 0.
+
+        By default, no retries will be attempted and the error will be re-raised.
+        """
         return (self.RETHROW, None)
 
 
 class FallthroughRetryPolicy(RetryPolicy):
+    """
+    A retry policy that never retries and always propagates failures to
+    the application.
+    """
 
     def on_read_timeout(self, *args, **kwargs):
         return (self.RETHROW, None)
@@ -239,7 +533,52 @@ class FallthroughRetryPolicy(RetryPolicy):
 
 
 class DowngradingConsistencyRetryPolicy(RetryPolicy):
+    """
+    A retry policy that sometimes retries with a lower consistency level than
+    the one initially requested.
 
+    **BEWARE**: This policy may retry queries using a lower consistency
+    level than the one initially requested. By doing so, it may break
+    consistency guarantees. In other words, if you use this retry policy,
+    there is cases (documented below) where a read at :attr:`~.QUORUM`
+    *may not* see a preceding write at :attr`~.QUORUM`. Do not use this
+    policy unless you have understood the cases where this can happen and
+    are ok with that. It is also recommended to subclass this class so
+    that queries that required a consistency level downgrade can be
+    recorded (so that repairs can be made later, etc).
+
+    This policy implements the same retries as :class:`.RetryPolicy`,
+    but on top of that, it also retries in the following cases:
+
+    * On a read timeout: if the number of replica that responded is
+      greater than one but lower than is required by the requested
+      consistency level, the operation is retried at a lower consistency
+      level.
+    * On a write timeout: if the operation is an :attr:`~.UNLOGGED_BATCH`
+      and at least one replica acknowledged the write, the operation is
+      retried at a lower consistency level.  Furthermore, for other
+      write types, if at least one replica acknowledged the write, the
+      timeout is ignored.
+    * On an unavailable exception: if at least one replica is alive, the
+      operation is retried at a lower consistency level.
+
+    The reasoning being this retry policy is as follows:. If, based
+    on the information the Cassandra coordinator node returns, retrying the
+    operation with the initially requested consistency has a chance to
+    succeed, do it. Otherwise, if based on that information we know the
+    initially requested consistency level cannot be achieved currently, then:
+
+    * For writes, ignore the exception (thus silently failing the
+      consistency requirement) if we know the write has been persisted on at
+      least one replica.
+    * For reads, try reading at a lower consistency level (thus silently
+      failing the consistency requirement).
+
+    In other words, this policy implements the idea that if the requested
+    consistency level cannot be achieved, the next best thing for writes is
+    to make sure the data is persisted, and that reading something is better
+    than reading nothing, even if there is a risk of reading stale data.
+    """
     def _pick_consistency(self, num_responses):
         if num_responses >= 3:
             return (self.RETRY, ConsistencyLevel.THREE)
