@@ -34,6 +34,8 @@ class CQLConnectionError(CQLEngineException): pass
 class RowResult(tuple):
     pass
 
+QueryResult = namedtuple('RowResult', ('columns', 'results'))
+
 
 def _column_tuple_factory(colnames, values):
     return tuple(colnames), [RowResult(v) for v in values]
@@ -157,7 +159,7 @@ class ConnectionPool(object):
             results = [RowResult(r) for r in cur.fetchall()]
             LOG.debug('{} {}'.format(query, repr(params)))
             self.put(con)
-            return columns, results
+            return QueryResult(columns, results)
         except cql.ProgrammingError as ex:
             raise CQLEngineException(unicode(ex))
         except TTransportException:
