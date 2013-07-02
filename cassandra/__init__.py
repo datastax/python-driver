@@ -152,9 +152,21 @@ class WriteTimeout(Timeout):
 
 
 class AlreadyExists(Exception):
+    """
+    An attempt was made to create a keyspace or table that already exists.
+    """
 
     keyspace = None
+    """
+    The name of the keyspace that already exists, or, if an attempt was
+    made to create a new table, the keyspace that the table is in.
+    """
+
     table = None
+    """
+    The name of the table that already exists, or, if an attempt was
+    make to create a keyspace, ``None``.
+    """
 
     def __init__(self, keyspace=None, table=None):
         if table:
@@ -168,4 +180,22 @@ class AlreadyExists(Exception):
 
 
 class InvalidRequest(Exception):
+    """
+    A query was made that was invalid for some reason, such as trying to set
+    the keyspace for a connection to a nonexistent keyspace.
+    """
+    pass
+
+
+class Unauthorized(Exception):
+    """
+    The current user is not authorized to perfom the requested operation.
+    """
+    pass
+
+
+class AuthenticationFailed(Exception):
+    """
+    Failed to authenticate.
+    """
     pass

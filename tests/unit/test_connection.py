@@ -1,7 +1,7 @@
 from StringIO import StringIO
 import unittest
 
-from mock import patch, Mock, ANY
+from mock import Mock, ANY
 
 from cassandra.connection import (Connection, PROTOCOL_VERSION,
                                   HEADER_DIRECTION_TO_CLIENT,
@@ -10,9 +10,6 @@ from cassandra.decoder import (write_stringmultimap, write_int, write_string,
                                SupportedMessage)
 from cassandra.marshal import uint8_pack, uint32_pack
 
-@patch('socket.socket')
-@patch('pyev.Io')
-@patch('cassandra.io.asyncorereactor._start_loop')
 class ConnectionTest(unittest.TestCase):
 
     def make_connection(self):

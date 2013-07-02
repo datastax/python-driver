@@ -9,7 +9,7 @@ from cassandra.connection import (PROTOCOL_VERSION,
                                   HEADER_DIRECTION_TO_CLIENT,
                                   ProtocolError,
                                   ConnectionException)
-from cassandra.io.pyevreactor import PyevConnection
+from cassandra.io.libevreactor import LibevConnection
 from cassandra.decoder import (write_stringmultimap, write_int, write_string,
                                SupportedMessage, ReadyMessage, ServerError)
 from cassandra.marshal import uint8_pack, uint32_pack
@@ -17,10 +17,10 @@ from cassandra.marshal import uint8_pack, uint32_pack
 @patch('socket.socket')
 @patch('pyev.Io')
 @patch('cassandra.io.asyncorereactor._start_loop')
-class PyevConnectionTest(unittest.TestCase):
+class LibevConnectionTest(unittest.TestCase):
 
     def make_connection(self):
-        c = PyevConnection('1.2.3.4')
+        c = LibevConnection('1.2.3.4')
         c._socket = Mock()
         c._socket.send.side_effect = lambda x: len(x)
         return c

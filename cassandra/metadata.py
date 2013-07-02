@@ -41,11 +41,11 @@ class Metadata(object):
 
     keyspaces = None
     """
-    A map from keyspace names to matching :cls:`~.KeyspaceMetadata` instances.
+    A map from keyspace names to matching :class:`~.KeyspaceMetadata` instances.
     """
 
     token_map = None
-    """ A :cls:`~.TokenMap` instance. """
+    """ A :class:`~.TokenMap` instance describing the ring topology. """
 
     def __init__(self, cluster):
         # use a weak reference so that the Cluster object can be GC'ed.
@@ -57,9 +57,19 @@ class Metadata(object):
         self._hosts_lock = RLock()
 
     def export_schema_as_string(self):
+        """
+        Returns a string that can be executed as a query in order to recreate
+        the entire schema.  The string is formatted to be human readable.
+        """
         return "\n".join(ks.export_as_string() for ks in self.keyspaces.values())
 
     def rebuild_schema(self, keyspace, table, ks_results, cf_results, col_results):
+        """
+        Rebuild the view of the current schema from a fresh set of rows from
+        the system schema tables.
+
+        For internal use only.
+        """
         cf_def_rows = defaultdict(list)
         col_def_rows = defaultdict(lambda: defaultdict(list))
 
@@ -227,6 +237,11 @@ class Metadata(object):
             return None
 
     def rebuild_token_map(self, partitioner, token_map):
+        """
+        Rebuild our view of the topology from fresh rows from the
+        system topology tables.
+        For internal use only.
+        """
         if partitioner.endswith('RandomPartitioner'):
             token_cls = MD5Token
         elif partitioner.endswith('Murmur3Partitioner'):
@@ -249,6 +264,10 @@ class Metadata(object):
         self.token_map = TokenMap(token_cls, tokens_to_hosts, ring)
 
     def get_replicas(self, key):
+        """
+        Returns a list of :class:`.Host` instances that are replicas for a given
+        partition key.
+        """
         t = self.token_map
         return t.get_replicas(t.token_cls.from_key(key))
 
@@ -272,6 +291,9 @@ class Metadata(object):
         return self._hosts.get(address)
 
     def all_hosts(self):
+        """
+        Returns a list of all known :class:`.Host` instances in the cluster.
+        """
         with self._hosts_lock:
             return self._hosts.values()
 
@@ -299,7 +321,7 @@ class KeyspaceMetadata(object):
 
     tables = None
     """
-    A map from table names to instances of :cls:`~.TableMetadata`.
+    A map from table names to instances of :class:`~.TableMetadata`.
     """
 
     def __init__(self, name, durable_writes, strategy_class, strategy_options):
@@ -327,16 +349,46 @@ class TableMetadata(object):
     """
 
     keyspace = None
-    """ An instance of :cls:`~.KeyspaceMetadata` """
+    """ An instance of :class:`~.KeyspaceMetadata` """
 
     name = None
     """ The string name of the table """
 
-    # TODO docstrings for these
     partition_key = None
+    """
+    A list of :class:`.ColumnMetadata` instances representing the columns in
+    the partition key for this table.  This will always hold at least one
+    column.
+    """
+
     clustering_key = None
+    """
+    A list of :class:`.ColumnMetadata` instances representing the columns
+    in the clustering key for this table.  These are all of the
+    :attr:`.primary_key` columns that are not in the :attr:`.partition_key`.
+
+    Note that a table may have no clustering keys, in which case this will
+    be an empty list.
+    """
+
+    @property
+    def primary_key(self):
+        """
+        A list of :class:`.ColumnMetadata` representing the components of
+        the primary key for this table.
+        """
+        return self.partition_key + self.clustering_key
+
     columns = None
+    """
+    A dict mapping column names to :class:`.ColumnMetadata` instances.
+    """
+
     options = None
+    """
+    A dict mapping table option names to their specific settings for this
+    table.
+    """
 
     recognized_options = (
             "comment", "read_repair_chance",  # "local_read_repair_chance",
@@ -355,6 +407,11 @@ class TableMetadata(object):
         self.comparator = None
 
     def export_as_string(self):
+        """
+        Returns a string of CQL queries that can be used to recreate this table
+        along with all indexes on it.  The returned string is formatted to
+        be human readable.
+        """
         ret = self.as_cql_query(formatted=True)
         ret += ";"
 
@@ -365,6 +422,11 @@ class TableMetadata(object):
         return ret
 
     def as_cql_query(self, formatted=False):
+        """
+        Returns a CQL query that can be used to recreate this table (index
+        creations are not included).  If `formatted` is set to ``True``,
+        extra whitespace will be added to make the query human readable.
+        """
         ret = "CREATE TABLE %s.%s (%s" % (self.keyspace.name, self.name, "\n" if formatted else "")
 
         if formatted:
@@ -476,6 +538,23 @@ class TableMetadata(object):
 
 
 class ColumnMetadata(object):
+    """
+    A representation of a single column in a table.
+    """
+
+    table = None
+    """ The :class:`.TableMetadata` this column belongs to. """
+
+    name = None
+    """ The string name of this column. """
+
+    data_type = None
+
+    index = None
+    """
+    If an index exists on this column, this is an instance of
+    :class:`.IndexMetadata`, otherwise ``None``.
+    """
 
     def __init__(self, table_metadata, column_name, data_type, index_metadata=None):
         self.table = table_metadata
@@ -485,6 +564,10 @@ class ColumnMetadata(object):
 
     @property
     def typestring(self):
+        """
+        A string representation of the type for this column, such as "varchar"
+        or "map<string, int>".
+        """
         if issubclass(self.data_type, types.ReversedType):
             return self.data_type.subtypes[0].cql_parameterized_type()
         else:
@@ -495,6 +578,20 @@ class ColumnMetadata(object):
 
 
 class IndexMetadata(object):
+    """
+    A representation of a secondary index on a column.
+    """
+
+    column = None
+    """
+    The column (:class:`.ColumnMetadata`) this index is on.
+    """
+
+    name = None
+    """ A string name for the index. """
+
+    index_type = None
+    """ A string representing the type of index. """
 
     def __init__(self, column_metadata, index_name=None, index_type=None):
         self.column = column_metadata
@@ -502,6 +599,9 @@ class IndexMetadata(object):
         self.index_type = index_type
 
     def as_cql_query(self):
+        """
+        Returns a CQL query that can be used to recreate this index.
+        """
         table = self.column.table
         return "CREATE INDEX %s ON %s.%s (%s)" % (self.name, table.keyspace.name, table.name, self.column.name)
 

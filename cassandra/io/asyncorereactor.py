@@ -43,6 +43,10 @@ def _start_loop():
 
 
 class AsyncoreConnection(Connection, asyncore.dispatcher):
+    """
+    An implementation of :class:`.Connection` that utilizes the ``asyncore``
+    module in the Python standard library for its event loop.
+    """
 
     _buf = ""
     _total_reqd_bytes = 0

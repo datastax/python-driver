@@ -5,7 +5,7 @@ from threading import Thread, Event
 from cassandra import ConsistencyLevel
 from cassandra.decoder import QueryMessage
 from cassandra.io.asyncorereactor import AsyncoreConnection
-from cassandra.io.pyevreactor import PyevConnection
+from cassandra.io.libevreactor import LibevConnection
 
 class ConnectionTest(object):
 
@@ -164,6 +164,6 @@ class AsyncoreConnectionTest(ConnectionTest, unittest.TestCase):
     klass = AsyncoreConnection
 
 
-class PyevConnectionTest(ConnectionTest, unittest.TestCase):
+class LibevConnectionTest(ConnectionTest, unittest.TestCase):
 
-    klass = PyevConnection
+    klass = LibevConnection

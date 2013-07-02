@@ -1,10 +1,10 @@
 import errno
-from functools import wraps
+from functools import wraps, partial
 import logging
 from threading import Event, Lock, RLock
 from Queue import Queue
 
-from cassandra import ConsistencyLevel
+from cassandra import ConsistencyLevel, AuthenticationFailed
 from cassandra.marshal import int8_unpack
 from cassandra.decoder import (ReadyMessage, AuthenticateMessage, OptionsMessage,
                                StartupMessage, ErrorMessage, CredentialsMessage,
@@ -41,6 +41,10 @@ NONBLOCKING = (errno.EAGAIN, errno.EWOULDBLOCK)
 
 
 class ConnectionException(Exception):
+    """
+    An unrecoverable error was hit when attempting to use a connection,
+    or the connection was already closed or defunct.
+    """
 
     def __init__(self, message, host=None):
         Exception.__init__(self, message)
@@ -48,14 +52,17 @@ class ConnectionException(Exception):
 
 
 class ConnectionBusy(Exception):
-    pass
-
-
-class ProgrammingError(Exception):
+    """
+    An attempt was made to send a message through a :class:`.Connection` that
+    was already at the max number of in-flight operations.
+    """
     pass
 
 
 class ProtocolError(Exception):
+    """
+    Communication did not match the protocol that this driver expects.
+    """
     pass
 
 
@@ -214,7 +221,7 @@ class Connection(object):
         self.send_msg(sm, cb=self._handle_startup_response)
 
     @defunct_on_error
-    def _handle_startup_response(self, startup_response):
+    def _handle_startup_response(self, startup_response, did_authenticate=False):
         if self.is_defunct:
             return
         if isinstance(startup_response, ReadyMessage):
@@ -226,17 +233,23 @@ class Connection(object):
             log.debug("Got AuthenticateMessage on new Connection from %s" % self.host)
 
             if self.credentials is None:
-                raise ProgrammingError('Remote end requires authentication.')
+                raise AuthenticationFailed('Remote end requires authentication.')
 
             self.authenticator = startup_response.authenticator
             cm = CredentialsMessage(creds=self.credentials)
-            self.send_msg(cm, cb=self._handle_startup_response)
+            callback = partial(self._handle_startup_response, did_authenticate=True)
+            self.send_msg(cm, cb=callback)
         elif isinstance(startup_response, ErrorMessage):
             log.debug("Received ErrorMessage on new Connection from %s: %s"
                       % (self.host, startup_response.summary_msg()))
-            raise ConnectionException(
-                "Failed to initialize new connection to %s: %s"
-                % (self.host, startup_response.summary_msg()))
+            if did_authenticate:
+                raise AuthenticationFailed(
+                    "Failed to authenticate to %s: %s" %
+                    (self.host, startup_response.summary_msg()))
+            else:
+                raise ConnectionException(
+                    "Failed to initialize new connection to %s: %s"
+                    % (self.host, startup_response.summary_msg()))
         else:
             msg = "Unexpected response during Connection setup: %r" % (startup_response,)
             log.error(msg)

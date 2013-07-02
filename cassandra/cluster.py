@@ -13,7 +13,7 @@ import weakref
 from functools import partial
 from itertools import groupby
 
-from cassandra import ConsistencyLevel
+from cassandra import ConsistencyLevel, AuthenticationFailed
 from cassandra.connection import ConnectionException
 from cassandra.decoder import (QueryMessage, ResultMessage,
                                ErrorMessage, ReadTimeoutErrorMessage,
@@ -30,8 +30,8 @@ from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy)
 from cassandra.query import SimpleStatement, PreparedStatement, BoundStatement, bind_params
-from cassandra.pool import (AuthenticationException, _ReconnectionHandler,
-                            _HostReconnectionHandler, HostConnectionPool)
+from cassandra.pool import (_ReconnectionHandler, _HostReconnectionHandler,
+                            HostConnectionPool)
 
 
 log = logging.getLogger(__name__)
@@ -155,11 +155,11 @@ class Cluster(object):
     I/O with Cassandra.  These are the current options:
 
     * :class:`cassandra.io.asyncorereactor.AsyncoreConnection`
-    * :class:`cassandra.io.pyevreactor.PyevConnection`
+    * :class:`cassandra.io.libevreactor.LibevConnection`
 
     By default, ``AsyncoreConnection`` will be used, which uses
     the ``asyncore`` module in the Python standard library.  The
-    performance is slightly worse than with ``pyev``, but it is
+    performance is slightly worse than with ``libev``, but it is
     supported on a wider range of systems.
     """
 
@@ -715,7 +715,7 @@ class Session(object):
         else:
             try:
                 new_pool = HostConnectionPool(host, distance, self)
-            except AuthenticationException, auth_exc:
+            except AuthenticationFailed, auth_exc:
                 conn_exc = ConnectionException(str(auth_exc), host=host)
                 host.monitor.signal_connection_failure(conn_exc)
                 return self._pools.get(host)
@@ -803,7 +803,7 @@ class _ControlReconnectionHandler(_ReconnectionHandler):
 
     def on_exception(self, exc, next_delay):
         # TODO only overridden to add logging, so add logging
-        if isinstance(exc, AuthenticationException):
+        if isinstance(exc, AuthenticationFailed):
             return False
         else:
             log.debug("Error trying to reconnect control connection: %r" % (exc,))

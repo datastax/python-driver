@@ -25,7 +25,7 @@ except ImportError:
     from StringIO import StringIO  # ignore flake8 warning: # NOQA
 
 from cassandra import (ConsistencyLevel, Unavailable, WriteTimeout, ReadTimeout,
-                       AlreadyExists, InvalidRequest)
+                       AlreadyExists, InvalidRequest, Unauthorized)
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
                                int8_pack, int8_unpack)
 from cassandra.cqltypes import lookup_cqltype
@@ -277,6 +277,9 @@ class SyntaxException(RequestValidationException):
 class UnauthorizedErrorMessage(RequestValidationException):
     summary = 'Unauthorized'
     error_code = 0x2100
+
+    def to_exception(self):
+        return Unauthorized(self.summary_msg())
 
 
 class InvalidRequestException(RequestValidationException):

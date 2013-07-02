@@ -70,7 +70,11 @@ def defunct_on_error(f):
     return wrapper
 
 
-class PyevConnection(Connection):
+class LibevConnection(Connection):
+    """
+    An implementation of :class:`.Connection` that utilizes libev through
+    the pyev library for its event loop.
+    """
 
     _buf = ""
     _total_reqd_bytes = 0

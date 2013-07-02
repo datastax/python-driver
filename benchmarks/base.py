@@ -18,10 +18,10 @@ log.addHandler(handler)
 
 supported_reactors = [AsyncoreConnection]
 try:
-    from cassandra.io.pyevreactor import PyevConnection
-    supported_reactors.append(PyevConnection)
+    from cassandra.io.libevreactor import LibevConnection
+    supported_reactors.append(LibevConnection)
 except ImportError, exc:
-    log.warning("Not benchmarking pyev reactor: %s" % (exc,))
+    log.warning("Not benchmarking libev reactor: %s" % (exc,))
 
 KEYSPACE = "testkeyspace"
 TABLE = "testtable"

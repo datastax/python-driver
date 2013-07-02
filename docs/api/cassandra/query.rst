@@ -1,5 +1,5 @@
-``cassandra.query``
-===================
+``cassandra.query`` - Prepared Statements and Query Policies
+============================================================
 
 .. module:: cassandra.query
 

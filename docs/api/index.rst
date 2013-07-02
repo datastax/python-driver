@@ -15,4 +15,4 @@ Cassandra Modules
    cassandra/pool
    cassandra/connection
    cassandra/io/asyncorereactor
-   cassandra/io/pyevreactor
+   cassandra/io/libevreactor

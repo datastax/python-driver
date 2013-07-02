@@ -225,7 +225,7 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
             if dc == self.local_dc:
                 continue
 
-            for host in current_dc_hosts[:self.used_hosts_per_remote_dc]:
+            for host in list(current_dc_hosts)[:self.used_hosts_per_remote_dc]:
                 yield host
 
     def on_up(self, host):

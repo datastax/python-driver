@@ -17,3 +17,12 @@
 
 .. autoexception:: WriteTimeout()
    :members:
+
+.. autoexception:: InvalidRequest()
+   :members:
+
+.. autoexception:: Unauthorized()
+   :members:
+
+.. autoexception:: AuthenticationFailed()
+   :members:

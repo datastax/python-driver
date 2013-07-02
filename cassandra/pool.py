@@ -1,30 +1,42 @@
+"""
+Connection pooling and host management.
+"""
+
 import logging
 import time
 from threading import Lock, RLock, Condition
 import traceback
 import weakref
 
-from connection import MAX_STREAM_PER_CONNECTION, ConnectionException
+from cassandra import AuthenticationFailed
+from cassandra.connection import MAX_STREAM_PER_CONNECTION, ConnectionException
 
 log = logging.getLogger(__name__)
 
 
-class BusyConnectionException(Exception):
-    pass
-
-
-class AuthenticationException(Exception):
-    pass
-
-
 class NoConnectionsAvailable(Exception):
+    """
+    All existing connections to a given host are busy, or there are
+    no open connections.
+    """
     pass
 
 
 class Host(object):
+    """
+    Represents a single Cassandra node.
+    """
 
     address = None
+    """
+    The IP address or hostname of the node.
+    """
+
     monitor = None
+    """
+    A :class:`.HealthMonitor` instance that tracks whether this node is
+    up or down.
+    """
 
     _datacenter = None
     _rack = None
@@ -43,17 +55,28 @@ class Host(object):
 
     @property
     def datacenter(self):
+        """ The datacenter the node is in.  """
         return self._datacenter
 
     @property
     def rack(self):
+        """ The rack the node is in.  """
         return self._rack
 
     def set_location_info(self, datacenter, rack):
+        """
+        Sets the datacenter and rack for this node. Intended for internal
+        use (by the control connection, which periodically checks the
+        ring topology) only.
+        """
         self._datacenter = datacenter
         self._rack = rack
 
     def get_and_set_reconnection_handler(self, new_handler):
+        """
+        Atomically replaces the reconnection handler for this
+        host.  Intended for internal use only.
+        """
         with self._reconnection_lock:
             old = self._reconnection_handler
             self._reconnection_handler = new_handler
@@ -137,9 +160,9 @@ class _ReconnectionHandler(object):
 
         Subclasses should return ``False`` if no more attempts to connection
         should be made, ``True`` otherwise.  The default behavior is to
-        always retry unless the error is an AuthenticationException.
+        always retry unless the error is an :exc:`.AuthenticationFailed`.
         """
-        if isinstance(exc, AuthenticationException):
+        if isinstance(exc, AuthenticationFailed):
             return False
         else:
             return True
@@ -159,7 +182,7 @@ class _HostReconnectionHandler(_ReconnectionHandler):
         self.host.monitor.reset()
 
     def on_exception(self, exc, next_delay):
-        if isinstance(exc, AuthenticationException):
+        if isinstance(exc, AuthenticationFailed):
             return False
         else:
             log.warn("Error attempting to reconnect to %s: %s", self.host, exc)
@@ -168,8 +191,17 @@ class _HostReconnectionHandler(_ReconnectionHandler):
 
 
 class HealthMonitor(object):
+    """
+    Monitors whether a particular host is marked as up or down.
+    This class is primarily intended for internal use, although
+    applications may find it useful to check whether a given node
+    is up or down.
+    """
 
     is_up = True
+    """
+    A boolean representing the current state of the node.
+    """
 
     def __init__(self, conviction_policy):
         self._conviction_policy = conviction_policy
@@ -352,7 +384,7 @@ class HostConnectionPool(object):
             if self.host.monitor.signal_connection_failure(exc):
                 self.shutdown()
             return False
-        except AuthenticationException:
+        except AuthenticationFailed:
             with self._lock:
                 self.open_count -= 1
             return False
