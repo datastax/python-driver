@@ -7,6 +7,9 @@
    :members:
    :exclude-members: rebuild_schema, rebuild_token_map, add_host, remove_host, get_host
 
+Schemas
+-------
+
 .. autoclass:: KeyspaceMetadata ()
    :members:
 
@@ -19,10 +22,13 @@
 .. autoclass:: IndexMetadata ()
    :members:
 
-.. autoclass:: TokenMap
+Tokens and Ring Topology
+------------------------
+
+.. autoclass:: TokenMap ()
    :members:
 
-.. autoclass:: Token
+.. autoclass:: Token ()
    :members:
 
 .. autoclass:: Murmur3Token

@@ -243,11 +243,11 @@ class Metadata(object):
         For internal use only.
         """
         if partitioner.endswith('RandomPartitioner'):
-            token_cls = MD5Token
+            token_class = MD5Token
         elif partitioner.endswith('Murmur3Partitioner'):
-            token_cls = Murmur3Token
+            token_class = Murmur3Token
         elif partitioner.endswith('ByteOrderedPartitioner'):
-            token_cls = BytesToken
+            token_class = BytesToken
         else:
             self.token_map = None
             return
@@ -256,12 +256,12 @@ class Metadata(object):
         ring = []
         for host, token_strings in token_map.iteritems():
             for token_string in token_strings:
-                token = token_cls(token_string)
+                token = token_class(token_string)
                 ring.append(token)
                 tokens_to_hosts[token].add(host)
 
         ring = sorted(ring)
-        self.token_map = TokenMap(token_cls, tokens_to_hosts, ring)
+        self.token_map = TokenMap(token_class, tokens_to_hosts, ring)
 
     def get_replicas(self, key):
         """
@@ -269,7 +269,7 @@ class Metadata(object):
         partition key.
         """
         t = self.token_map
-        return t.get_replicas(t.token_cls.from_key(key))
+        return t.get_replicas(t.token_class.from_key(key))
 
     def add_host(self, address):
         cluster = self.cluster_ref()
@@ -607,13 +607,35 @@ class IndexMetadata(object):
 
 
 class TokenMap(object):
+    """
+    Information about the layout of the ring.
+    """
 
-    def __init__(self, token_cls, tokens_to_hosts, ring):
-        self.token_cls = token_cls
+    token_class = None
+    """
+    A subclass of :class:`.Token`, depending on what partitioner the cluster uses.
+    """
+
+    tokens_to_hosts = None
+    """
+    A map of :class:`.Token` objects to :class:`.Host` objects.
+    """
+
+    ring = None
+    """
+    An ordered list of :class:`.Token` instances in the ring.
+    """
+
+    def __init__(self, token_class, tokens_to_hosts, ring):
+        self.token_class = token_class
         self.tokens_to_hosts = tokens_to_hosts
         self.ring = ring
 
     def get_replicas(self, token):
+        """
+        Get :class:`.Host` instances representing all of the replica nodes
+        for a given :class:`.Token`.
+        """
         point = bisect_left(self.ring, token)
         if point == 0 and token != self.ring[0]:
             return self.tokens_to_hosts[self.ring[-1]]
@@ -624,6 +646,9 @@ class TokenMap(object):
 
 
 class Token(object):
+    """
+    Abstract class representing a token.
+    """
 
     @classmethod
     def hash_fn(cls, key):
@@ -645,27 +670,39 @@ MIN_LONG = -(2 ** 63)
 MAX_LONG = (2 ** 63) - 1
 
 class Murmur3Token(Token):
+    """
+    A token for ``Murmur3Partitioner``.
+    """
 
     @classmethod
     def hash_fn(cls, key):
         h = murmur3(key)
         return h if h != MIN_LONG else MAX_LONG
 
-    def __init__(self, token_string):
-        self.value = int(token_string)
+    def __init__(self, token):
+        """ `token` should be an int or string representing the token """
+        self.value = int(token)
 
 
 class MD5Token(Token):
+    """
+    A token for ``RandomPartitioner``.
+    """
 
     @classmethod
     def hash_fn(cls, key):
         return abs(varint_unpack(md5('foo').digest()))
 
-    def __init__(self, token_string):
-        self.value = int(token_string)
+    def __init__(self, token):
+        """ `token` should be an int or string representing the token """
+        self.value = int(token)
 
 
 class BytesToken(Token):
+    """
+    A token for ``ByteOrderedPartitioner``.
+    """
 
     def __init__(self, token_string):
+        """ `token_string` should be string representing the token """
         self.value = token_string
