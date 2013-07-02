@@ -1,5 +1,10 @@
 CHANGELOG
 
+0.5
+* eagerly loading results into the query result cache, the cql driver does this anyway,
+    and pulling them from the cursor was causing some problems with gevented queries,
+    this will cause some breaking changes for users calling execute directly
+
 0.4.10
 * changing query parameter placeholders from uuid1 to uuid4
 
