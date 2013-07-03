@@ -1,7 +1,10 @@
 from itertools import islice, cycle, groupby, repeat
+import logging
 from random import randint
 
 from cassandra import ConsistencyLevel
+
+log = logging.getLogger(__name__)
 
 class HostDistance(object):
     """

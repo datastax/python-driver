@@ -1,20 +1,23 @@
 from bisect import bisect_left
 from collections import defaultdict, OrderedDict
-import json
 from hashlib import md5
+import json
+import logging
 import re
 from threading import RLock
 import weakref
 
 murmur3 = None
 try:
-    import cassandra.murmur3 as murmur3
-except ImportError:
+    from murmur3 import murmur3
+except ImportError, exc:
     pass
 
 import cassandra.cqltypes as types
 from cassandra.marshal import varint_unpack
 from cassandra.pool import Host
+
+log = logging.getLogger(__name__)
 
 _keywords = set((
     'select', 'from', 'where', 'and', 'key', 'insert', 'update', 'with',
@@ -246,6 +249,10 @@ class Metadata(object):
             token_class = MD5Token
         elif partitioner.endswith('Murmur3Partitioner'):
             token_class = Murmur3Token
+            if murmur3 is None:
+                log.warning(
+                    "The murmur3 C extension is not available, token awareness "
+                    "cannot be supported for the Murmur3Partitioner")
         elif partitioner.endswith('ByteOrderedPartitioner'):
             token_class = BytesToken
         else:
@@ -269,7 +276,12 @@ class Metadata(object):
         partition key.
         """
         t = self.token_map
-        return t.get_replicas(t.token_class.from_key(key))
+        if not t:
+            return []
+        try:
+            return t.get_replicas(t.token_class.from_key(key))
+        except NoMurmur3:
+            return []
 
     def add_host(self, address):
         cluster = self.cluster_ref()
@@ -636,6 +648,8 @@ class TokenMap(object):
         Get :class:`.Host` instances representing all of the replica nodes
         for a given :class:`.Token`.
         """
+        # TODO depending on keyspace and replication strategy options,
+        # return full set of replicas
         point = bisect_left(self.ring, token)
         if point == 0 and token != self.ring[0]:
             return self.tokens_to_hosts[self.ring[-1]]
@@ -669,6 +683,11 @@ class Token(object):
 MIN_LONG = -(2 ** 63)
 MAX_LONG = (2 ** 63) - 1
 
+
+class NoMurmur3(Exception):
+    pass
+
+
 class Murmur3Token(Token):
     """
     A token for ``Murmur3Partitioner``.
@@ -676,8 +695,11 @@ class Murmur3Token(Token):
 
     @classmethod
     def hash_fn(cls, key):
-        h = murmur3(key)
-        return h if h != MIN_LONG else MAX_LONG
+        if murmur3 is not None:
+            h = murmur3(key)
+            return h if h != MIN_LONG else MAX_LONG
+        else:
+            raise NoMurmur3()
 
     def __init__(self, token):
         """ `token` should be an int or string representing the token """
