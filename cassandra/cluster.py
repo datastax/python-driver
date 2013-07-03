@@ -317,7 +317,7 @@ class Cluster(object):
 
             if not self._is_setup:
                 self.load_balancing_policy.populate(
-                    weakref.proxy(self), self.metadata.getAllHosts())
+                    weakref.proxy(self), self.metadata.all_hosts())
                 self._is_setup = True
 
             if self.control_connection:
