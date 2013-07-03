@@ -165,7 +165,7 @@ class AlreadyExists(Exception):
     table = None
     """
     The name of the table that already exists, or, if an attempt was
-    make to create a keyspace, ``None``.
+    make to create a keyspace, :const:`None`.
     """
 
     def __init__(self, keyspace=None, table=None):

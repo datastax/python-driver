@@ -26,7 +26,7 @@ class Query(object):
 
     tracing_enabled = False
     """
-    A boolean flag that may be set to ``True`` to enable tracing on this
+    A boolean flag that may be set to :const:`True` to enable tracing on this
     query only.
 
     **Note**: query tracing is not yet supported by this driver
@@ -45,17 +45,29 @@ class Query(object):
         self.consistency_level = consistency_level
         self._routing_key = routing_key
 
-    @property
-    def routing_key(self):
+    def _get_routing_key(self):
         return self._routing_key
 
-    @routing_key.setter
-    def set_routing_key(self, *key_components):
+    def _set_routing_key(self, key_components):
         if len(key_components) == 1:
             self._routing_key = key_components[0]
         else:
             self._routing_key = "".join(struct.pack("HsB", len(component), component, 0)
                                         for component in key_components)
+
+    def _del_routing_key(self):
+        self._routing_key = None
+
+    routing_key = property(
+        _get_routing_key,
+        _set_routing_key,
+        _del_routing_key,
+        """
+        The :attr:`~.TableMetadata.partition_key` portion of the primary key,
+        which can be used to determine which nodes are replicas for the query.
+
+        When setting this attribute, a list or tuple *must* be used.
+        """)
 
 class SimpleStatement(Query):
     """

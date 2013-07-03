@@ -75,7 +75,7 @@ class LoadBalancingPolicy(object):
         order.  A generator may work well for custom implementations
         of this method.
 
-        Note that the `query` argument may be ``None`` when preparing
+        Note that the `query` argument may be :const:`None` when preparing
         statements.
         """
         raise NotImplementedError()
@@ -175,8 +175,8 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
         `used_hosts_per_remote_dc` controls how many nodes in
         each remote datacenter will have connections opened
         against them. In other words, `used_hosts_per_remote_dc` hosts
-        will be considered :data:`.HostDistance.REMOTE` and the
-        rest will be considered :data:`.HostDistance.IGNORED`.
+        will be considered :attr:`~.HostDistance.REMOTE` and the
+        rest will be considered :attr:`~.HostDistance.IGNORED`.
         By default, all remote hosts are ignored.
         """
         self.local_dc = local_dc
@@ -241,6 +241,70 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
         self._dc_live_hosts.setdefault(host.datacenter, set()).discard(host)
 
 
+class TokenAwarePolicy(LoadBalancingPolicy):
+    """
+    A :class:`.LoadBalancingPolicy` wrapper that adds token awareness to
+    a child policy.
+
+    This alters the child policy's behavior so that it first attempts to
+    send queries to :attr:`~.HostDistance.LOCAL` replicas (as determined
+    by the child policy) based on the :class:`.Query`'s
+    :attr:`~.Query.routing_key`.  Once those hosts are exhausted, the
+    remaining hosts in the child policy's query plan will be used.
+
+    If no :attr:`~.Query.routing_key` is set on the query, the child
+    policy's query plan will be used as is.
+    """
+
+    _child_policy = None
+    _cluster_metadata = None
+
+    def __init__(self, child_policy):
+        self.child_policy = child_policy
+
+    def populate(self, cluster, hosts):
+        self._cluster_metadata = cluster.metadata
+        self.child_policy.populate(cluster, hosts)
+
+    def distance(self, *args, **kwargs):
+        return self.child_policy.distance(*args, **kwargs)
+
+    def make_query_plan(self, query=None):
+        child = self.child_policy
+        if query is None:
+            for host in child.make_query_plan(query):
+                yield host
+        else:
+            routing_key = query.routing_key
+            if routing_key is None:
+                for host in child.make_query_plan(query):
+                    yield host
+            else:
+                replicas = self.metadata.get_replicas(routing_key)
+                for replica in replicas:
+                    if replica.monitor.is_up and \
+                            child.distance(replica) == HostDistance.LOCAL:
+                        yield replica
+
+                for host in child.make_query_plan(query):
+                    # skip if we've already listed this host
+                    if host not in replicas or \
+                            child.distance(replica) == HostDistance.REMOTE:
+                        yield host
+
+    def on_up(self, *args, **kwargs):
+        return self.child_policy.on_up(*args, **kwargs)
+
+    def on_down(self, *args, **kwargs):
+        return self.child_policy.on_down(*args, **kwargs)
+
+    def on_add(self, *args, **kwargs):
+        return self.child_policy.on_add(*args, **kwargs)
+
+    def on_remove(self, *args, **kwargs):
+        return self.child_policy.on_remove(*args, **kwargs)
+
+
 class ConvictionPolicy(object):
     """
     A policy which decides when hosts should be considered down
@@ -257,8 +321,8 @@ class ConvictionPolicy(object):
 
     def add_failure(self, connection_exc):
         """
-        Implementations should return ``True`` if the host should be
-        convicted, ``False`` otherwise.
+        Implementations should return :const:`True` if the host should be
+        convicted, :const:`False` otherwise.
         """
         raise NotImplementedError()
 
@@ -314,7 +378,7 @@ class ConstantReconnectionPolicy(ReconnectionPolicy):
         each attempt.
 
         `max_attempts` should be a total number of attempts to be made before
-        giving up, or ``None`` to continue reconnection attempts forever.
+        giving up, or :const:`None` to continue reconnection attempts forever.
         The default is 64.
         """
         if delay < 0:
@@ -431,7 +495,7 @@ class RetryPolicy(object):
         perspective (i.e. a replica did not respond to the coordinator in time).
         It should return a tuple with two items: one of the class enums (such
         as :attr:`.RETRY`) and a :class:`.ConsistencyLevel` to retry the
-        operation at or ``None`` to keep the same consistency level.
+        operation at or :const:`None` to keep the same consistency level.
 
         `query` is the :class:`.Query` that timed out.
 
@@ -541,7 +605,7 @@ class DowngradingConsistencyRetryPolicy(RetryPolicy):
     level than the one initially requested. By doing so, it may break
     consistency guarantees. In other words, if you use this retry policy,
     there is cases (documented below) where a read at :attr:`~.QUORUM`
-    *may not* see a preceding write at :attr`~.QUORUM`. Do not use this
+    *may not* see a preceding write at :attr:`~.QUORUM`. Do not use this
     policy unless you have understood the cases where this can happen and
     are ok with that. It is also recommended to subclass this class so
     that queries that required a consistency level downgrade can be

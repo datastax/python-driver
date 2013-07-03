@@ -424,7 +424,7 @@ class TableMetadata(object):
     def as_cql_query(self, formatted=False):
         """
         Returns a CQL query that can be used to recreate this table (index
-        creations are not included).  If `formatted` is set to ``True``,
+        creations are not included).  If `formatted` is set to :const:`True`,
         extra whitespace will be added to make the query human readable.
         """
         ret = "CREATE TABLE %s.%s (%s" % (self.keyspace.name, self.name, "\n" if formatted else "")
@@ -553,7 +553,7 @@ class ColumnMetadata(object):
     index = None
     """
     If an index exists on this column, this is an instance of
-    :class:`.IndexMetadata`, otherwise ``None``.
+    :class:`.IndexMetadata`, otherwise :const:`None`.
     """
 
     def __init__(self, table_metadata, column_name, data_type, index_metadata=None):

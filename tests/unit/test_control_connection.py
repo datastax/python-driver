@@ -39,7 +39,7 @@ class MockMetadata(object):
 class MockCluster(object):
 
     max_schema_agreement_wait = Cluster.max_schema_agreement_wait
-    load_balancing_policy_factory = RoundRobinPolicy
+    load_balancing_policy = RoundRobinPolicy()
     reconnection_policy = ConstantReconnectionPolicy(2)
 
     def __init__(self):

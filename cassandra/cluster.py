@@ -90,7 +90,7 @@ class Cluster(object):
     compression = True
     """
     Whether or not compression should be enabled when possible. Defaults to
-    ``True`` and attempts to use snappy compression.
+    :const:`True` and attempts to use snappy compression.
     """
 
     auth_provider = None
@@ -99,11 +99,10 @@ class Cluster(object):
     and returns a dict of credentials for that node.
     """
 
-    load_balancing_policy_factory = RoundRobinPolicy
+    load_balancing_policy = RoundRobinPolicy()
     """
-    A factory function which creates instances of subclasses of
-    :class:`policies.LoadBalancingPolicy`.  Defaults to
-    :class:`policies.RoundRobinPolicy`.
+    An instance of :class:`.policies.LoadBalancingPolicy` or
+    one of its subclasses.  Defaults to :class:`~.RoundRobinPolicy`.
     """
 
     reconnection_policy = ExponentialReconnectionPolicy(1.0, 600.0)
@@ -168,6 +167,7 @@ class Cluster(object):
     scheduler = None
     executor = None
     _is_shutdown = False
+    _is_setup = False
     _prepared_statements = None
 
     def __init__(self,
@@ -175,7 +175,7 @@ class Cluster(object):
                  port=9042,
                  compression=True,
                  auth_provider=None,
-                 load_balancing_policy_factory=None,
+                 load_balancing_policy=None,
                  reconnection_policy=None,
                  retry_policy_factory=None,
                  conviction_policy_factory=None,
@@ -198,10 +198,8 @@ class Cluster(object):
                 raise ValueError("auth_provider must be callable")
             self.auth_provider = auth_provider
 
-        if load_balancing_policy_factory is not None:
-            if not callable(load_balancing_policy_factory):
-                raise ValueError("load_balancing_policy_factory must be callable")
-            self.load_balancing_policy_factory = load_balancing_policy_factory
+        if load_balancing_policy is not None:
+            self.load_balancing_policy = load_balancing_policy
 
         if reconnection_policy is not None:
             self.reconnection_policy = reconnection_policy
@@ -318,6 +316,11 @@ class Cluster(object):
         with self._lock:
             if self._is_shutdown:
                 raise Exception("Cluster is already shut down")
+
+            if not self._is_setup:
+                self.load_balancing_policy.populate(
+                    weakref.proxy(self), self.metadata.getAllHosts())
+                self._is_setup = True
 
             if self.control_connection:
                 try:
@@ -550,8 +553,7 @@ class Session(object):
 
         self._lock = RLock()
         self._pools = {}
-        self._load_balancer = cluster.load_balancing_policy_factory()
-        self._load_balancer.populate(weakref.proxy(cluster), hosts)
+        self._load_balancer = cluster.load_balancing_policy
 
         for host in hosts:
             self.add_host(host)
@@ -832,7 +834,7 @@ class ControlConnection(object):
         # use a weak reference to allow the Cluster instance to be GC'ed (and
         # shutdown) since implementing __del__ disables the cycle detector
         self._cluster = weakref.proxy(cluster)
-        self._balancing_policy = cluster.load_balancing_policy_factory()
+        self._balancing_policy = cluster.load_balancing_policy
         self._balancing_policy.populate(cluster, [])
         self._reconnection_policy = cluster.reconnection_policy
         self._connection = None

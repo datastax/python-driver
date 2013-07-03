@@ -158,9 +158,10 @@ class _ReconnectionHandler(object):
         number of seconds (as a float) that the handler will wait before
         attempting to connect again.
 
-        Subclasses should return ``False`` if no more attempts to connection
-        should be made, ``True`` otherwise.  The default behavior is to
-        always retry unless the error is an :exc:`.AuthenticationFailed`.
+        Subclasses should return :const:`False` if no more attempts to
+        connection should be made, :const:`True` otherwise.  The default
+        behavior is to always retry unless the error is an
+        :exc:`.AuthenticationFailed` instance.
         """
         if isinstance(exc, AuthenticationFailed):
             return False

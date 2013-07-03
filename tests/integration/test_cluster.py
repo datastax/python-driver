@@ -45,8 +45,8 @@ class ClusterTests(unittest.TestCase):
         def foo(*args, **kwargs):
             return Mock()
 
-        for kw in ('auth_provider', 'load_balancing_policy_factory',
-                   'retry_policy_factory', 'conviction_policy_factory'):
+        for kw in ('auth_provider', 'retry_policy_factory',
+                   'conviction_policy_factory'):
             kwargs = {kw: 123}
             self.assertRaises(ValueError, Cluster, **kwargs)
 
@@ -55,7 +55,8 @@ class ClusterTests(unittest.TestCase):
             self.assertEquals(getattr(c, kw), foo)
 
         for kw in ('contact_points', 'port', 'compression', 'metrics_enabled',
-                   'reconnection_policy', 'sockopts', 'max_schema_agreement_wait'):
+                   'load_balancing_policy', 'reconnection_policy', 'sockopts',
+                   'max_schema_agreement_wait'):
             kwargs = {kw: (1, 2, 3)}
             c = Cluster(**kwargs)
             self.assertEquals(getattr(c, kw), (1, 2, 3))
