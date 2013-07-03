@@ -216,7 +216,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         return self._writable
 
     def readable(self):
-        return self._readable or (self._have_listeners and not self.is_defunct or self.is_closed)
+        return self._readable or (self._have_listeners and not (self.is_defunct or self.is_closed))
 
     def send_msg(self, msg, cb):
         if self.is_defunct:
