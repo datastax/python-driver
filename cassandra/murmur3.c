@@ -1,3 +1,13 @@
+/*
+ * The majority of this code was taken from the python-smhasher library,
+ * which can be found here: https://github.com/phensley/python-smhasher
+ *
+ * That library is under the MIT license with the following copyright:
+ *
+ * Copyright (c) 2011 Austin Appleby (Murmur3 routine)
+ * Copyright (c) 2011 Patrick Hensley (Python wrapper, packaging)
+ *
+ */
 
 #include <Python.h>
 #include <stdio.h>
