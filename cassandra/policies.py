@@ -280,7 +280,7 @@ class TokenAwarePolicy(LoadBalancingPolicy):
                 for host in child.make_query_plan(query):
                     yield host
             else:
-                replicas = self.metadata.get_replicas(routing_key)
+                replicas = self._cluster_metadata.get_replicas(routing_key)
                 for replica in replicas:
                     if replica.monitor.is_up and \
                             child.distance(replica) == HostDistance.LOCAL:
@@ -289,7 +289,7 @@ class TokenAwarePolicy(LoadBalancingPolicy):
                 for host in child.make_query_plan(query):
                     # skip if we've already listed this host
                     if host not in replicas or \
-                            child.distance(replica) == HostDistance.REMOTE:
+                            child.distance(host) == HostDistance.REMOTE:
                         yield host
 
     def on_up(self, *args, **kwargs):

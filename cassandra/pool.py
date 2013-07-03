@@ -92,7 +92,8 @@ class Host(object):
         return self.address
 
     def __repr__(self):
-        return "<%s: %s>" % (self.__class__.__name__, self.address)
+        dc = (" %s" % (self._datacenter,)) if self._datacenter else ""
+        return "<%s: %s%s>" % (self.__class__.__name__, self.address, dc)
 
 
 class _ReconnectionHandler(object):

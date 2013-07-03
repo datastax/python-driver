@@ -1,12 +1,19 @@
-import unittest
+from itertools import islice, cycle
+from mock import Mock
+import struct
 from threading import Thread
+import unittest
 
 from cassandra import ConsistencyLevel
+from cassandra.cluster import Cluster
+from cassandra.metadata import Metadata
 from cassandra.policies import (RoundRobinPolicy, DCAwareRoundRobinPolicy,
-                                SimpleConvictionPolicy, HostDistance,
-                                ExponentialReconnectionPolicy, RetryPolicy,
-                                WriteType, DowngradingConsistencyRetryPolicy)
+                                TokenAwarePolicy, SimpleConvictionPolicy,
+                                HostDistance, ExponentialReconnectionPolicy,
+                                RetryPolicy, WriteType,
+                                DowngradingConsistencyRetryPolicy)
 from cassandra.pool import Host
+from cassandra.query import Query
 
 class TestRoundRobinPolicy(unittest.TestCase):
 
@@ -161,6 +168,72 @@ class TestDCAwareRoundRobinPolicy(unittest.TestCase):
 
         # since we have hosts in dc9000, the distance shouldn't be IGNORED
         self.assertEqual(policy.distance(new_remote_host), HostDistance.REMOTE)
+
+
+class TokenAwarePolicyTest(unittest.TestCase):
+
+    def test_wrap_round_robin(self):
+        cluster = Mock(spec=Cluster)
+        cluster.metadata = Mock(spec=Metadata)
+        hosts = [Host(str(i), SimpleConvictionPolicy) for i in range(4)]
+
+        def get_replicas(packed_key):
+            index = struct.unpack('>i', packed_key)[0]
+            return list(islice(cycle(hosts), index, index + 2))
+
+        cluster.metadata.get_replicas.side_effect = get_replicas
+
+        policy = TokenAwarePolicy(RoundRobinPolicy())
+        policy.populate(cluster, hosts)
+
+        for i in range(4):
+            query = Query(routing_key=struct.pack('>i', i))
+            qplan = list(policy.make_query_plan(query))
+
+            replicas = get_replicas(struct.pack('>i', i))
+            other = set(h for h in hosts if h not in replicas)
+            self.assertEquals(replicas, qplan[:2])
+            self.assertEquals(other, set(qplan[2:]))
+
+    def test_wrap_dc_aware(self):
+        cluster = Mock(spec=Cluster)
+        cluster.metadata = Mock(spec=Metadata)
+        hosts = [Host(str(i), SimpleConvictionPolicy) for i in range(4)]
+        for h in hosts[:2]:
+            h.set_location_info("dc1", "rack1")
+        for h in hosts[2:]:
+            h.set_location_info("dc2", "rack1")
+
+        def get_replicas(packed_key):
+            index = struct.unpack('>i', packed_key)[0]
+            # return one node from each DC
+            if index % 2 == 0:
+                return [hosts[0], hosts[2]]
+            else:
+                return [hosts[1], hosts[3]]
+
+        cluster.metadata.get_replicas.side_effect = get_replicas
+
+        policy = TokenAwarePolicy(DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=1))
+        policy.populate(cluster, hosts)
+
+        for i in range(4):
+            query = Query(routing_key=struct.pack('>i', i))
+            qplan = list(policy.make_query_plan(query))
+            replicas = get_replicas(struct.pack('>i', i))
+
+            # first should be the only local replica
+            self.assertIn(qplan[0], replicas)
+            self.assertEquals(qplan[0].datacenter, "dc1")
+
+            # then the local non-replica
+            self.assertNotIn(qplan[1], replicas)
+            self.assertEquals(qplan[1].datacenter, "dc1")
+
+            # then one of the remotes (used_hosts_per_remote_dc is 1, so we
+            # shouldn't see two remotes)
+            self.assertEquals(qplan[2].datacenter, "dc2")
+            self.assertEquals(3, len(qplan))
 
 
 class ExponentialReconnectionPolicyTest(unittest.TestCase):

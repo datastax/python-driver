@@ -48,12 +48,12 @@ class Query(object):
     def _get_routing_key(self):
         return self._routing_key
 
-    def _set_routing_key(self, key_components):
-        if len(key_components) == 1:
-            self._routing_key = key_components[0]
-        else:
+    def _set_routing_key(self, key):
+        if isinstance(key, (list, tuple)):
             self._routing_key = "".join(struct.pack("HsB", len(component), component, 0)
-                                        for component in key_components)
+                                        for component in key)
+        else:
+            self._routing_key = key
 
     def _del_routing_key(self):
         self._routing_key = None
@@ -66,7 +66,9 @@ class Query(object):
         The :attr:`~.TableMetadata.partition_key` portion of the primary key,
         which can be used to determine which nodes are replicas for the query.
 
-        When setting this attribute, a list or tuple *must* be used.
+        If the partition key is a composite, a list or tuple must be passed in.
+        Each key component should be in its packed (binary) format, so all
+        components should be strings.
         """)
 
 class SimpleStatement(Query):
