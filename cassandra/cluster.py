@@ -889,11 +889,12 @@ class ControlConnection(object):
         Creates a new Connection, registers for pushed events, and refreshes
         node/token and schema metadata.
         """
-        log.debug("[control connection] Opening new connection to %s" % (host,))
+        log.debug("[control connection] Opening new connection to %s", host)
         connection = self._cluster.connection_factory(host.address)
 
-        log.debug("[control connection] Established new connection, registering "
-                  "watchers and refreshing schema and topology")
+        log.debug("[control connection] Established new connection to %s, "
+                  "registering watchers and refreshing schema and topology",
+                  host)
         try:
             connection.register_watchers({
                 "TOPOLOGY_CHANGE": self._handle_topology_change,
