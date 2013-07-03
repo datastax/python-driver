@@ -278,7 +278,7 @@ class TokenMetadataTest(unittest.TestCase):
         cluster = Cluster()
         cluster.connect()
         tmap = cluster.metadata.token_map
-        self.assertTrue(issubclass(tmap.token_cls, Token))
+        self.assertTrue(issubclass(tmap.token_class, Token))
         self.assertEqual(1, len(tmap.ring))
         self.assertEqual(1, len(tmap.tokens_to_hosts))
         cluster.shutdown()

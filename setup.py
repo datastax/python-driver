@@ -62,7 +62,7 @@ setup(
     packages=["cassandra", "cassandra.io"],
     ext_modules=[murmur3],
     install_requires=['futures'],
-    test_requires=['nose', 'mock'],
+    tests_require=['nose', 'mock', 'ccm'],
     cmdclass={"doc": doc},
     classifiers=[
         'Development Status :: 3 - Alpha',
