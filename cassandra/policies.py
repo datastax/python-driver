@@ -459,9 +459,8 @@ class RetryPolicy(object):
     and unavailable failures.
 
     To specify a default retry policy, set the
-    :attr:`.Cluster.retry_policy_factory` attribute to this class,
-    one of its subclasses, or a function that returns instances of this
-    class or a subclass.
+    :attr:`.Cluster.default_retry_policy` attribute to an instance of this
+    class or one of its subclasses.
 
     To specify a retry policy per query, set the :attr:`.Query.retry_policy`
     attribute to an instance of this class or one of its subclasses.

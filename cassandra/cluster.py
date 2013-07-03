@@ -107,23 +107,23 @@ class Cluster(object):
 
     reconnection_policy = ExponentialReconnectionPolicy(1.0, 600.0)
     """
-    An instance of :class:`policies.ReconnectionPolicy`. Defaults to an instance
-    of :class:`ExponentialReconnectionPolicy` with a base delay of one second and
+    An instance of :class:`.policies.ReconnectionPolicy`. Defaults to an instance
+    of :class:`.ExponentialReconnectionPolicy` with a base delay of one second and
     a max delay of ten minutes.
     """
 
-    retry_policy_factory = RetryPolicy
+    default_retry_policy = RetryPolicy()
     """
-    A factory function which creates instances of
-    :class:`policies.RetryPolicy`.  Defaults to
-    :class:`policies.RetryPolicy`.
+    A default :class:`.policies.RetryPolicy` instance to use for all
+    :class:`.Query` objects which do not have a :attr:`~.Query.retry_policy`
+    explicitly set.
     """
 
     conviction_policy_factory = SimpleConvictionPolicy
     """
     A factory function which creates instances of
-    :class:`policies.ConvictionPolicy`.  Defaults to
-    :class:`policies.SimpleConvictionPolicy`.
+    :class:`.policies.ConvictionPolicy`.  Defaults to
+    :class:`.policies.SimpleConvictionPolicy`.
     """
 
     metrics_enabled = False
@@ -177,7 +177,7 @@ class Cluster(object):
                  auth_provider=None,
                  load_balancing_policy=None,
                  reconnection_policy=None,
-                 retry_policy_factory=None,
+                 default_retry_policy=None,
                  conviction_policy_factory=None,
                  metrics_enabled=False,
                  connection_class=None,
@@ -204,10 +204,8 @@ class Cluster(object):
         if reconnection_policy is not None:
             self.reconnection_policy = reconnection_policy
 
-        if retry_policy_factory is not None:
-            if not callable(retry_policy_factory):
-                raise ValueError("retry_policy_factory must be callable")
-            self.retry_policy_factory = retry_policy_factory
+        if default_retry_policy is not None:
+            self.default_retry_policy = default_retry_policy
 
         if conviction_policy_factory is not None:
             if not callable(conviction_policy_factory):
@@ -1363,7 +1361,7 @@ class ResponseFuture(object):
                 if self.query:
                     retry_policy = self.query.retry_policy
                 if not retry_policy:
-                    retry_policy = self.session.cluster.retry_policy_factory()
+                    retry_policy = self.session.cluster.default_retry_policy
 
                 if isinstance(response, ReadTimeoutErrorMessage):
                     retry = retry_policy.on_read_timeout(
