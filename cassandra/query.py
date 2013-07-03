@@ -212,12 +212,17 @@ class BoundStatement(Query):
         if self._routing_key is not None:
             return self._routing_key
 
-        components = []
-        for statement_index in self.prepared_statement.routing_key_indexes:
-            val = self.values[statement_index]
-            components.append(struct.pack("HsB", len(val), val, 0))
+        routing_indexes = self.prepared_statement.routing_key_indexes
+        if len(routing_indexes) == 1:
+            self._routing_key = self.values[routing_indexes[0]]
+        else:
+            components = []
+            for statement_index in routing_indexes:
+                val = self.values[statement_index]
+                components.append(struct.pack("HsB", len(val), val, 0))
 
-        self._routing_key = "".join(components)
+            self._routing_key = "".join(components)
+
         return self._routing_key
 
 
