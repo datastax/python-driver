@@ -42,11 +42,13 @@ class doc(Command):
 
         if has_subprocess:
             try:
-                subprocess.check_output(
+                output = subprocess.check_output(
                     ["sphinx-build", "-b", mode, "docs", path],
                     stderr=subprocess.STDOUT)
             except subprocess.CalledProcessError, exc:
                 raise RuntimeError("Documentation step '%s' failed: %s: %s" % (mode, exc, exc.output))
+            else:
+                print output
 
             print ""
             print "Documentation step '%s' performed, results here:" % mode
@@ -57,7 +59,7 @@ setup(
     name='cassandra',
     version=__version__,
     description='Python driver for Cassandra',
-    packages=["cassandra"],
+    packages=["cassandra", "cassandra.io"],
     ext_modules=[murmur3],
     install_requires=['futures'],
     test_requires=['nose', 'mock'],
