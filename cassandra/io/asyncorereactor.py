@@ -11,6 +11,7 @@ import asyncore
 
 from cassandra.connection import (Connection, ResponseWaiter, ConnectionException,
                                   ConnectionBusy, NONBLOCKING)
+from cassandra.decoder import RegisterMessage
 from cassandra.marshal import int32_unpack
 
 log = logging.getLogger(__name__)
@@ -188,13 +189,13 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
             if not self._callbacks:
                 self._readable = False
         else:
-            log.debug("connection closed by server")
             self.close()
 
     def handle_pushed(self, response):
-        for cb in self._push_watchers[response.type]:
+        log.debug("Message pushed from server: %r", response)
+        for cb in self._push_watchers.get(response.event_type, []):
             try:
-                cb(response)
+                cb(response.event_args)
             except:
                 log.exception("Pushed event handler errored, ignoring:")
 
@@ -247,7 +248,10 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
     def register_watcher(self, event_type, callback):
         self._push_watchers[event_type].add(callback)
         self._have_listeners = True
+        self.wait_for_response(RegisterMessage(event_list=[event_type]))
 
     def register_watchers(self, type_callback_dict):
         for event_type, callback in type_callback_dict.items():
-            self.register_watcher(event_type, callback)
+            self._push_watchers[event_type].add(callback)
+        self._have_listeners = True
+        self.wait_for_response(RegisterMessage(event_list=type_callback_dict.keys()))
