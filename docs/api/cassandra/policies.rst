@@ -18,6 +18,9 @@ Load Balancing
 .. autoclass:: DCAwareRoundRobinPolicy
    :members:
 
+.. autoclass:: TokenAwarePolicy
+   :members:
+
 Marking Hosts Up or Down
 ------------------------
 
