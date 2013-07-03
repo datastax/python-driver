@@ -19,13 +19,44 @@ Features to be Added
 
 Installation
 ------------
-The driver currently depends on pyev for its core event loop. The pyev library
-depends on libev.  If you're on Linux, you should be able to install libev
+A package hasn't been put on pypi yet, so for now, run:
+
+    .. code-block:: bash
+
+      $ sudo pip install futures  # install dependency
+      $ sudo python setup.py install
+
+libev support
+^^^^^^^^^^^^^
+
+The driver currently uses Python's ``asyncore`` module for its default
+event loop.  For better performance, ``libev`` is also supported through
+the ``pyev`` python wrapper.
+
+If you're on Linux, you should be able to install libev
 through a package manager.  For example, on Debian/Ubuntu:
 
     .. code-block:: bash
 
-      $ sudo apt-get install libev-dev
+      $ sudo apt-get install libev
+
+and then install ``pyev`` as follows:
+
+    .. code-block:: bash
+
+      $ sudo pip install pyev
+
+If successful, you should be able to use the libev event loop by
+doing the following
+
+    .. code-block:: python
+
+      >>> from cassandra.io.libevreactor import LibevConnection
+      >>> from cassandra.cluster import Cluster
+
+      >>> cluster = Cluster()
+      >>> cluster.connection_class = LibevConnection
+      >>> session = cluster.connect()
 
 License
 -------
