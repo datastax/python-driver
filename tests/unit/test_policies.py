@@ -78,11 +78,32 @@ class TestDCAwareRoundRobinPolicy(unittest.TestCase):
         for h in hosts[2:]:
             h.set_location_info("dc2", "rack1")
 
-        policy = DCAwareRoundRobinPolicy("dc1")
+        local_hosts = set(h for h in hosts if h.datacenter == "dc1")
+        remote_hosts = set(h for h in hosts if h.datacenter != "dc1")
+
+        # allow all of the remote hosts to be used
+        policy = DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=2)
         policy.populate(None, hosts)
         qplan = list(policy.make_query_plan())
-        self.assertEqual(set(qplan[:2]), set(h for h in hosts if h.datacenter == "dc1"))
-        self.assertEqual(set(qplan[2:]), set(h for h in hosts if h.datacenter != "dc1"))
+        self.assertEqual(set(qplan[:2]), local_hosts)
+        self.assertEqual(set(qplan[2:]), remote_hosts)
+
+        # allow only one of the remote hosts to be used
+        policy = DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=1)
+        policy.populate(None, hosts)
+        qplan = list(policy.make_query_plan())
+        self.assertEqual(set(qplan[:2]), local_hosts)
+
+        used_remotes = set(qplan[2:])
+        self.assertEqual(1, len(used_remotes))
+        self.assertIn(qplan[2], remote_hosts)
+
+        # allow no remote hosts to be used
+        policy = DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=0)
+        policy.populate(None, hosts)
+        qplan = list(policy.make_query_plan())
+        self.assertEqual(2, len(qplan))
+        self.assertEqual(local_hosts, set(qplan))
 
     def test_get_distance(self):
         policy = DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=0)
