@@ -47,7 +47,7 @@ copyright = u'2012, Blake Eggleston'
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 #
-__cqlengine_version_path__ = os.path.realpath(__file__ + '/../VERSION')
+__cqlengine_version_path__ = os.path.realpath(__file__ + '/../../cqlengine/VERSION')
 # The short X.Y version.
 version = open(__cqlengine_version_path__, 'r').readline().strip()
 # The full version, including alpha/beta/rc tags.
