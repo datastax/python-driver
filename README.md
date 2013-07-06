@@ -49,8 +49,6 @@ class ExampleModel(Model):
 >>> em6 = ExampleModel.create(example_type=1, description="example6", created_at=datetime.now())
 >>> em7 = ExampleModel.create(example_type=1, description="example7", created_at=datetime.now())
 >>> em8 = ExampleModel.create(example_type=1, description="example8", created_at=datetime.now())
-# Note: the UUID and DateTime columns will create uuid4 and datetime.now
-# values automatically if we don't specify them when creating new rows
 
 #and now we can run some queries against our table
 >>> ExampleModel.objects.count()

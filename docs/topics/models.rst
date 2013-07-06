@@ -41,7 +41,7 @@ The Person model would create this CQL table:
 Columns
 =======
 
-    Columns in your models map to columns in your CQL table. You define CQL columns by defining column attributes on your model classes. For a model to be valid it needs at least one primary key column (defined automatically if you don't define one) and one non-primary key column.
+    Columns in your models map to columns in your CQL table. You define CQL columns by defining column attributes on your model classes. For a model to be valid it needs at least one primary key column and one non-primary key column.
 
     Just as in CQL, the order you define your columns in is important, and is the same order they are defined in on a model's corresponding table.
 
