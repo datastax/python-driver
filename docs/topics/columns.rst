@@ -46,17 +46,29 @@ Columns
 
     Stores a datetime value.
 
-    Python's datetime.now callable is set as the default value for this column ::
-
         columns.DateTime()
 
 .. class:: UUID()
 
     Stores a type 1 or type 4 UUID.
 
-    Python's uuid.uuid4 callable is set as the default value for this column. ::
-
         columns.UUID()
+
+.. class:: TimeUUID()
+
+    Stores a UUID value as the cql type 'timeuuid' ::
+
+        columns.TimeUUID()
+
+    .. classmethod:: from_datetime(dt)
+
+        generates a TimeUUID for the given datetime
+
+        :param dt: the datetime to create a time uuid from
+        :type dt: datetime.datetime
+
+        :returns: a time uuid created from the given datetime
+        :rtype: uuid1
 
 .. class:: Boolean()
 
@@ -91,6 +103,7 @@ Collection Type Columns
     .. code-block:: python
         
         class Person(Model):
+            id          = columns.UUID(primary_key=True, default=uuid.uuid4)
             first_name  = columns.Text()
             last_name   = columns.Text()
 
