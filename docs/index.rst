@@ -9,7 +9,7 @@ cqlengine documentation
 
 .. _Breaking Changes: https://groups.google.com/forum/?fromgroups#!topic/cqlengine-users/erkSNe1JwuU
 
-cqlengine is a Cassandra CQL 3 Object Mapper for Python with an interface similar to the Django orm and mongoengine
+cqlengine is a Cassandra CQL 3 Object Mapper for Python
 
 :ref:`getting-started`
 
