@@ -146,6 +146,3 @@ Model Attributes
 
         *Optional.* Sets the name of the keyspace used by this model. Defaulst to cqlengine
 
-Automatic Primary Keys
-======================
-    CQL requires that all tables define at least one primary key. If a model definition does not include a primary key column, cqlengine will automatically add a uuid primary key column named ``id``.
