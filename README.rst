@@ -1,11 +1,15 @@
-python-driver
-=============
-Python Native Protocol Driver (Work in Progress)
+DataStax Python Driver for Apache Cassandra (Beta)
+==================================================
+A Python client driver for Apache Cassandra.  This driver works exclusively
+with the Cassandra Query Language v3 (CQL3) and Cassandra's native
+protocol.  As such, only Cassandra 1.2+ is supported.
 
 **Warning**
 
 This driver is currently under heavy development, so the API and layout of
-packages, modules, classes, and functions are subject to change.
+packages, modules, classes, and functions are subject to change.  There may
+also be serious bugs, so usage in a production environment is *not*
+recommended at this time.
 
 Features to be Added
 --------------------
@@ -28,7 +32,6 @@ A package hasn't been put on pypi yet, so for now, run:
 
 libev support
 ^^^^^^^^^^^^^
-
 The driver currently uses Python's ``asyncore`` module for its default
 event loop.  For better performance, ``libev`` is also supported through
 the ``pyev`` python wrapper.
