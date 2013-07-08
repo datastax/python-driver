@@ -43,7 +43,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'Cassandra Driver'
-copyright = u'2013, Tyler Hobbs'
+copyright = u'2013, DataStax'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -183,8 +183,8 @@ htmlhelp_basename = 'CassandraDriverdoc'
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'CassandraDriver.tex', u'Cassandra Driver Documentation',
-   u'Tyler Hobbs', 'manual'),
+    ('index', 'CassandraDriver.tex', u'Cassandra Driver Documentation',
+     u'DataStax', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
