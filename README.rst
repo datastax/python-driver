@@ -11,6 +11,10 @@ packages, modules, classes, and functions are subject to change.  There may
 also be serious bugs, so usage in a production environment is *not*
 recommended at this time.
 
+Documentation
+-------------
+* `API Documentation <http://datastax.github.io/python-driver/api/index.html>`_
+
 Features to be Added
 --------------------
 * C extension for encoding/decoding messages
