@@ -11,8 +11,9 @@ packages, modules, classes, and functions are subject to change.  There may
 also be serious bugs, so usage in a production environment is *not*
 recommended at this time.
 
-Documentation
--------------
+* `JIRA <https://datastax-oss.atlassian.net/browse/PYTHON>`_
+* `Mailing List <https://groups.google.com/a/lists.datastax.com/forum/#!forum/python-driver-user>`_
+* IRC: #datastax-drivers on irc.freenode.net (you can use `freenode's web-based client <http://webchat.freenode.net/?channels=#datastax-drivers>`_)
 * `API Documentation <http://datastax.github.io/python-driver/api/index.html>`_
 
 Features to be Added
