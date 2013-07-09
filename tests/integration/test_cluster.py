@@ -41,25 +41,6 @@ class ClusterTests(unittest.TestCase):
         cluster = Cluster(['127.1.2.9', '127.1.2.10'])
         self.assertRaises(NoHostAvailable, cluster.connect)
 
-    def test_init_kwargs(self):
-        def foo(*args, **kwargs):
-            return Mock()
-
-        for kw in ('auth_provider', 'conviction_policy_factory'):
-            kwargs = {kw: 123}
-            self.assertRaises(ValueError, Cluster, **kwargs)
-
-            kwargs = {kw: foo}
-            c = Cluster(**kwargs)
-            self.assertEquals(getattr(c, kw), foo)
-
-        for kw in ('contact_points', 'port', 'compression', 'metrics_enabled',
-                   'load_balancing_policy', 'retry_policy', 'reconnection_policy',
-                   'sockopts', 'max_schema_agreement_wait'):
-            kwargs = {kw: (1, 2, 3)}
-            c = Cluster(**kwargs)
-            self.assertEquals(getattr(c, kw), (1, 2, 3))
-
     def test_submit_schema_refresh(self):
         cluster = Cluster()
         cluster.connect()
