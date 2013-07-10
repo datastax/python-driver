@@ -151,21 +151,23 @@ class ConnectionPool(object):
         raise CQLConnectionError("Could not connect to any server in cluster")
 
     def execute(self, query, params):
-        try:
-            con = self.get()
-            cur = con.cursor()
-            cur.execute(query, params)
-            columns = [i[0] for i in cur.description or []]
-            results = [RowResult(r) for r in cur.fetchall()]
-            LOG.debug('{} {}'.format(query, repr(params)))
-            self.put(con)
-            return QueryResult(columns, results)
-        except cql.ProgrammingError as ex:
-            raise CQLEngineException(unicode(ex))
-        except TTransportException:
-            pass
+        while True:
+            try:
+                con = self.get()
+                cur = con.cursor()
+                cur.execute(query, params)
+                columns = [i[0] for i in cur.description or []]
+                results = [RowResult(r) for r in cur.fetchall()]
+                LOG.debug('{} {}'.format(query, repr(params)))
+                self.put(con)
+                return QueryResult(columns, results)
+            except CQLConnectionError as ex:
+                raise CQLEngineException("Could not execute query against the cluster")
+            except cql.ProgrammingError as ex:
+                raise CQLEngineException(unicode(ex))
+            except TTransportException:
+                raise CQLEngineException("Could not execute query against the cluster")
 
-        raise CQLEngineException("Could not execute query against the cluster")
 
 
 def execute(query, params={}):
