@@ -1,5 +1,8 @@
 CHANGELOG
 
+0.5.2
+* adding hex conversion to Bytes column
+
 0.5.1
 * improving connection pooling
 * fixing bug with clustering order columns not being quoted
