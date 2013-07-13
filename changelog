@@ -1,5 +1,9 @@
 CHANGELOG
 
+0.5.1
+* improving connection pooling
+* fixing bug with clustering order columns not being quoted
+
 0.5
 * eagerly loading results into the query result cache, the cql driver does this anyway,
     and pulling them from the cursor was causing some problems with gevented queries,
