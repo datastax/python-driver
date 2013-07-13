@@ -195,6 +195,11 @@ class Column(object):
 class Bytes(Column):
     db_type = 'blob'
 
+    def to_database(self, value):
+        val = super(Bytes, self).to_database(value)
+        if val is None: return
+        return val.encode('hex')
+
 class Ascii(Column):
     db_type = 'ascii'
 

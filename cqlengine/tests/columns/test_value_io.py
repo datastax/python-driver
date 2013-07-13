@@ -77,6 +77,12 @@ class BaseColumnIOTest(BaseCassEngTestCase):
             #delete
             self._generated_model.filter(pkey=pkey).delete()
 
+class TestBlobIO(BaseColumnIOTest):
+
+    column = columns.Bytes
+    pkey_val = 'blake', uuid4().bytes
+    data_val = 'eggleston', uuid4().bytes
+
 class TestTextIO(BaseColumnIOTest):
 
     column = columns.Text
