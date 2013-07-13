@@ -7,6 +7,8 @@ from cqlengine.connection import ConnectionPool, Host
 from mock import Mock, MagicMock, MagicProxy, patch
 from cqlengine import management
 from cqlengine.tests.query.test_queryset import TestModel
+from cqlengine.models import Model
+from cqlengine import columns
 
 from cql.thrifteries import ThriftConnection
 
@@ -65,3 +67,23 @@ class DeleteTableTest(BaseCassEngTestCase):
 
         delete_table(TestModel)
         delete_table(TestModel)
+
+class LowercaseKeyModel(Model):
+    first_key = columns.Integer(primary_key=True)
+    second_key = columns.Integer(primary_key=True)
+    some_data = columns.Text()
+
+class CapitalizedKeyModel(Model):
+    firstKey = columns.Integer(primary_key=True)
+    secondKey = columns.Integer(primary_key=True)
+    someData = columns.Text()
+
+class CapitalizedKeyTest(BaseCassEngTestCase):
+
+    def test_table_definition(self):
+        """ Tests that creating a table with capitalized column names succeedso """
+        create_table(LowercaseKeyModel)
+        create_table(CapitalizedKeyModel)
+
+        delete_table(LowercaseKeyModel)
+        delete_table(CapitalizedKeyModel)
