@@ -26,6 +26,12 @@ else:
             return ''
         return snappy.decompress(byts)
     locally_supported_compressions['snappy'] = (snappy.compress, decompress)
+try:
+    import lz4
+except ImportError:
+    pass
+else:
+    locally_supported_compressions['lz4'] = (lz4.compress, lz4.decompress)
 
 
 MAX_STREAM_PER_CONNECTION = 128
