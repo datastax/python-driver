@@ -44,7 +44,7 @@ class TypeTests(unittest.TestCase):
         v4_uuid = uuid4()
         mydatetime = datetime(2013, 1, 1, 1, 1, 1)
 
-        params = (
+        params = [
             "sometext",
             "sometext",
             "ascii",  # ascii
@@ -64,15 +64,9 @@ class TypeTests(unittest.TestCase):
             v4_uuid,  # uuid
             v1_uuid,  # timeuuid
             123456789123456789123456789  # varint
-        )
-        s.execute("""
-            INSERT INTO mytable (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, params)
+        ]
 
-        results = s.execute("SELECT * FROM mytable")
-
-        expected = (
+        expected_vals = (
             "sometext",
             "sometext",
             "ascii",  # ascii
@@ -94,5 +88,42 @@ class TypeTests(unittest.TestCase):
             123456789123456789123456789  # varint
         )
 
-        for expected, actual in zip(expected, results[0]):
+        s.execute("""
+            INSERT INTO mytable (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, params)
+
+        results = s.execute("SELECT * FROM mytable")
+
+        for expected, actual in zip(expected_vals, results[0]):
+            self.assertEquals(expected, actual)
+
+        # try the same thing with a prepared statement
+        prepared = s.prepare("""
+            INSERT INTO mytable (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """)
+
+        params[4] = 'blob'
+        s.execute(prepared.bind(params))
+
+        results = s.execute("SELECT * FROM mytable")
+
+        for expected, actual in zip(expected_vals, results[0]):
+            self.assertEquals(expected, actual)
+
+        # query with prepared statement
+        prepared = s.prepare("""
+            SELECT a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s FROM mytable
+            """)
+        results = s.execute(prepared.bind(()))
+
+        for expected, actual in zip(expected_vals, results[0]):
+            self.assertEquals(expected, actual)
+
+        # query with prepared statement, no explicit columns
+        prepared = s.prepare("""SELECT * FROM mytable""")
+        results = s.execute(prepared.bind(()))
+
+        for expected, actual in zip(expected_vals, results[0]):
             self.assertEquals(expected, actual)
