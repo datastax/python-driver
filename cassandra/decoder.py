@@ -16,6 +16,7 @@
 
 from collections import namedtuple, OrderedDict
 import datetime
+import logging
 import socket
 import types
 from uuid import UUID
@@ -30,6 +31,7 @@ from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unp
                                int8_pack, int8_unpack)
 from cassandra.cqltypes import lookup_cqltype
 
+log = logging.getLogger(__name__)
 
 class NotSupportedError(Exception):
     pass
@@ -45,10 +47,6 @@ PROTOCOL_VERSION_MASK = 0x7f
 HEADER_DIRECTION_FROM_CLIENT = 0x00
 HEADER_DIRECTION_TO_CLIENT = 0x80
 HEADER_DIRECTION_MASK = 0x80
-
-
-def warn(msg):
-    print msg
 
 
 def tuple_factory(colnames, rows):
@@ -147,7 +145,7 @@ def decode_response(stream_id, flags, opcode, body, decompressor=None):
         tracing_id = None
 
     if flags:
-        warn("Unknown protocol flags set: %02x. May cause problems." % flags)
+        log.warn("Unknown protocol flags set: %02x. May cause problems." % flags)
 
     msg_class = _message_types_by_opcode[opcode]
     msg = msg_class.recv_body(StringIO(body))
