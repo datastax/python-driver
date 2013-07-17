@@ -82,6 +82,8 @@ class _MessageType(object):
     __metaclass__ = _register_msg_type
     params = ()
 
+    tracing = False
+
     def __init__(self, **kwargs):
         for pname in self.params:
             try:
@@ -99,7 +101,9 @@ class _MessageType(object):
         flags = 0
         if compression is not None and len(body) > 0:
             body = compression(body)
-            flags |= 0x1
+            flags |= 0x01
+        if self.tracing:
+            flags |= 0x02
         msglen = int32_pack(len(body))
         msg_parts = map(int8_pack, (version, flags, stream_id, self.opcode)) + [msglen, body]
         return ''.join(msg_parts)
@@ -112,7 +116,9 @@ class _MessageType(object):
         flags = 0
         if compression is not None and len(body) > 0:
             body = compression(body)
-            flags |= 0x1
+            flags |= 0x01
+        if self.tracing:
+            flags |= 0x02
         msglen = int32_pack(len(body))
         header = ''.join(map(int8_pack, (version, flags, streamid, self.opcode))) \
                  + msglen
@@ -127,16 +133,26 @@ class _MessageType(object):
 
 
 def decode_response(stream_id, flags, opcode, body, decompressor=None):
-    if flags & 0x1:
+    if flags & 0x01:
         if decompressor is None:
             raise Exception("No decompressor available for compressed frame!")
         body = decompressor(body)
-        flags ^= 0x1
+        flags ^= 0x01
+
+    body = StringIO(body)
+    if flags & 0x02:
+        tracing_id = body.read(16)
+        flags ^= 0x02
+    else:
+        tracing_id = None
+
     if flags:
         warn("Unknown protocol flags set: %02x. May cause problems." % flags)
+
     msg_class = _message_types_by_opcode[opcode]
     msg = msg_class.recv_body(StringIO(body))
     msg.stream_id = stream_id
+    msg.tracing_id = tracing_id
     return msg
 
 
