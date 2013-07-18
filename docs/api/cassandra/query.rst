@@ -16,3 +16,10 @@
    :members:
 
 .. autoclass:: ValueSequence
+   :members:
+
+.. autoclass:: QueryTrace ()
+   :members:
+
+.. autoclass:: TraceEvent ()
+   :members:

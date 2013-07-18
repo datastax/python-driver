@@ -27,6 +27,12 @@ class Query(object):
     will be retried.
     """
 
+    trace = None
+    """
+    If :meth:`.Session.execute()` is run with `trace` set to :const:`True`,
+    this will be set to a :class:`.QueryTrace` instance.
+    """
+
     consistency_level = ConsistencyLevel.ONE
     """
     The :class:`.ConsistencyLevel` to be used for this operation.  Defaults
@@ -301,7 +307,7 @@ class QueryTrace(object):
 
     events = None
     """
-    A chronologically sorted list of :class:`.TracingEvent` instances
+    A chronologically sorted list of :class:`.TraceEvent` instances
     representing the steps the traced operation went through.  This
     corresponds to the rows in ``system_traces.events`` for this tracing
     session.
@@ -353,19 +359,43 @@ class QueryTrace(object):
 
 
 class TraceEvent(object):
+    """
+    Representation of a single event within a query trace.
+    """
 
-    name = None
-    happened_at = None
+    description = None
+    """
+    A brief description of the event.
+    """
+
+    datetime = None
+    """
+    A UTC :class:`datetime.datetime` marking when the event occurred.
+    """
+
     source = None
-    source_elapsed = None
-    thread_name = None
+    """
+    The IP address of the node this event occurred on.
+    """
 
-    def __init__(self, name, timeuuid, source, source_elapsed, thread_name):
-        self.name = name
-        self.happened_at = datetime.utcfromtimestamp(unix_time_from_uuid1(timeuuid))
+    source_elapsed = None
+    """
+    A :class:`datetime.timedelta` measuring the amount of time until
+    this event occurred starting from when :attr:`.source` first
+    received the query.
+    """
+
+    thread_name = None
+    """
+    The name of the thread that this event occurred on.
+    """
+
+    def __init__(self, description, timeuuid, source, source_elapsed, thread_name):
+        self.description = description
+        self.datetime = datetime.utcfromtimestamp(unix_time_from_uuid1(timeuuid))
         self.source = source
         self.source_elapsed = timedelta(microseconds=source_elapsed)
         self.thread_name = thread_name
 
     def __str__(self):
-        return "%s on %s[%s] at %s" % (self.name, self.source, self.thread_name, self.happened_at)
+        return "%s on %s[%s] at %s" % (self.description, self.source, self.thread_name, self.datetime)
