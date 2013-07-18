@@ -30,7 +30,7 @@ from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy)
 from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
-                             bind_params, QueryTrace)
+                             bind_params, QueryTrace, Query)
 from cassandra.pool import (_ReconnectionHandler, _HostReconnectionHandler,
                             HostConnectionPool)
 
@@ -570,13 +570,31 @@ class Session(object):
         sequence is used, ``%s`` should be used the placeholder for each
         argument.  If a dict is used, ``%(name)s`` style placeholders must
         be used.
+
+        If `trace` is set to :const:`True`, an attempt will be made to
+        fetch the trace details and attach them to the `query`'s
+        :attr:`~.Query.trace` attribute in the form of a :class:`.QueryTrace`
+        instance.  This requires that `query` be a :class:`.Query` subclass
+        instance and not just a string.  If there is an error fetching the
+        trace details, the :attr:`~.Query.trace` attribute will be left as
+        :const:`None`.
         """
+        if trace and not isinstance(query, Query):
+            raise TypeError(
+                "The query argument must be an instance of a subclass of "
+                "cassandra.query.Query when trace=True")
+
         future = self.execute_async(query, parameters, trace)
-        result = future.result()
-        if not trace:
-            return result
-        else:
-            return result, future.query_trace
+        try:
+            result = future.result()
+        finally:
+            if trace:
+                try:
+                    query.trace = future.get_query_trace()
+                except:
+                    log.exception("Unable to fetch query trace:")
+
+        return result
 
     def execute_async(self, query, parameters=None, trace=False):
         """
@@ -585,6 +603,10 @@ class Session(object):
         delivery.  You may also call :meth:`~.ResponseFuture.result()`
         on the ``ResponseFuture`` to syncronously block for results at
         any time.
+
+        If `trace` is set to :const:`True`, you may call
+        :meth:`.ResponseFuture.get_query_trace()` after the request
+        completes to retrieve a :class:`.QueryTrace` instance.
 
         Example usage::
 
@@ -1271,11 +1293,11 @@ class ResponseFuture(object):
     row_factory = None
     message = None
     query = None
-    query_trace = None
 
     _req_id = None
     _final_result = _NO_RESULT_YET
     _final_exception = None
+    _query_trace = None
     _callback = None
     _errback = None
     _current_host = None
@@ -1345,7 +1367,7 @@ class ResponseFuture(object):
 
             trace_id = getattr(response, 'trace_id', None)
             if trace_id:
-                self.query_trace = QueryTrace(trace_id, self.session)
+                self._query_trace = QueryTrace(trace_id, self.session)
 
             if isinstance(response, ResultMessage):
                 if response.kind == ResultMessage.KIND_SET_KEYSPACE:
@@ -1542,6 +1564,19 @@ class ResponseFuture(object):
                 raise self._final_exception
             else:
                 assert False  # shouldn't get here
+
+    def get_query_trace(self):
+        """
+        Returns the :class:`~.query.QueryTrace` instance representing a trace
+        of the last attempt for this operation, or :const:`None` if tracing was
+        not enabled for this query.  Note that this may raise an exception if
+        there are problems retrieving the trace details from Cassandra.
+        """
+        if not self._query_trace:
+            return None
+
+        self._query_trace.populate()
+        return self._query_trace
 
     def add_callback(self, fn, *args, **kwargs):
         """
