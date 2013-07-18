@@ -29,7 +29,8 @@ from cassandra.metadata import Metadata
 from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy)
-from cassandra.query import SimpleStatement, PreparedStatement, BoundStatement, bind_params
+from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
+                             bind_params, QueryTrace)
 from cassandra.pool import (_ReconnectionHandler, _HostReconnectionHandler,
                             HostConnectionPool)
 
@@ -556,7 +557,7 @@ class Session(object):
         for host in hosts:
             self.add_host(host)
 
-    def execute(self, query, parameters=None):
+    def execute(self, query, parameters=None, trace=False):
         """
         Execute the given query and synchronously wait for the response.
 
@@ -570,9 +571,14 @@ class Session(object):
         argument.  If a dict is used, ``%(name)s`` style placeholders must
         be used.
         """
-        return self.execute_async(query, parameters).result()
+        future = self.execute_async(query, parameters, trace)
+        result = future.result()
+        if not trace:
+            return result
+        else:
+            return result, future.query_trace
 
-    def execute_async(self, query, parameters=None):
+    def execute_async(self, query, parameters=None, trace=False):
         """
         Execute the given query and return a :class:`~.ResponseFuture` object
         which callbacks may be attached to for asynchronous response
@@ -622,9 +628,8 @@ class Session(object):
                 query_string = bind_params(query.query_string, parameters)
             message = QueryMessage(query=query_string, consistency_level=query.consistency_level)
 
-        if query.tracing_enabled:
-            # TODO enable tracing on the message
-            pass
+        if trace:
+            message.tracing = True
 
         future = ResponseFuture(self, message, query)
         future.send_request()
@@ -1266,6 +1271,7 @@ class ResponseFuture(object):
     row_factory = None
     message = None
     query = None
+    query_trace = None
 
     _req_id = None
     _final_result = _NO_RESULT_YET
@@ -1336,6 +1342,10 @@ class ResponseFuture(object):
         try:
             if self._current_pool:
                 self._current_pool.return_connection(self._connection)
+
+            trace_id = getattr(response, 'trace_id', None)
+            if trace_id:
+                self.query_trace = QueryTrace(trace_id, self.session)
 
             if isinstance(response, ResultMessage):
                 if response.kind == ResultMessage.KIND_SET_KEYSPACE:

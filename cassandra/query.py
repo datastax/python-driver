@@ -27,14 +27,6 @@ class Query(object):
     will be retried.
     """
 
-    tracing_enabled = False
-    """
-    A boolean flag that may be set to :const:`True` to enable tracing on this
-    query only.
-
-    **Note**: query tracing is not yet supported by this driver
-    """
-
     consistency_level = ConsistencyLevel.ONE
     """
     The :class:`.ConsistencyLevel` to be used for this operation.  Defaults
