@@ -5,6 +5,7 @@ queries.
 """
 
 import struct
+import time
 
 from cassandra import ConsistencyLevel
 from cassandra.decoder import (cql_encoders, cql_encode_object,
@@ -255,3 +256,52 @@ def bind_params(query, params):
     else:
         return query % tuple(cql_encoders.get(type(v), cql_encode_object)(v)
                              for v in params)
+
+
+class QueryTrace(object):
+
+    trace_id = None
+    request_type = None
+    duration = None
+    coordinator = None
+    parameters = None
+    started_at = None
+    events = None
+    session = None
+
+    _SELECT_SESSIONS_FORMAT = "SELECT * FROM system_traces.sessions WHERE session_id = %s"
+    _SELECT_EVENTS_FORMAT = "SELECT * FROM system_traces.events WHERE session_id = %s"
+
+    def __init__(self, trace_id, session):
+        self.trace_id = trace_id
+        self.session = session
+
+    def populate(self):
+        while self.duration is None:
+            session_results = self.session.execute(self._SELECT_SESSIONS_FORMAT, (self.trace_id,))
+            if not session_results or session_results[0].duration is None:
+                time.sleep(0.01)
+                continue
+
+            session_row = session_results[0]
+            self.request_type = session_row.request
+            self.duration = session_row.duration
+            self.started_at = session_row.started_at
+            self.coordinator = session_row.coordinator
+            self.parameters = session_row.parameters
+
+            event_results = self.session.execute(self._SELECT_EVENTS_FORMAT, (self.trace_id,))
+            self.events = tuple(TraceEvent(r.activity, r.event_id, r.source, r.source_elapsed, r.thread)
+                                for r in event_results)
+
+
+class TraceEvent(object):
+
+    name, timestamp, source, source_elapsed, thread_name = None
+
+    def __init__(self, name, timeuuid, source, source_elapsed, thread_name):
+        self.name = name
+        self.timestamp = timeuuid  # TODO extract datetime
+        self.source = source
+        self.source_elapsed = source_elapsed
+        self.thread_name = thread_name
