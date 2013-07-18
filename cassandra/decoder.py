@@ -139,18 +139,18 @@ def decode_response(stream_id, flags, opcode, body, decompressor=None):
 
     body = StringIO(body)
     if flags & 0x02:
-        tracing_id = body.read(16)
+        trace_id = UUID(bytes=body.read(16))
         flags ^= 0x02
     else:
-        tracing_id = None
+        trace_id = None
 
     if flags:
         log.warn("Unknown protocol flags set: %02x. May cause problems." % flags)
 
     msg_class = _message_types_by_opcode[opcode]
-    msg = msg_class.recv_body(StringIO(body))
+    msg = msg_class.recv_body(body)
     msg.stream_id = stream_id
-    msg.tracing_id = tracing_id
+    msg.trace_id = trace_id
     return msg
 
 
