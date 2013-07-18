@@ -252,29 +252,87 @@ def bind_params(query, params):
                              for v in params)
 
 
+class TraceUnavailable(Exception):
+    """
+    Raised when complete trace details cannot be fetched from Cassandra.
+    """
+    pass
+
+
 class QueryTrace(object):
+    """
+    A trace of the duration and events that occurred when executing
+    an operation.
+    """
 
     trace_id = None
+    """
+    :class:`uuid.UUID` unique identifier for this tracing session.  Matches
+    the ``session_id`` column in ``system_traces.sessions`` and
+    ``system_traces.events``.
+    """
+
     request_type = None
+    """
+    A string that very generally describes the traced operation.
+    """
+
     duration = None
+    """
+    A :class:`datetime.timedelta` measure of the duration of the query.
+    """
+
     coordinator = None
+    """
+    The IP address of the host that acted as coordinator for this request.
+    """
+
     parameters = None
+    """
+    A :class:`dict` of parameters for the traced operation, such as the
+    specific query string.
+    """
+
     started_at = None
+    """
+    A UTC :class:`datetime.datetime` object describing when the operation
+    was started.
+    """
+
     events = None
-    session = None
+    """
+    A chronologically sorted list of :class:`.TracingEvent` instances
+    representing the steps the traced operation went through.  This
+    corresponds to the rows in ``system_traces.events`` for this tracing
+    session.
+    """
+
+    _session = None
 
     _SELECT_SESSIONS_FORMAT = "SELECT * FROM system_traces.sessions WHERE session_id = %s"
     _SELECT_EVENTS_FORMAT = "SELECT * FROM system_traces.events WHERE session_id = %s"
+    _BASE_RETRY_SLEEP = 0.003
+    _MAX_ATTEMPTS = 5
 
     def __init__(self, trace_id, session):
         self.trace_id = trace_id
-        self.session = session
+        self._session = session
 
     def populate(self):
-        while self.duration is None:
-            session_results = self.session.execute(self._SELECT_SESSIONS_FORMAT, (self.trace_id,))
+        """
+        Retrieves the actual tracing details from Cassandra and populates the
+        attributes of this instance.  Because tracing details are stored
+        asynchronously by Cassandra, this may need to retry the session
+        detail fetch up to five times before raising :exc:`.TraceUnavailable`.
+
+        Currently intended for internal use only.
+        """
+        attempt = 0
+        while attempt <= self._MAX_ATTEMPTS:
+            attempt += 1
+            session_results = self._session.execute(self._SELECT_SESSIONS_FORMAT, (self.trace_id,))
             if not session_results or session_results[0].duration is None:
-                time.sleep(0.01)
+                time.sleep(self._BASE_RETRY_SLEEP * attempt)
                 continue
 
             session_row = session_results[0]
@@ -284,7 +342,7 @@ class QueryTrace(object):
             self.coordinator = session_row.coordinator
             self.parameters = session_row.parameters
 
-            event_results = self.session.execute(self._SELECT_EVENTS_FORMAT, (self.trace_id,))
+            event_results = self._session.execute(self._SELECT_EVENTS_FORMAT, (self.trace_id,))
             self.events = tuple(TraceEvent(r.activity, r.event_id, r.source, r.source_elapsed, r.thread)
                                 for r in event_results)
 
