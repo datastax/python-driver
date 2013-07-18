@@ -19,7 +19,6 @@ recommended at this time.
 Features to be Added
 --------------------
 * C extension for encoding/decoding messages
-* Tracing support
 * Connection pool metrics
 * Authentication/security feature support
 * Twisted, gevent support
