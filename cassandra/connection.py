@@ -165,7 +165,8 @@ class Connection(object):
         except Exception, exc:
             log.exception("Error decoding response from Cassandra. "
                           "opcode: %04x; message contents: %r" % (opcode, body))
-            callback(exc)
+            if callback:
+                callback(exc)
             self.defunct(exc)
             return
 
