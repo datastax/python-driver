@@ -4,10 +4,12 @@ specifying consistency levels and retry policies for individual
 queries.
 """
 
+from datetime import datetime, timedelta
 import struct
 import time
 
 from cassandra import ConsistencyLevel
+from cassandra.cqltypes import unix_time_from_uuid1
 from cassandra.decoder import (cql_encoders, cql_encode_object,
                                cql_encode_sequence)
 
@@ -285,7 +287,7 @@ class QueryTrace(object):
 
             session_row = session_results[0]
             self.request_type = session_row.request
-            self.duration = session_row.duration
+            self.duration = timedelta(microseconds=session_row.duration)
             self.started_at = session_row.started_at
             self.coordinator = session_row.coordinator
             self.parameters = session_row.parameters
@@ -294,14 +296,26 @@ class QueryTrace(object):
             self.events = tuple(TraceEvent(r.activity, r.event_id, r.source, r.source_elapsed, r.thread)
                                 for r in event_results)
 
+    def __str__(self):
+        return "%s [%s] coordinator: %s, started at: %s, duration: %s, parameters: %s" \
+               % (self.request_type, self.trace_id, self.coordinator, self.started_at,
+                  self.duration, self.parameters)
+
 
 class TraceEvent(object):
 
-    name, timestamp, source, source_elapsed, thread_name = None
+    name = None
+    happened_at = None
+    source = None
+    source_elapsed = None
+    thread_name = None
 
     def __init__(self, name, timeuuid, source, source_elapsed, thread_name):
         self.name = name
-        self.timestamp = timeuuid  # TODO extract datetime
+        self.happened_at = datetime.utcfromtimestamp(unix_time_from_uuid1(timeuuid))
         self.source = source
-        self.source_elapsed = source_elapsed
+        self.source_elapsed = timedelta(microseconds=source_elapsed)
         self.thread_name = thread_name
+
+    def __str__(self):
+        return "%s on %s[%s] at %s" % (self.name, self.source, self.thread_name, self.happened_at)
