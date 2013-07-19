@@ -18,7 +18,7 @@ from collections import namedtuple
 try:
     from collections import OrderedDict
 except ImportError:  # Python <2.7
-    from util import OrderedDict
+    from cassandra.util import OrderedDict
 
 import datetime
 import logging

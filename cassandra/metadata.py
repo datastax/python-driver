@@ -3,7 +3,7 @@ from collections import defaultdict
 try:
     from collections import OrderedDict
 except ImportError:  # Python <2.7
-    from util import OrderedDict
+    from cassandra.util import OrderedDict
 from hashlib import md5
 import json
 import logging
