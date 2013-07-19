@@ -14,7 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import namedtuple, OrderedDict
+from collections import namedtuple
+try:
+    from collections import OrderedDict
+except ImportError:  # Python <2.7
+    from util import OrderedDict
+
 import datetime
 import logging
 import socket
