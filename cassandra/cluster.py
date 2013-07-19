@@ -10,6 +10,10 @@ from threading import RLock, Thread, Event
 import traceback
 import Queue
 import weakref
+try:
+    from weakref import WeakSet
+except ImportError:
+    from cassandra.util import WeakSet
 from functools import partial
 from itertools import groupby
 
@@ -223,7 +227,7 @@ class Cluster(object):
         # let Session objects be GC'ed (and shutdown) when the user no longer
         # holds a reference. Normally the cycle detector would handle this,
         # but implementing __del__ prevents that.
-        self.sessions = weakref.WeakSet()
+        self.sessions = WeakSet()
         self.metadata = Metadata(self)
         self.control_connection = None
         self._prepared_statements = {}
