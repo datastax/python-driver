@@ -7,6 +7,10 @@ import time
 from threading import Lock, RLock, Condition
 import traceback
 import weakref
+try:
+    from weakref import WeakSet
+except ImportError:
+    from cassandra.util import WeakSet
 
 from cassandra import AuthenticationFailed
 from cassandra.connection import MAX_STREAM_PER_CONNECTION, ConnectionException
@@ -211,7 +215,7 @@ class HealthMonitor(object):
         # self._listeners will hold, among other things, references to
         # Cluster objects.  To allow those to be GC'ed (and shutdown) even
         # though we've implemented __del__, use weak references.
-        self._listeners = weakref.WeakSet()
+        self._listeners = WeakSet()
         self._lock = RLock()
 
     def register(self, listener):
