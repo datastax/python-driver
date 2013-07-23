@@ -243,6 +243,24 @@ class Integer(Column):
         return self.validate(value)
 
 
+class Counter(Integer):
+    db_type = 'counter'
+
+    def get_update_statement(self, val, prev, ctx):
+        val = self.to_database(val)
+        prev = self.to_database(prev or 0)
+
+        delta = val - prev
+        if delta == 0:
+            return []
+
+        field_id = uuid4().hex
+        sign = '+' if delta > 0 else '-'
+        delta = abs(delta)
+        ctx[field_id] = delta
+        return ['"{0}" = "{0}" {1} {2}'.format(self.db_field_name, sign, delta)]
+
+
 class DateTime(Column):
     db_type = 'timestamp'
 
@@ -363,7 +381,6 @@ class TimeUUID(UUID):
                             clock_seq_hi_variant, clock_seq_low, node), version=1)
 
 
-
 class Boolean(Column):
     db_type = 'boolean'
 
@@ -419,11 +436,6 @@ class Decimal(Column):
     def to_database(self, value):
         return self.validate(value)
 
-class Counter(Column):
-    #TODO: counter field
-    def __init__(self, **kwargs):
-        super(Counter, self).__init__(**kwargs)
-        raise NotImplementedError
 
 class BaseContainerColumn(Column):
     """
