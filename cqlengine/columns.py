@@ -192,6 +192,7 @@ class Column(object):
     def get_cql(self):
         return '"{}"'.format(self.db_field_name)
 
+
 class Bytes(Column):
     db_type = 'blob'
 
@@ -200,8 +201,10 @@ class Bytes(Column):
         if val is None: return
         return val.encode('hex')
 
+
 class Ascii(Column):
     db_type = 'ascii'
+
 
 class Text(Column):
     db_type = 'text'
@@ -248,13 +251,19 @@ class Counter(Integer):
 
     def get_update_statement(self, val, prev, ctx):
         val = self.to_database(val)
-        prev = self.to_database(prev or 0)
+        prev = self.to_database(prev)
+        field_id = uuid4().hex
+
+        # use a set statement if there is no
+        # previous value to compute a delta from
+        if prev is None:
+            ctx[field_id] = val
+            return ['"{}" = :{}'.format(self.db_field_name, field_id)]
 
         delta = val - prev
         if delta == 0:
             return []
 
-        field_id = uuid4().hex
         sign = '+' if delta > 0 else '-'
         delta = abs(delta)
         ctx[field_id] = delta
@@ -333,6 +342,7 @@ class UUID(Column):
         return self.validate(value)
 
 from uuid import UUID as pyUUID, getnode
+
 
 class TimeUUID(UUID):
     """
@@ -417,6 +427,7 @@ class Float(Column):
     def to_database(self, value):
         return self.validate(value)
 
+
 class Decimal(Column):
     db_type = 'decimal'
 
@@ -475,6 +486,7 @@ class BaseContainerColumn(Column):
         Used to add partial update statements
         """
         raise NotImplementedError
+
 
 class Set(BaseContainerColumn):
     """
@@ -564,6 +576,7 @@ class Set(BaseContainerColumn):
                 statements += ['"{0}" = "{0}" - :{1}'.format(self.db_field_name, field_id)]
 
             return statements
+
 
 class List(BaseContainerColumn):
     """
@@ -788,6 +801,7 @@ class Map(BaseContainerColumn):
             del_statements += ['"{}"[:{}]'.format(self.db_field_name, field_id)]
 
         return del_statements
+
 
 class _PartitionKeysToken(Column):
     """
