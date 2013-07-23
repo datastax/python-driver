@@ -169,10 +169,9 @@ class ConnectionPool(object):
                 raise CQLEngineException("Could not execute query against the cluster")
 
 
-
-def execute(query, params={}):
+def execute(query, params=None):
+    params = params or {}
     return connection_pool.execute(query, params)
-
 
 @contextmanager
 def connection_manager():
