@@ -5,6 +5,7 @@ from hashlib import md5
 from time import time
 from uuid import uuid1
 from cqlengine import BaseContainerColumn, BaseValueManager, Map, columns
+from cqlengine.columns import Counter
 
 from cqlengine.connection import connection_manager, execute, RowResult
 
@@ -809,8 +810,9 @@ class DMLQuery(object):
             for name, col in self.model._columns.items():
                 if not col.is_primary_key:
                     val = values.get(name)
-                    if val is None: continue
-                    if isinstance(col, BaseContainerColumn):
+                    if val is None:
+                        continue
+                    if isinstance(col, (BaseContainerColumn, Counter)):
                         #remove value from query values, the column will handle it
                         query_values.pop(field_ids.get(name), None)
 
