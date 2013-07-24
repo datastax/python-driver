@@ -249,22 +249,26 @@ class Integer(Column):
 class Counter(Integer):
     db_type = 'counter'
 
+    def __init__(self,
+                 index=False,
+                 db_field=None,
+                 required=False):
+        super(Counter, self).__init__(
+            primary_key=False,
+            partition_key=False,
+            index=index,
+            db_field=db_field,
+            default=0,
+            required=required,
+        )
+
     def get_update_statement(self, val, prev, ctx):
         val = self.to_database(val)
-        prev = self.to_database(prev)
+        prev = self.to_database(prev or 0)
         field_id = uuid4().hex
 
-        # use a set statement if there is no
-        # previous value to compute a delta from
-        if prev is None:
-            ctx[field_id] = val
-            return ['"{}" = :{}'.format(self.db_field_name, field_id)]
-
         delta = val - prev
-        if delta == 0:
-            return []
-
-        sign = '+' if delta > 0 else '-'
+        sign = '-' if delta < 0 else '+'
         delta = abs(delta)
         ctx[field_id] = delta
         return ['"{0}" = "{0}" {1} {2}'.format(self.db_field_name, sign, delta)]

@@ -801,7 +801,7 @@ class DMLQuery(object):
         query_values = {field_ids[n]:field_values[n] for n in field_names}
 
         qs = []
-        if self.instance._can_update():
+        if self.instance._has_counter or self.instance._can_update():
             qs += ["UPDATE {}".format(self.column_family_name)]
             qs += ["SET"]
 
@@ -818,7 +818,7 @@ class DMLQuery(object):
 
                         val_mgr = self.instance._values[name]
                         set_statements += col.get_update_statement(val, val_mgr.previous_value, query_values)
-                        pass
+
                     else:
                         set_statements += ['"{}" = :{}'.format(col.db_field_name, field_ids[col.db_field_name])]
             qs += [', '.join(set_statements)]
@@ -831,8 +831,9 @@ class DMLQuery(object):
 
             qs += [' AND '.join(where_statements)]
 
-            # clear the qs if there are not set statements
-            if not set_statements: qs = []
+            # clear the qs if there are no set statements and this is not a counter model
+            if not set_statements and not self.instance._has_counter:
+                qs = []
 
         else:
             qs += ["INSERT INTO {}".format(self.column_family_name)]
