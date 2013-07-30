@@ -3,7 +3,7 @@ This module houses the main classes you will interact with,
 :class:`.Cluster` and :class:`.Session`.
 """
 
-from futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 import logging
 import time
 from threading import RLock, Thread, Event
