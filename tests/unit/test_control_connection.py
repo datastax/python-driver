@@ -2,7 +2,7 @@ import unittest
 
 from mock import Mock, ANY
 
-from futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 
 from cassandra.decoder import ResultMessage
 from cassandra.cluster import ControlConnection, Cluster, _Scheduler
