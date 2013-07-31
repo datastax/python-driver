@@ -114,7 +114,7 @@ def create_table(model, create_missing_keyspace=True):
         field_names = [x.name for x in fields]
         for name, col in model._columns.items():
             if col.primary_key or col.partition_key: continue # we can't mess with the PK
-            if name in field_names: continue # skip columns already defined
+            if col.db_field_name in field_names: continue # skip columns already defined
 
             # add missing column using the column def
             query = "ALTER TABLE {} add {}".format(cf_name, col.get_column_def())

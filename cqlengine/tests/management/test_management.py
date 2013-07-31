@@ -109,6 +109,14 @@ class ThirdModel(Model):
     # removed fourth key, but it should stay in the DB
     blah = columns.Map(columns.Text, columns.Text)
 
+class FourthModel(Model):
+    __table_name__ = 'first_model'
+    first_key = columns.UUID(primary_key=True)
+    second_key = columns.UUID()
+    third_key = columns.Text()
+    # removed fourth key, but it should stay in the DB
+    renamed = columns.Map(columns.Text, columns.Text, db_field='blah')
+
 class AddColumnTest(BaseCassEngTestCase):
     def setUp(self):
         delete_table(FirstModel)
@@ -126,6 +134,10 @@ class AddColumnTest(BaseCassEngTestCase):
         self.assertEqual(len(fields), 3)
 
         create_table(ThirdModel)
+        fields = get_fields(FirstModel)
+        self.assertEqual(len(fields), 4)
+
+        create_table(FourthModel)
         fields = get_fields(FirstModel)
         self.assertEqual(len(fields), 4)
 
