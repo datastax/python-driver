@@ -1,5 +1,4 @@
 import unittest
-from mock import Mock
 
 from cassandra.cluster import Cluster, NoHostAvailable
 
@@ -44,6 +43,7 @@ class ClusterTests(unittest.TestCase):
     def test_submit_schema_refresh(self):
         cluster = Cluster()
         cluster.connect()
+        self.assertNotIn("newkeyspace", cluster.metadata.keyspaces)
 
         other_cluster = Cluster()
         session = other_cluster.connect()
@@ -52,8 +52,6 @@ class ClusterTests(unittest.TestCase):
             CREATE KEYSPACE newkeyspace
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
             """)
-
-        self.assertNotIn("newkeyspace", cluster.metadata.keyspaces)
 
         future = cluster.submit_schema_refresh()
         future.result()
