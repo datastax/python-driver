@@ -66,7 +66,6 @@ class ClusterTests(unittest.TestCase):
         host = cluster.metadata.all_hosts()[0]
         host.monitor.signal_connection_failure(None)
         cluster.on_down(host)
-        self.assertNotEqual(None, cluster.control_connection._reconnection_handler)
         self.assertNotIn(host, session._pools)
         host_reconnector = host._reconnection_handler
         self.assertNotEqual(None, host_reconnector)
