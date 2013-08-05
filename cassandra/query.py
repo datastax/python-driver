@@ -101,7 +101,6 @@ class PreparedStatement(object):
 
     column_metadata = None
     query_id = None
-    md5_id = None
     query_string = None
     keyspace = None
 
@@ -109,18 +108,17 @@ class PreparedStatement(object):
 
     consistency_level = ConsistencyLevel.ONE
 
-    def __init__(self, column_metadata, query_id, md5_id, routing_key_indexes, query, keyspace):
+    def __init__(self, column_metadata, query_id, routing_key_indexes, query, keyspace):
         self.column_metadata = column_metadata
         self.query_id = query_id
-        self.md5_id = md5_id
         self.routing_key_indexes = routing_key_indexes
         self.query_string = query
         self.keyspace = keyspace
 
     @classmethod
-    def from_message(cls, query_id, md5_id, column_metadata, cluster_metadata, query, keyspace):
+    def from_message(cls, query_id, column_metadata, cluster_metadata, query, keyspace):
         if not column_metadata:
-            return PreparedStatement(column_metadata, query_id, md5_id, None, query, keyspace)
+            return PreparedStatement(column_metadata, query_id, None, query, keyspace)
 
         partition_key_columns = None
         routing_key_indexes = None
@@ -143,7 +141,7 @@ class PreparedStatement(object):
                     pass  # we're missing a partition key component in the prepared
                           # statement; just leave routing_key_indexes as None
 
-        return PreparedStatement(column_metadata, query_id, md5_id, routing_key_indexes, query, keyspace)
+        return PreparedStatement(column_metadata, query_id, routing_key_indexes, query, keyspace)
 
     def bind(self, values):
         """

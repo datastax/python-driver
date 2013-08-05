@@ -13,7 +13,8 @@ import weakref
 try:
     from weakref import WeakSet
 except ImportError:
-    from cassandra.util import WeakSet
+    from cassandra.util import WeakSet # NOQA
+
 from functools import partial
 from itertools import groupby
 
@@ -504,8 +505,8 @@ class Cluster(object):
             # log and ignore
             log.exception("Error trying to prepare all statements on host %s" % (host,))
 
-    def prepare_on_all_sessions(self, md5_id, prepared_statement, excluded_host):
-        self._prepared_statements[md5_id] = prepared_statement
+    def prepare_on_all_sessions(self, query_id, prepared_statement, excluded_host):
+        self._prepared_statements[query_id] = prepared_statement
         for session in self.sessions:
             session.prepare_on_all_hosts(prepared_statement.query_string, excluded_host)
 
@@ -645,7 +646,6 @@ class Session(object):
         if isinstance(query, BoundStatement):
             message = ExecuteMessage(
                 query_id=query.prepared_statement.query_id,
-                md5_id=query.prepared_statement.md5_id,
                 query_params=query.values,
                 consistency_level=query.consistency_level)
         else:
@@ -676,17 +676,17 @@ class Session(object):
         future = ResponseFuture(self, message, query=None)
         try:
             future.send_request()
-            query_id, md5_id, column_metadata = future.result()
+            query_id, column_metadata = future.result()
         except:
             log.exception("Error preparing query:")
             raise
 
         prepared_statement = PreparedStatement.from_message(
-            query_id, md5_id, column_metadata, self.cluster.metadata, query, self.keyspace)
+            query_id, column_metadata, self.cluster.metadata, query, self.keyspace)
 
         host = future._current_host
         try:
-            self.cluster.prepare_on_all_sessions(md5_id, prepared_statement, host)
+            self.cluster.prepare_on_all_sessions(query_id, prepared_statement, host)
         except:
             log.exception("Error preparing query on all hosts:")
 
@@ -1420,11 +1420,11 @@ class ResponseFuture(object):
                     self._retry(reuse_connection=False, consistency_level=None)
                     return
                 elif isinstance(response, PreparedQueryNotFound):
-                    md5_id = response.info
+                    query_id = response.info
                     try:
-                        prepared_statement = self.session.cluster._prepared_statements[md5_id]
+                        prepared_statement = self.session.cluster._prepared_statements[query_id]
                     except KeyError:
-                        log.error("Tried to execute unknown prepared statement %s" % (md5_id.encode('hex'),))
+                        log.error("Tried to execute unknown prepared statement %s" % (query_id.encode('hex'),))
                         self._set_final_exception(response)
                         return
 

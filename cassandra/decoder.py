@@ -18,7 +18,7 @@ from collections import namedtuple
 try:
     from collections import OrderedDict
 except ImportError:  # Python <2.7
-    from cassandra.util import OrderedDict
+    from cassandra.util import OrderedDict # NOQA
 
 import datetime
 import logging
@@ -320,9 +320,8 @@ class PreparedQueryNotFound(RequestValidationException):
 
     @staticmethod
     def recv_error_info(f):
-        # read the query_id, but ignore and just return the MD5
-        read_short(f)
-        return f.read(16)
+        # return the query ID
+        return read_binary_string(f)
 
 
 class AlreadyExistsException(ConfigurationException):
@@ -483,10 +482,9 @@ class ResultMessage(_MessageType):
 
     @classmethod
     def recv_results_prepared(cls, f):
-        query_id = read_short(f)
-        md5_id = f.read(16)
+        query_id = read_binary_string(f)
         column_metadata = cls.recv_results_metadata(f)
-        return (query_id, md5_id, column_metadata)
+        return (query_id, column_metadata)
 
     @classmethod
     def recv_results_metadata(cls, f):
@@ -550,11 +548,10 @@ class PrepareMessage(_MessageType):
 class ExecuteMessage(_MessageType):
     opcode = 0x0A
     name = 'EXECUTE'
-    params = ('query_id', 'md5_id', 'query_params', 'consistency_level',)
+    params = ('query_id', 'query_params', 'consistency_level',)
 
     def send_body(self, f):
-        write_short(f, self.query_id)
-        f.write(self.md5_id)
+        write_string(f, self.query_id)
         write_short(f, len(self.query_params))
         for param in self.query_params:
             write_value(f, param)
@@ -649,6 +646,12 @@ def read_string(f):
     size = read_short(f)
     contents = f.read(size)
     return contents.decode('utf8')
+
+
+def read_binary_string(f):
+    size = read_short(f)
+    contents = f.read(size)
+    return contents
 
 
 def write_string(f, s):
