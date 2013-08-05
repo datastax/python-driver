@@ -4,8 +4,6 @@ import unittest
 import os
 from threading import Event
 
-logging.getLogger().addHandler(logging.StreamHandler())
-
 try:
     from ccmlib.cluster import Cluster as CCMCluster
     from ccmlib import common
