@@ -5,6 +5,7 @@ from cassandra.metadata import TableMetadata, Token, MD5Token, TokenMap
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
+from tests.integration import get_cluster
 
 class SchemaMetadataTest(unittest.TestCase):
 
@@ -275,12 +276,14 @@ class TokenMetadataTest(unittest.TestCase):
     """
 
     def test_token(self):
+        expected_node_count = len(get_cluster().nodes)
+
         cluster = Cluster()
         cluster.connect()
         tmap = cluster.metadata.token_map
         self.assertTrue(issubclass(tmap.token_class, Token))
-        self.assertEqual(1, len(tmap.ring))
-        self.assertEqual(1, len(tmap.tokens_to_hosts))
+        self.assertEqual(expected_node_count, len(tmap.ring))
+        self.assertEqual(expected_node_count, len(tmap.tokens_to_hosts))
         cluster.shutdown()
 
     def test_getting_replicas(self):
