@@ -9,10 +9,15 @@ from cassandra.connection import (PROTOCOL_VERSION,
                                   HEADER_DIRECTION_TO_CLIENT,
                                   ProtocolError,
                                   ConnectionException)
-from cassandra.io.libevreactor import LibevConnection
+
 from cassandra.decoder import (write_stringmultimap, write_int, write_string,
                                SupportedMessage, ReadyMessage, ServerError)
 from cassandra.marshal import uint8_pack, uint32_pack
+
+try:
+    from cassandra.io.libevreactor import LibevConnection
+except ImportError:
+    raise unittest.SkipTest('pyev does not appear to be installed correctly')
 
 @patch('socket.socket')
 @patch('pyev.Io')

@@ -5,7 +5,11 @@ from threading import Thread, Event
 from cassandra import ConsistencyLevel
 from cassandra.decoder import QueryMessage
 from cassandra.io.asyncorereactor import AsyncoreConnection
-from cassandra.io.libevreactor import LibevConnection
+
+try:
+    from cassandra.io.libevreactor import LibevConnection
+except ImportError:
+    LibevConnection = None
 
 class ConnectionTest(object):
 
@@ -167,3 +171,8 @@ class AsyncoreConnectionTest(ConnectionTest, unittest.TestCase):
 class LibevConnectionTest(ConnectionTest, unittest.TestCase):
 
     klass = LibevConnection
+
+    @classmethod
+    def setup_class(cls):
+        if LibevConnection is None:
+            raise unittest.SkipTest('pyev does not appear to be installed properly')
