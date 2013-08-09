@@ -6,7 +6,7 @@ This module houses the main classes you will interact with,
 from concurrent.futures import ThreadPoolExecutor
 import logging
 import time
-from threading import RLock, Thread, Event
+from threading import Lock, RLock, Thread, Event
 import traceback
 import Queue
 import weakref
@@ -869,6 +869,7 @@ class ControlConnection(object):
         self._connection = None
 
         self._lock = RLock()
+        self._schema_agreement_lock = Lock()
 
         self._reconnection_handler = None
         self._reconnection_lock = RLock()
@@ -1144,45 +1145,50 @@ class ControlConnection(object):
             self._cluster.executor.submit(self.refresh_schema, keyspace, table)
 
     def wait_for_schema_agreement(self, connection=None):
-        log.debug("[control connection] Waiting for schema agreement")
-        if not connection:
-            connection = self._connection
+        # Each schema change typically generates two schema refreshes, one
+        # from the response type and one from the pushed notification. Holding
+        # a lock is just a simple way to cut down on the number of schema queries
+        # we'll make.
+        with self._schema_agreement_lock:
+            log.debug("[control connection] Waiting for schema agreement")
+            if not connection:
+                connection = self._connection
 
-        start = self._time.time()
-        elapsed = 0
-        cl = ConsistencyLevel.ONE
-        while elapsed < self._cluster.max_schema_agreement_wait:
-            peers_query = QueryMessage(query=self._SELECT_SCHEMA_PEERS, consistency_level=cl)
-            local_query = QueryMessage(query=self._SELECT_SCHEMA_LOCAL, consistency_level=cl)
-            peers_result, local_result = connection.wait_for_responses(peers_query, local_query)
-            peers_result = dict_factory(*peers_result.results)
+            start = self._time.time()
+            elapsed = 0
+            cl = ConsistencyLevel.ONE
+            while elapsed < self._cluster.max_schema_agreement_wait:
+                peers_query = QueryMessage(query=self._SELECT_SCHEMA_PEERS, consistency_level=cl)
+                local_query = QueryMessage(query=self._SELECT_SCHEMA_LOCAL, consistency_level=cl)
+                peers_result, local_result = connection.wait_for_responses(peers_query, local_query)
+                peers_result = dict_factory(*peers_result.results)
 
-            versions = set()
-            if local_result.results:
-                local_row = dict_factory(*local_result.results)[0]
-                if local_row.get("schema_version"):
-                    versions.add(local_row.get("schema_version"))
+                versions = set()
+                if local_result.results:
+                    local_row = dict_factory(*local_result.results)[0]
+                    if local_row.get("schema_version"):
+                        versions.add(local_row.get("schema_version"))
 
-            for row in peers_result:
-                if not row.get("rpc_address") or not row.get("schema_version"):
-                    continue
+                for row in peers_result:
+                    if not row.get("rpc_address") or not row.get("schema_version"):
+                        continue
 
-                rpc = row.get("rpc_address")
-                if rpc == "0.0.0.0":  # TODO ipv6 check
-                    rpc = row.get("peer")
+                    rpc = row.get("rpc_address")
+                    if rpc == "0.0.0.0":  # TODO ipv6 check
+                        rpc = row.get("peer")
 
-                peer = self._cluster.metadata.get_host(rpc)
-                if peer and peer.monitor.is_up:
-                    versions.add(row.get("schema_version"))
+                    peer = self._cluster.metadata.get_host(rpc)
+                    if peer and peer.monitor.is_up:
+                        versions.add(row.get("schema_version"))
 
-            if len(versions) == 1:
-                return True
+                if len(versions) == 1:
+                    return True
 
-            log.debug("[control connection] Schemas mismatched, trying again")
-            self._time.sleep(0.2)
-            elapsed = self._time.time() - start
+                log.debug("[control connection] Schemas mismatched, trying again")
+                self._time.sleep(0.2)
+                elapsed = self._time.time() - start
 
-        return False
+            return False
 
     def _signal_error(self):
         # try just signaling the host monitor, as this will trigger a reconnect
