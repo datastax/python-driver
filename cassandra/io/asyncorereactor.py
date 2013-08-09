@@ -16,33 +16,36 @@ from cassandra.marshal import int32_unpack
 
 log = logging.getLogger(__name__)
 
-_loop_started = None
+_loop_started = False
 _loop_lock = Lock()
 
 def _run_loop():
+    global _loop_started
     log.debug("Starting asyncore event loop")
-    asyncore.loop(timeout=0.001, use_poll=True, count=None)
-    if log:
-        # this can happen during interpreter shutdown
-        log.debug("Asyncore event loop ended")
     with _loop_lock:
-        global _loop_started
+        asyncore.loop(timeout=0.001, use_poll=True, count=None)
         _loop_started = False
+        if log:
+            # this can happen during interpreter shutdown
+            log.debug("Asyncore event loop ended")
 
 def _start_loop():
     global _loop_started
     should_start = False
-    with _loop_lock:
-        if not _loop_started:
+    did_acquire = False
+    try:
+        did_acquire = _loop_lock.acquire(False)
+        if did_acquire and not _loop_started:
             _loop_started = True
             should_start = True
+    finally:
+        if did_acquire:
+            _loop_lock.release()
 
     if should_start:
         t = Thread(target=_run_loop, name="event_loop")
         t.daemon = True
         t.start()
-
-    return should_start
 
 
 class AsyncoreConnection(Connection, asyncore.dispatcher):
