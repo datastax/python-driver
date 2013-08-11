@@ -601,6 +601,29 @@ class Session(object):
 
         return result
 
+    def execute_many(self, queries, trace=False):
+        """
+        Executes many queries in parallel and yields responses as they come in.
+
+        `queries` should be instances of :class:`cassandra.query.Query`.
+
+        If `trace` is set to :const:`True`, you may call
+        :meth:`.ResponseFuture.get_query_trace()` after the request
+        completes to retreive a :class:`.QueryTrace` instance.
+
+        Example usage::
+
+            >>> session = cluster.connect()
+            >>> statement = session.prepare("SELECT * FROM mycf WHERE KEY = ?")
+            >>> queries = map(statement.bind, [("a",), ("b",)])
+            >>> results = session.execute_many(queries)
+        """
+        for future in (self.execute_async(query, trace=trace) for query in queries):
+            try:
+                yield future.result()
+            except Exception:
+                yield None
+
     def execute_async(self, query, parameters=None, trace=False):
         """
         Execute the given query and return a :class:`~.ResponseFuture` object
