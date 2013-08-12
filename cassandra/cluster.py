@@ -618,7 +618,7 @@ class Session(object):
             >>> queries = map(statement.bind, [("a",), ("b",)])
             >>> results = session.execute_many(queries)
         """
-        for future in (self.execute_async(query, trace=trace) for query in queries):
+        for future in [self.execute_async(query, trace=trace) for query in queries]:
             try:
                 yield future.result()
             except Exception:
