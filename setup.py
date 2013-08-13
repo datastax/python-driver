@@ -61,7 +61,7 @@ setup(
     description='Python driver for Cassandra',
     packages=["cassandra", "cassandra.io"],
     ext_modules=[murmur3],
-    install_requires=['futures'],
+    install_requires=['futures', 'scales'],
     tests_require=['nose', 'mock', 'ccm'],
     cmdclass={"doc": doc},
     classifiers=[
