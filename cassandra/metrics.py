@@ -7,6 +7,24 @@ log = logging.getLogger(__name__)
 
 class Metrics(object):
 
+    request_timer = None
+    """
+    A :class:`greplin.scales.PmfStat` timer for requests. This is a dict-like
+    object with the following keys:
+
+      * count - number of requests that have been timed
+      * min - min latency
+      * max - max latency
+      * mean - mean latency
+      * stdev - standard deviation for latencies
+      * median - median latency
+      * 75percentile - 75th percentile latencies
+      * 97percentile - 97th percentile latencies
+      * 98percentile - 98th percentile latencies
+      * 99percentile - 99th percentile latencies
+      * 999percentile - 99.9th percentile latencies
+    """
+
     connection_errors = None
     """
     A :class:`greplin.scales.IntStat` count of the number of times that a
@@ -74,6 +92,7 @@ class Metrics(object):
         log.debug("Starting metric capture")
 
         self.stats = scales.collection('/cassandra',
+            scales.PmfStat('request_timer'),
             scales.IntStat('connection_errors'),
             scales.IntStat('write_timeouts'),
             scales.IntStat('read_timeouts'),
@@ -90,6 +109,7 @@ class Metrics(object):
             scales.Stat('open_connections',
                 lambda: sum(sum(p.open_count for p in s._pools.values()) for s in cluster_proxy.sessions)))
 
+        self.request_timer = self.stats.request_timer
         self.connection_errors = self.stats.connection_errors
         self.write_timeouts = self.stats.write_timeouts
         self.read_timeouts = self.stats.read_timeouts
