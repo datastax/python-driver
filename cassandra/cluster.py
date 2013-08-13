@@ -31,6 +31,7 @@ from cassandra.decoder import (QueryMessage, ResultMessage,
                                dict_factory)
 from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.metadata import Metadata
+from cassandra.metrics import Metrics
 from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy)
@@ -135,6 +136,12 @@ class Cluster(object):
     metrics_enabled = False
     """
     Whether or not metric collection is enabled.
+    """
+
+    metrics = None
+    """
+    An instance of :class:`.metrics.Metrics` if :attr:`.metrics_enabled` is
+    :const:`True`, else :const:`None`.
     """
 
     sockopts = None
@@ -257,6 +264,9 @@ class Cluster(object):
         self.scheduler = _Scheduler(self.executor)
 
         self._lock = RLock()
+
+        if self.metrics_enabled:
+            self.metrics = Metrics(weakref.proxy(self))
 
         self.control_connection = ControlConnection(self)
         for address in contact_points:
@@ -550,6 +560,7 @@ class Session(object):
     _lock = None
     _pools = None
     _load_balancer = None
+    _metrics = None
 
     def __init__(self, cluster, hosts):
         self.cluster = cluster
@@ -558,6 +569,7 @@ class Session(object):
         self._lock = RLock()
         self._pools = {}
         self._load_balancer = cluster.load_balancing_policy
+        self._metrics = cluster.metrics
 
         for host in hosts:
             self.add_host(host)
@@ -657,7 +669,7 @@ class Session(object):
         if trace:
             message.tracing = True
 
-        future = ResponseFuture(self, message, query)
+        future = ResponseFuture(self, message, query, metrics=self._metrics)
         future.send_request()
         return future
 
@@ -1249,7 +1261,11 @@ class _Scheduler(object):
         t.start()
 
     def shutdown(self):
-        log.debug("Shutting down Cluster Scheduler")
+        try:
+            log.debug("Shutting down Cluster Scheduler")
+        except AttributeError:
+            # this can happen on interpreter shutdown
+            pass
         self.is_shutdown = True
 
     def schedule(self, delay, fn, *args, **kwargs):
@@ -1320,12 +1336,17 @@ class ResponseFuture(object):
     _current_pool = None
     _connection = None
     _query_retries = 0
+    _start_time = None
+    _metrics = None
 
-    def __init__(self, session, message, query):
+    def __init__(self, session, message, query, metrics=None):
         self.session = session
         self.row_factory = session.row_factory
         self.message = message
         self.query = query
+        self._metrics = metrics
+        if metrics is not None:
+            self._start_time = time.time()
 
         # convert the list/generator/etc to an iterator so that subsequent
         # calls to send_request (which retries may do) will resume where
@@ -1413,21 +1434,31 @@ class ResponseFuture(object):
                     retry_policy = self.session.cluster.default_retry_policy
 
                 if isinstance(response, ReadTimeoutErrorMessage):
+                    if self._metrics is not None:
+                        self._metrics.on_read_timeout()
                     retry = retry_policy.on_read_timeout(
                         self.query, retry_num=self._query_retries, **response.info)
                 elif isinstance(response, WriteTimeoutErrorMessage):
+                    if self._metrics is not None:
+                        self._metrics.on_write_timeout()
                     retry = retry_policy.on_write_timeout(
                         self.query, retry_num=self._query_retries, **response.info)
                 elif isinstance(response, UnavailableErrorMessage):
+                    if self._metrics is not None:
+                        self._metrics.on_unavailable()
                     retry = retry_policy.on_unavailable(
                         self.query, retry_num=self._query_retries, **response.info)
                 elif isinstance(response, OverloadedErrorMessage):
+                    if self._metrics is not None:
+                        self._metrics.on_other_error()
                     # need to retry against a different host here
                     log.warn("Host %s is overloaded, retrying against a different "
                              "host" % (self._current_host))
                     self._retry(reuse_connection=False, consistency_level=None)
                     return
                 elif isinstance(response, IsBootstrappingErrorMessage):
+                    if self._metrics is not None:
+                        self._metrics.on_other_error()
                     # need to retry against a different host here
                     self._retry(reuse_connection=False, consistency_level=None)
                     return
@@ -1466,13 +1497,19 @@ class ResponseFuture(object):
 
                 retry_type, consistency = retry
                 if retry_type is RetryPolicy.RETRY:
+                    if self._metrics is not None:
+                        self._metrics.on_retry()
                     self._query_retries += 1
                     self._retry(reuse_connection=True, consistency_level=consistency)
                 elif retry_type is RetryPolicy.RETHROW:
                     self._set_final_exception(response.to_exception())
                 else:  # IGNORE
+                    if self._metrics is not None:
+                        self._metrics.on_ignore()
                     self._set_final_result(None)
             elif isinstance(response, ConnectionException):
+                if self._metrics is not None:
+                    self._metrics.on_connection_error()
                 self._connection.defunct(response)
                 self._retry(reuse_connection=False, consistency_level=None)
             elif isinstance(response, Exception):
@@ -1513,6 +1550,8 @@ class ResponseFuture(object):
                 "statement on host %s: %s" % (self._host, response)))
 
     def _set_final_result(self, response):
+        if self._metrics is not None:
+            self._metrics.request_timer.addValue(time.time() - self._start_time)
         if hasattr(self, 'session'):
             try:
                 del self.session  # clear reference cycles
@@ -1525,6 +1564,8 @@ class ResponseFuture(object):
             fn(response, *args, **kwargs)
 
     def _set_final_exception(self, response):
+        if self._metrics is not None:
+            self._metrics.request_timer.addValue(time.time() - self._start_time)
         try:
             del self.session  # clear reference cycles
         except AttributeError:
