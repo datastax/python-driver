@@ -120,3 +120,24 @@ class Metrics(object):
         self.known_hosts = self.stats.known_hosts
         self.connected_to = self.stats.connected_to
         self.open_connections = self.stats.open_connections
+
+    def on_connection_error(self):
+        self.stats.connection_errors += 1
+
+    def on_write_timeout(self):
+        self.stats.write_timeouts += 1
+
+    def on_read_timeout(self):
+        self.stats.read_timeouts += 1
+
+    def on_unavailable(self):
+        self.stats.unavailables += 1
+
+    def on_other_error(self):
+        self.stats.other_errors += 1
+
+    def on_ignore(self):
+        self.stats.ignores += 1
+
+    def on_retry(self):
+        self.stats.retries += 1
