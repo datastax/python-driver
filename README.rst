@@ -45,13 +45,15 @@ through a package manager.  For example, on Debian/Ubuntu:
 
     .. code-block:: bash
 
-      $ sudo apt-get install libev
+      $ sudo apt-get install libev4
 
 and then install ``pyev`` as follows:
 
     .. code-block:: bash
 
-      $ sudo pip install pyev
+      $ sudo pip install --no-install pyev==0.8.1-4.04
+      $ sudo chmod +x build/pyev/src/libev/configure
+      $ sudo pip install pyev==0.8.1-4.04
 
 If successful, you should be able to use the libev event loop by
 doing the following
