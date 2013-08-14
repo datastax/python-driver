@@ -19,7 +19,7 @@ from functools import partial
 from itertools import groupby
 
 from cassandra import ConsistencyLevel, AuthenticationFailed
-from cassandra.connection import ConnectionException
+from cassandra.connection import ConnectionException, ConnectionShutdown
 from cassandra.decoder import (QueryMessage, ResultMessage,
                                ErrorMessage, ReadTimeoutErrorMessage,
                                WriteTimeoutErrorMessage,
@@ -1520,7 +1520,8 @@ class ResponseFuture(object):
             elif isinstance(response, ConnectionException):
                 if self._metrics is not None:
                     self._metrics.on_connection_error()
-                self._connection.defunct(response)
+                if not isinstance(response, ConnectionShutdown):
+                    self._connection.defunct(response)
                 self._retry(reuse_connection=False, consistency_level=None)
             elif isinstance(response, Exception):
                 if hasattr(response, 'to_exception'):
@@ -1594,6 +1595,11 @@ class ResponseFuture(object):
         self.session.submit(self._retry_task, reuse_connection)
 
     def _retry_task(self, reuse_connection):
+        if self._final_exception:
+            # the connection probably broke while we were waiting
+            # to retry the operation
+            return
+
         if reuse_connection and self._query(self._current_host):
             return
 
