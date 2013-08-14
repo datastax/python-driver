@@ -246,8 +246,17 @@ class Integer(Column):
         return self.validate(value)
 
 
+class CounterValueManager(BaseValueManager):
+    def __init__(self, instance, column, value):
+        super(CounterValueManager, self).__init__(instance, column, value)
+        self.value = self.value or 0
+        self.previous_value = self.previous_value or 0
+
+
 class Counter(Integer):
     db_type = 'counter'
+
+    value_manager = CounterValueManager
 
     def __init__(self,
                  index=False,

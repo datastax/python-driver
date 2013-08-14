@@ -59,6 +59,15 @@ class TestCounterColumn(BaseCassEngTestCase):
 
     def test_update_from_none(self):
         """ Tests that updating from None uses a create statement """
+        instance = TestCounterModel()
+        instance.counter += 1
+        instance.save()
 
-    def test_multiple_inserts(self):
-        """ Tests inserting over existing data works as expected """
+        new = TestCounterModel.get(partition=instance.partition)
+        assert new.counter == 1
+
+    def test_new_instance_defaults_to_zero(self):
+        """ Tests that instantiating a new model instance will set the counter column to zero """
+        instance = TestCounterModel()
+        assert instance.counter == 0
+
