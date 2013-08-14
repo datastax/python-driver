@@ -175,7 +175,7 @@ class Connection(object):
                 self.handle_pushed(response)
             elif callback is not None:
                 callback(response)
-        except:
+        except Exception:
             log.exception("Callback handler errored, ignoring:")
 
     @defunct_on_error

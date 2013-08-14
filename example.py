@@ -63,7 +63,7 @@ def main():
 
     try:
         rows = future.result()
-    except:
+    except Exception:
         log.exeception()
 
     for row in rows:
