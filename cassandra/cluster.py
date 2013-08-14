@@ -1507,8 +1507,6 @@ class ResponseFuture(object):
 
                 retry_type, consistency = retry
                 if retry_type is RetryPolicy.RETRY:
-                    if self._metrics is not None:
-                        self._metrics.on_retry()
                     self._query_retries += 1
                     self._retry(reuse_connection=True, consistency_level=consistency)
                 elif retry_type is RetryPolicy.RETHROW:
@@ -1588,6 +1586,8 @@ class ResponseFuture(object):
             fn(response, *args, **kwargs)
 
     def _retry(self, reuse_connection, consistency_level):
+        if self._metrics is not None:
+            self._metrics.on_retry()
         if consistency_level is not None:
             self.message.consistency_level = consistency_level
 
