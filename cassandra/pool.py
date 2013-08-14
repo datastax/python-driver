@@ -359,7 +359,7 @@ class HostConnectionPool(object):
     def _create_new_connection(self):
         try:
             self._add_conn_if_under_max()
-        except:
+        except Exception:
             log.exception("Unexpectedly failed to create new connection")
         finally:
             with self._lock:

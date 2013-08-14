@@ -201,7 +201,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         for cb in self._push_watchers.get(response.event_type, []):
             try:
                 cb(response.event_args)
-            except:
+            except Exception:
                 log.exception("Pushed event handler errored, ignoring:")
 
     def push(self, data):
