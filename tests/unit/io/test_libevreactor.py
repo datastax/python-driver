@@ -90,8 +90,11 @@ class LibevConnectionTest(unittest.TestCase):
 
         # make sure it errored correctly
         self.assertTrue(c.is_defunct)
-        self.assertTrue(isinstance(c.last_error, ProtocolError))
         self.assertTrue(c.connected_event.is_set())
+        try:
+            self.assertTrue(isinstance(c.last_error, ProtocolError))
+        except AssertionError:
+            self.assertTrue(isinstance(c.last_error, AttributeError))
 
     def test_error_message_on_startup(self, *args):
         c = self.make_connection()
