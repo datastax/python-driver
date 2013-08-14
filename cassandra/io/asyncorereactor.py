@@ -19,18 +19,29 @@ log = logging.getLogger(__name__)
 _loop_started = False
 _loop_lock = Lock()
 
+_starting_conns = set()
+_starting_conns_lock = Lock()
+
 def _run_loop():
     global _loop_started
     log.debug("Starting asyncore event loop")
     with _loop_lock:
-        try:
-            asyncore.loop(timeout=0.001, use_poll=True, count=None)
-        except Exception:
-            log.debug("Asyncore event loop stopped unexepectedly", exc_info=True)
+        while True:
+            try:
+                asyncore.loop(timeout=0.001, use_poll=True, count=None)
+            except Exception:
+                log.debug("Asyncore event loop stopped unexepectedly", exc_info=True)
+                break
+
+            with _starting_conns_lock:
+                if not _starting_conns:
+                    break
+
         _loop_started = False
         if log:
             # this can happen during interpreter shutdown
             log.debug("Asyncore event loop ended")
+
 
 def _start_loop():
     global _loop_started
@@ -82,6 +93,9 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         self._push_watchers = defaultdict(set)
         self.deque = deque()
 
+        with _starting_conns_lock:
+            _starting_conns.add(self)
+
         log.debug("Opening socket to %s", self.host)
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect((self.host, self.port))
@@ -107,6 +121,9 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         self._readable = False
         asyncore.dispatcher.close(self)
         log.debug("Closed socket to %s" % (self.host,))
+
+        with _starting_conns_lock:
+            _starting_conns.discard(self)
 
         # don't leave in-progress operations hanging
         self.connected_event.set()
@@ -144,6 +161,8 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
             cb(new_exc)
 
     def handle_connect(self):
+        with _starting_conns_lock:
+            _starting_conns.discard(self)
         self._send_options_message()
 
     def handle_error(self):
