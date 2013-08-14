@@ -747,8 +747,11 @@ class Session(object):
             pool.shutdown()
 
     def __del__(self):
-        self.shutdown()
-        del self.cluster
+        try:
+            self.shutdown()
+            del self.cluster
+        except TypeError:
+            pass
 
     def add_host(self, host):
         """ Internal """
