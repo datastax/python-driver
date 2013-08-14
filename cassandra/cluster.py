@@ -13,7 +13,7 @@ import weakref
 try:
     from weakref import WeakSet
 except ImportError:
-    from cassandra.util import WeakSet # NOQA
+    from cassandra.util import WeakSet  # NOQA
 
 from functools import partial
 from itertools import groupby
@@ -29,7 +29,6 @@ from cassandra.decoder import (QueryMessage, ResultMessage,
                                PreparedQueryNotFound,
                                IsBootstrappingErrorMessage, named_tuple_factory,
                                dict_factory)
-from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.metadata import Metadata
 from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
@@ -38,6 +37,12 @@ from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              bind_params, QueryTrace, Query)
 from cassandra.pool import (_ReconnectionHandler, _HostReconnectionHandler,
                             HostConnectionPool)
+
+# pyev is all around faster, so we want to try and default to using that when we can
+try:
+    from cassandra.io.libevreactor import LibevConnection as DefaultConnection
+except ImportError:
+    from cassandra.io.asyncorereactor import AsyncoreConnection as DefaultConnection
 
 
 log = logging.getLogger(__name__)
@@ -154,7 +159,7 @@ class Cluster(object):
     An instance of :class:`cassandra.metadata.Metadata`.
     """
 
-    connection_class = AsyncoreConnection
+    connection_class = DefaultConnection
     """
     This determines what event loop system will be used for managing
     I/O with Cassandra.  These are the current options:
@@ -166,6 +171,8 @@ class Cluster(object):
     the ``asyncore`` module in the Python standard library.  The
     performance is slightly worse than with ``libev``, but it is
     supported on a wider range of systems.
+
+    If ``pyev`` is installed, ``LibevConnection`` will be used instead.
     """
 
     sessions = None
