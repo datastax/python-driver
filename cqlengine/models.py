@@ -334,6 +334,10 @@ class ModelMetaClass(type):
         #TODO: check that the defined columns don't conflict with any of the Model API's existing attributes/methods
         #transform column definitions
         for k,v in column_definitions:
+            # counter column primary keys are not allowed
+            if (v.primary_key or v.partition_key) and isinstance(v, (columns.Counter, columns.BaseContainerColumn)):
+                raise ModelDefinitionException('counter columns and container columns cannot be used as primary keys')
+
             # this will mark the first primary key column as a partition
             # key, if one hasn't been set already
             if not has_partition_keys and v.primary_key:
