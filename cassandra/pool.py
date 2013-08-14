@@ -5,12 +5,11 @@ Connection pooling and host management.
 import logging
 import time
 from threading import Lock, RLock, Condition
-import traceback
 import weakref
 try:
     from weakref import WeakSet
 except ImportError:
-    from cassandra.util import WeakSet
+    from cassandra.util import WeakSet  # NOQA
 
 from cassandra import AuthenticationFailed
 from cassandra.connection import MAX_STREAM_PER_CONNECTION, ConnectionException
@@ -192,7 +191,7 @@ class _HostReconnectionHandler(_ReconnectionHandler):
             return False
         else:
             log.warn("Error attempting to reconnect to %s: %s", self.host, exc)
-            log.debug(traceback.format_exc(exc))
+            log.debug("Reconnection error details", exc_info=True)
             return True
 
 

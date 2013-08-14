@@ -7,7 +7,6 @@ from concurrent.futures import ThreadPoolExecutor
 import logging
 import time
 from threading import Lock, RLock, Thread, Event
-import traceback
 import Queue
 import weakref
 try:
@@ -43,7 +42,7 @@ from cassandra.pool import (_ReconnectionHandler, _HostReconnectionHandler,
 try:
     from cassandra.io.libevreactor import LibevConnection as DefaultConnection
 except ImportError:
-    from cassandra.io.asyncorereactor import AsyncoreConnection as DefaultConnection
+    from cassandra.io.asyncorereactor import AsyncoreConnection as DefaultConnection  # NOQA
 
 
 log = logging.getLogger(__name__)
@@ -898,12 +897,6 @@ class ControlConnection(object):
 
         self._is_shutdown = False
 
-    def log_error(self, message, *args):
-        if not self._is_shutdown:
-            new_args = [traceback.format_exc(a) if isinstance(a, BaseException) else a
-                        for a in args]
-            log.debug(message, *new_args)
-
     def connect(self):
         if self._is_shutdown:
             return
@@ -998,8 +991,8 @@ class ControlConnection(object):
                     self._get_and_set_reconnection_handler,
                     new_handler=None)
                 self._reconnection_handler.start()
-        except Exception, e:
-            self.log_error("[control connection] error reconnecting", e)
+        except Exception:
+            log.debug("[control connection] error reconnecting", exc_info=True)
             raise
 
     def _get_and_set_reconnection_handler(self, new_handler):
@@ -1031,8 +1024,8 @@ class ControlConnection(object):
         try:
             if self._connection:
                 self._refresh_schema(self._connection, keyspace, table)
-        except Exception, exc:
-            self.log_error("[control connection] Error refreshing schema: %s", exc)
+        except Exception:
+            log.debug("[control connection] Error refreshing schema", exc_info=True)
             self._signal_error()
 
     def _refresh_schema(self, connection, keyspace=None, table=None):
@@ -1069,8 +1062,8 @@ class ControlConnection(object):
         try:
             if self._connection:
                 self._refresh_node_list_and_token_map(self._connection)
-        except Exception, exc:
-            self.log_error("[control connection] Error refreshing node list and token map: %s", exc)
+        except Exception:
+            log.debug("[control connection] Error refreshing node list and token map", exc_info=True)
             self._signal_error()
 
     def _refresh_node_list_and_token_map(self, connection):
@@ -1401,7 +1394,7 @@ class ResponseFuture(object):
             self._connection = connection
             return request_id
         except Exception, exc:
-            log.debug("Error querying host %s: %s", host, traceback.format_exc(exc))
+            log.debug("Error querying host %s", host, exc_info=True)
             self._errors[host] = exc
             if connection:
                 pool.return_connection(connection)
