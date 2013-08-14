@@ -28,7 +28,7 @@ def setup_package():
             cluster = CCMCluster.load(path, CLUSTER_NAME)
             log.debug("Found existing ccm test cluster, clearing")
             cluster.clear()
-        except:
+        except Exception:
             log.debug("Creating new ccm test cluster")
             cluster = CCMCluster(path, CLUSTER_NAME, cassandra_version='1.2.6')
             cluster.set_configuration_options({'start_native_transport': True})
@@ -37,7 +37,7 @@ def setup_package():
 
         log.debug("Starting ccm test cluster")
         cluster.start(wait_for_binary_proto=True)
-    except:
+    except Exception:
         log.exception("Failed to start ccm cluster:")
         raise
 

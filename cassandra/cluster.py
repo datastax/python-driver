@@ -340,7 +340,7 @@ class Cluster(object):
                 try:
                     self.control_connection.connect()
                     log.debug("Control connection created")
-                except:
+                except Exception:
                     log.exception("Control connection failed to connect, "
                                   "shutting down Cluster:")
                     self.shutdown()
@@ -488,7 +488,7 @@ class Cluster(object):
             connection = self.connection_factory(host.address)
             try:
                 self.control_connection.wait_for_schema_agreement(connection)
-            except:
+            except Exception:
                 pass
 
             statements = self._prepared_statements.values()
@@ -507,11 +507,11 @@ class Cluster(object):
                             response.kind != ResultMessage.KIND_PREPARED):
                             log.debug("Got unexpected response when preparing "
                                       "statement on host %s: %r" % (host, response))
-                    except:
+                    except Exception:
                         log.exception("Error trying to prepare statement on "
                                       "host %s" % (host,))
 
-        except:
+        except Exception:
             # log and ignore
             log.exception("Error trying to prepare all statements on host %s" % (host,))
 
@@ -608,7 +608,7 @@ class Session(object):
             if trace:
                 try:
                     query.trace = future.get_query_trace()
-                except:
+                except Exception:
                     log.exception("Unable to fetch query trace:")
 
         return result
@@ -646,7 +646,7 @@ class Session(object):
 
             >>> try:
             ...     results = future.result()
-            ... except:
+            ... except Exception:
             ...     log.exception("Operation failed:")
 
         """
@@ -689,7 +689,7 @@ class Session(object):
         try:
             future.send_request()
             query_id, column_metadata = future.result()
-        except:
+        except Exception:
             log.exception("Error preparing query:")
             raise
 
@@ -699,7 +699,7 @@ class Session(object):
         host = future._current_host
         try:
             self.cluster.prepare_on_all_sessions(query_id, prepared_statement, host)
-        except:
+        except Exception:
             log.exception("Error preparing query on all hosts:")
 
         return prepared_statement
@@ -718,7 +718,7 @@ class Session(object):
                 # statement is used.  Just log errors and continue on.
                 try:
                     request_id = future._query(host)
-                except:
+                except Exception:
                     log.exception("Error preparing query for host %s:" % (host,))
                     continue
 
@@ -729,7 +729,7 @@ class Session(object):
 
                 try:
                     future.result()
-                except:
+                except Exception:
                     log.exception("Error preparing query for host %s:" % (host,))
 
     def shutdown(self):
@@ -954,7 +954,7 @@ class ControlConnection(object):
 
             self._refresh_node_list_and_token_map(connection)
             self._refresh_schema(connection)
-        except:
+        except Exception:
             connection.close()
             raise
 
@@ -1301,7 +1301,7 @@ class _Scheduler(object):
 def refresh_schema_and_set_result(keyspace, table, control_conn, response_future):
     try:
         control_conn.refresh_schema(keyspace, table)
-    except:
+    except Exception:
         log.exception("Exception refreshing schema in response to schema change:")
     finally:
         response_future._set_final_result(None)
@@ -1605,7 +1605,7 @@ class ResponseFuture(object):
             ...     rows = future.result()
             ...     for row in rows:
             ...         ... # process results
-            ... except:
+            ... except Exception:
             ...     log.exception("Operation failed:")
 
         """
