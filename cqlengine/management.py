@@ -3,6 +3,13 @@ import json
 from cqlengine.connection import connection_manager, execute
 from cqlengine.exceptions import CQLEngineException
 
+import logging
+from collections import namedtuple
+Field = namedtuple('Field', ['name', 'type'])
+
+logger = logging.getLogger(__name__)
+
+
 def create_keyspace(name, strategy_class='SimpleStrategy', replication_factor=3, durable_writes=True, **replication_values):
     """
     creates a keyspace
@@ -60,6 +67,7 @@ def create_table(model, create_missing_keyspace=True):
             "SELECT columnfamily_name from system.schema_columnfamilies WHERE keyspace_name = :ks_name",
             {'ks_name': ks_name}
         )
+    tables = [x[0] for x in tables.results]
 
     #check for an existing column family
     #TODO: check system tables instead of using cql thrifteries
@@ -67,9 +75,9 @@ def create_table(model, create_missing_keyspace=True):
         qs = ['CREATE TABLE {}'.format(cf_name)]
 
         #add column types
-        pkeys = []
-        ckeys = []
-        qtypes = []
+        pkeys = [] # primary keys
+        ckeys = [] # clustering keys
+        qtypes = [] # field types
         def add_column(col):
             s = col.get_column_def()
             if col.primary_key:
@@ -100,6 +108,19 @@ def create_table(model, create_missing_keyspace=True):
             # and ignore if it says the column family already exists
             if "Cannot add already existing column family" not in unicode(ex):
                 raise
+    else:
+        # see if we're missing any columns
+        fields = get_fields(model)
+        field_names = [x.name for x in fields]
+        for name, col in model._columns.items():
+            if col.primary_key or col.partition_key: continue # we can't mess with the PK
+            if col.db_field_name in field_names: continue # skip columns already defined
+
+            # add missing column using the column def
+            query = "ALTER TABLE {} add {}".format(cf_name, col.get_column_def())
+            logger.debug(query)
+            execute(query)
+
 
     #get existing index names, skip ones that already exist
     with connection_manager() as con:
@@ -126,6 +147,20 @@ def create_table(model, create_missing_keyspace=True):
                 # index already exists
                 pass
 
+def get_fields(model):
+    # returns all fields that aren't part of the PK
+    ks_name = model._get_keyspace()
+    col_family = model.column_family_name(include_keyspace=False)
+
+    with connection_manager() as con:
+        query = "SELECT column_name, validator FROM system.schema_columns \
+                 WHERE keyspace_name = :ks_name AND columnfamily_name = :col_family"
+
+        logger.debug("get_fields %s %s", ks_name, col_family)
+
+        tmp = con.execute(query, {'ks_name':ks_name, 'col_family':col_family})
+    return [Field(x[0], x[1]) for x in tmp.results]
+    # convert to Field named tuples
 
 def delete_table(model):
 
