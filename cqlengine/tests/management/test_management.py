@@ -1,16 +1,15 @@
 from cqlengine.exceptions import CQLEngineException
-from cqlengine.management import create_table, delete_table
+from cqlengine.management import create_table, delete_table, get_fields
 from cqlengine.tests.base import BaseCassEngTestCase
 
 from cqlengine.connection import ConnectionPool, Host
 
-from mock import Mock, MagicMock, MagicProxy, patch
+from mock import MagicMock, patch
 from cqlengine import management
 from cqlengine.tests.query.test_queryset import TestModel
 from cqlengine.models import Model
 from cqlengine import columns
 
-from cql.thrifteries import ThriftConnection
 
 class ConnectionPoolFailoverTestCase(BaseCassEngTestCase):
     """Test cassandra connection pooling."""
@@ -87,3 +86,58 @@ class CapitalizedKeyTest(BaseCassEngTestCase):
 
         delete_table(LowercaseKeyModel)
         delete_table(CapitalizedKeyModel)
+
+
+class FirstModel(Model):
+    __table_name__ = 'first_model'
+    first_key = columns.UUID(primary_key=True)
+    second_key = columns.UUID()
+    third_key = columns.Text()
+
+class SecondModel(Model):
+    __table_name__ = 'first_model'
+    first_key = columns.UUID(primary_key=True)
+    second_key = columns.UUID()
+    third_key = columns.Text()
+    fourth_key = columns.Text()
+
+class ThirdModel(Model):
+    __table_name__ = 'first_model'
+    first_key = columns.UUID(primary_key=True)
+    second_key = columns.UUID()
+    third_key = columns.Text()
+    # removed fourth key, but it should stay in the DB
+    blah = columns.Map(columns.Text, columns.Text)
+
+class FourthModel(Model):
+    __table_name__ = 'first_model'
+    first_key = columns.UUID(primary_key=True)
+    second_key = columns.UUID()
+    third_key = columns.Text()
+    # removed fourth key, but it should stay in the DB
+    renamed = columns.Map(columns.Text, columns.Text, db_field='blah')
+
+class AddColumnTest(BaseCassEngTestCase):
+    def setUp(self):
+        delete_table(FirstModel)
+
+    def test_add_column(self):
+        create_table(FirstModel)
+        fields = get_fields(FirstModel)
+
+        # this should contain the second key
+        self.assertEqual(len(fields), 2)
+        # get schema
+        create_table(SecondModel)
+
+        fields = get_fields(FirstModel)
+        self.assertEqual(len(fields), 3)
+
+        create_table(ThirdModel)
+        fields = get_fields(FirstModel)
+        self.assertEqual(len(fields), 4)
+
+        create_table(FourthModel)
+        fields = get_fields(FirstModel)
+        self.assertEqual(len(fields), 4)
+

@@ -154,6 +154,8 @@ class ConnectionPool(object):
         while True:
             try:
                 con = self.get()
+                if not con:
+                    raise CQLEngineException("Error calling execute without calling setup.")
                 cur = con.cursor()
                 cur.execute(query, params)
                 columns = [i[0] for i in cur.description or []]
