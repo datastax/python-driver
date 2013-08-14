@@ -51,6 +51,13 @@ class ConnectionException(Exception):
         self.host = host
 
 
+class ConnectionShutdown(ConnectionException):
+    """
+    Raised when a connection has been defuncted or closed.
+    """
+    pass
+
+
 class ConnectionBusy(Exception):
     """
     An attempt was made to send a message through a :class:`.Connection` that

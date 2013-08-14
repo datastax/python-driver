@@ -8,7 +8,7 @@ from Queue import Queue
 
 import pyev
 
-from cassandra.connection import (Connection, ResponseWaiter, ConnectionException,
+from cassandra.connection import (Connection, ResponseWaiter, ConnectionShutdown,
                                   ConnectionBusy, NONBLOCKING)
 from cassandra.decoder import RegisterMessage
 from cassandra.marshal import int32_unpack
@@ -141,23 +141,33 @@ class LibevConnection(Connection):
         # don't leave in-progress operations hanging
         if not self.is_defunct:
             self._error_all_callbacks(
-                ConnectionException("Connection to %s was closed" % self.host))
+                ConnectionShutdown("Connection to %s was closed" % self.host))
 
     def __del__(self):
         self.close()
 
     def defunct(self, exc):
-        log.debug("Defuncting connection to %s: %s\n%s" %
-                  (self.host, exc, traceback.format_exc(exc)))
+        with self.lock:
+            if self.is_defunct:
+                return
+            self.is_defunct = True
+
+        trace = traceback.format_exc(exc)
+        if trace != "None":
+            log.debug("Defuncting connection to %s: %s\n%s",
+                      self.host, exc, traceback.format_exc(exc))
+        else:
+            log.debug("Defuncting connection to %s: %s", self.host, exc)
+
         self.last_error = exc
-        self.is_defunct = True
         self._error_all_callbacks(exc)
         self.connected_event.set()
         return exc
 
     def _error_all_callbacks(self, exc):
+        new_exc = ConnectionShutdown(str(exc))
         for cb in self._callbacks.values():
-            cb(exc)
+            cb(new_exc)
 
     def handle_write(self, watcher, revents):
         try:
@@ -238,9 +248,9 @@ class LibevConnection(Connection):
 
     def send_msg(self, msg, cb):
         if self.is_defunct:
-            raise ConnectionException("Connection to %s is defunct" % self.host)
+            raise ConnectionShutdown("Connection to %s is defunct" % self.host)
         elif self.is_closed:
-            raise ConnectionException("Connection to %s is closed" % self.host)
+            raise ConnectionShutdown("Connection to %s is closed" % self.host)
 
         try:
             request_id = self._id_queue.get_nowait()
