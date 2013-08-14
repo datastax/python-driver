@@ -26,7 +26,7 @@ def _run_loop():
         try:
             asyncore.loop(timeout=0.001, use_poll=True, count=None)
         except Exception:
-            pass
+            log.debug("Asyncore event loop stopped unexepectedly", exc_info=True)
         _loop_started = False
         if log:
             # this can happen during interpreter shutdown
