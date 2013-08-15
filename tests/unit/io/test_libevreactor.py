@@ -20,7 +20,7 @@ except ImportError, exc:
     raise unittest.SkipTest('libev does not appear to be installed correctly: %s' % (exc,))
 
 @patch('socket.socket')
-@patch('cassandra.io.libevwrapper.Io')
+@patch('cassandra.io.libevwrapper.IO')
 @patch('cassandra.io.libevreactor._start_loop')
 class LibevConnectionTest(unittest.TestCase):
 
