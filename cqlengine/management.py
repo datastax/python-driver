@@ -147,12 +147,20 @@ def get_create_table(model):
     with_qs = ['read_repair_chance = {}'.format(model.__read_repair_chance__)]
 
     _order = ['"{}" {}'.format(c.db_field_name, c.clustering_order or 'ASC') for c in model._clustering_keys.values()]
+
     if _order:
         with_qs.append('clustering order by ({})'.format(', '.join(_order)))
 
+    compaction_options = get_compaction_options(model)
+
+    if compaction_options:
+        compaction_options = json.dumps(compaction_options).replace('"', "'")
+        with_qs.append("compaction = {}".format(compaction_options))
 
     # add read_repair_chance
     qs += ['WITH {}'.format(' AND '.join(with_qs))]
+
+
     qs = ' '.join(qs)
     return qs
 

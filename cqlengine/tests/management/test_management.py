@@ -1,5 +1,5 @@
 from cqlengine.exceptions import CQLEngineException
-from cqlengine.management import create_table, delete_table, get_fields, get_compaction_options
+from cqlengine.management import create_table, delete_table, get_fields, get_compaction_options, get_create_table
 from cqlengine.tests.base import BaseCassEngTestCase
 
 from cqlengine.connection import ConnectionPool, Host
@@ -216,4 +216,8 @@ class LeveledCompactionTest(BaseCompactionTest):
     def test_sstable_size_in_mb(self):
         with patch.object(self.model, '__compaction_sstable_size_in_mb__', 32):
             result = get_compaction_options(self.model)
+
         assert result['sstable_size_in_mb'] == 32
+
+
+
