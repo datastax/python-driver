@@ -5,7 +5,11 @@ try:
 except ImportError:
     has_subprocess = False
 
-from distutils.core import setup, Extension
+from distribute_setup import use_setuptools
+use_setuptools()
+
+from setuptools import setup
+from distutils.core import Extension
 from distutils.cmd import Command
 
 from cassandra import __version__
