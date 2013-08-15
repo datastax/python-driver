@@ -75,7 +75,6 @@ def sync_table(model, create_missing_keyspace=True):
     tables = [x[0] for x in tables.results]
 
     #check for an existing column family
-    #TODO: check system tables instead of using cql thrifteries
     if raw_cf_name not in tables:
         qs = get_create_table(model)
 
@@ -217,6 +216,20 @@ def get_fields(model):
         tmp = con.execute(query, {'ks_name':ks_name, 'col_family':col_family})
     return [Field(x[0], x[1]) for x in tmp.results]
     # convert to Field named tuples
+
+def get_compaction_settings(model):
+    # returns a dictionary of compaction settings in an existing table
+    ks_name = model._get_keyspace()
+    col_family = model.column_family_name(include_keyspace=False)
+    with connection_manager() as con:
+        query = "SELECT , validator FROM system.schema_columns \
+                 WHERE keyspace_name = :ks_name AND columnfamily_name = :col_family"
+
+        logger.debug("get_fields %s %s", ks_name, col_family)
+
+        tmp = con.execute(query, {'ks_name':ks_name, 'col_family':col_family})
+    import ipdb; ipdb.set_trace()
+
 
 def delete_table(model):
     warnings.warn("delete_table has been deprecated in favor of drop_table()", DeprecationWarning)

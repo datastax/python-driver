@@ -229,4 +229,9 @@ class LeveledCompactionTest(BaseCompactionTest):
         drop_table(LeveledcompactionTestTable)
         sync_table(LeveledcompactionTestTable)
 
+        LeveledcompactionTestTable.__compaction__ = SizeTieredCompactionStrategy
+        LeveledcompactionTestTable.__compaction_sstable_size_in_mb__ = None
+
+        sync_table(LeveledcompactionTestTable)
+
 
