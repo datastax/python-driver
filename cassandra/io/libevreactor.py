@@ -6,19 +6,17 @@ from threading import Event, Lock, Thread
 import traceback
 from Queue import Queue
 
-import pyev
-
 from cassandra.connection import (Connection, ResponseWaiter, ConnectionShutdown,
                                   ConnectionBusy, NONBLOCKING)
 from cassandra.decoder import RegisterMessage
 from cassandra.marshal import int32_unpack
+import cassandra.io.libevwrapper as libev
+
 
 log = logging.getLogger(__name__)
 
-
-_loop = pyev.default_loop(pyev.EVBACKEND_SELECT)
-
-_loop_notifier = _loop.async(lambda *a, **kw: None)
+_loop = libev.Loop()
+_loop_notifier = libev.Async(_loop)
 _loop_notifier.start()
 
 # prevent _loop_notifier from keeping the loop from returning
@@ -47,7 +45,7 @@ def _start_loop():
     should_start = False
     with _loop_lock:
         if not _loop_started:
-            log.debug("Starting pyev event loop")
+            log.debug("Starting libev event loop")
             _loop_started = True
             should_start = True
 
@@ -73,8 +71,7 @@ def defunct_on_error(f):
 
 class LibevConnection(Connection):
     """
-    An implementation of :class:`.Connection` that utilizes libev through
-    the pyev library for its event loop.
+    An implementation of :class:`.Connection` that utilizes libev.
     """
 
     _buf = ""
@@ -109,8 +106,8 @@ class LibevConnection(Connection):
             for args in self.sockopts:
                 self._socket.setsockopt(*args)
 
-        self._read_watcher = pyev.Io(self._socket._sock, pyev.EV_READ, _loop, self.handle_read)
-        self._write_watcher = pyev.Io(self._socket._sock, pyev.EV_WRITE, _loop, self.handle_write)
+        self._read_watcher = libev.IO(self._socket._sock, libev.EV_READ, _loop, self.handle_read)
+        self._write_watcher = libev.IO(self._socket._sock, libev.EV_WRITE, _loop, self.handle_write)
         with _loop_lock:
             self._read_watcher.start()
             self._write_watcher.start()
@@ -241,7 +238,7 @@ class LibevConnection(Connection):
         with self.lock:
             self.deque.extend(chunks)
 
-            if not self._write_watcher.active:
+            if not self._write_watcher.is_active():
                 with _loop_lock:
                     self._write_watcher.start()
                     _loop_notifier.send()
