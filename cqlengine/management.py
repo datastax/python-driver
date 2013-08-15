@@ -47,8 +47,10 @@ def delete_keyspace(name):
         if name in [r[0] for r in keyspaces]:
             execute("DROP KEYSPACE {}".format(name))
 
-
 def create_table(model, create_missing_keyspace=True):
+    sync_table(model, create_missing_keyspace)
+
+def sync_table(model, create_missing_keyspace=True):
 
     if model.__abstract__:
         raise CQLEngineException("cannot create table from abstract model")

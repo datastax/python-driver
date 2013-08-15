@@ -140,6 +140,8 @@ class BaseModel(object):
     #the keyspace for this model
     __keyspace__ = None
 
+
+    __compaction__ = None
     __read_repair_chance__ = 0.1
 
     def __init__(self, **values):
