@@ -1,5 +1,5 @@
 from cqlengine.exceptions import CQLEngineException
-from cqlengine.management import create_table, delete_table, get_fields, get_compaction_options, get_create_table
+from cqlengine.management import create_table, delete_table, get_fields, get_compaction_options, get_create_table, sync_table, drop_table
 from cqlengine.tests.base import BaseCassEngTestCase
 
 from cqlengine.connection import ConnectionPool, Host
@@ -219,5 +219,14 @@ class LeveledCompactionTest(BaseCompactionTest):
 
         assert result['sstable_size_in_mb'] == 32
 
+    def test_create_table(self):
+        class LeveledcompactionTestTable(Model):
+            __compaction__ = LeveledCompactionStrategy
+            __compaction_sstable_size_in_mb__ = 64
+            user_id = columns.UUID(primary_key=True)
+            name = columns.Text()
+
+        drop_table(LeveledcompactionTestTable)
+        sync_table(LeveledcompactionTestTable)
 
 

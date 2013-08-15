@@ -1,5 +1,14 @@
 CHANGELOG
 
+0.7.0
+* added counter columns
+* added support for compaction settings at the model level
+* deprecated delete_table in favor of drop_table
+* deprecated create_table in favor of sync_table
+
+0.6.0
+* added table sync
+
 0.5.2
 * adding hex conversion to Bytes column
 
