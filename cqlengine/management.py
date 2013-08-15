@@ -75,35 +75,7 @@ def sync_table(model, create_missing_keyspace=True):
     #check for an existing column family
     #TODO: check system tables instead of using cql thrifteries
     if raw_cf_name not in tables:
-        qs = ['CREATE TABLE {}'.format(cf_name)]
-
-        #add column types
-        pkeys = [] # primary keys
-        ckeys = [] # clustering keys
-        qtypes = [] # field types
-        def add_column(col):
-            s = col.get_column_def()
-            if col.primary_key:
-                keys = (pkeys if col.partition_key else ckeys)
-                keys.append('"{}"'.format(col.db_field_name))
-            qtypes.append(s)
-        for name, col in model._columns.items():
-            add_column(col)
-
-        qtypes.append('PRIMARY KEY (({}){})'.format(', '.join(pkeys), ckeys and ', ' + ', '.join(ckeys) or ''))
-
-        qs += ['({})'.format(', '.join(qtypes))]
-
-        with_qs = ['read_repair_chance = {}'.format(model.__read_repair_chance__)]
-
-        _order = ['"{}" {}'.format(c.db_field_name, c.clustering_order or 'ASC') for c in model._clustering_keys.values()]
-        if _order:
-            with_qs.append('clustering order by ({})'.format(', '.join(_order)))
-
-
-        # add read_repair_chance
-        qs += ['WITH {}'.format(' AND '.join(with_qs))]
-        qs = ' '.join(qs)
+        qs = get_create_table(model)
 
         try:
             execute(qs)
@@ -150,6 +122,40 @@ def sync_table(model, create_missing_keyspace=True):
             except CQLEngineException:
                 # index already exists
                 pass
+
+def get_create_table(model):
+    cf_name = model.column_family_name()
+    qs = ['CREATE TABLE {}'.format(cf_name)]
+
+    #add column types
+    pkeys = [] # primary keys
+    ckeys = [] # clustering keys
+    qtypes = [] # field types
+    def add_column(col):
+        s = col.get_column_def()
+        if col.primary_key:
+            keys = (pkeys if col.partition_key else ckeys)
+            keys.append('"{}"'.format(col.db_field_name))
+        qtypes.append(s)
+    for name, col in model._columns.items():
+        add_column(col)
+
+    qtypes.append('PRIMARY KEY (({}){})'.format(', '.join(pkeys), ckeys and ', ' + ', '.join(ckeys) or ''))
+
+    qs += ['({})'.format(', '.join(qtypes))]
+
+    with_qs = ['read_repair_chance = {}'.format(model.__read_repair_chance__)]
+
+    _order = ['"{}" {}'.format(c.db_field_name, c.clustering_order or 'ASC') for c in model._clustering_keys.values()]
+    if _order:
+        with_qs.append('clustering order by ({})'.format(', '.join(_order)))
+
+
+    # add read_repair_chance
+    qs += ['WITH {}'.format(' AND '.join(with_qs))]
+    qs = ' '.join(qs)
+    return qs
+
 
 def get_compaction_options(model):
     """
