@@ -1,11 +1,11 @@
 from cqlengine.exceptions import CQLEngineException
-from cqlengine.management import create_table, delete_table, get_fields
+from cqlengine.management import create_table, delete_table, get_fields, get_compaction_options
 from cqlengine.tests.base import BaseCassEngTestCase
 
 from cqlengine.connection import ConnectionPool, Host
 
 from mock import MagicMock, patch
-from cqlengine import management
+from cqlengine import management, SizeTieredCompactionStrategy, LeveledCompactionStrategy
 from cqlengine.tests.query.test_queryset import TestModel
 from cqlengine.models import Model
 from cqlengine import columns
@@ -140,4 +140,57 @@ class AddColumnTest(BaseCassEngTestCase):
         create_table(FourthModel)
         fields = get_fields(FirstModel)
         self.assertEqual(len(fields), 4)
+
+class CompactionModel(Model):
+    __compaction__ = None
+    cid = columns.UUID(primary_key=True)
+    name = columns.Text()
+
+class CompactionSizeTieredModel(Model):
+    __compaction__ = SizeTieredCompactionStrategy
+    cid = columns.UUID(primary_key=True)
+    name = columns.Text()
+
+class CompactionLeveledStrategyModel(Model):
+    __compaction__ = LeveledCompactionStrategy
+    cid = columns.UUID(primary_key=True)
+    name = columns.Text()
+
+import copy
+
+class EmptyCompactionTest(BaseCassEngTestCase):
+    def test_empty_compaction(self):
+        self.model = copy.deepcopy(CompactionModel)
+        result = get_compaction_options(self.model)
+        self.assertIsNone(result)
+
+
+class SizeTieredCompactionTest(BaseCassEngTestCase):
+
+    def setUp(self):
+        self.model = copy.deepcopy(CompactionModel)
+        self.model.__compaction__ = SizeTieredCompactionStrategy
+
+    def test_size_tiered(self):
+        result = get_compaction_options(self.model)
+        assert result['class'] == SizeTieredCompactionStrategy
+
+    def test_min_threshold(self):
+        self.model.__compaction_min_threshold__ = 2
+
+        result = get_compaction_options(self.model)
+        assert result['min_threshold'] == 2
+
+class LeveledCompactionTest(BaseCassEngTestCase):
+    def setUp(self):
+        self.model = copy.deepcopy(CompactionLeveledStrategyModel)
+
+    def test_simple_leveled(self):
+        result = get_compaction_options(self.model)
+        assert result['class'] == LeveledCompactionStrategy
+
+    def test_bucket_high_fails(self):
+        with patch.object(self.model, '__compaction_bucket_high__', 10), \
+             self.assertRaises(CQLEngineException):
+            result = get_compaction_options(self.model)
 

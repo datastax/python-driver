@@ -1,4 +1,5 @@
 import json
+from cqlengine import SizeTieredCompactionStrategy
 
 from cqlengine.connection import connection_manager, execute
 from cqlengine.exceptions import CQLEngineException
@@ -99,6 +100,7 @@ def sync_table(model, create_missing_keyspace=True):
         if _order:
             with_qs.append('clustering order by ({})'.format(', '.join(_order)))
 
+
         # add read_repair_chance
         qs += ['WITH {}'.format(' AND '.join(with_qs))]
         qs = ' '.join(qs)
@@ -148,6 +150,36 @@ def sync_table(model, create_missing_keyspace=True):
             except CQLEngineException:
                 # index already exists
                 pass
+
+def get_compaction_options(model):
+    """
+    Generates dictionary (later converted to a string) for creating and altering
+    tables with compaction strategy
+
+    :param model:
+    :return:
+    """
+    if not model.__compaction__:
+        return None
+
+    result = {'class':model.__compaction__}
+
+    def setter(key, limited_to_strategy = None):
+        mkey = "__compaction_{}__".format(key)
+        tmp = getattr(model, mkey)
+        if tmp and limited_to_strategy and limited_to_strategy != model.__compaction__:
+            raise CQLEngineException("{} is limited to {}".format(key, limited_to_strategy))
+
+        if tmp:
+            result[key] = tmp
+
+    setter('min_threshold')
+    setter('tombstone_compaction_interval')
+    setter('bucket_high', SizeTieredCompactionStrategy)
+    setter('bucket_low', SizeTieredCompactionStrategy)
+
+    return result
+
 
 def get_fields(model):
     # returns all fields that aren't part of the PK

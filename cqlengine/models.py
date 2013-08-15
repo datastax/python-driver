@@ -141,7 +141,23 @@ class BaseModel(object):
     __keyspace__ = None
 
 
+    # compaction options
     __compaction__ = None
+    __compaction_tombstone_compaction_interval__ = None
+    __compaction_tombstone_threshold = None
+
+    # compaction - size tiered options
+    __compaction_bucket_high__ = None
+    __compaction_bucket_low__ = None
+    __compaction_max_threshold__ = None
+    __compaction_min_threshold__ = None
+    __compaction_min_sstable_size__ = None
+
+    # compaction - leveled options
+    __compaction_sstable_size_in_mb__ = None # only works with Leveled
+
+    # end compaction
+
     __read_repair_chance__ = 0.1
 
     def __init__(self, **values):
