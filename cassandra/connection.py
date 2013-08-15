@@ -9,7 +9,7 @@ from cassandra.marshal import int8_unpack
 from cassandra.decoder import (ReadyMessage, AuthenticateMessage, OptionsMessage,
                                StartupMessage, ErrorMessage, CredentialsMessage,
                                QueryMessage, ResultMessage, decode_response,
-                               InvalidRequestException)
+                               InvalidRequestException, SupportedMessage)
 
 
 log = logging.getLogger(__name__)
@@ -194,6 +194,11 @@ class Connection(object):
     def _handle_options_response(self, options_response):
         if self.is_defunct:
             return
+
+        if not isinstance(options_response, SupportedMessage):
+            log.error("Did not get expected SupportedMessage response; instead, got: %s", options_response)
+            return
+
         log.debug("Received options response on new Connection from %s" % self.host)
         self.supported_cql_versions = options_response.cql_versions
         self.remote_supported_compressions = options_response.options['COMPRESSION']
