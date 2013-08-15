@@ -59,12 +59,6 @@ through `Homebrew <http://brew.sh/>`_. For example, on Mac OS X:
 
       $ brew install libev
 
-and then install ``pyev`` as follows:
-
-    .. code-block:: bash
-
-      $ pip install pyev
-
 Usage
 ^^^^^
 
