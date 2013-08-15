@@ -175,8 +175,12 @@ def get_compaction_options(model):
 
     setter('min_threshold')
     setter('tombstone_compaction_interval')
+
     setter('bucket_high', SizeTieredCompactionStrategy)
     setter('bucket_low', SizeTieredCompactionStrategy)
+    setter('max_threshold', SizeTieredCompactionStrategy)
+    setter('min_threshold', SizeTieredCompactionStrategy)
+    setter('min_sstable_size', SizeTieredCompactionStrategy)
 
     return result
 

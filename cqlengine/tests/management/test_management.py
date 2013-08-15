@@ -185,12 +185,30 @@ class LeveledCompactionTest(BaseCassEngTestCase):
     def setUp(self):
         self.model = copy.deepcopy(CompactionLeveledStrategyModel)
 
+    def assert_option_fails(self, key):
+        # key is a normal_key, converted to
+        # __compaction_key__
+        key = "__compaction_{}__".format(key)
+
+        with patch.object(self.model, key, 10), \
+             self.assertRaises(CQLEngineException):
+            get_compaction_options(self.model)
+
     def test_simple_leveled(self):
         result = get_compaction_options(self.model)
         assert result['class'] == LeveledCompactionStrategy
 
     def test_bucket_high_fails(self):
-        with patch.object(self.model, '__compaction_bucket_high__', 10), \
-             self.assertRaises(CQLEngineException):
-            result = get_compaction_options(self.model)
+        self.assert_option_fails('bucket_high')
 
+    def test_bucket_low_fails(self):
+        self.assert_option_fails('bucket_low')
+
+    def test_max_threshold_fails(self):
+        self.assert_option_fails('max_threshold')
+
+    def test_min_threshold_fails(self):
+        self.assert_option_fails('min_threshold')
+
+    def test_min_sstable_size_fails(self):
+        self.assert_option_fails('min_sstable_size')
