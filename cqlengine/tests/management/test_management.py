@@ -164,8 +164,18 @@ class EmptyCompactionTest(BaseCassEngTestCase):
         result = get_compaction_options(self.model)
         self.assertIsNone(result)
 
+class BaseCompactionTest(BaseCassEngTestCase):
+    def assert_option_fails(self, key):
+        # key is a normal_key, converted to
+        # __compaction_key__
 
-class SizeTieredCompactionTest(BaseCassEngTestCase):
+        key = "__compaction_{}__".format(key)
+
+        with patch.object(self.model, key, 10), \
+             self.assertRaises(CQLEngineException):
+            get_compaction_options(self.model)
+
+class SizeTieredCompactionTest(BaseCompactionTest):
 
     def setUp(self):
         self.model = copy.deepcopy(CompactionModel)
@@ -177,22 +187,12 @@ class SizeTieredCompactionTest(BaseCassEngTestCase):
 
     def test_min_threshold(self):
         self.model.__compaction_min_threshold__ = 2
-
         result = get_compaction_options(self.model)
         assert result['min_threshold'] == 2
 
-class LeveledCompactionTest(BaseCassEngTestCase):
+class LeveledCompactionTest(BaseCompactionTest):
     def setUp(self):
         self.model = copy.deepcopy(CompactionLeveledStrategyModel)
-
-    def assert_option_fails(self, key):
-        # key is a normal_key, converted to
-        # __compaction_key__
-        key = "__compaction_{}__".format(key)
-
-        with patch.object(self.model, key, 10), \
-             self.assertRaises(CQLEngineException):
-            get_compaction_options(self.model)
 
     def test_simple_leveled(self):
         result = get_compaction_options(self.model)
@@ -212,3 +212,4 @@ class LeveledCompactionTest(BaseCassEngTestCase):
 
     def test_min_sstable_size_fails(self):
         self.assert_option_fails('min_sstable_size')
+

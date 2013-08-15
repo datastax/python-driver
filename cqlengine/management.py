@@ -1,5 +1,5 @@
 import json
-from cqlengine import SizeTieredCompactionStrategy
+from cqlengine import SizeTieredCompactionStrategy, LeveledCompactionStrategy
 
 from cqlengine.connection import connection_manager, execute
 from cqlengine.exceptions import CQLEngineException
@@ -181,6 +181,8 @@ def get_compaction_options(model):
     setter('max_threshold', SizeTieredCompactionStrategy)
     setter('min_threshold', SizeTieredCompactionStrategy)
     setter('min_sstable_size', SizeTieredCompactionStrategy)
+
+    setter("sstable_size_in_mb", LeveledCompactionStrategy)
 
     return result
 
