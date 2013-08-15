@@ -213,3 +213,7 @@ class LeveledCompactionTest(BaseCompactionTest):
     def test_min_sstable_size_fails(self):
         self.assert_option_fails('min_sstable_size')
 
+    def test_sstable_size_in_mb(self):
+        with patch.object(self.model, '__compaction_sstable_size_in_mb__', 32):
+            result = get_compaction_options(self.model)
+        assert result['sstable_size_in_mb'] == 32
