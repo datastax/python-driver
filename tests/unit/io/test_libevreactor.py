@@ -16,12 +16,12 @@ from cassandra.marshal import uint8_pack, uint32_pack
 
 try:
     from cassandra.io.libevreactor import LibevConnection
-except ImportError:
-    raise unittest.SkipTest('pyev does not appear to be installed correctly')
+except ImportError, exc:
+    raise unittest.SkipTest('libev does not appear to be installed correctly: %s' % (exc,))
 
 @patch('socket.socket')
-@patch('pyev.Io')
-@patch('cassandra.io.asyncorereactor._start_loop')
+@patch('cassandra.io.libevwrapper.Io')
+@patch('cassandra.io.libevreactor._start_loop')
 class LibevConnectionTest(unittest.TestCase):
 
     def make_connection(self):

@@ -38,7 +38,7 @@ from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
 from cassandra.pool import (_ReconnectionHandler, _HostReconnectionHandler,
                             HostConnectionPool)
 
-# pyev is all around faster, so we want to try and default to using that when we can
+# libev is all around faster, so we want to try and default to using that when we can
 try:
     from cassandra.io.libevreactor import LibevConnection as DefaultConnection
 except ImportError:
@@ -178,7 +178,7 @@ class Cluster(object):
     performance is slightly worse than with ``libev``, but it is
     supported on a wider range of systems.
 
-    If ``pyev`` is installed, ``LibevConnection`` will be used instead.
+    If ``libev`` is installed, ``LibevConnection`` will be used instead.
     """
 
     sessions = None

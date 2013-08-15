@@ -37,22 +37,14 @@ libev support
 ^^^^^^^^^^^^^
 The driver currently uses Python's ``asyncore`` module for its default
 event loop.  For better performance, ``libev`` is also supported through
-the ``pyev`` python wrapper.
+a C extension.
 
 If you're on Linux, you should be able to install libev
 through a package manager.  For example, on Debian/Ubuntu:
 
     .. code-block:: bash
 
-      $ sudo apt-get install libev4
-
-and then install ``pyev`` as follows:
-
-    .. code-block:: bash
-
-      $ sudo pip install --no-install pyev==0.8.1-4.04
-      $ sudo chmod +x build/pyev/src/libev/configure
-      $ sudo pip install pyev==0.8.1-4.04
+      $ sudo apt-get install libev4 libev-dev
 
 If successful, you should be able to use the libev event loop by
 doing the following
