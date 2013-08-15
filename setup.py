@@ -11,6 +11,9 @@ from distutils.cmd import Command
 from cassandra import __version__
 
 murmur3 = Extension('cassandra.murmur3', sources=['cassandra/murmur3.c'])
+libevwrapper = Extension('cassandra.io.libevwrapper',
+                         libraries=['ev'],
+                         sources=['cassandra/io/libevwrapper.c'])
 
 class doc(Command):
 
@@ -60,7 +63,7 @@ setup(
     version=__version__,
     description='Python driver for Cassandra',
     packages=["cassandra", "cassandra.io"],
-    ext_modules=[murmur3],
+    ext_modules=[murmur3, libevwrapper],
     install_requires=['futures', 'scales'],
     tests_require=['nose', 'mock', 'ccm'],
     cmdclass={"doc": doc},
