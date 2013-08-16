@@ -70,6 +70,7 @@ class ColumnQueryEvaluator(AbstractQueryableColumn):
     def _get_column(self):
         return self.column
 
+
 class ColumnDescriptor(object):
     """
     Handles the reading and writing of column values to and from
@@ -127,6 +128,7 @@ class BaseModel(object):
     """
 
     class DoesNotExist(_DoesNotExist): pass
+
     class MultipleObjectsReturned(_MultipleObjectsReturned): pass
 
     objects = QuerySetDescriptor()
@@ -316,19 +318,26 @@ class ModelMetaClass(type):
 
         column_definitions = inherited_columns.items() + column_definitions
 
-        #columns defined on model, excludes automatically
-        #defined columns
         defined_columns = OrderedDict(column_definitions)
 
         #prepend primary key if one hasn't been defined
         if not is_abstract and not any([v.primary_key for k,v in column_definitions]):
             raise ModelDefinitionException("At least 1 primary key is required.")
 
+        counter_columns = [c for c in defined_columns.values() if isinstance(c, columns.Counter)]
+        data_columns = [c for c in defined_columns.values() if not c.primary_key and not isinstance(c, columns.Counter)]
+        if counter_columns and data_columns:
+            raise ModelDefinitionException('counter models may not have data columns')
+
         has_partition_keys = any(v.partition_key for (k, v) in column_definitions)
 
         #TODO: check that the defined columns don't conflict with any of the Model API's existing attributes/methods
         #transform column definitions
         for k,v in column_definitions:
+            # counter column primary keys are not allowed
+            if (v.primary_key or v.partition_key) and isinstance(v, (columns.Counter, columns.BaseContainerColumn)):
+                raise ModelDefinitionException('counter columns and container columns cannot be used as primary keys')
+
             # this will mark the first primary key column as a partition
             # key, if one hasn't been set already
             if not has_partition_keys and v.primary_key:
@@ -382,6 +391,7 @@ class ModelMetaClass(type):
 
         attrs['_partition_keys'] = partition_keys
         attrs['_clustering_keys'] = clustering_keys
+        attrs['_has_counter'] = len(counter_columns) > 0
 
         #setup class exceptions
         DoesNotExistBase = None

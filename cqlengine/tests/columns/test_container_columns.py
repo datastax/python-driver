@@ -28,7 +28,9 @@ class JsonTestColumn(columns.Column):
         if value is None: return
         return json.dumps(value)
 
+
 class TestSetColumn(BaseCassEngTestCase):
+
     @classmethod
     def setUpClass(cls):
         super(TestSetColumn, cls).setUpClass()
@@ -39,7 +41,6 @@ class TestSetColumn(BaseCassEngTestCase):
     def tearDownClass(cls):
         super(TestSetColumn, cls).tearDownClass()
         delete_table(TestSetModel)
-
 
     def test_empty_set_initial(self):
         """

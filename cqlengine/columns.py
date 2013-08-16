@@ -192,6 +192,7 @@ class Column(object):
     def get_cql(self):
         return '"{}"'.format(self.db_field_name)
 
+
 class Bytes(Column):
     db_type = 'blob'
 
@@ -200,8 +201,10 @@ class Bytes(Column):
         if val is None: return
         return val.encode('hex')
 
+
 class Ascii(Column):
     db_type = 'ascii'
+
 
 class Text(Column):
     db_type = 'text'
@@ -241,6 +244,43 @@ class Integer(Column):
 
     def to_database(self, value):
         return self.validate(value)
+
+
+class CounterValueManager(BaseValueManager):
+    def __init__(self, instance, column, value):
+        super(CounterValueManager, self).__init__(instance, column, value)
+        self.value = self.value or 0
+        self.previous_value = self.previous_value or 0
+
+
+class Counter(Integer):
+    db_type = 'counter'
+
+    value_manager = CounterValueManager
+
+    def __init__(self,
+                 index=False,
+                 db_field=None,
+                 required=False):
+        super(Counter, self).__init__(
+            primary_key=False,
+            partition_key=False,
+            index=index,
+            db_field=db_field,
+            default=0,
+            required=required,
+        )
+
+    def get_update_statement(self, val, prev, ctx):
+        val = self.to_database(val)
+        prev = self.to_database(prev or 0)
+        field_id = uuid4().hex
+
+        delta = val - prev
+        sign = '-' if delta < 0 else '+'
+        delta = abs(delta)
+        ctx[field_id] = delta
+        return ['"{0}" = "{0}" {1} {2}'.format(self.db_field_name, sign, delta)]
 
 
 class DateTime(Column):
@@ -316,6 +356,7 @@ class UUID(Column):
 
 from uuid import UUID as pyUUID, getnode
 
+
 class TimeUUID(UUID):
     """
     UUID containing timestamp
@@ -363,7 +404,6 @@ class TimeUUID(UUID):
                             clock_seq_hi_variant, clock_seq_low, node), version=1)
 
 
-
 class Boolean(Column):
     db_type = 'boolean'
 
@@ -400,6 +440,7 @@ class Float(Column):
     def to_database(self, value):
         return self.validate(value)
 
+
 class Decimal(Column):
     db_type = 'decimal'
 
@@ -419,11 +460,6 @@ class Decimal(Column):
     def to_database(self, value):
         return self.validate(value)
 
-class Counter(Column):
-    #TODO: counter field
-    def __init__(self, **kwargs):
-        super(Counter, self).__init__(**kwargs)
-        raise NotImplementedError
 
 class BaseContainerColumn(Column):
     """
@@ -463,6 +499,7 @@ class BaseContainerColumn(Column):
         Used to add partial update statements
         """
         raise NotImplementedError
+
 
 class Set(BaseContainerColumn):
     """
@@ -552,6 +589,7 @@ class Set(BaseContainerColumn):
                 statements += ['"{0}" = "{0}" - :{1}'.format(self.db_field_name, field_id)]
 
             return statements
+
 
 class List(BaseContainerColumn):
     """
@@ -776,6 +814,7 @@ class Map(BaseContainerColumn):
             del_statements += ['"{}"[:{}]'.format(self.db_field_name, field_id)]
 
         return del_statements
+
 
 class _PartitionKeysToken(Column):
     """
