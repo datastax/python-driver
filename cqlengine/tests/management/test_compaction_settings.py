@@ -1,5 +1,6 @@
 import copy
-from mock import patch
+from time import sleep
+from mock import patch, MagicMock
 from cqlengine import Model, columns, SizeTieredCompactionStrategy, LeveledCompactionStrategy
 from cqlengine.exceptions import CQLEngineException
 from cqlengine.management import get_compaction_options, drop_table, sync_table
@@ -69,20 +70,26 @@ class LeveledCompactionTest(BaseCompactionTest):
 
         assert result['sstable_size_in_mb'] == 32
 
-    def test_create_table(self):
-        class LeveledcompactionTestTable(Model):
-            __compaction__ = LeveledCompactionStrategy
-            __compaction_sstable_size_in_mb__ = 64
-            user_id = columns.UUID(primary_key=True)
-            name = columns.Text()
 
+class LeveledcompactionTestTable(Model):
+    __compaction__ = LeveledCompactionStrategy
+    __compaction_sstable_size_in_mb__ = 64
+
+    user_id = columns.UUID(primary_key=True)
+    name = columns.Text()
+
+
+class AlterTableTest(BaseCassEngTestCase):
+
+    def test_alter_is_called_table(self):
         drop_table(LeveledcompactionTestTable)
         sync_table(LeveledcompactionTestTable)
+        with patch('cqlengine.management.update_compaction') as mock:
+            mock.return_value = True
+            sync_table(LeveledcompactionTestTable)
+        assert mock.called == 1
 
-        LeveledcompactionTestTable.__compaction__ = SizeTieredCompactionStrategy
-        LeveledcompactionTestTable.__compaction_sstable_size_in_mb__ = None
 
-        sync_table(LeveledcompactionTestTable)
 
 
 class EmptyCompactionTest(BaseCassEngTestCase):

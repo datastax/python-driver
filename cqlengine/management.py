@@ -103,9 +103,7 @@ def sync_table(model, create_missing_keyspace=True):
             logger.debug(query)
             execute(query)
 
-            update_compaction(model)
-            # update compaction
-
+        update_compaction(model)
 
 
     #get existing index names, skip ones that already exist
@@ -228,6 +226,7 @@ def get_fields(model):
 
 
 def update_compaction(model):
+    logger.debug("Checking %s for compaction differences", model)
     ks_name = model._get_keyspace()
     col_family = model.column_family_name(include_keyspace=False)
 
