@@ -138,11 +138,11 @@ Model Attributes
 
         *Optional.* Indicates that this model is only intended to be used as a base class for other models. You can't create tables for abstract models, but checks around schema validity are skipped during class construction.
 
-    .. attribute:: Model.table_name
+    .. attribute:: Model.__table_name__
 
         *Optional.* Sets the name of the CQL table for this model. If left blank, the table name will be the name of the model, with it's module name as it's prefix. Manually defined table names are not inherited.
 
-    .. attribute:: Model.keyspace
+    .. attribute:: Model.__keyspace__
 
         *Optional.* Sets the name of the keyspace used by this model. Defaulst to cqlengine
 
