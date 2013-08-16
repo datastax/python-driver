@@ -20,6 +20,9 @@ from distutils.cmd import Command
 
 from cassandra import __version__
 
+long_description = ""
+with open("README.rst") as f:
+    long_description = f.read()
 
 class doc(Command):
 
@@ -166,9 +169,11 @@ The optional C extensions are not supported on big-endian systems.
     features = {}
 
 setup(
-    name='cassandra',
+    name='cassandra-driver',
     version=__version__,
     description='Python driver for Cassandra',
+    long_description=long_description,
+    url='http://github.com/datastax/python-driver',
     author='Tyler Hobbs',
     author_email='tyler@datastax.com',
     packages=["cassandra", "cassandra.io"],

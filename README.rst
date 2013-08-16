@@ -26,12 +26,17 @@ Features to be Added
 
 Installation
 ------------
-A package hasn't been put on pypi yet, so for now, run:
+If you would like to use the optional C extensions, please follow
+the instructions in the section below before installing the driver.
 
-    .. code-block:: bash
+Installation through pip is recommended:
 
-      $ sudo pip install futures scales # install dependencies
-      $ sudo python setup.py install
+    $ sudo pip install cassandra-driver
+
+If you want to install manually, you can instead do:
+
+    $ sudo pip install futures scales # install dependencies
+    $ sudo python setup.py install
 
 C Extensions
 ^^^^^^^^^^^^
@@ -47,15 +52,11 @@ To compile the extenions, ensure that GCC and the Python headers are available.
 
 On Ubuntu and Debian, this can be accomplished by running:
 
-    .. code-block:: bash
-
-      $ sudo apt-get install build-essential python-dev
+    $ sudo apt-get install build-essential python-dev
 
 On RedHat and RedHat-based systems like CentOS and Fedora:
 
-    .. code-block:: bash
-
-      $ sudo yum install gcc python-devel
+    $ sudo yum install gcc python-devel
 
 On OS X, homebrew installations of Python should provide the necessary headers.
 
@@ -68,29 +69,23 @@ a C extension.
 If you're on Linux, you should be able to install libev
 through a package manager.  For example, on Debian/Ubuntu:
 
-    .. code-block:: bash
-
-      $ sudo apt-get install libev4 libev-dev
+    $ sudo apt-get install libev4 libev-dev
 
 If you're on Mac OS X, you should be able to install libev
 through `Homebrew <http://brew.sh/>`_. For example, on Mac OS X:
 
-    .. code-block:: bash
-
-      $ brew install libev
+    $ brew install libev
 
 If successful, you should be able to build and install the extension
 (just using ``setup.py build`` or ``setup.py install``) and then use
 the libev event loop by doing the following
 
-    .. code-block:: python
+    >>> from cassandra.io.libevreactor import LibevConnection
+    >>> from cassandra.cluster import Cluster
 
-      >>> from cassandra.io.libevreactor import LibevConnection
-      >>> from cassandra.cluster import Cluster
-
-      >>> cluster = Cluster()
-      >>> cluster.connection_class = LibevConnection
-      >>> session = cluster.connect()
+    >>> cluster = Cluster()
+    >>> cluster.connection_class = LibevConnection
+    >>> session = cluster.connect()
 
 License
 -------
