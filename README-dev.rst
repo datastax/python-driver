@@ -9,6 +9,7 @@ Releasing
 * Upload the package to pypi:
 
     python setup.py register
+
     python setup.py sdist upload
 
 * Update the docs (see below)
