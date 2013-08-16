@@ -30,17 +30,40 @@ A package hasn't been put on pypi yet, so for now, run:
 
     .. code-block:: bash
 
-      $ sudo pip install futures  # install dependency
+      $ sudo pip install futures scales # install dependencies
       $ sudo python setup.py install
+
+C Extensions
+^^^^^^^^^^^^
+By default, two C extensions are compiled: one that adds support
+for token-aware routing with the Murmur3Partitioner, and one that
+allows you to use libev for the event loop, which improves performance.
+
+When running setup.py, you can disable both with the ``--no-extensions``
+option, or selectively disable on or the other with ``--no-murmur3`` and
+``--no-libev``.
+
+To compile the extenions, ensure that GCC and the Python headers are available.
+
+On Ubuntu and Debian, this can be accomplished by running:
+
+    .. code-block:: bash
+
+      $ sudo apt-get install build-essential python-dev
+
+On RedHat and RedHat-based systems like CentOS and Fedora:
+
+    .. code-block:: bash
+
+      $ sudo yum install gcc python-devel
+
+On OS X, homebrew installations of Python should provide the necessary headers.
 
 libev support
 ^^^^^^^^^^^^^
 The driver currently uses Python's ``asyncore`` module for its default
 event loop.  For better performance, ``libev`` is also supported through
 a C extension.
-
-Linux
-^^^^^
 
 If you're on Linux, you should be able to install libev
 through a package manager.  For example, on Debian/Ubuntu:
@@ -49,18 +72,12 @@ through a package manager.  For example, on Debian/Ubuntu:
 
       $ sudo apt-get install libev4 libev-dev
 
-OS X
-^^^^
-
 If you're on Mac OS X, you should be able to install libev
 through `Homebrew <http://brew.sh/>`_. For example, on Mac OS X:
 
     .. code-block:: bash
 
       $ brew install libev
-
-Usage
-^^^^^
 
 If successful, you should be able to use the libev event loop by
 doing the following
