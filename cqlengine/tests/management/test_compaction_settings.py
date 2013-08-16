@@ -85,7 +85,6 @@ class AlterTableTest(BaseCassEngTestCase):
         drop_table(LeveledcompactionTestTable)
         sync_table(LeveledcompactionTestTable)
         with patch('cqlengine.management.update_compaction') as mock:
-            mock.return_value = True
             sync_table(LeveledcompactionTestTable)
         assert mock.called == 1
 
