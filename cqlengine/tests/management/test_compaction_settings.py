@@ -78,6 +78,7 @@ class LeveledcompactionTestTable(Model):
     user_id = columns.UUID(primary_key=True)
     name = columns.Text()
 
+from cqlengine.management import schema_columnfamilies
 
 class AlterTableTest(BaseCassEngTestCase):
 
@@ -87,6 +88,18 @@ class AlterTableTest(BaseCassEngTestCase):
         with patch('cqlengine.management.update_compaction') as mock:
             sync_table(LeveledcompactionTestTable)
         assert mock.called == 1
+
+    def test_alter_actually_alters(self):
+        tmp = copy.deepcopy(LeveledcompactionTestTable)
+        drop_table(tmp)
+        sync_table(tmp)
+        tmp.__compaction__ = SizeTieredCompactionStrategy
+        tmp.__compaction_sstable_size_in_mb__ = None
+        sync_table(tmp)
+
+        table_settings = schema_columnfamilies.get(keyspace_name=tmp._get_keyspace(),
+                                                   columnfamily_name=tmp.column_family_name(include_keyspace=False))
+        self.assertRegexpMatches(table_settings['compaction_strategy_class'], '.*SizeTieredCompactionStrategy$')
 
 
 

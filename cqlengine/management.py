@@ -187,6 +187,12 @@ def get_compaction_options(model):
     result = {'class':model.__compaction__}
 
     def setter(key, limited_to_strategy = None):
+        """
+        sets key in result, checking if the key is limited to either SizeTiered or Leveled
+        :param key: one of the compaction options, like "bucket_high"
+        :param limited_to_strategy: SizeTieredCompactionStrategy, LeveledCompactionStrategy
+        :return:
+        """
         mkey = "__compaction_{}__".format(key)
         tmp = getattr(model, mkey)
         if tmp and limited_to_strategy and limited_to_strategy != model.__compaction__:
@@ -234,7 +240,7 @@ def update_compaction(model):
                                     columnfamily_name=col_family)
     # check compaction_strategy_class
     # check compaction_strategy_options
-
+    return True
 
 
 def delete_table(model):
