@@ -40,7 +40,7 @@ for token-aware routing with the Murmur3Partitioner, and one that
 allows you to use libev for the event loop, which improves performance.
 
 When running setup.py, you can disable both with the ``--no-extensions``
-option, or selectively disable on or the other with ``--no-murmur3`` and
+option, or selectively disable one or the other with ``--no-murmur3`` and
 ``--no-libev``.
 
 To compile the extenions, ensure that GCC and the Python headers are available.
@@ -79,8 +79,9 @@ through `Homebrew <http://brew.sh/>`_. For example, on Mac OS X:
 
       $ brew install libev
 
-If successful, you should be able to use the libev event loop by
-doing the following
+If successful, you should be able to build and install the extension
+(just using ``setup.py build`` or ``setup.py install``) and then use
+the libev event loop by doing the following
 
     .. code-block:: python
 
