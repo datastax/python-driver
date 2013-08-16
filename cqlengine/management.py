@@ -1,6 +1,7 @@
 import json
 import warnings
 from cqlengine import SizeTieredCompactionStrategy, LeveledCompactionStrategy
+from cqlengine.named import NamedTable
 
 from cqlengine.connection import connection_manager, execute
 from cqlengine.exceptions import CQLEngineException
@@ -10,6 +11,10 @@ from collections import namedtuple
 Field = namedtuple('Field', ['name', 'type'])
 
 logger = logging.getLogger(__name__)
+
+
+# system keyspaces
+schema_columnfamilies = NamedTable('system', 'schema_columnfamilies')
 
 
 def create_keyspace(name, strategy_class='SimpleStrategy', replication_factor=3, durable_writes=True, **replication_values):
@@ -97,6 +102,10 @@ def sync_table(model, create_missing_keyspace=True):
             query = "ALTER TABLE {} add {}".format(cf_name, col.get_column_def())
             logger.debug(query)
             execute(query)
+
+            update_compaction(model)
+            # update compaction
+
 
 
     #get existing index names, skip ones that already exist
@@ -217,18 +226,16 @@ def get_fields(model):
     return [Field(x[0], x[1]) for x in tmp.results]
     # convert to Field named tuples
 
-def get_compaction_settings(model):
-    # returns a dictionary of compaction settings in an existing table
+
+def update_compaction(model):
     ks_name = model._get_keyspace()
     col_family = model.column_family_name(include_keyspace=False)
-    with connection_manager() as con:
-        query = "SELECT , validator FROM system.schema_columns \
-                 WHERE keyspace_name = :ks_name AND columnfamily_name = :col_family"
 
-        logger.debug("get_fields %s %s", ks_name, col_family)
+    row = schema_columnfamilies.get(keyspace_name=ks_name,
+                                    columnfamily_name=col_family)
+    # check compaction_strategy_class
+    # check compaction_strategy_options
 
-        tmp = con.execute(query, {'ks_name':ks_name, 'col_family':col_family})
-    import ipdb; ipdb.set_trace()
 
 
 def delete_table(model):
