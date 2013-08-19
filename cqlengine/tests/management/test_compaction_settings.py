@@ -101,6 +101,19 @@ class AlterTableTest(BaseCassEngTestCase):
                                                    columnfamily_name=tmp.column_family_name(include_keyspace=False))
         self.assertRegexpMatches(table_settings['compaction_strategy_class'], '.*SizeTieredCompactionStrategy$')
 
+    def test_alter_options(self):
+
+        class AlterTable(Model):
+            __compaction__ = LeveledCompactionStrategy
+            __compaction_sstable_size_in_mb__ = 64
+
+            user_id = columns.UUID(primary_key=True)
+            name = columns.Text()
+
+        drop_table(AlterTable)
+        sync_table(AlterTable)
+        AlterTable.__compaction_sstable_size_in_mb__ = 128
+        sync_table(AlterTable)
 
 
 
@@ -108,7 +121,7 @@ class EmptyCompactionTest(BaseCassEngTestCase):
     def test_empty_compaction(self):
         self.model = copy.deepcopy(CompactionModel)
         result = get_compaction_options(self.model)
-        self.assertIsNone(result)
+        self.assertEqual({}, result)
 
 
 class CompactionLeveledStrategyModel(Model):
