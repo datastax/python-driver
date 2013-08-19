@@ -67,15 +67,19 @@ Column Types
 Column Options
 --------------
 
-    Each column can be defined with optional arguments to modify the way they behave. While some column types may define additional column options, these are the options that are available on all columns:
+    Each column can be defined with optional arguments to modify the way they behave. While some column types may
+    define additional column options, these are the options that are available on all columns:
 
     :attr:`~cqlengine.columns.BaseColumn.primary_key`
         If True, this column is created as a primary key field. A model can have multiple primary keys. Defaults to False.
 
-        *In CQL, there are 2 types of primary keys: partition keys and clustering keys. As with CQL, the first primary key is the partition key, and all others are clustering keys, unless partition keys are specified manually using* :attr:`~cqlengine.columns.BaseColumn.partition_key`
+        *In CQL, there are 2 types of primary keys: partition keys and clustering keys. As with CQL, the first
+        primary key is the partition key, and all others are clustering keys, unless partition keys are specified
+        manually using* :attr:`~cqlengine.columns.BaseColumn.partition_key`
 
     :attr:`~cqlengine.columns.BaseColumn.partition_key`
-        If True, this column is created as partition primary key. There may be many partition keys defined, forming *composite partition key*
+        If True, this column is created as partition primary key. There may be many partition keys defined,
+        forming a *composite partition key*
 
     :attr:`~cqlengine.columns.BaseColumn.index`
         If True, an index will be created for this column. Defaults to False.
@@ -83,13 +87,16 @@ Column Options
         *Note: Indexes can only be created on models with one primary key*
 
     :attr:`~cqlengine.columns.BaseColumn.db_field`
-        Explicitly sets the name of the column in the database table. If this is left blank, the column name will be the same as the name of the column attribute. Defaults to None.
+        Explicitly sets the name of the column in the database table. If this is left blank, the column name will be
+        the same as the name of the column attribute. Defaults to None.
 
     :attr:`~cqlengine.columns.BaseColumn.default`
-        The default value for this column. If a model instance is saved without a value for this column having been defined, the default value will be used. This can be either a value or a callable object (ie: datetime.now is a valid default argument).
+        The default value for this column. If a model instance is saved without a value for this column having been
+        defined, the default value will be used. This can be either a value or a callable object (ie: datetime.now is a valid default argument).
+        Callable defaults will be called each time a default is assigned to a None value
 
     :attr:`~cqlengine.columns.BaseColumn.required`
-        If True, this model cannot be saved without a value defined for this column. Defaults to True. Primary key fields cannot have their required fields set to False.
+        If True, this model cannot be saved without a value defined for this column. Defaults to False. Primary key fields always require values.
 
 Model Methods
 =============
@@ -138,11 +145,11 @@ Model Attributes
 
         *Optional.* Indicates that this model is only intended to be used as a base class for other models. You can't create tables for abstract models, but checks around schema validity are skipped during class construction.
 
-    .. attribute:: Model.table_name
+    .. attribute:: Model.__table_name__
 
         *Optional.* Sets the name of the CQL table for this model. If left blank, the table name will be the name of the model, with it's module name as it's prefix. Manually defined table names are not inherited.
 
-    .. attribute:: Model.keyspace
+    .. attribute:: Model.__keyspace__
 
         *Optional.* Sets the name of the keyspace used by this model. Defaulst to cqlengine
 
