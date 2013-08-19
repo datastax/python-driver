@@ -119,8 +119,12 @@ class AlterTableTest(BaseCassEngTestCase):
 
 class EmptyCompactionTest(BaseCassEngTestCase):
     def test_empty_compaction(self):
-        self.model = copy.deepcopy(CompactionModel)
-        result = get_compaction_options(self.model)
+        class EmptyCompactionModel(Model):
+            __compaction__ = None
+            cid = columns.UUID(primary_key=True)
+            name = columns.Text()
+
+        result = get_compaction_options(EmptyCompactionModel)
         self.assertEqual({}, result)
 
 
