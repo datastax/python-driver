@@ -239,8 +239,14 @@ def update_compaction(model):
     row = schema_columnfamilies.get(keyspace_name=ks_name,
                                     columnfamily_name=col_family)
     # check compaction_strategy_class
+    do_update = not row['compaction_strategy_class'].endswith(model.__compaction__)
+
     # check compaction_strategy_options
-    return True
+    if do_update:
+        options = get_compaction_options(model)
+        options = json.dumps(options).replace('"', "'")
+        cf_name = model.column_family_name()
+        execute("ALTER TABLE {} with compaction = {}".format(cf_name, options))
 
 
 def delete_table(model):
