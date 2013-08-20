@@ -180,7 +180,7 @@ Compaction Options
 
     For example:
 
-    .. code-block::python
+    .. code-block:: python
 
         class User(Model):
             __compaction__ = cqlengine.LeveledCompactionStrategy
