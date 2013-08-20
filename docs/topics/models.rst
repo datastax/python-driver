@@ -190,5 +190,16 @@ Compaction Options
             user_id = columns.UUID(primary_key=True)
             name = columns.Text()
 
+    or for SizeTieredCompaction:
 
-    Tables may use LeveledCompactionStrategy or SizeTieredCompactionStrategy.  Both options are available in the top level cqlengine module.
+    .. code-block:: python
+
+        class TimeData(Model):
+            __compaction__ = SizeTieredCompactionStrategy
+            __compaction_bucket_low__ = .3
+            __compaction_bucket_high__ = 2
+            __compaction_min_threshold__ = 2
+            __compaction_max_threshold__ = 64
+            __compaction_tombstone_compaction_interval__ = 86400
+
+    Tables may use `LeveledCompactionStrategy` or `SizeTieredCompactionStrategy`.  Both options are available in the top level cqlengine module.  To reiterate, you will need to set your `__compaction__` option explicitly in order for cqlengine to handle any of your settings.
