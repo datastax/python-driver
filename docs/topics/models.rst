@@ -161,7 +161,8 @@ Compaction Options
 
     cqlengine supports all compaction options as of Cassandra 1.2.8.
 
-    Tables may either be
+    Available Options:
+
     .. attribute:: Model.__compaction_bucket_high__
 
     .. attribute:: Model.__compaction_bucket_low__
