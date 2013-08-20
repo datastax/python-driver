@@ -133,8 +133,10 @@ libev_support = Feature(
     "Libev event loop support",
     standard=True,
     ext_modules=[Extension('cassandra.io.libevwrapper',
-                           libraries=['ev'],
-                           sources=['cassandra/io/libevwrapper.c'])])
+                           sources=['cassandra/io/libevwrapper.c'],
+                           include_dirs=['/usr/include/libev'],
+                           libraries=['ev']
+                           )])
 
 features = {
     "murmur3": murmur3_ext,
