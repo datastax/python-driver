@@ -35,7 +35,7 @@ setup(
     ],
     keywords='cassandra,cql,orm',
     install_requires = ['cql'],
-    author='Blake Eggleston',
+    author='Blake Eggleston, Jon Haddad',
     author_email='bdeggleston@gmail.com',
     url='https://github.com/cqlengine/cqlengine',
     license='BSD',
