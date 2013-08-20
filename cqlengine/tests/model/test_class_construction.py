@@ -1,5 +1,5 @@
 from uuid import uuid4
-from cqlengine.query import QueryException
+from cqlengine.query import QueryException, ModelQuerySet, DMLQuery
 from cqlengine.tests.base import BaseCassEngTestCase
 
 from cqlengine.exceptions import ModelException, CQLEngineException
@@ -298,6 +298,42 @@ class TestAbstractModelClasses(BaseCassEngTestCase):
         assert w2.data == r2.data
 
         delete_table(ConcreteModelWithCol)
+
+
+class TestCustomQuerySet(BaseCassEngTestCase):
+    """ Tests overriding the default queryset class """
+
+    class TestException(Exception): pass
+
+    def test_overriding_queryset(self):
+
+        class QSet(ModelQuerySet):
+            def create(iself, **kwargs):
+                raise self.TestException
+
+        class CQModel(Model):
+            __queryset__ = QSet
+            part = columns.UUID(primary_key=True)
+            data = columns.Text()
+
+        with self.assertRaises(self.TestException):
+            CQModel.create(part=uuid4(), data='s')
+
+    def test_overriding_dmlqueryset(self):
+
+        class DMLQ(DMLQuery):
+            def save(iself):
+                raise self.TestException
+
+        class CDQModel(Model):
+            __dmlquery__ = DMLQ
+            part = columns.UUID(primary_key=True)
+            data = columns.Text()
+
+        with self.assertRaises(self.TestException):
+            CDQModel().save()
+
+
 
 
 

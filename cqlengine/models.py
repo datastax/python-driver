@@ -7,9 +7,11 @@ from cqlengine.query import ModelQuerySet, DMLQuery, AbstractQueryableColumn
 from cqlengine.query import DoesNotExist as _DoesNotExist
 from cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
 
+
 class ModelDefinitionException(ModelException): pass
 
 DEFAULT_KEYSPACE = 'cqlengine'
+
 
 class hybrid_classmethod(object):
     """
@@ -44,7 +46,7 @@ class QuerySetDescriptor(object):
         """ :rtype: ModelQuerySet """
         if model.__abstract__:
             raise CQLEngineException('cannot execute queries against abstract models')
-        return ModelQuerySet(model)
+        return model.__queryset__(model)
 
     def __call__(self, *args, **kwargs):
         """
@@ -154,9 +156,12 @@ class BaseModel(object):
     __compaction_min_sstable_size__ = None
 
     # compaction - leveled options
-    __compaction_sstable_size_in_mb__ = None # only works with Leveled
+    __compaction_sstable_size_in_mb__ = None
 
     # end compaction
+    # the queryset class used for this class
+    __queryset__ = ModelQuerySet
+    __dmlquery__ = DMLQuery
 
     __read_repair_chance__ = 0.1
 
@@ -279,7 +284,7 @@ class BaseModel(object):
     def save(self):
         is_new = self.pk is None
         self.validate()
-        DMLQuery(self.__class__, self, batch=self._batch).save()
+        self.__dmlquery__(self.__class__, self, batch=self._batch).save()
 
         #reset the value managers
         for v in self._values.values():
@@ -290,7 +295,7 @@ class BaseModel(object):
 
     def delete(self):
         """ Deletes this instance """
-        DMLQuery(self.__class__, self, batch=self._batch).delete()
+        self.__dmlquery__(self.__class__, self, batch=self._batch).delete()
 
     @classmethod
     def _class_batch(cls, batch):
