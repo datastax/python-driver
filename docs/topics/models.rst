@@ -157,7 +157,7 @@ Model Attributes
 Compaction Options
 ====================
 
-    As of cqlengine 0.6 we've added support for specifying compaction options.  cqlengine will only use your compaction options if you have a strategy set.  When a table is synced, it will be altered to match the compaction options set on your table.  This means that if you are changing settings manually they will be changed back on resync.  Do not use the compaction settings of cqlengine if you want to manage your compaction settings manually.
+    As of cqlengine 0.7 we've added support for specifying compaction options.  cqlengine will only use your compaction options if you have a strategy set.  When a table is synced, it will be altered to match the compaction options set on your table.  This means that if you are changing settings manually they will be changed back on resync.  Do not use the compaction settings of cqlengine if you want to manage your compaction settings manually.
 
     cqlengine supports all compaction options as of Cassandra 1.2.8.
 
@@ -183,7 +183,7 @@ Compaction Options
     .. code-block::python
 
         class User(Model):
-            __compaction__ = LeveledCompactionStrategy
+            __compaction__ = cqlengine.LeveledCompactionStrategy
             __compaction_sstable_size_in_mb__ = 64
             __compaction_tombstone_threshold__ = .2
 
@@ -191,3 +191,4 @@ Compaction Options
             name = columns.Text()
 
 
+    Tables may use LeveledCompactionStrategy or SizeTieredCompactionStrategy.  Both options are available in the top level cqlengine module.
