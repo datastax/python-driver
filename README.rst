@@ -71,6 +71,10 @@ through a package manager.  For example, on Debian/Ubuntu:
 
     $ sudo apt-get install libev4 libev-dev
 
+On RHEL/CentOS/Fedora:
+
+    $ sudo yum install libev libev-devel
+
 If you're on Mac OS X, you should be able to install libev
 through `Homebrew <http://brew.sh/>`_. For example, on Mac OS X:
 
