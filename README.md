@@ -37,8 +37,8 @@ class ExampleModel(Model):
 >>> connection.setup(['127.0.0.1:9160'])
 
 #...and create your CQL table
->>> from cqlengine.management import create_table
->>> create_table(ExampleModel)
+>>> from cqlengine.management import sync_table
+>>> sync_table(ExampleModel)
 
 #now we can create some rows:
 >>> em1 = ExampleModel.create(example_type=0, description="example1", created_at=datetime.now())
