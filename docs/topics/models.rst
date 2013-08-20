@@ -21,11 +21,11 @@ This example defines a Person table, with the columns ``first_name`` and ``last_
 
     from cqlengine import columns
     from cqlengine.models import Model
-    
+
     class Person(Model):
         first_name  = columns.Text()
         last_name = columns.Text()
-     
+
 
 The Person model would create this CQL table:
 
@@ -83,7 +83,7 @@ Column Options
 
     :attr:`~cqlengine.columns.BaseColumn.index`
         If True, an index will be created for this column. Defaults to False.
-        
+
         *Note: Indexes can only be created on models with one primary key*
 
     :attr:`~cqlengine.columns.BaseColumn.db_field`
@@ -109,7 +109,7 @@ Model Methods
     *Example*
 
     .. code-block:: python
-        
+
         #using the person model from earlier:
         class Person(Model):
             first_name  = columns.Text()
@@ -118,7 +118,7 @@ Model Methods
         person = Person(first_name='Blake', last_name='Eggleston')
         person.first_name  #returns 'Blake'
         person.last_name  #returns 'Eggleston'
-        
+
 
     .. method:: save()
 
@@ -135,7 +135,7 @@ Model Methods
 
 
     .. method:: delete()
-    
+
         Deletes the object from the database.
 
 Model Attributes
@@ -152,4 +152,42 @@ Model Attributes
     .. attribute:: Model.__keyspace__
 
         *Optional.* Sets the name of the keyspace used by this model. Defaulst to cqlengine
+
+
+Compaction Options
+====================
+
+    As of cqlengine 0.6 we've added support for specifying compaction options.  cqlengine will only use your compaction options if you have a strategy set.  When a table is synced, it will be altered to match the compaction options set on your table.  This means that if you are changing settings manually they will be changed back on resync.  Do not use the compaction settings of cqlengine if you want to manage your compaction settings manually.
+
+    cqlengine supports all compaction options as of Cassandra 1.2.8.
+
+    Tables may either be
+    .. attribute:: Model.__compaction_bucket_high__
+
+    .. attribute:: Model.__compaction_bucket_low__
+
+    .. attribute:: Model.__compaction_max_compaction_threshold__
+
+    .. attribute:: Model.__compaction_min_compaction_threshold__
+
+    .. attribute:: Model.__compaction_min_sstable_size__
+
+    .. attribute:: Model.__compaction_sstable_size_in_mb__
+
+    .. attribute:: Model.__compaction_tombstone_compaction_interval__
+
+    .. attribute:: Model.__compaction_tombstone_threshold__
+
+    For example:
+
+    .. code-block::python
+
+        class User(Model):
+            __compaction__ = LeveledCompactionStrategy
+            __compaction_sstable_size_in_mb__ = 64
+            __compaction_tombstone_threshold__ = .2
+
+            user_id = columns.UUID(primary_key=True)
+            name = columns.Text()
+
 

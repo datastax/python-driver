@@ -201,7 +201,6 @@ def get_compaction_options(model):
         if tmp:
             result[key] = tmp
 
-    setter('min_threshold')
     setter('tombstone_compaction_interval')
 
     setter('bucket_high', SizeTieredCompactionStrategy)
@@ -231,18 +230,19 @@ def get_fields(model):
     # convert to Field named tuples
 
 
+def get_table_settings(model):
+    return schema_columnfamilies.get(keyspace_name=model._get_keyspace(),
+                                     columnfamily_name=model.column_family_name(include_keyspace=False))
+
+
 def update_compaction(model):
     logger.debug("Checking %s for compaction differences", model)
-    ks_name = model._get_keyspace()
-    col_family = model.column_family_name(include_keyspace=False)
-
-    row = schema_columnfamilies.get(keyspace_name=ks_name,
-                                    columnfamily_name=col_family)
+    row = get_table_settings(model)
     # check compaction_strategy_class
-    if model.__compaction__:
-        do_update = not row['compaction_strategy_class'].endswith(model.__compaction__)
-    else:
-        do_update = False
+    if not model.__compaction__:
+        return
+
+    do_update = not row['compaction_strategy_class'].endswith(model.__compaction__)
 
     existing_options = row['compaction_strategy_options']
     existing_options = json.loads(existing_options)
@@ -251,14 +251,19 @@ def update_compaction(model):
     desired_options.pop('class', None)
 
     for k,v in desired_options.items():
-        if existing_options[k] != v:
+        val = existing_options.pop(k, None)
+        if val != v:
             do_update = True
 
     # check compaction_strategy_options
     if do_update:
-        options = json.dumps(get_compaction_options(model)).replace('"', "'")
+        options = get_compaction_options(model)
+        # jsonify
+        options = json.dumps(options).replace('"', "'")
         cf_name = model.column_family_name()
-        execute("ALTER TABLE {} with compaction = {}".format(cf_name, options))
+        query = "ALTER TABLE {} with compaction = {}".format(cf_name, options)
+        logger.debug(query)
+        execute(query)
 
 
 def delete_table(model):
@@ -280,4 +285,5 @@ def drop_table(model):
 
     cf_name = model.column_family_name()
     execute('drop table {};'.format(cf_name))
+
 
