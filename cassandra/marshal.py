@@ -37,6 +37,8 @@ def bitlength(n):
 
 def varint_pack(big):
     pos = True
+    if big == 0:
+        return '\x00'
     if big < 0:
         bytelength = bitlength(abs(big) - 1) / 8 + 1
         big = (1 << bytelength * 8) + big
