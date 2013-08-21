@@ -18,9 +18,9 @@ Columns
 .. class:: Ascii()
 
     Stores a US-ASCII character string ::
-        
+
         columns.Ascii()
-        
+
 
 .. class:: Text()
 
@@ -93,15 +93,24 @@ Columns
 
         columns.Decimal()
 
+.. class:: Counter()
+
+    Counters can be incremented and decremented.
+
+    ..code:: python
+
+      columns.Counter()
+
+
 Collection Type Columns
 ----------------------------
 
     CQLEngine also supports container column types. Each container column requires a column class argument to specify what type of objects it will hold. The Map column requires 2, one for the key, and the other for the value
-    
+
     *Example*
 
     .. code-block:: python
-        
+
         class Person(Model):
             id          = columns.UUID(primary_key=True, default=uuid.uuid4)
             first_name  = columns.Text()
@@ -111,7 +120,7 @@ Collection Type Columns
             enemies     = columns.Set(columns.Text)
             todo_list   = columns.List(columns.Text)
             birthdays   = columns.Map(columns.Text, columns.DateTime)
-        
+
 
 
 .. class:: Set()
