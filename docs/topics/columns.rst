@@ -95,11 +95,9 @@ Columns
 
 .. class:: Counter()
 
-    Counters can be incremented and decremented.
+    Counters can be incremented and decremented ::
 
-    ..code:: python
-
-      columns.Counter()
+        columns.Counter()
 
 
 Collection Type Columns
