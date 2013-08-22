@@ -352,7 +352,7 @@ class AbstractQuerySet(object):
             raise CQLEngineException("Only inserts, updates, and deletes are available in batch mode")
         if self._result_cache is None:
             columns, self._result_cache = execute(self._select_query(), self._where_values())
-            self._construct_result = self._create_result_constructor(columns)
+            self._construct_result = self._get_result_constructor(columns)
 
     def _fill_result_cache_to_idx(self, idx):
         self._execute_query()
@@ -408,7 +408,7 @@ class AbstractQuerySet(object):
                 self._fill_result_cache_to_idx(s)
                 return self._result_cache[s]
 
-    def _create_result_constructor(self, names):
+    def _get_result_constructor(self, names):
         """
         Returns a function that will be used to instantiate query results
         """
@@ -650,7 +650,7 @@ class SimpleQuerySet(AbstractQuerySet):
         """ Returns the fields to be returned by the select query """
         return 'SELECT *'
 
-    def _create_result_constructor(self, names):
+    def _get_result_constructor(self, names):
         """
         Returns a function that will be used to instantiate query results
         """
@@ -697,26 +697,27 @@ class ModelQuerySet(AbstractQuerySet):
         db_fields = [self.model._columns[f].db_field_name for f in fields]
         return 'SELECT {}'.format(', '.join(['"{}"'.format(f) for f in db_fields]))
 
-    def _create_result_constructor(self, names):
-        """
-        Returns a function that will be used to instantiate query results
-        """
+    def _get_instance_constructor(self, names):
+        """ returns a function used to construct model instances """
         model = self.model
         db_map = model._db_map
-        if not self._values_list:
-            def _construct_instance(values):
-                field_dict = dict((db_map.get(k, k), v) for k, v in zip(names, values))
-                instance = model(**field_dict)
-                instance._is_persisted = True
-                return instance
-            return _construct_instance
+        def _construct_instance(values):
+            field_dict = dict((db_map.get(k, k), v) for k, v in zip(names, values))
+            instance = model(**field_dict)
+            instance._is_persisted = True
+            return instance
+        return _construct_instance
 
-        columns = [model._columns[n] for n in names]
-        if self._flat_values_list:
-            return (lambda values: columns[0].to_python(values[0]))
+    def _get_result_constructor(self, names):
+        """ Returns a function that will be used to instantiate query results """
+        if not self._values_list:
+            return self._get_instance_constructor(names)
         else:
-            # result_cls = namedtuple("{}Tuple".format(self.model.__name__), names)
-            return (lambda values: map(lambda (c, v): c.to_python(v), zip(columns, values)))
+            columns = [self.model._columns[n] for n in names]
+            if self._flat_values_list:
+                return lambda values: columns[0].to_python(values[0])
+            else:
+                return lambda values: map(lambda (c, v): c.to_python(v), zip(columns, values))
 
     def _get_ordering_condition(self, colname):
         colname, order_type = super(ModelQuerySet, self)._get_ordering_condition(colname)
