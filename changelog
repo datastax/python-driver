@@ -1,5 +1,8 @@
 CHANGELOG
 
+0.7.1
+* refactoring query class to make defining custom model instantiation logic easier
+
 0.7.0
 * added counter columns
 * added support for compaction settings at the model level
