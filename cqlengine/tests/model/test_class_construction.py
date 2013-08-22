@@ -221,10 +221,6 @@ class TestManualTableNaming(BaseCassEngTestCase):
         assert self.RenamedTest.column_family_name(include_keyspace=False) == 'manual_name'
         assert self.RenamedTest.column_family_name(include_keyspace=True) == 'whatever.manual_name'
 
-    def test_manual_table_name_is_not_inherited(self):
-        class InheritedTest(self.RenamedTest): pass
-        assert InheritedTest.table_name is None
-
 class AbstractModel(Model):
     __abstract__ = True
 

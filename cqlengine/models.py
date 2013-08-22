@@ -401,9 +401,6 @@ class ModelMetaClass(type):
         for field_name, col in column_dict.items():
             db_map[col.db_field_name] = field_name
 
-        #short circuit table_name inheritance
-        attrs['table_name'] = attrs.get('__table_name__')
-
         #add management members to the class
         attrs['_columns'] = column_dict
         attrs['_primary_keys'] = primary_keys
