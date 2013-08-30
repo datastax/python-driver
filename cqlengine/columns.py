@@ -86,7 +86,8 @@ class Column(object):
                  db_field=None,
                  default=None,
                  required=False,
-                 clustering_order=None):
+                 clustering_order=None,
+                 polymorphic_key=False):
         """
         :param primary_key: bool flag, indicates this column is a primary key. The first primary key defined
             on a model is the partition key (unless partition keys are set), all others are cluster keys
@@ -99,6 +100,8 @@ class Column(object):
             exception if required is set to True and there is a None value assigned
         :param clustering_order: only applicable on clustering keys (primary keys that are not partition keys)
             determines the order that the clustering keys are sorted on disk
+        :param polymorphic_key: boolean, if set to True, this column will be used for saving and loading instances
+            of polymorphic tables
         """
         self.partition_key = partition_key
         self.primary_key = partition_key or primary_key
@@ -107,6 +110,7 @@ class Column(object):
         self.default = default
         self.required = required
         self.clustering_order = clustering_order
+        self.polymorphic_key = polymorphic_key
         #the column name in the model definition
         self.column_name = None
 
