@@ -51,6 +51,16 @@ class TestPolymorphicClassConstruction(BaseCassEngTestCase):
         assert Base._polymorphic_column_name == 'type1'
         assert M1._polymorphic_column_name == 'type1'
 
+    def test_table_names_are_inherited_from_poly_base(self):
+        class Base(models.Model):
+            partition = columns.Integer(primary_key=True)
+            type1 = columns.Integer(polymorphic_key=True)
+
+        class M1(Base):
+            __polymorphic_key__ = 1
+
+        assert Base.column_family_name() == M1.column_family_name()
+
 
 class PolyBase(models.Model):
     partition = columns.UUID(primary_key=True, default=uuid.uuid4)
@@ -83,10 +93,24 @@ class TestPolymorphicModel(BaseCassEngTestCase):
 
     def test_saving_base_model_fails(self):
         with self.assertRaises(models.PolyMorphicModelException):
-            PolyBase.create(partition=1)
+            PolyBase.create()
 
     def test_saving_subclass_saves_poly_key(self):
-        pass
+        p1 = Poly1.create(data1='pickle')
+        p2 = Poly2.create(data2='bacon')
+
+        assert p1.row_type == Poly1.__polymorphic_key__
+        assert p2.row_type == Poly2.__polymorphic_key__
+
+    def test_query_deserialization(self):
+        p1 = Poly1.create(data1='pickle')
+        p2 = Poly2.create(data2='bacon')
+
+        p1r = PolyBase.get(partition=p1.partition)
+        p2r = PolyBase.get(partition=p2.partition)
+
+        assert isinstance(p1r, Poly1)
+        assert isinstance(p2r, Poly2)
 
 
 class TestIndexedPolymorphicQuery(BaseCassEngTestCase):

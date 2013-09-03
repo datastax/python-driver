@@ -190,17 +190,57 @@ class BaseModel(object):
         self._batch = None
 
     @classmethod
+    def _discover_polymorphic_submodels(cls):
+        if not cls._is_polymorphic_base:
+            raise ModelException('_discover_polymorphic_submodels can only be called on polymorphic base classes')
+        def _discover(klass):
+            if not klass._is_polymorphic_base and klass.__polymorphic_key__ is not None:
+                cls._polymorphic_map[klass.__polymorphic_key__] = klass
+            for subklass in klass.__subclasses__():
+                _discover(subklass)
+        _discover(cls)
+
+    @classmethod
+    def _get_model_by_polymorphic_key(cls, key):
+        if not cls._is_polymorphic_base:
+            raise ModelException('_get_model_by_polymorphic_key can only be called on polymorphic base classes')
+        return cls._polymorphic_map.get(key)
+
+    @classmethod
     def _construct_instance(cls, names, values):
         """
         method used to construct instances from query results
-
-        :param cls:
-        :param names:
-        :param values:
-        :return:
+        this is where polymorphic deserialization occurs
         """
         field_dict = dict((cls._db_map.get(k, k), v) for k, v in zip(names, values))
-        instance = cls(**field_dict)
+        if cls._is_polymorphic:
+            poly_key = field_dict.get(cls._polymorphic_column_name)
+
+            if poly_key is None:
+                raise PolyMorphicModelException('polymorphic key was not found in values')
+
+            poly_base = cls if cls._is_polymorphic_base else cls._polymorphic_base
+
+            klass = poly_base._get_model_by_polymorphic_key(poly_key)
+            if klass is None:
+                poly_base._discover_polymorphic_submodels()
+                klass = poly_base._get_model_by_polymorphic_key(poly_key)
+                if klass is None:
+                    raise PolyMorphicModelException(
+                        'unrecognized polymorphic key {} for class {}'.format(poly_key, poly_base.__name__)
+                    )
+
+            if not issubclass(klass, poly_base):
+                raise PolyMorphicModelException(
+                    '{} is not a subclass of {}'.format(klass.__name__, poly_base.__name__)
+                )
+
+            field_dict = {k: v for k, v in field_dict.items() if k in klass._columns.keys()}
+
+        else:
+            klass = cls
+
+        instance = klass(**field_dict)
         instance._is_persisted = True
         return instance
 
@@ -475,6 +515,7 @@ class ModelMetaClass(type):
         attrs['_polymorphic_base'] = polymorphic_base
         attrs['_polymorphic_column'] = polymorphic_column
         attrs['_polymorphic_column_name'] = polymorphic_column_name
+        attrs['_polymorphic_map'] = {} if is_polymorphic_base else None
 
         #setup class exceptions
         DoesNotExistBase = None
