@@ -686,13 +686,16 @@ class ModelQuerySet(AbstractQuerySet):
 
     def _get_select_statement(self):
         """ Returns the fields to be returned by the select query """
-        fields = self.model._columns.keys()
-        if self._defer_fields:
-            fields = [f for f in fields if f not in self._defer_fields]
-        elif self._only_fields:
-            fields = self._only_fields
-        db_fields = [self.model._columns[f].db_field_name for f in fields]
-        return 'SELECT {}'.format(', '.join(['"{}"'.format(f) for f in db_fields]))
+        if self._defer_fields or self._only_fields:
+            fields = self.model._columns.keys()
+            if self._defer_fields:
+                fields = [f for f in fields if f not in self._defer_fields]
+            elif self._only_fields:
+                fields = self._only_fields
+            db_fields = [self.model._columns[f].db_field_name for f in fields]
+            return 'SELECT {}'.format(', '.join(['"{}"'.format(f) for f in db_fields]))
+        else:
+            return 'SELECT *'
 
     def _get_result_constructor(self, names):
         """ Returns a function that will be used to instantiate query results """
