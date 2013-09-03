@@ -189,6 +189,21 @@ class BaseModel(object):
         self._is_persisted = False
         self._batch = None
 
+    @classmethod
+    def _construct_instance(cls, names, values):
+        """
+        method used to construct instances from query results
+
+        :param cls:
+        :param names:
+        :param values:
+        :return:
+        """
+        field_dict = dict((cls._db_map.get(k, k), v) for k, v in zip(names, values))
+        instance = cls(**field_dict)
+        instance._is_persisted = True
+        return instance
+
     def _can_update(self):
         """
         Called by the save function to check if this should be
@@ -215,6 +230,16 @@ class BaseModel(object):
         :rtype: Column
         """
         return cls._columns[name]
+
+    @classmethod
+    def _get_polymorphic_base(cls):
+        if cls._is_polymorphic:
+            if cls._is_polymorphic_base:
+                return cls
+            for base in cls.__bases__:
+                klass = base._get_polymorphic_base()
+                if klass is not None:
+                    return klass
 
     def __eq__(self, other):
         if self.__class__ != other.__class__:
@@ -246,6 +271,10 @@ class BaseModel(object):
         if cls.__table_name__:
             cf_name = cls.__table_name__.lower()
         else:
+            # get polymorphic base table names if model is polymorphic
+            if cls._is_polymorphic and not cls._is_polymorphic_base:
+                return cls._get_polymorphic_base().column_family_name(include_keyspace=include_keyspace)
+
             camelcase = re.compile(r'([a-z])([A-Z])')
             ccase = lambda s: camelcase.sub(lambda v: '{}_{}'.format(v.group(1), v.group(2).lower()), s)
 

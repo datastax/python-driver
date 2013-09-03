@@ -679,9 +679,6 @@ class ModelQuerySet(AbstractQuerySet):
             if any(not w.column.partition_key for w in token_ops):
                 raise QueryException('The token() function is only supported on the partition key')
 
-
-                #TODO: abuse this to see if we can get cql to raise an exception
-
     def _where_clause(self):
         """ Returns a where clause based on the given filter args """
         self._validate_where_syntax()
@@ -697,21 +694,10 @@ class ModelQuerySet(AbstractQuerySet):
         db_fields = [self.model._columns[f].db_field_name for f in fields]
         return 'SELECT {}'.format(', '.join(['"{}"'.format(f) for f in db_fields]))
 
-    def _get_instance_constructor(self, names):
-        """ returns a function used to construct model instances """
-        model = self.model
-        db_map = model._db_map
-        def _construct_instance(values):
-            field_dict = dict((db_map.get(k, k), v) for k, v in zip(names, values))
-            instance = model(**field_dict)
-            instance._is_persisted = True
-            return instance
-        return _construct_instance
-
     def _get_result_constructor(self, names):
         """ Returns a function that will be used to instantiate query results """
         if not self._values_list:
-            return self._get_instance_constructor(names)
+            return lambda values: self.model._construct_instance(names, values)
         else:
             columns = [self.model._columns[n] for n in names]
             if self._flat_values_list:
