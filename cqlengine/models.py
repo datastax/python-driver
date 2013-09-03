@@ -230,7 +230,7 @@ class BaseModel(object):
                         'unrecognized polymorphic key {} for class {}'.format(poly_key, poly_base.__name__)
                     )
 
-            if not issubclass(klass, poly_base):
+            if not issubclass(klass, cls):
                 raise PolyMorphicModelException(
                     '{} is not a subclass of {}'.format(klass.__name__, poly_base.__name__)
                 )

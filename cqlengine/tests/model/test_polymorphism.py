@@ -113,6 +113,68 @@ class TestPolymorphicModel(BaseCassEngTestCase):
         assert isinstance(p2r, Poly2)
 
 
+class UnindexedPolyBase(models.Model):
+    partition = columns.UUID(primary_key=True, default=uuid.uuid4)
+    cluster = columns.UUID(primary_key=True, default=uuid.uuid4)
+    row_type = columns.Integer(polymorphic_key=True)
+
+
+class UnindexedPoly1(UnindexedPolyBase):
+    __polymorphic_key__ = 1
+    data1 = columns.Text()
+
+
+class UnindexedPoly2(UnindexedPolyBase):
+    __polymorphic_key__ = 2
+    data2 = columns.Text()
+
+
+class TestUnindexedPolymorphicQuery(BaseCassEngTestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestUnindexedPolymorphicQuery, cls).setUpClass()
+        management.sync_table(UnindexedPoly1)
+        management.sync_table(UnindexedPoly2)
+
+        cls.p1 = UnindexedPoly1.create(data1='pickle')
+        cls.p2 = UnindexedPoly2.create(partition=cls.p1.partition, data2='bacon')
+
+    @classmethod
+    def tearDownClass(cls):
+        super(TestUnindexedPolymorphicQuery, cls).tearDownClass()
+        management.drop_table(UnindexedPoly1)
+        management.drop_table(UnindexedPoly2)
+
+    def test_non_conflicting_type_results_work(self):
+        assert len([p for p in UnindexedPoly1.objects(partition=self.p1.partition, cluster=self.p1.cluster)]) == 1
+        assert len([p for p in UnindexedPoly2.objects(partition=self.p1partition, cluster=self.p2.cluster)]) == 1
+
+    def test_conflicting_type_results(self):
+        with self.assertRaises(models.PolyMorphicModelException):
+            [p for p in UnindexedPoly1.objects(partition=self.p1.partition)]
+        with self.assertRaises(models.PolyMorphicModelException):
+            [p for p in UnindexedPoly2.objects(partition=self.p1.partition)]
+
+    def test_allow_filtering_filters_types(self):
+        pass
+
+
+class IndexedPolyBase(models.Model):
+    partition = columns.UUID(primary_key=True, default=uuid.uuid4)
+    row_type = columns.Integer(polymorphic_key=True, index=True)
+
+
+class IndexedPoly1(IndexedPolyBase):
+    __polymorphic_key__ = 1
+    data1 = columns.Text()
+
+
+class IndexedPoly2(IndexedPolyBase):
+    __polymorphic_key__ = 2
+    data2 = columns.Text()
+
+
 class TestIndexedPolymorphicQuery(BaseCassEngTestCase):
 
     def test_success_case(self):
@@ -121,14 +183,3 @@ class TestIndexedPolymorphicQuery(BaseCassEngTestCase):
     def test_polymorphic_key_is_added_to_queries(self):
         pass
 
-
-class TestUnindexedPolymorphicQuery(BaseCassEngTestCase):
-
-    def test_non_conflicting_type_results_work(self):
-        pass
-
-    def test_conflicting_type_results(self):
-        pass
-
-    def test_allow_filtering_filters_types(self):
-        pass
