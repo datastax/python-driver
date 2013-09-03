@@ -49,7 +49,18 @@ class QuerySetDescriptor(object):
         """ :rtype: ModelQuerySet """
         if model.__abstract__:
             raise CQLEngineException('cannot execute queries against abstract models')
-        return model.__queryset__(model)
+        queryset = model.__queryset__(model)
+
+        # if this is a concrete polymorphic model, and the polymorphic
+        # key is an indexed column, add a filter clause to only return
+        # logical rows of the proper type
+        if model._is_polymorphic and not model._is_polymorphic_base:
+            name, column = model._polymorphic_column_name, model._polymorphic_column
+            if column.partition_key or column.index:
+                # look for existing poly types
+                return queryset.filter(**{name: model.__polymorphic_key__})
+
+        return queryset
 
     def __call__(self, *args, **kwargs):
         """

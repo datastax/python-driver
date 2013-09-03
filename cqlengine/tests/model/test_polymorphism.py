@@ -148,7 +148,7 @@ class TestUnindexedPolymorphicQuery(BaseCassEngTestCase):
 
         cls.p1 = UnindexedPoly1.create(data1='pickle')
         cls.p2 = UnindexedPoly2.create(partition=cls.p1.partition, data2='bacon')
-        cls.p3 = UnindexedPoly3.create(partition=cls.p1.partition, data3='bacon')
+        cls.p3 = UnindexedPoly3.create(partition=cls.p1.partition, data3='turkey')
 
     @classmethod
     def tearDownClass(cls):
@@ -175,6 +175,7 @@ class TestUnindexedPolymorphicQuery(BaseCassEngTestCase):
 
 class IndexedPolyBase(models.Model):
     partition = columns.UUID(primary_key=True, default=uuid.uuid4)
+    cluster = columns.UUID(primary_key=True, default=uuid.uuid4)
     row_type = columns.Integer(polymorphic_key=True, index=True)
 
 
@@ -188,16 +189,25 @@ class IndexedPoly2(IndexedPolyBase):
     data2 = columns.Text()
 
 
-class IndexedPoly3(IndexedPoly2):
-    __polymorphic_key__ = 3
-    data3 = columns.Text()
-
-
 class TestIndexedPolymorphicQuery(BaseCassEngTestCase):
 
-    def test_success_case(self):
-        pass
+    @classmethod
+    def setUpClass(cls):
+        super(TestIndexedPolymorphicQuery, cls).setUpClass()
+        management.sync_table(IndexedPoly1)
+        management.sync_table(IndexedPoly2)
 
-    def test_polymorphic_key_is_added_to_queries(self):
-        pass
+        cls.p1 = IndexedPoly1.create(data1='pickle')
+        cls.p2 = IndexedPoly2.create(partition=cls.p1.partition, data2='bacon')
+
+    @classmethod
+    def tearDownClass(cls):
+        super(TestIndexedPolymorphicQuery, cls).tearDownClass()
+        management.drop_table(IndexedPoly1)
+        management.drop_table(IndexedPoly2)
+
+    def test_success_case(self):
+        assert len(list(IndexedPoly1.objects(partition=self.p1.partition))) == 1
+        assert len(list(IndexedPoly2.objects(partition=self.p1.partition))) == 1
+
 
