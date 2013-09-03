@@ -10,6 +10,9 @@ from cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
 
 class ModelDefinitionException(ModelException): pass
 
+
+class PolyMorphicModelException(ModelException): pass
+
 DEFAULT_KEYSPACE = 'cqlengine'
 
 
@@ -142,6 +145,8 @@ class BaseModel(object):
     #the keyspace for this model
     __keyspace__ = None
 
+    #polymorphism options
+    __polymorphic_key__ = None
 
     # compaction options
     __compaction__ = None
@@ -282,6 +287,14 @@ class BaseModel(object):
         return cls.objects.get(*args, **kwargs)
 
     def save(self):
+
+        # handle polymorphic models
+        if self._is_polymorphic:
+            if self._is_polymorphic_base:
+                raise PolyMorphicModelException('cannot save polymorphic base model')
+            else:
+                setattr(self, self._polymorphic_column_name, self.__polymorphic_key__)
+
         is_new = self.pk is None
         self.validate()
         self.__dmlquery__(self.__class__, self, batch=self._batch).save()
@@ -328,6 +341,9 @@ class ModelMetaClass(type):
         #short circuit __abstract__ inheritance
         is_abstract = attrs['__abstract__'] = attrs.get('__abstract__', False)
 
+        #short circuit __polymorphic_key__ inheritance
+        attrs['__polymorphic_key__'] = attrs.get('__polymorphic_key__', None)
+
         def _transform_column(col_name, col_obj):
             column_dict[col_name] = col_obj
             if col_obj.primary_key:
@@ -339,11 +355,20 @@ class ModelMetaClass(type):
         column_definitions = [(k,v) for k,v in attrs.items() if isinstance(v, columns.Column)]
         column_definitions = sorted(column_definitions, lambda x,y: cmp(x[1].position, y[1].position))
 
+        polymorphic_base = any([c[1].polymorphic_key for c in column_definitions])
+
         column_definitions = inherited_columns.items() + column_definitions
+
+        polymorphic_columns = [c for c in column_definitions if c[1].polymorphic_key]
+        is_polymorphic = len(polymorphic_columns) > 0
+        if len(polymorphic_columns) > 1:
+            raise ModelDefinitionException('only one polymorphic_key can be defined in a model, {} found'.format(len(polymorphic_columns)))
+
+        polymorphic_column_name, polymorphic_column = polymorphic_columns[0] if polymorphic_columns else (None, None)
 
         defined_columns = OrderedDict(column_definitions)
 
-        #prepend primary key if one hasn't been defined
+        # check for primary key
         if not is_abstract and not any([v.primary_key for k,v in column_definitions]):
             raise ModelDefinitionException("At least 1 primary key is required.")
 
@@ -356,7 +381,7 @@ class ModelMetaClass(type):
 
         #TODO: check that the defined columns don't conflict with any of the Model API's existing attributes/methods
         #transform column definitions
-        for k,v in column_definitions:
+        for k, v in column_definitions:
             # counter column primary keys are not allowed
             if (v.primary_key or v.partition_key) and isinstance(v, (columns.Counter, columns.BaseContainerColumn)):
                 raise ModelDefinitionException('counter columns and container columns cannot be used as primary keys')
@@ -412,6 +437,12 @@ class ModelMetaClass(type):
         attrs['_partition_keys'] = partition_keys
         attrs['_clustering_keys'] = clustering_keys
         attrs['_has_counter'] = len(counter_columns) > 0
+
+        # add polymorphic management attributes
+        attrs['_is_polymorphic_base'] = polymorphic_base
+        attrs['_is_polymorphic'] = is_polymorphic
+        attrs['_polymorphic_column'] = polymorphic_column
+        attrs['_polymorphic_column_name'] = polymorphic_column_name
 
         #setup class exceptions
         DoesNotExistBase = None
