@@ -232,7 +232,7 @@ class BaseModel(object):
 
             if not issubclass(klass, cls):
                 raise PolyMorphicModelException(
-                    '{} is not a subclass of {}'.format(klass.__name__, poly_base.__name__)
+                    '{} is not a subclass of {}'.format(klass.__name__, cls.__name__)
                 )
 
             field_dict = {k: v for k, v in field_dict.items() if k in klass._columns.keys()}
