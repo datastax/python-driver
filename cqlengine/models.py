@@ -231,16 +231,6 @@ class BaseModel(object):
         """
         return cls._columns[name]
 
-    @classmethod
-    def _get_polymorphic_base(cls):
-        if cls._is_polymorphic:
-            if cls._is_polymorphic_base:
-                return cls
-            for base in cls.__bases__:
-                klass = base._get_polymorphic_base()
-                if klass is not None:
-                    return klass
-
     def __eq__(self, other):
         if self.__class__ != other.__class__:
             return False
@@ -273,7 +263,7 @@ class BaseModel(object):
         else:
             # get polymorphic base table names if model is polymorphic
             if cls._is_polymorphic and not cls._is_polymorphic_base:
-                return cls._get_polymorphic_base().column_family_name(include_keyspace=include_keyspace)
+                return cls._polymorphic_base.column_family_name(include_keyspace=include_keyspace)
 
             camelcase = re.compile(r'([a-z])([A-Z])')
             ccase = lambda s: camelcase.sub(lambda v: '{}_{}'.format(v.group(1), v.group(2).lower()), s)
@@ -384,7 +374,7 @@ class ModelMetaClass(type):
         column_definitions = [(k,v) for k,v in attrs.items() if isinstance(v, columns.Column)]
         column_definitions = sorted(column_definitions, lambda x,y: cmp(x[1].position, y[1].position))
 
-        polymorphic_base = any([c[1].polymorphic_key for c in column_definitions])
+        is_polymorphic_base = any([c[1].polymorphic_key for c in column_definitions])
 
         column_definitions = inherited_columns.items() + column_definitions
 
@@ -394,6 +384,18 @@ class ModelMetaClass(type):
             raise ModelDefinitionException('only one polymorphic_key can be defined in a model, {} found'.format(len(polymorphic_columns)))
 
         polymorphic_column_name, polymorphic_column = polymorphic_columns[0] if polymorphic_columns else (None, None)
+
+        # find polymorphic base class
+        polymorphic_base = None
+        if is_polymorphic and not is_polymorphic_base:
+            def _get_polymorphic_base(bases):
+                for base in bases:
+                    if getattr(base, '_is_polymorphic_base', False):
+                        return base
+                    klass = _get_polymorphic_base(base.__bases__)
+                    if klass:
+                        return klass
+            polymorphic_base = _get_polymorphic_base(bases)
 
         defined_columns = OrderedDict(column_definitions)
 
@@ -468,8 +470,9 @@ class ModelMetaClass(type):
         attrs['_has_counter'] = len(counter_columns) > 0
 
         # add polymorphic management attributes
-        attrs['_is_polymorphic_base'] = polymorphic_base
+        attrs['_is_polymorphic_base'] = is_polymorphic_base
         attrs['_is_polymorphic'] = is_polymorphic
+        attrs['_polymorphic_base'] = polymorphic_base
         attrs['_polymorphic_column'] = polymorphic_column
         attrs['_polymorphic_column_name'] = polymorphic_column_name
 
