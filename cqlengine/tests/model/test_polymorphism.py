@@ -62,7 +62,10 @@ class TestPolymorphicClassConstruction(BaseCassEngTestCase):
         assert Base.column_family_name() == M1.column_family_name()
 
     def test_collection_columns_cant_be_polymorphic_keys(self):
-        pass
+        with self.assertRaises(models.ModelDefinitionException):
+            class Base(models.Model):
+                partition = columns.Integer(primary_key=True)
+                type1 = columns.Set(columns.Integer, polymorphic_key=True)
 
 
 class PolyBase(models.Model):

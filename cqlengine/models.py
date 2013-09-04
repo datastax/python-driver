@@ -436,6 +436,9 @@ class ModelMetaClass(type):
 
         polymorphic_column_name, polymorphic_column = polymorphic_columns[0] if polymorphic_columns else (None, None)
 
+        if isinstance(polymorphic_column, (columns.BaseContainerColumn, columns.Counter)):
+            raise ModelDefinitionException('counter and container columns cannot be used for polymorphic keys')
+
         # find polymorphic base class
         polymorphic_base = None
         if is_polymorphic and not is_polymorphic_base:
