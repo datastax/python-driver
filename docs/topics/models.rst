@@ -154,6 +154,92 @@ Model Attributes
         *Optional.* Sets the name of the keyspace used by this model. Defaulst to cqlengine
 
 
+Table Polymorphism
+==================
+
+    As of cqlengine 0.8, it is possible to save and load different model classes using a single CQL table.
+    This is useful in situations where you have different object types that you want to store in a single cassandra row.
+
+    For instance, suppose you want a table that stores rows of pets owned by an owner:
+
+    .. code-block:: python
+
+        class Pet(Model):
+            __table_name__ = 'pet'
+            owner_id = UUID(primary_key=True)
+            pet_id = UUID(primary_key=True)
+            pet_type = Text(polymorphic_key=True)
+            name = Text()
+
+            def eat(self, food):
+                pass
+
+            def sleep(self, time):
+                pass
+
+        class Cat(Pet):
+            __polymorphic_key__ = 'cat'
+            cuteness = Float()
+
+            def tear_up_couch(self):
+                pass
+
+        class Dog(Pet):
+            __polymorphic_key__ = 'dog'
+            fierceness = Float()
+
+            def bark_all_night(self):
+                pass
+
+    After calling ``sync_table`` on each of these tables, the columns defined in each model will be added to the
+    ``pet`` table. Additionally, saving ``Cat`` and ``Dog`` models will save the meta data needed to identify each row
+    as either a cat or dog.
+
+    To setup a polymorphic model structure, follow these steps
+
+    1.  Create a base model with a column set as the polymorphic_key (set ``polymorphic_key=True`` in the column definition)
+    2.  Create subclass models, and define a unique ``__polymorphic_key__`` value on each
+    3.  Run ``sync_table`` on each of the sub tables
+
+    **About the polymorphic key**
+
+    The polymorphic key is what cqlengine uses under the covers to map logical cql rows to the appropriate model type. The
+    base model maintains a map of polymorphic keys to subclasses. When a polymorphic model is saved, this value is automatically
+    saved into the polymorphic key column. You can set the polymorphic key column to any column type that you like, with
+    the exception of container and counter columns, although ``Integer`` columns make the most sense. Additionally, if you
+    set ``index=True`` on your polymorphic key column, you can execute queries against polymorphic subclasses, and a
+    ``WHERE`` clause will be automatically added to your query, returning only rows of that type. Note that you must
+    define a unique ``__polymorphic_key__`` value to each subclass, and that you can only assign a single polymorphic
+    key column per model
+
+
+Extending Model Validation
+==========================
+
+    Each time you save a model instance in cqlengine, the data in the model is validated against the schema you've defined
+    for your model. Most of the validation is fairly straightforward, it basically checks that you're not trying to do
+    something like save text into an integer column, and it enforces the ``required`` flag set on column definitions.
+    It also performs any transformations needed to save the data properly.
+
+    However, there are often additional constraints or transformations you want to impose on your data, beyond simply
+    making sure that Cassandra won't complain when you try to insert it. To define additional validation on a model,
+    extend the model's validation method:
+
+    .. code-block:: python
+
+        class Member(Model):
+            person_id = UUID(primary_key=True)
+            name = Text(required=True)
+
+            def validate(self):
+                super(Member, self).validate()
+                if self.name == 'jon':
+                    raise ValidationError('no jon\'s allowed')
+
+    *Note*: while not required, the convention is to raise a ``ValidationError`` (``from cqlengine import ValidationError``)
+    if validation fails
+
+
 Compaction Options
 ====================
 
