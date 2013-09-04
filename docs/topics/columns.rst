@@ -42,6 +42,12 @@ Columns
 
         columns.Integer()
 
+.. class:: VarInt()
+
+    Stores an arbitrary-precision integer ::
+
+        columns.VarInt()
+
 .. class:: DateTime()
 
     Stores a datetime value.

@@ -250,6 +250,26 @@ class Integer(Column):
         return self.validate(value)
 
 
+class VarInt(Column):
+    db_type = 'varint'
+
+    def validate(self, value):
+        val = super(VarInt, self).validate(value)
+        if val is None:
+            return
+        try:
+            return long(val)
+        except (TypeError, ValueError):
+            raise ValidationError(
+                "{} can't be converted to integral value".format(value))
+
+    def to_python(self, value):
+        return self.validate(value)
+
+    def to_database(self, value):
+        return self.validate(value)
+
+
 class CounterValueManager(BaseValueManager):
     def __init__(self, instance, column, value):
         super(CounterValueManager, self).__init__(instance, column, value)
