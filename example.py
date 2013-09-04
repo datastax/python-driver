@@ -14,8 +14,12 @@ from cassandra.query import SimpleStatement
 
 KEYSPACE = "testkeyspace"
 
+def ap(ip):
+    return [('username', 'cassandra'), ('password', 'cassandra')]
+
 def main():
     cluster = Cluster(['127.0.0.1'])
+    # cluster = Cluster(['127.0.0.1'], auth_provider=ap) # using an authenticator
     session = cluster.connect()
 
     rows = session.execute("SELECT keyspace_name FROM system.schema_keyspaces")
