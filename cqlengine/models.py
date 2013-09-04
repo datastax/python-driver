@@ -331,6 +331,12 @@ class BaseModel(object):
         """ Cleans and validates the field values """
         for name, col in self._columns.items():
             val = col.validate(getattr(self, name))
+
+            # handle custom validation
+            validation_function = getattr(self, 'validate_{}'.format(name), None)
+            if validation_function:
+                val = validation_function(val)
+
             setattr(self, name, val)
 
     def _as_dict(self):
