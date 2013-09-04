@@ -14,6 +14,7 @@ from cqlengine.columns import Bytes
 from cqlengine.columns import Ascii
 from cqlengine.columns import Text
 from cqlengine.columns import Integer
+from cqlengine.columns import VarInt
 from cqlengine.columns import DateTime
 from cqlengine.columns import Date
 from cqlengine.columns import UUID
@@ -23,6 +24,9 @@ from cqlengine.columns import Decimal
 
 from cqlengine.management import create_table, delete_table
 from cqlengine.models import Model
+
+import sys
+
 
 class TestDatetime(BaseCassEngTestCase):
     class DatetimeTest(Model):
@@ -62,6 +66,28 @@ class TestDatetime(BaseCassEngTestCase):
         self.DatetimeTest.objects.create(test_id=0, created_at=today)
         dt2 = self.DatetimeTest.objects(test_id=0).first()
         assert dt2.created_at.isoformat() == datetime(today.year, today.month, today.day).isoformat()
+
+
+class TestVarInt(BaseCassEngTestCase):
+    class VarIntTest(Model):
+        test_id = Integer(primary_key=True)
+        bignum = VarInt(primary_key=True)
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestVarInt, cls).setUpClass()
+        create_table(cls.VarIntTest)
+
+    @classmethod
+    def tearDownClass(cls):
+        super(TestVarInt, cls).tearDownClass()
+        delete_table(cls.VarIntTest)
+
+    def test_varint_io(self):
+        long_int = sys.maxint + 1
+        int1 = self.VarIntTest.objects.create(test_id=0, bignum=long_int)
+        int2 = self.VarIntTest.objects(test_id=0).first()
+        assert int1.bignum == int2.bignum
 
 
 class TestDate(BaseCassEngTestCase):
@@ -109,7 +135,7 @@ class TestDecimal(BaseCassEngTestCase):
         super(TestDecimal, cls).tearDownClass()
         delete_table(cls.DecimalTest)
 
-    def test_datetime_io(self):
+    def test_decimal_io(self):
         dt = self.DecimalTest.objects.create(test_id=0, dec_val=D('0.00'))
         dt2 = self.DecimalTest.objects(test_id=0).first()
         assert dt2.dec_val == dt.dec_val
