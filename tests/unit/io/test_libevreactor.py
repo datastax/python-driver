@@ -187,11 +187,11 @@ class LibevConnectionTest(unittest.TestCase):
         # read in the first byte
         c._socket.recv.return_value = message[0]
         c.handle_read(None, None)
-        self.assertEquals(c._buf, message[0])
+        self.assertEquals(c._iobuf.getvalue(), message[0])
 
         c._socket.recv.return_value = message[1:]
         c.handle_read(None, None)
-        self.assertEquals("", c._buf)
+        self.assertEquals("", c._iobuf.getvalue())
 
         # let it write out a StartupMessage
         c.handle_write(None, None)
@@ -213,12 +213,12 @@ class LibevConnectionTest(unittest.TestCase):
         # read in the first nine bytes
         c._socket.recv.return_value = message[:9]
         c.handle_read(None, None)
-        self.assertEquals(c._buf, message[:9])
+        self.assertEquals(c._iobuf.getvalue(), message[:9])
 
         # ... then read in the rest
         c._socket.recv.return_value = message[9:]
         c.handle_read(None, None)
-        self.assertEquals("", c._buf)
+        self.assertEquals("", c._iobuf.getvalue())
 
         # let it write out a StartupMessage
         c.handle_write(None, None)

@@ -12,6 +12,7 @@ from cassandra.decoder import RegisterMessage
 from cassandra.marshal import int32_unpack
 import cassandra.io.libevwrapper as libev
 
+import cStringIO
 
 log = logging.getLogger(__name__)
 
@@ -74,7 +75,6 @@ class LibevConnection(Connection):
     An implementation of :class:`.Connection` that utilizes libev.
     """
 
-    _buf = ""
     _total_reqd_bytes = 0
     _read_watcher = None
     _write_watcher = None
@@ -93,6 +93,7 @@ class LibevConnection(Connection):
         Connection.__init__(self, *args, **kwargs)
 
         self.connected_event = Event()
+        self._iobuf = cStringIO.StringIO()
 
         self._callbacks = {}
         self._push_watchers = defaultdict(set)
@@ -197,23 +198,40 @@ class LibevConnection(Connection):
             return
 
         if buf:
-            self._buf += buf
+            self._iobuf.write(buf)
             while True:
-                if len(self._buf) < 8:
+                pos = self._iobuf.tell()
+                if pos < 8:
                     # we don't have a complete header yet
                     break
-                elif self._total_reqd_bytes and len(self._buf) < self._total_reqd_bytes:
+                elif self._total_reqd_bytes and self._iobuf.tell() < self._total_reqd_bytes:
                     # we already saw a header, but we don't have a complete message yet
                     break
                 else:
-                    body_len = int32_unpack(self._buf[4:8])
-                    if len(self._buf) - 8 >= body_len:
-                        msg = self._buf[:8 + body_len]
-                        self._buf = self._buf[8 + body_len:]
+                    # have enough for header, read body len from header
+                    self._iobuf.seek(4)
+                    body_len_bytes = self._iobuf.read(4)
+                    body_len = int32_unpack(body_len_bytes)
+
+                    # seek to end to get length of current buffer
+                    self._iobuf.seek(0, 2) 
+                    pos = self._iobuf.tell() 
+
+                    if pos - 8 >= body_len:
+                        # read message header/body
+                        self._iobuf.seek(0)
+                        msg = self._iobuf.read(8 + body_len)
+
+                        # leave leftover in current buffer
+                        self._iobuf = cStringIO.StringIO()
+                        self._iobuf.write(self._iobuf.read())
+
                         self._total_reqd_bytes = 0
                         self.process_msg(msg, body_len)
                     else:
                         self._total_reqd_bytes = body_len + 8
+                        
+                    self._iobuf.seek(0, 2) # seek to end
         else:
             log.debug("connection closed by server")
             self.close()
