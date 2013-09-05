@@ -13,7 +13,15 @@ cqlengine is a Cassandra CQL 3 Object Mapper for Python
 
 :ref:`getting-started`
 
+Download
+========
+
+`Github <https://github.com/cqlengine/cqlengine>`_
+
+`PyPi <https://pypi.python.org/pypi/cqlengine>`_
+
 Contents:
+=========
 
 .. toctree::
     :maxdepth: 2
