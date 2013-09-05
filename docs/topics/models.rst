@@ -151,7 +151,7 @@ Model Attributes
 
     .. attribute:: Model.__keyspace__
 
-        *Optional.* Sets the name of the keyspace used by this model. Defaulst to cqlengine
+        *Optional.* Sets the name of the keyspace used by this model. Defaults to cqlengine
 
 
 Table Polymorphism
