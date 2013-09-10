@@ -811,6 +811,7 @@ def cql_encode_set_collection(val):
 cql_encoders = {
     float: cql_encode_object,
     str: cql_encode_str,
+    unicode: cql_encode_unicode,
     types.NoneType: cql_encode_none,
     int: cql_encode_object,
     long: cql_encode_object,
