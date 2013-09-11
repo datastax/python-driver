@@ -91,6 +91,9 @@ class SimpleStatement(Query):
     def query_string(self):
         return self._query_string
 
+    def __repr__(self):
+        return u'<SimpleStatement query="%s">' %s (self.query_string)
+
 
 class PreparedStatement(object):
     """
@@ -150,6 +153,10 @@ class PreparedStatement(object):
         even if there is only one value to bind.
         """
         return BoundStatement(self).bind(values)
+
+    def __repr__(self):
+        return u'<PreparedStatement query="%s">' %s (self.query_string)
+
 
 
 class BoundStatement(Query):
