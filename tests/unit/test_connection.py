@@ -1,5 +1,9 @@
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest
+
 from StringIO import StringIO
-import unittest
 
 from mock import Mock, ANY
 

@@ -1,6 +1,10 @@
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest
+
 from mock import Mock, NonCallableMagicMock
 from threading import Thread, Event
-import unittest
 
 from cassandra.cluster import Session
 from cassandra.connection import Connection, MAX_STREAM_PER_CONNECTION

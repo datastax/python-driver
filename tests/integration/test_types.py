@@ -1,7 +1,11 @@
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest
+
 from decimal import Decimal
 from datetime import datetime
 from uuid import uuid1, uuid4
-import unittest
 
 from cassandra.cluster import Cluster
 

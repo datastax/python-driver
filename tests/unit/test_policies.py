@@ -1,8 +1,12 @@
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest
+
 from itertools import islice, cycle
 from mock import Mock
 import struct
 from threading import Thread
-import unittest
 
 from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster
