@@ -5,6 +5,7 @@ except ImportError:
 
 from cassandra.query import bind_params, ValueSequence
 
+
 class ParamBindingTest(unittest.TestCase):
 
     def test_bind_sequence(self):
@@ -32,13 +33,13 @@ class ParamBindingTest(unittest.TestCase):
         self.assertEquals(result, "[ 'a' , 'b' , 'c' ]")
 
     def test_set_collection(self):
-        result = bind_params("%s", ({'a', 'b', 'c'},))
+        result = bind_params("%s", (set(['a', 'b', 'c']),))
         self.assertEquals(result, "{ 'a' , 'c' , 'b' }")
 
     def test_map_collection(self):
         result = bind_params("%s", ({'a': 'a', 'b': 'b'},))
         self.assertEquals(result, "{ 'a' : 'a' , 'b' : 'b' }")
 
-    def  test_quote_escaping(self):
+    def test_quote_escaping(self):
         result = bind_params("%s", ("""'ef''ef"ef""ef'""",))
         self.assertEquals(result, """'''ef''''ef"ef""ef'''""")
