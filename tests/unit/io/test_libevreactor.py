@@ -1,7 +1,11 @@
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest
+
 import errno
 from StringIO import StringIO
 from socket import error as socket_error
-import unittest
 
 from mock import patch, Mock
 
