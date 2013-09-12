@@ -1,13 +1,17 @@
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest
+
 import logging
 log = logging.getLogger(__name__)
-import unittest
 import os
 from threading import Event
 
 try:
     from ccmlib.cluster import Cluster as CCMCluster
     from ccmlib import common
-except ImportError:
+except ImportError, e:
     raise unittest.SkipTest('ccm is a dependency for integration tests')
 
 CLUSTER_NAME = 'test_cluster'
