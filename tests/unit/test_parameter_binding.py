@@ -73,6 +73,15 @@ class BoundStatementTestCase(unittest.TestCase):
         else:
             self.fail('Passed invalid type but exception was not thrown')
 
+        try:
+            bound_statement.bind(values)
+        except TypeError, e:
+            self.assertEqual(e.col_name, 'foo1')
+            self.assertEqual(e.expected_type, Int32Type)
+            self.assertEqual(e.actual_type, str)
+        else:
+            self.fail('Passed invalid type but exception was not thrown')
+
         values = [1, ['1', '2']]
 
         try:

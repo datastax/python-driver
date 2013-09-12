@@ -281,7 +281,7 @@ class TraceUnavailable(Exception):
     pass
 
 
-class InvalidParameterTypeError(Exception):
+class InvalidParameterTypeError(TypeError):
     """
     Raised when a used tries to bind a prepared statement with an argument of an
     invalid type.
