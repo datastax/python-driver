@@ -3,6 +3,7 @@ try:
 except ImportError:
     import unittest
 
+import platform
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
@@ -61,12 +62,20 @@ marshalled_value_pairs = (
     ('\x00\x00', 'ListType(FloatType)', ()),
     ('\x00\x00', 'SetType(IntegerType)', set()),
     ('\x00\x01\x00\x10\xafYC\xa3\xea<\x11\xe1\xabc\xc4,\x03"y\xf0', 'ListType(TimeUUIDType)', (UUID(bytes='\xafYC\xa3\xea<\x11\xe1\xabc\xc4,\x03"y\xf0'),)),
-    # these following entries work for me right now, but they're dependent on
-    # vagaries of internal python ordering for unordered types
+)
+
+# these following entries work for me right now, but they're dependent on
+# vagaries of internal python ordering for unordered types
+marshalled_value_pairs_unsafe = (
     ('\x00\x03\x00\x06\xe3\x81\xbfbob\x00\x04\x00\x00\x00\xc7\x00\x00\x00\x04\xff\xff\xff\xff\x00\x01\\\x00\x04\x00\x00\x00\x00', 'MapType(UTF8Type, Int32Type)', {u'\u307fbob': 199, u'': -1, u'\\': 0}),
     ('\x00\x02\x00\x08@\x14\x00\x00\x00\x00\x00\x00\x00\x08@\x01\x99\x99\x99\x99\x99\x9a', 'SetType(DoubleType)', set([2.2, 5.0])),
     ('\x00', 'IntegerType', 0),
 )
+
+if platform.python_implementation() == 'CPython':
+    # Only run tests for entries which depend on internal python ordering under
+    # CPython
+    marshalled_value_pairs += marshalled_value_pairs_unsafe
 
 class TestUnmarshal(unittest.TestCase):
     def test_unmarshalling(self):
