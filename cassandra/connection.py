@@ -166,7 +166,7 @@ class Connection(object):
         if stream_id < 0:
             callback = None
         else:
-            callback = self._callbacks.pop(stream_id)
+            callback = self._callbacks.pop(stream_id, None)
             self._id_queue.put_nowait(stream_id)
 
         body = None
@@ -193,7 +193,7 @@ class Connection(object):
         except Exception, exc:
             log.exception("Error decoding response from Cassandra. "
                           "opcode: %04x; message contents: %r" % (opcode, body))
-            if callback:
+            if callback is not None:
                 callback(exc)
             self.defunct(exc)
             return
