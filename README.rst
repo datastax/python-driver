@@ -35,7 +35,7 @@ Installation through pip is recommended:
 
 If you want to install manually, you can instead do:
 
-    $ sudo pip install futures scales # install dependencies
+    $ sudo pip install futures scales blist # install dependencies
     $ sudo python setup.py install
 
 C Extensions

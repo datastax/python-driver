@@ -35,6 +35,13 @@ apache_cassandra_type_prefix = 'org.apache.cassandra.db.marshal.'
 
 _number_types = frozenset((int, long, float))
 
+from blist import sortedset
+
+try:
+    from collections import OrderedDict
+except ImportError:  # Python <2.7
+    from cassandra.util import OrderedDict # NOQA
+
 def trim_if_startswith(s, prefix):
     if s.startswith(prefix):
         return s[len(prefix):]
@@ -581,7 +588,7 @@ class ListType(_SimpleParameterizedType):
 class SetType(_SimpleParameterizedType):
     typename = 'set'
     num_subtypes = 1
-    adapter = set
+    adapter = sortedset
 
 
 class MapType(_ParameterizedType):
@@ -598,7 +605,7 @@ class MapType(_ParameterizedType):
         subkeytype, subvaltype = cls.subtypes
         numelements = uint16_unpack(byts[:2])
         p = 2
-        themap = {}
+        themap = OrderedDict()
         for n in xrange(numelements):
             key_len = uint16_unpack(byts[p:p + 2])
             p += 2
