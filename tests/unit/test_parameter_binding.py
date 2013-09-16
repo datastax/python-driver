@@ -9,6 +9,7 @@ from cassandra.query import InvalidParameterTypeError
 from cassandra.cqltypes import Int32Type
 
 
+
 class ParamBindingTest(unittest.TestCase):
 
     def test_bind_sequence(self):
