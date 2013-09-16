@@ -180,7 +180,7 @@ setup(
     author_email='tyler@datastax.com',
     packages=["cassandra", "cassandra.io"],
     features=features,
-    install_requires=['futures', 'scales'],
+    install_requires=['futures', 'scales', 'blist'],
     tests_require=['nose', 'mock', 'ccm'],
     cmdclass={"build_ext": build_extensions,
               "doc": doc},
