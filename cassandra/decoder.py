@@ -383,7 +383,7 @@ class CredentialsMessage(_MessageType):
 
     def send_body(self, f):
         write_short(f, len(self.creds))
-        for credkey, credval in self.creds:
+        for credkey, credval in self.creds.items():
             write_string(f, credkey)
             write_string(f, credval)
 
