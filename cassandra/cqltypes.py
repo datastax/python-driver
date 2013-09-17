@@ -73,7 +73,7 @@ class CassandraTypeType(type):
 
 casstype_scanner = re.Scanner((
     (r'[()]', lambda s, t: t),
-    (r'[a-zA-Z0-9_.:]+', lambda s, t: t),
+    (r'[a-zA-Z0-9_.:=>]+', lambda s, t: t),
     (r'[\s,]', None),
 ))
 
@@ -612,6 +612,11 @@ class MapType(_ParameterizedType):
 
 class CompositeType(_ParameterizedType):
     typename = "'org.apache.cassandra.db.marshal.CompositeType'"
+    num_subtypes = 'UNKNOWN'
+
+
+class DynamicCompositeType(_ParameterizedType):
+    typename = "'org.apache.cassandra.db.marshal.DynamicCompositeType'"
     num_subtypes = 'UNKNOWN'
 
 
