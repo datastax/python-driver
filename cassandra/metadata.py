@@ -357,6 +357,7 @@ class KeyspaceMetadata(object):
             if k != "class":
                 ret += ", '%s': '%s'" % (k, v)
         ret += ' } AND DURABLE_WRITES = %s;' % ("true" if self.durable_writes else "false")
+        return ret
 
 
 class TableMetadata(object):
