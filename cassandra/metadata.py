@@ -526,7 +526,7 @@ class TableMetadata(object):
 
     def protect_value(self, value):
         if value is None:
-            return 'NULL' # this totally won't work
+            return 'NULL'
         if isinstance(value, bool):
             value = str(value).lower()
         elif isinstance(value, float):
