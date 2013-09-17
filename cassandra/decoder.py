@@ -34,7 +34,12 @@ from cassandra import (ConsistencyLevel, Unavailable, WriteTimeout, ReadTimeout,
                        AlreadyExists, InvalidRequest, Unauthorized)
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
                                int8_pack, int8_unpack)
-from cassandra.cqltypes import lookup_cqltype
+from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
+                                CounterColumnType, DateType, DecimalType,
+                                DoubleType, FloatType, Int32Type,
+                                InetAddressType, IntegerType, ListType,
+                                LongType, MapType, SetType, TimeUUIDType,
+                                UTF8Type, UUIDType)
 
 log = logging.getLogger(__name__)
 
@@ -431,25 +436,25 @@ class ResultMessage(_MessageType):
     KIND_SCHEMA_CHANGE = 0x0005
 
     type_codes = {
-        0x0001: 'ascii',
-        0x0002: 'bigint',
-        0x0003: 'blob',
-        0x0004: 'boolean',
-        0x0005: 'counter',
-        0x0006: 'decimal',
-        0x0007: 'double',
-        0x0008: 'float',
-        0x0009: 'int',
-        0x000A: 'text',
-        0x000B: 'timestamp',
-        0x000C: 'uuid',
-        0x000D: 'varchar',
-        0x000E: 'varint',
-        0x000F: 'timeuuid',
-        0x0010: 'inet',
-        0x0020: 'list',
-        0x0021: 'map',
-        0x0022: 'set',
+        0x0001: AsciiType,
+        0x0002: LongType,
+        0x0003: BytesType,
+        0x0004: BooleanType,
+        0x0005: CounterColumnType,
+        0x0006: DecimalType,
+        0x0007: DoubleType,
+        0x0008: FloatType,
+        0x0009: Int32Type,
+        0x000A: UTF8Type,
+        0x000B: DateType,
+        0x000C: UUIDType,
+        0x000D: UTF8Type,
+        0x000E: IntegerType,
+        0x000F: TimeUUIDType,
+        0x0010: InetAddressType,
+        0x0020: ListType,
+        0x0021: MapType,
+        0x0022: SetType,
     }
 
     FLAGS_GLOBAL_TABLES_SPEC = 0x0001
@@ -518,18 +523,18 @@ class ResultMessage(_MessageType):
     def read_type(cls, f):
         optid = read_short(f)
         try:
-            cqltype = lookup_cqltype(cls.type_codes[optid])
+            typeclass = cls.type_codes[optid]
         except KeyError:
             raise NotSupportedError("Unknown data type code 0x%x. Have to skip"
                                     " entire result set." % optid)
-        if cqltype.typename in ('list', 'set'):
+        if typeclass in (ListType, SetType):
             subtype = cls.read_type(f)
-            cqltype = cqltype.apply_parameters(subtype)
-        elif cqltype.typename == 'map':
+            typeclass = typeclass.apply_parameters(subtype)
+        elif typeclass == MapType:
             keysubtype = cls.read_type(f)
             valsubtype = cls.read_type(f)
-            cqltype = cqltype.apply_parameters(keysubtype, valsubtype)
-        return cqltype
+            typeclass = typeclass.apply_parameters(keysubtype, valsubtype)
+        return typeclass
 
     @staticmethod
     def recv_row(f, colcount):

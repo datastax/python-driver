@@ -51,7 +51,6 @@ def unix_time_from_uuid1(u):
     return (u.get_time() - 0x01B21DD213814000) / 10000000.0
 
 _casstypes = {}
-_cqltypes = {}
 
 class CassandraTypeType(type):
     """
@@ -69,7 +68,6 @@ class CassandraTypeType(type):
         cls = type.__new__(metacls, name, bases, dct)
         if not name.startswith('_'):
             _casstypes[name] = cls
-            _cqltypes[cls.typename] = cls
         return cls
 
 
@@ -140,37 +138,6 @@ def lookup_casstype(casstype):
         return parse_casstype_args(casstype)
     except (ValueError, AssertionError, IndexError), e:
         raise ValueError("Don't know how to parse type string %r: %s" % (casstype, e))
-
-
-def lookup_cqltype(cqltype):
-    """
-    Given a CQL type specifier, possibly including parameters, hand back the
-    CassandraType class responsible for it. If a name is not recognized,
-    KeyError is raised. If the type specifier looks like a CQL string literal
-    (starts and ends with a single quote character "'"), then it is interpreted
-    as a Cassandra type name, and looked up accordingly.
-
-    Example:
-
-        >>> lookup_cqltype('map<text, int>')
-        <class 'cassandra.types.MapType(UTF8Type, Int32Type)'>
-
-    """
-    if isinstance(cqltype, CassandraType):
-        return cqltype
-    args = ()
-    if cqltype.startswith("'") and cqltype.endswith("'"):
-        return lookup_casstype(cqltype[1:-1].replace("''", "'"))
-    if '<' in cqltype:
-        # do we need to support arbitrary nesting? if so, this is where
-        # we need to tokenize and parse
-        assert cqltype.endswith('>'), cqltype
-        cqltype, args = cqltype[:-1].split('<', 1)
-        args = [lookup_cqltype(s.strip()) for s in args.split(',')]
-    typeclass = _cqltypes[cqltype]
-    if args:
-        typeclass = typeclass.apply_parameters(*args)
-    return typeclass
 
 
 class _CassandraType(object):
@@ -523,9 +490,6 @@ class UTF8Type(_CassandraType):
         return ustr.encode('utf8')
 
 
-# name alias
-_cqltypes['varchar'] = _cqltypes['text']
-
 class _ParameterizedType(_CassandraType):
     def __init__(self, val):
         if not self.subtypes:
@@ -670,11 +634,6 @@ def is_counter_type(t):
         t = lookup_casstype(t)
     return issubclass(t, CounterColumnType)
 
-
-cql_type_to_apache_class = dict((c, t.cassname) for (c, t) in _cqltypes.items())
-apache_class_to_cql_type = dict((n, t.typename) for (n, t) in _casstypes.items())
-
-cql_types = sorted(t for t in _cqltypes.keys() if not t.startswith("'"))
 
 def cql_typename(casstypename):
     """
