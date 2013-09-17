@@ -153,7 +153,7 @@ def lookup_cqltype(cqltype):
     Example:
 
         >>> lookup_cqltype('map<text, int>')
-        <class 'cassandra.types.MapType(UTF8Type, Int32Type)'>
+        <class 'cassandra.cqltypes.MapType(UTF8Type, Int32Type)'>
 
     """
     if isinstance(cqltype, CassandraType):
