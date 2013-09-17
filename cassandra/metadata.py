@@ -274,7 +274,7 @@ class Metadata(object):
         ring = sorted(ring)
         self.token_map = TokenMap(token_class, tokens_to_hosts, ring)
 
-    def get_replicas(self, key):
+    def get_replicas(self, key, replication=1):
         """
         Returns a list of :class:`.Host` instances that are replicas for a given
         partition key.
@@ -283,7 +283,7 @@ class Metadata(object):
         if not t:
             return []
         try:
-            return t.get_replicas(t.token_class.from_key(key))
+            return t.get_replicas(t.token_class.from_key(key), replication)
         except NoMurmur3:
             return []
 
@@ -648,7 +648,7 @@ class TokenMap(object):
         self.tokens_to_hosts = tokens_to_hosts
         self.ring = ring
 
-    def get_replicas(self, token):
+    def get_replicas(self, token, replication=1):
         """
         Get :class:`.Host` instances representing all of the replica nodes
         for a given :class:`.Token`.
@@ -657,11 +657,12 @@ class TokenMap(object):
         # return full set of replicas
         point = bisect_left(self.ring, token)
         if point == 0 and token != self.ring[0]:
-            return self.tokens_to_hosts[self.ring[-1]]
+            tokens = self.ring[-replication:]
         elif point == len(self.ring):
-            return self.tokens_to_hosts[self.ring[0]]
+            tokens = self.ring[0:replication]
         else:
-            return self.tokens_to_hosts[self.ring[point]]
+            tokens = self.ring[point:point+replication]
+        return [self.tokens_to_hosts[t] for t in tokens]
 
 
 class Token(object):
