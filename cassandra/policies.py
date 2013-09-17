@@ -391,7 +391,9 @@ class ConstantReconnectionPolicy(ReconnectionPolicy):
         The default is 64.
         """
         if delay < 0:
-            raise ValueError("Delay may not be negative")
+            raise ValueError("delay must not be negative")
+        if max_attempts < 0:
+            raise ValueError("max_attempts must not be negative")
 
         self.delay = delay
         self.max_attempts = max_attempts
