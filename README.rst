@@ -35,7 +35,7 @@ Installation through pip is recommended:
 
 If you want to install manually, you can instead do:
 
-    $ sudo pip install futures scales # install dependencies
+    $ sudo pip install futures scales blist # install dependencies
     $ sudo python setup.py install
 
 C Extensions
@@ -90,6 +90,25 @@ the libev event loop by doing the following
     >>> cluster = Cluster()
     >>> cluster.connection_class = LibevConnection
     >>> session = cluster.connect()
+
+Compression Support
+^^^^^^^^^^^^^^^^^^^
+Compression can optionally be used for communication between the driver and
+Cassandra.  There are currently two supported compression algorithms:
+snappy (in Cassandra 1.2+) and LZ4 (only in Cassandra 2.0+).  If either is
+available for the driver and Cassandra also supports it, it will
+be used automatically.
+
+For lz4 support::
+
+    sudo pip install lz4
+
+For snappy support::
+
+    sudo pip install python-snappy
+
+(If using a Debian Linux derivative such as Ubuntu, it may be easier to
+just run ``apt-get install python-snappy``.)
 
 License
 -------

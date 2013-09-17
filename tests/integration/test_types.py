@@ -1,7 +1,13 @@
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest
+
 from decimal import Decimal
 from datetime import datetime
 from uuid import uuid1, uuid4
-import unittest
+
+from blist import sortedset
 
 from cassandra.cluster import Cluster
 
@@ -79,7 +85,7 @@ class TypeTests(unittest.TestCase):
             "1.2.3.4",  # inet
             12345,  # int
             ('a', 'b', 'c'),  # list<text> collection
-            {1, 2, 3},  # set<int> collection
+            sortedset((1, 2, 3)),  # set<int> collection
             {'a': 1, 'b': 2},  # map<text, int> collection
             "text",  # text
             mydatetime,  # timestamp

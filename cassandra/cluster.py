@@ -1430,7 +1430,7 @@ class ResponseFuture(object):
 
     def _set_result(self, response):
         try:
-            if self._current_pool:
+            if self._current_pool and self._connection:
                 self._current_pool.return_connection(self._connection)
 
             trace_id = getattr(response, 'trace_id', None)

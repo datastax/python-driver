@@ -1,4 +1,7 @@
-import unittest
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest
 
 from cassandra.cluster import Cluster
 from cassandra.metadata import TableMetadata, Token, MD5Token, TokenMap

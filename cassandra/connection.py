@@ -5,7 +5,7 @@ from threading import Event, Lock, RLock
 from Queue import Queue
 
 from cassandra import ConsistencyLevel, AuthenticationFailed
-from cassandra.marshal import int8_unpack
+from cassandra.marshal import int8_unpack, int32_pack
 from cassandra.decoder import (ReadyMessage, AuthenticateMessage, OptionsMessage,
                                StartupMessage, ErrorMessage, CredentialsMessage,
                                QueryMessage, ResultMessage, decode_response,
@@ -15,6 +15,7 @@ from cassandra.decoder import (ReadyMessage, AuthenticateMessage, OptionsMessage
 log = logging.getLogger(__name__)
 
 locally_supported_compressions = {}
+
 try:
     import snappy
 except ImportError:
@@ -26,6 +27,26 @@ else:
             return ''
         return snappy.decompress(byts)
     locally_supported_compressions['snappy'] = (snappy.compress, decompress)
+
+try:
+    import lz4
+except ImportError:
+    pass
+else:
+
+    # Cassandra writes the uncompressed message length in big endian order,
+    # but the lz4 lib requires little endian order, so we wrap these
+    # functions to handle that
+
+    def lz4_compress(byts):
+        # write length in big-endian instead of little-endian
+        return int32_pack(len(byts)) + lz4.compress(byts)[4:]
+
+    def lz4_decompress(byts):
+        # flip from big-endian to little-endian
+        return lz4.decompress(byts[3::-1] + byts[4:])
+
+    locally_supported_compressions['lz4'] = (lz4_compress, lz4_decompress)
 
 
 MAX_STREAM_PER_CONNECTION = 128
@@ -145,7 +166,7 @@ class Connection(object):
         if stream_id < 0:
             callback = None
         else:
-            callback = self._callbacks.pop(stream_id)
+            callback = self._callbacks.pop(stream_id, None)
             self._id_queue.put_nowait(stream_id)
 
         body = None
@@ -172,7 +193,7 @@ class Connection(object):
         except Exception, exc:
             log.exception("Error decoding response from Cassandra. "
                           "opcode: %04x; message contents: %r" % (opcode, body))
-            if callback:
+            if callback is not None:
                 callback(exc)
             self.defunct(exc)
             return
