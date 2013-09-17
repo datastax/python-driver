@@ -1,7 +1,7 @@
 try:
     import unittest2 as unittest
 except ImportError:
-    import unittest
+    import unittest # noqa
 
 import platform
 from datetime import datetime

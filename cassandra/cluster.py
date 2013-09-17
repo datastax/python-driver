@@ -767,11 +767,11 @@ class Session(object):
         else:
             try:
                 new_pool = HostConnectionPool(host, distance, self)
-            except AuthenticationFailed, auth_exc:
+            except AuthenticationFailed as auth_exc:
                 conn_exc = ConnectionException(str(auth_exc), host=host)
                 host.monitor.signal_connection_failure(conn_exc)
                 return self._pools.get(host)
-            except Exception, conn_exc:
+            except Exception as conn_exc:
                 host.monitor.signal_connection_failure(conn_exc)
                 return self._pools.get(host)
 
@@ -927,11 +927,11 @@ class ControlConnection(object):
         for host in self._balancing_policy.make_query_plan():
             try:
                 return self._try_connect(host)
-            except ConnectionException, exc:
+            except ConnectionException as exc:
                 errors[host.address] = exc
                 host.monitor.signal_connection_failure(exc)
                 log.warn("[control connection] Error connecting to %s: %s", host, exc)
-            except Exception, exc:
+            except Exception as exc:
                 errors[host.address] = exc
                 log.warn("[control connection] Error connecting to %s: %s", host, exc)
 
@@ -1393,7 +1393,7 @@ class ResponseFuture(object):
             self._current_pool = pool
             self._connection = connection
             return request_id
-        except Exception, exc:
+        except Exception as exc:
             log.debug("Error querying host %s", host, exc_info=True)
             self._errors[host] = exc
             if connection:
@@ -1525,7 +1525,7 @@ class ResponseFuture(object):
                 exc = ConnectionException(msg, self._current_host)
                 self._connection.defunct(exc)
                 self._set_final_exception(exc)
-        except Exception, exc:
+        except Exception as exc:
             # almost certainly caused by a bug, but we need to set something here
             log.exception("Unexpected exception while handling result in ResponseFuture:")
             self._set_final_exception(exc)

@@ -130,7 +130,7 @@ class _ReconnectionHandler(object):
 
         try:
             self.on_reconnection(self.try_reconnect())
-        except Exception, exc:
+        except Exception as exc:
             next_delay = self.schedule.next()
             if self.on_exception(exc, next_delay):
                 self.scheduler.schedule(next_delay, self.run)
@@ -382,7 +382,7 @@ class HostConnectionPool(object):
                 self._connections = new_connections
             self._signal_available_conn()
             return True
-        except ConnectionException, exc:
+        except ConnectionException as exc:
             log.exception("Failed to add new connection to pool for host %s" % (self.host,))
             with self._lock:
                 self.open_count -= 1

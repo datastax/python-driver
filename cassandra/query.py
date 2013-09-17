@@ -302,7 +302,6 @@ class InvalidParameterTypeError(TypeError):
         super(InvalidParameterTypeError, self).__init__(message)
 
 
-
 class QueryTrace(object):
     """
     A trace of the duration and events that occurred when executing

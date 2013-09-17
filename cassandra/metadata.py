@@ -14,7 +14,7 @@ import weakref
 murmur3 = None
 try:
     from murmur3 import murmur3
-except ImportError, exc:
+except ImportError:
     pass
 
 import cassandra.cqltypes as types

@@ -181,7 +181,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
 
         try:
             sent = self.send(next_msg)
-        except socket.error, err:
+        except socket.error as err:
             if (err.args[0] in NONBLOCKING):
                 self.deque.appendleft(next_msg)
             else:
@@ -199,7 +199,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
     def handle_read(self):
         try:
             buf = self.recv(self.in_buffer_size)
-        except socket.error, err:
+        except socket.error as err:
             if err.args[0] not in NONBLOCKING:
                 self.defunct(err)
             return

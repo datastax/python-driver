@@ -100,7 +100,7 @@ def defunct_on_error(f):
     def wrapper(self, *args, **kwargs):
         try:
             return f(self, *args, **kwargs)
-        except Exception, exc:
+        except Exception as exc:
             self.defunct(exc)
 
     return wrapper
@@ -190,7 +190,7 @@ class Connection(object):
                 raise ProtocolError("Got negative body length: %r" % body_len)
 
             response = decode_response(stream_id, flags, opcode, body, self.decompressor)
-        except Exception, exc:
+        except Exception as exc:
             log.exception("Error decoding response from Cassandra. "
                           "opcode: %04x; message contents: %r" % (opcode, body))
             if callback is not None:
@@ -303,10 +303,10 @@ class Connection(object):
                 else:
                     raise self.defunct(ConnectionException(
                         "Problem while setting keyspace: %r" % (result,), self.host))
-            except InvalidRequestException, ire:
+            except InvalidRequestException as ire:
                 # the keyspace probably doesn't exist
                 raise ire.to_exception()
-            except Exception, exc:
+            except Exception as exc:
                 raise self.defunct(ConnectionException(
                     "Problem while setting keyspace: %r" % (exc,), self.host))
 

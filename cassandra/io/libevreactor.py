@@ -68,7 +68,7 @@ def defunct_on_error(f):
     def wrapper(self, *args, **kwargs):
         try:
             return f(self, *args, **kwargs)
-        except Exception, exc:
+        except Exception as exc:
             self.defunct(exc)
 
     return wrapper
@@ -180,7 +180,7 @@ class LibevConnection(Connection):
 
         try:
             sent = self._socket.send(next_msg)
-        except socket.error, err:
+        except socket.error as err:
             if (err.args[0] in NONBLOCKING):
                 self.deque.appendleft(next_msg)
             else:
@@ -196,7 +196,7 @@ class LibevConnection(Connection):
     def handle_read(self, watcher, revents):
         try:
             buf = self._socket.recv(self.in_buffer_size)
-        except socket.error, err:
+        except socket.error as err:
             if err.args[0] not in NONBLOCKING:
                 self.defunct(err)
             return

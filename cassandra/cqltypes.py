@@ -136,7 +136,7 @@ def lookup_casstype(casstype):
         return casstype
     try:
         return parse_casstype_args(casstype)
-    except (ValueError, AssertionError, IndexError), e:
+    except (ValueError, AssertionError, IndexError) as e:
         raise ValueError("Don't know how to parse type string %r: %s" % (casstype, e))
 
 

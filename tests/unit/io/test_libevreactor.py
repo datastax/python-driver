@@ -1,7 +1,7 @@
 try:
     import unittest2 as unittest
 except ImportError:
-    import unittest
+    import unittest # noqa
 
 import errno
 from StringIO import StringIO
@@ -20,7 +20,7 @@ from cassandra.marshal import uint8_pack, uint32_pack
 
 try:
     from cassandra.io.libevreactor import LibevConnection
-except ImportError, exc:
+except ImportError as exc:
     raise unittest.SkipTest('libev does not appear to be installed correctly: %s' % (exc,))
 
 @patch('socket.socket')

@@ -1,7 +1,7 @@
 try:
     import unittest2 as unittest
 except ImportError:
-    import unittest
+    import unittest # noqa
 
 from cassandra.query import bind_params, ValueSequence
 from cassandra.query import PreparedStatement, BoundStatement
@@ -49,8 +49,8 @@ class ParamBindingTest(unittest.TestCase):
 
 
 class BoundStatementTestCase(unittest.TestCase):
+
     def test_invalid_argument_type(self):
-        query = 'SELECT foo1, foo2 from bar where foo1 = ? and foo2 = ?'
         keyspace = 'keyspace1'
         column_family = 'cf1'
 
@@ -70,7 +70,7 @@ class BoundStatementTestCase(unittest.TestCase):
 
         try:
             bound_statement.bind(values)
-        except InvalidParameterTypeError, e:
+        except InvalidParameterTypeError as e:
             self.assertEqual(e.col_name, 'foo1')
             self.assertEqual(e.expected_type, Int32Type)
             self.assertEqual(e.actual_type, str)
@@ -79,7 +79,7 @@ class BoundStatementTestCase(unittest.TestCase):
 
         try:
             bound_statement.bind(values)
-        except TypeError, e:
+        except TypeError as e:
             self.assertEqual(e.col_name, 'foo1')
             self.assertEqual(e.expected_type, Int32Type)
             self.assertEqual(e.actual_type, str)
@@ -90,7 +90,7 @@ class BoundStatementTestCase(unittest.TestCase):
 
         try:
             bound_statement.bind(values)
-        except InvalidParameterTypeError, e:
+        except InvalidParameterTypeError as e:
             self.assertEqual(e.col_name, 'foo2')
             self.assertEqual(e.expected_type, Int32Type)
             self.assertEqual(e.actual_type, list)
