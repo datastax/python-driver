@@ -380,24 +380,35 @@ class IntegerType(_CassandraType):
     serialize = staticmethod(varint_pack)
 
 
+have_ipv6_packing = hasattr(socket, 'inet_ntop')
+
 class InetAddressType(_CassandraType):
     typename = 'inet'
+
+    # TODO: implement basic ipv6 support for Windows?
+    # inet_ntop and inet_pton aren't available on Windows
 
     @staticmethod
     def deserialize(byts):
         if len(byts) == 16:
-            fam = socket.AF_INET6
+            if not have_ipv6_packing:
+                raise Exception(
+                    "IPv6 addresses cannot currently be handled on Windows")
+            return socket.inet_ntop(socket.AF_INET6, byts)
         else:
-            fam = socket.AF_INET
-        return socket.inet_ntop(fam, byts)
+            return socket.inet_ntoa(byts)
 
     @staticmethod
     def serialize(addr):
         if ':' in addr:
             fam = socket.AF_INET6
+            if not have_ipv6_packing:
+                raise Exception(
+                    "IPv6 addresses cannot currently be handled on Windows")
+            return socket.inet_pton(fam, addr)
         else:
             fam = socket.AF_INET
-        return socket.inet_pton(fam, addr)
+            return socket.inet_aton(addr)
 
 
 class CounterColumnType(_CassandraType):
