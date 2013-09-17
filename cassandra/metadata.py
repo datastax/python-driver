@@ -731,4 +731,8 @@ class BytesToken(Token):
 
     def __init__(self, token_string):
         """ `token_string` should be string representing the token """
+        if not isinstance(token_string, basestring):
+            raise TypeError(
+                "Tokens for ByteOrderedPartitioner should be strings (got %s)"
+                % (type(token_string),))
         self.value = token_string
