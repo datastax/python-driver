@@ -15,9 +15,30 @@ from cassandra.policies import (RoundRobinPolicy, DCAwareRoundRobinPolicy,
                                 TokenAwarePolicy, SimpleConvictionPolicy,
                                 HostDistance, ExponentialReconnectionPolicy,
                                 RetryPolicy, WriteType,
-                                DowngradingConsistencyRetryPolicy)
+                                DowngradingConsistencyRetryPolicy, ConstantReconnectionPolicy,
+                                LoadBalancingPolicy, ConvictionPolicy, ReconnectionPolicy)
 from cassandra.pool import Host
 from cassandra.query import Statement
+
+
+class TestLoadBalancingPolicy(unittest.TestCase):
+    def test_non_implemented(self):
+        """
+        Code coverage for interface-style base class
+        """
+
+        policy = LoadBalancingPolicy()
+        host = Host("ip1", SimpleConvictionPolicy)
+        host.set_location_info("dc1", "rack1")
+
+        self.assertRaises(NotImplementedError, policy.distance, host)
+        self.assertRaises(NotImplementedError, policy.distance, host)
+        self.assertRaises(NotImplementedError, policy.make_query_plan)
+        self.assertRaises(NotImplementedError, policy.on_up, host)
+        self.assertRaises(NotImplementedError, policy.on_down, host)
+        self.assertRaises(NotImplementedError, policy.on_add, host)
+        self.assertRaises(NotImplementedError, policy.on_remove, host)
+
 
 class TestRoundRobinPolicy(unittest.TestCase):
 
@@ -67,8 +88,23 @@ class TestRoundRobinPolicy(unittest.TestCase):
         map(lambda t: t.start(), threads)
         map(lambda t: t.join(), threads)
 
+    def test_no_live_nodes(self):
+        """
+        Ensure query plan for a downed cluster will execute without errors
+        """
 
-class TestDCAwareRoundRobinPolicy(unittest.TestCase):
+        hosts = [0, 1, 2, 3]
+        policy = RoundRobinPolicy()
+        policy.populate(None, hosts)
+
+        for i in range(4):
+            policy.on_down(i)
+
+        qplan = list(policy.make_query_plan())
+        self.assertEqual(qplan, [])
+
+
+class DCAwareRoundRobinPolicyTest(unittest.TestCase):
 
     def test_no_remote(self):
         hosts = []
@@ -173,6 +209,47 @@ class TestDCAwareRoundRobinPolicy(unittest.TestCase):
         # since we have hosts in dc9000, the distance shouldn't be IGNORED
         self.assertEqual(policy.distance(new_remote_host), HostDistance.REMOTE)
 
+        policy.on_down(new_local_host)
+        policy.on_down(hosts[1])
+        qplan = list(policy.make_query_plan())
+        self.assertEqual(set(qplan), set([hosts[3], new_remote_host]))
+
+        policy.on_down(new_remote_host)
+        policy.on_down(hosts[3])
+        qplan = list(policy.make_query_plan())
+        self.assertEqual(qplan, [])
+
+    def test_no_live_nodes(self):
+        """
+        Ensure query plan for a downed cluster will execute without errors
+        """
+
+        hosts = []
+        for i in range(4):
+            h = Host(i, SimpleConvictionPolicy)
+            h.set_location_info("dc1", "rack1")
+            hosts.append(h)
+
+        policy = DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=1)
+        policy.populate(None, hosts)
+
+        for host in hosts:
+            policy.on_down(host)
+
+        qplan = list(policy.make_query_plan())
+        self.assertEqual(qplan, [])
+
+    def test_no_nodes(self):
+        """
+        Ensure query plan for an empty cluster will execute without errors
+        """
+
+        policy = DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=1)
+        policy.populate(None, [])
+
+        qplan = list(policy.make_query_plan())
+        self.assertEqual(qplan, [])
+
 
 class TokenAwarePolicyTest(unittest.TestCase):
 
@@ -198,6 +275,19 @@ class TokenAwarePolicyTest(unittest.TestCase):
             other = set(h for h in hosts if h not in replicas)
             self.assertEquals(replicas, qplan[:2])
             self.assertEquals(other, set(qplan[2:]))
+
+        # Should use the secondary policy
+        for i in range(4):
+            query = Query()
+            qplan = list(policy.make_query_plan(query))
+
+            self.assertEquals(set(qplan), set(hosts))
+
+        # Should use the secondary policy
+        for i in range(4):
+            qplan = list(policy.make_query_plan())
+
+            self.assertEquals(set(qplan), set(hosts))
 
     def test_wrap_dc_aware(self):
         cluster = Mock(spec=Cluster)
@@ -239,6 +329,74 @@ class TokenAwarePolicyTest(unittest.TestCase):
             self.assertEquals(qplan[2].datacenter, "dc2")
             self.assertEquals(3, len(qplan))
 
+class ConvictionPolicyTest(unittest.TestCase):
+    def test_not_implemented(self):
+        """
+        Code coverage for interface-style base class
+        """
+
+        conviction_policy = ConvictionPolicy(1)
+        self.assertRaises(NotImplementedError, conviction_policy.add_failure, 1)
+        self.assertRaises(NotImplementedError, conviction_policy.reset)
+
+
+class SimpleConvictionPolicyTest(unittest.TestCase):
+    def test_basic_responses(self):
+        """
+        Code coverage for SimpleConvictionPolicy
+        """
+
+        conviction_policy = SimpleConvictionPolicy(1)
+
+        # DISCUSS: Always return True?
+        self.assertEqual(conviction_policy.add_failure(1), True)
+
+        self.assertEqual(conviction_policy.reset(), None)
+
+
+class ReconnectionPolicyTest(unittest.TestCase):
+    def test_basic_responses(self):
+        """
+        Code coverage for interface-style base class
+        """
+
+        policy = ReconnectionPolicy()
+        self.assertRaises(NotImplementedError, policy.new_schedule)
+
+
+class ConstantReconnectionPolicyTest(unittest.TestCase):
+
+    def test_bad_vals(self):
+        """
+        Test initialization values
+        """
+
+        self.assertRaises(ValueError, ConstantReconnectionPolicy, -1, 0)
+
+    def test_schedule(self):
+        """
+        Test ConstantReconnectionPolicy schedule
+        """
+
+        delay = 2
+        max_attempts = 100
+        policy = ConstantReconnectionPolicy(delay=delay, max_attempts=max_attempts)
+        schedule = list(policy.new_schedule())
+        self.assertEqual(len(schedule), max_attempts)
+        for i, delay in enumerate(schedule):
+            self.assertEqual(delay, delay)
+
+    def test_schedule_negative_max_attempts(self):
+        """
+        Test how negative max_attempts are handled
+        """
+
+        delay = 2
+        max_attempts = -100
+        policy = ConstantReconnectionPolicy(delay=delay, max_attempts=max_attempts)
+        schedule = list(policy.new_schedule())
+        self.assertEqual(len(schedule), 0)
+
 
 class ExponentialReconnectionPolicyTest(unittest.TestCase):
 
@@ -270,25 +428,28 @@ class RetryPolicyTest(unittest.TestCase):
             query=None, consistency="ONE", required_responses=1, received_responses=2,
             data_retrieved=True, retry_num=1)
         self.assertEqual(retry, RetryPolicy.RETHROW)
+        self.assertEqual(consistency, None)
 
         # if we didn't get enough responses, rethrow
         retry, consistency = policy.on_read_timeout(
             query=None, consistency="ONE", required_responses=2, received_responses=1,
             data_retrieved=True, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETHROW)
+        self.assertEqual(consistency, None)
 
         # if we got enough responses, but also got a data response, rethrow
         retry, consistency = policy.on_read_timeout(
             query=None, consistency="ONE", required_responses=2, received_responses=2,
             data_retrieved=True, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETHROW)
+        self.assertEqual(consistency, None)
 
-        # we got enough reponses but no data response, so retry
+        # we got enough responses but no data response, so retry
         retry, consistency = policy.on_read_timeout(
             query=None, consistency="ONE", required_responses=2, received_responses=2,
             data_retrieved=False, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETRY)
-        self.assertEqual(consistency, "ONE")
+        self.assertEqual(consistency, 'ONE')
 
     def test_write_timeout(self):
         policy = RetryPolicy()
@@ -298,19 +459,21 @@ class RetryPolicyTest(unittest.TestCase):
             query=None, consistency="ONE", write_type=WriteType.SIMPLE,
             required_responses=1, received_responses=2, retry_num=1)
         self.assertEqual(retry, RetryPolicy.RETHROW)
+        self.assertEqual(consistency, None)
 
         # if it's not a BATCH_LOG write, don't retry it
         retry, consistency = policy.on_write_timeout(
             query=None, consistency="ONE", write_type=WriteType.SIMPLE,
             required_responses=1, received_responses=2, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETHROW)
+        self.assertEqual(consistency, None)
 
         # retry BATCH_LOG writes regardless of received responses
         retry, consistency = policy.on_write_timeout(
             query=None, consistency="ONE", write_type=WriteType.BATCH_LOG,
             required_responses=10000, received_responses=1, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETRY)
-        self.assertEqual(consistency, "ONE")
+        self.assertEqual(consistency, 'ONE')
 
 
 class DowngradingConsistencyRetryPolicyTest(unittest.TestCase):
@@ -323,6 +486,14 @@ class DowngradingConsistencyRetryPolicyTest(unittest.TestCase):
             query=None, consistency="ONE", required_responses=1, received_responses=2,
             data_retrieved=True, retry_num=1)
         self.assertEqual(retry, RetryPolicy.RETHROW)
+        self.assertEqual(consistency, None)
+
+        # if we didn't get enough responses, retry at a lower consistency
+        retry, consistency = policy.on_read_timeout(
+            query=None, consistency="ONE", required_responses=4, received_responses=3,
+            data_retrieved=True, retry_num=0)
+        self.assertEqual(retry, RetryPolicy.RETRY)
+        self.assertEqual(consistency, ConsistencyLevel.THREE)
 
         # if we didn't get enough responses, retry at a lower consistency
         retry, consistency = policy.on_read_timeout(
@@ -343,18 +514,21 @@ class DowngradingConsistencyRetryPolicyTest(unittest.TestCase):
             query=None, consistency="ONE", required_responses=3, received_responses=0,
             data_retrieved=True, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETHROW)
+        self.assertEqual(consistency, None)
 
         # if we got enough response but no data, retry
         retry, consistency = policy.on_read_timeout(
             query=None, consistency="ONE", required_responses=3, received_responses=3,
             data_retrieved=False, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETRY)
+        self.assertEqual(consistency, 'ONE')
 
         # if we got enough responses, but also got a data response, rethrow
         retry, consistency = policy.on_read_timeout(
             query=None, consistency="ONE", required_responses=2, received_responses=2,
             data_retrieved=True, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETHROW)
+        self.assertEqual(consistency, None)
 
     def test_write_timeout(self):
         policy = DowngradingConsistencyRetryPolicy()
@@ -364,6 +538,7 @@ class DowngradingConsistencyRetryPolicyTest(unittest.TestCase):
             query=None, consistency="ONE", write_type=WriteType.SIMPLE,
             required_responses=1, received_responses=2, retry_num=1)
         self.assertEqual(retry, RetryPolicy.RETHROW)
+        self.assertEqual(consistency, None)
 
         # ignore failures on these types of writes
         for write_type in (WriteType.SIMPLE, WriteType.BATCH, WriteType.COUNTER):
@@ -386,6 +561,13 @@ class DowngradingConsistencyRetryPolicyTest(unittest.TestCase):
         self.assertEqual(retry, RetryPolicy.RETRY)
         self.assertEqual(consistency, "ONE")
 
+        # timeout on an unknown write_type
+        retry, consistency = policy.on_write_timeout(
+            query=None, consistency="ONE", write_type=None,
+            required_responses=1, received_responses=2, retry_num=0)
+        self.assertEqual(retry, RetryPolicy.RETHROW)
+        self.assertEqual(consistency, None)
+
     def test_unavailable(self):
         policy = DowngradingConsistencyRetryPolicy()
 
@@ -393,6 +575,7 @@ class DowngradingConsistencyRetryPolicyTest(unittest.TestCase):
         retry, consistency = policy.on_unavailable(
             query=None, consistency="ONE", required_replicas=3, alive_replicas=1, retry_num=1)
         self.assertEqual(retry, RetryPolicy.RETHROW)
+        self.assertEqual(consistency, None)
 
         # downgrade consistency on unavailable exceptions
         retry, consistency = policy.on_unavailable(
