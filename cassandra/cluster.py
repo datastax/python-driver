@@ -364,7 +364,7 @@ class Cluster(object):
         """
         with self._lock:
             if self._is_shutdown:
-                return
+                raise Exception("The Cluster was already shutdown")
             else:
                 self._is_shutdown = True
 
