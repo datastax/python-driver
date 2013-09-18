@@ -313,6 +313,7 @@ class Cluster(object):
         if self.auth_provider:
             kwargs['credentials'] = self.auth_provider(address)
 
+        kwargs['port'] = self.port
         kwargs['compression'] = self.compression
         kwargs['sockopts'] = self.sockopts
 
@@ -322,6 +323,7 @@ class Cluster(object):
         if self.auth_provider:
             kwargs['credentials'] = self.auth_provider(host)
 
+        kwargs['port'] = self.port
         kwargs['compression'] = self.compression
         kwargs['sockopts'] = self.sockopts
 
