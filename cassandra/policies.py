@@ -71,7 +71,7 @@ class LoadBalancingPolicy(object):
         """
         raise NotImplementedError()
 
-    def make_query_plan(self, query=None):
+    def make_query_plan(self, working_keyspace=None, query=None):
         """
         Given a :class:`~.query.Query` instance, return a iterable
         of :class:`.Host` instances which should be queried in that
@@ -80,6 +80,10 @@ class LoadBalancingPolicy(object):
 
         Note that the `query` argument may be :const:`None` when preparing
         statements.
+
+        `working_keyspace` should be the string name of the current keyspace,
+        as set through :meth:`.Session.set_keyspace()` or with a ``USE``
+        statement.
         """
         raise NotImplementedError()
 
@@ -133,7 +137,7 @@ class RoundRobinPolicy(LoadBalancingPolicy):
     def distance(self, host):
         return HostDistance.LOCAL
 
-    def make_query_plan(self, query=None):
+    def make_query_plan(self, working_keyspace=None, query=None):
         # not thread-safe, but we don't care much about lost increments
         # for the purposes of load balancing
         pos = self._position
@@ -219,7 +223,7 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
             else:
                 return HostDistance.IGNORED
 
-    def make_query_plan(self, query=None):
+    def make_query_plan(self, working_keyspace=None, query=None):
         # not thread-safe, but we don't care much about lost increments
         # for the purposes of load balancing
         pos = self._position
@@ -278,24 +282,29 @@ class TokenAwarePolicy(LoadBalancingPolicy):
     def distance(self, *args, **kwargs):
         return self.child_policy.distance(*args, **kwargs)
 
-    def make_query_plan(self, query=None):
+    def make_query_plan(self, working_keyspace=None, query=None):
+        if query and query.keyspace:
+            keyspace = query.keyspace
+        else:
+            keyspace = working_keyspace
+
         child = self.child_policy
         if query is None:
-            for host in child.make_query_plan(query):
+            for host in child.make_query_plan(keyspace, query):
                 yield host
         else:
             routing_key = query.routing_key
             if routing_key is None:
-                for host in child.make_query_plan(query):
+                for host in child.make_query_plan(keyspace, query):
                     yield host
             else:
-                replicas = self._cluster_metadata.get_replicas(routing_key)
+                replicas = self._cluster_metadata.get_replicas(keyspace, routing_key)
                 for replica in replicas:
                     if replica.monitor.is_up and \
                             child.distance(replica) == HostDistance.LOCAL:
                         yield replica
 
-                for host in child.make_query_plan(query):
+                for host in child.make_query_plan(keyspace, query):
                     # skip if we've already listed this host
                     if host not in replicas or \
                             child.distance(host) == HostDistance.REMOTE:

@@ -1,10 +1,10 @@
 try:
     import unittest2 as unittest
 except ImportError:
-    import unittest
+    import unittest # noqa
 
 from cassandra.cluster import Cluster
-from cassandra.metadata import TableMetadata, Token, MD5Token, TokenMap
+from cassandra.metadata import KeyspaceMetadata, TableMetadata, Token, MD5Token, TokenMap
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
@@ -120,8 +120,8 @@ class SchemaMetadataTest(unittest.TestCase):
 
         self.assertEqual(ksmeta.name, self.ksname)
         self.assertTrue(ksmeta.durable_writes)
-        self.assertTrue(ksmeta.replication['class'].endswith('SimpleStrategy'))
-        self.assertEqual(ksmeta.replication['replication_factor'], '1')
+        self.assertEqual(ksmeta.replication_strategy.name, 'SimpleStrategy')
+        self.assertEqual(ksmeta.replication_strategy.replication_factor, 1)
 
         self.assertTrue(self.cfname in ksmeta.tables)
         tablemeta = ksmeta.tables[self.cfname]
@@ -286,27 +286,27 @@ class TokenMetadataTest(unittest.TestCase):
         tmap = cluster.metadata.token_map
         self.assertTrue(issubclass(tmap.token_class, Token))
         self.assertEqual(expected_node_count, len(tmap.ring))
-        self.assertEqual(expected_node_count, len(tmap.tokens_to_hosts))
         cluster.shutdown()
 
     def test_getting_replicas(self):
         tokens = [MD5Token(str(i)) for i in range(0, (2 ** 127 - 1), 2 ** 125)]
         hosts = [Host("ip%d" % i, SimpleConvictionPolicy) for i in range(len(tokens))]
-        tokens_to_hosts = dict((t, set([h])) for t, h in zip(tokens, hosts))
-        token_map = TokenMap(MD5Token, tokens_to_hosts, tokens)
+        token_to_primary_replica = dict(zip(tokens, hosts))
+        keyspace = KeyspaceMetadata("ks", True, "SimpleStrategy", {"replication_factor": "1"})
+        token_map = TokenMap(MD5Token, token_to_primary_replica, tokens, [keyspace])
 
         # tokens match node tokens exactly
         for token, expected_host in zip(tokens, hosts):
-            replicas = token_map.get_replicas(token)
+            replicas = token_map.get_replicas("ks", token)
             self.assertEqual(replicas, set([expected_host]))
 
         # shift the tokens back by one
         for token, expected_host in zip(tokens[1:], hosts[1:]):
-            replicas = token_map.get_replicas(MD5Token(str(token.value - 1)))
+            replicas = token_map.get_replicas("ks", MD5Token(str(token.value - 1)))
             self.assertEqual(replicas, set([expected_host]))
 
         # shift the tokens forward by one
         for i, token in enumerate(tokens):
-            replicas = token_map.get_replicas(MD5Token(str(token.value + 1)))
+            replicas = token_map.get_replicas("ks", MD5Token(str(token.value + 1)))
             expected_host = hosts[(i + 1) % len(hosts)]
             self.assertEqual(replicas, set([expected_host]))

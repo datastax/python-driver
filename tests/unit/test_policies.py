@@ -181,7 +181,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
         cluster.metadata = Mock(spec=Metadata)
         hosts = [Host(str(i), SimpleConvictionPolicy) for i in range(4)]
 
-        def get_replicas(packed_key):
+        def get_replicas(keyspace, packed_key):
             index = struct.unpack('>i', packed_key)[0]
             return list(islice(cycle(hosts), index, index + 2))
 
@@ -192,9 +192,9 @@ class TokenAwarePolicyTest(unittest.TestCase):
 
         for i in range(4):
             query = Query(routing_key=struct.pack('>i', i))
-            qplan = list(policy.make_query_plan(query))
+            qplan = list(policy.make_query_plan(None, query))
 
-            replicas = get_replicas(struct.pack('>i', i))
+            replicas = get_replicas(None, struct.pack('>i', i))
             other = set(h for h in hosts if h not in replicas)
             self.assertEquals(replicas, qplan[:2])
             self.assertEquals(other, set(qplan[2:]))
@@ -208,7 +208,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
         for h in hosts[2:]:
             h.set_location_info("dc2", "rack1")
 
-        def get_replicas(packed_key):
+        def get_replicas(keyspace, packed_key):
             index = struct.unpack('>i', packed_key)[0]
             # return one node from each DC
             if index % 2 == 0:
@@ -223,8 +223,8 @@ class TokenAwarePolicyTest(unittest.TestCase):
 
         for i in range(4):
             query = Query(routing_key=struct.pack('>i', i))
-            qplan = list(policy.make_query_plan(query))
-            replicas = get_replicas(struct.pack('>i', i))
+            qplan = list(policy.make_query_plan(None, query))
+            replicas = get_replicas(None, struct.pack('>i', i))
 
             # first should be the only local replica
             self.assertIn(qplan[0], replicas)

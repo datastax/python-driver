@@ -263,18 +263,20 @@ class Metadata(object):
             self.token_map = None
             return
 
-        tokens_to_hosts = defaultdict(set)
+        token_to_primary_replica = {}
         ring = []
         for host, token_strings in token_map.iteritems():
             for token_string in token_strings:
                 token = token_class(token_string)
                 ring.append(token)
-                tokens_to_hosts[token].add(host)
+                token_to_primary_replica[token] = host
 
-        ring = sorted(ring)
-        self.token_map = TokenMap(token_class, tokens_to_hosts, ring)
+        all_tokens = sorted(ring)
+        self.token_map = TokenMap(
+                token_class, token_to_primary_replica, all_tokens,
+                self.keyspaces.values())
 
-    def get_replicas(self, key):
+    def get_replicas(self, keyspace, key):
         """
         Returns a list of :class:`.Host` instances that are replicas for a given
         partition key.
@@ -283,7 +285,7 @@ class Metadata(object):
         if not t:
             return []
         try:
-            return t.get_replicas(t.token_class.from_key(key))
+            return t.get_replicas(keyspace, t.token_class.from_key(key))
         except NoMurmur3:
             return []
 
@@ -344,14 +346,15 @@ class SimpleStrategy(ReplicationStrategy):
     replication_factor = None
 
     def __init__(self, replication_factor):
-        self.replication_factor = replication_factor
+        self.replication_factor = int(replication_factor)
 
     def make_token_replica_map(self, token_to_primary_replica, ring):
         replica_map = {}
         for i in range(len(ring)):
             j, hosts = 0, set()
             while len(hosts) < self.replication_factor and j < len(ring):
-                hosts.add(token_to_primary_replica[ring[(i + j) % len(ring)]])
+                token = ring[(i + j) % len(ring)]
+                hosts.add(token_to_primary_replica[token])
                 j += 1
 
             replica_map[ring[i]] = hosts
@@ -399,6 +402,7 @@ class NetworkTopologyStrategy(ReplicationStrategy):
         for dc, repl_factor in self.dc_replication_factors:
             ret += ", '%s': '%d'" % (dc, repl_factor)
         return ret + "}"
+
 
 class KeyspaceMetadata(object):
     """
@@ -708,9 +712,10 @@ class TokenMap(object):
     A subclass of :class:`.Token`, depending on what partitioner the cluster uses.
     """
 
-    tokens_to_hosts = None
+    tokens_to_hosts_by_ks = None
     """
-    A map of :class:`.Token` objects to :class:`.Host` objects.
+    A map of keyspace names to a nested map of :class:`.Token` objects to
+    sets of :class:`.Host` objects.
     """
 
     ring = None
@@ -718,25 +723,39 @@ class TokenMap(object):
     An ordered list of :class:`.Token` instances in the ring.
     """
 
-    def __init__(self, token_class, tokens_to_hosts, ring):
+    def __init__(self, token_class, token_to_primary_replica, all_tokens, keyspaces):
         self.token_class = token_class
-        self.tokens_to_hosts = tokens_to_hosts
-        self.ring = ring
+        self.ring = all_tokens
 
-    def get_replicas(self, token):
+        self.tokens_to_hosts_by_ks = {}
+        for ks_metadata in keyspaces:
+            strategy = ks_metadata.replication_strategy
+            if strategy is None:
+                token_to_hosts = defaultdict(set)
+                for token, host in token_to_primary_replica.items():
+                    token_to_hosts[token].add(host)
+                self.tokens_to_hosts_by_ks[ks_metadata.name] = token_to_hosts
+            else:
+                self.tokens_to_hosts_by_ks[ks_metadata.name] = \
+                        strategy.make_token_replica_map(
+                                token_to_primary_replica, all_tokens)
+
+    def get_replicas(self, keyspace, token):
         """
-        Get :class:`.Host` instances representing all of the replica nodes
-        for a given :class:`.Token`.
+        Get  a set of :class:`.Host` instances representing all of the
+        replica nodes for a given :class:`.Token`.
         """
-        # TODO depending on keyspace and replication strategy options,
-        # return full set of replicas
+        tokens_to_hosts = self.tokens_to_hosts_by_ks.get(keyspace, None)
+        if tokens_to_hosts is None:
+            return set()
+
         point = bisect_left(self.ring, token)
         if point == 0 and token != self.ring[0]:
-            return self.tokens_to_hosts[self.ring[-1]]
+            return tokens_to_hosts[self.ring[-1]]
         elif point == len(self.ring):
-            return self.tokens_to_hosts[self.ring[0]]
+            return tokens_to_hosts[self.ring[0]]
         else:
-            return self.tokens_to_hosts[self.ring[point]]
+            return tokens_to_hosts[self.ring[point]]
 
 
 class Token(object):
@@ -785,6 +804,10 @@ class Murmur3Token(Token):
         """ `token` should be an int or string representing the token """
         self.value = int(token)
 
+    def __repr__(self):
+        return "<Murmur3Token: %r" % (self.value,)
+    __str__ = __repr__
+
 
 class MD5Token(Token):
     """
@@ -799,6 +822,10 @@ class MD5Token(Token):
         """ `token` should be an int or string representing the token """
         self.value = int(token)
 
+    def __repr__(self):
+        return "<MD5Token: %d" % (self.value,)
+    __str__ = __repr__
+
 
 class BytesToken(Token):
     """
@@ -812,3 +839,7 @@ class BytesToken(Token):
                 "Tokens for ByteOrderedPartitioner should be strings (got %s)"
                 % (type(token_string),))
         self.value = token_string
+
+    def __repr__(self):
+        return "<BytesToken: %r" % (self.value,)
+    __str__ = __repr__

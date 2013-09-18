@@ -930,10 +930,10 @@ class ControlConnection(object):
             except ConnectionException as exc:
                 errors[host.address] = exc
                 host.monitor.signal_connection_failure(exc)
-                log.warn("[control connection] Error connecting to %s: %s", host, exc)
+                log.warn("[control connection] Error connecting to %s:", host, exc_info=True)
             except Exception as exc:
                 errors[host.address] = exc
-                log.warn("[control connection] Error connecting to %s: %s", host, exc)
+                log.warn("[control connection] Error connecting to %s:", host, exc_info=True)
 
         raise NoHostAvailable("Unable to connect to any servers", errors)
 
@@ -1354,7 +1354,8 @@ class ResponseFuture(object):
         # convert the list/generator/etc to an iterator so that subsequent
         # calls to send_request (which retries may do) will resume where
         # they last left off
-        self.query_plan = iter(session._load_balancer.make_query_plan(query))
+        self.query_plan = iter(session._load_balancer.make_query_plan(
+            session.keyspace, query))
 
         self._event = Event()
         self._errors = {}

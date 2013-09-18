@@ -38,9 +38,16 @@ class Query(object):
     The :class:`.ConsistencyLevel` to be used for this operation.  Defaults
     to :attr:`.ConsistencyLevel.ONE`.
     """
+
+    keyspace = None
+    """
+    The string name of the keyspace this query acts on.
+    """
+
     _routing_key = None
 
-    def __init__(self, retry_policy=None, tracing_enabled=False, consistency_level=ConsistencyLevel.ONE, routing_key=None):
+    def __init__(self, retry_policy=None, tracing_enabled=False,
+                 consistency_level=ConsistencyLevel.ONE, routing_key=None):
         self.retry_policy = retry_policy
         self.tracing_enabled = tracing_enabled
         self.consistency_level = consistency_level
@@ -244,6 +251,14 @@ class BoundStatement(Query):
             self._routing_key = "".join(components)
 
         return self._routing_key
+
+    @property
+    def keyspace(self):
+        meta = self.prepared_statement.column_metadata
+        if meta:
+            return meta[0][0]
+        else:
+            return None
 
 
 class ValueSequence(object):
