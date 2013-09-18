@@ -529,7 +529,7 @@ class TableMetadata(object):
         if value is None:
             return 'NULL'
         if isinstance(value, bool):
-            value = str(value).lower()
+            return str(value)
         elif isinstance(value, float):
             return '%f' % value
         elif isinstance(value, int):
