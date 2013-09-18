@@ -314,6 +314,92 @@ class Metadata(object):
             return self._hosts.values()
 
 
+class ReplicationStrategy(object):
+
+    @classmethod
+    def create(cls, strategy_class, options_map):
+        if not strategy_class:
+            return None
+
+        if strategy_class.endswith("OldNetworkTopologyStrategy"):
+            return None
+        elif strategy_class.endswith("NetworkTopologyStrategy"):
+            return NetworkTopologyStrategy(options_map)
+        elif strategy_class.endswith("SimpleStrategy"):
+            repl_factor = options_map.get('replication_factor', None)
+            if not repl_factor:
+                return None
+            return SimpleStrategy(repl_factor)
+
+    def make_token_replica_map(token_to_primary_replica, ring):
+        raise NotImplementedError()
+
+    def export_for_schema(self):
+        raise NotImplementedError()
+
+
+class SimpleStrategy(ReplicationStrategy):
+
+    name = "SimpleStrategy"
+    replication_factor = None
+
+    def __init__(self, replication_factor):
+        self.replication_factor = replication_factor
+
+    def make_token_replica_map(self, token_to_primary_replica, ring):
+        replica_map = {}
+        for i in range(len(ring)):
+            j, hosts = 0, set()
+            while len(hosts) < self.replication_factor and j < len(ring):
+                hosts.add(token_to_primary_replica[ring[(i + j) % len(ring)]])
+                j += 1
+
+            replica_map[ring[i]] = hosts
+
+        return replica_map
+
+    def export_for_schema(self):
+        return "{'class': 'SimpleStrategy', 'replication_factor': '%d'}" \
+               % (self.replication_factor,)
+
+class NetworkTopologyStrategy(ReplicationStrategy):
+
+    name = "NetworkTopologyStrategy"
+    dc_replication_factors = None
+
+    def __init__(self, dc_replication_factors):
+        self.dc_replication_factors = dc_replication_factors
+
+    def make_token_replica_map(self, token_to_primary_replica, ring):
+        # note: this does not account for hosts having different racks
+        replica_map = {}
+        for i in range(len(ring)):
+            remaining = self.dc_replication_factors.copy()
+            for j in range(len(ring)):
+                host = token_to_primary_replica[ring[(i + j) % len(ring)]]
+                if not host.datacenter:
+                    continue
+
+                if not remaining[host.datacenter]:
+                    # we already have all replicas for this DC
+                    continue
+
+                replica_map[ring[i]].add(host)
+                remaining[host.datacenter] -= 1
+                if remaining[host.datacenter] == 0:
+                    del remaining[host.datacenter]
+
+                if not remaining:
+                    break
+
+        return replica_map
+
+    def export_for_schema(self):
+        ret = "{'class': 'NetworkTopologyStrategy'"
+        for dc, repl_factor in self.dc_replication_factors:
+            ret += ", '%s': '%d'" % (dc, repl_factor)
+        return ret + "}"
+
 class KeyspaceMetadata(object):
     """
     A representation of the schema for a single keyspace.
@@ -328,11 +414,9 @@ class KeyspaceMetadata(object):
     or not
     """
 
-    replication = None
+    replication_strategy = None
     """
-    A dict holding the replication settings for this keyspace. Typically,
-    there will be a "class" entry with the name of the replication strategy
-    class.
+    A :class:`.ReplicationStrategy` subclass object.
     """
 
     tables = None
@@ -343,21 +427,16 @@ class KeyspaceMetadata(object):
     def __init__(self, name, durable_writes, strategy_class, strategy_options):
         self.name = name
         self.durable_writes = durable_writes
-        self.replication = strategy_options
-        self.replication["class"] = strategy_class
+        self.replication_strategy = ReplicationStrategy.create(strategy_class, strategy_options)
         self.tables = {}
 
     def export_as_string(self):
         return "\n".join([self.as_cql_query()] + [t.as_cql_query() for t in self.tables.values()])
 
     def as_cql_query(self):
-        ret = "CREATE KEYSPACE %s WITH REPLICATION = { 'class' : '%s'" % \
-                (self.name, self.replication["class"])
-        for k, v in self.replication.items():
-            if k != "class":
-                ret += ", '%s': '%s'" % (k, v)
-        ret += ' } AND DURABLE_WRITES = %s;' % ("true" if self.durable_writes else "false")
-        return ret
+        ret = "CREATE KEYSPACE %s WITH REPLICATION = %s " % \
+              (self.name, self.replication_strategy.export_for_schema())
+        return ret + (' AND DURABLE_WRITES = %s;' % ("true" if self.durable_writes else "false"))
 
 
 class TableMetadata(object):
