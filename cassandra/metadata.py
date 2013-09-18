@@ -528,11 +528,7 @@ class TableMetadata(object):
     def protect_value(self, value):
         if value is None:
             return 'NULL'
-        if isinstance(value, bool):
-            return str(value)
-        elif isinstance(value, float):
-            return '%f' % value
-        elif isinstance(value, int):
+        if isinstance(value, (int, float, bool)):
             return str(value)
         return "'%s'" % value.replace("'", "''")
 
