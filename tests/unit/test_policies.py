@@ -17,7 +17,7 @@ from cassandra.policies import (RoundRobinPolicy, DCAwareRoundRobinPolicy,
                                 RetryPolicy, WriteType,
                                 DowngradingConsistencyRetryPolicy)
 from cassandra.pool import Host
-from cassandra.query import Query
+from cassandra.query import Statement
 
 class TestRoundRobinPolicy(unittest.TestCase):
 
@@ -191,7 +191,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
         policy.populate(cluster, hosts)
 
         for i in range(4):
-            query = Query(routing_key=struct.pack('>i', i))
+            query = Statement(routing_key=struct.pack('>i', i))
             qplan = list(policy.make_query_plan(None, query))
 
             replicas = get_replicas(None, struct.pack('>i', i))
@@ -222,7 +222,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
         policy.populate(cluster, hosts)
 
         for i in range(4):
-            query = Query(routing_key=struct.pack('>i', i))
+            query = Statement(routing_key=struct.pack('>i', i))
             qplan = list(policy.make_query_plan(None, query))
             replicas = get_replicas(None, struct.pack('>i', i))
 

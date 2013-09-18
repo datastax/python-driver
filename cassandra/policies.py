@@ -73,7 +73,7 @@ class LoadBalancingPolicy(object):
 
     def make_query_plan(self, working_keyspace=None, query=None):
         """
-        Given a :class:`~.query.Query` instance, return a iterable
+        Given a :class:`~.query.Statement` instance, return a iterable
         of :class:`.Host` instances which should be queried in that
         order.  A generator may work well for custom implementations
         of this method.
@@ -261,11 +261,11 @@ class TokenAwarePolicy(LoadBalancingPolicy):
 
     This alters the child policy's behavior so that it first attempts to
     send queries to :attr:`~.HostDistance.LOCAL` replicas (as determined
-    by the child policy) based on the :class:`.Query`'s
-    :attr:`~.Query.routing_key`.  Once those hosts are exhausted, the
+    by the child policy) based on the :class:`.Statement`'s
+    :attr:`~.Statement.routing_key`.  Once those hosts are exhausted, the
     remaining hosts in the child policy's query plan will be used.
 
-    If no :attr:`~.Query.routing_key` is set on the query, the child
+    If no :attr:`~.Statement.routing_key` is set on the query, the child
     policy's query plan will be used as is.
     """
 
@@ -482,7 +482,7 @@ class RetryPolicy(object):
     :attr:`.Cluster.default_retry_policy` attribute to an instance of this
     class or one of its subclasses.
 
-    To specify a retry policy per query, set the :attr:`.Query.retry_policy`
+    To specify a retry policy per query, set the :attr:`.Statement.retry_policy`
     attribute to an instance of this class or one of its subclasses.
 
     If custom behavior is needed for retrying certain operations,
@@ -516,7 +516,7 @@ class RetryPolicy(object):
         as :attr:`.RETRY`) and a :class:`.ConsistencyLevel` to retry the
         operation at or :const:`None` to keep the same consistency level.
 
-        `query` is the :class:`.Query` that timed out.
+        `query` is the :class:`.Statement` that timed out.
 
         `consistency` is the :class:`.ConsistencyLevel` that the operation was
         attempted at.
@@ -546,7 +546,7 @@ class RetryPolicy(object):
         This is called when a write operation times out from the coordinator's
         perspective (i.e. a replica did not respond to the coordinator in time).
 
-        `query` is the :class:`.Query` that timed out.
+        `query` is the :class:`.Statement` that timed out.
 
         `consistency` is the :class:`.ConsistencyLevel` that the operation was
         attempted at.
@@ -581,7 +581,7 @@ class RetryPolicy(object):
         This means that the read or write operation was never forwared to
         any replicas.
 
-        `query` is the :class:`.Query` that failed.
+        `query` is the :class:`.Statement` that failed.
 
         `consistency` is the :class:`.ConsistencyLevel` that the operation was
         attempted at.

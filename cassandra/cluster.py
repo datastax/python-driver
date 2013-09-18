@@ -34,7 +34,7 @@ from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy)
 from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
-                             bind_params, QueryTrace, Query)
+                             bind_params, QueryTrace, Statement)
 from cassandra.pool import (_ReconnectionHandler, _HostReconnectionHandler,
                             HostConnectionPool)
 
@@ -126,7 +126,7 @@ class Cluster(object):
     default_retry_policy = RetryPolicy()
     """
     A default :class:`.policies.RetryPolicy` instance to use for all
-    :class:`.Query` objects which do not have a :attr:`~.Query.retry_policy`
+    :class:`.Statement` objects which do not have a :attr:`~.Statement.retry_policy`
     explicitly set.
     """
 
@@ -589,7 +589,7 @@ class Session(object):
         If an error is encountered while executing the query, an Exception
         will be raised.
 
-        `query` may be a query string or an instance of :class:`cassandra.query.Query`.
+        `query` may be a query string or an instance of :class:`cassandra.query.Statement`.
 
         `parameters` may be a sequence or dict of parameters to bind.  If a
         sequence is used, ``%s`` should be used the placeholder for each
@@ -598,16 +598,16 @@ class Session(object):
 
         If `trace` is set to :const:`True`, an attempt will be made to
         fetch the trace details and attach them to the `query`'s
-        :attr:`~.Query.trace` attribute in the form of a :class:`.QueryTrace`
-        instance.  This requires that `query` be a :class:`.Query` subclass
+        :attr:`~.Statement.trace` attribute in the form of a :class:`.QueryTrace`
+        instance.  This requires that `query` be a :class:`.Statement` subclass
         instance and not just a string.  If there is an error fetching the
-        trace details, the :attr:`~.Query.trace` attribute will be left as
+        trace details, the :attr:`~.Statement.trace` attribute will be left as
         :const:`None`.
         """
-        if trace and not isinstance(query, Query):
+        if trace and not isinstance(query, Statement):
             raise TypeError(
                 "The query argument must be an instance of a subclass of "
-                "cassandra.query.Query when trace=True")
+                "cassandra.query.Statement when trace=True")
 
         future = self.execute_async(query, parameters, trace)
         try:

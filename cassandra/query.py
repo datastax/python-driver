@@ -13,7 +13,7 @@ from cassandra.cqltypes import unix_time_from_uuid1
 from cassandra.decoder import (cql_encoders, cql_encode_object,
                                cql_encode_sequence)
 
-class Query(object):
+class Statement(object):
     """
     An abstract class representing a single query. There are two subclasses:
     :class:`.SimpleStatement` and :class:`.BoundStatement`.  These can
@@ -37,11 +37,6 @@ class Query(object):
     """
     The :class:`.ConsistencyLevel` to be used for this operation.  Defaults
     to :attr:`.ConsistencyLevel.ONE`.
-    """
-
-    keyspace = None
-    """
-    The string name of the keyspace this query acts on.
     """
 
     _routing_key = None
@@ -79,9 +74,17 @@ class Query(object):
         components should be strings.
         """)
 
-class SimpleStatement(Query):
+    @property
+    def keyspace(self):
+        """
+        The string name of the keyspace this query acts on.
+        """
+        return None
+
+
+class SimpleStatement(Statement):
     """
-    A simple, un-prepared query.  All attributes of :class:`Query` apply
+    A simple, un-prepared query.  All attributes of :class:`Statement` apply
     to this class as well.
     """
 
@@ -91,7 +94,7 @@ class SimpleStatement(Query):
         of parameter placeholders that will be filled through the
         `parameters` argument of :meth:`.Session.execute()`.
         """
-        Query.__init__(self, *args, **kwargs)
+        Statement.__init__(self, *args, **kwargs)
         self._query_string = query_string
 
     @property
@@ -169,12 +172,12 @@ class PreparedStatement(object):
                 (self.query_string, consistency))
 
 
-class BoundStatement(Query):
+class BoundStatement(Statement):
     """
     A prepared statement that has been bound to a particular set of values.
     These may be created directly or through :meth:`.PreparedStatement.bind()`.
 
-    All attributes of :class:`Query` apply to this class as well.
+    All attributes of :class:`Statement` apply to this class as well.
     """
 
     prepared_statement = None
@@ -190,13 +193,13 @@ class BoundStatement(Query):
     def __init__(self, prepared_statement, *args, **kwargs):
         """
         `prepared_statement` should be an instance of :class:`PreparedStatement`.
-        All other ``*args`` and ``**kwargs`` will be passed to :class:`.Query`.
+        All other ``*args`` and ``**kwargs`` will be passed to :class:`.Statement`.
         """
         self.consistency_level = prepared_statement.consistency_level
         self.prepared_statement = prepared_statement
         self.values = []
 
-        Query.__init__(self, *args, **kwargs)
+        Statement.__init__(self, *args, **kwargs)
 
     def bind(self, values):
         """
