@@ -76,13 +76,15 @@ On RHEL/CentOS/Fedora::
     $ sudo yum install libev libev-devel
 
 If you're on Mac OS X, you should be able to install libev
-through `Homebrew <http://brew.sh/>`_. For example, on Mac OS X:
+through `Homebrew <http://brew.sh/>`_. For example, on Mac OS X::
 
     $ brew install libev
 
 If successful, you should be able to build and install the extension
 (just using ``setup.py build`` or ``setup.py install``) and then use
-the libev event loop by doing the following::
+the libev event loop by doing the following:
+
+.. code-block:: python
 
     >>> from cassandra.io.libevreactor import LibevConnection
     >>> from cassandra.cluster import Cluster
