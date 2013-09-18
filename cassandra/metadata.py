@@ -714,7 +714,7 @@ class MD5Token(Token):
 
     @classmethod
     def hash_fn(cls, key):
-        return abs(varint_unpack(md5('foo').digest()))
+        return abs(varint_unpack(md5(key).digest()))
 
     def __init__(self, token):
         """ `token` should be an int or string representing the token """
