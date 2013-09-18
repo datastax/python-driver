@@ -29,11 +29,11 @@ Installation
 If you would like to use the optional C extensions, please follow
 the instructions in the section below before installing the driver.
 
-Installation through pip is recommended:
+Installation through pip is recommended::
 
     $ sudo pip install cassandra-driver
 
-If you want to install manually, you can instead do:
+If you want to install manually, you can instead do::
 
     $ sudo pip install futures scales blist # install dependencies
     $ sudo python setup.py install
@@ -50,11 +50,11 @@ option, or selectively disable one or the other with ``--no-murmur3`` and
 
 To compile the extenions, ensure that GCC and the Python headers are available.
 
-On Ubuntu and Debian, this can be accomplished by running:
+On Ubuntu and Debian, this can be accomplished by running::
 
     $ sudo apt-get install build-essential python-dev
 
-On RedHat and RedHat-based systems like CentOS and Fedora:
+On RedHat and RedHat-based systems like CentOS and Fedora::
 
     $ sudo yum install gcc python-devel
 
@@ -67,11 +67,11 @@ event loop.  For better performance, ``libev`` is also supported through
 a C extension.
 
 If you're on Linux, you should be able to install libev
-through a package manager.  For example, on Debian/Ubuntu:
+through a package manager.  For example, on Debian/Ubuntu::
 
     $ sudo apt-get install libev4 libev-dev
 
-On RHEL/CentOS/Fedora:
+On RHEL/CentOS/Fedora::
 
     $ sudo yum install libev libev-devel
 
@@ -82,7 +82,7 @@ through `Homebrew <http://brew.sh/>`_. For example, on Mac OS X:
 
 If successful, you should be able to build and install the extension
 (just using ``setup.py build`` or ``setup.py install``) and then use
-the libev event loop by doing the following
+the libev event loop by doing the following::
 
     >>> from cassandra.io.libevreactor import LibevConnection
     >>> from cassandra.cluster import Cluster
