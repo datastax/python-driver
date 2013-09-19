@@ -104,6 +104,7 @@ class LibevConnection(Connection):
         self.deque = deque()
 
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._socket.settimeout(1.0)  # TODO potentially make this value configurable
         self._socket.connect((self.host, self.port))
         self._socket.setblocking(0)
 

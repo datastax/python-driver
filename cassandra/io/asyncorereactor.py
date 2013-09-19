@@ -1,16 +1,18 @@
 from collections import defaultdict, deque
 from functools import partial
 import logging
+import os
 import socket
 import sys
 from threading import Event, Lock, Thread
 import traceback
 from Queue import Queue
+from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL, EISCONN, errorcode
 
 import asyncore
 
 from cassandra.connection import (Connection, ResponseWaiter, ConnectionShutdown,
-                                  ConnectionBusy, NONBLOCKING)
+                                  ConnectionBusy, ConnectionException, NONBLOCKING)
 from cassandra.decoder import RegisterMessage
 from cassandra.marshal import int32_unpack
 
@@ -96,7 +98,6 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         with _starting_conns_lock:
             _starting_conns.add(self)
 
-        log.debug("Opening socket to %s", self.host)
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect((self.host, self.port))
 
@@ -109,6 +110,30 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
 
         # start the global event loop if needed
         _start_loop()
+
+    def create_socket(self, family, type):
+        # copied from asyncore, but with the line to set the socket in
+        # non-blocking mode removed (we will do that after connecting)
+        self.family_and_type = family, type
+        sock = socket.socket(family, type)
+        self.set_socket(sock)
+
+    def connect(self, address):
+        # this is copied directly from asyncore.py, except that
+        # a timeout is set before connecting
+        self.connected = False
+        self.connecting = True
+        self.socket.settimeout(1.0)
+        err = self.socket.connect_ex(address)
+        if err in (EINPROGRESS, EALREADY, EWOULDBLOCK) \
+        or err == EINVAL and os.name in ('nt', 'ce'):
+            raise ConnectionException("Timed out connecting to %s" % (address[0]))
+        if err in (0, EISCONN):
+            self.addr = address
+            self.setblocking(0)
+            self.handle_connect_event()
+        else:
+            raise socket.error(err, errorcode[err])
 
     def close(self):
         with self.lock:
