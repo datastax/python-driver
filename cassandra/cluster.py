@@ -181,6 +181,23 @@ class Cluster(object):
     If ``libev`` is installed, ``LibevConnection`` will be used instead.
     """
 
+    remotehost_map = None
+    """
+        For EC2, its normal to have the node's use the internal/private IP
+        address.  Unfortunately when trying to interact with the cluster
+        externally, it becomes problematic as contact_points's is largely
+        ignored and the internal ip's are used which are inaccessible unless
+        using a VPN.
+
+        A valid remote map would be:
+            remotehost_map[internal private ip] = external public ip/dns
+
+        where `internal private ip` is a value in system.peers
+
+        Note: assumes system.peers rpc_address == 0.0.0.0
+    """
+
+
     sessions = None
     control_connection = None
     scheduler = None
@@ -202,7 +219,8 @@ class Cluster(object):
                  connection_class=None,
                  sockopts=None,
                  executor_threads=2,
-                 max_schema_agreement_wait=10):
+                 max_schema_agreement_wait=10,
+                 remotehost_map=None):
         """
         Any of the mutable Cluster attributes may be set as keyword arguments
         to the constructor.
@@ -237,6 +255,8 @@ class Cluster(object):
         self.metrics_enabled = metrics_enabled
         self.sockopts = sockopts
         self.max_schema_agreement_wait = max_schema_agreement_wait
+
+        self.remotehost_map = remotehost_map or None
 
         # let Session objects be GC'ed (and shutdown) when the user no longer
         # holds a reference. Normally the cycle detector would handle this,
@@ -1096,12 +1116,20 @@ class ControlConnection(object):
                 token_map[host] = tokens
 
         found_hosts = set()
+        has_map = self._cluster.remotehost_map is not None
+
         for row in peers_result:
             addr = row.get("rpc_address")
 
             # TODO handle ipv6 equivalent
             if not addr or addr == "0.0.0.0":
-                addr = row.get("peer")
+                peer_ip = row.get("peer")
+                if has_map and self._cluster.remotehost_map.get(peer_ip, False):
+                    addr = self._cluster.remotehost_map.get(peer_ip)
+                else:
+                    addr = peer_ip
+
+                del peer_ip
 
             found_hosts.add(addr)
 
