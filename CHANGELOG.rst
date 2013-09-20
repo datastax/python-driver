@@ -1,6 +1,6 @@
 1.0.0-beta3
 ===========
-(In progress)
+Sep 20, 2013
 
 Features
 --------
@@ -25,6 +25,7 @@ Bug Fixes
 * Avoid a potential loss of precision on float constants due to string
   formatting
 * Actually utilize non-standard ports set on Cluster objects
+* Fix export of schema as a set of CQL queries
 
 Other
 -----
@@ -33,6 +34,7 @@ Other
 * Raise InvalidTypeParameterError when parameters of the wrong
   type are used with statements
 * Make all tests compatible with Python 2.6
+* Add 1s timeout for opening new connections
 
 1.0.0-beta2
 ===========
