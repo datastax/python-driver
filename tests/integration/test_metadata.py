@@ -3,12 +3,10 @@ try:
 except ImportError:
     import unittest # noqa
 
-import cassandra
 from cassandra import AlreadyExists
 
 from cassandra.cluster import Cluster
 from cassandra.metadata import KeyspaceMetadata, TableMetadata, Token, MD5Token, TokenMap
-from cassandra.metadata import TableMetadata, Token, MD5Token, TokenMap, Murmur3Token
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
@@ -351,7 +349,6 @@ class TestCodeCoverage(unittest.TestCase):
         host = list(cluster.metadata.get_replicas('test3rf', 'key'))[0]
         self.assertEqual(host.datacenter, 'datacenter1')
         self.assertEqual(host.rack, 'rack1')
-        self.assertEqual(host.address, '127.0.0.2')
 
     def test_token_map(self):
         """
@@ -361,16 +358,16 @@ class TestCodeCoverage(unittest.TestCase):
         cluster = Cluster()
         cluster.connect('test3rf')
         ring = cluster.metadata.token_map.ring
+        owners = list(cluster.metadata.token_map.token_to_host_owner[token] for token in ring)
+        get_replicas = cluster.metadata.token_map.get_replicas
 
-        # BUG: The next line fails
-        self.assertNotEqual(list(cluster.metadata.token_map.get_replicas('test3rf', ring[0])), [])
-        self.assertEqual(list(cluster.metadata.token_map.get_replicas('test3rf', ring[0]))[0].address, '127.0.0.1')
-        self.assertEqual(list(cluster.metadata.token_map.get_replicas('test3rf', ring[1]))[0].address, '127.0.0.2')
-        self.assertEqual(list(cluster.metadata.token_map.get_replicas('test3rf', ring[2]))[0].address, '127.0.0.3')
+        for ksname in ('test1rf', 'test2rf', 'test3rf'):
+            self.assertNotEqual(list(get_replicas('test3rf', ring[0])), [])
 
-        self.assertEqual(list(cluster.metadata.token_map.get_replicas('test3rf', Murmur3Token(ring[0].value - 1)))[0].address, '127.0.0.3')
-        self.assertEqual(list(cluster.metadata.token_map.get_replicas('test3rf', Murmur3Token(ring[1].value - 1)))[0].address, '127.0.0.1')
-        self.assertEqual(list(cluster.metadata.token_map.get_replicas('test3rf', Murmur3Token(ring[2].value - 1)))[0].address, '127.0.0.2')
+        for i, token in enumerate(ring):
+            self.assertEqual(get_replicas('test3rf', token), set(owners))
+            self.assertEqual(get_replicas('test2rf', token), set([owners[i], owners[(i + 1) % 3]]))
+            self.assertEqual(get_replicas('test1rf', token), set([owners[i]]))
 
 
 class TokenMetadataTest(unittest.TestCase):

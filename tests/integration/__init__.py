@@ -57,25 +57,33 @@ def setup_test_keyspace():
     cluster = Cluster()
     session = cluster.connect()
 
-    ksname = 'test3rf'
-    cfname = 'test'
-
     try:
         results = session.execute("SELECT keyspace_name FROM system.schema_keyspaces")
         existing_keyspaces = [row[0] for row in results]
-        if ksname in existing_keyspaces:
-            session.execute("DROP KEYSPACE %s" % ksname)
+        for ksname in ('test1rf', 'test2rf', 'test3rf'):
+            if ksname in existing_keyspaces:
+                session.execute("DROP KEYSPACE %s" % ksname)
 
         ddl = '''
-            CREATE KEYSPACE %s
+            CREATE KEYSPACE test3rf
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '3'}'''
-        session.execute(ddl % ksname)
+        session.execute(ddl)
 
         ddl = '''
-            CREATE TABLE %s.%s (
+            CREATE KEYSPACE test2rf
+            WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '2'}'''
+        session.execute(ddl)
+
+        ddl = '''
+            CREATE KEYSPACE test1rf
+            WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}'''
+        session.execute(ddl)
+
+        ddl = '''
+            CREATE TABLE test3rf.test (
                 k int PRIMARY KEY,
                 v int )'''
-        session.execute(ddl % (ksname, cfname))
+        session.execute(ddl)
     finally:
         cluster.shutdown()
 
