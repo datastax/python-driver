@@ -9,9 +9,52 @@ from uuid import uuid1, uuid4
 
 from blist import sortedset
 
+from cassandra import InvalidRequest
 from cassandra.cluster import Cluster
 
 class TypeTests(unittest.TestCase):
+    def test_blob_type(self):
+        c = Cluster()
+        s = c.connect()
+        s.execute("""
+            CREATE KEYSPACE IF NOT EXISTS typetests_blob
+            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}
+            """)
+        s.set_keyspace("typetests_blob")
+        s.execute("""
+            CREATE TABLE IF NOT EXISTS mytable (
+                a ascii,
+                b blob,
+                PRIMARY KEY (a)
+            )
+        """)
+
+        params = [
+            'key1',
+            'blob'
+        ]
+
+        # Invalid type, blob can't be specified as a string
+        query = 'INSERT INTO mytable (a, b) VALUES (%s, %s)'
+        msg = r'.*Invalid STRING constant \(blob\) for b of type blob.*'
+        self.assertRaisesRegexp(InvalidRequest, msg, s.execute, query, params)
+
+        # Valid types
+        params = [
+            'key2',
+            bytearray('blob1', 'hex')
+        ]
+        s.execute(query, params)
+
+        expected_vals = [
+            'key2',
+            bytearray('blob1', 'hex')
+        ]
+
+        results = s.execute("SELECT * FROM mytable")
+
+        for expected, actual in zip(expected_vals, results[0]):
+            self.assertEquals(expected, actual)
 
     def test_basic_types(self):
         c = Cluster()
