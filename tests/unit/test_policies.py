@@ -278,13 +278,6 @@ class TokenAwarePolicyTest(unittest.TestCase):
 
         # Should use the secondary policy
         for i in range(4):
-            query = Query()
-            qplan = list(policy.make_query_plan(query))
-
-            self.assertEquals(set(qplan), set(hosts))
-
-        # Should use the secondary policy
-        for i in range(4):
             qplan = list(policy.make_query_plan())
 
             self.assertEquals(set(qplan), set(hosts))
@@ -347,10 +340,7 @@ class SimpleConvictionPolicyTest(unittest.TestCase):
         """
 
         conviction_policy = SimpleConvictionPolicy(1)
-
-        # DISCUSS: Always return True?
         self.assertEqual(conviction_policy.add_failure(1), True)
-
         self.assertEqual(conviction_policy.reset(), None)
 
 
@@ -393,9 +383,12 @@ class ConstantReconnectionPolicyTest(unittest.TestCase):
 
         delay = 2
         max_attempts = -100
-        policy = ConstantReconnectionPolicy(delay=delay, max_attempts=max_attempts)
-        schedule = list(policy.new_schedule())
-        self.assertEqual(len(schedule), 0)
+
+        try:
+            policy = ConstantReconnectionPolicy(delay=delay, max_attempts=max_attempts)
+            self.fail('max_attempts should throw ValueError when negative')
+        except ValueError:
+            pass
 
 
 class ExponentialReconnectionPolicyTest(unittest.TestCase):

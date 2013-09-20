@@ -4,22 +4,21 @@ from cassandra.cluster import Cluster
 
 
 class QueryTest(unittest.TestCase):
-    # TODO: Cover routing keys
-    # def test_query(self):
-    #     cluster = Cluster()
-    #     session = cluster.connect()
-    #
-    #     prepared = session.prepare(
-    #         """
-    #         INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
-    #         """)
-    #
-    #     self.assertIsInstance(prepared, PreparedStatement)
-    #     bound = prepared.bind((1, None))
-    #     self.assertIsInstance(bound, BoundStatement)
-    #     session.execute(bound)
-    #
-    #     print bound.routing_key
+    def test_query(self):
+        cluster = Cluster()
+        session = cluster.connect()
+
+        prepared = session.prepare(
+            """
+            INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
+            """)
+
+        self.assertIsInstance(prepared, PreparedStatement)
+        bound = prepared.bind((1, None))
+        self.assertIsInstance(bound, BoundStatement)
+        session.execute(bound)
+        self.assertEqual(bound.routing_key, '\x00\x00\x00\x01')
+
 
     def test_value_sequence(self):
         """
@@ -43,3 +42,5 @@ class QueryTest(unittest.TestCase):
 
         # Ensure this does not throw an exception
         str(statement.trace)
+        for event in statement.trace.events:
+            str(event)

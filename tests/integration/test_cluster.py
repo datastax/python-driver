@@ -87,13 +87,14 @@ class ClusterTests(unittest.TestCase):
         Ensure that a cluster can be shutdown twice, without error
         """
 
-        # DISCUSS: Should we allow this?
-
         cluster = Cluster()
         cluster.shutdown()
 
-        # Shouldn't throw an error
-        cluster.shutdown()
+        try:
+            cluster.shutdown()
+            self.fail('A double cluster.shutdown() should throw an error.')
+        except Exception as e:
+            self.assertEqual(e.message, 'The Cluster was already shutdown')
 
     def test_connect_to_already_shutdown_cluster(self):
         """

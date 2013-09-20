@@ -38,7 +38,7 @@ def setup_package():
             cluster.clear()
         except Exception:
             log.debug("Creating new ccm test cluster")
-            cluster = CCMCluster(path, CLUSTER_NAME, cassandra_version='1.2.6')
+            cluster = CCMCluster(path, CLUSTER_NAME, cassandra_version='1.2.9')
             cluster.set_configuration_options({'start_native_transport': True})
             common.switch_cluster(path, CLUSTER_NAME)
             cluster.populate(3)

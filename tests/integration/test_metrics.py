@@ -14,19 +14,26 @@ class MetricsTests(unittest.TestCase):
         Trigger and ensure connection_errors are counted
         """
 
-        # DISCUSS: Doesn't trigger code coverage on cassandra.metrics.on_connection_error(). Find new example.
         cluster = Cluster(metrics_enabled=True)
         session = cluster.connect()
-
-        # Test write
         session.execute("USE test3rf")
+
+        # Test writes
+        for i in range(0, 100):
+            session.execute_async(
+                """
+                INSERT INTO test3rf.test (k, v) VALUES (%s, %s)
+                """ % (i, i))
 
         # Force kill cluster
         get_cluster().stop(wait=True, gently=False)
         try:
+            # Ensure the nodes are actually down
             self.assertRaises(NoHostAvailable, session.execute, "USE test3rf")
         finally:
             get_cluster().start(wait_for_binary_proto=True)
+
+        self.assertGreater(cluster.metrics.stats.connection_errors, 0)
 
     def test_write_timeout(self):
         """

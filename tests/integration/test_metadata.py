@@ -118,7 +118,7 @@ class SchemaMetadataTest(unittest.TestCase):
 
         meta = self.cluster.metadata
         self.assertNotEqual(meta.cluster_ref, None)
-        # self.assertNotEqual(meta.cluster_name, None)  # TODO needs to be fixed
+        self.assertNotEqual(meta.cluster_name, None)
         self.assertTrue(self.ksname in meta.keyspaces)
         ksmeta = meta.keyspaces[self.ksname]
 
@@ -285,18 +285,21 @@ class TestCodeCoverage(unittest.TestCase):
         cluster = Cluster()
         cluster.connect()
 
-        # BUG: Does not work
-        # print cluster.metadata.export_schema_as_string()
+        # BUG: cassandra.metadata:KeyspaceMetadata.as_cql_query() fails when self.name == 'system'
+        # because self.replication_strategy == None
+        # self.assertTrue(isinstance(cluster.metadata.export_schema_as_string(), str))
         # Traceback (most recent call last):
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/test_metadata.py", line 280, in test_export_schema
-        #     print cluster.metadata.export_schema_as_string()
+        #   File "/Users/joaquin/repos/python-driver/tests/integration/test_metadata.py", line 288, in test_export_schema
+        #     self.assertTrue(isinstance(cluster.metadata.export_schema_as_string(), str))
         #   File "/Users/joaquin/repos/python-driver/cassandra/metadata.py", line 71, in export_schema_as_string
         #     return "\n".join(ks.export_as_string() for ks in self.keyspaces.values())
         #   File "/Users/joaquin/repos/python-driver/cassandra/metadata.py", line 71, in <genexpr>
         #     return "\n".join(ks.export_as_string() for ks in self.keyspaces.values())
-        #   File "/Users/joaquin/repos/python-driver/cassandra/metadata.py", line 351, in export_as_string
+        #   File "/Users/joaquin/repos/python-driver/cassandra/metadata.py", line 438, in export_as_string
         #     return "\n".join([self.as_cql_query()] + [t.as_cql_query() for t in self.tables.values()])
-        # TypeError: sequence item 0: expected string, NoneType found
+        #   File "/Users/joaquin/repos/python-driver/cassandra/metadata.py", line 444, in as_cql_query
+        #     (self.name, self.replication_strategy.export_for_schema())
+        # AttributeError: 'NoneType' object has no attribute 'export_for_schema'
 
     def test_export_keyspace_schema(self):
         """
@@ -306,19 +309,11 @@ class TestCodeCoverage(unittest.TestCase):
         cluster = Cluster()
         cluster.connect()
 
-        # BUG: Attempting to check cassandra.metadata:350
-        # print cluster.metadata.keyspaces.export_as_string()
-        # Traceback (most recent call last):
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/test_metadata.py", line 296, in test_export_keyspace_schema
-        #     print cluster.metadata.keyspaces.export_as_string()
-        # AttributeError: 'dict' object has no attribute 'export_as_string'
-
-        # BUG: Attempting to check cassandra.metadata:353
-        # print cluster.metadata.keyspaces.as_cql_query()
-        # Traceback (most recent call last):
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/test_metadata.py", line 305, in test_export_keyspace_schema
-        #     print cluster.metadata.keyspaces.as_cql_query()
-        # AttributeError: 'dict' object has no attribute 'as_cql_query'
+        for keyspace in cluster.metadata.keyspaces:
+            if keyspace != 'system':
+                keyspace_metadata = cluster.metadata.keyspaces[keyspace]
+                self.assertTrue(isinstance(keyspace_metadata.export_as_string(), unicode))
+                self.assertTrue(isinstance(keyspace_metadata.as_cql_query(), unicode))
 
     def test_already_exists_exceptions(self):
         """
@@ -347,10 +342,13 @@ class TestCodeCoverage(unittest.TestCase):
         Ensure cluster.metadata.get_replicas return correctly when not attached to keyspace
         """
         cluster = Cluster()
-        self.assertEqual(cluster.metadata.get_replicas('key'), [])
+        self.assertEqual(cluster.metadata.get_replicas('test3rf', 'key'), [])
 
         cluster.connect('test3rf')
-        host = list(cluster.metadata.get_replicas('key'))[0]
+
+        # BUG: The next line fails
+        self.assertNotEqual(list(cluster.metadata.get_replicas('test3rf', 'key')), [])
+        host = list(cluster.metadata.get_replicas('test3rf', 'key'))[0]
         self.assertEqual(host.datacenter, 'datacenter1')
         self.assertEqual(host.rack, 'rack1')
         self.assertEqual(host.address, '127.0.0.2')
@@ -364,14 +362,15 @@ class TestCodeCoverage(unittest.TestCase):
         cluster.connect('test3rf')
         ring = cluster.metadata.token_map.ring
 
-        self.assertEqual(list(cluster.metadata.token_map.get_replicas(ring[0]))[0].address, '127.0.0.1')
-        self.assertEqual(list(cluster.metadata.token_map.get_replicas(ring[1]))[0].address, '127.0.0.2')
-        self.assertEqual(list(cluster.metadata.token_map.get_replicas(ring[2]))[0].address, '127.0.0.3')
+        # BUG: The next line fails
+        self.assertNotEqual(list(cluster.metadata.token_map.get_replicas('test3rf', ring[0])), [])
+        self.assertEqual(list(cluster.metadata.token_map.get_replicas('test3rf', ring[0]))[0].address, '127.0.0.1')
+        self.assertEqual(list(cluster.metadata.token_map.get_replicas('test3rf', ring[1]))[0].address, '127.0.0.2')
+        self.assertEqual(list(cluster.metadata.token_map.get_replicas('test3rf', ring[2]))[0].address, '127.0.0.3')
 
-        # BUG: I was specifically trying to ensure that tokens wrap around
-        self.assertEqual(list(cluster.metadata.token_map.get_replicas(Murmur3Token(ring[0].value - 1)))[0].address, '127.0.0.3')
-        # self.assertEqual(list(cluster.metadata.token_map.get_replicas(Murmur3Token(ring[1].value - 1)))[0].address, '127.0.0.1')
-        # self.assertEqual(list(cluster.metadata.token_map.get_replicas(Murmur3Token(ring[2].value - 1)))[0].address, '127.0.0.2')
+        self.assertEqual(list(cluster.metadata.token_map.get_replicas('test3rf', Murmur3Token(ring[0].value - 1)))[0].address, '127.0.0.3')
+        self.assertEqual(list(cluster.metadata.token_map.get_replicas('test3rf', Murmur3Token(ring[1].value - 1)))[0].address, '127.0.0.1')
+        self.assertEqual(list(cluster.metadata.token_map.get_replicas('test3rf', Murmur3Token(ring[2].value - 1)))[0].address, '127.0.0.2')
 
 
 class TokenMetadataTest(unittest.TestCase):

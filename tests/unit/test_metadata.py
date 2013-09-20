@@ -17,9 +17,8 @@ class TestMetadata(unittest.TestCase):
         self.assertEqual(table_metadata.protect_name('test\'s'), '"test\'s"')
         self.assertEqual(table_metadata.protect_name('test\'s'), "\"test's\"")
         self.assertEqual(table_metadata.protect_name('tests ?!@#$%^&*()'), '"tests ?!@#$%^&*()"')
-
-        # BUG: Or is this fine?
         self.assertEqual(table_metadata.protect_name('1'), '"1"')
+        self.assertEqual(table_metadata.protect_name('1test'), '"1test"')
 
     def test_protect_names(self):
         """
@@ -50,14 +49,12 @@ class TestMetadata(unittest.TestCase):
 
         table_metadata = TableMetadata('ks_name', 'table_name')
 
-        self.assertEqual(table_metadata.protect_value(True), "'true'")
-        self.assertEqual(table_metadata.protect_value(False), "'false'")
-        self.assertEqual(table_metadata.protect_value(3.14), '3.140000')
+        self.assertEqual(table_metadata.protect_value(True), "True")
+        self.assertEqual(table_metadata.protect_value(False), "False")
+        self.assertEqual(table_metadata.protect_value(3.14), '3.14')
         self.assertEqual(table_metadata.protect_value(3), '3')
         self.assertEqual(table_metadata.protect_value('test'), "'test'")
         self.assertEqual(table_metadata.protect_value('test\'s'), "'test''s'")
-
-        # BUG: Do we remove this altogether now?
         self.assertEqual(table_metadata.protect_value(None), 'NULL')
 
     def test_is_valid_name(self):
@@ -89,13 +86,16 @@ class TestMetadata(unittest.TestCase):
         self.assertEqual(murmur3_token.hash_fn(str(cassandra.metadata.MAX_LONG)), 7162290910810015547)
 
         md5_token = MD5Token(cassandra.metadata.MIN_LONG - 1)
-        # BUG: MD5Token always returns the same token
-        # self.assertNotEqual(md5_token.hash_fn('123'), 110673303387115207421586718101067225896)
-        # self.assertNotEqual(md5_token.hash_fn(str(cassandra.metadata.MAX_LONG)), 110673303387115207421586718101067225896)
+        self.assertEqual(md5_token.hash_fn('123'), 42767516990368493138776584305024125808L)
+        self.assertEqual(md5_token.hash_fn(str(cassandra.metadata.MAX_LONG)), 28528976619278518853815276204542453639L)
 
-        bytes_token = BytesToken(cassandra.metadata.MIN_LONG - 1)
+        bytes_token = BytesToken(str(cassandra.metadata.MIN_LONG - 1))
         self.assertEqual(bytes_token.hash_fn('123'), '123')
+        self.assertEqual(bytes_token.hash_fn(123), 123)
         self.assertEqual(bytes_token.hash_fn(str(cassandra.metadata.MAX_LONG)), str(cassandra.metadata.MAX_LONG))
 
-        # BUG? Should only accept strings?
-        self.assertEqual(bytes_token.hash_fn(123), '123')
+        try:
+            bytes_token = BytesToken(cassandra.metadata.MIN_LONG - 1)
+            self.fail('Tokens for ByteOrderedPartitioner should be only strings')
+        except TypeError:
+            pass
