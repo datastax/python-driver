@@ -10,19 +10,41 @@ from uuid import uuid1, uuid4
 from blist import sortedset
 
 from cassandra import InvalidRequest
-from cassandra.cluster import Cluster
+from cassandra.cluster import Cluster, NoHostAvailable
+
+CQL_TO_VERSION_MAP = {
+    '3.1.0': '2.0',
+    '3.0.5': '1.2'
+}
 
 class TypeTests(unittest.TestCase):
-    def test_blob_type(self):
+    def setUp(self):
+        super(TypeTests, self).setUp()
+
+        # TODO: There must be a nicer way to do this
+        for cql_version, cass_version in CQL_TO_VERSION_MAP.items():
+            c = Cluster(cql_version=cql_version)
+
+            try:
+                s = c.connect()
+            except NoHostAvailable, e:
+                message = e.errors['127.0.0.1'].message
+                if not 'is not supported by' in message:
+                    raise e
+            else:
+                self._cass_version = cass_version
+
+    def test_blob_type_as_string(self):
         c = Cluster()
         s = c.connect()
+
         s.execute("""
-            CREATE KEYSPACE IF NOT EXISTS typetests_blob
+            CREATE KEYSPACE typetests_blob1
             WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}
             """)
-        s.set_keyspace("typetests_blob")
+        s.set_keyspace("typetests_blob1")
         s.execute("""
-            CREATE TABLE IF NOT EXISTS mytable (
+            CREATE TABLE mytable (
                 a ascii,
                 b blob,
                 PRIMARY KEY (a)
@@ -31,23 +53,56 @@ class TypeTests(unittest.TestCase):
 
         params = [
             'key1',
-            'blob'
+            'blobyblob'.encode('hex')
         ]
 
-        # Invalid type, blob can't be specified as a string
         query = 'INSERT INTO mytable (a, b) VALUES (%s, %s)'
-        msg = r'.*Invalid STRING constant \(blob\) for b of type blob.*'
-        self.assertRaisesRegexp(InvalidRequest, msg, s.execute, query, params)
 
-        # Valid types
+        if self._cass_version == '2.0':
+            # Blob values can't be specified using string notation in CQL 3.1.0 and
+            # above which is used by default in Cassandra 2.0.
+            msg = r'.*Invalid STRING constant \(.*?\) for b of type blob.*'
+            self.assertRaisesRegexp(InvalidRequest, msg, s.execute, query, params)
+            return
+
+        s.execute(query, params)
+        expected_vals = [
+           'key1',
+           'blobyblob'
+        ]
+
+        results = s.execute("SELECT * FROM mytable")
+
+        for expected, actual in zip(expected_vals, results[0]):
+            self.assertEquals(expected, actual)
+
+    def test_blob_type_as_bytearray(self):
+        c = Cluster()
+        s = c.connect()
+
+        s.execute("""
+            CREATE KEYSPACE typetests_blob2
+            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}
+            """)
+        s.set_keyspace("typetests_blob2")
+        s.execute("""
+            CREATE TABLE mytable (
+                a ascii,
+                b blob,
+                PRIMARY KEY (a)
+            )
+        """)
+
         params = [
-            'key2',
+            'key1',
             bytearray('blob1', 'hex')
         ]
+
+        query = 'INSERT INTO mytable (a, b) VALUES (%s, %s);'
         s.execute(query, params)
 
         expected_vals = [
-            'key2',
+            'key1',
             bytearray('blob1', 'hex')
         ]
 
@@ -70,7 +125,6 @@ class TypeTests(unittest.TestCase):
                 b text,
                 c ascii,
                 d bigint,
-                e blob,
                 f boolean,
                 g decimal,
                 h double,
@@ -98,7 +152,6 @@ class TypeTests(unittest.TestCase):
             "sometext",
             "ascii",  # ascii
             12345678923456789,  # bigint
-            "blob".encode('hex'),  # blob
             True,  # boolean
             Decimal('1.234567890123456789'),  # decimal
             0.000244140625,  # double
@@ -120,7 +173,6 @@ class TypeTests(unittest.TestCase):
             "sometext",
             "ascii",  # ascii
             12345678923456789,  # bigint
-            "blob",  # blob
             True,  # boolean
             Decimal('1.234567890123456789'),  # decimal
             0.000244140625,  # double
@@ -138,8 +190,8 @@ class TypeTests(unittest.TestCase):
         )
 
         s.execute("""
-            INSERT INTO mytable (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO mytable (a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, params)
 
         results = s.execute("SELECT * FROM mytable")
@@ -149,11 +201,10 @@ class TypeTests(unittest.TestCase):
 
         # try the same thing with a prepared statement
         prepared = s.prepare("""
-            INSERT INTO mytable (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO mytable (a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """)
 
-        params[4] = 'blob'
         s.execute(prepared.bind(params))
 
         results = s.execute("SELECT * FROM mytable")
@@ -163,7 +214,7 @@ class TypeTests(unittest.TestCase):
 
         # query with prepared statement
         prepared = s.prepare("""
-            SELECT a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s FROM mytable
+            SELECT a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s FROM mytable
             """)
         results = s.execute(prepared.bind(()))
 
