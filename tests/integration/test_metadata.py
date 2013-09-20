@@ -308,10 +308,9 @@ class TestCodeCoverage(unittest.TestCase):
         cluster.connect()
 
         for keyspace in cluster.metadata.keyspaces:
-            if keyspace != 'system':
-                keyspace_metadata = cluster.metadata.keyspaces[keyspace]
-                self.assertIsInstance(keyspace_metadata.export_as_string(), unicode)
-                self.assertIsInstance(keyspace_metadata.as_cql_query(), unicode)
+            keyspace_metadata = cluster.metadata.keyspaces[keyspace]
+            self.assertIsInstance(keyspace_metadata.export_as_string(), unicode)
+            self.assertIsInstance(keyspace_metadata.as_cql_query(), unicode)
 
     def test_already_exists_exceptions(self):
         """
