@@ -332,6 +332,8 @@ class ReplicationStrategy(object):
             if not repl_factor:
                 return None
             return SimpleStrategy(repl_factor)
+        elif strategy_class.endswith("LocalStrategy"):
+            return LocalStrategy()
 
     def make_token_replica_map(token_to_primary_replica, ring):
         raise NotImplementedError()
@@ -402,6 +404,17 @@ class NetworkTopologyStrategy(ReplicationStrategy):
         for dc, repl_factor in self.dc_replication_factors:
             ret += ", '%s': '%d'" % (dc, repl_factor)
         return ret + "}"
+
+
+class LocalStrategy(ReplicationStrategy):
+
+    name = "LocalStrategy"
+
+    def make_token_replica_map(self, token_to_primary_replica, ring):
+        return {}
+
+    def export_for_schema(self):
+        return "{'class': 'LocalStrategy'}"
 
 
 class KeyspaceMetadata(object):
