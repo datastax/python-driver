@@ -285,10 +285,10 @@ class TestCodeCoverage(unittest.TestCase):
 
         # BUG: cassandra.metadata:KeyspaceMetadata.as_cql_query() fails when self.name == 'system'
         # because self.replication_strategy == None
-        # self.assertTrue(isinstance(cluster.metadata.export_schema_as_string(), str))
+        # self.assertIsInstance(cluster.metadata.export_schema_as_string(), str)
         # Traceback (most recent call last):
         #   File "/Users/joaquin/repos/python-driver/tests/integration/test_metadata.py", line 288, in test_export_schema
-        #     self.assertTrue(isinstance(cluster.metadata.export_schema_as_string(), str))
+        #     self.assertIsInstance(cluster.metadata.export_schema_as_string(), str)
         #   File "/Users/joaquin/repos/python-driver/cassandra/metadata.py", line 71, in export_schema_as_string
         #     return "\n".join(ks.export_as_string() for ks in self.keyspaces.values())
         #   File "/Users/joaquin/repos/python-driver/cassandra/metadata.py", line 71, in <genexpr>
@@ -310,8 +310,8 @@ class TestCodeCoverage(unittest.TestCase):
         for keyspace in cluster.metadata.keyspaces:
             if keyspace != 'system':
                 keyspace_metadata = cluster.metadata.keyspaces[keyspace]
-                self.assertTrue(isinstance(keyspace_metadata.export_as_string(), unicode))
-                self.assertTrue(isinstance(keyspace_metadata.as_cql_query(), unicode))
+                self.assertIsInstance(keyspace_metadata.export_as_string(), unicode)
+                self.assertIsInstance(keyspace_metadata.as_cql_query(), unicode)
 
     def test_already_exists_exceptions(self):
         """

@@ -46,8 +46,8 @@ class TestFactories(unittest.TestCase):
 
         result = session.execute(self.select)
 
-        self.assertTrue(isinstance(result, list))
-        self.assertTrue(isinstance(result[0], tuple))
+        self.assertIsInstance(result, list)
+        self.assertIsInstance(result[0], tuple)
 
         for row in result:
             self.assertEqual(row[0], row[1])
@@ -68,7 +68,7 @@ class TestFactories(unittest.TestCase):
 
         result = session.execute(self.select)
 
-        self.assertTrue(isinstance(result, list))
+        self.assertIsInstance(result, list)
 
         for row in result:
             self.assertEqual(row.k, row.v)
@@ -90,8 +90,8 @@ class TestFactories(unittest.TestCase):
 
         result = session.execute(self.select)
 
-        self.assertTrue(isinstance(result, list))
-        self.assertTrue(isinstance(result[0], dict))
+        self.assertIsInstance(result, list)
+        self.assertIsInstance(result[0], dict)
 
         for row in result:
             self.assertEqual(row['k'], row['v'])
@@ -112,8 +112,8 @@ class TestFactories(unittest.TestCase):
 
         result = session.execute(self.select)
 
-        self.assertTrue(isinstance(result, list))
-        self.assertTrue(isinstance(result[0], OrderedDict))
+        self.assertIsInstance(result, list)
+        self.assertIsInstance(result[0], OrderedDict)
 
         for row in result:
             self.assertEqual(row['k'], row['v'])
