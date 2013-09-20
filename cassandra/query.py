@@ -107,6 +107,60 @@ class SimpleStatement(Statement):
                 (self.query_string, consistency))
 
 
+class BatchStatement(Statement):
+    """
+    Represents a BATCH statement.
+    """
+    def __init__(self, queries, options=None, *args, **kwargs):
+        """
+        :param queries: A list of queries to include in this batch statement.
+        :type queries: ``list`` of ``str``
+
+        :param options: Option options which can be used in a BATCH statement.
+                        For more info, see
+                        http://cassandra.apache.org/doc/cql3/CQL.html#batchStmt.
+        :type options: ``dict``
+        """
+        super(BatchStatement, self).__init__(*args, **kwargs)
+        self._options = options or {}
+        self._queries = queries
+
+        self._query_string = self._get_batch_statement(queries, options)
+
+    def _get_batch_statement(self, queries, options=None):
+        options = options or {}
+
+        query_parts = []
+        using_parts = []
+
+        query_parts = ['BEGIN BATCH']
+
+        if options:
+            for key, value in options.items():
+                key = key.upper()
+                value = '%(key)s %(value)s' % {'key': key, 'value': value}
+                using_parts += [value]
+
+        if using_parts:
+            query_parts += ['USING ' + ' AND '.join(using_parts)]
+
+        query_parts += queries
+        query_parts += ['APPLY BATCH;']
+        query = '\n'.join(query_parts)
+
+        return query
+
+    @property
+    def query_string(self):
+        return self._query_string
+
+    def __repr__(self):
+        query_string = self.query_string[:30].replace('\n', ' ')
+        consistency = ConsistencyLevel.value_to_name[self.consistency_level]
+        return (u'<BatchStatement query="%s", consistency=%s>' %
+                (query_string, consistency))
+
+
 class PreparedStatement(object):
     """
     A statement that has been prepared against at least one Cassandra node.
