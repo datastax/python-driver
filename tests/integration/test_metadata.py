@@ -3,8 +3,12 @@ try:
 except ImportError:
     import unittest # noqa
 
+import cassandra
+from cassandra import AlreadyExists
+
 from cassandra.cluster import Cluster
 from cassandra.metadata import KeyspaceMetadata, TableMetadata, Token, MD5Token, TokenMap
+from cassandra.metadata import TableMetadata, Token, MD5Token, TokenMap, Murmur3Token
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
@@ -114,7 +118,7 @@ class SchemaMetadataTest(unittest.TestCase):
 
         meta = self.cluster.metadata
         self.assertNotEqual(meta.cluster_ref, None)
-        # self.assertNotEqual(meta.cluster_name, None)  # TODO needs to be fixed
+        self.assertNotEqual(meta.cluster_name, None)
         self.assertTrue(self.ksname in meta.keyspaces)
         ksmeta = meta.keyspaces[self.ksname]
 
@@ -271,6 +275,102 @@ class SchemaMetadataTest(unittest.TestCase):
         self.assertEqual(3, len(statements))
         self.assertEqual(d_index, statements[1])
         self.assertEqual(e_index, statements[2])
+
+class TestCodeCoverage(unittest.TestCase):
+    def test_export_schema(self):
+        """
+        Test export schema functionality
+        """
+
+        cluster = Cluster()
+        cluster.connect()
+
+        # BUG: cassandra.metadata:KeyspaceMetadata.as_cql_query() fails when self.name == 'system'
+        # because self.replication_strategy == None
+        # self.assertTrue(isinstance(cluster.metadata.export_schema_as_string(), str))
+        # Traceback (most recent call last):
+        #   File "/Users/joaquin/repos/python-driver/tests/integration/test_metadata.py", line 288, in test_export_schema
+        #     self.assertTrue(isinstance(cluster.metadata.export_schema_as_string(), str))
+        #   File "/Users/joaquin/repos/python-driver/cassandra/metadata.py", line 71, in export_schema_as_string
+        #     return "\n".join(ks.export_as_string() for ks in self.keyspaces.values())
+        #   File "/Users/joaquin/repos/python-driver/cassandra/metadata.py", line 71, in <genexpr>
+        #     return "\n".join(ks.export_as_string() for ks in self.keyspaces.values())
+        #   File "/Users/joaquin/repos/python-driver/cassandra/metadata.py", line 438, in export_as_string
+        #     return "\n".join([self.as_cql_query()] + [t.as_cql_query() for t in self.tables.values()])
+        #   File "/Users/joaquin/repos/python-driver/cassandra/metadata.py", line 444, in as_cql_query
+        #     (self.name, self.replication_strategy.export_for_schema())
+        # AttributeError: 'NoneType' object has no attribute 'export_for_schema'
+
+    def test_export_keyspace_schema(self):
+        """
+        Test export keyspace schema functionality
+        """
+
+        cluster = Cluster()
+        cluster.connect()
+
+        for keyspace in cluster.metadata.keyspaces:
+            if keyspace != 'system':
+                keyspace_metadata = cluster.metadata.keyspaces[keyspace]
+                self.assertTrue(isinstance(keyspace_metadata.export_as_string(), unicode))
+                self.assertTrue(isinstance(keyspace_metadata.as_cql_query(), unicode))
+
+    def test_already_exists_exceptions(self):
+        """
+        Ensure AlreadyExists exception is thrown when hit
+        """
+
+        cluster = Cluster()
+        session = cluster.connect()
+
+        ksname = 'test3rf'
+        cfname = 'test'
+
+        ddl = '''
+            CREATE KEYSPACE %s
+            WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '3'}'''
+        self.assertRaises(AlreadyExists, session.execute, ddl % ksname)
+
+        ddl = '''
+            CREATE TABLE %s.%s (
+                k int PRIMARY KEY,
+                v int )'''
+        self.assertRaises(AlreadyExists, session.execute, ddl % (ksname, cfname))
+
+    def test_replicas(self):
+        """
+        Ensure cluster.metadata.get_replicas return correctly when not attached to keyspace
+        """
+        cluster = Cluster()
+        self.assertEqual(cluster.metadata.get_replicas('test3rf', 'key'), [])
+
+        cluster.connect('test3rf')
+
+        # BUG: The next line fails
+        self.assertNotEqual(list(cluster.metadata.get_replicas('test3rf', 'key')), [])
+        host = list(cluster.metadata.get_replicas('test3rf', 'key'))[0]
+        self.assertEqual(host.datacenter, 'datacenter1')
+        self.assertEqual(host.rack, 'rack1')
+        self.assertEqual(host.address, '127.0.0.2')
+
+    def test_token_map(self):
+        """
+        Test token mappings
+        """
+
+        cluster = Cluster()
+        cluster.connect('test3rf')
+        ring = cluster.metadata.token_map.ring
+
+        # BUG: The next line fails
+        self.assertNotEqual(list(cluster.metadata.token_map.get_replicas('test3rf', ring[0])), [])
+        self.assertEqual(list(cluster.metadata.token_map.get_replicas('test3rf', ring[0]))[0].address, '127.0.0.1')
+        self.assertEqual(list(cluster.metadata.token_map.get_replicas('test3rf', ring[1]))[0].address, '127.0.0.2')
+        self.assertEqual(list(cluster.metadata.token_map.get_replicas('test3rf', ring[2]))[0].address, '127.0.0.3')
+
+        self.assertEqual(list(cluster.metadata.token_map.get_replicas('test3rf', Murmur3Token(ring[0].value - 1)))[0].address, '127.0.0.3')
+        self.assertEqual(list(cluster.metadata.token_map.get_replicas('test3rf', Murmur3Token(ring[1].value - 1)))[0].address, '127.0.0.1')
+        self.assertEqual(list(cluster.metadata.token_map.get_replicas('test3rf', Murmur3Token(ring[2].value - 1)))[0].address, '127.0.0.2')
 
 
 class TokenMetadataTest(unittest.TestCase):

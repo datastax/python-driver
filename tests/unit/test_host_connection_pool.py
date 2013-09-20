@@ -9,7 +9,7 @@ from threading import Thread, Event
 from cassandra.cluster import Session
 from cassandra.connection import Connection, MAX_STREAM_PER_CONNECTION
 from cassandra.pool import Host, HostConnectionPool, NoConnectionsAvailable, HealthMonitor
-from cassandra.policies import HostDistance
+from cassandra.policies import HostDistance, SimpleConvictionPolicy
 
 class HostConnectionPoolTests(unittest.TestCase):
 
@@ -202,3 +202,27 @@ class HostConnectionPoolTests(unittest.TestCase):
         # a new creation should be scheduled
         session.submit.assert_called_once()
         self.assertFalse(pool.is_shutdown)
+
+    def test_host_instantiations(self):
+        """
+        Ensure Host fails if not initialized properly
+        """
+
+        self.assertRaises(ValueError, Host, None, None)
+        self.assertRaises(ValueError, Host, '127.0.0.1', None)
+        self.assertRaises(ValueError, Host, None, SimpleConvictionPolicy)
+
+    def test_host_equality(self):
+        """
+        Test host equality has correct logic
+        """
+
+        a = Host('127.0.0.1', SimpleConvictionPolicy)
+        b = Host('127.0.0.1', SimpleConvictionPolicy)
+        c = Host('127.0.0.2', SimpleConvictionPolicy)
+
+        self.assertEqual(a, b, 'Two Host instances should be equal when sharing.')
+        self.assertNotEqual(a, c, 'Two Host instances should NOT be equal when using two different addresses.')
+        self.assertNotEqual(b, c, 'Two Host instances should NOT be equal when using two different addresses.')
+
+        self.assertFalse(a == '127.0.0.1')
