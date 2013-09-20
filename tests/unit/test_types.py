@@ -93,11 +93,10 @@ class TypeTests(unittest.TestCase):
         Test cassandra.cqltypes.DateType() construction
         """
 
-        pass
-        # TODO: Figure out the required format here
-        # date_string = str(datetime.datetime.now().strftime('%s.%f'))
-        # print date_string
-        # print cassandra.cqltypes.DateType(date_string)
+        # Ensure all formats can be parsed, without exception
+        for format in cassandra.cqltypes.cql_time_formats:
+            date_string = str(datetime.datetime.now().strftime(format))
+            cassandra.cqltypes.DateType(date_string)
 
     def test_cql_typename(self):
         """
