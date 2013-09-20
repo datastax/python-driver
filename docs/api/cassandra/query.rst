@@ -3,7 +3,7 @@
 
 .. module:: cassandra.query
 
-.. autoclass:: Query
+.. autoclass:: Statement
    :members:
 
 .. autoclass:: SimpleStatement
@@ -23,3 +23,7 @@
 
 .. autoclass:: TraceEvent ()
    :members:
+
+.. autoexception:: TraceUnavailable
+
+.. autoexception:: InvalidParameterTypeError

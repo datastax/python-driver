@@ -39,3 +39,15 @@ Tokens and Ring Topology
 
 .. autoclass:: BytesToken
    :members:
+
+.. autoclass:: ReplicationStrategy
+   :members:
+
+.. autoclass:: SimpleStrategy
+   :members:
+
+.. autoclass:: NetworkTopologyStrategy
+   :members:
+
+.. autoclass:: LocalStrategy
+   :members:
