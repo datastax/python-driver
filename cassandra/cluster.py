@@ -681,7 +681,7 @@ class Session(object):
         future.send_request()
         return future
 
-    def prepare(self, query):
+    def prepare(self, query, consistency_level=ConsistencyLevel.ONE):
         """
         Prepares a query string, returing a :class:`~cassandra.query.PreparedStatement`
         instance which can be used as follows::
@@ -702,7 +702,8 @@ class Session(object):
             raise
 
         prepared_statement = PreparedStatement.from_message(
-            query_id, column_metadata, self.cluster.metadata, query, self.keyspace)
+            query_id, column_metadata, self.cluster.metadata, query,
+            self.keyspace, consistency_level)
 
         host = future._current_host
         try:
