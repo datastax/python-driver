@@ -343,7 +343,7 @@ class ReplicationStrategy(object):
         elif strategy_class.endswith("LocalStrategy"):
             return LocalStrategy()
 
-    def make_token_replica_map(token_to_host_owner, ring):
+    def make_token_replica_map(self, token_to_host_owner, ring):
         raise NotImplementedError()
 
     def export_for_schema(self):
