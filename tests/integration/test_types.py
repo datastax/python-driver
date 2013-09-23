@@ -12,27 +12,18 @@ from blist import sortedset
 from cassandra import InvalidRequest
 from cassandra.cluster import Cluster, NoHostAvailable
 
-CQL_TO_VERSION_MAP = {
-    '3.1.0': '2.0',
-    '3.0.5': '1.2'
-}
 
 class TypeTests(unittest.TestCase):
     def setUp(self):
         super(TypeTests, self).setUp()
 
-        # TODO: There must be a nicer way to do this
-        for cql_version, cass_version in CQL_TO_VERSION_MAP.items():
-            c = Cluster(cql_version=cql_version)
-
-            try:
-                s = c.connect()
-            except NoHostAvailable, e:
-                message = e.errors['127.0.0.1'].message
-                if not 'is not supported by' in message:
-                    raise e
-            else:
-                self._cass_version = cass_version
+        # Detect CQL and Cassandra version
+        c = Cluster()
+        s = c.connect()
+        s.set_keyspace('system')
+        row = s.execute('SELECT cql_version, release_version FROM local')[0]
+        self._cql_version = self._get_version_as_tuple(row.cql_version)
+        self._cass_version = self._get_version_as_tuple(row.release_version)
 
     def test_blob_type_as_string(self):
         c = Cluster()
@@ -58,7 +49,7 @@ class TypeTests(unittest.TestCase):
 
         query = 'INSERT INTO mytable (a, b) VALUES (%s, %s)'
 
-        if self._cass_version == '2.0':
+        if self._cql_version >= (3, 1, 0):
             # Blob values can't be specified using string notation in CQL 3.1.0 and
             # above which is used by default in Cassandra 2.0.
             msg = r'.*Invalid STRING constant \(.*?\) for b of type blob.*'
@@ -227,3 +218,9 @@ class TypeTests(unittest.TestCase):
 
         for expected, actual in zip(expected_vals, results[0]):
             self.assertEquals(expected, actual)
+
+    def _get_version_as_tuple(self, version):
+        version = version.split('.')
+        version = [int(p) for p in version]
+        version = tuple(version)
+        return version
