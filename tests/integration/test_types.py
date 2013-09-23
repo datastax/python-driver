@@ -12,18 +12,13 @@ from blist import sortedset
 from cassandra import InvalidRequest
 from cassandra.cluster import Cluster, NoHostAvailable
 
+from tests.integration import BaseTestCase
 
-class TypeTests(unittest.TestCase):
+
+class TypeTests(BaseTestCase):
     def setUp(self):
         super(TypeTests, self).setUp()
-
-        # Detect CQL and Cassandra version
-        c = Cluster()
-        s = c.connect()
-        s.set_keyspace('system')
-        row = s.execute('SELECT cql_version, release_version FROM local')[0]
-        self._cql_version = self._get_version_as_tuple(row.cql_version)
-        self._cass_version = self._get_version_as_tuple(row.release_version)
+        self._versions = self._get_cass_and_cql_version()
 
     def test_blob_type_as_string(self):
         c = Cluster()
@@ -49,7 +44,7 @@ class TypeTests(unittest.TestCase):
 
         query = 'INSERT INTO mytable (a, b) VALUES (%s, %s)'
 
-        if self._cql_version >= (3, 1, 0):
+        if self._versions['cql_version'] >= (3, 1, 0):
             # Blob values can't be specified using string notation in CQL 3.1.0 and
             # above which is used by default in Cassandra 2.0.
             msg = r'.*Invalid STRING constant \(.*?\) for b of type blob.*'
