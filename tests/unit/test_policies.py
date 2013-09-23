@@ -16,7 +16,7 @@ from cassandra.policies import (RoundRobinPolicy, DCAwareRoundRobinPolicy,
                                 HostDistance, ExponentialReconnectionPolicy,
                                 RetryPolicy, WriteType,
                                 DowngradingConsistencyRetryPolicy, ConstantReconnectionPolicy,
-                                LoadBalancingPolicy, ConvictionPolicy, ReconnectionPolicy)
+                                LoadBalancingPolicy, ConvictionPolicy, ReconnectionPolicy, FallthroughRetryPolicy)
 from cassandra.pool import Host
 from cassandra.query import Statement
 
@@ -32,7 +32,7 @@ class TestLoadBalancingPolicy(unittest.TestCase):
         host.set_location_info("dc1", "rack1")
 
         self.assertRaises(NotImplementedError, policy.distance, host)
-        self.assertRaises(NotImplementedError, policy.distance, host)
+        self.assertRaises(NotImplementedError, policy.populate, None, host)
         self.assertRaises(NotImplementedError, policy.make_query_plan)
         self.assertRaises(NotImplementedError, policy.on_up, host)
         self.assertRaises(NotImplementedError, policy.on_down, host)
@@ -322,6 +322,89 @@ class TokenAwarePolicyTest(unittest.TestCase):
             self.assertEquals(qplan[2].datacenter, "dc2")
             self.assertEquals(3, len(qplan))
 
+    class FakeCluster:
+        def __init__(self):
+            self.metadata = None
+
+    def test_get_distance(self):
+        """
+        Same test as DCAwareRoundRobinPolicyTest.test_get_distance()
+        Except a FakeCluster is needed for the metadata variable and
+        policy.child_policy is needed to change child policy settings
+        """
+
+        policy = TokenAwarePolicy(DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=0))
+        host = Host("ip1", SimpleConvictionPolicy)
+        host.set_location_info("dc1", "rack1")
+
+        policy.populate(self.FakeCluster(), [host])
+
+        self.assertEqual(policy.distance(host), HostDistance.LOCAL)
+
+        # used_hosts_per_remote_dc is set to 0, so ignore it
+        remote_host = Host("ip2", SimpleConvictionPolicy)
+        remote_host.set_location_info("dc2", "rack1")
+        self.assertEqual(policy.distance(remote_host), HostDistance.IGNORED)
+
+        # dc2 isn't registered in the policy's live_hosts dict
+        policy.child_policy.used_hosts_per_remote_dc = 1
+        self.assertEqual(policy.distance(remote_host), HostDistance.IGNORED)
+
+        # make sure the policy has both dcs registered
+        policy.populate(self.FakeCluster(), [host, remote_host])
+        self.assertEqual(policy.distance(remote_host), HostDistance.REMOTE)
+
+        # since used_hosts_per_remote_dc is set to 1, only the first
+        # remote host in dc2 will be REMOTE, the rest are IGNORED
+        second_remote_host = Host("ip3", SimpleConvictionPolicy)
+        second_remote_host.set_location_info("dc2", "rack1")
+        policy.populate(self.FakeCluster(), [host, remote_host, second_remote_host])
+        distances = set([policy.distance(remote_host), policy.distance(second_remote_host)])
+        self.assertEqual(distances, set([HostDistance.REMOTE, HostDistance.IGNORED]))
+
+
+    def test_status_updates(self):
+        """
+        Same test as DCAwareRoundRobinPolicyTest.test_status_updates()
+        """
+
+        hosts = [Host(i, SimpleConvictionPolicy) for i in range(4)]
+        for h in hosts[:2]:
+            h.set_location_info("dc1", "rack1")
+        for h in hosts[2:]:
+            h.set_location_info("dc2", "rack1")
+
+        policy = TokenAwarePolicy(DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=1))
+        policy.populate(self.FakeCluster(), hosts)
+        policy.on_down(hosts[0])
+        policy.on_remove(hosts[2])
+
+        new_local_host = Host(4, SimpleConvictionPolicy)
+        new_local_host.set_location_info("dc1", "rack1")
+        policy.on_up(new_local_host)
+
+        new_remote_host = Host(5, SimpleConvictionPolicy)
+        new_remote_host.set_location_info("dc9000", "rack1")
+        policy.on_add(new_remote_host)
+
+        # we now have two local hosts and two remote hosts in separate dcs
+        qplan = list(policy.make_query_plan())
+        self.assertEqual(set(qplan[:2]), set([hosts[1], new_local_host]))
+        self.assertEqual(set(qplan[2:]), set([hosts[3], new_remote_host]))
+
+        # since we have hosts in dc9000, the distance shouldn't be IGNORED
+        self.assertEqual(policy.distance(new_remote_host), HostDistance.REMOTE)
+
+        policy.on_down(new_local_host)
+        policy.on_down(hosts[1])
+        qplan = list(policy.make_query_plan())
+        self.assertEqual(set(qplan), set([hosts[3], new_remote_host]))
+
+        policy.on_down(new_remote_host)
+        policy.on_down(hosts[3])
+        qplan = list(policy.make_query_plan())
+        self.assertEqual(qplan, [])
+
 class ConvictionPolicyTest(unittest.TestCase):
     def test_not_implemented(self):
         """
@@ -467,6 +550,106 @@ class RetryPolicyTest(unittest.TestCase):
             required_responses=10000, received_responses=1, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETRY)
         self.assertEqual(consistency, 'ONE')
+
+    def test_unavailable(self):
+        """
+        Use the same tests for test_write_timeout, but ensure they only RETHROW
+        """
+        policy = RetryPolicy()
+
+        retry, consistency = policy.on_unavailable(
+            query=None, consistency="ONE",
+            required_replicas=1, alive_replicas=2, retry_num=1)
+        self.assertEqual(retry, RetryPolicy.RETHROW)
+        self.assertEqual(consistency, None)
+
+        retry, consistency = policy.on_unavailable(
+            query=None, consistency="ONE",
+            required_replicas=1, alive_replicas=2, retry_num=0)
+        self.assertEqual(retry, RetryPolicy.RETHROW)
+        self.assertEqual(consistency, None)
+
+        retry, consistency = policy.on_unavailable(
+            query=None, consistency="ONE",
+            required_replicas=10000, alive_replicas=1, retry_num=0)
+        self.assertEqual(retry, RetryPolicy.RETHROW)
+        self.assertEqual(consistency, None)
+
+
+class FallthroughRetryPolicyTest(unittest.TestCase):
+
+    """
+    Use the same tests for test_write_timeout, but ensure they only RETHROW
+    """
+
+    def test_read_timeout(self):
+        policy = FallthroughRetryPolicy()
+
+        retry, consistency = policy.on_read_timeout(
+            query=None, consistency="ONE", required_responses=1, received_responses=2,
+            data_retrieved=True, retry_num=1)
+        self.assertEqual(retry, RetryPolicy.RETHROW)
+        self.assertEqual(consistency, None)
+
+        retry, consistency = policy.on_read_timeout(
+            query=None, consistency="ONE", required_responses=2, received_responses=1,
+            data_retrieved=True, retry_num=0)
+        self.assertEqual(retry, RetryPolicy.RETHROW)
+        self.assertEqual(consistency, None)
+
+        retry, consistency = policy.on_read_timeout(
+            query=None, consistency="ONE", required_responses=2, received_responses=2,
+            data_retrieved=True, retry_num=0)
+        self.assertEqual(retry, RetryPolicy.RETHROW)
+        self.assertEqual(consistency, None)
+
+        retry, consistency = policy.on_read_timeout(
+            query=None, consistency="ONE", required_responses=2, received_responses=2,
+            data_retrieved=False, retry_num=0)
+        self.assertEqual(retry, RetryPolicy.RETHROW)
+        self.assertEqual(consistency, None)
+
+    def test_write_timeout(self):
+        policy = FallthroughRetryPolicy()
+
+        retry, consistency = policy.on_write_timeout(
+            query=None, consistency="ONE", write_type=WriteType.SIMPLE,
+            required_responses=1, received_responses=2, retry_num=1)
+        self.assertEqual(retry, RetryPolicy.RETHROW)
+        self.assertEqual(consistency, None)
+
+        retry, consistency = policy.on_write_timeout(
+            query=None, consistency="ONE", write_type=WriteType.SIMPLE,
+            required_responses=1, received_responses=2, retry_num=0)
+        self.assertEqual(retry, RetryPolicy.RETHROW)
+        self.assertEqual(consistency, None)
+
+        retry, consistency = policy.on_write_timeout(
+            query=None, consistency="ONE", write_type=WriteType.BATCH_LOG,
+            required_responses=10000, received_responses=1, retry_num=0)
+        self.assertEqual(retry, RetryPolicy.RETHROW)
+        self.assertEqual(consistency, None)
+
+    def test_unavailable(self):
+        policy = FallthroughRetryPolicy()
+
+        retry, consistency = policy.on_unavailable(
+            query=None, consistency="ONE",
+            required_replicas=1, alive_replicas=2, retry_num=1)
+        self.assertEqual(retry, RetryPolicy.RETHROW)
+        self.assertEqual(consistency, None)
+
+        retry, consistency = policy.on_unavailable(
+            query=None, consistency="ONE",
+            required_replicas=1, alive_replicas=2, retry_num=0)
+        self.assertEqual(retry, RetryPolicy.RETHROW)
+        self.assertEqual(consistency, None)
+
+        retry, consistency = policy.on_unavailable(
+            query=None, consistency="ONE",
+            required_replicas=10000, alive_replicas=1, retry_num=0)
+        self.assertEqual(retry, RetryPolicy.RETHROW)
+        self.assertEqual(consistency, None)
 
 
 class DowngradingConsistencyRetryPolicyTest(unittest.TestCase):
