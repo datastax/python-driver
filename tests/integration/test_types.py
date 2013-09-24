@@ -10,15 +10,15 @@ from uuid import uuid1, uuid4
 from blist import sortedset
 
 from cassandra import InvalidRequest
-from cassandra.cluster import Cluster, NoHostAvailable
+from cassandra.cluster import Cluster
 
-from tests.integration import BaseTestCase
+from tests.integration import get_server_versions
 
 
-class TypeTests(BaseTestCase):
+class TypeTests(unittest.TestCase):
+
     def setUp(self):
-        super(TypeTests, self).setUp()
-        self._versions = self._get_cass_and_cql_version()
+        self._cass_version, self._cql_version = get_server_versions()
 
     def test_blob_type_as_string(self):
         c = Cluster()
@@ -44,7 +44,7 @@ class TypeTests(BaseTestCase):
 
         query = 'INSERT INTO mytable (a, b) VALUES (%s, %s)'
 
-        if self._versions['cql_version'] >= (3, 1, 0):
+        if self._cql_version >= (3, 1, 0):
             # Blob values can't be specified using string notation in CQL 3.1.0 and
             # above which is used by default in Cassandra 2.0.
             msg = r'.*Invalid STRING constant \(.*?\) for b of type blob.*'
@@ -213,9 +213,3 @@ class TypeTests(BaseTestCase):
 
         for expected, actual in zip(expected_vals, results[0]):
             self.assertEquals(expected, actual)
-
-    def _get_version_as_tuple(self, version):
-        version = version.split('.')
-        version = [int(p) for p in version]
-        version = tuple(version)
-        return version

@@ -24,29 +24,26 @@ if not os.path.exists(path):
     os.mkdir(path)
 
 
-class BaseTestCase(unittest.TestCase):
-    def _get_cass_and_cql_version(self):
-        """
-        Probe system.local table to determine Cassandra and CQL version.
-        """
-        c = Cluster()
-        s = c.connect()
-        s.set_keyspace('system')
-        row = s.execute('SELECT cql_version, release_version FROM local')[0]
+def get_server_versions():
+    """
+    Probe system.local table to determine Cassandra and CQL version.
+    Returns a tuple of (cassandra_version, cql_version).
+    """
+    c = Cluster()
+    s = c.connect()
+    s.set_keyspace('system')
+    row = s.execute('SELECT cql_version, release_version FROM local')[0]
 
-        cass_version = self._get_version_as_tuple(row.release_version)
-        cql_version = self._get_version_as_tuple(row.cql_version)
+    cass_version = _tuple_version(row.release_version)
+    cql_version = _tuple_version(row.cql_version)
 
-        c.shutdown()
+    c.shutdown()
 
-        result = {'cass_version': cass_version, 'cql_version': cql_version}
-        return result
+    return (cass_version, cql_version)
 
-    def _get_version_as_tuple(self, version):
-        version = version.split('.')
-        version = [int(p) for p in version]
-        version = tuple(version)
-        return version
+
+def _tuple_version(version_string):
+    return tuple([int(p) for p in version_string.split('.')])
 
 
 def get_cluster():
