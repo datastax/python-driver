@@ -213,6 +213,7 @@ class BoundStatement(Statement):
                 "Too many arguments provided to bind() (got %d, expected %d)" %
                 (len(values), len(col_meta)))
 
+        self.raw_values = values
         self.values = []
         for value, col_spec in zip(values, col_meta):
             if value is None:
@@ -262,6 +263,11 @@ class BoundStatement(Statement):
             return meta[0][0]
         else:
             return None
+
+    def __repr__(self):
+        consistency = ConsistencyLevel.value_to_name[self.consistency_level]
+        return (u'<BoundStatement query="%s", values=%s, consistency=%s>' %
+                (self.prepared_statement.query_string, self.raw_values, consistency))
 
 
 class ValueSequence(object):
