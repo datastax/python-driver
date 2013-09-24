@@ -24,6 +24,31 @@ if not os.path.exists(path):
     os.mkdir(path)
 
 
+def get_server_versions():
+    """
+    Probe system.local table to determine Cassandra and CQL version.
+    Returns a tuple of (cassandra_version, cql_version).
+    """
+    c = Cluster()
+    s = c.connect()
+    s.set_keyspace('system')
+    row = s.execute('SELECT cql_version, release_version FROM local')[0]
+
+    cass_version = _tuple_version(row.release_version)
+    cql_version = _tuple_version(row.cql_version)
+
+    c.shutdown()
+
+    return (cass_version, cql_version)
+
+
+def _tuple_version(version_string):
+    if '-' in version_string:
+        version_string = version_string[:version_string.index('-')]
+
+    return tuple([int(p) for p in version_string.split('.')])
+
+
 def get_cluster():
     return CCM_CLUSTER
 

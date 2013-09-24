@@ -9,9 +9,93 @@ from uuid import uuid1, uuid4
 
 from blist import sortedset
 
+from cassandra import InvalidRequest
 from cassandra.cluster import Cluster
 
+from tests.integration import get_server_versions
+
+
 class TypeTests(unittest.TestCase):
+
+    def setUp(self):
+        self._cass_version, self._cql_version = get_server_versions()
+
+    def test_blob_type_as_string(self):
+        c = Cluster()
+        s = c.connect()
+
+        s.execute("""
+            CREATE KEYSPACE typetests_blob1
+            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}
+            """)
+        s.set_keyspace("typetests_blob1")
+        s.execute("""
+            CREATE TABLE mytable (
+                a ascii,
+                b blob,
+                PRIMARY KEY (a)
+            )
+        """)
+
+        params = [
+            'key1',
+            'blobyblob'.encode('hex')
+        ]
+
+        query = 'INSERT INTO mytable (a, b) VALUES (%s, %s)'
+
+        if self._cql_version >= (3, 1, 0):
+            # Blob values can't be specified using string notation in CQL 3.1.0 and
+            # above which is used by default in Cassandra 2.0.
+            msg = r'.*Invalid STRING constant \(.*?\) for b of type blob.*'
+            self.assertRaisesRegexp(InvalidRequest, msg, s.execute, query, params)
+            return
+
+        s.execute(query, params)
+        expected_vals = [
+           'key1',
+           'blobyblob'
+        ]
+
+        results = s.execute("SELECT * FROM mytable")
+
+        for expected, actual in zip(expected_vals, results[0]):
+            self.assertEquals(expected, actual)
+
+    def test_blob_type_as_bytearray(self):
+        c = Cluster()
+        s = c.connect()
+
+        s.execute("""
+            CREATE KEYSPACE typetests_blob2
+            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}
+            """)
+        s.set_keyspace("typetests_blob2")
+        s.execute("""
+            CREATE TABLE mytable (
+                a ascii,
+                b blob,
+                PRIMARY KEY (a)
+            )
+        """)
+
+        params = [
+            'key1',
+            bytearray('blob1', 'hex')
+        ]
+
+        query = 'INSERT INTO mytable (a, b) VALUES (%s, %s);'
+        s.execute(query, params)
+
+        expected_vals = [
+            'key1',
+            bytearray('blob1', 'hex')
+        ]
+
+        results = s.execute("SELECT * FROM mytable")
+
+        for expected, actual in zip(expected_vals, results[0]):
+            self.assertEquals(expected, actual)
 
     def test_basic_types(self):
         c = Cluster()
@@ -27,7 +111,6 @@ class TypeTests(unittest.TestCase):
                 b text,
                 c ascii,
                 d bigint,
-                e blob,
                 f boolean,
                 g decimal,
                 h double,
@@ -55,7 +138,6 @@ class TypeTests(unittest.TestCase):
             "sometext",
             "ascii",  # ascii
             12345678923456789,  # bigint
-            "blob".encode('hex'),  # blob
             True,  # boolean
             Decimal('1.234567890123456789'),  # decimal
             0.000244140625,  # double
@@ -77,7 +159,6 @@ class TypeTests(unittest.TestCase):
             "sometext",
             "ascii",  # ascii
             12345678923456789,  # bigint
-            "blob",  # blob
             True,  # boolean
             Decimal('1.234567890123456789'),  # decimal
             0.000244140625,  # double
@@ -95,8 +176,8 @@ class TypeTests(unittest.TestCase):
         )
 
         s.execute("""
-            INSERT INTO mytable (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO mytable (a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, params)
 
         results = s.execute("SELECT * FROM mytable")
@@ -106,11 +187,10 @@ class TypeTests(unittest.TestCase):
 
         # try the same thing with a prepared statement
         prepared = s.prepare("""
-            INSERT INTO mytable (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO mytable (a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """)
 
-        params[4] = 'blob'
         s.execute(prepared.bind(params))
 
         results = s.execute("SELECT * FROM mytable")
@@ -120,7 +200,7 @@ class TypeTests(unittest.TestCase):
 
         # query with prepared statement
         prepared = s.prepare("""
-            SELECT a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s FROM mytable
+            SELECT a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s FROM mytable
             """)
         results = s.execute(prepared.bind(()))
 

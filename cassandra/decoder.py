@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from binascii import hexlify
 from collections import namedtuple
 try:
     from collections import OrderedDict
@@ -783,6 +784,10 @@ def cql_encode_str(val):
     return cql_quote(val)
 
 
+def cql_encode_bytes(val):
+    return '0x' + hexlify(val)
+
+
 def cql_encode_object(val):
     return str(val)
 
@@ -815,6 +820,7 @@ def cql_encode_set_collection(val):
 
 cql_encoders = {
     float: cql_encode_object,
+    bytearray: cql_encode_bytes,
     str: cql_encode_str,
     unicode: cql_encode_unicode,
     types.NoneType: cql_encode_none,
