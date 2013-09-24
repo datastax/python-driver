@@ -6,10 +6,9 @@ Releasing
 * Commit the changelog and version changes
 * Tag the release.  For example: ``git tag -a 1.0.0 -m 'version 1.0.0'``
 * Push the commit and tag: ``git push --tags origin master``
-* Upload the package to pypi:
+* Upload the package to pypi::
 
     python setup.py register
-
     python setup.py sdist upload
 
 * Update the docs (see below)
@@ -26,15 +25,15 @@ In order for the extensions to be built and used in the test, run:
 Building the Docs
 =================
 Sphinx is required to build the docs. You probably want to install through apt,
-if possible:
+if possible::
 
-    $ sudo apt-get install python-sphinx
+    sudo apt-get install python-sphinx
 
-pip may also work:
+pip may also work::
 
-    $ sudo pip install -U Sphinx
+    sudo pip install -U Sphinx
 
-To build the docs, run:
+To build the docs, run::
 
     python setup.py doc
 
@@ -43,9 +42,9 @@ clone a second copy of this repo and leave it on that branch) and copy the entir
 contents all of ``docs/_build/X.Y.Z/*`` into the root of the ``gh-pages`` branch
 and then push that branch to github.
 
-For example:
+For example::
 
-    $ python setup.py doc
-    $ cp -R docs/_build/1.0.0-beta1/* ~/python-driver-docs/
-    $ cd ~/python-driver-docs
-    $ git push origin gh-pages
+    python setup.py doc
+    cp -R docs/_build/1.0.0-beta1/* ~/python-driver-docs/
+    cd ~/python-driver-docs
+    git push origin gh-pages
