@@ -42,10 +42,11 @@ class Statement(object):
     _routing_key = None
 
     def __init__(self, retry_policy=None, tracing_enabled=False,
-                 consistency_level=ConsistencyLevel.ONE, routing_key=None):
+                 consistency_level=None, routing_key=None):
         self.retry_policy = retry_policy
         self.tracing_enabled = tracing_enabled
-        self.consistency_level = consistency_level
+        if consistency_level is not None:
+            self.consistency_level = consistency_level
         self._routing_key = routing_key
 
     def _get_routing_key(self):
@@ -123,12 +124,14 @@ class PreparedStatement(object):
 
     consistency_level = ConsistencyLevel.ONE
 
-    def __init__(self, column_metadata, query_id, routing_key_indexes, query, keyspace):
+    def __init__(self, column_metadata, query_id, routing_key_indexes, query, keyspace,
+                 consistency_level=ConsistencyLevel.ONE):
         self.column_metadata = column_metadata
         self.query_id = query_id
         self.routing_key_indexes = routing_key_indexes
         self.query_string = query
         self.keyspace = keyspace
+        self.consistency_level = consistency_level
 
     @classmethod
     def from_message(cls, query_id, column_metadata, cluster_metadata, query, keyspace):
