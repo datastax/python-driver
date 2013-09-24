@@ -18,7 +18,7 @@ Releasing
 
 Running the Tests
 =================
-In order for the extensions to be built and used in the test, run:
+In order for the extensions to be built and used in the test, run::
 
     python setup.py nosetests
 
