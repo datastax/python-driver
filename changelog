@@ -1,5 +1,15 @@
 CHANGELOG
 
+0.8.2
+* fix for connection failover
+
+0.8.1
+* fix for models not exactly matching schema
+
+0.8.0
+* support for table polymorphism
+* var int type
+
 0.7.1
 * refactoring query class to make defining custom model instantiation logic easier
 
