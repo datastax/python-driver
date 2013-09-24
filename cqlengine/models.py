@@ -184,10 +184,6 @@ class BaseModel(object):
     def __init__(self, **values):
         self._values = {}
 
-        extra_columns = set(values.keys()) - set(self._columns.keys())
-        if extra_columns:
-            raise ValidationError("Incorrect columns passed: {}".format(extra_columns))
-
         for name, column in self._columns.items():
             value =  values.get(name, None)
             if value is not None or isinstance(column, columns.BaseContainerColumn):
@@ -342,6 +338,9 @@ class BaseModel(object):
 
     @classmethod
     def create(cls, **kwargs):
+        extra_columns = set(kwargs.keys()) - set(cls._columns.keys())
+        if extra_columns:
+            raise ValidationError("Incorrect columns passed: {}".format(extra_columns))
         return cls.objects.create(**kwargs)
 
     @classmethod
