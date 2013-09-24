@@ -123,17 +123,21 @@ class PreparedStatement(object):
 
     consistency_level = ConsistencyLevel.ONE
 
-    def __init__(self, column_metadata, query_id, routing_key_indexes, query, keyspace):
+    def __init__(self, column_metadata, query_id, routing_key_indexes, query,
+                 keyspace, consistency_level=ConsistencyLevel.ONE):
         self.column_metadata = column_metadata
         self.query_id = query_id
         self.routing_key_indexes = routing_key_indexes
         self.query_string = query
         self.keyspace = keyspace
+        self.consistency_level = consistency_level
 
     @classmethod
-    def from_message(cls, query_id, column_metadata, cluster_metadata, query, keyspace):
+    def from_message(cls, query_id, column_metadata, cluster_metadata, query,
+                     keyspace, consistency_level):
         if not column_metadata:
-            return PreparedStatement(column_metadata, query_id, None, query, keyspace)
+            return PreparedStatement(column_metadata, query_id, None, query,
+                                     keyspace, consistency_level)
 
         partition_key_columns = None
         routing_key_indexes = None
@@ -156,7 +160,8 @@ class PreparedStatement(object):
                     pass  # we're missing a partition key component in the prepared
                           # statement; just leave routing_key_indexes as None
 
-        return PreparedStatement(column_metadata, query_id, routing_key_indexes, query, keyspace)
+        return PreparedStatement(column_metadata, query_id, routing_key_indexes,
+                                 query, keyspace, consistency_level)
 
     def bind(self, values):
         """
@@ -195,11 +200,12 @@ class BoundStatement(Statement):
         `prepared_statement` should be an instance of :class:`PreparedStatement`.
         All other ``*args`` and ``**kwargs`` will be passed to :class:`.Statement`.
         """
+        Statement.__init__(self, *args, **kwargs)
+
         self.consistency_level = prepared_statement.consistency_level
         self.prepared_statement = prepared_statement
         self.values = []
 
-        Statement.__init__(self, *args, **kwargs)
 
     def bind(self, values):
         """
