@@ -23,7 +23,7 @@ from cqlengine.columns import Boolean
 from cqlengine.columns import Float
 from cqlengine.columns import Decimal
 
-from cqlengine.management import create_table, delete_table, sync_table
+from cqlengine.management import create_table, delete_table, sync_table, drop_table
 from cqlengine.models import Model
 
 import sys
@@ -241,6 +241,7 @@ class TestPythonDoesntDieWhenExtraFieldIsInCassandra(BaseCassEngTestCase):
         id = UUID(primary_key=True, default=uuid4)
 
     def test_extra_field(self):
+        drop_table(self.TestModel)
         sync_table(self.TestModel)
         self.TestModel.create()
         execute("ALTER TABLE {} add blah int".format(self.TestModel.column_family_name(include_keyspace=True)))
