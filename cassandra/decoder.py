@@ -783,6 +783,12 @@ def cql_encode_str(val):
     return cql_quote(val)
 
 
+def cql_encode_bytes(val):
+    hex_val = ''.join('%02x' % byte for byte in val)
+    hex_val = '0x' + hex_val
+    return hex_val
+
+
 def cql_encode_object(val):
     return str(val)
 
@@ -815,6 +821,7 @@ def cql_encode_set_collection(val):
 
 cql_encoders = {
     float: cql_encode_object,
+    bytearray: cql_encode_bytes,
     str: cql_encode_str,
     unicode: cql_encode_unicode,
     types.NoneType: cql_encode_none,

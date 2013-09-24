@@ -201,6 +201,7 @@ class Cluster(object):
                  metrics_enabled=False,
                  connection_class=None,
                  sockopts=None,
+                 cql_version=None,
                  executor_threads=2,
                  max_schema_agreement_wait=10):
         """
@@ -236,6 +237,7 @@ class Cluster(object):
 
         self.metrics_enabled = metrics_enabled
         self.sockopts = sockopts
+        self.cql_version = cql_version
         self.max_schema_agreement_wait = max_schema_agreement_wait
 
         # let Session objects be GC'ed (and shutdown) when the user no longer
@@ -316,6 +318,7 @@ class Cluster(object):
         kwargs['port'] = self.port
         kwargs['compression'] = self.compression
         kwargs['sockopts'] = self.sockopts
+        kwargs['cql_version'] = self.cql_version
 
         return self.connection_class.factory(address, *args, **kwargs)
 
@@ -326,6 +329,7 @@ class Cluster(object):
         kwargs['port'] = self.port
         kwargs['compression'] = self.compression
         kwargs['sockopts'] = self.sockopts
+        kwargs['cql_version'] = self.cql_version
 
         return partial(self.connection_class.factory, host.address, *args, **kwargs)
 
