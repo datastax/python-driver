@@ -1,3 +1,21 @@
+1.0.0-beta4
+===========
+Sep 24, 2013
+
+Features
+--------
+* Handle new blob syntax in Cassandra 2.0 by accepting bytearray
+  objects for blob values
+* Add cql_version kwarg to Cluster.__init__
+
+Bug Fixes
+---------
+* Fix KeyError when building token map with NetworkTopologyStrategy
+  keyspaces (this prevented a Cluster from successfully connecting
+  at all).
+* Don't lose default consitency level from parent PreparedStatement
+  when creating BoundStatements
+
 1.0.0-beta3
 ===========
 Sep 20, 2013
