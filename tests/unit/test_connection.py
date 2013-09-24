@@ -93,7 +93,7 @@ class ConnectionTest(unittest.TestCase):
         c.defunct = Mock()
 
         # read in a SupportedMessage response
-        header = self.make_header_prefix(SupportedMessage, version=0x04)
+        header = self.make_header_prefix(SupportedMessage)
         options = self.make_options_body()
         message = self.make_msg(header, options)
         c.process_msg(message, -13)
@@ -127,3 +127,18 @@ class ConnectionTest(unittest.TestCase):
         c.defunct.assert_called_once_with(ANY)
         args, kwargs = c.defunct.call_args
         self.assertIsInstance(args[0], ProtocolError)
+
+    def test_not_implemented(self):
+        """
+        Ensure the following methods throw NIE's. If not, come back and test them.
+        """
+
+        c  = self.make_connection()
+
+        self.assertRaises(NotImplementedError, c.close)
+        self.assertRaises(NotImplementedError, c.defunct, None)
+        self.assertRaises(NotImplementedError, c.send_msg, None, None)
+        self.assertRaises(NotImplementedError, c.wait_for_response, None)
+        self.assertRaises(NotImplementedError, c.wait_for_responses)
+        self.assertRaises(NotImplementedError, c.register_watcher, None, None)
+        self.assertRaises(NotImplementedError, c.register_watchers, None)

@@ -283,21 +283,7 @@ class TestCodeCoverage(unittest.TestCase):
         cluster = Cluster()
         cluster.connect()
 
-        # BUG: cassandra.metadata:KeyspaceMetadata.as_cql_query() fails when self.name == 'system'
-        # because self.replication_strategy == None
-        # self.assertTrue(isinstance(cluster.metadata.export_schema_as_string(), str))
-        # Traceback (most recent call last):
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/test_metadata.py", line 288, in test_export_schema
-        #     self.assertTrue(isinstance(cluster.metadata.export_schema_as_string(), str))
-        #   File "/Users/joaquin/repos/python-driver/cassandra/metadata.py", line 71, in export_schema_as_string
-        #     return "\n".join(ks.export_as_string() for ks in self.keyspaces.values())
-        #   File "/Users/joaquin/repos/python-driver/cassandra/metadata.py", line 71, in <genexpr>
-        #     return "\n".join(ks.export_as_string() for ks in self.keyspaces.values())
-        #   File "/Users/joaquin/repos/python-driver/cassandra/metadata.py", line 438, in export_as_string
-        #     return "\n".join([self.as_cql_query()] + [t.as_cql_query() for t in self.tables.values()])
-        #   File "/Users/joaquin/repos/python-driver/cassandra/metadata.py", line 444, in as_cql_query
-        #     (self.name, self.replication_strategy.export_for_schema())
-        # AttributeError: 'NoneType' object has no attribute 'export_for_schema'
+        self.assertIsInstance(cluster.metadata.export_schema_as_string(), unicode)
 
     def test_export_keyspace_schema(self):
         """
@@ -308,10 +294,9 @@ class TestCodeCoverage(unittest.TestCase):
         cluster.connect()
 
         for keyspace in cluster.metadata.keyspaces:
-            if keyspace != 'system':
-                keyspace_metadata = cluster.metadata.keyspaces[keyspace]
-                self.assertTrue(isinstance(keyspace_metadata.export_as_string(), unicode))
-                self.assertTrue(isinstance(keyspace_metadata.as_cql_query(), unicode))
+            keyspace_metadata = cluster.metadata.keyspaces[keyspace]
+            self.assertIsInstance(keyspace_metadata.export_as_string(), unicode)
+            self.assertIsInstance(keyspace_metadata.as_cql_query(), unicode)
 
     def test_already_exists_exceptions(self):
         """
@@ -344,7 +329,6 @@ class TestCodeCoverage(unittest.TestCase):
 
         cluster.connect('test3rf')
 
-        # BUG: The next line fails
         self.assertNotEqual(list(cluster.metadata.get_replicas('test3rf', 'key')), [])
         host = list(cluster.metadata.get_replicas('test3rf', 'key'))[0]
         self.assertEqual(host.datacenter, 'datacenter1')

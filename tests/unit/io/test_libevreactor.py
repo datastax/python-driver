@@ -95,7 +95,7 @@ class LibevConnectionTest(unittest.TestCase):
         # make sure it errored correctly
         self.assertTrue(c.is_defunct)
         self.assertTrue(c.connected_event.is_set())
-        self.assertTrue(isinstance(c.last_error, ProtocolError))
+        self.assertIsInstance(c.last_error, ProtocolError)
 
     def test_error_message_on_startup(self, *args):
         c = self.make_connection()
@@ -119,7 +119,7 @@ class LibevConnectionTest(unittest.TestCase):
 
         # make sure it errored correctly
         self.assertTrue(c.is_defunct)
-        self.assertTrue(isinstance(c.last_error, ConnectionException))
+        self.assertIsInstance(c.last_error, ConnectionException)
         self.assertTrue(c.connected_event.is_set())
 
     def test_socket_error_on_write(self, *args):
@@ -131,7 +131,7 @@ class LibevConnectionTest(unittest.TestCase):
 
         # make sure it errored correctly
         self.assertTrue(c.is_defunct)
-        self.assertTrue(isinstance(c.last_error, socket_error))
+        self.assertIsInstance(c.last_error, socket_error)
         self.assertTrue(c.connected_event.is_set())
 
     def test_blocking_on_write(self, *args):
@@ -178,7 +178,7 @@ class LibevConnectionTest(unittest.TestCase):
 
         # make sure it errored correctly
         self.assertTrue(c.is_defunct)
-        self.assertTrue(isinstance(c.last_error, socket_error))
+        self.assertIsInstance(c.last_error, socket_error)
         self.assertTrue(c.connected_event.is_set())
 
     def test_partial_header_read(self, *args):
