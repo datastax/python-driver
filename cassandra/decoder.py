@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from binascii import hexlify
 from collections import namedtuple
 try:
     from collections import OrderedDict
@@ -784,9 +785,7 @@ def cql_encode_str(val):
 
 
 def cql_encode_bytes(val):
-    hex_val = ''.join('%02x' % byte for byte in val)
-    hex_val = '0x' + hex_val
-    return hex_val
+    return '0x' + hexlify(val)
 
 
 def cql_encode_object(val):
