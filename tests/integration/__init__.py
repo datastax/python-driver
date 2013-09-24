@@ -43,6 +43,9 @@ def get_server_versions():
 
 
 def _tuple_version(version_string):
+    if '-' in version_string:
+        version_string = version_string[:version_string.index('-')]
+
     return tuple([int(p) for p in version_string.split('.')])
 
 
