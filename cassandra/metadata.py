@@ -385,9 +385,9 @@ class NetworkTopologyStrategy(ReplicationStrategy):
 
     def make_token_replica_map(self, token_to_host_owner, ring):
         # note: this does not account for hosts having different racks
-        replica_map = {}
+        replica_map = defaultdict(set)
         for i in range(len(ring)):
-            remaining = self.dc_replication_factors.copy()
+            remaining = dict((dc, int(rf)) for dc, rf in self.dc_replication_factors.items())
             for j in range(len(ring)):
                 host = token_to_host_owner[ring[(i + j) % len(ring)]]
                 if not host.datacenter:
@@ -842,7 +842,7 @@ class Murmur3Token(Token):
         self.value = int(token)
 
     def __repr__(self):
-        return "<Murmur3Token: %r" % (self.value,)
+        return "<Murmur3Token: %r>" % (self.value,)
     __str__ = __repr__
 
 
@@ -860,7 +860,7 @@ class MD5Token(Token):
         self.value = int(token)
 
     def __repr__(self):
-        return "<MD5Token: %d" % (self.value,)
+        return "<MD5Token: %d>" % (self.value,)
     __str__ = __repr__
 
 
@@ -878,5 +878,5 @@ class BytesToken(Token):
         self.value = token_string
 
     def __repr__(self):
-        return "<BytesToken: %r" % (self.value,)
+        return "<BytesToken: %r>" % (self.value,)
     __str__ = __repr__
