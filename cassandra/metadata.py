@@ -822,6 +822,9 @@ class Token(object):
     def __hash__(self):
         return self.value
 
+    def __repr__(self):
+        return "<%s: %r>" % (self.__class__.__name__, self.value)
+    __str__ = __repr__
 
 MIN_LONG = -(2 ** 63)
 MAX_LONG = (2 ** 63) - 1
@@ -848,10 +851,6 @@ class Murmur3Token(Token):
         """ `token` should be an int or string representing the token """
         self.value = int(token)
 
-    def __repr__(self):
-        return "<Murmur3Token: %r>" % (self.value,)
-    __str__ = __repr__
-
 
 class MD5Token(Token):
     """
@@ -866,10 +865,6 @@ class MD5Token(Token):
         """ `token` should be an int or string representing the token """
         self.value = int(token)
 
-    def __repr__(self):
-        return "<MD5Token: %d>" % (self.value,)
-    __str__ = __repr__
-
 
 class BytesToken(Token):
     """
@@ -883,7 +878,3 @@ class BytesToken(Token):
                 "Tokens for ByteOrderedPartitioner should be strings (got %s)"
                 % (type(token_string),))
         self.value = token_string
-
-    def __repr__(self):
-        return "<BytesToken: %r>" % (self.value,)
-    __str__ = __repr__
