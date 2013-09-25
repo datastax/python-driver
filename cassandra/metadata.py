@@ -387,13 +387,16 @@ class NetworkTopologyStrategy(ReplicationStrategy):
         # note: this does not account for hosts having different racks
         replica_map = defaultdict(set)
         for i in range(len(ring)):
-            remaining = dict((dc, int(rf)) for dc, rf in self.dc_replication_factors.items())
+            remaining = dict((dc, int(rf))
+                             for dc, rf in self.dc_replication_factors.items()
+                             if rf > 0)
             for j in range(len(ring)):
-                host = token_to_host_owner[ring[(i + j) % len(ring)]]
+                token = ring[(i + j) % len(ring)]
+                host = token_to_host_owner[token]
                 if not host.datacenter:
                     continue
 
-                if not remaining[host.datacenter]:
+                if not host.datacenter in remaining:
                     # we already have all replicas for this DC
                     continue
 
