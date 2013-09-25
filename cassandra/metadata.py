@@ -819,6 +819,10 @@ class Token(object):
         else:
             return 1
 
+    def __hash__(self):
+        return self.value
+
+
 MIN_LONG = -(2 ** 63)
 MAX_LONG = (2 ** 63) - 1
 
