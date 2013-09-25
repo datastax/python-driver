@@ -6,6 +6,7 @@ from decimal import Decimal as D
 from unittest import TestCase
 from uuid import uuid4, uuid1
 from cqlengine import ValidationError
+from cqlengine.connection import execute
 
 from cqlengine.tests.base import BaseCassEngTestCase
 
@@ -22,7 +23,7 @@ from cqlengine.columns import Boolean
 from cqlengine.columns import Float
 from cqlengine.columns import Decimal
 
-from cqlengine.management import create_table, delete_table
+from cqlengine.management import create_table, delete_table, sync_table, drop_table
 from cqlengine.models import Model
 
 import sys
@@ -234,6 +235,17 @@ class TestExtraFieldsRaiseException(BaseCassEngTestCase):
         with self.assertRaises(ValidationError):
             self.TestModel.create(bacon=5000)
 
+class TestPythonDoesntDieWhenExtraFieldIsInCassandra(BaseCassEngTestCase):
+    class TestModel(Model):
+        __table_name__ = 'alter_doesnt_break_running_app'
+        id = UUID(primary_key=True, default=uuid4)
+
+    def test_extra_field(self):
+        drop_table(self.TestModel)
+        sync_table(self.TestModel)
+        self.TestModel.create()
+        execute("ALTER TABLE {} add blah int".format(self.TestModel.column_family_name(include_keyspace=True)))
+        self.TestModel.objects().all()
 
 class TestTimeUUIDFromDatetime(TestCase):
     def test_conversion_specific_date(self):

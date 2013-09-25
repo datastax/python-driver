@@ -168,7 +168,7 @@ class ConnectionPool(object):
             except cql.ProgrammingError as ex:
                 raise CQLEngineException(unicode(ex))
             except TTransportException:
-                raise CQLEngineException("Could not execute query against the cluster")
+                pass
 
 
 def execute(query, params=None):
