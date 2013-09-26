@@ -44,6 +44,11 @@ try:
 except ImportError:
     from cassandra.io.asyncorereactor import AsyncoreConnection as DefaultConnection  # NOQA
 
+# Forces load of utf8 encoding module to avoid deadlock that occurs
+# if code that is being imported tries to import the module in a seperate
+# thread.
+# See http://bugs.python.org/issue10923
+"".encode('utf8')
 
 log = logging.getLogger(__name__)
 
