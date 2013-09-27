@@ -386,27 +386,30 @@ class NetworkTopologyStrategy(ReplicationStrategy):
     def make_token_replica_map(self, token_to_host_owner, ring):
         # note: this does not account for hosts having different racks
         replica_map = defaultdict(set)
-        for i in range(len(ring)):
-            remaining = dict((dc, int(rf))
-                             for dc, rf in self.dc_replication_factors.items()
-                             if rf > 0)
-            for j in range(len(ring)):
-                token = ring[(i + j) % len(ring)]
-                host = token_to_host_owner[token]
-                if not host.datacenter:
-                    continue
+        ring_len = len(ring)
+        ring_len_range = range(ring_len)
+        dc_rf_map = dict((dc, int(rf))
+                         for dc, rf in self.dc_replication_factors.items() if rf > 0)
+        dcs = dict((h, h.datacenter) for h in set(token_to_host_owner.values()))
 
-                if not host.datacenter in remaining:
+        for i in ring_len_range:
+            remaining = dc_rf_map.copy()
+            for j in ring_len_range:
+                token = ring[(i + j) % ring_len]
+                host = token_to_host_owner[token]
+                dc = dcs[host]
+                if not dc in remaining:
                     # we already have all replicas for this DC
                     continue
 
                 replica_map[ring[i]].add(host)
-                remaining[host.datacenter] -= 1
-                if remaining[host.datacenter] == 0:
-                    del remaining[host.datacenter]
 
-                if not remaining:
-                    break
+                if remaining[dc] == 1:
+                    del remaining[dc]
+                    if not remaining:
+                        break
+                else:
+                    remaining[dc] -= 1
 
         return replica_map
 
@@ -818,6 +821,9 @@ class Token(object):
             return 0
         else:
             return 1
+
+    def __eq__(self, other):
+        return self.value == other.value
 
     def __hash__(self):
         return self.value
