@@ -197,7 +197,7 @@ Column Options
 
     .. attribute:: BaseColumn.required
 
-        If True, this model cannot be saved without a value defined for this column. Defaults to True. Primary key fields cannot have their required fields set to False.
+        If True, this model cannot be saved without a value defined for this column. Defaults to False. Primary key fields cannot have their required fields set to False.
 
     .. attribute:: BaseColumn.clustering_order
 
