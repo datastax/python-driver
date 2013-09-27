@@ -12,6 +12,8 @@ import logging
 from copy import copy
 from cqlengine.exceptions import CQLEngineException
 
+from cql import OperationalError
+
 from contextlib import contextmanager
 
 from thrift.transport.TTransport import TTransportException
@@ -26,6 +28,7 @@ _max_connections = 10
 
 # global connection pool
 connection_pool = None
+
 
 
 class CQLConnectionError(CQLEngineException): pass
@@ -169,6 +172,9 @@ class ConnectionPool(object):
                 raise CQLEngineException(unicode(ex))
             except TTransportException:
                 pass
+            except OperationalError as ex:
+                LOG.exception("Operational Error %s on %s:%s", ex, con.host, con.port)
+                raise ex
 
 
 def execute(query, params=None):
