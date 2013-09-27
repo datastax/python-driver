@@ -1,5 +1,8 @@
 CHANGELOG
 
+0.8.3
+* better logging for operational errors
+
 0.8.2
 * fix for connection failover
 
