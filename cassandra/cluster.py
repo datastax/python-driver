@@ -5,7 +5,6 @@ This module houses the main classes you will interact with,
 
 from concurrent.futures import ThreadPoolExecutor
 import logging
-import sys
 import time
 from threading import Lock, RLock, Thread, Event
 import Queue
@@ -214,13 +213,6 @@ class Cluster(object):
         Any of the mutable Cluster attributes may be set as keyword arguments
         to the constructor.
         """
-        # if 'gevent.monkey' in sys.modules:
-        #     raise Exception(
-        #         "gevent monkey-patching detected. This driver does not currently "
-        #         "support gevent, and monkey patching will break the driver "
-        #         "completely. You can track progress towards adding gevent "
-        #         "support here: https://datastax-oss.atlassian.net/browse/PYTHON-7.")
-
         self.contact_points = contact_points
         self.port = port
         self.compression = compression

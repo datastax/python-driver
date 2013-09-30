@@ -62,11 +62,9 @@ class GeventConnection(Connection):
         self._push_watchers = defaultdict(set)
         self.deque = deque()
 
-        log.debug("About to connect in gevent %s" % ((self.host, self.port),))
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._socket.settimeout(1.0)  # TODO potentially make this value configurable
         self._socket.connect((self.host, self.port))
-        log.debug("Did connect in gevent")
 
         self._read_watcher = gevent.spawn(lambda: self.handle_read())
         self._write_watcher = gevent.spawn(lambda: self.handle_write())
