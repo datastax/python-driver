@@ -15,6 +15,7 @@ try:
 except ImportError:
     LibevConnection = None
 
+
 class ConnectionTest(object):
 
     klass = None
