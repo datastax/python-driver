@@ -25,8 +25,6 @@ from cassandra.marshal import int32_unpack
 
 log = logging.getLogger(__name__)
 
-_starting_conns = set()
-
 
 def is_timeout(err):
     return (
