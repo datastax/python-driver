@@ -3,12 +3,17 @@ from gevent import select
 from gevent import socket
 from gevent.event import Event
 
-from collections import defaultdict, deque
+from collections import defaultdict
 from functools import partial
 import logging
 import os
 import sys
 import traceback
+
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO  # ignore flake8 warning: # NOQA
 
 if 'gevent.monkey' in sys.modules:
     from gevent.queue import Queue
@@ -18,7 +23,7 @@ else:
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL
 
 from cassandra.connection import (Connection, ResponseWaiter, ConnectionShutdown,
-                                  ConnectionBusy, NONBLOCKING)
+                                  ConnectionBusy)
 from cassandra.decoder import RegisterMessage
 from cassandra.marshal import int32_unpack
 
@@ -38,7 +43,6 @@ class GeventConnection(Connection):
     An implementation of :class:`.Connection` that utilizes ``gevent``.
     """
 
-    _buf = ""
     _total_reqd_bytes = 0
     _read_watcher = None
     _write_watcher = None
@@ -57,22 +61,21 @@ class GeventConnection(Connection):
         super(GeventConnection, self).__init__(*args, **kwargs)
 
         self.connected_event = Event()
+        self._iobuf = StringIO()
+        self._write_queue = Queue()
 
         self._callbacks = {}
         self._push_watchers = defaultdict(set)
-        self.deque = deque()
 
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._socket.settimeout(1.0)  # TODO potentially make this value configurable
         self._socket.connect((self.host, self.port))
-
-        self._read_watcher = gevent.spawn(lambda: self.handle_read())
-        self._write_watcher = gevent.spawn(lambda: self.handle_write())
 
         if self.sockopts:
             for args in self.sockopts:
                 self._socket.setsockopt(*args)
 
+        self._read_watcher = gevent.spawn(lambda: self.handle_read())
+        self._write_watcher = gevent.spawn(lambda: self.handle_write())
         self._send_options_message()
 
     def close(self):
@@ -135,24 +138,18 @@ class GeventConnection(Connection):
 
         while True:
             try:
+                next_msg = self._write_queue.get()
                 select.select((), wlist, ())
             except Exception as err:
-                log.debug("Write loop got error %s" % err)
+                log.debug("Write loop: got error %s" % err)
                 return
 
-            if self.deque:
-                next_msg = self.deque.popleft()
-                try:
-                    self._socket.sendall(next_msg)
-                except socket.error as err:
-                    if (err.args[0] in NONBLOCKING):
-                        self.deque.appendleft(next_msg)
-                        gevent.sleep(1.0)
-                    else:
-                        self.defunct(err)
-                        return  # Leave the write loop
-            else:
-                gevent.sleep(0.1)
+            try:
+                self._socket.sendall(next_msg)
+            except socket.error as err:
+                log.debug("Write loop: got error, defuncting socket and exiting")
+                self.defunct(err)
+                return  # Leave the write loop
 
     def handle_read(self):
         rlist = (self._socket,)
@@ -161,7 +158,6 @@ class GeventConnection(Connection):
             try:
                 select.select(rlist, (), ())
             except Exception as err:
-                log.debug("Read loop got error %s" % err)
                 return
 
             try:
@@ -172,26 +168,44 @@ class GeventConnection(Connection):
                     return  # leave the read loop
 
             if buf:
-                self._buf += buf
+                self._iobuf.write(buf)
                 while True:
-                    if len(self._buf) < 8:
-                        # we don't have a complete header yet
-                        break
-                    elif self._total_reqd_bytes and len(self._buf) < self._total_reqd_bytes:
-                        # we already saw a header, but we don't have a complete message yet
+                    pos = self._iobuf.tell()
+                    if pos < 8 or (self._total_reqd_bytes > 0 and pos < self._total_reqd_bytes):
+                        # we don't have a complete header yet or we
+                        # already saw a header, but we don't have a
+                        # complete message yet
                         break
                     else:
-                        body_len = int32_unpack(self._buf[4:8])
-                        if len(self._buf) - 8 >= body_len:
-                            msg = self._buf[:8 + body_len]
-                            self._buf = self._buf[8 + body_len:]
+                        # have enough for header, read body len from header
+                        self._iobuf.seek(4)
+                        body_len_bytes = self._iobuf.read(4)
+                        body_len = int32_unpack(body_len_bytes)
+
+                        # seek to end to get length of current buffer
+                        self._iobuf.seek(0, os.SEEK_END)
+                        pos = self._iobuf.tell()
+
+                        if pos - 8 >= body_len:
+                            # read message header and body
+                            self._iobuf.seek(0)
+                            msg = self._iobuf.read(8 + body_len)
+
+                            # leave leftover in current buffer
+                            leftover = self._iobuf.read()
+                            self._iobuf = StringIO()
+                            self._iobuf.write(leftover)
+
                             self._total_reqd_bytes = 0
                             self.process_msg(msg, body_len)
                         else:
                             self._total_reqd_bytes = body_len + 8
+                            break
+            else:
+                log.debug("connection closed by server")
+                self.close()
 
     def handle_pushed(self, response):
-        log.debug("Message pushed from server: %r", response)
         for cb in self._push_watchers.get(response.event_type, []):
             try:
                 cb(response.event_args)
@@ -199,15 +213,9 @@ class GeventConnection(Connection):
                 log.exception("Pushed event handler errored, ignoring:")
 
     def push(self, data):
-        sabs = self.out_buffer_size
-        if len(data) > sabs:
-            chunks = []
-            for i in xrange(0, len(data), sabs):
-                chunks.append(data[i:i + sabs])
-        else:
-            chunks = [data]
-
-        self.deque.extend(chunks)
+        chunk_size = self.out_buffer_size
+        for i in xrange(0, len(data), chunk_size):
+            self._write_queue.put(data[i:i+chunk_size])
 
     def send_msg(self, msg, cb):
         if self.is_defunct:
