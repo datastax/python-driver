@@ -283,7 +283,7 @@ class ValueSequence(object):
     For example::
 
         >>> my_user_ids = ('alice', 'bob', 'charles')
-        >>> query = "SELECT * FROM users WHERE user_id IN ?"
+        >>> query = "SELECT * FROM users WHERE user_id IN %s"
         >>> session.execute(query, parameters=[ValueSequence(my_user_ids)])
 
     """
