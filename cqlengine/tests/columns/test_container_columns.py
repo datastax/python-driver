@@ -145,8 +145,6 @@ class TestSetColumn(BaseCassEngTestCase):
         column = columns.Set(columns.Text(min_length=100))
         assert isinstance(column.value_col, columns.Text)
 
-
-
     def test_to_python(self):
         """ Tests that to_python of value column is called """
         column = columns.Set(JsonTestColumn)

@@ -1,5 +1,8 @@
 CHANGELOG
 
+0.8.4
+* changing value manager previous value copying to deepcopy
+
 0.8.3
 * better logging for operational errors
 

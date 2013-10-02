@@ -1,5 +1,5 @@
 #column field types
-from copy import copy
+from copy import deepcopy
 from datetime import datetime
 from datetime import date
 import re
@@ -8,12 +8,13 @@ from cql.query import cql_quote
 
 from cqlengine.exceptions import ValidationError
 
+
 class BaseValueManager(object):
 
     def __init__(self, instance, column, value):
         self.instance = instance
         self.column = column
-        self.previous_value = copy(value)
+        self.previous_value = deepcopy(value)
         self.value = value
 
     @property
@@ -31,7 +32,7 @@ class BaseValueManager(object):
         return self.value != self.previous_value
 
     def reset_previous_value(self):
-        self.previous_value = copy(self.value)
+        self.previous_value = deepcopy(self.value)
 
     def getval(self):
         return self.value
@@ -51,6 +52,7 @@ class BaseValueManager(object):
             return property(_get, _set, _del)
         else:
             return property(_get, _set)
+
 
 class ValueQuoter(object):
     """
