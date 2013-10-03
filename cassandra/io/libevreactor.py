@@ -223,14 +223,13 @@ class LibevConnection(Connection):
                 else:
                     # have enough for header, read body len from header
                     self._iobuf.seek(4)
-                    body_len_bytes = self._iobuf.read(4)
-                    body_len = int32_unpack(body_len_bytes)
+                    body_len = int32_unpack(self._iobuf.read(4))
 
                     # seek to end to get length of current buffer
                     self._iobuf.seek(0, os.SEEK_END)
                     pos = self._iobuf.tell()
 
-                    if pos - 8 >= body_len:
+                    if pos >= body_len + 8:
                         # read message header and body
                         self._iobuf.seek(0)
                         msg = self._iobuf.read(8 + body_len)

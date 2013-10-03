@@ -12,6 +12,11 @@ from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL, EISCONN, errorcode
 import asyncore
 
 try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO  # ignore flake8 warning: # NOQA
+
+try:
     import ssl
 except ImportError:
     ssl = None # NOQA
@@ -75,7 +80,6 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
     module in the Python standard library for its event loop.
     """
 
-    _buf = ""
     _total_reqd_bytes = 0
     _writable = False
     _readable = False
@@ -95,6 +99,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         asyncore.dispatcher.__init__(self)
 
         self.connected_event = Event()
+        self._iobuf = StringIO()
 
         self._callbacks = {}
         self._push_watchers = defaultdict(set)
@@ -232,30 +237,47 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
 
     def handle_read(self):
         try:
-            buf = self.recv(self.in_buffer_size)
+            while True:
+                buf = self.recv(self.in_buffer_size)
+                self._iobuf.write(buf)
+                if len(buf) < self.in_buffer_size:
+                    break
         except socket.error as err:
             if err.args[0] not in NONBLOCKING:
                 self.defunct(err)
             return
 
-        if buf:
-            self._buf += buf
+        if self._iobuf.tell():
             while True:
-                if len(self._buf) < 8:
-                    # we don't have a complete header yet
-                    break
-                elif self._total_reqd_bytes and len(self._buf) < self._total_reqd_bytes:
-                    # we already saw a header, but we don't have a complete message yet
+                pos = self._iobuf.tell()
+                if pos < 8 or (self._total_reqd_bytes > 0 and pos < self._total_reqd_bytes):
+                    # we don't have a complete header yet or we
+                    # already saw a header, but we don't have a
+                    # complete message yet
                     break
                 else:
-                    body_len = int32_unpack(self._buf[4:8])
-                    if len(self._buf) - 8 >= body_len:
-                        msg = self._buf[:8 + body_len]
-                        self._buf = self._buf[8 + body_len:]
+                    self._iobuf.seek(4)
+                    body_len = int32_unpack(self._iobuf.read(4))
+
+                    # seek to end to get length of current buffer
+                    self._iobuf.seek(0, os.SEEK_END)
+                    pos = self._iobuf.tell()
+
+                    if pos >= body_len + 8:
+                        # read message header and body
+                        self._iobuf.seek(0)
+                        msg = self._iobuf.read(8 + body_len)
+
+                        # leave leftover in current buffer
+                        leftover = self._iobuf.read()
+                        self._iobuf = StringIO()
+                        self._iobuf.write(leftover)
+
                         self._total_reqd_bytes = 0
                         self.process_msg(msg, body_len)
                     else:
                         self._total_reqd_bytes = body_len + 8
+                        break
 
             if not self._callbacks:
                 self._readable = False
