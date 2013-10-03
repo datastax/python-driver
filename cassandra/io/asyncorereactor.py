@@ -11,6 +11,11 @@ from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL, EISCONN, errorcode
 
 import asyncore
 
+try:
+    import ssl
+except ImportError:
+    ssl = None # NOQA
+
 from cassandra.connection import (Connection, ResponseWaiter, ConnectionShutdown,
                                   ConnectionBusy, ConnectionException, NONBLOCKING)
 from cassandra.decoder import RegisterMessage
@@ -116,6 +121,10 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         # non-blocking mode removed (we will do that after connecting)
         self.family_and_type = family, type
         sock = socket.socket(family, type)
+        if self.ssl_options:
+            if not ssl:
+                raise Exception("This version of Python was not compiled with SSL support")
+            sock = ssl.wrap_socket(sock, **self.ssl_options)
         self.set_socket(sock)
 
     def connect(self, address):

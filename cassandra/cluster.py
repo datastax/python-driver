@@ -154,6 +154,18 @@ class Cluster(object):
     :const:`True`, else :const:`None`.
     """
 
+    ssl_options = None
+    """
+    A optional dict which will be used as kwargs for ``ssl.wrap_socket()``
+    when new sockets are created.  This should be used when client encryption
+    is enabled in Cassandra.
+
+    By default, a ``ca_certs`` value should be supplied (the value should be
+    a string pointing to the location of the CA certs file), and you probably
+    want to specify ``ssl_version`` as ``ssl.PROTOCOL_TLSv1`` to match
+    Cassandra's default protocol.
+    """
+
     sockopts = None
     """
     An optional list of tuples which will be used as arguments to
@@ -206,6 +218,7 @@ class Cluster(object):
                  conviction_policy_factory=None,
                  metrics_enabled=False,
                  connection_class=None,
+                 ssl_options=None,
                  sockopts=None,
                  cql_version=None,
                  executor_threads=2,
@@ -248,6 +261,7 @@ class Cluster(object):
             self.connection_class = connection_class
 
         self.metrics_enabled = metrics_enabled
+        self.ssl_options = ssl_options
         self.sockopts = sockopts
         self.cql_version = cql_version
         self.max_schema_agreement_wait = max_schema_agreement_wait
@@ -324,26 +338,24 @@ class Cluster(object):
         Called to create a new connection with proper configuration.
         Intended for internal use only.
         """
-        if self.auth_provider:
-            kwargs['credentials'] = self.auth_provider(address)
-
-        kwargs['port'] = self.port
-        kwargs['compression'] = self.compression
-        kwargs['sockopts'] = self.sockopts
-        kwargs['cql_version'] = self.cql_version
-
+        kwargs = self._make_connection_kwargs(address, kwargs)
         return self.connection_class.factory(address, *args, **kwargs)
 
     def _make_connection_factory(self, host, *args, **kwargs):
-        if self.auth_provider:
-            kwargs['credentials'] = self.auth_provider(host)
-
-        kwargs['port'] = self.port
-        kwargs['compression'] = self.compression
-        kwargs['sockopts'] = self.sockopts
-        kwargs['cql_version'] = self.cql_version
-
+        kwargs = self._make_connection_kwargs(host.address, kwargs)
         return partial(self.connection_class.factory, host.address, *args, **kwargs)
+
+    def _make_connection_kwargs(self, address, kwargs_dict):
+        if self.auth_provider:
+            kwargs_dict['credentials'] = self.auth_provider(address)
+
+        kwargs_dict['port'] = self.port
+        kwargs_dict['compression'] = self.compression
+        kwargs_dict['sockopts'] = self.sockopts
+        kwargs_dict['ssl_options'] = self.ssl_options
+        kwargs_dict['cql_version'] = self.cql_version
+
+        return kwargs_dict
 
     def connect(self, keyspace=None):
         """
@@ -1091,7 +1103,6 @@ class ControlConnection(object):
         local_query = QueryMessage(query=self._SELECT_LOCAL, consistency_level=cl)
         peers_result, local_result = connection.wait_for_responses(peers_query, local_query)
         peers_result = dict_factory(*peers_result.results)
-        log.debug("[control connection] Got system table results to refresh node list and token map")
 
         partitioner = None
         token_map = {}

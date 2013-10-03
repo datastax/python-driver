@@ -118,16 +118,20 @@ class Connection(object):
     compressor = None
     decompressor = None
 
+    ssl_options = None
     last_error = None
     in_flight = 0
     is_defunct = False
     is_closed = False
     lock = None
 
-    def __init__(self, host='127.0.0.1', port=9042, credentials=None, sockopts=None, compression=True, cql_version=None):
+    def __init__(self, host='127.0.0.1', port=9042, credentials=None,
+                 ssl_options=None, sockopts=None, compression=True,
+                 cql_version=None):
         self.host = host
         self.port = port
         self.credentials = credentials
+        self.ssl_options = ssl_options
         self.sockopts = sockopts
         self.compression = compression
         self.cql_version = cql_version

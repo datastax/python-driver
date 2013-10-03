@@ -18,6 +18,11 @@ try:
 except ImportError:
     from StringIO import StringIO  # ignore flake8 warning: # NOQA
 
+try:
+    import ssl
+except ImportError:
+    ssl = None # NOQA
+
 log = logging.getLogger(__name__)
 
 _loop = libev.Loop()
@@ -104,6 +109,10 @@ class LibevConnection(Connection):
         self.deque = deque()
 
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        if self.ssl_options:
+            if not ssl:
+                raise Exception("This version of Python was not compiled with SSL support")
+            self._socket = ssl.wrap_socket(self._socket, **self.ssl_options)
         self._socket.settimeout(1.0)  # TODO potentially make this value configurable
         self._socket.connect((self.host, self.port))
         self._socket.setblocking(0)
