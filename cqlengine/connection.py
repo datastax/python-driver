@@ -44,11 +44,32 @@ def _column_tuple_factory(colnames, values):
     return tuple(colnames), [RowResult(v) for v in values]
 
 
-def setup(hosts, username=None, password=None, max_connections=10, default_keyspace=None, consistency='ONE'):
+def setup(
+        hosts,
+        username=None,
+        password=None,
+        max_connections=10,
+        default_keyspace=None,
+        consistency='ONE',
+        timeout=None):
     """
     Records the hosts and connects to one of them
 
     :param hosts: list of hosts, strings in the <hostname>:<port>, or just <hostname>
+    :type hosts: list
+    :param username: The cassandra username
+    :type username: str
+    :param password: The cassandra password
+    :type password: str
+    :param max_connections: The maximum number of connections to service
+    :type max_connections: int or long
+    :param default_keyspace: The default keyspace to use
+    :type default_keyspace: str
+    :param consistency: The global consistency level
+    :type consistency: str
+    :param timeout: The connection timeout in milliseconds
+    :type timeout: int or long
+
     """
     global _max_connections
     global connection_pool
@@ -72,17 +93,24 @@ def setup(hosts, username=None, password=None, max_connections=10, default_keysp
     if not _hosts:
         raise CQLConnectionError("At least one host required")
 
-    connection_pool = ConnectionPool(_hosts, username, password, consistency)
+    connection_pool = ConnectionPool(_hosts, username, password, consistency, timeout)
 
 
 class ConnectionPool(object):
     """Handles pooling of database connections."""
 
-    def __init__(self, hosts, username=None, password=None, consistency=None):
+    def __init__(
+            self,
+            hosts,
+            username=None,
+            password=None,
+            consistency=None,
+            timeout=None):
         self._hosts = hosts
         self._username = username
         self._password = password
         self._consistency = consistency
+        self._timeout = timeout
 
         self._queue = Queue.Queue(maxsize=_max_connections)
 
@@ -124,6 +152,25 @@ class ConnectionPool(object):
         else:
             self._queue.put(conn)
 
+    def _create_transport(self, host):
+        """
+        Create a new Thrift transport for the given host.
+
+        :param host: The host object
+        :type host: Host
+
+        :rtype: thrift.TTransport.*
+
+        """
+        from thrift.transport import TSocket, TTransport
+
+        thrift_socket = TSocket.TSocket(host.name, host.port)
+        
+        if self._timeout is not None:
+            thrift_socket.setTimeout(self._timeout)
+            
+        return TTransport.TFramedTransport(thrift_socket)
+
     def _create_connection(self):
         """
         Creates a new connection for the connection pool.
@@ -138,12 +185,14 @@ class ConnectionPool(object):
 
         for host in hosts:
             try:
+                transport = self._create_transport(host)
                 new_conn = cql.connect(
                     host.name,
                     host.port,
                     user=self._username,
                     password=self._password,
-                    consistency_level=self._consistency
+                    consistency_level=self._consistency,
+                    transport=transport
                 )
                 new_conn.set_cql_version('3.0.0')
                 return new_conn
