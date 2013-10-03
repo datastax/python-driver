@@ -25,6 +25,9 @@ If there is a problem with one of the servers, cqlengine will try to connect to 
     :param consistency: the consistency level of the connection, defaults to 'ONE'
     :type consistency: str
 
+    :param timeout: the connection timeout in seconds
+    :type timeout: int or long
+
     Records the hosts and connects to one of them
 
 See the example at :ref:`getting-started`

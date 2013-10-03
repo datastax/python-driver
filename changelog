@@ -1,5 +1,8 @@
 CHANGELOG
 
+0.8.5
+* adding support for timeouts
+
 0.8.4
 * changing value manager previous value copying to deepcopy
 
