@@ -68,6 +68,7 @@ class GeventConnection(Connection):
         self._push_watchers = defaultdict(set)
 
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._socket.settimeout(1.0)
         self._socket.connect((self.host, self.port))
 
         if self.sockopts:
