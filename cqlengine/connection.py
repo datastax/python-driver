@@ -67,7 +67,7 @@ def setup(
     :type default_keyspace: str
     :param consistency: The global consistency level
     :type consistency: str
-    :param timeout: The connection timeout in milliseconds
+    :param timeout: The connection timeout in seconds
     :type timeout: int or long
 
     """
