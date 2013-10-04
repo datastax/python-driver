@@ -2,6 +2,12 @@
 Managing Schmas
 ===============
 
+**Users of versions < 0.4, please read this post before upgrading:** `Breaking Changes`_
+
+.. _Breaking Changes: https://groups.google.com/forum/?fromgroups#!topic/cqlengine-users/erkSNe1JwuU
+
+.. module:: cqlengine.connection
+
 .. module:: cqlengine.management
 
 Once a connection has been made to Cassandra, you can use the functions in ``cqlengine.management`` to create and delete keyspaces, as well as create and delete tables for defined models

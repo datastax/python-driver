@@ -1,6 +1,100 @@
 CHANGELOG
 
-0.2.1 (in progress)
+0.8.5
+* adding support for timeouts
+
+0.8.4
+* changing value manager previous value copying to deepcopy
+
+0.8.3
+* better logging for operational errors
+
+0.8.2
+* fix for connection failover
+
+0.8.1
+* fix for models not exactly matching schema
+
+0.8.0
+* support for table polymorphism
+* var int type
+
+0.7.1
+* refactoring query class to make defining custom model instantiation logic easier
+
+0.7.0
+* added counter columns
+* added support for compaction settings at the model level
+* deprecated delete_table in favor of drop_table
+* deprecated create_table in favor of sync_table
+* added support for custom QuerySets
+
+0.6.0
+* added table sync
+
+0.5.2
+* adding hex conversion to Bytes column
+
+0.5.1
+* improving connection pooling
+* fixing bug with clustering order columns not being quoted
+
+0.5
+* eagerly loading results into the query result cache, the cql driver does this anyway,
+    and pulling them from the cursor was causing some problems with gevented queries,
+    this will cause some breaking changes for users calling execute directly
+
+0.4.10
+* changing query parameter placeholders from uuid1 to uuid4
+
+0.4.7
+* adding support for passing None into query batch methods to clear any batch objects
+
+0.4.6
+* fixing the way models are compared
+
+0.4.5
+* fixed bug where container columns would not call their child to_python method, this only really affected columns with special to_python logic
+
+0.4.4
+* adding query logging back
+* fixed bug updating an empty list column
+
+0.4.3
+* fixed bug with Text column validation
+
+0.4.2
+* added support for instantiating container columns with column instances
+
+0.4.1
+* fixed bug in TimeUUID from datetime method
+
+0.4.0
+* removed default values from all column types
+* explicit primary key is required (automatic id removed)
+* added validation on keyname types on .create()
+* changed table_name to __table_name__, read_repair_chance to __read_repair_chance__, keyspace to __keyspace__
+* modified table name auto generator to ignore module name
+* changed internal implementation of model value get/set
+* added TimeUUID.from_datetime(), used for generating UUID1's for a specific
+time
+
+0.3.3
+* added abstract base class models
+
+0.3.2
+* comprehesive rewrite of connection management (thanks @rustyrazorblade)
+
+0.3
+* added support for Token function (thanks @mrk-its)
+* added support for compound partition key (thanks @mrk-its)s
+* added support for defining clustering key ordering (thanks @mrk-its)
+* added values_list to Query class, bypassing object creation if desired (thanks @mrk-its)
+* fixed bug with Model.objects caching values (thanks @mrk-its)
+* fixed Cassandra 1.2.5 compatibility bug
+* updated model exception inheritance
+
+0.2.1
 * adding support for datetimes with tzinfo (thanks @gdoermann)
 * fixing bug in saving map updates (thanks @pandu-rao)
 

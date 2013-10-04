@@ -2,6 +2,12 @@
 Making Queries
 ==============
 
+**Users of versions < 0.4, please read this post before upgrading:** `Breaking Changes`_
+
+.. _Breaking Changes: https://groups.google.com/forum/?fromgroups#!topic/cqlengine-users/erkSNe1JwuU
+
+.. module:: cqlengine.connection
+
 .. module:: cqlengine.query
 
 Retrieving objects
@@ -29,9 +35,9 @@ Retrieving objects with filters
     That can be accomplished with the QuerySet's ``.filter(\*\*)`` method.
 
     For example, given the model definition:
-    
+
     .. code-block:: python
-        
+
         class Automobile(Model):
             manufacturer = columns.Text(primary_key=True)
             year = columns.Integer(primary_key=True)
@@ -40,10 +46,16 @@ Retrieving objects with filters
 
     ...and assuming the Automobile table contains a record of every car model manufactured in the last 20 years or so, we can retrieve only the cars made by a single manufacturer like this:
 
-    
+
     .. code-block:: python
 
         q = Automobile.objects.filter(manufacturer='Tesla')
+
+    You can also use the more convenient syntax:
+
+    .. code-block:: python
+
+        q = Automobile.objects(Automobile.manufacturer == 'Tesla')
 
     We can then further filter our query with another call to **.filter**
 
@@ -123,12 +135,17 @@ Filtering Operators
             q = Automobile.objects.filter(manufacturer='Tesla')
             q = q.filter(year__in=[2011, 2012])
 
+
     :attr:`> (__gt) <query.QueryOperator.GreaterThanOperator>`
 
         .. code-block:: python
 
             q = Automobile.objects.filter(manufacturer='Tesla')
             q = q.filter(year__gt=2010)  # year > 2010
+
+            # or the nicer syntax
+
+            q.filter(Automobile.year > 2010)
 
     :attr:`>= (__gte) <query.QueryOperator.GreaterThanOrEqualOperator>`
 
@@ -137,6 +154,10 @@ Filtering Operators
             q = Automobile.objects.filter(manufacturer='Tesla')
             q = q.filter(year__gte=2010)  # year >= 2010
 
+            # or the nicer syntax
+
+            Automobile.objects.filter(Automobile.manufacturer == 'Tesla')
+
     :attr:`< (__lt) <query.QueryOperator.LessThanOperator>`
 
         .. code-block:: python
@@ -144,12 +165,18 @@ Filtering Operators
             q = Automobile.objects.filter(manufacturer='Tesla')
             q = q.filter(year__lt=2012)  # year < 2012
 
+            # or...
+
+            q.filter(Automobile.year < 2012)
+
     :attr:`<= (__lte) <query.QueryOperator.LessThanOrEqualOperator>`
 
         .. code-block:: python
 
             q = Automobile.objects.filter(manufacturer='Tesla')
             q = q.filter(year__lte=2012)  # year <= 2012
+
+            q.filter(Automobile.year <= 2012)
 
 
 TimeUUID Functions
@@ -178,6 +205,28 @@ TimeUUID Functions
 
         DataStream.filter(time__gt=cqlengine.MinTimeUUID(min_time), time__lt=cqlengine.MaxTimeUUID(max_time))
 
+Token Function
+==============
+
+    Token functon may be used only on special, virtual column pk__token, representing token of partition key (it also works for composite partition keys).
+    Cassandra orders returned items by value of partition key token, so using cqlengine.Token we can easy paginate through all table rows.
+
+    See http://cassandra.apache.org/doc/cql3/CQL.html#tokenFun
+
+    *Example*
+
+    .. code-block:: python
+
+        class Items(Model):
+            id      = cqlengine.Text(primary_key=True)
+            data    = cqlengine.Bytes()
+
+        query = Items.objects.all().limit(10)
+
+        first_page = list(query);
+        last = first_page[-1]
+        next_page = list(query.filter(pk__token__gt=cqlengine.Token(last.pk)))
+
 QuerySets are imutable
 ======================
 
@@ -198,7 +247,7 @@ Ordering QuerySets
 
     Since Cassandra is essentially a distributed hash table on steroids, the order you get records back in will not be particularly predictable.
 
-    However, you can set a column to order on with the ``.order_by(column_name)`` method. 
+    However, you can set a column to order on with the ``.order_by(column_name)`` method.
 
     *Example*
 
@@ -213,15 +262,22 @@ Ordering QuerySets
 
     *For instance, given our Automobile model, year is the only column we can order on.*
 
+Values Lists
+============
+
+    There is a special QuerySet's method ``.values_list()`` - when called, QuerySet returns lists of values instead of model instances. It may significantly speedup things with lower memory footprint for large responses.
+    Each tuple contains the value from the respective field passed into the ``values_list()`` call — so the first item is the first field, etc. For example:
+
+
 Batch Queries
 ===============
 
-    cqlengine now supports batch queries using the BatchQuery class. Batch queries can be started and stopped manually, or within a context manager. To add queries to the batch object, you just need to precede the create/save/delete call with a call to batch, and pass in the batch object. 
-    
+    cqlengine now supports batch queries using the BatchQuery class. Batch queries can be started and stopped manually, or within a context manager. To add queries to the batch object, you just need to precede the create/save/delete call with a call to batch, and pass in the batch object.
+
     You can only create, update, and delete rows with a batch query, attempting to read rows out of the database with a batch query will fail.
 
     .. code-block:: python
-        
+
         from cqlengine import BatchQuery
 
         #using a context manager
@@ -239,6 +295,21 @@ Batch Queries
         em1 = ExampleModel.batch(b).create(example_type=0, description="1", created_at=now)
         em2 = ExampleModel.batch(b).create(example_type=0, description="2", created_at=now)
         em3 = ExampleModel.batch(b).create(example_type=0, description="3", created_at=now)
+        b.execute()
+
+        # updating in a batch
+
+        b = BatchQuery()
+        em1.description = "new description"
+        em1.batch(b).save()
+        em2.description = "another new description"
+        em2.batch(b).save()
+        b.execute()
+
+        # deleting in a batch
+        b = BatchQuery()
+        ExampleModel.objects(id=some_id).batch(b).delete()
+        ExampleModel.objects(id=some_id2).batch(b).delete()
         b.execute()
 
 QuerySet method reference
@@ -269,7 +340,7 @@ QuerySet method reference
     .. method:: limit(num)
 
         Limits the number of results returned by Cassandra.
-        
+
         *Note that CQL's default limit is 10,000, so all queries without a limit set explicitly will have an implicit limit of 10,000*
 
     .. method:: order_by(field_name)
@@ -277,7 +348,7 @@ QuerySet method reference
         :param field_name: the name of the field to order on. *Note: the field_name must be a clustering key*
         :type field_name: string
 
-        Sets the field to order on. 
+        Sets the field to order on.
 
     .. method:: allow_filtering()
 

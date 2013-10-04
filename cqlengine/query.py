@@ -1,19 +1,25 @@
-from collections import namedtuple
 import copy
 from datetime import datetime
+from uuid import uuid4
 from hashlib import md5
 from time import time
 from uuid import uuid1
-from cqlengine import BaseContainerColumn, BaseValueManager, Map
+from cqlengine import BaseContainerColumn, BaseValueManager, Map, columns
+from cqlengine.columns import Counter
 
-from cqlengine.connection import connection_manager
+from cqlengine.connection import connection_manager, execute, RowResult
+
 from cqlengine.exceptions import CQLEngineException
-from cqlengine.functions import BaseQueryFunction
+from cqlengine.functions import QueryValue, Token
 
 #CQL 3 reference:
 #http://www.datastax.com/docs/1.1/references/cql/index
 
 class QueryException(CQLEngineException): pass
+class DoesNotExist(QueryException): pass
+class MultipleObjectsReturned(QueryException): pass
+
+
 class QueryOperatorException(QueryException): pass
 
 class QueryOperator(object):
@@ -24,14 +30,16 @@ class QueryOperator(object):
     # The comparator symbol this operator uses in cql
     cql_symbol = None
 
+    QUERY_VALUE_WRAPPER = QueryValue
+
     def __init__(self, column, value):
         self.column = column
         self.value = value
 
-        #the identifier is a unique key that will be used in string
-        #replacement on query strings, it's created from a hash
-        #of this object's id and the time
-        self.identifier = uuid1().hex
+        if isinstance(value, QueryValue):
+            self.query_value = value
+        else:
+            self.query_value = self.QUERY_VALUE_WRAPPER(value)
 
         #perform validation on this operator
         self.validate_operator()
@@ -41,12 +49,8 @@ class QueryOperator(object):
     def cql(self):
         """
         Returns this operator's portion of the WHERE clause
-        :param valname: the dict key that this operator's compare value will be found in
         """
-        if isinstance(self.value, BaseQueryFunction):
-            return '"{}" {} {}'.format(self.column.db_field_name, self.cql_symbol, self.value.to_cql(self.identifier))
-        else:
-            return '"{}" {} :{}'.format(self.column.db_field_name, self.cql_symbol, self.identifier)
+        return '{} {} {}'.format(self.column.cql, self.cql_symbol, self.query_value.cql)
 
     def validate_operator(self):
         """
@@ -81,10 +85,7 @@ class QueryOperator(object):
         this should return the dict: {'colval':<self.value>}
         SELECT * FROM column_family WHERE colname=:colval
         """
-        if isinstance(self.value, BaseQueryFunction):
-            return {self.identifier: self.column.to_database(self.value.get_value())}
-        else:
-            return {self.identifier: self.column.to_database(self.value)}
+        return self.query_value.get_dict(self.column)
 
     @classmethod
     def get_operator(cls, symbol):
@@ -102,34 +103,41 @@ class QueryOperator(object):
         except KeyError:
             raise QueryOperatorException("{} doesn't map to a QueryOperator".format(symbol))
 
+    # equality operator, used by tests
+
+    def __eq__(self, op):
+        return self.__class__ is op.__class__ and \
+                self.column.db_field_name == op.column.db_field_name and \
+                self.value == op.value
+
+    def __ne__(self, op):
+        return not (self == op)
+
+    def __hash__(self):
+        return hash(self.column.db_field_name) ^ hash(self.value)
+
 class EqualsOperator(QueryOperator):
     symbol = 'EQ'
     cql_symbol = '='
+
+class IterableQueryValue(QueryValue):
+    def __init__(self, value):
+        try:
+            super(IterableQueryValue, self).__init__(value, [uuid4().hex for i in value])
+        except TypeError:
+            raise QueryException("in operator arguments must be iterable, {} found".format(value))
+
+    def get_dict(self, column):
+        return dict((i, column.to_database(v)) for (i, v) in zip(self.identifier, self.value))
+
+    def get_cql(self):
+        return '({})'.format(', '.join(':{}'.format(i) for i in self.identifier))
 
 class InOperator(EqualsOperator):
     symbol = 'IN'
     cql_symbol = 'IN'
 
-    class Quoter(object):
-        """
-        contains a single value, which will quote itself for CQL insertion statements
-        """
-        def __init__(self, value):
-            self.value = value
-
-        def __str__(self):
-            from cql.query import cql_quote as cq
-            return '(' + ', '.join([cq(v) for v in self.value]) + ')'
-
-    def get_dict(self):
-        if isinstance(self.value, BaseQueryFunction):
-            return {self.identifier: self.column.to_database(self.value.get_value())}
-        else:
-            try:
-                values = [v for v in self.value]
-            except TypeError:
-                raise QueryException("in operator arguments must be iterable, {} found".format(self.value))
-            return {self.identifier: self.Quoter([self.column.to_database(v) for v in self.value])}
+    QUERY_VALUE_WRAPPER = IterableQueryValue
 
 class GreaterThanOperator(QueryOperator):
     symbol = "GT"
@@ -146,6 +154,39 @@ class LessThanOperator(QueryOperator):
 class LessThanOrEqualOperator(QueryOperator):
     symbol = "LTE"
     cql_symbol = '<='
+
+class AbstractQueryableColumn(object):
+    """
+    exposes cql query operators through pythons
+    builtin comparator symbols
+    """
+
+    def _get_column(self):
+        raise NotImplementedError
+
+    def in_(self, item):
+        """
+        Returns an in operator
+
+        used in where you'd typically want to use python's `in` operator
+        """
+        return InOperator(self._get_column(), item)
+
+    def __eq__(self, other):
+        return EqualsOperator(self._get_column(), other)
+
+    def __gt__(self, other):
+        return GreaterThanOperator(self._get_column(), other)
+
+    def __ge__(self, other):
+        return GreaterThanOrEqualOperator(self._get_column(), other)
+
+    def __lt__(self, other):
+        return LessThanOperator(self._get_column(), other)
+
+    def __le__(self, other):
+        return LessThanOrEqualOperator(self._get_column(), other)
+
 
 class BatchType(object):
     Unlogged    = 'UNLOGGED'
@@ -187,8 +228,7 @@ class BatchQuery(object):
 
         query_list.append('APPLY BATCH;')
 
-        with connection_manager() as con:
-            con.execute('\n'.join(query_list), parameters)
+        execute('\n'.join(query_list), parameters)
 
         self.queries = []
 
@@ -200,10 +240,11 @@ class BatchQuery(object):
         if exc_type is not None: return
         self.execute()
 
-class QuerySet(object):
+
+class AbstractQuerySet(object):
 
     def __init__(self, model):
-        super(QuerySet, self).__init__()
+        super(AbstractQuerySet, self).__init__()
         self.model = model
 
         #Where clause filters
@@ -221,6 +262,9 @@ class QuerySet(object):
         #see the defer and only methods
         self._defer_fields = []
         self._only_fields = []
+
+        self._values_list = False
+        self._flat_values_list = False
 
         #results cache
         self._con = None
@@ -240,8 +284,8 @@ class QuerySet(object):
     def __str__(self):
         return str(self.__unicode__())
 
-    def __call__(self, **kwargs):
-        return self.filter(**kwargs)
+    def __call__(self, *args, **kwargs):
+        return self.filter(*args, **kwargs)
 
     def __deepcopy__(self, memo):
         clone = self.__class__(self.model)
@@ -260,36 +304,13 @@ class QuerySet(object):
         return clone
 
     def __len__(self):
-        return self.count()
-
-    def __del__(self):
-        if self._con:
-            self._con.close()
-            self._con = None
-            self._cur = None
+        self._execute_query()
+        return len(self._result_cache)
 
     #----query generation / execution----
 
-    def _validate_where_syntax(self):
-        """ Checks that a filterset will not create invalid cql """
-
-        #check that there's either a = or IN relationship with a primary key or indexed field
-        equal_ops = [w for w in self._where if isinstance(w, EqualsOperator)]
-        if not any([w.column.primary_key or w.column.index for w in equal_ops]):
-            raise QueryException('Where clauses require either a "=" or "IN" comparison with either a primary key or indexed field')
-
-        if not self._allow_filtering:
-            #if the query is not on an indexed field
-            if not any([w.column.index for w in equal_ops]):
-                if not any([w.column._partition_key for w in equal_ops]):
-                    raise QueryException('Filtering on a clustering key without a partition key is not allowed unless allow_filtering() is called on the querset')
-
-
-        #TODO: abuse this to see if we can get cql to raise an exception
-
     def _where_clause(self):
         """ Returns a where clause based on the given filter args """
-        self._validate_where_syntax()
         return ' AND '.join([f.cql for f in self._where])
 
     def _where_values(self):
@@ -299,18 +320,15 @@ class QuerySet(object):
             values.update(where.get_dict())
         return values
 
+    def _get_select_statement(self):
+        """ returns the select portion of this queryset's cql statement """
+        raise NotImplementedError
+
     def _select_query(self):
         """
         Returns a select clause based on the given filter args
         """
-        fields = self.model._columns.keys()
-        if self._defer_fields:
-            fields = [f for f in fields if f not in self._defer_fields]
-        elif self._only_fields:
-            fields = [f for f in fields if f in self._only_fields]
-        db_fields = [self.model._columns[f].db_field_name for f in fields]
-
-        qs = ['SELECT {}'.format(', '.join(['"{}"'.format(f) for f in db_fields]))]
+        qs = [self._get_select_statement()]
         qs += ['FROM {}'.format(self.column_family_name)]
 
         if self._where:
@@ -333,9 +351,8 @@ class QuerySet(object):
         if self._batch:
             raise CQLEngineException("Only inserts, updates, and deletes are available in batch mode")
         if self._result_cache is None:
-            self._con = connection_manager()
-            self._cur = self._con.execute(self._select_query(), self._where_values())
-            self._result_cache = [None]*self._cur.rowcount
+            columns, self._result_cache = execute(self._select_query(), self._where_values())
+            self._construct_result = self._get_result_constructor(columns)
 
     def _fill_result_cache_to_idx(self, idx):
         self._execute_query()
@@ -346,15 +363,12 @@ class QuerySet(object):
         if qty < 1:
             return
         else:
-            names = [i[0] for i in self._cur.description]
-            for values in self._cur.fetchmany(qty):
-                value_dict = dict(zip(names, values))
+            for idx in range(qty):
                 self._result_idx += 1
-                self._result_cache[self._result_idx] = self._construct_instance(value_dict)
+                self._result_cache[self._result_idx] = self._construct_result(self._result_cache[self._result_idx])
 
             #return the connection to the connection pool if we have all objects
-            if self._result_cache and self._result_cache[-1] is not None:
-                self._con.close()
+            if self._result_cache and self._result_idx == (len(self._result_cache) - 1):
                 self._con = None
                 self._cur = None
 
@@ -363,7 +377,7 @@ class QuerySet(object):
 
         for idx in range(len(self._result_cache)):
             instance = self._result_cache[idx]
-            if instance is None:
+            if isinstance(instance, RowResult):
                 self._fill_result_cache_to_idx(idx)
             yield self._result_cache[idx]
 
@@ -394,19 +408,11 @@ class QuerySet(object):
                 self._fill_result_cache_to_idx(s)
                 return self._result_cache[s]
 
-
-    def _construct_instance(self, values):
-        #translate column names to model names
-        field_dict = {}
-        db_map = self.model._db_map
-        for key, val in values.items():
-            if key in db_map:
-                field_dict[db_map[key]] = val
-            else:
-                field_dict[key] = val
-        instance = self.model(**field_dict)
-        instance._is_persisted = True
-        return instance
+    def _get_result_constructor(self, names):
+        """
+        Returns a function that will be used to instantiate query results
+        """
+        raise NotImplementedError
 
     def batch(self, batch_obj):
         """
@@ -414,8 +420,8 @@ class QuerySet(object):
         :param batch_obj:
         :return:
         """
-        if not isinstance(batch_obj, BatchQuery):
-            raise CQLEngineException('batch_obj must be a BatchQuery instance')
+        if batch_obj is not None and not isinstance(batch_obj, BatchQuery):
+            raise CQLEngineException('batch_obj must be a BatchQuery instance or None')
         clone = copy.deepcopy(self)
         clone._batch = batch_obj
         return clone
@@ -427,9 +433,7 @@ class QuerySet(object):
             return None
 
     def all(self):
-        clone = copy.deepcopy(self)
-        clone._where = []
-        return clone
+        return copy.deepcopy(self)
 
     def _parse_filter_arg(self, arg):
         """
@@ -437,7 +441,7 @@ class QuerySet(object):
         <colname>__<op>
         :returns: colname, op tuple
         """
-        statement = arg.split('__')
+        statement = arg.rsplit('__', 1)
         if len(statement) == 1:
             return arg, None
         elif len(statement) == 2:
@@ -445,16 +449,31 @@ class QuerySet(object):
         else:
             raise QueryException("Can't parse '{}'".format(arg))
 
-    def filter(self, **kwargs):
+    def filter(self, *args, **kwargs):
+        """
+        Adds WHERE arguments to the queryset, returning a new queryset
+
+        #TODO: show examples
+
+        :rtype: AbstractQuerySet
+        """
         #add arguments to the where clause filters
         clone = copy.deepcopy(self)
+        for operator in args:
+            if not isinstance(operator, QueryOperator):
+                raise QueryException('{} is not a valid query operator'.format(operator))
+            clone._where.append(operator)
+
         for arg, val in kwargs.items():
             col_name, col_op = self._parse_filter_arg(arg)
             #resolve column and operator
             try:
-                column = self.model._columns[col_name]
+                column = self.model._get_column(col_name)
             except KeyError:
-                raise QueryException("Can't resolve column name: '{}'".format(col_name))
+                if col_name == 'pk__token':
+                    column = columns._PartitionKeysToken(self.model)
+                else:
+                    raise QueryException("Can't resolve column name: '{}'".format(col_name))
 
             #get query operator, or use equals if not supplied
             operator_class = QueryOperator.get_operator(col_op or 'EQ')
@@ -464,14 +483,16 @@ class QuerySet(object):
 
         return clone
 
-    def get(self, **kwargs):
+    def get(self, *args, **kwargs):
         """
         Returns a single instance matching this query, optionally with additional filter kwargs.
 
         A DoesNotExistError will be raised if there are no rows matching the query
         A MultipleObjectsFoundError will be raised if there is more than one row matching the queyr
         """
-        if kwargs: return self.filter(**kwargs).get()
+        if args or kwargs:
+            return self.filter(*args, **kwargs).get()
+
         self._execute_query()
         if len(self._result_cache) == 0:
             raise self.model.DoesNotExist
@@ -480,6 +501,12 @@ class QuerySet(object):
                     '{} objects found'.format(len(self._result_cache)))
         else:
             return self[0]
+
+    def _get_ordering_condition(self, colname):
+        order_type = 'DESC' if colname.startswith('-') else 'ASC'
+        colname = colname.replace('-', '')
+
+        return colname, order_type
 
     def order_by(self, *colnames):
         """
@@ -495,24 +522,7 @@ class QuerySet(object):
 
         conditions = []
         for colname in colnames:
-            order_type = 'DESC' if colname.startswith('-') else 'ASC'
-            colname = colname.replace('-', '')
-
-            column = self.model._columns.get(colname)
-            if column is None:
-                raise QueryException("Can't resolve the column name: '{}'".format(colname))
-
-            #validate the column selection
-            if not column.primary_key:
-                raise QueryException(
-                    "Can't order on '{}', can only order on (clustered) primary keys".format(colname))
-
-            pks = [v for k, v in self.model._columns.items() if v.primary_key]
-            if column == pks[0]:
-                raise QueryException(
-                    "Can't order by the first primary key (partition key), clustering (secondary) keys only")
-
-            conditions.append('"{}" {}'.format(column.db_field_name, order_type))
+            conditions.append('"{}" {}'.format(*self._get_ordering_condition(colname)))
 
         clone = copy.deepcopy(self)
         clone._order.extend(conditions)
@@ -533,9 +543,8 @@ class QuerySet(object):
 
             qs = ' '.join(qs)
 
-            with connection_manager() as con:
-                cur = con.execute(qs, self._where_values())
-                return cur.fetchone()[0]
+            _, result = execute(qs, self._where_values())
+            return result[0][0]
         else:
             return len(self._result_cache)
 
@@ -613,8 +622,124 @@ class QuerySet(object):
         if self._batch:
             self._batch.add_query(qs, self._where_values())
         else:
-            with connection_manager() as con:
-                con.execute(qs, self._where_values())
+            execute(qs, self._where_values())
+
+    def __eq__(self, q):
+        return set(self._where) == set(q._where)
+
+    def __ne__(self, q):
+        return not (self != q)
+
+class ResultObject(dict):
+    """
+    adds attribute access to a dictionary
+    """
+
+    def __getattr__(self, item):
+        try:
+            return self[item]
+        except KeyError:
+            raise AttributeError
+
+class SimpleQuerySet(AbstractQuerySet):
+    """
+
+    """
+
+    def _get_select_statement(self):
+        """ Returns the fields to be returned by the select query """
+        return 'SELECT *'
+
+    def _get_result_constructor(self, names):
+        """
+        Returns a function that will be used to instantiate query results
+        """
+        def _construct_instance(values):
+            return ResultObject(zip(names, values))
+        return _construct_instance
+
+class ModelQuerySet(AbstractQuerySet):
+    """
+
+    """
+    def _validate_where_syntax(self):
+        """ Checks that a filterset will not create invalid cql """
+
+        #check that there's either a = or IN relationship with a primary key or indexed field
+        equal_ops = [w for w in self._where if isinstance(w, EqualsOperator)]
+        token_ops = [w for w in self._where if isinstance(w.value, Token)]
+        if not any([w.column.primary_key or w.column.index for w in equal_ops]) and not token_ops:
+            raise QueryException('Where clauses require either a "=" or "IN" comparison with either a primary key or indexed field')
+
+        if not self._allow_filtering:
+            #if the query is not on an indexed field
+            if not any([w.column.index for w in equal_ops]):
+                if not any([w.column.partition_key for w in equal_ops]) and not token_ops:
+                    raise QueryException('Filtering on a clustering key without a partition key is not allowed unless allow_filtering() is called on the querset')
+            if any(not w.column.partition_key for w in token_ops):
+                raise QueryException('The token() function is only supported on the partition key')
+
+    def _where_clause(self):
+        """ Returns a where clause based on the given filter args """
+        self._validate_where_syntax()
+        return super(ModelQuerySet, self)._where_clause()
+
+    def _get_select_statement(self):
+        """ Returns the fields to be returned by the select query """
+        if self._defer_fields or self._only_fields:
+            fields = self.model._columns.keys()
+            if self._defer_fields:
+                fields = [f for f in fields if f not in self._defer_fields]
+            elif self._only_fields:
+                fields = self._only_fields
+            db_fields = [self.model._columns[f].db_field_name for f in fields]
+            return 'SELECT {}'.format(', '.join(['"{}"'.format(f) for f in db_fields]))
+        else:
+            return 'SELECT *'
+
+    def _get_result_constructor(self, names):
+        """ Returns a function that will be used to instantiate query results """
+        if not self._values_list:
+            return lambda values: self.model._construct_instance(names, values)
+        else:
+            columns = [self.model._columns[n] for n in names]
+            if self._flat_values_list:
+                return lambda values: columns[0].to_python(values[0])
+            else:
+                return lambda values: map(lambda (c, v): c.to_python(v), zip(columns, values))
+
+    def _get_ordering_condition(self, colname):
+        colname, order_type = super(ModelQuerySet, self)._get_ordering_condition(colname)
+
+        column = self.model._columns.get(colname)
+        if column is None:
+            raise QueryException("Can't resolve the column name: '{}'".format(colname))
+
+        #validate the column selection
+        if not column.primary_key:
+            raise QueryException(
+                "Can't order on '{}', can only order on (clustered) primary keys".format(colname))
+
+        pks = [v for k, v in self.model._columns.items() if v.primary_key]
+        if column == pks[0]:
+            raise QueryException(
+                "Can't order by the first primary key (partition key), clustering (secondary) keys only")
+
+        return column.db_field_name, order_type
+
+    def values_list(self, *fields, **kwargs):
+        """ Instructs the query set to return tuples, not model instance """
+        flat = kwargs.pop('flat', False)
+        if kwargs:
+            raise TypeError('Unexpected keyword arguments to values_list: %s'
+                            % (kwargs.keys(),))
+        if flat and len(fields) > 1:
+            raise TypeError("'flat' is not valid when values_list is called with more than one field.")
+        clone = self.only(fields)
+        clone._values_list = True
+        clone._flat_values_list = flat
+        return clone
+
 
 class DMLQuery(object):
     """
@@ -629,13 +754,13 @@ class DMLQuery(object):
         self.model = model
         self.column_family_name = self.model.column_family_name()
         self.instance = instance
-        self.batch = batch
+        self._batch = batch
         pass
 
     def batch(self, batch_obj):
-        if not isinstance(batch_obj, BatchQuery):
-            raise CQLEngineException('batch_obj must be a BatchQuery instance')
-        self.batch = batch_obj
+        if batch_obj is not None and not isinstance(batch_obj, BatchQuery):
+            raise CQLEngineException('batch_obj must be a BatchQuery instance or None')
+        self._batch = batch_obj
         return self
 
     def save(self):
@@ -651,7 +776,7 @@ class DMLQuery(object):
 
         #organize data
         value_pairs = []
-        values = self.instance.as_dict()
+        values = self.instance._as_dict()
 
         #get defined fields and their column names
         for name, col in self.model._columns.items():
@@ -661,12 +786,12 @@ class DMLQuery(object):
 
         #construct query string
         field_names = zip(*value_pairs)[0]
-        field_ids = {n:uuid1().hex for n in field_names}
+        field_ids = {n:uuid4().hex for n in field_names}
         field_values = dict(value_pairs)
         query_values = {field_ids[n]:field_values[n] for n in field_names}
 
         qs = []
-        if self.instance._can_update():
+        if self.instance._has_counter or self.instance._can_update():
             qs += ["UPDATE {}".format(self.column_family_name)]
             qs += ["SET"]
 
@@ -675,14 +800,15 @@ class DMLQuery(object):
             for name, col in self.model._columns.items():
                 if not col.is_primary_key:
                     val = values.get(name)
-                    if val is None: continue
-                    if isinstance(col, BaseContainerColumn):
+                    if val is None:
+                        continue
+                    if isinstance(col, (BaseContainerColumn, Counter)):
                         #remove value from query values, the column will handle it
                         query_values.pop(field_ids.get(name), None)
 
                         val_mgr = self.instance._values[name]
                         set_statements += col.get_update_statement(val, val_mgr.previous_value, query_values)
-                        pass
+
                     else:
                         set_statements += ['"{}" = :{}'.format(col.db_field_name, field_ids[col.db_field_name])]
             qs += [', '.join(set_statements)]
@@ -695,8 +821,9 @@ class DMLQuery(object):
 
             qs += [' AND '.join(where_statements)]
 
-            # clear the qs if there are not set statements
-            if not set_statements: qs = []
+            # clear the qs if there are no set statements and this is not a counter model
+            if not set_statements and not self.instance._has_counter:
+                qs = []
 
         else:
             qs += ["INSERT INTO {}".format(self.column_family_name)]
@@ -709,11 +836,10 @@ class DMLQuery(object):
         # skip query execution if it's empty
         # caused by pointless update queries
         if qs:
-            if self.batch:
-                self.batch.add_query(qs, query_values)
+            if self._batch:
+                self._batch.add_query(qs, query_values)
             else:
-                with connection_manager() as con:
-                    con.execute(qs, query_values)
+                execute(qs, query_values)
 
 
         # delete nulled columns and removed map keys
@@ -736,18 +862,17 @@ class DMLQuery(object):
             qs += ['WHERE']
             where_statements = []
             for name, col in self.model._primary_keys.items():
-                field_id = uuid1().hex
+                field_id = uuid4().hex
                 query_values[field_id] = field_values[name]
                 where_statements += ['"{}" = :{}'.format(col.db_field_name, field_id)]
             qs += [' AND '.join(where_statements)]
 
             qs = ' '.join(qs)
 
-            if self.batch:
-                self.batch.add_query(qs, query_values)
+            if self._batch:
+                self._batch.add_query(qs, query_values)
             else:
-                with connection_manager() as con:
-                    con.execute(qs, query_values)
+                execute(qs, query_values)
 
     def delete(self):
         """ Deletes one instance """
@@ -758,17 +883,16 @@ class DMLQuery(object):
         qs += ['WHERE']
         where_statements = []
         for name, col in self.model._primary_keys.items():
-            field_id = uuid1().hex
+            field_id = uuid4().hex
             field_values[field_id] = col.to_database(getattr(self.instance, name))
             where_statements += ['"{}" = :{}'.format(col.db_field_name, field_id)]
 
         qs += [' AND '.join(where_statements)]
         qs = ' '.join(qs)
 
-        if self.batch:
-            self.batch.add_query(qs, field_values)
+        if self._batch:
+            self._batch.add_query(qs, field_values)
         else:
-            with connection_manager() as con:
-                con.execute(qs, field_values)
+            execute(qs, field_values)
 
 

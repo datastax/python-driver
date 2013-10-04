@@ -1,5 +1,5 @@
 #column field types
-from copy import copy
+from copy import deepcopy
 from datetime import datetime
 from datetime import date
 import re
@@ -8,12 +8,13 @@ from cql.query import cql_quote
 
 from cqlengine.exceptions import ValidationError
 
+
 class BaseValueManager(object):
 
     def __init__(self, instance, column, value):
         self.instance = instance
         self.column = column
-        self.previous_value = copy(value)
+        self.previous_value = deepcopy(value)
         self.value = value
 
     @property
@@ -31,7 +32,7 @@ class BaseValueManager(object):
         return self.value != self.previous_value
 
     def reset_previous_value(self):
-        self.previous_value = copy(self.value)
+        self.previous_value = deepcopy(self.value)
 
     def getval(self):
         return self.value
@@ -52,6 +53,26 @@ class BaseValueManager(object):
         else:
             return property(_get, _set)
 
+
+class ValueQuoter(object):
+    """
+    contains a single value, which will quote itself for CQL insertion statements
+    """
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        raise NotImplementedError
+
+    def __repr__(self):
+        return self.__str__()
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self.value == other.value
+        return False
+
+
 class Column(object):
 
     #the cassandra type this column maps to
@@ -60,24 +81,38 @@ class Column(object):
 
     instance_counter = 0
 
-    def __init__(self, primary_key=False, index=False, db_field=None, default=None, required=True):
+    def __init__(self,
+                 primary_key=False,
+                 partition_key=False,
+                 index=False,
+                 db_field=None,
+                 default=None,
+                 required=False,
+                 clustering_order=None,
+                 polymorphic_key=False):
         """
         :param primary_key: bool flag, indicates this column is a primary key. The first primary key defined
-        on a model is the partition key, all others are cluster keys
+            on a model is the partition key (unless partition keys are set), all others are cluster keys
+        :param partition_key: indicates that this column should be the partition key, defining
+            more than one partition key column creates a compound partition key
         :param index: bool flag, indicates an index should be created for this column
         :param db_field: the fieldname this field will map to in the database
         :param default: the default value, can be a value or a callable (no args)
-        :param required: boolean, is the field required?
+        :param required: boolean, is the field required? Model validation will raise and
+            exception if required is set to True and there is a None value assigned
+        :param clustering_order: only applicable on clustering keys (primary keys that are not partition keys)
+            determines the order that the clustering keys are sorted on disk
+        :param polymorphic_key: boolean, if set to True, this column will be used for saving and loading instances
+            of polymorphic tables
         """
-        self.primary_key = primary_key
+        self.partition_key = partition_key
+        self.primary_key = partition_key or primary_key
         self.index = index
         self.db_field = db_field
         self.default = default
         self.required = required
-
-        #only the model meta class should touch this
-        self._partition_key = False
-
+        self.clustering_order = clustering_order
+        self.polymorphic_key = polymorphic_key
         #the column name in the model definition
         self.column_name = None
 
@@ -137,7 +172,7 @@ class Column(object):
         """
         Returns a column definition for CQL table definition
         """
-        return '"{}" {}'.format(self.db_field_name, self.db_type)
+        return '{} {}'.format(self.cql, self.db_type)
 
     def set_column_name(self, name):
         """
@@ -156,17 +191,32 @@ class Column(object):
         """ Returns the name of the cql index """
         return 'index_{}'.format(self.db_field_name)
 
+    @property
+    def cql(self):
+        return self.get_cql()
+
+    def get_cql(self):
+        return '"{}"'.format(self.db_field_name)
+
+
 class Bytes(Column):
     db_type = 'blob'
 
+    def to_database(self, value):
+        val = super(Bytes, self).to_database(value)
+        if val is None: return
+        return val.encode('hex')
+
+
 class Ascii(Column):
     db_type = 'ascii'
+
 
 class Text(Column):
     db_type = 'text'
 
     def __init__(self, *args, **kwargs):
-        self.min_length = kwargs.pop('min_length', 1 if kwargs.get('required', True) else None)
+        self.min_length = kwargs.pop('min_length', 1 if kwargs.get('required', False) else None)
         self.max_length = kwargs.pop('max_length', None)
         super(Text, self).__init__(*args, **kwargs)
 
@@ -182,6 +232,7 @@ class Text(Column):
             if len(value) < self.min_length:
                 raise ValidationError('{} is shorter than {} characters'.format(self.column_name, self.min_length))
         return value
+
 
 class Integer(Column):
     db_type = 'int'
@@ -200,20 +251,82 @@ class Integer(Column):
     def to_database(self, value):
         return self.validate(value)
 
+
+class VarInt(Column):
+    db_type = 'varint'
+
+    def validate(self, value):
+        val = super(VarInt, self).validate(value)
+        if val is None:
+            return
+        try:
+            return long(val)
+        except (TypeError, ValueError):
+            raise ValidationError(
+                "{} can't be converted to integral value".format(value))
+
+    def to_python(self, value):
+        return self.validate(value)
+
+    def to_database(self, value):
+        return self.validate(value)
+
+
+class CounterValueManager(BaseValueManager):
+    def __init__(self, instance, column, value):
+        super(CounterValueManager, self).__init__(instance, column, value)
+        self.value = self.value or 0
+        self.previous_value = self.previous_value or 0
+
+
+class Counter(Integer):
+    db_type = 'counter'
+
+    value_manager = CounterValueManager
+
+    def __init__(self,
+                 index=False,
+                 db_field=None,
+                 required=False):
+        super(Counter, self).__init__(
+            primary_key=False,
+            partition_key=False,
+            index=index,
+            db_field=db_field,
+            default=0,
+            required=required,
+        )
+
+    def get_update_statement(self, val, prev, ctx):
+        val = self.to_database(val)
+        prev = self.to_database(prev or 0)
+        field_id = uuid4().hex
+
+        delta = val - prev
+        sign = '-' if delta < 0 else '+'
+        delta = abs(delta)
+        ctx[field_id] = delta
+        return ['"{0}" = "{0}" {1} {2}'.format(self.db_field_name, sign, delta)]
+
+
 class DateTime(Column):
     db_type = 'timestamp'
-    def __init__(self, **kwargs):
-        super(DateTime, self).__init__(**kwargs)
 
     def to_python(self, value):
         if isinstance(value, datetime):
             return value
+        elif isinstance(value, date):
+            return datetime(*(value.timetuple()[:6]))
         return datetime.utcfromtimestamp(value)
 
     def to_database(self, value):
         value = super(DateTime, self).to_database(value)
+        if value is None: return
         if not isinstance(value, datetime):
-            raise ValidationError("'{}' is not a datetime object".format(value))
+            if isinstance(value, date):
+                value = datetime(value.year, value.month, value.day)
+            else:
+                raise ValidationError("'{}' is not a datetime object".format(value))
         epoch = datetime(1970, 1, 1, tzinfo=value.tzinfo)
         offset = 0
         if epoch.tzinfo:
@@ -225,8 +338,6 @@ class DateTime(Column):
 class Date(Column):
     db_type = 'timestamp'
 
-    def __init__(self, **kwargs):
-        super(Date, self).__init__(**kwargs)
 
     def to_python(self, value):
         if isinstance(value, datetime):
@@ -254,17 +365,23 @@ class UUID(Column):
 
     re_uuid = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
 
-    def __init__(self, default=lambda:uuid4(), **kwargs):
-        super(UUID, self).__init__(default=default, **kwargs)
-
     def validate(self, value):
         val = super(UUID, self).validate(value)
         if val is None: return
         from uuid import UUID as _UUID
         if isinstance(val, _UUID): return val
-        if not self.re_uuid.match(val):
-            raise ValidationError("{} is not a valid uuid".format(value))
-        return _UUID(val)
+        if isinstance(val, basestring) and self.re_uuid.match(val):
+                return _UUID(val)
+        raise ValidationError("{} is not a valid uuid".format(value))
+
+    def to_python(self, value):
+        return self.validate(value)
+
+    def to_database(self, value):
+        return self.validate(value)
+
+from uuid import UUID as pyUUID, getnode
+
 
 class TimeUUID(UUID):
     """
@@ -273,18 +390,60 @@ class TimeUUID(UUID):
 
     db_type = 'timeuuid'
 
-    def __init__(self, **kwargs):
-        kwargs.setdefault('default', lambda: uuid1())
-        super(TimeUUID, self).__init__(**kwargs)
+    @classmethod
+    def from_datetime(self, dt):
+        """
+        generates a UUID for a given datetime
+
+        :param dt: datetime
+        :type dt: datetime
+        :return:
+        """
+        global _last_timestamp
+
+        epoch = datetime(1970, 1, 1, tzinfo=dt.tzinfo)
+
+        offset = 0
+        if epoch.tzinfo:
+            offset_delta = epoch.tzinfo.utcoffset(epoch)
+            offset = offset_delta.days*24*3600 + offset_delta.seconds
+
+        timestamp = (dt  - epoch).total_seconds() - offset
+
+        node = None
+        clock_seq = None
+
+        nanoseconds = int(timestamp * 1e9)
+        timestamp = int(nanoseconds // 100) + 0x01b21dd213814000L
+
+        if clock_seq is None:
+            import random
+            clock_seq = random.randrange(1 << 14L)  # instead of stable storage
+        time_low = timestamp & 0xffffffffL
+        time_mid = (timestamp >> 32L) & 0xffffL
+        time_hi_version = (timestamp >> 48L) & 0x0fffL
+        clock_seq_low = clock_seq & 0xffL
+        clock_seq_hi_variant = (clock_seq >> 8L) & 0x3fL
+        if node is None:
+            node = getnode()
+        return pyUUID(fields=(time_low, time_mid, time_hi_version,
+                            clock_seq_hi_variant, clock_seq_low, node), version=1)
+
 
 class Boolean(Column):
     db_type = 'boolean'
+
+    class Quoter(ValueQuoter):
+        """ Cassandra 1.2.5 is stricter about boolean values """
+        def __str__(self):
+            return 'true' if self.value else 'false'
 
     def to_python(self, value):
         return bool(value)
 
     def to_database(self, value):
-        return bool(value)
+        return self.Quoter(bool(value))
+
 
 class Float(Column):
     db_type = 'double'
@@ -307,24 +466,26 @@ class Float(Column):
     def to_database(self, value):
         return self.validate(value)
 
+
 class Decimal(Column):
     db_type = 'decimal'
 
-class Counter(Column):
-    #TODO: counter field
-    def __init__(self, **kwargs):
-        super(Counter, self).__init__(**kwargs)
-        raise NotImplementedError
+    def validate(self, value):
+        from decimal import Decimal as _Decimal
+        from decimal import InvalidOperation
+        val = super(Decimal, self).validate(value)
+        if val is None: return
+        try:
+            return _Decimal(val)
+        except InvalidOperation:
+            raise ValidationError("'{}' can't be coerced to decimal".format(val))
 
-class ContainerQuoter(object):
-    """
-    contains a single value, which will quote itself for CQL insertion statements
-    """
-    def __init__(self, value):
-        self.value = value
+    def to_python(self, value):
+        return self.validate(value)
 
-    def __str__(self):
-        raise NotImplementedError
+    def to_database(self, value):
+        return self.validate(value)
+
 
 class BaseContainerColumn(Column):
     """
@@ -335,15 +496,21 @@ class BaseContainerColumn(Column):
         """
         :param value_type: a column class indicating the types of the value
         """
-        if not issubclass(value_type, Column):
+        inheritance_comparator = issubclass if isinstance(value_type, type) else isinstance
+        if not inheritance_comparator(value_type, Column):
             raise ValidationError('value_type must be a column class')
-        if issubclass(value_type, BaseContainerColumn):
+        if inheritance_comparator(value_type, BaseContainerColumn):
             raise ValidationError('container types cannot be nested')
         if value_type.db_type is None:
             raise ValidationError('value_type cannot be an abstract column type')
 
-        self.value_type = value_type
-        self.value_col = self.value_type()
+        if isinstance(value_type, type):
+            self.value_type = value_type
+            self.value_col = self.value_type()
+        else:
+            self.value_col = value_type
+            self.value_type = self.value_col.__class__
+
         super(BaseContainerColumn, self).__init__(**kwargs)
 
     def get_column_def(self):
@@ -359,6 +526,7 @@ class BaseContainerColumn(Column):
         """
         raise NotImplementedError
 
+
 class Set(BaseContainerColumn):
     """
     Stores a set of unordered, unique values
@@ -367,20 +535,21 @@ class Set(BaseContainerColumn):
     """
     db_type = 'set<{}>'
 
-    class Quoter(ContainerQuoter):
+    class Quoter(ValueQuoter):
 
         def __str__(self):
             cq = cql_quote
             return '{' + ', '.join([cq(v) for v in self.value]) + '}'
 
-    def __init__(self, value_type, strict=True, **kwargs):
+    def __init__(self, value_type, strict=True, default=set, **kwargs):
         """
         :param value_type: a column class indicating the types of the value
         :param strict: sets whether non set values will be coerced to set
             type on validation, or raise a validation error, defaults to True
         """
         self.strict = strict
-        super(Set, self).__init__(value_type, **kwargs)
+
+        super(Set, self).__init__(value_type, default=default, **kwargs)
 
     def validate(self, value):
         val = super(Set, self).validate(value)
@@ -394,8 +563,13 @@ class Set(BaseContainerColumn):
 
         return {self.value_col.validate(v) for v in val}
 
+    def to_python(self, value):
+        if value is None: return set()
+        return {self.value_col.to_python(v) for v in value}
+
     def to_database(self, value):
         if value is None: return None
+
         if isinstance(value, self.Quoter): return value
         return self.Quoter({self.value_col.to_database(v) for v in value})
 
@@ -442,6 +616,7 @@ class Set(BaseContainerColumn):
 
             return statements
 
+
 class List(BaseContainerColumn):
     """
     Stores a list of ordered values
@@ -450,11 +625,14 @@ class List(BaseContainerColumn):
     """
     db_type = 'list<{}>'
 
-    class Quoter(ContainerQuoter):
+    class Quoter(ValueQuoter):
 
         def __str__(self):
             cq = cql_quote
             return '[' + ', '.join([cq(v) for v in self.value]) + ']'
+
+    def __init__(self, value_type, default=set, **kwargs):
+        return super(List, self).__init__(value_type=value_type, default=default, **kwargs)
 
     def validate(self, value):
         val = super(List, self).validate(value)
@@ -464,8 +642,8 @@ class List(BaseContainerColumn):
         return [self.value_col.validate(v) for v in val]
 
     def to_python(self, value):
-        if value is None: return None
-        return list(value)
+        if value is None: return []
+        return [self.value_col.to_python(v) for v in value]
 
     def to_database(self, value):
         if value is None: return None
@@ -490,10 +668,20 @@ class List(BaseContainerColumn):
 
         if val is None or val == prev:
             return []
+
         elif prev is None:
             return _insert()
+
         elif len(val) < len(prev):
+            # if elements have been removed,
+            # rewrite the whole list
             return _insert()
+
+        elif len(prev) == 0:
+            # if we're updating from an empty
+            # list, do a complete insert
+            return _insert()
+
         else:
             # the prepend and append lists,
             # if both of these are still None after looking
@@ -538,6 +726,7 @@ class List(BaseContainerColumn):
 
             return statements
 
+
 class Map(BaseContainerColumn):
     """
     Stores a key -> value map (dictionary)
@@ -547,27 +736,32 @@ class Map(BaseContainerColumn):
 
     db_type = 'map<{}, {}>'
 
-    class Quoter(ContainerQuoter):
+    class Quoter(ValueQuoter):
 
         def __str__(self):
             cq = cql_quote
             return '{' + ', '.join([cq(k) + ':' + cq(v) for k,v in self.value.items()]) + '}'
 
-    def __init__(self, key_type, value_type, **kwargs):
+    def __init__(self, key_type, value_type, default=dict, **kwargs):
         """
         :param key_type: a column class indicating the types of the key
         :param value_type: a column class indicating the types of the value
         """
-        if not issubclass(value_type, Column):
+        inheritance_comparator = issubclass if isinstance(key_type, type) else isinstance
+        if not inheritance_comparator(key_type, Column):
             raise ValidationError('key_type must be a column class')
-        if issubclass(value_type, BaseContainerColumn):
+        if inheritance_comparator(key_type, BaseContainerColumn):
             raise ValidationError('container types cannot be nested')
         if key_type.db_type is None:
             raise ValidationError('key_type cannot be an abstract column type')
 
-        self.key_type = key_type
-        self.key_col = self.key_type()
-        super(Map, self).__init__(value_type, **kwargs)
+        if isinstance(key_type, type):
+            self.key_type = key_type
+            self.key_col = self.key_type()
+        else:
+            self.key_col = key_type
+            self.key_type = self.key_col.__class__
+        super(Map, self).__init__(value_type, default=default, **kwargs)
 
     def get_column_def(self):
         """
@@ -587,8 +781,10 @@ class Map(BaseContainerColumn):
         return {self.key_col.validate(k):self.value_col.validate(v) for k,v in val.items()}
 
     def to_python(self, value):
+        if value is None:
+            return {}
         if value is not None:
-            return {self.key_col.to_python(k):self.value_col.to_python(v) for k,v in value.items()}
+            return {self.key_col.to_python(k): self.value_col.to_python(v) for k,v in value.items()}
 
     def to_database(self, value):
         if value is None: return None
@@ -645,4 +841,20 @@ class Map(BaseContainerColumn):
 
         return del_statements
 
+
+class _PartitionKeysToken(Column):
+    """
+    virtual column representing token of partition columns.
+    Used by filter(pk__token=Token(...)) filters
+    """
+
+    def __init__(self, model):
+        self.partition_columns = model._partition_keys.values()
+        super(_PartitionKeysToken, self).__init__(partition_key=True)
+
+    def to_database(self, value):
+        raise NotImplementedError
+
+    def get_cql(self):
+        return "token({})".format(", ".join(c.cql for c in self.partition_columns))
 

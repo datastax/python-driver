@@ -5,15 +5,27 @@
 cqlengine documentation
 =======================
 
-cqlengine is a Cassandra CQL 3 Object Mapper for Python with an interface similar to the Django orm and mongoengine
+**Users of versions < 0.4, please read this post before upgrading:** `Breaking Changes`_
+
+.. _Breaking Changes: https://groups.google.com/forum/?fromgroups#!topic/cqlengine-users/erkSNe1JwuU
+
+cqlengine is a Cassandra CQL 3 Object Mapper for Python
 
 :ref:`getting-started`
 
+Download
+========
+
+`Github <https://github.com/cqlengine/cqlengine>`_
+
+`PyPi <https://pypi.python.org/pypi/cqlengine>`_
+
 Contents:
+=========
 
 .. toctree::
     :maxdepth: 2
-    
+
     topics/models
     topics/queryset
     topics/columns
@@ -32,7 +44,7 @@ Getting Started
         from cqlengine import Model
 
         class ExampleModel(Model):
-            example_id      = columns.UUID(primary_key=True)  
+            example_id      = columns.UUID(primary_key=True, default=uuid.uuid4)
             example_type    = columns.Integer(index=True)
             created_at      = columns.DateTime()
             description     = columns.Text(required=False)
@@ -42,8 +54,8 @@ Getting Started
         >>> connection.setup(['127.0.0.1:9160'])
 
         #...and create your CQL table
-        >>> from cqlengine.management import create_table
-        >>> create_table(ExampleModel)
+        >>> from cqlengine.management import sync_table
+        >>> sync_table(ExampleModel)
 
         #now we can create some rows:
         >>> em1 = ExampleModel.create(example_type=0, description="example1", created_at=datetime.now())
@@ -54,8 +66,6 @@ Getting Started
         >>> em6 = ExampleModel.create(example_type=1, description="example6", created_at=datetime.now())
         >>> em7 = ExampleModel.create(example_type=1, description="example7", created_at=datetime.now())
         >>> em8 = ExampleModel.create(example_type=1, description="example8", created_at=datetime.now())
-        # Note: the UUID and DateTime columns will create uuid4 and datetime.now
-        # values automatically if we don't specify them when creating new rows
 
         #and now we can run some queries against our table
         >>> ExampleModel.objects.count()
@@ -87,8 +97,6 @@ Getting Started
 `Users Mailing List <https://groups.google.com/forum/?fromgroups#!forum/cqlengine-users>`_
 
 `Dev Mailing List <https://groups.google.com/forum/?fromgroups#!forum/cqlengine-dev>`_
-
-**NOTE: cqlengine is in alpha and under development, some features may change. Make sure to check the changelog and test your app before upgrading**
 
 
 Indices and tables
