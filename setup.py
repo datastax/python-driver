@@ -1,3 +1,4 @@
+import platform
 import os
 import sys
 import warnings
@@ -146,6 +147,10 @@ def run_setup(extensions):
         kw['cmdclass']['build_ext'] = build_extensions
         kw['ext_modules'] = extensions
 
+    dependencies = ['futures', 'scales', 'blist']
+    if platform.python_implementation() != "CPython":
+        dependencies.remove('blist')
+
     setup(
         name='cassandra-driver',
         version=__version__,
@@ -156,7 +161,7 @@ def run_setup(extensions):
         author_email='tyler@datastax.com',
         packages=['cassandra', 'cassandra.io'],
         include_package_data=True,
-        install_requires=['futures', 'scales', 'blist'],
+        install_requires=dependencies,
         tests_require=['nose', 'mock', 'ccm'],
         classifiers=[
             'Development Status :: 3 - Beta',

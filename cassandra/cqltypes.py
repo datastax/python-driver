@@ -20,6 +20,7 @@ import socket
 import time
 from datetime import datetime
 from uuid import UUID
+import warnings
 
 try:
     from cStringIO import StringIO
@@ -35,7 +36,15 @@ apache_cassandra_type_prefix = 'org.apache.cassandra.db.marshal.'
 
 _number_types = frozenset((int, long, float))
 
-from blist import sortedset
+try:
+    from blist import sortedset
+except ImportError:
+    warnings.warn(
+        "The blist library is not available, so a normal set will "
+        "be used in place of blist.sortedset for set collection values. "
+        "You can find the blist library here: https://pypi.python.org/pypi/blist/")
+
+    sortedset = set
 
 try:
     from collections import OrderedDict
