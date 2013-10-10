@@ -6,7 +6,7 @@ import socket
 import sys
 from threading import Event, Lock, Thread
 import traceback
-from Queue import Queue
+import Queue
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL, EISCONN, errorcode
 
 import asyncore
@@ -320,7 +320,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
 
         try:
             request_id = self._id_queue.get_nowait()
-        except Queue.EMPTY:
+        except Queue.Empty:
             raise ConnectionBusy(
                 "Connection to %s is at the max number of requests" % self.host)
 

@@ -5,7 +5,7 @@ import os
 import socket
 from threading import Event, Lock, Thread
 import traceback
-from Queue import Queue
+import Queue
 
 from cassandra.connection import (Connection, ResponseWaiter, ConnectionShutdown,
                                   ConnectionBusy, NONBLOCKING)
@@ -281,7 +281,7 @@ class LibevConnection(Connection):
 
         try:
             request_id = self._id_queue.get_nowait()
-        except Queue.EMPTY:
+        except Queue.Empty:
             raise ConnectionBusy(
                 "Connection to %s is at the max number of requests" % self.host)
 
