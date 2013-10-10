@@ -1609,6 +1609,11 @@ class ResponseFuture(object):
             fn(response, *args, **kwargs)
 
     def _retry(self, reuse_connection, consistency_level):
+        if self._final_exception:
+            # the connection probably broke while we were waiting
+            # to retry the operation
+            return
+
         if self._metrics is not None:
             self._metrics.on_retry()
         if consistency_level is not None:
