@@ -297,22 +297,22 @@ class Connection(object):
         if not keyspace or keyspace == self.keyspace:
             return
 
-        with self.lock:
-            query = 'USE "%s"' % (keyspace,)
-            try:
-                result = self.wait_for_response(
-                    QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE))
-                if isinstance(result, ResultMessage):
-                    self.keyspace = keyspace
-                else:
-                    raise self.defunct(ConnectionException(
-                        "Problem while setting keyspace: %r" % (result,), self.host))
-            except InvalidRequestException as ire:
-                # the keyspace probably doesn't exist
-                raise ire.to_exception()
-            except Exception as exc:
-                raise self.defunct(ConnectionException(
-                    "Problem while setting keyspace: %r" % (exc,), self.host))
+        query = QueryMessage(query='USE "%s"' % (keyspace,),
+                             consistency_level=ConsistencyLevel.ONE)
+        try:
+            result = self.wait_for_response(query)
+        except InvalidRequestException as ire:
+            # the keyspace probably doesn't exist
+            raise ire.to_exception()
+        except Exception as exc:
+            raise self.defunct(ConnectionException(
+                "Problem while setting keyspace: %r" % (exc,), self.host))
+
+        if isinstance(result, ResultMessage):
+            self.keyspace = keyspace
+        else:
+            raise self.defunct(ConnectionException(
+                "Problem while setting keyspace: %r" % (result,), self.host))
 
 
 class ResponseWaiter(object):

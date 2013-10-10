@@ -273,17 +273,20 @@ class LibevConnection(Connection):
                     self._write_watcher.start()
                     _loop_notifier.send()
 
-    def send_msg(self, msg, cb):
+    def send_msg(self, msg, cb, wait_for_id=False):
         if self.is_defunct:
             raise ConnectionShutdown("Connection to %s is defunct" % self.host)
         elif self.is_closed:
             raise ConnectionShutdown("Connection to %s is closed" % self.host)
 
-        try:
-            request_id = self._id_queue.get_nowait()
-        except Queue.Empty:
-            raise ConnectionBusy(
-                "Connection to %s is at the max number of requests" % self.host)
+        if not wait_for_id:
+            try:
+                request_id = self._id_queue.get_nowait()
+            except Queue.Empty:
+                raise ConnectionBusy(
+                    "Connection to %s is at the max number of requests" % self.host)
+        else:
+            request_id = self._id_queue.get()
 
         self._callbacks[request_id] = cb
         self.push(msg.to_string(request_id, compression=self.compressor))
@@ -294,10 +297,20 @@ class LibevConnection(Connection):
 
     def wait_for_responses(self, *msgs):
         waiter = ResponseWaiter(len(msgs))
-        for i, msg in enumerate(msgs):
-            self.send_msg(msg, partial(waiter.got_response, index=i))
+        with self.lock:
+            # we're not checking to make sure in_flight is < 128,
+            # but that's okay because we'll do a blocking wait
+            # on getting a request ID from the queue
+            self.in_flight += len(msgs)
 
-        return waiter.deliver()
+        for i, msg in enumerate(msgs):
+            self.send_msg(msg, partial(waiter.got_response, index=i), wait_for_id=True)
+
+        try:
+            return waiter.deliver()
+        finally:
+            with self.lock:
+                self.in_flight -= len(msgs)
 
     def register_watcher(self, event_type, callback):
         self._push_watchers[event_type].add(callback)
