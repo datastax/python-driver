@@ -5,10 +5,10 @@ This module houses the main classes you will interact with,
 
 from concurrent.futures import ThreadPoolExecutor
 import logging
-import sys
 import time
 from threading import Lock, RLock, Thread, Event
 import Queue
+import sys
 import weakref
 try:
     from weakref import WeakSet
@@ -39,11 +39,15 @@ from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
 from cassandra.pool import (_ReconnectionHandler, _HostReconnectionHandler,
                             HostConnectionPool)
 
-# libev is all around faster, so we want to try and default to using that when we can
-try:
-    from cassandra.io.libevreactor import LibevConnection as DefaultConnection
-except ImportError:
-    from cassandra.io.asyncorereactor import AsyncoreConnection as DefaultConnection  # NOQA
+# default to gevent when we are monkey patched, otherwise if libev is available, use that as the
+# default because it's faster than asyncore
+if 'gevent.monkey' in sys.modules:
+    from cassandra.io.geventreactor import GeventConnection as DefaultConnection
+else:
+    try:
+        from cassandra.io.libevreactor import LibevConnection as DefaultConnection
+    except ImportError:
+        from cassandra.io.asyncorereactor import AsyncoreConnection as DefaultConnection  # NOQA
 
 # Forces load of utf8 encoding module to avoid deadlock that occurs
 # if code that is being imported tries to import the module in a seperate
@@ -227,13 +231,6 @@ class Cluster(object):
         Any of the mutable Cluster attributes may be set as keyword arguments
         to the constructor.
         """
-        if 'gevent.monkey' in sys.modules:
-            raise Exception(
-                "gevent monkey-patching detected. This driver does not currently "
-                "support gevent, and monkey patching will break the driver "
-                "completely. You can track progress towards adding gevent "
-                "support here: https://datastax-oss.atlassian.net/browse/PYTHON-7.")
-
         self.contact_points = contact_points
         self.port = port
         self.compression = compression

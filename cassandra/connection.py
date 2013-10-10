@@ -1,8 +1,13 @@
 import errno
 from functools import wraps, partial
 import logging
+import sys
 from threading import Event, Lock, RLock
-from Queue import Queue
+
+if 'gevent.monkey' in sys.modules:
+    from gevent.queue import Queue
+else:
+    from Queue import Queue
 
 from cassandra import ConsistencyLevel, AuthenticationFailed
 from cassandra.marshal import int8_unpack, int32_pack
