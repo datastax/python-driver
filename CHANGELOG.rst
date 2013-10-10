@@ -1,3 +1,26 @@
+1.0.0b5
+========
+Oct 10, 2013
+
+Features
+--------
+* SSL support
+
+Bug Fixes
+---------
+* Avoid KeyError when building replica map for NetworkTopologyStrategy
+* Work around python bug which causes deadlock when a thread imports
+  the utf8 module
+* Handle no blist library, which is not compatible with pypy
+* Avoid deadlock triggered by a keyspace being set on a connection (which
+  may happen automatically for new connections)
+
+Other
+-----
+* Switch packaging from Distribute to setuptools, improved C extension
+  support
+* Use PEP 386 compliant beta and post-release versions
+
 1.0.0-beta4
 ===========
 Sep 24, 2013
