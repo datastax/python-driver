@@ -164,7 +164,7 @@ def run_setup(extensions):
         install_requires=dependencies,
         tests_require=['nose', 'mock', 'ccm'],
         classifiers=[
-            'Development Status :: 3 - Beta',
+            'Development Status :: 4 - Beta',
             'Intended Audience :: Developers',
             'License :: OSI Approved :: Apache Software License',
             'Natural Language :: English',
