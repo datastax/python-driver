@@ -519,7 +519,7 @@ class Cluster(object):
         if not self._prepared_statements:
             return
 
-        log.debug("Preparing all known prepared statements against host %s" % (host,))
+        log.debug("Preparing all known prepared statements against host %s", host)
         try:
             connection = self.connection_factory(host.address)
             try:
@@ -542,14 +542,14 @@ class Cluster(object):
                         if (not isinstance(response, ResultMessage) or
                             response.kind != ResultMessage.KIND_PREPARED):
                             log.debug("Got unexpected response when preparing "
-                                      "statement on host %s: %r" % (host, response))
+                                      "statement on host %s: %r", host, response)
                     except Exception:
                         log.exception("Error trying to prepare statement on "
-                                      "host %s" % (host,))
+                                      "host %s", host)
 
         except Exception:
             # log and ignore
-            log.exception("Error trying to prepare all statements on host %s" % (host,))
+            log.exception("Error trying to prepare all statements on host %s", host)
 
     def prepare_on_all_sessions(self, query_id, prepared_statement, excluded_host):
         self._prepared_statements[query_id] = prepared_statement
@@ -755,18 +755,18 @@ class Session(object):
                 try:
                     request_id = future._query(host)
                 except Exception:
-                    log.exception("Error preparing query for host %s:" % (host,))
+                    log.exception("Error preparing query for host %s:", host)
                     continue
 
                 if request_id is None:
                     # the error has already been logged by ResponsFuture
-                    log.debug("Failed to prepare query for host %s" % (host,))
+                    log.debug("Failed to prepare query for host %s", host)
                     continue
 
                 try:
                     future.result()
                 except Exception:
-                    log.exception("Error preparing query for host %s:" % (host,))
+                    log.exception("Error preparing query for host %s:", host)
 
     def shutdown(self):
         """
@@ -888,7 +888,7 @@ class _ControlReconnectionHandler(_ReconnectionHandler):
         if isinstance(exc, AuthenticationFailed):
             return False
         else:
-            log.debug("Error trying to reconnect control connection: %r" % (exc,))
+            log.debug("Error trying to reconnect control connection: %r", exc)
             return True
 
 
@@ -1134,7 +1134,7 @@ class ControlConnection(object):
 
             host = self._cluster.metadata.get_host(addr)
             if host is None:
-                log.debug("[control connection] Found new host to connect to: %s" % (addr,))
+                log.debug("[control connection] Found new host to connect to: %s", addr)
                 host = self._cluster.add_host(addr, signal=True)
             host.set_location_info(row.get("data_center"), row.get("rack"))
 
@@ -1255,11 +1255,11 @@ class ControlConnection(object):
         return bool(conn and conn.is_open)
 
     def on_up(self, host):
-        log.debug("[control connection] Host %s is considered up" % (host,))
+        log.debug("[control connection] Host %s is considered up", host)
         self._balancing_policy.on_up(host)
 
     def on_down(self, host):
-        log.debug("[control connection] Host %s is considered down" % (host,))
+        log.debug("[control connection] Host %s is considered down", host)
         self._balancing_policy.on_down(host)
 
         conn = self._connection
@@ -1268,12 +1268,12 @@ class ControlConnection(object):
             self.reconnect()
 
     def on_add(self, host):
-        log.debug("[control connection] Adding host %r and refreshing topology" % (host,))
+        log.debug("[control connection] Adding host %r and refreshing topology", host)
         self._balancing_policy.on_add(host)
         self.refresh_node_list_and_token_map()
 
     def on_remove(self, host):
-        log.debug("[control connection] Removing host %r and refreshing topology" % (host,))
+        log.debug("[control connection] Removing host %r and refreshing topology", host)
         self._balancing_policy.on_remove(host)
         self.refresh_node_list_and_token_map()
 
@@ -1305,7 +1305,7 @@ class _Scheduler(object):
             run_at = time.time() + delay
             self._scheduled.put_nowait((run_at, (fn, args, kwargs)))
         else:
-            log.debug("Ignoring scheduled function after shutdown: %r" % fn)
+            log.debug("Ignoring scheduled function after shutdown: %r", fn)
 
     def run(self):
         while True:
@@ -1500,7 +1500,7 @@ class ResponseFuture(object):
                     try:
                         prepared_statement = self.session.cluster._prepared_statements[query_id]
                     except KeyError:
-                        log.error("Tried to execute unknown prepared statement %s" % (query_id.encode('hex'),))
+                        log.error("Tried to execute unknown prepared statement %s", query_id.encode('hex'))
                         self._set_final_exception(response)
                         return
 

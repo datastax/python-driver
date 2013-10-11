@@ -141,7 +141,7 @@ class LibevConnection(Connection):
                 return
             self.is_closed = True
 
-        log.debug("Closing connection to %s" % (self.host,))
+        log.debug("Closing connection to %s", self.host)
         if self._read_watcher:
             self._read_watcher.stop()
         if self._write_watcher:
