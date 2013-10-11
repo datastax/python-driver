@@ -11,6 +11,7 @@ from cassandra.connection import Connection, MAX_STREAM_PER_CONNECTION
 from cassandra.pool import Host, HostConnectionPool, NoConnectionsAvailable, HealthMonitor
 from cassandra.policies import HostDistance, SimpleConvictionPolicy
 
+
 class HostConnectionPoolTests(unittest.TestCase):
 
     def make_session(self):
@@ -32,7 +33,7 @@ class HostConnectionPoolTests(unittest.TestCase):
         c = pool.borrow_connection(timeout=0.01)
         self.assertIs(c, conn)
         self.assertEqual(1, conn.in_flight)
-        conn.set_keyspace.assert_called_once_with('foobarkeyspace')
+        conn.set_keyspace_blocking.assert_called_once_with('foobarkeyspace')
 
         pool.return_connection(conn)
         self.assertEqual(0, conn.in_flight)
@@ -102,10 +103,11 @@ class HostConnectionPoolTests(unittest.TestCase):
         session.submit.side_effect = fire_event
 
         def get_conn():
+            conn.reset_mock()
             c = pool.borrow_connection(1.0)
             self.assertIs(conn, c)
             self.assertEqual(1, conn.in_flight)
-            conn.set_keyspace.assert_called_once_with('foobarkeyspace')
+            conn.set_keyspace_blocking.assert_called_once_with('foobarkeyspace')
             pool.return_connection(c)
 
         t = Thread(target=get_conn)

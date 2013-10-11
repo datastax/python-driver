@@ -286,6 +286,11 @@ class HostConnectionPool(object):
         core_conns = session.cluster.get_core_connections_per_host(host_distance)
         self._connections = [session.cluster.connection_factory(host.address)
                              for i in range(core_conns)]
+
+        if session.keyspace:
+            for conn in self._connections:
+                conn.set_keyspace_blocking(session.keyspace)
+
         self._trash = set()
         self.open_count = core_conns
 
@@ -310,7 +315,6 @@ class HostConnectionPool(object):
 
             # in_flight is incremented by wait_for_conn
             conn = self._wait_for_conn(timeout)
-            conn.set_keyspace(self._session.keyspace)
             return conn
         else:
             # note: it would be nice to push changes to these config settings
@@ -343,7 +347,6 @@ class HostConnectionPool(object):
                 # wait_for_conn will increment in_flight on the conn
                 least_busy = self._wait_for_conn(timeout)
 
-            least_busy.set_keyspace(self._session.keyspace)
             return least_busy
 
     def _maybe_spawn_new_connection(self):
@@ -377,6 +380,8 @@ class HostConnectionPool(object):
 
         try:
             conn = self._session.cluster.connection_factory(self.host.address)
+            if self._session.keyspace:
+                conn.set_keyspace_blocking(self._session.keyspace)
             with self._lock:
                 new_connections = self._connections[:] + [conn]
                 self._connections = new_connections
@@ -536,3 +541,23 @@ class HostConnectionPool(object):
             for i in range(to_create):
                 self._scheduled_for_creation += 1
                 self._session.submit(self._create_new_connection)
+
+    def _set_keyspace_for_all_conns(self, keyspace, callback):
+        """
+        Asynchronously sets the keyspace for all connections.  When all
+        connections have been set, `callback` will be called with two
+        arguments: this pool, and a list of any errors that occurred.
+        """
+        remaining_callbacks = set(self._connections)
+        errors = []
+
+        def connection_finished_setting_keyspace(conn, error):
+            remaining_callbacks.remove(conn)
+            if error:
+                errors.append(error)
+
+            if not remaining_callbacks:
+                callback(self, errors)
+
+        for conn in self._connections:
+            conn.set_keyspace_async(keyspace, connection_finished_setting_keyspace)

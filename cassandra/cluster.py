@@ -530,7 +530,7 @@ class Cluster(object):
             statements = self._prepared_statements.values()
             for keyspace, ks_statements in groupby(statements, lambda s: s.keyspace):
                 if keyspace is not None:
-                    connection.set_keyspace(keyspace)
+                    connection.set_keyspace_blocking(keyspace)
 
                 # note: we could potentially prepare some of these in parallel,
                 # but at the same time, we don't want to put too much load on
@@ -861,6 +861,29 @@ class Session(object):
         This operation blocks until complete.
         """
         self.execute('USE "%s"' % (keyspace,))
+
+    def _set_keyspace_for_all_pools(self, keyspace, callback):
+        """
+        Asynchronously sets the keyspace on all pools.  When all
+        pools have set all of their connections, `callback` will be
+        called with a dictionary of all errors that occurred, keyed
+        by the `Host` that they occurred against.
+        """
+        self.keyspace = keyspace
+
+        remaining_callbacks = set(self._pools.values())
+        errors = {}
+
+        def pool_finished_setting_keyspace(pool, host_errors):
+            remaining_callbacks.remove(pool)
+            if host_errors:
+                errors[pool.host] = host_errors
+
+            if not remaining_callbacks:
+                callback(host_errors)
+
+        for pool in self._pools.values():
+            pool._set_keyspace_for_all_conns(keyspace, pool_finished_setting_keyspace)
 
     def submit(self, fn, *args, **kwargs):
         """ Internal """
@@ -1442,9 +1465,16 @@ class ResponseFuture(object):
             if isinstance(response, ResultMessage):
                 if response.kind == ResultMessage.KIND_SET_KEYSPACE:
                     session = getattr(self, 'session', None)
+                    # since we're running on the event loop thread, we need to
+                    # use a non-blocking method for setting the keyspace on
+                    # all connections in this session, otherwise the event
+                    # loop thread will deadlock waiting for keyspaces to be
+                    # set.  This uses a callback chain which ends with
+                    # self._set_keyspace_completed() being called in the
+                    # event loop thread.
                     if session:
-                        session.keyspace = response.results
-                    self._set_final_result(None)
+                        session._set_keyspace_for_all_pools(
+                            response.results, self._set_keyspace_completed)
                 elif response.kind == ResultMessage.KIND_SCHEMA_CHANGE:
                     # refresh the schema before responding, but do it in another
                     # thread instead of the event loop thread
@@ -1559,6 +1589,13 @@ class ResponseFuture(object):
             # almost certainly caused by a bug, but we need to set something here
             log.exception("Unexpected exception while handling result in ResponseFuture:")
             self._set_final_exception(exc)
+
+    def _set_keyspace_completed(self, errors):
+        if not errors:
+            self._set_final_result(None)
+        else:
+            self._set_final_exception(ConnectionException(
+                "Failed to set keyspace on all hosts: %s" % (errors,)))
 
     def _execute_after_prepare(self, response):
         """

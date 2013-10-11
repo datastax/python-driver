@@ -293,7 +293,7 @@ class Connection(object):
             log.error(msg, startup_response)
             raise ProtocolError(msg % (startup_response,))
 
-    def set_keyspace(self, keyspace):
+    def set_keyspace_blocking(self, keyspace):
         if not keyspace or keyspace == self.keyspace:
             return
 
@@ -313,6 +313,30 @@ class Connection(object):
         else:
             raise self.defunct(ConnectionException(
                 "Problem while setting keyspace: %r" % (result,), self.host))
+
+    def set_keyspace_async(self, keyspace, callback):
+        """
+        Use this in order to avoid deadlocking the event loop thread.
+        When the operation completes, `callback` will be called with
+        two arguments: this connection and an Exception if an error
+        occurred, otherwise :const:`None`.
+        """
+        if not keyspace or keyspace == self.keyspace:
+            return
+
+        query = QueryMessage(query='USE "%s"' % (keyspace,),
+                             consistency_level=ConsistencyLevel.ONE)
+
+        def process_result(result):
+            if isinstance(result, ResultMessage):
+                callback(self, None)
+            elif isinstance(result, InvalidRequestException):
+                callback(self, result.to_exception())
+            else:
+                callback(self, self.defunct(ConnectionException(
+                    "Problem while setting keyspace: %r" % (result,), self.host)))
+
+        self.send_msg(query, process_result, wait_for_id=True)
 
 
 class ResponseWaiter(object):
