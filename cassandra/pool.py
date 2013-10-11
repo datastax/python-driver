@@ -297,7 +297,7 @@ class HostConnectionPool(object):
         conns = self._connections
         if not conns:
             # handled specially just for simpler code
-            log.debug("Detected empty pool, opening core conns to %s" % (self.host,))
+            log.debug("Detected empty pool, opening core conns to %s", self.host)
             core_conns = self._session.cluster.get_core_connections_per_host(self.host_distance)
             with self._lock:
                 # we check the length of self._connections again
@@ -352,7 +352,7 @@ class HostConnectionPool(object):
                 return
             self._scheduled_for_creation += 1
 
-        log.debug("Submitting task for creation of new Connection to %s" % (self.host,))
+        log.debug("Submitting task for creation of new Connection to %s", self.host)
         self._session.submit(self._create_new_connection)
 
     def _create_new_connection(self):
@@ -383,7 +383,7 @@ class HostConnectionPool(object):
             self._signal_available_conn()
             return True
         except ConnectionException as exc:
-            log.exception("Failed to add new connection to pool for host %s" % (self.host,))
+            log.exception("Failed to add new connection to pool for host %s", self.host)
             with self._lock:
                 self.open_count -= 1
             if self.host.monitor.signal_connection_failure(exc):
@@ -485,7 +485,7 @@ class HostConnectionPool(object):
                 self._trash.add(connection)
 
         if did_trash:
-            log.debug("Trashed connection to %s" % (self.host,))
+            log.debug("Trashed connection to %s", self.host)
 
     def _replace(self, connection):
         should_replace = False
@@ -498,7 +498,7 @@ class HostConnectionPool(object):
                 should_replace = True
 
         if should_replace:
-            log.debug("Replacing connection to %s" % (self.host,))
+            log.debug("Replacing connection to %s", self.host)
 
             def close_and_replace():
                 connection.close()
@@ -507,7 +507,7 @@ class HostConnectionPool(object):
             self._session.submit(close_and_replace)
         else:
             # just close it
-            log.debug("Closing connection to %s" % (self.host,))
+            log.debug("Closing connection to %s", self.host)
             connection.close()
 
     def shutdown(self):
