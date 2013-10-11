@@ -19,7 +19,7 @@ except ImportError:
 try:
     import ssl
 except ImportError:
-    ssl = None # NOQA
+    ssl = None  # NOQA
 
 from cassandra.connection import (Connection, ResponseWaiter, ConnectionShutdown,
                                   ConnectionBusy, ConnectionException, NONBLOCKING)
@@ -33,6 +33,7 @@ _loop_lock = Lock()
 
 _starting_conns = set()
 _starting_conns_lock = Lock()
+
 
 def _run_loop():
     global _loop_started
@@ -155,11 +156,11 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
                 return
             self.is_closed = True
 
-        log.debug("Closing connection to %s" % (self.host,))
+        log.debug("Closing connection to %s", self.host)
         self._writable = False
         self._readable = False
         asyncore.dispatcher.close(self)
-        log.debug("Closed socket to %s" % (self.host,))
+        log.debug("Closed socket to %s", self.host)
 
         with _starting_conns_lock:
             _starting_conns.discard(self)

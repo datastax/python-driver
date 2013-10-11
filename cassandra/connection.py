@@ -196,7 +196,7 @@ class Connection(object):
             response = decode_response(stream_id, flags, opcode, body, self.decompressor)
         except Exception as exc:
             log.exception("Error decoding response from Cassandra. "
-                          "opcode: %04x; message contents: %r" % (opcode, body))
+                          "opcode: %04x; message contents: %r", opcode, body)
             if callback is not None:
                 callback(exc)
             self.defunct(exc)
@@ -244,11 +244,11 @@ class Connection(object):
                        set(self.remote_supported_compressions))
             if len(overlap) == 0:
                 log.debug("No available compression types supported on both ends."
-                          " locally supported: %r. remotely supported: %r"
-                          % (locally_supported_compressions.keys(),
-                             self.remote_supported_compressions))
+                          " locally supported: %r. remotely supported: %r",
+                          locally_supported_compressions.keys(),
+                          self.remote_supported_compressions)
             else:
-                compression_type = iter(overlap).next() # choose any
+                compression_type = iter(overlap).next()  # choose any
                 opts['COMPRESSION'] = compression_type
                 # set the decompressor here, but set the compressor only after
                 # a successful Ready message
@@ -263,12 +263,12 @@ class Connection(object):
         if self.is_defunct:
             return
         if isinstance(startup_response, ReadyMessage):
-            log.debug("Got ReadyMessage on new Connection from %s" % self.host)
+            log.debug("Got ReadyMessage on new Connection from %s", self.host)
             if self._compressor:
                 self.compressor = self._compressor
             self.connected_event.set()
         elif isinstance(startup_response, AuthenticateMessage):
-            log.debug("Got AuthenticateMessage on new Connection from %s" % self.host)
+            log.debug("Got AuthenticateMessage on new Connection from %s", self.host)
 
             if self.credentials is None:
                 raise AuthenticationFailed('Remote end requires authentication.')
@@ -278,8 +278,8 @@ class Connection(object):
             callback = partial(self._handle_startup_response, did_authenticate=True)
             self.send_msg(cm, cb=callback)
         elif isinstance(startup_response, ErrorMessage):
-            log.debug("Received ErrorMessage on new Connection from %s: %s"
-                      % (self.host, startup_response.summary_msg()))
+            log.debug("Received ErrorMessage on new Connection from %s: %s",
+                      self.host, startup_response.summary_msg())
             if did_authenticate:
                 raise AuthenticationFailed(
                     "Failed to authenticate to %s: %s" %
@@ -289,9 +289,9 @@ class Connection(object):
                     "Failed to initialize new connection to %s: %s"
                     % (self.host, startup_response.summary_msg()))
         else:
-            msg = "Unexpected response during Connection setup: %r" % (startup_response,)
-            log.error(msg)
-            raise ProtocolError(msg)
+            msg = "Unexpected response during Connection setup: %r"
+            log.error(msg, startup_response)
+            raise ProtocolError(msg % (startup_response,))
 
     def set_keyspace(self, keyspace):
         if not keyspace or keyspace == self.keyspace:
