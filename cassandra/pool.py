@@ -264,6 +264,7 @@ class HealthMonitor(object):
 
 
 _MAX_SIMULTANEOUS_CREATION = 1
+_NEW_CONNECTION_GRACE_PERIOD = 5
 
 
 class HostConnectionPool(object):
@@ -467,7 +468,8 @@ class HostConnectionPool(object):
             # we can use in_flight here without holding the connection lock
             # because the fact that in_flight dipped below the min at some
             # point is enough to start the trashing procedure
-            if len(self._connections) > core_conns and in_flight <= min_reqs:
+            if len(self._connections) > core_conns and in_flight <= min_reqs and \
+                    time.time() - connection.connected_at >= _NEW_CONNECTION_GRACE_PERIOD:
                 self._maybe_trash_connection(connection)
             else:
                 self._signal_available_conn()

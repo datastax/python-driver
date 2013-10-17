@@ -2,6 +2,7 @@ import errno
 from functools import wraps, partial
 import logging
 from threading import Event, Lock, RLock
+import time
 from Queue import Queue
 
 from cassandra import ConsistencyLevel, AuthenticationFailed
@@ -124,6 +125,8 @@ class Connection(object):
     is_defunct = False
     is_closed = False
     lock = None
+
+    connected_at = None
 
     def __init__(self, host='127.0.0.1', port=9042, credentials=None,
                  ssl_options=None, sockopts=None, compression=True,
@@ -267,6 +270,7 @@ class Connection(object):
             log.debug("Got ReadyMessage on new connection (%s) from %s", id(self), self.host)
             if self._compressor:
                 self.compressor = self._compressor
+            self.connected_at = time.time()
             self.connected_event.set()
         elif isinstance(startup_response, AuthenticateMessage):
             log.debug("Got AuthenticateMessage on new connection (%s) from %s", id(self), self.host)
