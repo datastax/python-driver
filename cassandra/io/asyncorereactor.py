@@ -204,7 +204,12 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
     def _error_all_callbacks(self, exc):
         new_exc = ConnectionShutdown(str(exc))
         for cb in self._callbacks.values():
-            cb(new_exc)
+            try:
+                cb(new_exc)
+            except Exception:
+                log.warn("Ignoring unhandled exception while erroring callbacks for a "
+                         "failed connection (%s) to host %s:",
+                         id(self), self.host, exc_info=True)
 
     def handle_connect(self):
         with _starting_conns_lock:
