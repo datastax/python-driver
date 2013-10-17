@@ -8,7 +8,7 @@ from threading import Thread, Event
 
 from cassandra.cluster import Session
 from cassandra.connection import Connection, MAX_STREAM_PER_CONNECTION
-from cassandra.pool import Host, HostConnectionPool, NoConnectionsAvailable, HealthMonitor
+from cassandra.pool import Host, HostConnectionPool, NoConnectionsAvailable
 from cassandra.policies import HostDistance, SimpleConvictionPolicy
 
 
@@ -158,7 +158,7 @@ class HostConnectionPoolTests(unittest.TestCase):
 
         pool.borrow_connection(timeout=0.01)
         conn.is_defunct = True
-        host.monitor.signal_connection_failure.return_value = False
+        session.cluster.signal_connection_failure.return_value = False
         pool.return_connection(conn)
 
         # the connection should be closed a new creation scheduled
@@ -168,7 +168,6 @@ class HostConnectionPoolTests(unittest.TestCase):
 
     def test_return_defunct_connection_on_down_host(self):
         host = Mock(spec=Host, address='ip1')
-        host.monitor = Mock(spec=HealthMonitor)
         session = self.make_session()
         conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=False)
         session.cluster.connection_factory.return_value = conn
@@ -178,11 +177,11 @@ class HostConnectionPoolTests(unittest.TestCase):
 
         pool.borrow_connection(timeout=0.01)
         conn.is_defunct = True
-        host.monitor.signal_connection_failure.return_value = True
+        session.cluster.signal_connection_failure.return_value = True
         pool.return_connection(conn)
 
         # the connection should be closed a new creation scheduled
-        host.monitor.signal_connection_failure.assert_called_once()
+        session.cluster.signal_connection_failure.assert_called_once()
         conn.close.assert_called_once()
         self.assertFalse(session.submit.called)
         self.assertTrue(pool.is_shutdown)
@@ -198,7 +197,7 @@ class HostConnectionPoolTests(unittest.TestCase):
 
         pool.borrow_connection(timeout=0.01)
         conn.is_closed = True
-        host.monitor.signal_connection_failure.return_value = False
+        session.cluster.signal_connection_failure.return_value = False
         pool.return_connection(conn)
 
         # a new creation should be scheduled

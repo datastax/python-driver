@@ -333,8 +333,6 @@ class Cluster(object):
             self.metrics = Metrics(weakref.proxy(self))
 
         self.control_connection = ControlConnection(self)
-        for address in contact_points:
-            self.add_host(address, signal=True)
 
     def get_min_requests_per_connection(self, host_distance):
         return self._min_requests_per_connection[host_distance]
@@ -398,6 +396,13 @@ class Cluster(object):
                 raise Exception("Cluster is already shut down")
 
             if not self._is_setup:
+                for address in self.contact_points:
+                    host = self.add_host(address, signal=False)
+                    if host:
+                        host.set_up()
+                        for listener in self.listeners:
+                            listener.on_add(host)
+
                 self.load_balancing_policy.populate(
                     weakref.proxy(self), self.metadata.all_hosts())
                 self._is_setup = True
@@ -459,29 +464,104 @@ class Cluster(object):
         self.sessions.add(session)
         return session
 
+    def _on_up_future_completed(self, host, futures, results, lock, finished_future):
+        with lock:
+            futures.discard(finished_future)
+
+            try:
+                results.append(finished_future.result())
+            except Exception as exc:
+                results.append(exc)
+
+            if futures:
+                return
+
+        try:
+            # all futures have completed at this point
+            for exc in [f for f in results if isinstance(f, Exception)]:
+                log.error("Unexpected failure while marking node %s up:", host, exc_info=exc)
+                return
+
+            if not all(results):
+                log.debug("Connection pool could not be created, not marking node %s up:", host)
+                return
+
+            # mark the host as up and notify all listeners
+            host.set_up()
+            for listener in self.listeners:
+                listener.on_up(host)
+        finally:
+            host.lock.release()
+
+        # see if there are any pools to add or remove now that the host is marked up
+        for session in self.sessions:
+            session.update_created_pools()
+
     def on_up(self, host):
         """
-        Called when a host is marked up by its :class:`~.HealthMonitor`.
         Intended for internal use only.
         """
-        reconnector = host.get_and_set_reconnection_handler(None)
-        if reconnector:
-            reconnector.cancel()
+        if self._is_shutdown:
+            return
 
-        self._prepare_all_queries(host)
+        host.lock.acquire()
+        try:
+            if host.is_up:
+                host.lock.release()
+                return
 
-        self.control_connection.on_up(host)
-        for session in self.sessions:
-            session.on_up(host)
+            log.debug("Host %s has been marked up", host)
 
-    def on_down(self, host):
+            reconnector = host.get_and_set_reconnection_handler(None)
+            if reconnector:
+                log.debug("Now that host %s is up, cancelling the reconnection handler", host)
+                reconnector.cancel()
+
+            self._prepare_all_queries(host)
+
+            for session in self.sessions:
+                session.remove_pool(host)
+
+            self.load_balancing_policy.on_up(host)
+            self.control_connection.on_up(host)
+
+            futures_lock = Lock()
+            futures_results = []
+            futures = set()
+            callback = partial(self._on_up_future_completed, host, futures, futures_results, futures_lock)
+            for session in self.sessions:
+                future = session.add_or_renew_pool(host, is_host_addition=False)
+                future.add_done_callback(callback)
+                futures.add(future)
+        except Exception:
+            host.lock.release()
+
+        # for testing purposes
+        return futures
+
+    @run_in_executor
+    def on_down(self, host, is_host_addition):
         """
-        Called when a host is marked down by its :class:`~.HealthMonitor`.
         Intended for internal use only.
         """
+        if self._is_shutdown:
+            return
+
+        with host.lock:
+            if (not host.is_up) or host.is_currently_reconnecting():
+                return
+
+            host.set_down()
+
+        log.debug("Host %s has been marked down", host)
+
+        self.load_balancing_policy.on_down(host)
         self.control_connection.on_down(host)
         for session in self.sessions:
             session.on_down(host)
+
+        for listener in self.listeners:
+            listener.on_down(host)
 
         schedule = self.reconnection_policy.new_schedule()
 
@@ -491,14 +571,83 @@ class Cluster(object):
         conn_factory = self._make_connection_factory(host)
 
         reconnector = _HostReconnectionHandler(
-            host, conn_factory, self.scheduler, schedule,
-            host.get_and_set_reconnection_handler, new_handler=None)
+            host, conn_factory, is_host_addition, self.on_add, self.on_up,
+            self.scheduler, schedule, host.get_and_set_reconnection_handler,
+            new_handler=None)
 
         old_reconnector = host.get_and_set_reconnection_handler(reconnector)
         if old_reconnector:
+            log.debug("Old host reconnector found for %s, cancelling", host)
             old_reconnector.cancel()
 
+        log.debug("Staring reconnector for host %s", host)
         reconnector.start()
+
+    def on_add(self, host):
+        if self._is_shutdown:
+            return
+
+        log.debug("Adding new host %s", host)
+        self._prepare_all_queries(host)
+
+        self.load_balancing_policy.on_add(host)
+        self.control_connection.on_add(host)
+
+        futures_lock = Lock()
+        futures_results = []
+        futures = set()
+
+        def future_completed(future):
+            with futures_lock:
+                futures.discard(future)
+
+                try:
+                    futures_results.append(future.result())
+                except Exception as exc:
+                    futures_results.append(exc)
+
+                if futures:
+                    return
+
+            # all futures have completed at this point
+            for exc in [f for f in futures_results if isinstance(f, Exception)]:
+                log.error("Unexpected failure while adding node %s, will not mark up:", host, exc_info=exc)
+                return
+
+            if not all(futures_results):
+                log.debug("Connection pool could not be created, not marking node %s up:", host)
+                return
+
+            # mark the host as up and notify all listeners
+            host.set_up()
+            for listener in self.listeners:
+                listener.on_add(host)
+
+            # see if there are any pools to add or remove now that the host is marked up
+            for session in self.sessions:
+                session.update_created_pools()
+
+        for session in self.sessions:
+            future = session.add_or_renew_host(host, is_host_addition=True)
+            future.add_done_callback(future_completed)
+
+    def on_remove(self, host):
+        if self._is_shutdown:
+            return
+
+        log.debug("Removing host %s", host)
+        host.set_down()
+        self.load_balancing_policy.on_remove(host)
+        for session in self.sessions:
+            session.on_remove()
+        for listener in self.listeners:
+            listener.on_remove()
+
+    def signal_connection_failure(self, host, connection_exc, is_host_addition):
+        is_down = host.signal_connection_failure(connection_exc)
+        if is_down:
+            self.on_down(host, is_host_addition)
+        return is_down
 
     def add_host(self, address, signal):
         """
@@ -506,13 +655,10 @@ class Cluster(object):
         connection subsequently discovers a new node.  Intended for internal
         use only.
         """
-        log.info("Now considering host %s for new connections", address)
         new_host = self.metadata.add_host(address)
         if new_host and signal:
-            self._prepare_all_queries(new_host)
-            self.control_connection.on_add(new_host)
-            for session in self.sessions:  # TODO need to copy/lock?
-                session.on_add(new_host)
+            log.info("New Cassandra host %s added", address)
+            self.on_add(new_host)
 
         return new_host
 
@@ -521,11 +667,9 @@ class Cluster(object):
         Called when the control connection observes that a node has left the
         ring.  Intended for internal use only.
         """
-        log.info("Host %s will no longer be considered for new connections", host)
         if host and self.metadata.remove_host(host):
-            self.control_connection.on_remove(host)
-            for session in self.sessions:
-                session.on_remove(host)
+            log.info("Cassandra host %s removed", host)
+            self.on_remove(host)
 
     def register_listener(self, listener):
         """
@@ -574,7 +718,8 @@ class Cluster(object):
             try:
                 self.control_connection.wait_for_schema_agreement(connection)
             except Exception:
-                pass
+                log.debug("Error waiting for schema agreement before preparing statements against host %s", host, exc_info=True)
+                # TODO: potentially error out the connection?
 
             statements = self._prepared_statements.values()
             for keyspace, ks_statements in groupby(statements, lambda s: s.keyspace):
@@ -587,7 +732,8 @@ class Cluster(object):
                 for statement in ks_statements:
                     message = PrepareMessage(query=statement.query_string)
                     try:
-                        response = connection.wait_for_response(message)
+                        # TODO: make this timeout configurable somehow?
+                        response = connection.wait_for_response(message, timeout=1.0)
                         if (not isinstance(response, ResultMessage) or
                             response.kind != ResultMessage.KIND_PREPARED):
                             log.debug("Got unexpected response when preparing "
@@ -596,6 +742,8 @@ class Cluster(object):
                         log.exception("Error trying to prepare statement on "
                                       "host %s", host)
 
+            connection.close()
+            log.debug("Done preparing all known prepared statements against host %s", host)
         except Exception:
             # log and ignore
             log.exception("Error trying to prepare all statements on host %s", host)
@@ -657,7 +805,8 @@ class Session(object):
         self._metrics = cluster.metrics
 
         for host in hosts:
-            self.add_host(host)
+            future = self.add_or_renew_pool(host, is_host_addition=False)
+            future.result()
 
     def execute(self, query, parameters=None, trace=False):
         """
@@ -838,71 +987,81 @@ class Session(object):
         except TypeError:
             pass
 
-    def add_host(self, host):
-        """ Internal """
+    def add_or_renew_pool(self, host, is_host_addition):
+        """
+        For internal use only.
+        """
         distance = self._load_balancer.distance(host)
         if distance == HostDistance.IGNORED:
-            return self._pools.get(host)
-        else:
+            return None
+
+        def run_add_or_renew_pool():
             try:
                 new_pool = HostConnectionPool(host, distance, self)
             except AuthenticationFailed as auth_exc:
                 conn_exc = ConnectionException(str(auth_exc), host=host)
-                host.monitor.signal_connection_failure(conn_exc)
-                return self._pools.get(host)
+                self.cluster.signal_connection_failure(host, conn_exc, is_host_addition)
+                return False
             except Exception as conn_exc:
-                host.monitor.signal_connection_failure(conn_exc)
-                return self._pools.get(host)
+                log.debug("Signaling connection failure during Session.add_host: %s", conn_exc)
+                self.cluster.signal_connection_failure(host, conn_exc, is_host_addition)
+                return False
 
             previous = self._pools.get(host)
             self._pools[host] = new_pool
-            return previous
+            log.debug("Added pool for host %s to session", host)
+            if previous:
+                previous.shutdown()
 
-    def on_up(self, host):
-        """
-        Called by the parent Cluster instance when a host's :class:`HealthMonitor`
-        marks it up.  Only intended for internal use.
-        """
-        previous_pool = self.add_host(host)
-        self._load_balancer.on_up(host)
-        if previous_pool:
-            previous_pool.shutdown()
+            return True
 
-    def on_down(self, host):
-        """
-        Called by the parent Cluster instance when a host's :class:`HealthMonitor`
-        marks it down.  Only intended for internal use.
-        """
-        self._load_balancer.on_down(host)
+        return self.submit(run_add_or_renew_pool)
+
+    def remove_pool(self, host):
         pool = self._pools.pop(host, None)
         if pool:
-            pool.shutdown()
+            return self.submit(pool.shutdown)
+        else:
+            return None
 
+    def update_created_pools(self):
+        """
+        When the set of live nodes change, the loadbalancer will change its
+        mind on host distances. It might change it on the node that came/left
+        but also on other nodes (for instance, if a node dies, another
+        previously ignored node may be now considered).
+
+        This method ensures that all hosts for which a pool should exist
+        have one, and hosts that shouldn't don't.
+
+        For internal use only.
+        """
         for host in self.cluster.metadata.all_hosts():
-            if not host.monitor.is_up:
-                continue
-
             distance = self._load_balancer.distance(host)
-            if distance != HostDistance.IGNORED:
-                pool = self._pools.get(host)
-                if not pool:
-                    self.add_host(host)
+            pool = self._pools.get(host)
+
+            if not pool:
+                if distance != HostDistance.IGNORED and host.is_up:
+                    self.add_or_renew_pool(host, False)
+            elif distance != pool.host_distance:
+                # the distance has changed
+                if distance == HostDistance.IGNORED:
+                    self.remove_pool(host)
                 else:
                     pool.host_distance = distance
 
-    def on_add(self, host):
-        """ Internal """
-        previous_pool = self.add_host(host)
-        self._load_balancer.on_add(host)
-        if previous_pool:
-            previous_pool.shutdown()
+    def on_down(self, host):
+        """
+        Called by the parent Cluster instance when a node is marked down.
+        Only intended for internal use.
+        """
+        future = self.remove_pool(host)
+        if future:
+            future.add_done_callback(lambda f: self.update_created_pools())
 
     def on_remove(self, host):
         """ Internal """
-        self._load_balancer.on_remove(host)
-        pool = self._pools.pop(host)
-        if pool:
-            pool.shutdown()
+        self.on_down(host)
 
     def set_keyspace(self, keyspace):
         """
@@ -1031,8 +1190,8 @@ class ControlConnection(object):
                 return self._try_connect(host)
             except ConnectionException as exc:
                 errors[host.address] = exc
-                host.monitor.signal_connection_failure(exc)
                 log.warn("[control connection] Error connecting to %s:", host, exc_info=True)
+                self._cluster.signal_connection_failure(host, exc, is_host_addition=False)
             except Exception as exc:
                 errors[host.address] = exc
                 log.warn("[control connection] Error connecting to %s:", host, exc_info=True)
@@ -1242,14 +1401,16 @@ class ControlConnection(object):
                 # this is the first time we've seen the node
                 self._cluster.scheduler.schedule(1, self._cluster.add_host, addr, signal=True)
             else:
-                self._cluster.scheduler.schedule(1, host.monitor.set_up)
+                # this will be run by the scheduler
+                self._cluster.scheduler.schedule(1, self._cluster.on_up, host)
         elif change_type == "DOWN":
             # Note that there is a slight risk we can receive the event late and thus
             # mark the host down even though we already had reconnected successfully.
             # But it is unlikely, and don't have too much consequence since we'll try reconnecting
             # right away, so we favor the detection to make the Host.is_up more accurate.
             if host is not None:
-                self._cluster.scheduler.schedule(1, host.monitor.set_down)
+                # this will be run by the scheduler
+                self._cluster.on_down(host, is_host_addition=False)
 
     def _handle_schema_change(self, event):
         keyspace = event['keyspace'] or None
@@ -1294,10 +1455,11 @@ class ControlConnection(object):
                         rpc = row.get("peer")
 
                     peer = self._cluster.metadata.get_host(rpc)
-                    if peer and peer.monitor.is_up:
+                    if peer and peer.is_up:
                         versions.add(row.get("schema_version"))
 
                 if len(versions) == 1:
+                    log.debug("[control connection] Schemas match")
                     return True
 
                 log.debug("[control connection] Schemas mismatched, trying again")
@@ -1307,14 +1469,15 @@ class ControlConnection(object):
             return False
 
     def _signal_error(self):
-        # try just signaling the host monitor, as this will trigger a reconnect
+        # try just signaling the cluster, as this will trigger a reconnect
         # as part of marking the host down
         if self._connection and self._connection.is_defunct:
             host = self._cluster.metadata.get_host(self._connection.host)
             # host may be None if it's already been removed, but that indicates
             # that errors have already been reported, so we're fine
             if host:
-                host.monitor.signal_connection_failure(self._connection.last_error)
+                self._cluster.signal_connection_failure(
+                        host, self._connection.last_error, is_host_addition=False)
                 return
 
         # if the connection is not defunct or the host already left, reconnect
@@ -1327,26 +1490,22 @@ class ControlConnection(object):
         return bool(conn and conn.is_open)
 
     def on_up(self, host):
-        log.debug("[control connection] Host %s is considered up", host)
-        self._balancing_policy.on_up(host)
+        pass
 
     def on_down(self, host):
-        log.debug("[control connection] Host %s is considered down", host)
-        self._balancing_policy.on_down(host)
 
         conn = self._connection
         if conn and conn.host == host.address and \
                 self._reconnection_handler is None:
+            log.debug("[control connection] Control connection host (%s) is "
+                      "considered down, starting reconnection", host)
+            # this will result in a task being submitted to the executor to reconnect
             self.reconnect()
 
     def on_add(self, host):
-        log.debug("[control connection] Adding host %r and refreshing topology", host)
-        self._balancing_policy.on_add(host)
         self.refresh_node_list_and_token_map()
 
     def on_remove(self, host):
-        log.debug("[control connection] Removing host %r and refreshing topology", host)
-        self._balancing_policy.on_remove(host)
         self.refresh_node_list_and_token_map()
 
 
@@ -1659,13 +1818,13 @@ class ResponseFuture(object):
             else:
                 self._set_final_exception(ConnectionException(
                     "Got unexpected response when preparing statement "
-                    "on host %s: %s" % (self._host, response)))
+                    "on host %s: %s" % (self._current_host, response)))
         elif isinstance(response, ErrorMessage):
             self._set_final_exception(response)
         else:
             self._set_final_exception(ConnectionException(
                 "Got unexpected response type when preparing "
-                "statement on host %s: %s" % (self._host, response)))
+                "statement on host %s: %s" % (self._current_host, response)))
 
     def _set_final_result(self, response):
         if self._metrics is not None:

@@ -306,7 +306,6 @@ class Metadata(object):
             else:
                 return None
 
-        new_host.monitor.register(cluster)
         return new_host
 
     def remove_host(self, host):

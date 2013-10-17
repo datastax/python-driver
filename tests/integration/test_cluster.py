@@ -74,7 +74,7 @@ class ClusterTests(unittest.TestCase):
         Ensure errors are not thrown when using non-default policies
         """
 
-        cluster = Cluster(
+        Cluster(
             load_balancing_policy=RoundRobinPolicy(),
             reconnection_policy=ExponentialReconnectionPolicy(1.0, 600.0),
             default_retry_policy=RetryPolicy(),
@@ -176,28 +176,6 @@ class ClusterTests(unittest.TestCase):
         future.result()
 
         self.assertIn("newkeyspace", cluster.metadata.keyspaces)
-
-    def test_on_down_and_up(self):
-        """
-        Test on_down and on_up handling
-        """
-
-        cluster = Cluster()
-        session = cluster.connect()
-        host = cluster.metadata.all_hosts()[0]
-        host.monitor.signal_connection_failure(None)
-        cluster.on_down(host)
-        self.assertNotIn(host, session._pools)
-        host_reconnector = host._reconnection_handler
-        self.assertNotEqual(None, host_reconnector)
-
-        host.monitor.is_up = True
-
-        cluster.on_up(host)
-
-        self.assertEqual(None, host._reconnection_handler)
-        self.assertTrue(host_reconnector._cancelled)
-        self.assertIn(host, session._pools)
 
     def test_trace(self):
         """

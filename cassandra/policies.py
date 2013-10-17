@@ -42,7 +42,29 @@ class HostDistance(object):
     """
 
 
-class LoadBalancingPolicy(object):
+class HostStateListener(object):
+
+    def on_up(self, host):
+        """ Called when a node is marked up. """
+        raise NotImplementedError()
+
+    def on_down(self, host):
+        """ Called when a node is marked down. """
+        raise NotImplementedError()
+
+    def on_add(self, host):
+        """
+        Called when a node is added to the cluster.  The newly added node
+        should be considered up.
+        """
+        raise NotImplementedError()
+
+    def on_remove(self, host):
+        """ Called when a node is removed from the cluster. """
+        raise NotImplementedError()
+
+
+class LoadBalancingPolicy(HostStateListener):
     """
     Load balancing policies are used to decide how to distribute
     requests among all possible coordinator nodes in the cluster.
@@ -84,36 +106,6 @@ class LoadBalancingPolicy(object):
         `working_keyspace` should be the string name of the current keyspace,
         as set through :meth:`.Session.set_keyspace()` or with a ``USE``
         statement.
-        """
-        raise NotImplementedError()
-
-    def on_up(self, host):
-        """
-        Called when a :class:`~.pool.Host`'s :class:`~.HealthMonitor`
-        marks the node up.
-        """
-        raise NotImplementedError()
-
-    def on_down(self, host):
-        """
-        Called when a :class:`~.pool.Host`'s :class:`~.HealthMonitor`
-        marks the node down.
-        """
-        raise NotImplementedError()
-
-    def on_add(self, host):
-        """
-        Called when a :class:`.Cluster` instance is first created and
-        the initial contact points are added as well as when a new
-        :class:`~.pool.Host` is discovered in the cluster, which may
-        happen the first time the ring topology is examined or when
-        a new node joins the cluster.
-        """
-        raise NotImplementedError()
-
-    def on_remove(self, host):
-        """
-        Called when a :class:`~.pool.Host` leaves the cluster.
         """
         raise NotImplementedError()
 
@@ -300,7 +292,7 @@ class TokenAwarePolicy(LoadBalancingPolicy):
             else:
                 replicas = self._cluster_metadata.get_replicas(keyspace, routing_key)
                 for replica in replicas:
-                    if replica.monitor.is_up and \
+                    if replica.is_up and \
                             child.distance(replica) == HostDistance.LOCAL:
                         yield replica
 

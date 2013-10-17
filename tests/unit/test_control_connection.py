@@ -23,6 +23,8 @@ class MockMetadata(object):
             "192.168.1.1": Host("192.168.1.1", SimpleConvictionPolicy),
             "192.168.1.2": Host("192.168.1.2", SimpleConvictionPolicy)
         }
+        for host in self.hosts.values():
+            host.set_up()
 
         self.cluster_name = None
         self.partitioner = None
@@ -44,6 +46,7 @@ class MockCluster(object):
     max_schema_agreement_wait = Cluster.max_schema_agreement_wait
     load_balancing_policy = RoundRobinPolicy()
     reconnection_policy = ConstantReconnectionPolicy(2)
+    down_host = None
 
     def __init__(self):
         self.metadata = MockMetadata()
@@ -59,6 +62,12 @@ class MockCluster(object):
 
     def remove_host(self, host):
         self.removed_hosts.append(host)
+
+    def on_up(self, host):
+        pass
+
+    def on_down(self, host, is_host_addition):
+        self.down_host = host
 
 
 class MockConnection(object):
@@ -142,7 +151,7 @@ class ControlConnectionTest(unittest.TestCase):
 
         # change the schema version on one of the existing entries
         self.connection.peer_results[1][1][3] = 'c'
-        self.cluster.metadata.get_host('192.168.1.1').monitor.is_up = False
+        self.cluster.metadata.get_host('192.168.1.1').is_up = False
 
         self.assertTrue(self.control_connection.wait_for_schema_agreement())
         self.assertEqual(self.time.clock, 0)
@@ -156,7 +165,7 @@ class ControlConnectionTest(unittest.TestCase):
         )
         host = Host("0.0.0.0", SimpleConvictionPolicy)
         self.cluster.metadata.hosts[PEER_IP] = host
-        host.monitor.is_up = False
+        host.is_up = False
 
         # even though the new host has a different schema version, it's
         # marked as down, so the control connection shouldn't care
@@ -164,7 +173,7 @@ class ControlConnectionTest(unittest.TestCase):
         self.assertEqual(self.time.clock, 0)
 
         # but once we mark it up, the control connection will care
-        host.monitor.is_up = True
+        host.is_up = True
         self.assertFalse(self.control_connection.wait_for_schema_agreement())
         self.assertGreaterEqual(self.time.clock, Cluster.max_schema_agreement_wait)
 
@@ -248,7 +257,7 @@ class ControlConnectionTest(unittest.TestCase):
         }
         self.control_connection._handle_status_change(event)
         host = self.cluster.metadata.hosts['192.168.1.0']
-        self.cluster.scheduler.schedule.assert_called_with(ANY, host.monitor.set_up)
+        self.cluster.scheduler.schedule.assert_called_with(ANY, self.cluster.on_up, host)
 
         self.cluster.scheduler.schedule.reset_mock()
         event = {
@@ -265,7 +274,7 @@ class ControlConnectionTest(unittest.TestCase):
         }
         self.control_connection._handle_status_change(event)
         host = self.cluster.metadata.hosts['192.168.1.0']
-        self.cluster.scheduler.schedule.assert_called_with(ANY, host.monitor.set_down)
+        self.assertIs(host, self.cluster.down_host)
 
     def test_handle_schema_change(self):
 

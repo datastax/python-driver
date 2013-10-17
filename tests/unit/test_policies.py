@@ -257,6 +257,8 @@ class TokenAwarePolicyTest(unittest.TestCase):
         cluster = Mock(spec=Cluster)
         cluster.metadata = Mock(spec=Metadata)
         hosts = [Host(str(i), SimpleConvictionPolicy) for i in range(4)]
+        for host in hosts:
+            host.set_up()
 
         def get_replicas(keyspace, packed_key):
             index = struct.unpack('>i', packed_key)[0]
@@ -286,6 +288,8 @@ class TokenAwarePolicyTest(unittest.TestCase):
         cluster = Mock(spec=Cluster)
         cluster.metadata = Mock(spec=Metadata)
         hosts = [Host(str(i), SimpleConvictionPolicy) for i in range(4)]
+        for host in hosts:
+            host.set_up()
         for h in hosts[:2]:
             h.set_location_info("dc1", "rack1")
         for h in hosts[2:]:
@@ -361,7 +365,6 @@ class TokenAwarePolicyTest(unittest.TestCase):
         policy.populate(self.FakeCluster(), [host, remote_host, second_remote_host])
         distances = set([policy.distance(remote_host), policy.distance(second_remote_host)])
         self.assertEqual(distances, set([HostDistance.REMOTE, HostDistance.IGNORED]))
-
 
     def test_status_updates(self):
         """
@@ -468,7 +471,7 @@ class ConstantReconnectionPolicyTest(unittest.TestCase):
         max_attempts = -100
 
         try:
-            policy = ConstantReconnectionPolicy(delay=delay, max_attempts=max_attempts)
+            ConstantReconnectionPolicy(delay=delay, max_attempts=max_attempts)
             self.fail('max_attempts should throw ValueError when negative')
         except ValueError:
             pass

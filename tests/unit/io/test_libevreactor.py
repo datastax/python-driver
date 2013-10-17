@@ -11,7 +11,6 @@ from mock import patch, Mock
 
 from cassandra.connection import (PROTOCOL_VERSION,
                                   HEADER_DIRECTION_TO_CLIENT,
-                                  ProtocolError,
                                   ConnectionException)
 
 from cassandra.decoder import (write_stringmultimap, write_int, write_string,
@@ -87,7 +86,7 @@ class LibevConnectionTest(unittest.TestCase):
         c.handle_write(None, None)
 
         # read in a SupportedMessage response
-        header = self.make_header_prefix(SupportedMessage, version=0x04)
+        header = self.make_header_prefix(SupportedMessage, version=0xa4)
         options = self.make_options_body()
         c._socket.recv.return_value = self.make_msg(header, options)
         c.handle_read(None, None)
@@ -95,7 +94,7 @@ class LibevConnectionTest(unittest.TestCase):
         # make sure it errored correctly
         self.assertTrue(c.is_defunct)
         self.assertTrue(c.connected_event.is_set())
-        self.assertIsInstance(c.last_error, ProtocolError)
+        self.assertIsInstance(c.last_error, ConnectionException)
 
     def test_error_message_on_startup(self, *args):
         c = self.make_connection()

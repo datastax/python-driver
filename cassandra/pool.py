@@ -4,7 +4,7 @@ Connection pooling and host management.
 
 import logging
 import time
-from threading import Lock, RLock, Condition
+from threading import RLock, Condition
 import weakref
 try:
     from weakref import WeakSet
@@ -35,15 +35,18 @@ class Host(object):
     The IP address or hostname of the node.
     """
 
-    monitor = None
+    conviction_policy = None
     """
-    A :class:`.HealthMonitor` instance that tracks whether this node is
-    up or down.
+    A class:`ConvictionPolicy` instance for determining when this node should
+    be marked up or down.
     """
+
+    is_up = None
 
     _datacenter = None
     _rack = None
     _reconnection_handler = None
+    lock = None
 
     def __init__(self, inet_address, conviction_policy_factory):
         if inet_address is None:
@@ -52,9 +55,8 @@ class Host(object):
             raise ValueError("conviction_policy_factory may not be None")
 
         self.address = inet_address
-        self.monitor = HealthMonitor(conviction_policy_factory(self))
-
-        self._reconnection_lock = Lock()
+        self.conviction_policy = conviction_policy_factory(self)
+        self.lock = RLock()
 
     @property
     def datacenter(self):
@@ -75,12 +77,25 @@ class Host(object):
         self._datacenter = datacenter
         self._rack = rack
 
+    def set_up(self):
+        self.conviction_policy.reset()
+        self.is_up = True
+
+    def set_down(self):
+        self.is_up = False
+
+    def signal_connection_failure(self, connection_exc):
+        return self.conviction_policy.add_failure(connection_exc)
+
+    def is_currently_reconnecting(self):
+        return self._reconnection_handler is not None
+
     def get_and_set_reconnection_handler(self, new_handler):
         """
         Atomically replaces the reconnection handler for this
         host.  Intended for internal use only.
         """
-        with self._reconnection_lock:
+        with self.lock:
             old = self._reconnection_handler
             self._reconnection_handler = new_handler
             return old
@@ -175,8 +190,11 @@ class _ReconnectionHandler(object):
 
 class _HostReconnectionHandler(_ReconnectionHandler):
 
-    def __init__(self, host, connection_factory, *args, **kwargs):
+    def __init__(self, host, connection_factory, is_host_addition, on_add, on_up, *args, **kwargs):
         _ReconnectionHandler.__init__(self, *args, **kwargs)
+        self.is_host_addition = is_host_addition
+        self.on_add = on_add
+        self.on_up = on_up
         self.host = host
         self.connection_factory = connection_factory
 
@@ -184,83 +202,21 @@ class _HostReconnectionHandler(_ReconnectionHandler):
         return self.connection_factory()
 
     def on_reconnection(self, connection):
-        self.host.monitor.reset()
+        connection.close()
+        log.info("Successful reconnection to %s, marking node up", self.host)
+        if self.is_host_addition:
+            self.on_add(self.host)
+        else:
+            self.on_up(self.host)
 
     def on_exception(self, exc, next_delay):
         if isinstance(exc, AuthenticationFailed):
             return False
         else:
-            log.warn("Error attempting to reconnect to %s: %s", self.host, exc)
+            log.warn("Error attempting to reconnect to %s, scheduling retry in %f seconds: %s",
+                     self.host, next_delay, exc)
             log.debug("Reconnection error details", exc_info=True)
             return True
-
-
-class HealthMonitor(object):
-    """
-    Monitors whether a particular host is marked as up or down.
-    This class is primarily intended for internal use, although
-    applications may find it useful to check whether a given node
-    is up or down.
-    """
-
-    is_up = True
-    """
-    A boolean representing the current state of the node.
-    """
-
-    def __init__(self, conviction_policy):
-        self._conviction_policy = conviction_policy
-        self._host = conviction_policy.host
-        # self._listeners will hold, among other things, references to
-        # Cluster objects.  To allow those to be GC'ed (and shutdown) even
-        # though we've implemented __del__, use weak references.
-        self._listeners = WeakSet()
-        self._lock = RLock()
-
-    def register(self, listener):
-        with self._lock:
-            self._listeners.add(listener)
-
-    def unregister(self, listener):
-        with self._lock:
-            self._listeners.remove(listener)
-
-    def set_up(self):
-        if self.is_up:
-            return
-
-        self._conviction_policy.reset()
-        log.info("Host %s is considered up", self._host)
-
-        with self._lock:
-            listeners = self._listeners.copy()
-
-        for listener in listeners:
-            listener.on_up(self._host)
-
-        self.is_up = True
-
-    def set_down(self):
-        if not self.is_up:
-            return
-
-        self.is_up = False
-        log.info("Host %s is considered down", self._host)
-
-        with self._lock:
-            listeners = self._listeners.copy()
-
-        for listener in listeners:
-            listener.on_down(self._host)
-
-    def reset(self):
-        return self.set_up()
-
-    def signal_connection_failure(self, connection_exc):
-        is_down = self._conviction_policy.add_failure(connection_exc)
-        if is_down:
-            self.set_down()
-        return is_down
 
 
 _MAX_SIMULTANEOUS_CREATION = 1
@@ -295,6 +251,7 @@ class HostConnectionPool(object):
 
         self._trash = set()
         self.open_count = core_conns
+        log.debug("Finished initializing new connection pool for host %s", self.host)
 
     def borrow_connection(self, timeout):
         if self.is_shutdown:
@@ -395,7 +352,7 @@ class HostConnectionPool(object):
             log.exception("Failed to add new connection to pool for host %s", self.host)
             with self._lock:
                 self.open_count -= 1
-            if self.host.monitor.signal_connection_failure(exc):
+            if self._session.cluster.signal_connection_failure(self.host, exc, is_host_addition=False):
                 self.shutdown()
             return False
         except AuthenticationFailed:
@@ -448,7 +405,8 @@ class HostConnectionPool(object):
         if connection.is_defunct or connection.is_closed:
             log.debug("Defunct or closed connection (%s) returned to pool, potentially "
                       "marking host %s as down", id(connection), self.host)
-            is_down = self.host.monitor.signal_connection_failure(connection.last_error)
+            is_down = self._session.cluster.signal_connection_failure(
+                    self.host, connection.last_error, is_host_addition=False)
             if is_down:
                 self.shutdown()
             else:

@@ -68,8 +68,8 @@ class ResponseFutureTests(unittest.TestCase):
                       kind=ResultMessage.KIND_SET_KEYSPACE,
                       results="keyspace1")
         rf._set_result(result)
+        rf._set_keyspace_completed({})
         self.assertEqual(None, rf.result())
-        self.assertEqual(session.keyspace, 'keyspace1')
 
     def test_schema_change_result(self):
         session = self.make_session()
