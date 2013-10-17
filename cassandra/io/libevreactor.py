@@ -8,7 +8,7 @@ import traceback
 import Queue
 
 from cassandra.connection import (Connection, ResponseWaiter, ConnectionShutdown,
-                                  ConnectionBusy, NONBLOCKING)
+                                  ConnectionBusy, NONBLOCKING, TimedOut)
 from cassandra.decoder import RegisterMessage
 from cassandra.marshal import int32_unpack
 import cassandra.io.libevwrapper as libev
@@ -91,10 +91,14 @@ class LibevConnection(Connection):
 
     @classmethod
     def factory(cls, *args, **kwargs):
+        timeout = kwargs.pop('timeout', 5.0)
         conn = cls(*args, **kwargs)
-        conn.connected_event.wait()
+        conn.connected_event.wait(timeout)
         if conn.last_error:
             raise conn.last_error
+        elif not conn.connected_event.is_set():
+            conn.close()
+            raise TimedOut("Timed out creating new connection")
         else:
             return conn
 
@@ -292,10 +296,11 @@ class LibevConnection(Connection):
         self.push(msg.to_string(request_id, compression=self.compressor))
         return request_id
 
-    def wait_for_response(self, msg):
-        return self.wait_for_responses(msg)[0]
+    def wait_for_response(self, msg, timeout=None):
+        return self.wait_for_responses(msg, timeout=timeout)[0]
 
-    def wait_for_responses(self, *msgs):
+    def wait_for_responses(self, *msgs, **kwargs):
+        timeout = kwargs.get('timeout')
         waiter = ResponseWaiter(len(msgs))
         with self.lock:
             # we're not checking to make sure in_flight is < 128,
@@ -307,7 +312,7 @@ class LibevConnection(Connection):
             self.send_msg(msg, partial(waiter.got_response, index=i), wait_for_id=True)
 
         try:
-            return waiter.deliver()
+            return waiter.deliver(timeout=timeout)
         finally:
             with self.lock:
                 self.in_flight -= len(msgs)

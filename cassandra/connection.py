@@ -152,10 +152,10 @@ class Connection(object):
     def send_msg(self, msg, cb):
         raise NotImplementedError()
 
-    def wait_for_response(self, msg):
+    def wait_for_response(self, msg, **kwargs):
         raise NotImplementedError()
 
-    def wait_for_responses(self, *msgs):
+    def wait_for_responses(self, *msgs, **kwargs):
         raise NotImplementedError()
 
     def register_watcher(self, event_type, callback):
@@ -340,6 +340,10 @@ class Connection(object):
         self.send_msg(query, process_result, wait_for_id=True)
 
 
+class TimedOut(Exception):
+    pass
+
+
 class ResponseWaiter(object):
 
     def __init__(self, num_responses):
@@ -358,9 +362,11 @@ class ResponseWaiter(object):
             if not self.pending:
                 self.event.set()
 
-    def deliver(self):
-        self.event.wait()
+    def deliver(self, timeout=None):
+        self.event.wait(timeout)
         if self.error:
             raise self.error
+        elif not self.event.is_set():
+            raise TimedOut()
         else:
             return self.responses
