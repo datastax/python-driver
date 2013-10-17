@@ -15,7 +15,7 @@ try:
 except ImportError:
     from cassandra.util import WeakSet  # NOQA
 
-from functools import partial
+from functools import partial, wraps
 from itertools import groupby
 
 from cassandra import ConsistencyLevel, AuthenticationFailed
@@ -80,6 +80,30 @@ class NoHostAvailable(Exception):
     def __init__(self, message, errors):
         Exception.__init__(self, message, errors)
         self.errors = errors
+
+
+def _future_completed(future):
+    """ Helper for run_in_executor() """
+    exc = future.exception()
+    if exc:
+        log.debug("Failed to run task on executor", exc_info=exc)
+
+
+def run_in_executor(f):
+    """
+    A decorator to run the given method in the ThreadPoolExecutor.
+    """
+
+    @wraps(f)
+    def new_f(self, *args, **kwargs):
+
+        try:
+            future = self.executor.submit(f, self, *args, **kwargs)
+            future.add_done_callback(_future_completed)
+        except Exception:
+            log.exception("Failed to submit task to executor")
+
+    return new_f
 
 
 class Cluster(object):
