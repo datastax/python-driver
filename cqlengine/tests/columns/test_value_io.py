@@ -95,6 +95,12 @@ class TestInteger(BaseColumnIOTest):
     pkey_val = 5
     data_val = 6
 
+class TestBigInt(BaseColumnIOTest):
+
+    column = columns.BigInt
+    pkey_val = 6
+    data_val = pow(2, 63) - 1
+
 class TestDateTime(BaseColumnIOTest):
 
     column = columns.DateTime

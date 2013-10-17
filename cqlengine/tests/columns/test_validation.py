@@ -15,6 +15,7 @@ from cqlengine.columns import Bytes
 from cqlengine.columns import Ascii
 from cqlengine.columns import Text
 from cqlengine.columns import Integer
+from cqlengine.columns import BigInt
 from cqlengine.columns import VarInt
 from cqlengine.columns import DateTime
 from cqlengine.columns import Date
@@ -178,6 +179,16 @@ class TestInteger(BaseCassEngTestCase):
     def test_default_zero_fields_validate(self):
         """ Tests that integer columns with a default value of 0 validate """
         it = self.IntegerTest()
+        it.validate()
+
+class TestBigInt(BaseCassEngTestCase):
+    class BigIntTest(Model):
+        test_id = UUID(primary_key=True, default=lambda:uuid4())
+        value   = BigInt(default=0, required=True)
+
+    def test_default_zero_fields_validate(self):
+        """ Tests that bigint columns with a default value of 0 validate """
+        it = self.BigIntTest()
         it.validate()
 
 class TestText(BaseCassEngTestCase):
