@@ -293,8 +293,6 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
 
             if not self._callbacks:
                 self._readable = False
-        else:
-            self.close()
 
     def handle_pushed(self, response):
         log.debug("Message pushed from server: %r", response)
