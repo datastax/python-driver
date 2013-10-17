@@ -231,6 +231,9 @@ class Cluster(object):
     _is_setup = False
     _prepared_statements = None
 
+    _listeners = None
+    _listener_lock = None
+
     def __init__(self,
                  contact_points=("127.0.0.1",),
                  port=9042,
@@ -289,6 +292,9 @@ class Cluster(object):
         self.sockopts = sockopts
         self.cql_version = cql_version
         self.max_schema_agreement_wait = max_schema_agreement_wait
+
+        self._listeners = set()
+        self._listener_lock = Lock()
 
         # let Session objects be GC'ed (and shutdown) when the user no longer
         # holds a reference. Normally the cycle detector would handle this,
@@ -520,6 +526,25 @@ class Cluster(object):
             self.control_connection.on_remove(host)
             for session in self.sessions:
                 session.on_remove(host)
+
+    def register_listener(self, listener):
+        """
+        Adds a :class:`cassandra.policies.HostStateListener` subclass instance to
+        the list of listeners to be notified when a host is added, removed,
+        marked up, or marked down.
+        """
+        with self._listener_lock:
+            self._listeners.add(listener)
+
+    def unregister_listener(self, listener):
+        """ Removes a registered listener. """
+        with self._listener_lock:
+            self._listeners.remove(listener)
+
+    @property
+    def listeners(self):
+        with self._listener_lock:
+            return self._listeners.copy()
 
     def ensure_core_connections(self):
         """
