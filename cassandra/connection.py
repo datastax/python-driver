@@ -212,7 +212,7 @@ class Connection(object):
 
     @defunct_on_error
     def _send_options_message(self):
-        log.debug("Sending initial options message for new Connection to %s", self.host)
+        log.debug("Sending initial options message for new connection (%s) to %s", id(self), self.host)
         self.send_msg(OptionsMessage(), self._handle_options_response)
 
     @defunct_on_error
@@ -224,7 +224,8 @@ class Connection(object):
             log.error("Did not get expected SupportedMessage response; instead, got: %s", options_response)
             return
 
-        log.debug("Received options response on new Connection from %s" % self.host)
+        log.debug("Received options response on new connection (%s) from %s",
+                  id(self), self.host)
         self.supported_cql_versions = options_response.cql_versions
         self.remote_supported_compressions = options_response.options['COMPRESSION']
 
@@ -263,12 +264,12 @@ class Connection(object):
         if self.is_defunct:
             return
         if isinstance(startup_response, ReadyMessage):
-            log.debug("Got ReadyMessage on new Connection from %s", self.host)
+            log.debug("Got ReadyMessage on new connection (%s) from %s", id(self), self.host)
             if self._compressor:
                 self.compressor = self._compressor
             self.connected_event.set()
         elif isinstance(startup_response, AuthenticateMessage):
-            log.debug("Got AuthenticateMessage on new Connection from %s", self.host)
+            log.debug("Got AuthenticateMessage on new connection (%s) from %s", id(self), self.host)
 
             if self.credentials is None:
                 raise AuthenticationFailed('Remote end requires authentication.')
@@ -278,8 +279,8 @@ class Connection(object):
             callback = partial(self._handle_startup_response, did_authenticate=True)
             self.send_msg(cm, cb=callback)
         elif isinstance(startup_response, ErrorMessage):
-            log.debug("Received ErrorMessage on new Connection from %s: %s",
-                      self.host, startup_response.summary_msg())
+            log.debug("Received ErrorMessage on new connection (%s) from %s: %s",
+                      id(self), self.host, startup_response.summary_msg())
             if did_authenticate:
                 raise AuthenticationFailed(
                     "Failed to authenticate to %s: %s" %

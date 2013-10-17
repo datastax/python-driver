@@ -156,7 +156,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
                 return
             self.is_closed = True
 
-        log.debug("Closing connection to %s", self.host)
+        log.debug("Closing connection (%s) to %s", id(self), self.host)
         self._writable = False
         self._readable = False
         asyncore.dispatcher.close(self)
@@ -185,10 +185,11 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
 
         trace = traceback.format_exc(exc)
         if trace != "None":
-            log.debug("Defuncting connection to %s: %s\n%s",
-                      self.host, exc, traceback.format_exc(exc))
+            log.debug("Defuncting connection (%s) to %s: %s\n%s",
+                      id(self), self.host, exc, traceback.format_exc(exc))
         else:
-            log.debug("Defuncting connection to %s: %s", self.host, exc)
+            log.debug("Defuncting connection (%s) to %s: %s",
+                      id(self), self.host, exc)
 
         self.last_error = exc
         self._error_all_callbacks(exc)
@@ -209,7 +210,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         self.defunct(sys.exc_info()[1])
 
     def handle_close(self):
-        log.debug("connection closed by server")
+        log.debug("connection (%s) to %s closed by server", id(self), self.host)
         self.close()
 
     def handle_write(self):

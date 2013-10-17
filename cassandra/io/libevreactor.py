@@ -141,7 +141,7 @@ class LibevConnection(Connection):
                 return
             self.is_closed = True
 
-        log.debug("Closing connection to %s", self.host)
+        log.debug("Closing connection (%s) to %s", id(self), self.host)
         if self._read_watcher:
             self._read_watcher.stop()
         if self._write_watcher:
@@ -166,10 +166,10 @@ class LibevConnection(Connection):
 
         trace = traceback.format_exc(exc)
         if trace != "None":
-            log.debug("Defuncting connection to %s: %s\n%s",
-                      self.host, exc, traceback.format_exc(exc))
+            log.debug("Defuncting connection (%s) to %s: %s\n%s",
+                      id(self), self.host, exc, traceback.format_exc(exc))
         else:
-            log.debug("Defuncting connection to %s: %s", self.host, exc)
+            log.debug("Defuncting connection (%s) to %s: %s", id(self), self.host, exc)
 
         self.last_error = exc
         self._error_all_callbacks(exc)
@@ -245,7 +245,7 @@ class LibevConnection(Connection):
                         self._total_reqd_bytes = body_len + 8
                         break
         else:
-            log.debug("connection closed by server")
+            log.debug("connection (%s) to host %s closed by server", id(self), self.host)
             self.close()
 
     def handle_pushed(self, response):

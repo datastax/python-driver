@@ -283,6 +283,7 @@ class HostConnectionPool(object):
         self._lock = RLock()
         self._conn_available_condition = Condition()
 
+        log.debug("Initializing new connection pool for host %s", self.host)
         core_conns = session.cluster.get_core_connections_per_host(host_distance)
         self._connections = [session.cluster.connection_factory(host.address)
                              for i in range(core_conns)]
@@ -385,6 +386,8 @@ class HostConnectionPool(object):
             with self._lock:
                 new_connections = self._connections[:] + [conn]
                 self._connections = new_connections
+            log.debug("Added new connection (%s) to pool for host %s, signaling availablility",
+                      id(conn), self.host)
             self._signal_available_conn()
             return True
         except ConnectionException as exc:
@@ -442,6 +445,8 @@ class HostConnectionPool(object):
             in_flight = connection.in_flight
 
         if connection.is_defunct or connection.is_closed:
+            log.debug("Defunct or closed connection (%s) returned to pool, potentially "
+                      "marking host %s as down", id(connection), self.host)
             is_down = self.host.monitor.signal_connection_failure(connection.last_error)
             if is_down:
                 self.shutdown()
@@ -453,6 +458,7 @@ class HostConnectionPool(object):
                     if in_flight == 0:
                         with self._lock:
                             self._trash.remove(connection)
+                        log.debug("Closing trashed connection (%s) to %s", id(connection), self.host)
                         connection.close()
                 return
 
@@ -482,6 +488,7 @@ class HostConnectionPool(object):
 
                 with connection.lock:
                     if connection.in_flight == 0:
+                        log.debug("Skipping trash and closing unused connection (%s) to %s", id(connection), self.host)
                         connection.close()
 
                         # skip adding it to the trash if we're already closing it
@@ -490,7 +497,7 @@ class HostConnectionPool(object):
                 self._trash.add(connection)
 
         if did_trash:
-            log.debug("Trashed connection to %s", self.host)
+            log.debug("Trashed connection (%s) to %s", id(connection), self.host)
 
     def _replace(self, connection):
         should_replace = False
@@ -503,7 +510,7 @@ class HostConnectionPool(object):
                 should_replace = True
 
         if should_replace:
-            log.debug("Replacing connection to %s", self.host)
+            log.debug("Replacing connection (%s) to %s", id(connection), self.host)
 
             def close_and_replace():
                 connection.close()
@@ -512,7 +519,7 @@ class HostConnectionPool(object):
             self._session.submit(close_and_replace)
         else:
             # just close it
-            log.debug("Closing connection to %s", self.host)
+            log.debug("Closing connection (%s) to %s", id(connection), self.host)
             connection.close()
 
     def shutdown(self):
