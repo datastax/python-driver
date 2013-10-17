@@ -351,6 +351,7 @@ class Date(Column):
 
     def to_database(self, value):
         value = super(Date, self).to_database(value)
+        if value is None: return
         if isinstance(value, datetime):
             value = value.date()
         if not isinstance(value, date):
