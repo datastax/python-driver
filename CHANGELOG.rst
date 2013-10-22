@@ -1,3 +1,22 @@
+1.0.0b6
+=======
+Oct 22, 2013
+
+Bug Fixes
+---------
+* Use lazy string formatting when logging
+* Avoid several deadlock scenarios, especially when nodes go down
+* Avoid trashing newly created connections due to insufficient traffic
+* Gracefully handle un-handled Exceptions when erroring callbacks
+
+Other
+-----
+* Node state listeners (which are called when a node is added, removed,
+  goes down, or comes up) should now be registered through
+  Cluster.register_listener() instead of through a host's HealthMonitor
+  (which has been removed)
+
+
 1.0.0b5
 ========
 Oct 10, 2013
