@@ -12,8 +12,8 @@ Releasing
     python setup.py sdist upload
 
 * Update the docs (see below)
-* Add a '+' to the version in ``cassandra/__init__.py`` so that it looks
-  like ``x.y.z+``
+* Append a 'post' string to the version tuple in ``cassandra/__init__.py``
+  so that it looks like ``(x, y, z, 'post')``
 * Commit and push
 
 Running the Tests
