@@ -510,7 +510,7 @@ class Cluster(object):
                 host.lock.release()
                 return
 
-            log.debug("Host %s has been marked up", host)
+            log.info("Host %s has been marked up", host)
 
             reconnector = host.get_and_set_reconnection_handler(None)
             if reconnector:
@@ -553,7 +553,7 @@ class Cluster(object):
 
             host.set_down()
 
-        log.debug("Host %s has been marked down", host)
+        log.warn("Host %s has been marked down", host)
 
         self.load_balancing_policy.on_down(host)
         self.control_connection.on_down(host)
