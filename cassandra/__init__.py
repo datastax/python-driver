@@ -1,4 +1,4 @@
-__version_info__ = (1, 0, '0b6')
+__version_info__ = (1, 0, '0b6', 'post')
 __version__ = '.'.join(map(str, __version_info__))
 
 
