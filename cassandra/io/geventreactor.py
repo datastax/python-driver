@@ -1,7 +1,7 @@
 import gevent
-from gevent import select
-from gevent import socket
+from gevent import select, socket
 from gevent.event import Event
+from gevent.queue import Queue
 
 from collections import defaultdict
 from functools import partial
@@ -14,11 +14,6 @@ try:
     from cStringIO import StringIO
 except ImportError:
     from StringIO import StringIO  # ignore flake8 warning: # NOQA
-
-if 'gevent.monkey' in sys.modules:
-    from gevent.queue import Queue
-else:
-    from Queue import Queue
 
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL
 
