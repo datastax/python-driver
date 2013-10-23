@@ -741,9 +741,6 @@ class Cluster(object):
                             response.kind != ResultMessage.KIND_PREPARED):
                             log.debug("Got unexpected response when preparing "
                                       "statement on host %s: %r", host, response)
-                    except Exception:
-                        log.exception("Error trying to prepare statement on "
-                                      "host %s", host)
 
             connection.close()
             log.debug("Done preparing all known prepared statements against host %s", host)
