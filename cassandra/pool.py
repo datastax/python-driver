@@ -141,16 +141,21 @@ class _ReconnectionHandler(object):
 
     def run(self):
         if self._cancelled:
-            self.callback(*(self.callback_args), **(self.callback_kwargs))
+            return
 
+        conn = None
         try:
-            self.on_reconnection(self.try_reconnect())
+            conn = self.try_reconnect()
         except Exception as exc:
             next_delay = self.schedule.next()
             if self.on_exception(exc, next_delay):
                 self.scheduler.schedule(next_delay, self.run)
         else:
-            self.callback(*(self.callback_args), **(self.callback_kwargs))
+            if not self._cancelled:
+                self.on_reconnection(conn)
+                self.callback(*(self.callback_args), **(self.callback_kwargs))
+        finally:
+            conn.close()
 
     def cancel(self):
         self._cancelled = True
@@ -202,8 +207,7 @@ class _HostReconnectionHandler(_ReconnectionHandler):
         return self.connection_factory()
 
     def on_reconnection(self, connection):
-        connection.close()
-        log.info("Successful reconnection to %s, marking node up", self.host)
+        log.info("Successful reconnection to %s, marking node up if it isn't already", self.host)
         if self.is_host_addition:
             self.on_add(self.host)
         else:
@@ -493,10 +497,6 @@ class HostConnectionPool(object):
         for conn in self._connections:
             conn.close()
             self.open_count -= 1
-
-        reconnector = self.host.get_and_set_reconnection_handler(None)
-        if reconnector:
-            reconnector.cancel()
 
     def ensure_core_connections(self):
         if self.is_shutdown:
