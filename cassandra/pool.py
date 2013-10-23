@@ -48,6 +48,9 @@ class Host(object):
     _reconnection_handler = None
     lock = None
 
+    _currently_handling_node_up = False
+    _handle_node_up_condition = None
+
     def __init__(self, inet_address, conviction_policy_factory):
         if inet_address is None:
             raise ValueError("inet_address may not be None")
@@ -57,6 +60,7 @@ class Host(object):
         self.address = inet_address
         self.conviction_policy = conviction_policy_factory(self)
         self.lock = RLock()
+        self._handle_node_up_condition = Condition()
 
     @property
     def datacenter(self):

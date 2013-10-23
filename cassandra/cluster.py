@@ -464,6 +464,12 @@ class Cluster(object):
         self.sessions.add(session)
         return session
 
+    def _cleanup_failed_on_up_handling(self, host):
+        self.load_balancing_policy.on_down(host)
+        self.control_connection.on_down(host)
+        for session in self.sessions:
+            session.remove_pool(host)
+
     def _on_up_future_completed(self, host, futures, results, lock, finished_future):
         with lock:
             futures.discard(finished_future)
@@ -480,10 +486,12 @@ class Cluster(object):
             # all futures have completed at this point
             for exc in [f for f in results if isinstance(f, Exception)]:
                 log.error("Unexpected failure while marking node %s up:", host, exc_info=exc)
+                self._cleanup_failed_on_up_handling(host)
                 return
 
             if not all(results):
-                log.debug("Connection pool could not be created, not marking node %s up:", host)
+                log.debug("Connection pool could not be created, not marking node %s up", host)
+                self._cleanup_failed_on_up_handling(host)
                 return
 
             # mark the host as up and notify all listeners
@@ -491,7 +499,11 @@ class Cluster(object):
             for listener in self.listeners:
                 listener.on_up(host)
         finally:
-            host.lock.release()
+            host._handle_node_up_condition.acquire()
+            if host._currently_handling_node_up:
+                host._currently_handling_node_up = False
+                host._handle_node_up_condition.notify()
+            host._handle_node_up_condition.release()
 
         # see if there are any pools to add or remove now that the host is marked up
         for session in self.sessions:
@@ -504,12 +516,17 @@ class Cluster(object):
         if self._is_shutdown:
             return
 
-        host.lock.acquire()
-        try:
-            if host.is_up:
-                host.lock.release()
-                return
+        host._handle_node_up_condition.acquire()
+        while host._currently_handling_node_up:
+            host._handle_node_up_condition.wait()
+        host.handling_up_down = True
+        host._handle_node_up_condition.release()
 
+        if host.is_up:
+            return
+
+        futures = set()
+        try:
             log.info("Host %s has been marked up", host)
 
             reconnector = host.get_and_set_reconnection_handler(None)
@@ -527,14 +544,20 @@ class Cluster(object):
 
             futures_lock = Lock()
             futures_results = []
-            futures = set()
             callback = partial(self._on_up_future_completed, host, futures, futures_results, futures_lock)
             for session in self.sessions:
                 future = session.add_or_renew_pool(host, is_host_addition=False)
                 future.add_done_callback(callback)
                 futures.add(future)
         except Exception:
-            host.lock.release()
+            # this shouldn't happen, but just in case, reset the condition
+            for future in futures:
+                future.cancel()
+            host._handle_node_up_condition.acquire()
+            host._currently_handling_node_up = False
+            host._handle_node_up_condition.notify()
+            host._handle_node_up_condition.release()
+            raise
 
         # for testing purposes
         return futures
