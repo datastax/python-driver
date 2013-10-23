@@ -1636,8 +1636,8 @@ class ResponseFuture(object):
                 self._req_id = req_id
                 return
 
-        self._final_exception = NoHostAvailable(
-            "Unable to complete the operation against any hosts", self._errors)
+        self._set_final_exception(NoHostAvailable(
+            "Unable to complete the operation against any hosts", self._errors))
 
     def _query(self, host):
         pool = self.session._pools.get(host)
