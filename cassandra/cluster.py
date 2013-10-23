@@ -726,14 +726,17 @@ class Cluster(object):
                 if keyspace is not None:
                     connection.set_keyspace_blocking(keyspace)
 
-                # note: we could potentially prepare some of these in parallel,
-                # but at the same time, we don't want to put too much load on
-                # the server at once
-                for statement in ks_statements:
-                    message = PrepareMessage(query=statement.query_string)
-                    try:
-                        # TODO: make this timeout configurable somehow?
-                        response = connection.wait_for_response(message, timeout=1.0)
+                # prepare 10 statements at a time
+                ks_statements = list(ks_statements)
+                chunks = []
+                for i in xrange(0, len(ks_statements), 10):
+                    chunks.append(ks_statements[i:i + 10])
+
+                for ks_chunk in chunks:
+                    messages = [PrepareMessage(query=s.query_string) for s in ks_chunk]
+                    # TODO: make this timeout configurable somehow?
+                    responses = connection.wait_for_responses(*messages, timeout=2.0)
+                    for response in responses:
                         if (not isinstance(response, ResultMessage) or
                             response.kind != ResultMessage.KIND_PREPARED):
                             log.debug("Got unexpected response when preparing "
