@@ -729,8 +729,9 @@ class ModelQuerySet(AbstractQuerySet):
         return column.db_field_name, order_type
 
     def _get_ttl_statement(self):
-        return ""
-
+        if not self._ttl:
+            return ""
+        return "USING TTL {}".format(self._ttl)
 
     def values_list(self, *fields, **kwargs):
         """ Instructs the query set to return tuples, not model instance """
