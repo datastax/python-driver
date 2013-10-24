@@ -380,11 +380,11 @@ class BaseModel(object):
 
             # check for nonexistant columns
             if col is None:
-                raise ValidationError("{}.{} has no column named: {}".format(self.__module__, self.__name__, k))
+                raise ValidationError("{}.{} has no column named: {}".format(self.__module__, self.__class__.__name__, k))
 
             # check for primary key update attempts
             if col.is_primary_key:
-                raise ValidationError("Cannot apply update to primary key '{}' for {}.{}".format(k, self.__module__, self.__name__))
+                raise ValidationError("Cannot apply update to primary key '{}' for {}.{}".format(k, self.__module__, self.__class__.__name__))
 
             setattr(self, k, v)
 
