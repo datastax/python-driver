@@ -141,7 +141,7 @@ IO_init(libevwrapper_IO *self, PyObject *args, PyObject *kwds) {
     libevwrapper_Loop *loop;
     int io_flags = 0;
 
-    if (!PyArg_ParseTuple(args, "ObOO", &socket, &io_flags, &loop, &callback)) {
+    if (!PyArg_ParseTuple(args, "OiOO", &socket, &io_flags, &loop, &callback)) {
         return -1;
     }
 
