@@ -9,7 +9,7 @@ from cqlengine.columns import Counter
 
 from cqlengine.connection import connection_manager, execute, RowResult
 
-from cqlengine.exceptions import CQLEngineException
+from cqlengine.exceptions import CQLEngineException, ValidationError
 from cqlengine.functions import QueryValue, Token
 
 #CQL 3 reference:
@@ -634,13 +634,6 @@ class AbstractQuerySet(object):
         else:
             execute(qs, self._where_values())
 
-    def update(self, **values):
-        """
-        updates the contents of the query
-        """
-        qs = ['UPDATE {}'.format(self.column_family_name)]
-        qs += ['SET']
-
     def __eq__(self, q):
         return set(self._where) == set(q._where)
 
@@ -759,6 +752,54 @@ class ModelQuerySet(AbstractQuerySet):
         clone._values_list = True
         clone._flat_values_list = flat
         return clone
+
+    def update(self, **values):
+        """ Updates the rows in this queryset """
+        if not values:
+            raise ValidationError("At least one column needs to be updated")
+
+        set_statements = []
+        ctx = {}
+        nulled_columns = set()
+        for name, val in values.items():
+            col = self.model._columns.get(name)
+            # check for nonexistant columns
+            if col is None:
+                raise ValidationError("{}.{} has no column named: {}".format(self.__module__, self.model.__name__, name))
+            # check for primary key update attempts
+            if col.is_primary_key:
+                raise ValidationError("Cannot apply update to primary key '{}' for {}.{}".format(name, self.__module__, self.model.__name__))
+
+            val = col.validate(val)
+            if val is None:
+                nulled_columns.add(name)
+                continue
+            # add the update statements
+            if isinstance(col, (BaseContainerColumn, Counter)):
+                val_mgr = self.instance._values[name]
+                set_statements += col.get_update_statement(val, val_mgr.previous_value, ctx)
+
+            else:
+                field_id = uuid4().hex
+                set_statements += ['"{}" = :{}'.format(col.db_field_name, field_id)]
+                ctx[field_id] = val
+
+        if set_statements:
+            qs = "UPDATE {} SET {} WHERE {}".format(
+                self.column_family_name,
+                ', '.join(set_statements),
+                self._where_clause()
+            )
+            ctx.update(self._where_values())
+            execute(qs, ctx)
+
+        if nulled_columns:
+            qs = "DELETE {} FROM {} WHERE {}".format(
+                ', '.join(nulled_columns),
+                self.column_family_name,
+                self._where_clause()
+            )
+            execute(qs, self._where_values())
 
 
 class DMLQuery(object):
