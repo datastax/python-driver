@@ -7,7 +7,6 @@ from cqlengine.query import ModelQuerySet, DMLQuery, AbstractQueryableColumn
 from cqlengine.query import DoesNotExist as _DoesNotExist
 from cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
 
-
 class ModelDefinitionException(ModelException): pass
 
 
@@ -76,6 +75,7 @@ class TTLDescriptor(object):
     """
     def __get__(self, instance, model):
         if instance:
+            # instance method
             def ttl_setter(ts):
                 instance._ttl = ts
                 return instance
