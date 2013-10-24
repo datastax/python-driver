@@ -3,7 +3,8 @@ from cqlengine.tests.base import BaseCassEngTestCase
 from cqlengine.models import Model
 from uuid import uuid4
 from cqlengine import columns
-
+import mock
+from cqlengine.connection import ConnectionPool
 
 class TestTTLModel(Model):
     id      = columns.UUID(primary_key=True, default=lambda:uuid4())
@@ -56,7 +57,16 @@ class TTLInstanceTest(BaseTTLTest):
         o.text = "new stuff"
         o.ttl(60)
         self.assertEqual(60, o._ttl)
-        o.save()
+
+    def test_ttl_is_include_with_query(self):
+        o = TestTTLModel.create(text="whatever")
+        o.text = "new stuff"
+        o.ttl(60)
+
+        with mock.patch.object(ConnectionPool, 'execute') as m:
+            o.save()
+        query = m.call_args[0][0]
+        self.assertIn("USING TTL", query)
 
 
 

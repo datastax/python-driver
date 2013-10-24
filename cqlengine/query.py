@@ -284,6 +284,7 @@ class AbstractQuerySet(object):
 
         self._batch = None
         self._ttl = None
+        self._consistency = None
 
     @property
     def column_family_name(self):
@@ -615,7 +616,7 @@ class AbstractQuerySet(object):
         return self._only_or_defer('defer', fields)
 
     def create(self, **kwargs):
-        return self.model(**kwargs).batch(self._batch).save()
+        return self.model(**kwargs).batch(self._batch).ttl(self._ttl).consistency(self._consistency).save()
 
     #----delete---
     def delete(self, columns=[]):
@@ -935,7 +936,9 @@ class DMLQuery(object):
             qs += ['VALUES']
             qs += ["({})".format(', '.join([':'+field_ids[f] for f in field_names]))]
 
+
         qs = ' '.join(qs)
+
 
         # skip query execution if it's empty
         # caused by pointless update queries
