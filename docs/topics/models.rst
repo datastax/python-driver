@@ -138,6 +138,14 @@ Model Methods
 
         Deletes the object from the database.
 
+    .. method:: batch(batch_object)
+
+        Sets the batch object to run instance updates and inserts queries with.
+
+    .. method:: ttl(batch_object)
+
+        Sets the ttl values to run instance updates and inserts queries with.
+
 Model Attributes
 ================
 
