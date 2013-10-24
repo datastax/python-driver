@@ -22,6 +22,7 @@ class MultipleObjectsReturned(QueryException): pass
 
 class QueryOperatorException(QueryException): pass
 
+
 class QueryOperator(object):
     # The symbol that identifies this operator in filter kwargs
     # ie: colname__<symbol>
@@ -116,9 +117,11 @@ class QueryOperator(object):
     def __hash__(self):
         return hash(self.column.db_field_name) ^ hash(self.value)
 
+
 class EqualsOperator(QueryOperator):
     symbol = 'EQ'
     cql_symbol = '='
+
 
 class IterableQueryValue(QueryValue):
     def __init__(self, value):
@@ -133,27 +136,33 @@ class IterableQueryValue(QueryValue):
     def get_cql(self):
         return '({})'.format(', '.join(':{}'.format(i) for i in self.identifier))
 
+
 class InOperator(EqualsOperator):
     symbol = 'IN'
     cql_symbol = 'IN'
 
     QUERY_VALUE_WRAPPER = IterableQueryValue
 
+
 class GreaterThanOperator(QueryOperator):
     symbol = "GT"
     cql_symbol = '>'
+
 
 class GreaterThanOrEqualOperator(QueryOperator):
     symbol = "GTE"
     cql_symbol = '>='
 
+
 class LessThanOperator(QueryOperator):
     symbol = "LT"
     cql_symbol = '<'
 
+
 class LessThanOrEqualOperator(QueryOperator):
     symbol = "LTE"
     cql_symbol = '<='
+
 
 class AbstractQueryableColumn(object):
     """
@@ -191,6 +200,7 @@ class AbstractQueryableColumn(object):
 class BatchType(object):
     Unlogged    = 'UNLOGGED'
     Counter     = 'COUNTER'
+
 
 class BatchQuery(object):
     """
@@ -625,11 +635,19 @@ class AbstractQuerySet(object):
         else:
             execute(qs, self._where_values())
 
+    def update(self, **values):
+        """
+        updates the contents of the query
+        """
+        qs = ['UPDATE {}'.format(self.column_family_name)]
+        qs += ['SET']
+
     def __eq__(self, q):
         return set(self._where) == set(q._where)
 
     def __ne__(self, q):
         return not (self != q)
+
 
 class ResultObject(dict):
     """
@@ -641,6 +659,7 @@ class ResultObject(dict):
             return self[item]
         except KeyError:
             raise AttributeError
+
 
 class SimpleQuerySet(AbstractQuerySet):
     """
@@ -658,6 +677,7 @@ class SimpleQuerySet(AbstractQuerySet):
         def _construct_instance(values):
             return ResultObject(zip(names, values))
         return _construct_instance
+
 
 class ModelQuerySet(AbstractQuerySet):
     """
@@ -768,84 +788,11 @@ class DMLQuery(object):
         self._batch = batch_obj
         return self
 
-    def save(self):
+    def _delete_null_columns(self):
         """
-        Creates / updates a row.
-        This is a blind insert call.
-        All validation and cleaning needs to happen
-        prior to calling this.
+        executes a delete query to remove null columns
         """
-        if self.instance is None:
-            raise CQLEngineException("DML Query intance attribute is None")
-        assert type(self.instance) == self.model
-
-        #organize data
-        value_pairs = []
-        values = self.instance._as_dict()
-
-        #get defined fields and their column names
-        for name, col in self.model._columns.items():
-            val = values.get(name)
-            if val is None: continue
-            value_pairs += [(col.db_field_name, val)]
-
-        #construct query string
-        field_names = zip(*value_pairs)[0]
-        field_ids = {n:uuid4().hex for n in field_names}
-        field_values = dict(value_pairs)
-        query_values = {field_ids[n]:field_values[n] for n in field_names}
-
-        qs = []
-        if self.instance._has_counter or self.instance._can_update():
-            qs += ["UPDATE {}".format(self.column_family_name)]
-            qs += ["SET"]
-
-            set_statements = []
-            #get defined fields and their column names
-            for name, col in self.model._columns.items():
-                if not col.is_primary_key:
-                    val = values.get(name)
-                    if val is None:
-                        continue
-                    if isinstance(col, (BaseContainerColumn, Counter)):
-                        #remove value from query values, the column will handle it
-                        query_values.pop(field_ids.get(name), None)
-
-                        val_mgr = self.instance._values[name]
-                        set_statements += col.get_update_statement(val, val_mgr.previous_value, query_values)
-
-                    else:
-                        set_statements += ['"{}" = :{}'.format(col.db_field_name, field_ids[col.db_field_name])]
-            qs += [', '.join(set_statements)]
-
-            qs += ['WHERE']
-
-            where_statements = []
-            for name, col in self.model._primary_keys.items():
-                where_statements += ['"{}" = :{}'.format(col.db_field_name, field_ids[col.db_field_name])]
-
-            qs += [' AND '.join(where_statements)]
-
-            # clear the qs if there are no set statements and this is not a counter model
-            if not set_statements and not self.instance._has_counter:
-                qs = []
-
-        else:
-            qs += ["INSERT INTO {}".format(self.column_family_name)]
-            qs += ["({})".format(', '.join(['"{}"'.format(f) for f in field_names]))]
-            qs += ['VALUES']
-            qs += ["({})".format(', '.join([':'+field_ids[f] for f in field_names]))]
-
-        qs = ' '.join(qs)
-
-        # skip query execution if it's empty
-        # caused by pointless update queries
-        if qs:
-            if self._batch:
-                self._batch.add_query(qs, query_values)
-            else:
-                execute(qs, query_values)
-
+        values, field_names, field_ids, field_values, query_values = self._get_query_values()
 
         # delete nulled columns and removed map keys
         qs = ['DELETE']
@@ -878,6 +825,128 @@ class DMLQuery(object):
                 self._batch.add_query(qs, query_values)
             else:
                 execute(qs, query_values)
+
+    def update(self):
+        """
+        updates a row.
+        This is a blind update call.
+        All validation and cleaning needs to happen
+        prior to calling this.
+        """
+        if self.instance is None:
+            raise CQLEngineException("DML Query intance attribute is None")
+        assert type(self.instance) == self.model
+
+        values, field_names, field_ids, field_values, query_values = self._get_query_values()
+
+        qs = []
+        qs += ["UPDATE {}".format(self.column_family_name)]
+        qs += ["SET"]
+
+        set_statements = []
+        #get defined fields and their column names
+        for name, col in self.model._columns.items():
+            if not col.is_primary_key:
+                val = values.get(name)
+
+                # don't update something that is null
+                if val is None:
+                    continue
+
+                # don't update something if it hasn't changed
+                if not self.instance._values[name].changed and not isinstance(col, Counter):
+                    continue
+
+                # add the update statements
+                if isinstance(col, (BaseContainerColumn, Counter)):
+                    #remove value from query values, the column will handle it
+                    query_values.pop(field_ids.get(name), None)
+
+                    val_mgr = self.instance._values[name]
+                    set_statements += col.get_update_statement(val, val_mgr.previous_value, query_values)
+
+                else:
+                    set_statements += ['"{}" = :{}'.format(col.db_field_name, field_ids[col.db_field_name])]
+        qs += [', '.join(set_statements)]
+
+        qs += ['WHERE']
+
+        where_statements = []
+        for name, col in self.model._primary_keys.items():
+            where_statements += ['"{}" = :{}'.format(col.db_field_name, field_ids[col.db_field_name])]
+
+        qs += [' AND '.join(where_statements)]
+
+        # clear the qs if there are no set statements and this is not a counter model
+        if not set_statements and not self.instance._has_counter:
+            qs = []
+
+        qs = ' '.join(qs)
+        # skip query execution if it's empty
+        # caused by pointless update queries
+        if qs:
+            if self._batch:
+                self._batch.add_query(qs, query_values)
+            else:
+                execute(qs, query_values)
+
+        self._delete_null_columns()
+
+    def _get_query_values(self):
+        """
+        returns all the data needed to do queries
+        """
+        #organize data
+        value_pairs = []
+        values = self.instance._as_dict()
+
+        #get defined fields and their column names
+        for name, col in self.model._columns.items():
+            val = values.get(name)
+            if col._val_is_null(val): continue
+            value_pairs += [(col.db_field_name, val)]
+
+        #construct query string
+        field_names = zip(*value_pairs)[0]
+        field_ids = {n:uuid4().hex for n in field_names}
+        field_values = dict(value_pairs)
+        query_values = {field_ids[n]:field_values[n] for n in field_names}
+        return values, field_names, field_ids, field_values, query_values
+
+    def save(self):
+        """
+        Creates / updates a row.
+        This is a blind insert call.
+        All validation and cleaning needs to happen
+        prior to calling this.
+        """
+        if self.instance is None:
+            raise CQLEngineException("DML Query intance attribute is None")
+        assert type(self.instance) == self.model
+
+        values, field_names, field_ids, field_values, query_values = self._get_query_values()
+
+        qs = []
+        if self.instance._has_counter or self.instance._can_update():
+            return self.update()
+        else:
+            qs += ["INSERT INTO {}".format(self.column_family_name)]
+            qs += ["({})".format(', '.join(['"{}"'.format(f) for f in field_names]))]
+            qs += ['VALUES']
+            qs += ["({})".format(', '.join([':'+field_ids[f] for f in field_names]))]
+
+        qs = ' '.join(qs)
+
+        # skip query execution if it's empty
+        # caused by pointless update queries
+        if qs:
+            if self._batch:
+                self._batch.add_query(qs, query_values)
+            else:
+                execute(qs, query_values)
+
+        # delete any nulled columns
+        self._delete_null_columns()
 
     def delete(self):
         """ Deletes one instance """
