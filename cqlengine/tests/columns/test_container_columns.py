@@ -156,7 +156,14 @@ class TestSetColumn(BaseCassEngTestCase):
 
     def test_default_empty_container_saving(self):
         """ tests that the default empty container is not saved if it hasn't been updated """
-        self.fail("implement")
+        pkey = uuid4()
+        # create a row with set data
+        TestSetModel.create(partition=pkey, int_set={3, 4})
+        # create another with no set data
+        TestSetModel.create(partition=pkey)
+
+        m = TestSetModel.get(partition=pkey)
+        self.assertEqual(m.int_set, {3, 4})
 
 
 class TestListModel(Model):
@@ -288,7 +295,14 @@ class TestListColumn(BaseCassEngTestCase):
 
     def test_default_empty_container_saving(self):
         """ tests that the default empty container is not saved if it hasn't been updated """
-        self.fail("implement")
+        pkey = uuid4()
+        # create a row with list data
+        TestListModel.create(partition=pkey, int_list=[1,2,3,4])
+        # create another with no list data
+        TestListModel.create(partition=pkey)
+
+        m = TestListModel.get(partition=pkey)
+        self.assertEqual(m.int_list, [1,2,3,4])
 
 
 class TestMapModel(Model):
@@ -414,7 +428,15 @@ class TestMapColumn(BaseCassEngTestCase):
 
     def test_default_empty_container_saving(self):
         """ tests that the default empty container is not saved if it hasn't been updated """
-        self.fail("implement")
+        pkey = uuid4()
+        tmap = {1: uuid4(), 2: uuid4()}
+        # create a row with set data
+        TestMapModel.create(partition=pkey, int_map=tmap)
+        # create another with no set data
+        TestMapModel.create(partition=pkey)
+
+        m = TestMapModel.get(partition=pkey)
+        self.assertEqual(m.int_map, tmap)
 
 #    def test_partial_update_creation(self):
 #        """
