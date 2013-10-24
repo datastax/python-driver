@@ -53,6 +53,17 @@ class TTLModelTests(BaseTTLTest):
         self.assertTrue(isinstance(qs, TestTTLModel.__queryset__), type(qs))
 
 
+class TTLInstanceUpdateTest(BaseTTLTest):
+    def test_update_includes_ttl(self):
+        model = TestTTLModel.create(text="goodbye blake")
+        with mock.patch.object(ConnectionPool, 'execute') as m:
+            model.ttl(60).update(text="goodbye forever")
+
+        query = m.call_args[0][0]
+        self.assertIn("USING TTL", query)
+
+
+
 
 class TTLInstanceTest(BaseTTLTest):
     def test_instance_is_returned(self):
