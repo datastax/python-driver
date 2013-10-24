@@ -843,8 +843,16 @@ class DMLQuery(object):
         for name, col in self.model._columns.items():
             if not col.is_primary_key:
                 val = values.get(name)
+
+                # don't update something that is null
                 if val is None:
                     continue
+
+                # don't update something if it hasn't changed
+                if not self.instance._values[name].changed and not isinstance(col, Counter):
+                    continue
+
+                # add the update statements
                 if isinstance(col, (BaseContainerColumn, Counter)):
                     #remove value from query values, the column will handle it
                     query_values.pop(field_ids.get(name), None)
