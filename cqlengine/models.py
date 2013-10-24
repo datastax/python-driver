@@ -446,7 +446,7 @@ class BaseModel(object):
                 setattr(self, self._polymorphic_column_name, self.__polymorphic_key__)
 
         self.validate()
-        self.__dmlquery__(self.__class__, self, batch=self._batch).update()
+        self.__dmlquery__(self.__class__, self, batch=self._batch, ttl=self._ttl).update()
 
         #reset the value managers
         for v in self._values.values():
