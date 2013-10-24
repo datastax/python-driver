@@ -37,8 +37,13 @@ class TTLQueryTests(BaseTTLTest):
 
 class TTLModelTests(BaseTTLTest):
 
-    def test_model_ttl_success_case(self):
+    def test_ttl_included_on_create(self):
         """ tests that ttls on models work as expected """
+        with mock.patch.object(ConnectionPool, 'execute') as m:
+            TestTTLModel.ttl(60).create(text="hello blake")
+
+        query = m.call_args[0][0]
+        self.assertIn("USING TTL", query)
 
     def test_queryset_is_returned_on_class(self):
         """
@@ -46,6 +51,8 @@ class TTLModelTests(BaseTTLTest):
         """
         qs = TestTTLModel.ttl(60)
         self.assertTrue(isinstance(qs, TestTTLModel.__queryset__), type(qs))
+
+
 
 class TTLInstanceTest(BaseTTLTest):
     def test_instance_is_returned(self):
@@ -58,7 +65,7 @@ class TTLInstanceTest(BaseTTLTest):
         o.ttl(60)
         self.assertEqual(60, o._ttl)
 
-    def test_ttl_is_include_with_query(self):
+    def test_ttl_is_include_with_query_on_update(self):
         o = TestTTLModel.create(text="whatever")
         o.text = "new stuff"
         o.ttl(60)
