@@ -967,7 +967,7 @@ class Session(object):
         Intended for internal use only.
         """
         for host, pool in self._pools.items():
-            if host != excluded_host:
+            if host != excluded_host and host.is_up:
                 future = ResponseFuture(self, PrepareMessage(query=query), None)
 
                 # we don't care about errors preparing against specific hosts,
@@ -981,7 +981,8 @@ class Session(object):
 
                 if request_id is None:
                     # the error has already been logged by ResponsFuture
-                    log.debug("Failed to prepare query for host %s", host)
+                    log.debug("Failed to prepare query for host %s: %r",
+                              host, future._errors.get(host))
                     continue
 
                 try:
@@ -1664,7 +1665,10 @@ class ResponseFuture(object):
 
     def _query(self, host):
         pool = self.session._pools.get(host)
-        if not pool or pool.is_shutdown:
+        if not pool:
+            self._errors[host] = ConnectionException("Host has been marked down or removed")
+            return None
+        elif pool.is_shutdown:
             self._errors[host] = ConnectionException("Pool is shutdown")
             return None
 
