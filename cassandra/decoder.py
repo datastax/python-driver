@@ -32,7 +32,7 @@ try:
 except ImportError:
     from StringIO import StringIO  # ignore flake8 warning: # NOQA
 
-from cassandra import (ConsistencyLevel, Unavailable, WriteTimeout, ReadTimeout,
+from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
                        AlreadyExists, InvalidRequest, Unauthorized)
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
                                int8_pack, int8_unpack)
@@ -643,7 +643,7 @@ def write_short(f, s):
 
 
 def read_consistency_level(f):
-    return ConsistencyLevel.value_to_name[read_short(f)]
+    return read_short(f)
 
 
 def write_consistency_level(f, cl):
