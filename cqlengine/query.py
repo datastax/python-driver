@@ -793,7 +793,7 @@ class DMLQuery(object):
 
     def _delete_null_columns(self):
         """
-        executes a delete query to remove null columns
+        executes a delete query to remove columns that have changed to null
         """
         values, field_names, field_ids, field_values, query_values = self._get_query_values()
 

@@ -1,5 +1,9 @@
 CHANGELOG
 
+0.9
+* adding update method
+* only saving collection fields on insert if they've been modified
+
 0.8.5
 * adding support for timeouts
 
