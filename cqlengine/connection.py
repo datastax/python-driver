@@ -165,10 +165,10 @@ class ConnectionPool(object):
         from thrift.transport import TSocket, TTransport
 
         thrift_socket = TSocket.TSocket(host.name, host.port)
-        
+
         if self._timeout is not None:
             thrift_socket.setTimeout(self._timeout)
-            
+
         return TTransport.TFramedTransport(thrift_socket)
 
     def _create_connection(self):
@@ -202,14 +202,17 @@ class ConnectionPool(object):
 
         raise CQLConnectionError("Could not connect to any server in cluster")
 
-    def execute(self, query, params):
+    def execute(self, query, params, consistency_level=None):
+        if not consistency_level:
+            consistency_level = self._consistency
+
         while True:
             try:
                 con = self.get()
                 if not con:
                     raise CQLEngineException("Error calling execute without calling setup.")
                 cur = con.cursor()
-                cur.execute(query, params)
+                cur.execute(query, params, consistency_level=consistency_level)
                 columns = [i[0] for i in cur.description or []]
                 results = [RowResult(r) for r in cur.fetchall()]
                 LOG.debug('{} {}'.format(query, repr(params)))
