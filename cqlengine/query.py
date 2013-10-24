@@ -273,6 +273,7 @@ class AbstractQuerySet(object):
         self._result_idx = None
 
         self._batch = None
+        self._ttl = None
 
     @property
     def column_family_name(self):
@@ -727,6 +728,10 @@ class ModelQuerySet(AbstractQuerySet):
 
         return column.db_field_name, order_type
 
+    def _get_ttl_statement(self):
+        return ""
+
+
     def values_list(self, *fields, **kwargs):
         """ Instructs the query set to return tuples, not model instance """
         flat = kwargs.pop('flat', False)
@@ -755,7 +760,6 @@ class DMLQuery(object):
         self.column_family_name = self.model.column_family_name()
         self.instance = instance
         self._batch = batch
-        pass
 
     def batch(self, batch_obj):
         if batch_obj is not None and not isinstance(batch_obj, BatchQuery):

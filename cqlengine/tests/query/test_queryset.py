@@ -6,7 +6,7 @@ from cqlengine.tests.base import BaseCassEngTestCase
 
 from cqlengine.exceptions import ModelException
 from cqlengine import functions
-from cqlengine.management import create_table
+from cqlengine.management import create_table, drop_table
 from cqlengine.management import delete_table
 from cqlengine.models import Model
 from cqlengine import columns
@@ -200,9 +200,9 @@ class BaseQuerySetUsage(BaseCassEngTestCase):
     @classmethod
     def tearDownClass(cls):
         super(BaseQuerySetUsage, cls).tearDownClass()
-        delete_table(TestModel)
-        delete_table(IndexedTestModel)
-        delete_table(TestMultiClusteringModel)
+        drop_table(TestModel)
+        drop_table(IndexedTestModel)
+        drop_table(TestMultiClusteringModel)
 
 class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
 

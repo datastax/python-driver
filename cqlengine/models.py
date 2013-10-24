@@ -70,6 +70,51 @@ class QuerySetDescriptor(object):
         """
         raise NotImplementedError
 
+class TTLDescriptor(object):
+    """
+    returns a query set descriptor
+    """
+    def __get__(self, instance, model):
+        if instance:
+            def ttl_setter(ts):
+                instance._ttl = ts
+                return instance
+            return ttl_setter
+
+        qs = model.__queryset__(model)
+
+        def ttl_setter(ts):
+            qs._ttl = ts
+            return qs
+
+        return ttl_setter
+
+    def __call__(self, *args, **kwargs):
+        raise NotImplementedError
+
+
+class ConsistencyDescriptor(object):
+    """
+    returns a query set descriptor if called on Class, instance if it was an instance call
+    """
+    def __get__(self, instance, model):
+        if instance:
+            def consistency_setter(consistency):
+                instance._consistency = consistency
+                return instance
+            return consistency_setter
+
+        qs = model.__queryset__(model)
+
+        def consistency_setter(ts):
+            qs._consistency = ts
+            return qs
+
+        return consistency_setter
+
+    def __call__(self, *args, **kwargs):
+        raise NotImplementedError
+
 
 class ColumnQueryEvaluator(AbstractQueryableColumn):
     """
@@ -148,6 +193,8 @@ class BaseModel(object):
     class MultipleObjectsReturned(_MultipleObjectsReturned): pass
 
     objects = QuerySetDescriptor()
+    ttl = TTLDescriptor()
+    consistency = ConsistencyDescriptor()
 
     #table names will be generated automatically from it's model and package name
     #however, you can also define them manually here
@@ -179,10 +226,13 @@ class BaseModel(object):
     __queryset__ = ModelQuerySet
     __dmlquery__ = DMLQuery
 
+    __ttl__ = None
+
     __read_repair_chance__ = 0.1
 
     def __init__(self, **values):
         self._values = {}
+        self._ttl = None
 
         for name, column in self._columns.items():
             value =  values.get(name, None)
