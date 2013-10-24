@@ -334,6 +334,7 @@ class Connection(object):
 
         def process_result(result):
             if isinstance(result, ResultMessage):
+                self.keyspace = keyspace
                 callback(self, None)
             elif isinstance(result, InvalidRequestException):
                 callback(self, result.to_exception())
