@@ -898,7 +898,7 @@ class DMLQuery(object):
         #get defined fields and their column names
         for name, col in self.model._columns.items():
             val = values.get(name)
-            if val is None: continue
+            if col._val_is_null(val): continue
             value_pairs += [(col.db_field_name, val)]
 
         #construct query string

@@ -198,6 +198,10 @@ class Column(object):
     def get_cql(self):
         return '"{}"'.format(self.db_field_name)
 
+    def _val_is_null(self, val):
+        """ determines if the given value equates to a null value for the given column type """
+        return val is None
+
 
 class Bytes(Column):
     db_type = 'blob'
@@ -526,6 +530,15 @@ class BaseContainerColumn(Column):
         """
         raise NotImplementedError
 
+    def _val_is_null(self, val):
+        return not val
+
+
+class BaseContainerQuoter(ValueQuoter):
+
+    def __nonzero__(self):
+        return bool(self.value)
+
 
 class Set(BaseContainerColumn):
     """
@@ -535,7 +548,7 @@ class Set(BaseContainerColumn):
     """
     db_type = 'set<{}>'
 
-    class Quoter(ValueQuoter):
+    class Quoter(BaseContainerQuoter):
 
         def __str__(self):
             cq = cql_quote
@@ -625,11 +638,14 @@ class List(BaseContainerColumn):
     """
     db_type = 'list<{}>'
 
-    class Quoter(ValueQuoter):
+    class Quoter(BaseContainerQuoter):
 
         def __str__(self):
             cq = cql_quote
             return '[' + ', '.join([cq(v) for v in self.value]) + ']'
+
+        def __nonzero__(self):
+            return bool(self.value)
 
     def __init__(self, value_type, default=set, **kwargs):
         return super(List, self).__init__(value_type=value_type, default=default, **kwargs)
@@ -736,7 +752,7 @@ class Map(BaseContainerColumn):
 
     db_type = 'map<{}, {}>'
 
-    class Quoter(ValueQuoter):
+    class Quoter(BaseContainerQuoter):
 
         def __str__(self):
             cq = cql_quote
