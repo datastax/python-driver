@@ -966,7 +966,8 @@ class Session(object):
         Prepare the given query on all hosts, excluding ``excluded_host``.
         Intended for internal use only.
         """
-        for host, pool in self._pools.items():
+        futures = []
+        for host in self._pools:
             if host != excluded_host and host.is_up:
                 future = ResponseFuture(self, PrepareMessage(query=query), None)
 
@@ -985,10 +986,13 @@ class Session(object):
                               host, future._errors.get(host))
                     continue
 
-                try:
-                    future.result()
-                except Exception:
-                    log.exception("Error preparing query for host %s:", host)
+                futures.append((host, future))
+
+        for host, future in futures:
+            try:
+                future.result()
+            except Exception:
+                log.exception("Error preparing query for host %s:", host)
 
     def shutdown(self):
         """
