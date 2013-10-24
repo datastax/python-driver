@@ -24,7 +24,6 @@ except ImportError:  # Python <2.7
 import datetime
 import logging
 import socket
-import struct
 import types
 from uuid import UUID
 try:
@@ -647,13 +646,7 @@ def read_consistency_level(f):
 
 
 def write_consistency_level(f, cl):
-    try:
-        write_short(f, cl)
-    except struct.error:
-        if not isinstance(cl, (int, long)):
-            raise TypeError("Got non-integer for consistency_level: %r" % (cl,))
-        else:
-            raise
+    write_short(f, cl)
 
 
 def read_string(f):
