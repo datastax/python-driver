@@ -416,7 +416,7 @@ class BaseModel(object):
 
         is_new = self.pk is None
         self.validate()
-        self.__dmlquery__(self.__class__, self, batch=self._batch).save()
+        self.__dmlquery__(self.__class__, self, batch=self._batch, ttl=self._ttl).save()
 
         #reset the value managers
         for v in self._values.values():

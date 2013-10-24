@@ -776,12 +776,14 @@ class DMLQuery(object):
 
     unlike the read query object, this is mutable
     """
+    _ttl = None
 
-    def __init__(self, model, instance=None, batch=None):
+    def __init__(self, model, instance=None, batch=None, ttl=None):
         self.model = model
         self.column_family_name = self.model.column_family_name()
         self.instance = instance
         self._batch = batch
+        self._ttl = ttl
 
     def batch(self, batch_obj):
         if batch_obj is not None and not isinstance(batch_obj, BatchQuery):
@@ -878,6 +880,9 @@ class DMLQuery(object):
 
         qs += [' AND '.join(where_statements)]
 
+        if self._ttl:
+            qs += ["USING TTL {}".format(self._ttl)]
+
         # clear the qs if there are no set statements and this is not a counter model
         if not set_statements and not self.instance._has_counter:
             qs = []
@@ -936,7 +941,10 @@ class DMLQuery(object):
             qs += ['VALUES']
             qs += ["({})".format(', '.join([':'+field_ids[f] for f in field_names]))]
 
+        if self._ttl:
+            qs += ["USING TTL {}".format(self._ttl)]
 
+        qs += []
         qs = ' '.join(qs)
 
 
