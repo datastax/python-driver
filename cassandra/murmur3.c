@@ -172,7 +172,7 @@ static PyObject *
 murmur3(PyObject *self, PyObject *args)
 {
     const char *key;
-    Py_ssize_t len;
+    int *len;
     uint32_t seed = 0;
 
     if (!PyArg_ParseTuple(args, "s#|I", &key, &len, &seed)) {
