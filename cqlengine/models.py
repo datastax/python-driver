@@ -247,6 +247,17 @@ class BaseModel(object):
         self._is_persisted = False
         self._batch = None
 
+
+    def __repr__(self):
+        """
+        Pretty printing of models by their primary key
+        """
+        return '{} <{}>'.format(self.__class__.__name__, 
+                                ', '.join(('{}={}'.format(k, getattr(self, k)) for k,v in self._primary_keys.iteritems()))
+                                )
+
+    
+
     @classmethod
     def _discover_polymorphic_submodels(cls):
         if not cls._is_polymorphic_base:
