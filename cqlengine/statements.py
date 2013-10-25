@@ -1,19 +1,12 @@
-from cqlengine.operators import BaseWhereOperator
+from cqlengine.operators import BaseWhereOperator, BaseAssignmentOperator
 
 
 class StatementException(Exception): pass
 
 
-class WhereClause(object):
-    """ a single where statement used in queries """
+class BaseClause(object):
 
     def __init__(self, field, operator, value):
-        super(WhereClause, self).__init__()
-        if not isinstance(operator, BaseWhereOperator):
-            raise StatementException(
-                "operator must be of type {}, got {}".format(BaseWhereOperator, type(operator))
-            )
-
         self.field = field
         self.operator = operator
         self.value = value
@@ -23,6 +16,28 @@ class WhereClause(object):
 
     def __str__(self):
         return str(unicode(self))
+
+
+class WhereClause(BaseClause):
+    """ a single where statement used in queries """
+
+    def __init__(self, field, operator, value):
+        if not isinstance(operator, BaseWhereOperator):
+            raise StatementException(
+                "operator must be of type {}, got {}".format(BaseWhereOperator, type(operator))
+            )
+        super(WhereClause, self).__init__(field, operator, value)
+
+
+class SetClause(BaseClause):
+    """ a single variable st statement """
+
+    def __init__(self, field, operator, value):
+        if not isinstance(operator, BaseAssignmentOperator):
+            raise StatementException(
+                "operator must be of type {}, got {}".format(BaseAssignmentOperator, type(operator))
+            )
+        super(SetClause, self).__init__(field, operator, value)
 
 
 class BaseCQLStatement(object):
