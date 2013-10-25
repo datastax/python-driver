@@ -2,9 +2,12 @@ CHANGELOG
 
 0.9
 * adding update method
+* adding support for ttls
+* adding support for per-query consistency
 * adding BigInt column (thanks @Lifto)
 * adding support for timezone aware time uuid functions (thanks @dokai)
 * only saving collection fields on insert if they've been modified
+* adding model method that returns a list of modified columns
 
 0.8.5
 * adding support for timeouts
