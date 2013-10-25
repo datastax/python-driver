@@ -29,7 +29,7 @@ class WhereClause(BaseClause):
         super(WhereClause, self).__init__(field, operator, value)
 
 
-class SetClause(BaseClause):
+class AssignmentClause(BaseClause):
     """ a single variable st statement """
 
     def __init__(self, field, operator, value):
@@ -37,7 +37,7 @@ class SetClause(BaseClause):
             raise StatementException(
                 "operator must be of type {}, got {}".format(BaseAssignmentOperator, type(operator))
             )
-        super(SetClause, self).__init__(field, operator, value)
+        super(AssignmentClause, self).__init__(field, operator, value)
 
 
 class BaseCQLStatement(object):
@@ -72,8 +72,8 @@ class SelectStatement(BaseCQLStatement):
                  where=None,
                  order_by=None,
                  limit=None,
-                 allow_filtering=False
-    ):
+                 allow_filtering=False):
+
         super(SelectStatement, self).__init__(
             table,
             consistency=consistency,
@@ -106,7 +106,7 @@ class SelectStatement(BaseCQLStatement):
 
 
 class DMLStatement(BaseCQLStatement):
-    """ mutation statements """
+    """ mutation statements with ttls """
 
     def __init__(self, table, consistency=None, where=None, ttl=None):
         super(DMLStatement, self).__init__(
@@ -116,7 +116,30 @@ class DMLStatement(BaseCQLStatement):
         self.ttl = ttl
 
 
-class InsertStatement(DMLStatement):
+class AssignmentStatement(DMLStatement):
+    """ value assignment statements """
+
+    def __init__(self,
+                 table,
+                 assignments,
+                 consistency=None,
+                 where=None,
+                 ttl=None):
+        super(AssignmentStatement, self).__init__(
+            table,
+            consistency=consistency,
+            where=where,
+            ttl=ttl
+        )
+        self.assignments = assignments or []
+
+    def add_assignment_clause(self, clause):
+        if not isinstance(clause, AssignmentClause):
+            raise StatementException("only instances of AssignmentClause can be added to statements")
+        self.assignments.append(clause)
+
+
+class InsertStatement(AssignmentStatement):
     """ an cql insert select statement """
 
     def __init__(self, table, values, consistency=None):
@@ -131,12 +154,12 @@ class InsertStatement(DMLStatement):
         raise StatementException("Cannot add where clauses to insert statements")
 
 
-class UpdateStatement(DMLStatement):
+class UpdateStatement(AssignmentStatement):
     """ an cql update select statement """
 
     def __init__(self, table, consistency=None, where=None):
         super(UpdateStatement, self).__init__(table, consistency, where)
 
 
-class DeleteStatement(BaseCQLStatement):
+class DeleteStatement(DMLStatement):
     """ a cql delete statement """
