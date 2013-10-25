@@ -229,9 +229,11 @@ class ConnectionPool(object):
                 raise ex
 
 
-def execute(query, params=None):
+def execute(query, params=None, consistency_level=None):
     params = params or {}
-    return connection_pool.execute(query, params)
+    if consistency_level is None:
+        consistency_level = connection_pool._consistency
+    return connection_pool.execute(query, params, consistency_level)
 
 @contextmanager
 def connection_manager():

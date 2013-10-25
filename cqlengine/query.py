@@ -363,7 +363,7 @@ class AbstractQuerySet(object):
         if self._batch:
             raise CQLEngineException("Only inserts, updates, and deletes are available in batch mode")
         if self._result_cache is None:
-            columns, self._result_cache = execute(self._select_query(), self._where_values())
+            columns, self._result_cache = execute(self._select_query(), self._where_values(), self._consistency)
             self._construct_result = self._get_result_constructor(columns)
 
     def _fill_result_cache_to_idx(self, idx):
@@ -777,13 +777,15 @@ class DMLQuery(object):
     unlike the read query object, this is mutable
     """
     _ttl = None
+    _consistency = None
 
-    def __init__(self, model, instance=None, batch=None, ttl=None):
+    def __init__(self, model, instance=None, batch=None, ttl=None, consistency=None):
         self.model = model
         self.column_family_name = self.model.column_family_name()
         self.instance = instance
         self._batch = batch
         self._ttl = ttl
+        self._consistency = consistency
 
     def batch(self, batch_obj):
         if batch_obj is not None and not isinstance(batch_obj, BatchQuery):
@@ -894,7 +896,7 @@ class DMLQuery(object):
             if self._batch:
                 self._batch.add_query(qs, query_values)
             else:
-                execute(qs, query_values)
+                execute(qs, query_values, consistency_level=self._consistency)
 
         self._delete_null_columns()
 
@@ -954,7 +956,7 @@ class DMLQuery(object):
             if self._batch:
                 self._batch.add_query(qs, query_values)
             else:
-                execute(qs, query_values)
+                execute(qs, query_values, self._consistency)
 
         # delete any nulled columns
         self._delete_null_columns()
@@ -978,6 +980,6 @@ class DMLQuery(object):
         if self._batch:
             self._batch.add_query(qs, field_values)
         else:
-            execute(qs, field_values)
+            execute(qs, field_values, self._consistency)
 
 

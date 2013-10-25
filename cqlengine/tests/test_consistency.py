@@ -32,4 +32,10 @@ class TestConsistency(BaseConsistencyTest):
             TestConsistencyModel.consistency(ALL).create(text="i am not fault tolerant this way")
 
         args = m.call_args
-        self.assertEqual(ALL, args[2])
+        self.assertEqual(ALL, args[0][2])
+
+    def test_queryset_is_returned_on_create(self):
+        qs = TestConsistencyModel.consistency(ALL)
+        self.assertTrue(isinstance(qs, TestConsistencyModel.__queryset__), type(qs))
+
+

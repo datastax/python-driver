@@ -106,8 +106,8 @@ class ConsistencyDescriptor(object):
 
         qs = model.__queryset__(model)
 
-        def consistency_setter(ts):
-            qs._consistency = ts
+        def consistency_setter(consistency):
+            qs._consistency = consistency
             return qs
 
         return consistency_setter
@@ -227,6 +227,7 @@ class BaseModel(object):
     __dmlquery__ = DMLQuery
 
     __ttl__ = None
+    __consistency__ = None # can be set per query
 
     __read_repair_chance__ = 0.1
 
@@ -446,7 +447,10 @@ class BaseModel(object):
                 setattr(self, self._polymorphic_column_name, self.__polymorphic_key__)
 
         self.validate()
-        self.__dmlquery__(self.__class__, self, batch=self._batch, ttl=self._ttl).update()
+        self.__dmlquery__(self.__class__, self,
+                          batch=self._batch,
+                          ttl=self._ttl,
+                          consistency=self.consistency).update()
 
         #reset the value managers
         for v in self._values.values():
