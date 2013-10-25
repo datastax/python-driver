@@ -45,7 +45,7 @@ class TestConsistency(BaseConsistencyTest):
 
         with mock.patch.object(ConnectionPool, 'execute') as m:
             t.consistency(ALL).save()
-            
+
         args = m.call_args
         self.assertEqual(ALL, args[0][2])
 
