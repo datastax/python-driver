@@ -54,8 +54,10 @@ class MinTimeUUID(BaseQueryFunction):
         super(MinTimeUUID, self).__init__(value)
 
     def get_value(self):
-        epoch = datetime(1970, 1, 1)
-        return long((self.value - epoch).total_seconds() * 1000)
+        epoch = datetime(1970, 1, 1, tzinfo=self.value.tzinfo)
+        offset = epoch.tzinfo.utcoffset(epoch).total_seconds() if epoch.tzinfo else 0
+
+        return long(((self.value - epoch).total_seconds() - offset) * 1000)
 
     def get_dict(self, column):
         return {self.identifier: self.get_value()}
@@ -79,8 +81,10 @@ class MaxTimeUUID(BaseQueryFunction):
         super(MaxTimeUUID, self).__init__(value)
 
     def get_value(self):
-        epoch = datetime(1970, 1, 1)
-        return long((self.value - epoch).total_seconds() * 1000)
+        epoch = datetime(1970, 1, 1, tzinfo=self.value.tzinfo)
+        offset = epoch.tzinfo.utcoffset(epoch).total_seconds() if epoch.tzinfo else 0
+
+        return long(((self.value - epoch).total_seconds() - offset) * 1000)
 
     def get_dict(self, column):
         return {self.identifier: self.get_value()}

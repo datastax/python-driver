@@ -256,6 +256,10 @@ class Integer(Column):
         return self.validate(value)
 
 
+class BigInt(Integer):
+    db_type = 'bigint'
+
+
 class VarInt(Column):
     db_type = 'varint'
 
@@ -332,11 +336,9 @@ class DateTime(Column):
             else:
                 raise ValidationError("'{}' is not a datetime object".format(value))
         epoch = datetime(1970, 1, 1, tzinfo=value.tzinfo)
-        offset = 0
-        if epoch.tzinfo:
-            offset_delta = epoch.tzinfo.utcoffset(epoch)
-            offset = offset_delta.days*24*3600 + offset_delta.seconds
-        return long(((value  - epoch).total_seconds() - offset) * 1000)
+        offset = epoch.tzinfo.utcoffset(epoch).total_seconds() if epoch.tzinfo else 0
+
+        return long(((value - epoch).total_seconds() - offset) * 1000)
 
 
 class Date(Column):
@@ -406,12 +408,7 @@ class TimeUUID(UUID):
         global _last_timestamp
 
         epoch = datetime(1970, 1, 1, tzinfo=dt.tzinfo)
-
-        offset = 0
-        if epoch.tzinfo:
-            offset_delta = epoch.tzinfo.utcoffset(epoch)
-            offset = offset_delta.days*24*3600 + offset_delta.seconds
-
+        offset = epoch.tzinfo.utcoffset(epoch).total_seconds() if epoch.tzinfo else 0
         timestamp = (dt  - epoch).total_seconds() - offset
 
         node = None
