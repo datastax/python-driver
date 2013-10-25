@@ -1,5 +1,6 @@
 from uuid import uuid4
 from cqlengine.exceptions import ValidationError
+from cqlengine.query import QueryException
 
 from cqlengine.tests.base import BaseCassEngTestCase
 from cqlengine.models import Model
@@ -61,11 +62,6 @@ class QueryUpdateTests(BaseCassEngTestCase):
         # perform update
         with self.assertRaises(ValidationError):
             TestQueryUpdateModel.objects(partition=partition, cluster=3).update(count='asdf')
-
-    def test_update_with_no_values_failure(self):
-        """ tests calling update on models with no values passed in """
-        with self.assertRaises(ValidationError):
-            TestQueryUpdateModel.objects(partition=uuid4(), cluster=3).update()
 
     def test_invalid_update_kwarg(self):
         """ tests that passing in a kwarg to the update method that isn't a column will fail """

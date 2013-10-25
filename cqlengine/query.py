@@ -756,7 +756,7 @@ class ModelQuerySet(AbstractQuerySet):
     def update(self, **values):
         """ Updates the rows in this queryset """
         if not values:
-            raise ValidationError("At least one column needs to be updated")
+            return
 
         set_statements = []
         ctx = {}
