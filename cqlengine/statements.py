@@ -179,14 +179,6 @@ class AssignmentStatement(BaseCQLStatement):
 class InsertStatement(AssignmentStatement):
     """ an cql insert select statement """
 
-    def __init__(self, table, assignments, consistency=None):
-        super(InsertStatement, self).__init__(
-            table,
-            assignments,
-            consistency=consistency,
-            where=None
-        )
-
     def add_where_clause(self, clause):
         raise StatementException("Cannot add where clauses to insert statements")
 
@@ -201,20 +193,27 @@ class InsertStatement(AssignmentStatement):
         qs += ['VALUES']
         qs += ["({})".format(', '.join([':{}'.format(v) for v in values]))]
 
+        if self.ttl:
+            qs += ["USING TTL {}".format(self.ttl)]
+
         return ' '.join(qs)
 
 
 class UpdateStatement(AssignmentStatement):
     """ an cql update select statement """
 
-    def __init__(self, table, assignments, consistency=None, where=None, ttl=None):
-        super(UpdateStatement, self).__init__(
-            table,
-            assignments,
-            consistency=consistency,
-            where=where,
-            ttl=ttl
-        )
+    def __unicode__(self):
+        qs = ['UPDATE', self.table]
+        qs += 'SET'
+        qs += ', '.join([unicode(c) for c in self.assignments])
+
+        if self.where_clauses:
+            qs += [self._where]
+
+        if self.ttl:
+            qs += ["USING TTL {}".format(self.ttl)]
+
+        return ' '.join(qs)
 
 
 class DeleteStatement(BaseCQLStatement):
