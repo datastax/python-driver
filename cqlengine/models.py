@@ -356,7 +356,6 @@ class BaseModel(object):
         return cls.objects.get(*args, **kwargs)
 
     def save(self):
-
         # handle polymorphic models
         if self._is_polymorphic:
             if self._is_polymorphic_base:
@@ -367,6 +366,37 @@ class BaseModel(object):
         is_new = self.pk is None
         self.validate()
         self.__dmlquery__(self.__class__, self, batch=self._batch).save()
+
+        #reset the value managers
+        for v in self._values.values():
+            v.reset_previous_value()
+        self._is_persisted = True
+
+        return self
+
+    def update(self, **values):
+        for k, v in values.items():
+            col = self._columns.get(k)
+
+            # check for nonexistant columns
+            if col is None:
+                raise ValidationError("{}.{} has no column named: {}".format(self.__module__, self.__class__.__name__, k))
+
+            # check for primary key update attempts
+            if col.is_primary_key:
+                raise ValidationError("Cannot apply update to primary key '{}' for {}.{}".format(k, self.__module__, self.__class__.__name__))
+
+            setattr(self, k, v)
+
+        # handle polymorphic models
+        if self._is_polymorphic:
+            if self._is_polymorphic_base:
+                raise PolyMorphicModelException('cannot update polymorphic base model')
+            else:
+                setattr(self, self._polymorphic_column_name, self.__polymorphic_key__)
+
+        self.validate()
+        self.__dmlquery__(self.__class__, self, batch=self._batch).update()
 
         #reset the value managers
         for v in self._values.values():

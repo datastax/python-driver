@@ -154,6 +154,17 @@ class TestSetColumn(BaseCassEngTestCase):
         py_val = column.to_python(db_val.value)
         assert py_val == val
 
+    def test_default_empty_container_saving(self):
+        """ tests that the default empty container is not saved if it hasn't been updated """
+        pkey = uuid4()
+        # create a row with set data
+        TestSetModel.create(partition=pkey, int_set={3, 4})
+        # create another with no set data
+        TestSetModel.create(partition=pkey)
+
+        m = TestSetModel.get(partition=pkey)
+        self.assertEqual(m.int_set, {3, 4})
+
 
 class TestListModel(Model):
     partition = columns.UUID(primary_key=True, default=uuid4)
@@ -282,6 +293,18 @@ class TestListColumn(BaseCassEngTestCase):
         py_val = column.to_python(db_val.value)
         assert py_val == val
 
+    def test_default_empty_container_saving(self):
+        """ tests that the default empty container is not saved if it hasn't been updated """
+        pkey = uuid4()
+        # create a row with list data
+        TestListModel.create(partition=pkey, int_list=[1,2,3,4])
+        # create another with no list data
+        TestListModel.create(partition=pkey)
+
+        m = TestListModel.get(partition=pkey)
+        self.assertEqual(m.int_list, [1,2,3,4])
+
+
 class TestMapModel(Model):
     partition = columns.UUID(primary_key=True, default=uuid4)
     int_map = columns.Map(columns.Integer, columns.UUID, required=False)
@@ -308,8 +331,6 @@ class TestMapColumn(BaseCassEngTestCase):
         tmp = TestMapModel.create()
         tmp2 = TestMapModel.get(partition=tmp.partition)
         tmp2.int_map['blah'] = 1
-
-
 
     def test_io_success(self):
         """ Tests that a basic usage works as expected """
@@ -370,7 +391,6 @@ class TestMapColumn(BaseCassEngTestCase):
         m2 = TestMapModel.get(partition=m.partition)
         assert m2.int_map == expected
 
-
     def test_updates_to_none(self):
         """ Tests that setting the field to None works as expected """
         m = TestMapModel.create(int_map={1: uuid4()})
@@ -405,6 +425,18 @@ class TestMapColumn(BaseCassEngTestCase):
         assert db_val.value == {json.dumps(k):json.dumps(v) for k,v in val.items()}
         py_val = column.to_python(db_val.value)
         assert py_val == val
+
+    def test_default_empty_container_saving(self):
+        """ tests that the default empty container is not saved if it hasn't been updated """
+        pkey = uuid4()
+        tmap = {1: uuid4(), 2: uuid4()}
+        # create a row with set data
+        TestMapModel.create(partition=pkey, int_map=tmap)
+        # create another with no set data
+        TestMapModel.create(partition=pkey)
+
+        m = TestMapModel.get(partition=pkey)
+        self.assertEqual(m.int_map, tmap)
 
 #    def test_partial_update_creation(self):
 #        """

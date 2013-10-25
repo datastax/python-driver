@@ -353,3 +353,16 @@ QuerySet method reference
     .. method:: allow_filtering()
 
         Enables the (usually) unwise practive of querying on a clustering key without also defining a partition key
+
+    -- method:: update(**values)
+
+        Performs an update on the row selected by the queryset. Include values to update in the
+        update like so:
+
+        .. code-block:: python
+            Model.objects(key=n).update(value='x')
+
+        Passing in updates for columns which are not part of the model will raise a ValidationError.
+        Per column validation will be performed, but instance level validation will not
+        (`Model.validate` is not called).
+
