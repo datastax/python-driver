@@ -14,8 +14,6 @@ Cassandra CQL 3 Object Mapper for Python
 [Report a Bug](https://github.com/bdeggleston/cqlengine/issues)
 
 [Users Mailing List](https://groups.google.com/forum/?fromgroups#!forum/cqlengine-users)
-
-[Dev Mailing List](https://groups.google.com/forum/?fromgroups#!forum/cqlengine-dev)
 """
 
 setup(
