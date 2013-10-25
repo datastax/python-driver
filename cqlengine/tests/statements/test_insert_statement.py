@@ -21,4 +21,7 @@ class InsertStatementTests(TestCase):
         )
 
     def test_additional_rendering(self):
-        self.fail("Implement ttl and consistency")
+        ist = InsertStatement('table', ttl=60)
+        ist.add_assignment_clause(AssignmentClause('a', 'b'))
+        ist.add_assignment_clause(AssignmentClause('c', 'd'))
+        self.assertIn('USING TTL 60', unicode(ist))
