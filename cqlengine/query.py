@@ -805,10 +805,12 @@ class ModelQuerySet(AbstractQuerySet):
                 ctx[field_id] = val
 
         if set_statements:
-            qs = "UPDATE {} SET {} WHERE {}".format(
+            ttl_stmt = "USING TTL {}".format(self._ttl) if self._ttl else ""
+            qs = "UPDATE {} SET {} WHERE {} {}".format(
                 self.column_family_name,
                 ', '.join(set_statements),
-                self._where_clause()
+                self._where_clause(),
+                ttl_stmt
             )
             ctx.update(self._where_values())
             execute(qs, ctx, self._consistency)
