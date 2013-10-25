@@ -362,7 +362,7 @@ QuerySet method reference
 
         Sets the ttl to run the query query with. Note that running a select query with a ttl value will raise an exception
 
-    -- method:: update(**values)
+    .. method:: update(**values)
 
         Performs an update on the row selected by the queryset. Include values to update in the
         update like so:
