@@ -39,6 +39,10 @@ class BaseCQLStatement(object):
             raise StatementException("only instances of WhereClause can be added to statements")
         self.where_clauses.append(clause)
 
+    @property
+    def _where(self):
+        return 'WHERE {}'.format(' AND '.join([unicode(c) for c in self.where_clauses))
+
 
 class SelectStatement(BaseCQLStatement):
     """ a cql select statement """
@@ -69,7 +73,7 @@ class SelectStatement(BaseCQLStatement):
         qs += ['FROM', self.table]
 
         if self.where_clauses:
-            qs += ['WHERE', ' AND '.join([unicode(c) for c in self.where_clauses])]
+            qs += [self._where]
 
         if self.order_by:
             qs += ['ORDER BY {}'.format(', '.join(unicode(o) for o in self.order_by))]
@@ -103,6 +107,7 @@ class InsertStatement(DMLStatement):
             consistency=consistency,
             where=None
         )
+        self.values = values
 
     def add_where_clause(self, clause):
         raise StatementException("Cannot add where clauses to insert statements")
