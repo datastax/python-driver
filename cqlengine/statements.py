@@ -64,6 +64,11 @@ class BaseCQLStatement(object):
             self.add_where_clause(clause)
 
     def add_where_clause(self, clause):
+        """
+        adds a where clause to this statement
+        :param clause: the clause to add
+        :type clause: WhereClause
+        """
         if not isinstance(clause, WhereClause):
             raise StatementException("only instances of WhereClause can be added to statements")
         clause.set_context_id(self.context_counter)
@@ -71,6 +76,10 @@ class BaseCQLStatement(object):
         self.where_clauses.append(clause)
 
     def get_context(self):
+        """
+        returns the context dict for this statement
+        :rtype: dict
+        """
         ctx = {}
         for clause in self.where_clauses or []:
             clause.update_context(ctx)
@@ -132,7 +141,7 @@ class AssignmentStatement(BaseCQLStatement):
 
     def __init__(self,
                  table,
-                 assignments,
+                 assignments=None,
                  consistency=None,
                  where=None,
                  ttl=None):
@@ -149,11 +158,22 @@ class AssignmentStatement(BaseCQLStatement):
             self.add_assignment_clause(assignment)
 
     def add_assignment_clause(self, clause):
+        """
+        adds an assignment clause to this statement
+        :param clause: the clause to add
+        :type clause: AssignmentClause
+        """
         if not isinstance(clause, AssignmentClause):
             raise StatementException("only instances of AssignmentClause can be added to statements")
         clause.set_context_id(self.context_counter)
         self.context_counter += clause.get_context_size()
         self.assignments.append(clause)
+
+    def get_context(self):
+        ctx = super(AssignmentStatement, self).get_context()
+        for clause in self.assignments:
+            clause.update_context(ctx)
+        return ctx
 
 
 class InsertStatement(AssignmentStatement):
