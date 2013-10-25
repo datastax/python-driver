@@ -39,9 +39,12 @@ class BaseCQLStatement(object):
             raise StatementException("only instances of WhereClause can be added to statements")
         self.where_clauses.append(clause)
 
+    def __str__(self):
+        return str(unicode(self))
+
     @property
     def _where(self):
-        return 'WHERE {}'.format(' AND '.join([unicode(c) for c in self.where_clauses))
+        return 'WHERE {}'.format(' AND '.join([unicode(c) for c in self.where_clauses]))
 
 
 class SelectStatement(BaseCQLStatement):
