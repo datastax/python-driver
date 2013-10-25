@@ -2,6 +2,8 @@ CHANGELOG
 
 0.9
 * adding update method
+* adding BigInt column (thanks @Lifto)
+* adding support for timezone aware time uuid functions (thanks @dokai)
 * only saving collection fields on insert if they've been modified
 
 0.8.5

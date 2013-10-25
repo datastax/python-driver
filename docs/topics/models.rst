@@ -149,6 +149,7 @@ Model Methods
 
     -- method:: update(**values)
 
+
         Performs an update on the model instance. You can pass in values to set on the model
         for updating, or you can call without values to execute an update against any modified
         fields. If no fields on the model have been modified since loading, no query will be

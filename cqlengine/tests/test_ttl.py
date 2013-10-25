@@ -53,6 +53,7 @@ class TTLModelTests(BaseTTLTest):
         self.assertTrue(isinstance(qs, TestTTLModel.__queryset__), type(qs))
 
 
+
 class TTLInstanceUpdateTest(BaseTTLTest):
     def test_update_includes_ttl(self):
         model = TestTTLModel.create(text="goodbye blake")
@@ -87,6 +88,17 @@ class TTLInstanceTest(BaseTTLTest):
         self.assertIn("USING TTL", query)
 
 
+class TTLBlindUpdateTest(BaseTTLTest):
+    def test_ttl_included_with_blind_update(self):
+        o = TestTTLModel.create(text="whatever")
+        tid = o.id
 
-class QuerySetTTLFragmentTest(BaseTTLTest):
-    pass
+        with mock.patch.object(ConnectionPool, 'execute') as m:
+            TestTTLModel.objects(id=tid).ttl(60).update(text="bacon")
+
+        query = m.call_args[0][0]
+        self.assertIn("USING TTL", query)
+
+
+
+

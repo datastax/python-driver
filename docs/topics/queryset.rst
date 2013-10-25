@@ -358,7 +358,19 @@ QuerySet method reference
 
         Sets the batch object to run the query on. Note that running a select query with a batch object will raise an exception
 
-    .. method:: ttl(batch_object)
+    .. method:: ttl(ttl_in_seconds)
 
         Sets the ttl to run the query query with. Note that running a select query with a ttl value will raise an exception
+
+    -- method:: update(**values)
+
+        Performs an update on the row selected by the queryset. Include values to update in the
+        update like so:
+
+        .. code-block:: python
+            Model.objects(key=n).update(value='x')
+
+        Passing in updates for columns which are not part of the model will raise a ValidationError.
+        Per column validation will be performed, but instance level validation will not
+        (`Model.validate` is not called).
 

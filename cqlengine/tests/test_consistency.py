@@ -72,7 +72,7 @@ class TestConsistency(BaseConsistencyTest):
         uid = t.id
 
         with mock.patch.object(ConnectionPool, 'execute') as m:
-            TestConsistencyModel.objects(id=uid).update(text="grilled cheese")
+            TestConsistencyModel.objects(id=uid).consistency(ALL).update(text="grilled cheese")
 
         args = m.call_args
         self.assertEqual(ALL, args[0][2])
