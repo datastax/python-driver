@@ -7,7 +7,6 @@ from cqlengine.query import ModelQuerySet, DMLQuery, AbstractQueryableColumn
 from cqlengine.query import DoesNotExist as _DoesNotExist
 from cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
 
-
 class ModelDefinitionException(ModelException): pass
 
 
@@ -68,6 +67,52 @@ class QuerySetDescriptor(object):
 
         :rtype: ModelQuerySet
         """
+        raise NotImplementedError
+
+class TTLDescriptor(object):
+    """
+    returns a query set descriptor
+    """
+    def __get__(self, instance, model):
+        if instance:
+            # instance method
+            def ttl_setter(ts):
+                instance._ttl = ts
+                return instance
+            return ttl_setter
+
+        qs = model.__queryset__(model)
+
+        def ttl_setter(ts):
+            qs._ttl = ts
+            return qs
+
+        return ttl_setter
+
+    def __call__(self, *args, **kwargs):
+        raise NotImplementedError
+
+
+class ConsistencyDescriptor(object):
+    """
+    returns a query set descriptor if called on Class, instance if it was an instance call
+    """
+    def __get__(self, instance, model):
+        if instance:
+            def consistency_setter(consistency):
+                instance.__consistency__ = consistency
+                return instance
+            return consistency_setter
+
+        qs = model.__queryset__(model)
+
+        def consistency_setter(consistency):
+            qs._consistency = consistency
+            return qs
+
+        return consistency_setter
+
+    def __call__(self, *args, **kwargs):
         raise NotImplementedError
 
 
@@ -148,6 +193,8 @@ class BaseModel(object):
     class MultipleObjectsReturned(_MultipleObjectsReturned): pass
 
     objects = QuerySetDescriptor()
+    ttl = TTLDescriptor()
+    consistency = ConsistencyDescriptor()
 
     #table names will be generated automatically from it's model and package name
     #however, you can also define them manually here
@@ -179,10 +226,14 @@ class BaseModel(object):
     __queryset__ = ModelQuerySet
     __dmlquery__ = DMLQuery
 
+    __ttl__ = None
+    __consistency__ = None # can be set per query
+
     __read_repair_chance__ = 0.1
 
     def __init__(self, **values):
         self._values = {}
+        self._ttl = None
 
         for name, column in self._columns.items():
             value =  values.get(name, None)
@@ -365,7 +416,10 @@ class BaseModel(object):
 
         is_new = self.pk is None
         self.validate()
-        self.__dmlquery__(self.__class__, self, batch=self._batch).save()
+        self.__dmlquery__(self.__class__, self,
+                          batch=self._batch,
+                          ttl=self._ttl,
+                          consistency=self.__consistency__).save()
 
         #reset the value managers
         for v in self._values.values():
@@ -396,7 +450,10 @@ class BaseModel(object):
                 setattr(self, self._polymorphic_column_name, self.__polymorphic_key__)
 
         self.validate()
-        self.__dmlquery__(self.__class__, self, batch=self._batch).update()
+        self.__dmlquery__(self.__class__, self,
+                          batch=self._batch,
+                          ttl=self._ttl,
+                          consistency=self.__consistency__).update()
 
         #reset the value managers
         for v in self._values.values():

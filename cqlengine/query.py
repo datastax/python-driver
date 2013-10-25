@@ -208,16 +208,21 @@ class BatchQuery(object):
 
     http://www.datastax.com/docs/1.2/cql_cli/cql/BATCH
     """
+    _consistency = None
 
-    def __init__(self, batch_type=None, timestamp=None):
+    def __init__(self, batch_type=None, timestamp=None, consistency=None):
         self.queries = []
         self.batch_type = batch_type
         if timestamp is not None and not isinstance(timestamp, datetime):
             raise CQLEngineException('timestamp object must be an instance of datetime')
         self.timestamp = timestamp
+        self._consistency = consistency
 
     def add_query(self, query, params):
         self.queries.append((query, params))
+
+    def consistency(self, consistency):
+        self._consistency = consistency
 
     def execute(self):
         if len(self.queries) == 0:
@@ -238,7 +243,7 @@ class BatchQuery(object):
 
         query_list.append('APPLY BATCH;')
 
-        execute('\n'.join(query_list), parameters)
+        execute('\n'.join(query_list), parameters, self._consistency)
 
         self.queries = []
 
@@ -283,6 +288,8 @@ class AbstractQuerySet(object):
         self._result_idx = None
 
         self._batch = None
+        self._ttl = None
+        self._consistency = None
 
     @property
     def column_family_name(self):
@@ -300,7 +307,7 @@ class AbstractQuerySet(object):
     def __deepcopy__(self, memo):
         clone = self.__class__(self.model)
         for k,v in self.__dict__.items():
-            if k in ['_con', '_cur', '_result_cache', '_result_idx']:
+            if k in ['_con', '_cur', '_result_cache', '_result_idx']: # don't clone these
                 clone.__dict__[k] = None
             elif k == '_batch':
                 # we need to keep the same batch instance across
@@ -361,7 +368,7 @@ class AbstractQuerySet(object):
         if self._batch:
             raise CQLEngineException("Only inserts, updates, and deletes are available in batch mode")
         if self._result_cache is None:
-            columns, self._result_cache = execute(self._select_query(), self._where_values())
+            columns, self._result_cache = execute(self._select_query(), self._where_values(), self._consistency)
             self._construct_result = self._get_result_constructor(columns)
 
     def _fill_result_cache_to_idx(self, idx):
@@ -614,7 +621,7 @@ class AbstractQuerySet(object):
         return self._only_or_defer('defer', fields)
 
     def create(self, **kwargs):
-        return self.model(**kwargs).batch(self._batch).save()
+        return self.model(**kwargs).batch(self._batch).ttl(self._ttl).consistency(self._consistency).save()
 
     #----delete---
     def delete(self, columns=[]):
@@ -740,6 +747,11 @@ class ModelQuerySet(AbstractQuerySet):
 
         return column.db_field_name, order_type
 
+    def _get_ttl_statement(self):
+        if not self._ttl:
+            return ""
+        return "USING TTL {}".format(self._ttl)
+
     def values_list(self, *fields, **kwargs):
         """ Instructs the query set to return tuples, not model instance """
         flat = kwargs.pop('flat', False)
@@ -751,6 +763,16 @@ class ModelQuerySet(AbstractQuerySet):
         clone = self.only(fields)
         clone._values_list = True
         clone._flat_values_list = flat
+        return clone
+
+    def consistency(self, consistency):
+        clone = copy.deepcopy(self)
+        clone._consistency = consistency
+        return clone
+
+    def ttl(self, ttl):
+        clone = copy.deepcopy(self)
+        clone._ttl = ttl
         return clone
 
     def update(self, **values):
@@ -785,13 +807,15 @@ class ModelQuerySet(AbstractQuerySet):
                 ctx[field_id] = val
 
         if set_statements:
-            qs = "UPDATE {} SET {} WHERE {}".format(
+            ttl_stmt = "USING TTL {}".format(self._ttl) if self._ttl else ""
+            qs = "UPDATE {} SET {} WHERE {} {}".format(
                 self.column_family_name,
                 ', '.join(set_statements),
-                self._where_clause()
+                self._where_clause(),
+                ttl_stmt
             )
             ctx.update(self._where_values())
-            execute(qs, ctx)
+            execute(qs, ctx, self._consistency)
 
         if nulled_columns:
             qs = "DELETE {} FROM {} WHERE {}".format(
@@ -799,7 +823,7 @@ class ModelQuerySet(AbstractQuerySet):
                 self.column_family_name,
                 self._where_clause()
             )
-            execute(qs, self._where_values())
+            execute(qs, self._where_values(), self._consistency)
 
 
 class DMLQuery(object):
@@ -810,13 +834,16 @@ class DMLQuery(object):
 
     unlike the read query object, this is mutable
     """
+    _ttl = None
+    _consistency = None
 
-    def __init__(self, model, instance=None, batch=None):
+    def __init__(self, model, instance=None, batch=None, ttl=None, consistency=None):
         self.model = model
         self.column_family_name = self.model.column_family_name()
         self.instance = instance
         self._batch = batch
-        pass
+        self._ttl = ttl
+        self._consistency = consistency
 
     def batch(self, batch_obj):
         if batch_obj is not None and not isinstance(batch_obj, BatchQuery):
@@ -913,6 +940,9 @@ class DMLQuery(object):
 
         qs += [' AND '.join(where_statements)]
 
+        if self._ttl:
+            qs += ["USING TTL {}".format(self._ttl)]
+
         # clear the qs if there are no set statements and this is not a counter model
         if not set_statements and not self.instance._has_counter:
             qs = []
@@ -924,7 +954,7 @@ class DMLQuery(object):
             if self._batch:
                 self._batch.add_query(qs, query_values)
             else:
-                execute(qs, query_values)
+                execute(qs, query_values, consistency_level=self._consistency)
 
         self._delete_null_columns()
 
@@ -971,7 +1001,12 @@ class DMLQuery(object):
             qs += ['VALUES']
             qs += ["({})".format(', '.join([':'+field_ids[f] for f in field_names]))]
 
+        if self._ttl:
+            qs += ["USING TTL {}".format(self._ttl)]
+
+        qs += []
         qs = ' '.join(qs)
+
 
         # skip query execution if it's empty
         # caused by pointless update queries
@@ -979,7 +1014,7 @@ class DMLQuery(object):
             if self._batch:
                 self._batch.add_query(qs, query_values)
             else:
-                execute(qs, query_values)
+                execute(qs, query_values, self._consistency)
 
         # delete any nulled columns
         self._delete_null_columns()
@@ -1003,6 +1038,6 @@ class DMLQuery(object):
         if self._batch:
             self._batch.add_query(qs, field_values)
         else:
-            execute(qs, field_values)
+            execute(qs, field_values, self._consistency)
 
 
