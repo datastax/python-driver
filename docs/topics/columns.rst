@@ -38,9 +38,15 @@ Columns
 
 .. class:: Integer()
 
-    Stores an integer value ::
+    Stores a 32-bit signed integer value ::
 
         columns.Integer()
+
+.. class:: BigInt()
+
+    Stores a 64-bit signed long value ::
+
+        columns.BigInt()
 
 .. class:: VarInt()
 

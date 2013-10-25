@@ -256,6 +256,10 @@ class Integer(Column):
         return self.validate(value)
 
 
+class BigInt(Integer):
+    db_type = 'bigint'
+
+
 class VarInt(Column):
     db_type = 'varint'
 
