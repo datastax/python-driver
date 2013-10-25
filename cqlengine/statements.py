@@ -70,6 +70,12 @@ class BaseCQLStatement(object):
         self.context_counter += clause.get_context_size()
         self.where_clauses.append(clause)
 
+    def get_context(self):
+        ctx = {}
+        for clause in self.where_clauses or []:
+            clause.update_context(ctx)
+        return ctx
+
     def __str__(self):
         return str(unicode(self))
 
@@ -83,7 +89,7 @@ class SelectStatement(BaseCQLStatement):
 
     def __init__(self,
                  table,
-                 fields,
+                 fields=None,
                  consistency=None,
                  where=None,
                  order_by=None,
@@ -121,18 +127,7 @@ class SelectStatement(BaseCQLStatement):
         return ' '.join(qs)
 
 
-class DMLStatement(BaseCQLStatement):
-    """ mutation statements with ttls """
-
-    def __init__(self, table, consistency=None, where=None, ttl=None):
-        super(DMLStatement, self).__init__(
-            table,
-            consistency=consistency,
-            where=where)
-        self.ttl = ttl
-
-
-class AssignmentStatement(DMLStatement):
+class AssignmentStatement(BaseCQLStatement):
     """ value assignment statements """
 
     def __init__(self,
@@ -145,8 +140,8 @@ class AssignmentStatement(DMLStatement):
             table,
             consistency=consistency,
             where=where,
-            ttl=ttl
         )
+        self.ttl = ttl
 
         # add assignments
         self.assignments = []
@@ -202,16 +197,24 @@ class UpdateStatement(AssignmentStatement):
         )
 
 
-class DeleteStatement(DMLStatement):
+class DeleteStatement(BaseCQLStatement):
     """ a cql delete statement """
 
-    def __init__(self, table, fields, consistency=None, where=None, ttl=None):
+    def __init__(self, table, fields=None, consistency=None, where=None):
         super(DeleteStatement, self).__init__(
             table,
             consistency=consistency,
             where=where,
-            ttl=ttl
         )
         self.fields = [fields] if isinstance(fields, basestring) else (fields or [])
 
+    def __unicode__(self):
+        qs = ['DELETE']
+        qs += [', '.join(['"{}"'.format(f) for f in self.fields]) if self.fields else '*']
+        qs += ['FROM', self.table]
+
+        if self.where_clauses:
+            qs += [self._where]
+
+        return ' '.join(qs)
 
