@@ -32,11 +32,15 @@ class SelectStatementTests(TestCase):
         ss.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
         self.assertEqual(unicode(ss), 'SELECT * FROM table WHERE "a" = b', unicode(ss))
 
-    def test_order_by_rendering(self):
-        pass
-
-    def test_limit_rendering(self):
-        pass
-
-    def test_allow_filtering_rendering(self):
-        pass
+    def test_additional_rendering(self):
+        ss = SelectStatement(
+            'table',
+            None,
+            order_by=['x', 'y'],
+            limit=15,
+            allow_filtering=True
+        )
+        qstr = unicode(ss)
+        self.assertIn('LIMIT 15', qstr)
+        self.assertIn('ORDER BY x, y', qstr)
+        self.assertIn('ALLOW FILTERING', qstr)
