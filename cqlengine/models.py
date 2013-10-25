@@ -409,6 +409,10 @@ class BaseModel(object):
         """ Deletes this instance """
         self.__dmlquery__(self.__class__, self, batch=self._batch).delete()
 
+    def get_changed_columns(self):
+        """ returns a list of the columns that have been updated since instantiation or save """
+        return [k for k,v in self._values.items() if v.changed]
+
     @classmethod
     def _class_batch(cls, batch):
         return cls.objects.batch(batch)

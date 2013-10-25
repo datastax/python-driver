@@ -137,6 +137,7 @@ Model Methods
     .. method:: delete()
 
         Deletes the object from the database.
+
     -- method:: update(**values)
 
 
@@ -144,6 +145,10 @@ Model Methods
         for updating, or you can call without values to execute an update against any modified
         fields. If no fields on the model have been modified since loading, no query will be
         performed. Model validation is performed normally.
+
+    -- method:: get_changed_columns()
+
+        Returns a list of column names that have changed since the model was instantiated or saved
 
 Model Attributes
 ================
