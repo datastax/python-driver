@@ -5,7 +5,7 @@ from uuid import uuid4
 from cqlengine import columns
 import mock
 from cqlengine.connection import ConnectionPool
-from cqlengine import ALL
+from cqlengine import ALL, BatchQuery
 
 class TestConsistencyModel(Model):
     id      = columns.UUID(primary_key=True, default=lambda:uuid4())
@@ -50,3 +50,18 @@ class TestConsistency(BaseConsistencyTest):
         self.assertEqual(ALL, args[0][2])
 
 
+    def test_batch_consistency(self):
+
+        with mock.patch.object(ConnectionPool, 'execute') as m:
+            with BatchQuery(consistency=ALL) as b:
+                TestConsistencyModel.batch(b).create(text="monkey")
+
+        args = m.call_args
+        self.assertEqual(ALL, args[0][2])
+
+        with mock.patch.object(ConnectionPool, 'execute') as m:
+            with BatchQuery() as b:
+                TestConsistencyModel.batch(b).create(text="monkey")
+
+        args = m.call_args
+        self.assertNotEqual(ALL, args[0][2])

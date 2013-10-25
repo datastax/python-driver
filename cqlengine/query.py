@@ -208,16 +208,21 @@ class BatchQuery(object):
 
     http://www.datastax.com/docs/1.2/cql_cli/cql/BATCH
     """
+    _consistency = None
 
-    def __init__(self, batch_type=None, timestamp=None):
+    def __init__(self, batch_type=None, timestamp=None, consistency=None):
         self.queries = []
         self.batch_type = batch_type
         if timestamp is not None and not isinstance(timestamp, datetime):
             raise CQLEngineException('timestamp object must be an instance of datetime')
         self.timestamp = timestamp
+        self._consistency = consistency
 
     def add_query(self, query, params):
         self.queries.append((query, params))
+
+    def consistency(self, consistency):
+        self._consistency = consistency
 
     def execute(self):
         if len(self.queries) == 0:
@@ -238,7 +243,7 @@ class BatchQuery(object):
 
         query_list.append('APPLY BATCH;')
 
-        execute('\n'.join(query_list), parameters)
+        execute('\n'.join(query_list), parameters, self._consistency)
 
         self.queries = []
 
