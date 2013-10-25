@@ -11,6 +11,9 @@ class BaseClause(object):
         self.value = value
         self.context_id = None
 
+    def __unicode__(self):
+        raise NotImplementedError
+
     def __str__(self):
         return str(unicode(self))
 
@@ -40,11 +43,14 @@ class WhereClause(BaseClause):
         self.operator = operator
 
     def __unicode__(self):
-        return u'"{}" {} {}'.format(self.field, self.operator, self.context_id)
+        return u'"{}" {} :{}'.format(self.field, self.operator, self.context_id)
 
 
 class AssignmentClause(BaseClause):
     """ a single variable st statement """
+
+    def __unicode__(self):
+        return u'"{}" = :{}'.format(self.field, self.context_id)
 
     def insert_tuple(self):
         return self.field, self.context_id
@@ -84,6 +90,9 @@ class BaseCQLStatement(object):
         for clause in self.where_clauses or []:
             clause.update_context(ctx)
         return ctx
+
+    def __unicode__(self):
+        raise NotImplementedError
 
     def __str__(self):
         return str(unicode(self))
@@ -204,8 +213,8 @@ class UpdateStatement(AssignmentStatement):
 
     def __unicode__(self):
         qs = ['UPDATE', self.table]
-        qs += 'SET'
-        qs += ', '.join([unicode(c) for c in self.assignments])
+        qs += ['SET']
+        qs += [', '.join([unicode(c) for c in self.assignments])]
 
         if self.where_clauses:
             qs += [self._where]
