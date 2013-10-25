@@ -321,6 +321,15 @@ QuerySet method reference
 
         Returns a queryset matching all rows
 
+    .. method:: batch(batch_object)
+
+        Sets the batch object to run the query on. Note that running a select query with a batch object will raise an exception
+
+    .. method:: consistency(consistency_setting)
+
+        Sets the consistency level for the operation.  Options may be imported from the top level :attr:`cqlengine` package.
+
+
     .. method:: count()
 
         Returns the number of matching rows in your QuerySet
@@ -354,11 +363,11 @@ QuerySet method reference
 
         Enables the (usually) unwise practive of querying on a clustering key without also defining a partition key
 
-    .. method:: batch(batch_object)
-
-        Sets the batch object to run the query on. Note that running a select query with a batch object will raise an exception
 
     .. method:: ttl(ttl_in_seconds)
+
+        :param ttl_in_seconds: time in seconds in which the saved values should expire
+        :type ttl_in_seconds: int
 
         Sets the ttl to run the query query with. Note that running a select query with a ttl value will raise an exception
 
