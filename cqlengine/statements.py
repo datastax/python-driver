@@ -18,6 +18,12 @@ class WhereClause(object):
         self.operator = operator
         self.value = value
 
+    def __unicode__(self):
+        return u"{} {} {}".format(self.field, self.operator, self.value)
+
+    def __str__(self):
+        return str(unicode(self))
+
 
 class BaseCQLStatement(object):
     """ The base cql statement class """

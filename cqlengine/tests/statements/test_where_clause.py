@@ -1,4 +1,5 @@
 from unittest import TestCase
+from cqlengine.operators import EqualsOperator
 from cqlengine.statements import StatementException, WhereClause
 
 
@@ -11,3 +12,6 @@ class TestWhereClause(TestCase):
 
     def test_where_clause_rendering(self):
         """ tests that where clauses are rendered properly """
+        wc = WhereClause('a', EqualsOperator(), 'c')
+        self.assertEqual("a = c", unicode(wc))
+        self.assertEqual("a = c", str(wc))

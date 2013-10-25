@@ -14,6 +14,9 @@ class BaseQueryOperator(object):
             raise QueryOperatorException("cql symbol is None")
         return self.cql_symbol
 
+    def __str__(self):
+        return str(unicode(self))
+
     @classmethod
     def get_operator(cls, symbol):
         if cls == BaseQueryOperator:
