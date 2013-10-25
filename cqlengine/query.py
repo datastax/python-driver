@@ -307,7 +307,7 @@ class AbstractQuerySet(object):
     def __deepcopy__(self, memo):
         clone = self.__class__(self.model)
         for k,v in self.__dict__.items():
-            if k in ['_con', '_cur', '_result_cache', '_result_idx']:
+            if k in ['_con', '_cur', '_result_cache', '_result_idx']: # don't clone these
                 clone.__dict__[k] = None
             elif k == '_batch':
                 # we need to keep the same batch instance across
@@ -766,12 +766,14 @@ class ModelQuerySet(AbstractQuerySet):
         return clone
 
     def consistency(self, consistency):
-        self._consistency = consistency
-        return self
+        clone = copy.deepcopy(self)
+        clone._consistency = consistency
+        return clone
 
     def ttl(self, ttl):
-        self._ttl = ttl
-        return self
+        clone = copy.deepcopy(self)
+        clone._ttl = ttl
+        return clone
 
     def update(self, **values):
         """ Updates the rows in this queryset """
