@@ -11,6 +11,25 @@ from cqlengine.management import delete_table
 from cqlengine.models import Model
 from cqlengine import columns
 from cqlengine import query
+from datetime import timedelta
+from datetime import tzinfo
+
+
+class TzOffset(tzinfo):
+    """Minimal implementation of a timezone offset to help testing with timezone
+    aware datetimes.
+    """
+    def __init__(self, offset):
+        self._offset = timedelta(hours=offset)
+
+    def utcoffset(self, dt):
+        return self._offset
+
+    def tzname(self, dt):
+        return 'TzOffset: {}'.format(self._offset.hours)
+
+    def dst(self, dt):
+        return timedelta(0)
 
 class TestModel(Model):
     test_id = columns.Integer(primary_key=True)
@@ -514,6 +533,49 @@ class TestMinMaxTimeUUIDFunctions(BaseCassEngTestCase):
     def tearDownClass(cls):
         super(TestMinMaxTimeUUIDFunctions, cls).tearDownClass()
         delete_table(TimeUUIDQueryModel)
+
+    def test_tzaware_datetime_support(self):
+        """Test that using timezone aware datetime instances works with the
+        MinTimeUUID/MaxTimeUUID functions.
+        """
+        pk = uuid4()
+        midpoint_utc = datetime.utcnow().replace(tzinfo=TzOffset(0))
+        midpoint_helsinki = midpoint_utc.astimezone(TzOffset(3))
+
+        # Assert pre-condition that we have the same logical point in time
+        assert midpoint_utc.utctimetuple() == midpoint_helsinki.utctimetuple()
+        assert midpoint_utc.timetuple() != midpoint_helsinki.timetuple()
+
+        TimeUUIDQueryModel.create(
+            partition=pk,
+            time=columns.TimeUUID.from_datetime(midpoint_utc - timedelta(minutes=1)),
+            data='1')
+
+        TimeUUIDQueryModel.create(
+            partition=pk,
+            time=columns.TimeUUID.from_datetime(midpoint_utc),
+            data='2')
+
+        TimeUUIDQueryModel.create(
+            partition=pk,
+            time=columns.TimeUUID.from_datetime(midpoint_utc + timedelta(minutes=1)),
+            data='3')
+
+        assert ['1', '2'] == [o.data for o in TimeUUIDQueryModel.filter(
+            TimeUUIDQueryModel.partition == pk,
+            TimeUUIDQueryModel.time <= functions.MaxTimeUUID(midpoint_utc))]
+
+        assert ['1', '2'] == [o.data for o in TimeUUIDQueryModel.filter(
+            TimeUUIDQueryModel.partition == pk,
+            TimeUUIDQueryModel.time <= functions.MaxTimeUUID(midpoint_helsinki))]
+
+        assert ['2', '3'] == [o.data for o in TimeUUIDQueryModel.filter(
+            TimeUUIDQueryModel.partition == pk,
+            TimeUUIDQueryModel.time >= functions.MinTimeUUID(midpoint_utc))]
+
+        assert ['2', '3'] == [o.data for o in TimeUUIDQueryModel.filter(
+            TimeUUIDQueryModel.partition == pk,
+            TimeUUIDQueryModel.time >= functions.MinTimeUUID(midpoint_helsinki))]
 
     def test_success_case(self):
         """ Test that the min and max time uuid functions work as expected """
