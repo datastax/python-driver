@@ -12,6 +12,8 @@ from cqlengine.connection import connection_manager, execute, RowResult
 from cqlengine.exceptions import CQLEngineException, ValidationError
 from cqlengine.functions import QueryValue, Token
 
+from cqlengine import statements, operators
+
 #CQL 3 reference:
 #http://www.datastax.com/docs/1.1/references/cql/index
 
@@ -326,41 +328,22 @@ class AbstractQuerySet(object):
 
     #----query generation / execution----
 
-    def _where_clause(self):
-        """ Returns a where clause based on the given filter args """
-        return ' AND '.join([f.cql for f in self._where])
-
-    def _where_values(self):
-        """ Returns the value dict to be passed to the cql query """
-        values = {}
-        for where in self._where:
-            values.update(where.get_dict())
-        return values
-
-    def _get_select_statement(self):
-        """ returns the select portion of this queryset's cql statement """
-        raise NotImplementedError
+    def _select_fields(self):
+        """ returns the fields to select """
+        return []
 
     def _select_query(self):
         """
         Returns a select clause based on the given filter args
         """
-        qs = [self._get_select_statement()]
-        qs += ['FROM {}'.format(self.column_family_name)]
-
-        if self._where:
-            qs += ['WHERE {}'.format(self._where_clause())]
-
-        if self._order:
-            qs += ['ORDER BY {}'.format(', '.join(self._order))]
-
-        if self._limit:
-            qs += ['LIMIT {}'.format(self._limit)]
-
-        if self._allow_filtering:
-            qs += ['ALLOW FILTERING']
-
-        return ' '.join(qs)
+        return statements.SelectStatement(
+            self.column_family_name,
+            fields=self._select_fields(),
+            where=self._where,
+            order_by=self._order,
+            limit=self._limit,
+            allow_filtering=self._allow_filtering
+        )
 
     #----Reads------
 
@@ -368,7 +351,8 @@ class AbstractQuerySet(object):
         if self._batch:
             raise CQLEngineException("Only inserts, updates, and deletes are available in batch mode")
         if self._result_cache is None:
-            columns, self._result_cache = execute(self._select_query(), self._where_values(), self._consistency)
+            query = self._select_query()
+            columns, self._result_cache = execute(unicode(query).encode('utf-8'), query.get_context(), self._consistency)
             self._construct_result = self._get_result_constructor(columns)
 
     def _fill_result_cache_to_idx(self, idx):
@@ -477,7 +461,7 @@ class AbstractQuerySet(object):
         #add arguments to the where clause filters
         clone = copy.deepcopy(self)
         for operator in args:
-            if not isinstance(operator, QueryOperator):
+            if not isinstance(operator, statements.WhereClause):
                 raise QueryException('{} is not a valid query operator'.format(operator))
             clone._where.append(operator)
 
@@ -493,10 +477,10 @@ class AbstractQuerySet(object):
                     raise QueryException("Can't resolve column name: '{}'".format(col_name))
 
             #get query operator, or use equals if not supplied
-            operator_class = QueryOperator.get_operator(col_op or 'EQ')
-            operator = operator_class(column, val)
+            operator_class = operators.BaseWhereOperator.get_operator(col_op or 'EQ')
+            operator = operator_class()
 
-            clone._where.append(operator)
+            clone._where.append(statements.WhereClause(col_name, operator, val))
 
         return clone
 
@@ -716,6 +700,16 @@ class ModelQuerySet(AbstractQuerySet):
             return 'SELECT {}'.format(', '.join(['"{}"'.format(f) for f in db_fields]))
         else:
             return 'SELECT *'
+
+    def _select_fields(self):
+        if self._defer_fields or self._only_fields:
+            fields = self.model._columns.keys()
+            if self._defer_fields:
+                fields = [f for f in fields if f not in self._defer_fields]
+            elif self._only_fields:
+                fields = self._only_fields
+            return [self.model._columns[f].db_field_name for f in fields]
+        return super(ModelQuerySet, self)._select_fields()
 
     def _get_result_constructor(self, names):
         """ Returns a function that will be used to instantiate query results """
