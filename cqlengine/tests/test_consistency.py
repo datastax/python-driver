@@ -65,3 +65,14 @@ class TestConsistency(BaseConsistencyTest):
 
         args = m.call_args
         self.assertNotEqual(ALL, args[0][2])
+
+    def test_blind_update(self):
+        t = TestConsistencyModel.create(text="bacon and eggs")
+        t.text = "ham sandwich"
+        uid = t.id
+
+        with mock.patch.object(ConnectionPool, 'execute') as m:
+            TestConsistencyModel.objects(id=uid).update(text="grilled cheese")
+
+        args = m.call_args
+        self.assertEqual(ALL, args[0][2])
