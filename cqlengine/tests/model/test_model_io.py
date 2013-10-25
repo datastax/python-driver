@@ -42,8 +42,6 @@ class TestModelIO(BaseCassEngTestCase):
         for cname in tm._columns.keys():
             self.assertEquals(getattr(tm, cname), getattr(tm2, cname))
 
-
-
     def test_model_updating_works_properly(self):
         """
         Tests that subsequent saves after initial model creation work
@@ -78,7 +76,6 @@ class TestModelIO(BaseCassEngTestCase):
         assert tm2.text is None
         assert tm2._values['text'].previous_value is None
 
-
     def test_a_sensical_error_is_raised_if_you_try_to_create_a_table_twice(self):
         """
         """
@@ -91,6 +88,7 @@ class TestMultiKeyModel(Model):
     cluster     = columns.Integer(primary_key=True)
     count       = columns.Integer(required=False)
     text        = columns.Text(required=False)
+
 
 class TestDeleting(BaseCassEngTestCase):
 
@@ -158,6 +156,14 @@ class TestUpdating(BaseCassEngTestCase):
         assert check.count is None
         assert check.text is None
 
+    def test_get_changed_columns(self):
+        assert self.instance.get_changed_columns() == []
+        self.instance.count = 1
+        changes = self.instance.get_changed_columns()
+        assert len(changes) == 1
+        assert changes == ['count']
+        self.instance.save()
+        assert self.instance.get_changed_columns() == []
 
 
 class TestCanUpdate(BaseCassEngTestCase):

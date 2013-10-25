@@ -354,6 +354,14 @@ QuerySet method reference
 
         Enables the (usually) unwise practive of querying on a clustering key without also defining a partition key
 
+    .. method:: batch(batch_object)
+
+        Sets the batch object to run the query on. Note that running a select query with a batch object will raise an exception
+
+    .. method:: ttl(ttl_in_seconds)
+
+        Sets the ttl to run the query query with. Note that running a select query with a ttl value will raise an exception
+
     -- method:: update(**values)
 
         Performs an update on the row selected by the queryset. Include values to update in the
