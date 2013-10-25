@@ -6,14 +6,10 @@ class StatementException(Exception): pass
 
 class BaseClause(object):
 
-    def __init__(self, field, operator, value):
+    def __init__(self, field, value):
         self.field = field
-        self.operator = operator
         self.value = value
         self.context_id = None
-
-    def __unicode__(self):
-        return u'"{}" {} {}'.format(self.field, self.operator, self.context_id)
 
     def __str__(self):
         return str(unicode(self))
@@ -40,18 +36,15 @@ class WhereClause(BaseClause):
             raise StatementException(
                 "operator must be of type {}, got {}".format(BaseWhereOperator, type(operator))
             )
-        super(WhereClause, self).__init__(field, operator, value)
+        super(WhereClause, self).__init__(field, value)
+        self.operator = operator
+
+    def __unicode__(self):
+        return u'"{}" {} {}'.format(self.field, self.operator, self.context_id)
 
 
 class AssignmentClause(BaseClause):
     """ a single variable st statement """
-
-    def __init__(self, field, operator, value):
-        if not isinstance(operator, BaseAssignmentOperator):
-            raise StatementException(
-                "operator must be of type {}, got {}".format(BaseAssignmentOperator, type(operator))
-            )
-        super(AssignmentClause, self).__init__(field, operator, value)
 
     def insert_tuple(self):
         return self.field, self.context_id
