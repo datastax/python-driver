@@ -35,10 +35,14 @@ class BaseCQLStatement(object):
         self.where_clauses = []
 
 
-
-
 class SelectStatement(BaseCQLStatement):
     """ a cql select statement """
+
+    def __init__(self, table, fields, consistency=None):
+        super(SelectStatement, self).__init__(table, consistency)
+        if isinstance(fields, basestring):
+            fields = [fields]
+        self.fields = fields
 
 
 class DMLStatement(BaseCQLStatement):
