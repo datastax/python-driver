@@ -108,6 +108,7 @@ class SelectStatement(BaseCQLStatement):
     def __init__(self,
                  table,
                  fields=None,
+                 count=False,
                  consistency=None,
                  where=None,
                  order_by=None,
@@ -121,13 +122,17 @@ class SelectStatement(BaseCQLStatement):
         )
 
         self.fields = [fields] if isinstance(fields, basestring) else (fields or [])
+        self.count = count
         self.order_by = [order_by] if isinstance(order_by, basestring) else order_by
         self.limit = limit
         self.allow_filtering = allow_filtering
 
     def __unicode__(self):
         qs = ['SELECT']
-        qs += [', '.join(['"{}"'.format(f) for f in self.fields]) if self.fields else '*']
+        if self.count:
+            qs += ['COUNT(*)']
+        else:
+            qs += [', '.join(['"{}"'.format(f) for f in self.fields]) if self.fields else '*']
         qs += ['FROM', self.table]
 
         if self.where_clauses:

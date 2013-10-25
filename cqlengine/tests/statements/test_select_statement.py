@@ -18,22 +18,27 @@ class SelectStatementTests(TestCase):
 
     def test_none_fields_rendering(self):
         """ tests that a '*' is added if no fields are passed in """
-        ss = SelectStatement('table', None)
+        ss = SelectStatement('table')
         self.assertTrue(unicode(ss).startswith('SELECT *'), unicode(ss))
         self.assertTrue(str(ss).startswith('SELECT *'), str(ss))
 
     def test_table_rendering(self):
-        ss = SelectStatement('table', None)
+        ss = SelectStatement('table')
         self.assertTrue(unicode(ss).startswith('SELECT * FROM table'), unicode(ss))
         self.assertTrue(str(ss).startswith('SELECT * FROM table'), str(ss))
 
     def test_where_clause_rendering(self):
-        ss = SelectStatement('table', None)
+        ss = SelectStatement('table')
         ss.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
-        self.assertEqual(unicode(ss), 'SELECT * FROM table WHERE "a" = b', unicode(ss))
+        self.assertEqual(unicode(ss), 'SELECT * FROM table WHERE "a" = :0', unicode(ss))
+
+    def test_count(self):
+        ss = SelectStatement('table', count=True)
+        ss.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
+        self.assertEqual(unicode(ss), 'SELECT COUNT(*) FROM table WHERE "a" = :0', unicode(ss))
 
     def test_context(self):
-        ss = SelectStatement('table', None)
+        ss = SelectStatement('table')
         ss.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
         self.assertEqual(ss.get_context(), {0: 'b'})
 
@@ -49,6 +54,4 @@ class SelectStatementTests(TestCase):
         self.assertIn('LIMIT 15', qstr)
         self.assertIn('ORDER BY x, y', qstr)
         self.assertIn('ALLOW FILTERING', qstr)
-
-        self.fail("Implement ttl and consistency")
 
