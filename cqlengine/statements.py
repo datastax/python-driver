@@ -10,12 +10,26 @@ class BaseClause(object):
         self.field = field
         self.operator = operator
         self.value = value
+        self.context_id = None
 
     def __unicode__(self):
-        return u'"{}" {} {}'.format(self.field, self.operator, self.value)
+        return u'"{}" {} {}'.format(self.field, self.operator, self.context_id)
 
     def __str__(self):
         return str(unicode(self))
+
+    def get_context_size(self):
+        """ returns the number of entries this clause will add to the query context """
+        return 1
+
+    def set_context_id(self, i):
+        """ sets the value placeholder that will be used in the query """
+        self.context_id = i
+
+    def update_context(self, ctx):
+        """ updates the query context with this clauses values """
+        assert isinstance(ctx, dict)
+        ctx[self.context_id] = self.value
 
 
 class WhereClause(BaseClause):
@@ -47,11 +61,17 @@ class BaseCQLStatement(object):
         super(BaseCQLStatement, self).__init__()
         self.table = table
         self.consistency = consistency
-        self.where_clauses = where or []
+        self.context_counter = 0
+
+        self.where_clauses = []
+        for clause in where or []:
+            self.add_where_clause(clause)
 
     def add_where_clause(self, clause):
         if not isinstance(clause, WhereClause):
             raise StatementException("only instances of WhereClause can be added to statements")
+        clause.set_context_id(self.context_counter)
+        self.context_counter += clause.get_context_size()
         self.where_clauses.append(clause)
 
     def __str__(self):
@@ -131,11 +151,17 @@ class AssignmentStatement(DMLStatement):
             where=where,
             ttl=ttl
         )
-        self.assignments = assignments or []
+
+        # add assignments
+        self.assignments = []
+        for assignment in assignments or []:
+            self.add_assignment_clause(assignment)
 
     def add_assignment_clause(self, clause):
         if not isinstance(clause, AssignmentClause):
             raise StatementException("only instances of AssignmentClause can be added to statements")
+        clause.set_context_id(self.context_counter)
+        self.context_counter += clause.get_context_size()
         self.assignments.append(clause)
 
 
