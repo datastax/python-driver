@@ -100,7 +100,7 @@ class ConsistencyDescriptor(object):
     def __get__(self, instance, model):
         if instance:
             def consistency_setter(consistency):
-                instance._consistency = consistency
+                instance.__consistency__ = consistency
                 return instance
             return consistency_setter
 
@@ -416,7 +416,10 @@ class BaseModel(object):
 
         is_new = self.pk is None
         self.validate()
-        self.__dmlquery__(self.__class__, self, batch=self._batch, ttl=self._ttl).save()
+        self.__dmlquery__(self.__class__, self,
+                          batch=self._batch,
+                          ttl=self._ttl,
+                          consistency=self.__consistency__).save()
 
         #reset the value managers
         for v in self._values.values():
@@ -450,7 +453,7 @@ class BaseModel(object):
         self.__dmlquery__(self.__class__, self,
                           batch=self._batch,
                           ttl=self._ttl,
-                          consistency=self.consistency).update()
+                          consistency=self.__consistency__).update()
 
         #reset the value managers
         for v in self._values.values():

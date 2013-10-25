@@ -28,8 +28,9 @@ class BaseConsistencyTest(BaseCassEngTestCase):
 class TestConsistency(BaseConsistencyTest):
     def test_create_uses_consistency(self):
 
+        qs = TestConsistencyModel.consistency(ALL)
         with mock.patch.object(ConnectionPool, 'execute') as m:
-            TestConsistencyModel.consistency(ALL).create(text="i am not fault tolerant this way")
+            qs.create(text="i am not fault tolerant this way")
 
         args = m.call_args
         self.assertEqual(ALL, args[0][2])
@@ -37,5 +38,15 @@ class TestConsistency(BaseConsistencyTest):
     def test_queryset_is_returned_on_create(self):
         qs = TestConsistencyModel.consistency(ALL)
         self.assertTrue(isinstance(qs, TestConsistencyModel.__queryset__), type(qs))
+
+    def test_update_uses_consistency(self):
+        t = TestConsistencyModel.create(text="bacon and eggs")
+        t.text = "ham sandwich"
+
+        with mock.patch.object(ConnectionPool, 'execute') as m:
+            t.consistency(ALL).save()
+            
+        args = m.call_args
+        self.assertEqual(ALL, args[0][2])
 
 
