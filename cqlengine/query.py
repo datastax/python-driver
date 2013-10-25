@@ -181,22 +181,22 @@ class AbstractQueryableColumn(object):
 
         used in where you'd typically want to use python's `in` operator
         """
-        return InOperator(self._get_column(), item)
+        return statements.WhereClause(self._get_column(), operators.InOperator(), item)
 
     def __eq__(self, other):
-        return EqualsOperator(self._get_column(), other)
+        return statements.WhereClause(self._get_column(), operators.EqualsOperator(), other)
 
     def __gt__(self, other):
-        return GreaterThanOperator(self._get_column(), other)
+        return statements.WhereClause(self._get_column(), operators.GreaterThanOperator(), other)
 
     def __ge__(self, other):
-        return GreaterThanOrEqualOperator(self._get_column(), other)
+        return statements.WhereClause(self._get_column(), operators.GreaterThanOrEqualOperator(), other)
 
     def __lt__(self, other):
-        return LessThanOperator(self._get_column(), other)
+        return statements.WhereClause(self._get_column(), operators.LessThanOperator(), other)
 
     def __le__(self, other):
-        return LessThanOrEqualOperator(self._get_column(), other)
+        return statements.WhereClause(self._get_column(), operators.LessThanOrEqualOperator(), other)
 
 
 class BatchType(object):
