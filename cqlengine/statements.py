@@ -53,6 +53,9 @@ class AssignmentClause(BaseClause):
             )
         super(AssignmentClause, self).__init__(field, operator, value)
 
+    def insert_tuple(self):
+        return self.field, self.context_id
+
 
 class BaseCQLStatement(object):
     """ The base cql statement class """
@@ -178,6 +181,19 @@ class InsertStatement(AssignmentStatement):
 
     def add_where_clause(self, clause):
         raise StatementException("Cannot add where clauses to insert statements")
+
+    def __unicode__(self):
+        qs = ['INSERT INTO {}'.format(self.table)]
+
+        # get column names and context placeholders
+        fields = [a.insert_tuple() for a in self.assignments]
+        columns, values = zip(*fields)
+
+        qs += ["({})".format(', '.join(['"{}"'.format(c) for c in columns]))]
+        qs += ['VALUES']
+        qs += ["({})".format(', '.join([':{}'.format(v) for v in values]))]
+
+        return ' '.join(qs)
 
 
 class UpdateStatement(AssignmentStatement):
