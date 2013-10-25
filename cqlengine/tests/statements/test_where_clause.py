@@ -13,5 +13,6 @@ class TestWhereClause(TestCase):
     def test_where_clause_rendering(self):
         """ tests that where clauses are rendered properly """
         wc = WhereClause('a', EqualsOperator(), 'c')
-        self.assertEqual('"a" = c', unicode(wc))
-        self.assertEqual('"a" = c', str(wc))
+        wc.set_context_id(5)
+        self.assertEqual('"a" = :5', unicode(wc))
+        self.assertEqual('"a" = :5', str(wc))

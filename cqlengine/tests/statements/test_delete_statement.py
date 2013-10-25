@@ -30,7 +30,7 @@ class DeleteStatementTests(TestCase):
     def test_where_clause_rendering(self):
         ds = DeleteStatement('table', None)
         ds.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
-        self.assertEqual(unicode(ds), 'DELETE * FROM table WHERE "a" = 0', unicode(ds))
+        self.assertEqual(unicode(ds), 'DELETE * FROM table WHERE "a" = :0', unicode(ds))
 
     def test_context(self):
         ds = DeleteStatement('table', None)
