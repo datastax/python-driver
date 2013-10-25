@@ -80,7 +80,7 @@ class SelectStatement(BaseCQLStatement):
             where=where
         )
 
-        self.fields = [fields] if isinstance(fields, basestring) else fields
+        self.fields = [fields] if isinstance(fields, basestring) else (fields or [])
         self.order_by = [order_by] if isinstance(order_by, basestring) else order_by
         self.limit = limit
         self.allow_filtering = allow_filtering
@@ -157,9 +157,26 @@ class InsertStatement(AssignmentStatement):
 class UpdateStatement(AssignmentStatement):
     """ an cql update select statement """
 
-    def __init__(self, table, consistency=None, where=None):
-        super(UpdateStatement, self).__init__(table, consistency, where)
+    def __init__(self, table, assignments, consistency=None, where=None, ttl=None):
+        super(UpdateStatement, self).__init__(
+            table,
+            assignments,
+            consistency=consistency,
+            where=where,
+            ttl=ttl
+        )
 
 
 class DeleteStatement(DMLStatement):
     """ a cql delete statement """
+
+    def __init__(self, table, fields, consistency=None, where=None, ttl=None):
+        super(DeleteStatement, self).__init__(
+            table,
+            consistency=consistency,
+            where=where,
+            ttl=ttl
+        )
+        self.fields = [fields] if isinstance(fields, basestring) else (fields or [])
+
+
