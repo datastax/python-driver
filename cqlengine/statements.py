@@ -31,7 +31,7 @@ class BaseCQLStatement(object):
     def __init__(self, table, consistency=None):
         super(BaseCQLStatement, self).__init__()
         self.table = table
-        self.consistency = None
+        self.consistency = consistency
         self.where_clauses = []
 
 
@@ -43,6 +43,11 @@ class SelectStatement(BaseCQLStatement):
         if isinstance(fields, basestring):
             fields = [fields]
         self.fields = fields
+
+    def __unicode__(self):
+        qs = ['SELECT']
+        qs += [', '.join(self.fields) if self.fields else '*']
+        return ' '.join(qs)
 
 
 class DMLStatement(BaseCQLStatement):
