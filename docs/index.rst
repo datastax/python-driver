@@ -96,8 +96,6 @@ Getting Started
 
 `Users Mailing List <https://groups.google.com/forum/?fromgroups#!forum/cqlengine-users>`_
 
-`Dev Mailing List <https://groups.google.com/forum/?fromgroups#!forum/cqlengine-dev>`_
-
 
 Indices and tables
 ==================
