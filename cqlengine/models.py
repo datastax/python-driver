@@ -69,6 +69,7 @@ class QuerySetDescriptor(object):
         """
         raise NotImplementedError
 
+
 class TTLDescriptor(object):
     """
     returns a query set descriptor
