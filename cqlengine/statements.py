@@ -164,13 +164,13 @@ class AssignmentStatement(DMLStatement):
 class InsertStatement(AssignmentStatement):
     """ an cql insert select statement """
 
-    def __init__(self, table, values, consistency=None):
+    def __init__(self, table, assignments, consistency=None):
         super(InsertStatement, self).__init__(
             table,
+            assignments,
             consistency=consistency,
             where=None
         )
-        self.values = values
 
     def add_where_clause(self, clause):
         raise StatementException("Cannot add where clauses to insert statements")

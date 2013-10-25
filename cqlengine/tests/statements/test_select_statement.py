@@ -44,3 +44,6 @@ class SelectStatementTests(TestCase):
         self.assertIn('LIMIT 15', qstr)
         self.assertIn('ORDER BY x, y', qstr)
         self.assertIn('ALLOW FILTERING', qstr)
+
+        self.fail("Implement ttl and consistency")
+
