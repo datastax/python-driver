@@ -51,6 +51,17 @@ class TestSetColumn(BaseCassEngTestCase):
         m.int_set.add(5)
         m.save()
 
+    def test_deleting_last_item_should_succeed(self):
+        m = TestSetModel.create()
+        m.int_set.add(5)
+        m.save()
+        m.int_set.remove(5)
+        m.save()
+
+        m = TestSetModel.get(partition=m.partition)
+        self.assertNotIn(5, m.int_set)
+
+
     def test_empty_set_retrieval(self):
         m = TestSetModel.create()
         m2 = TestSetModel.get(partition=m.partition)
