@@ -343,6 +343,18 @@ class TestMapColumn(BaseCassEngTestCase):
         tmp2 = TestMapModel.get(partition=tmp.partition)
         tmp2.int_map['blah'] = 1
 
+    def test_remove_last_entry_works(self):
+        tmp = TestMapModel.create()
+        tmp.text_map["blah"] = datetime.now()
+        tmp.save()
+        del tmp.text_map["blah"]
+        tmp.save()
+
+        tmp = TestMapModel.get(partition=tmp.partition)
+        self.assertNotIn("blah", tmp.int_map)
+
+
+
     def test_io_success(self):
         """ Tests that a basic usage works as expected """
         k1 = uuid4()
