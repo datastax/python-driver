@@ -28,7 +28,7 @@ class BaseClause(object):
     def update_context(self, ctx):
         """ updates the query context with this clauses values """
         assert isinstance(ctx, dict)
-        ctx[self.context_id] = self.value
+        ctx[str(self.context_id)] = self.value
 
 
 class WhereClause(BaseClause):

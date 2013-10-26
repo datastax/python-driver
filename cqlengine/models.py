@@ -129,7 +129,11 @@ class ColumnQueryEvaluator(AbstractQueryableColumn):
     def __init__(self, column):
         self.column = column
 
+    def __unicode__(self):
+        return self.column.db_field_name
+
     def _get_column(self):
+        """ :rtype: ColumnQueryEvaluator """
         return self.column
 
 

@@ -175,28 +175,34 @@ class AbstractQueryableColumn(object):
     def _get_column(self):
         raise NotImplementedError
 
+    def __unicode__(self):
+        raise NotImplementedError
+
+    def __str__(self):
+        return str(unicode(self))
+
     def in_(self, item):
         """
         Returns an in operator
 
         used in where you'd typically want to use python's `in` operator
         """
-        return statements.WhereClause(self._get_column(), operators.InOperator(), item)
+        return statements.WhereClause(unicode(self), operators.InOperator(), item)
 
     def __eq__(self, other):
-        return statements.WhereClause(self._get_column(), operators.EqualsOperator(), other)
+        return statements.WhereClause(unicode(self), operators.EqualsOperator(), other)
 
     def __gt__(self, other):
-        return statements.WhereClause(self._get_column(), operators.GreaterThanOperator(), other)
+        return statements.WhereClause(unicode(self), operators.GreaterThanOperator(), other)
 
     def __ge__(self, other):
-        return statements.WhereClause(self._get_column(), operators.GreaterThanOrEqualOperator(), other)
+        return statements.WhereClause(unicode(self), operators.GreaterThanOrEqualOperator(), other)
 
     def __lt__(self, other):
-        return statements.WhereClause(self._get_column(), operators.LessThanOperator(), other)
+        return statements.WhereClause(unicode(self), operators.LessThanOperator(), other)
 
     def __le__(self, other):
-        return statements.WhereClause(self._get_column(), operators.LessThanOrEqualOperator(), other)
+        return statements.WhereClause(unicode(self), operators.LessThanOrEqualOperator(), other)
 
 
 class BatchType(object):
