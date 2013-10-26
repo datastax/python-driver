@@ -15,7 +15,7 @@ class BaseClause(object):
         raise NotImplementedError
 
     def __str__(self):
-        return str(unicode(self))
+        return unicode(self).encode('utf-8')
 
     def get_context_size(self):
         """ returns the number of entries this clause will add to the query context """
@@ -95,7 +95,7 @@ class BaseCQLStatement(object):
         raise NotImplementedError
 
     def __str__(self):
-        return str(unicode(self))
+        return unicode(self).encode('utf-8')
 
     @property
     def _where(self):

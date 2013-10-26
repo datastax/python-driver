@@ -15,7 +15,7 @@ class BaseQueryOperator(object):
         return self.cql_symbol
 
     def __str__(self):
-        return str(unicode(self))
+        return unicode(self).encode('utf-8')
 
     @classmethod
     def get_operator(cls, symbol):
