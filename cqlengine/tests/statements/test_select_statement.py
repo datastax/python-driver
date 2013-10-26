@@ -33,9 +33,11 @@ class SelectStatementTests(TestCase):
         self.assertEqual(unicode(ss), 'SELECT * FROM table WHERE "a" = :0', unicode(ss))
 
     def test_count(self):
-        ss = SelectStatement('table', count=True)
+        ss = SelectStatement('table', count=True, limit=10, order_by='d')
         ss.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
         self.assertEqual(unicode(ss), 'SELECT COUNT(*) FROM table WHERE "a" = :0', unicode(ss))
+        self.assertNotIn('LIMIT', unicode(ss))
+        self.assertNotIn('ORDER', unicode(ss))
 
     def test_context(self):
         ss = SelectStatement('table')

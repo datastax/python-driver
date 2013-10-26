@@ -138,10 +138,10 @@ class SelectStatement(BaseCQLStatement):
         if self.where_clauses:
             qs += [self._where]
 
-        if self.order_by:
+        if self.order_by and not self.count:
             qs += ['ORDER BY {}'.format(', '.join(unicode(o) for o in self.order_by))]
 
-        if self.limit:
+        if self.limit and not self.count:
             qs += ['LIMIT {}'.format(self.limit)]
 
         if self.allow_filtering:
