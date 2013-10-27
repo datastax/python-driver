@@ -12,159 +12,161 @@ from cqlengine.connection import connection_manager, execute, RowResult
 from cqlengine.exceptions import CQLEngineException, ValidationError
 from cqlengine.functions import QueryValue, Token
 
-from cqlengine import statements, operators
-
 #CQL 3 reference:
 #http://www.datastax.com/docs/1.1/references/cql/index
+from cqlengine.operators import InOperator, EqualsOperator, GreaterThanOperator, GreaterThanOrEqualOperator
+from cqlengine.operators import LessThanOperator, LessThanOrEqualOperator, BaseWhereOperator
+from cqlengine.statements import WhereClause, SelectStatement
+
 
 class QueryException(CQLEngineException): pass
 class DoesNotExist(QueryException): pass
 class MultipleObjectsReturned(QueryException): pass
 
 
-class QueryOperatorException(QueryException): pass
-
-
-class QueryOperator(object):
-    # The symbol that identifies this operator in filter kwargs
-    # ie: colname__<symbol>
-    symbol = None
-
-    # The comparator symbol this operator uses in cql
-    cql_symbol = None
-
-    QUERY_VALUE_WRAPPER = QueryValue
-
-    def __init__(self, column, value):
-        self.column = column
-        self.value = value
-
-        if isinstance(value, QueryValue):
-            self.query_value = value
-        else:
-            self.query_value = self.QUERY_VALUE_WRAPPER(value)
-
-        #perform validation on this operator
-        self.validate_operator()
-        self.validate_value()
-
-    @property
-    def cql(self):
-        """
-        Returns this operator's portion of the WHERE clause
-        """
-        return '{} {} {}'.format(self.column.cql, self.cql_symbol, self.query_value.cql)
-
-    def validate_operator(self):
-        """
-        Checks that this operator can be used on the column provided
-        """
-        if self.symbol is None:
-            raise QueryOperatorException(
-                    "{} is not a valid operator, use one with 'symbol' defined".format(
-                        self.__class__.__name__
-                    )
-                )
-        if self.cql_symbol is None:
-            raise QueryOperatorException(
-                    "{} is not a valid operator, use one with 'cql_symbol' defined".format(
-                        self.__class__.__name__
-                    )
-                )
-
-    def validate_value(self):
-        """
-        Checks that the compare value works with this operator
-
-        Doesn't do anything by default
-        """
-        pass
-
-    def get_dict(self):
-        """
-        Returns this operators contribution to the cql.query arg dictionanry
-
-        ie: if this column's name is colname, and the identifier is colval,
-        this should return the dict: {'colval':<self.value>}
-        SELECT * FROM column_family WHERE colname=:colval
-        """
-        return self.query_value.get_dict(self.column)
-
-    @classmethod
-    def get_operator(cls, symbol):
-        if not hasattr(cls, 'opmap'):
-            QueryOperator.opmap = {}
-            def _recurse(klass):
-                if klass.symbol:
-                    QueryOperator.opmap[klass.symbol.upper()] = klass
-                for subklass in klass.__subclasses__():
-                    _recurse(subklass)
-                pass
-            _recurse(QueryOperator)
-        try:
-            return QueryOperator.opmap[symbol.upper()]
-        except KeyError:
-            raise QueryOperatorException("{} doesn't map to a QueryOperator".format(symbol))
-
-    # equality operator, used by tests
-
-    def __eq__(self, op):
-        return self.__class__ is op.__class__ and \
-                self.column.db_field_name == op.column.db_field_name and \
-                self.value == op.value
-
-    def __ne__(self, op):
-        return not (self == op)
-
-    def __hash__(self):
-        return hash(self.column.db_field_name) ^ hash(self.value)
-
-
-class EqualsOperator(QueryOperator):
-    symbol = 'EQ'
-    cql_symbol = '='
-
-
-class IterableQueryValue(QueryValue):
-    def __init__(self, value):
-        try:
-            super(IterableQueryValue, self).__init__(value, [uuid4().hex for i in value])
-        except TypeError:
-            raise QueryException("in operator arguments must be iterable, {} found".format(value))
-
-    def get_dict(self, column):
-        return dict((i, column.to_database(v)) for (i, v) in zip(self.identifier, self.value))
-
-    def get_cql(self):
-        return '({})'.format(', '.join(':{}'.format(i) for i in self.identifier))
-
-
-class InOperator(EqualsOperator):
-    symbol = 'IN'
-    cql_symbol = 'IN'
-
-    QUERY_VALUE_WRAPPER = IterableQueryValue
-
-
-class GreaterThanOperator(QueryOperator):
-    symbol = "GT"
-    cql_symbol = '>'
-
-
-class GreaterThanOrEqualOperator(QueryOperator):
-    symbol = "GTE"
-    cql_symbol = '>='
-
-
-class LessThanOperator(QueryOperator):
-    symbol = "LT"
-    cql_symbol = '<'
-
-
-class LessThanOrEqualOperator(QueryOperator):
-    symbol = "LTE"
-    cql_symbol = '<='
-
+# class QueryOperatorException(QueryException): pass
+#
+#
+# class QueryOperator(object):
+#     # The symbol that identifies this operator in filter kwargs
+#     # ie: colname__<symbol>
+#     symbol = None
+#
+#     # The comparator symbol this operator uses in cql
+#     cql_symbol = None
+#
+#     QUERY_VALUE_WRAPPER = QueryValue
+#
+#     def __init__(self, column, value):
+#         self.column = column
+#         self.value = value
+#
+#         if isinstance(value, QueryValue):
+#             self.query_value = value
+#         else:
+#             self.query_value = self.QUERY_VALUE_WRAPPER(value)
+#
+#         #perform validation on this operator
+#         self.validate_operator()
+#         self.validate_value()
+#
+#     @property
+#     def cql(self):
+#         """
+#         Returns this operator's portion of the WHERE clause
+#         """
+#         return '{} {} {}'.format(self.column.cql, self.cql_symbol, self.query_value.cql)
+#
+#     def validate_operator(self):
+#         """
+#         Checks that this operator can be used on the column provided
+#         """
+#         if self.symbol is None:
+#             raise QueryOperatorException(
+#                     "{} is not a valid operator, use one with 'symbol' defined".format(
+#                         self.__class__.__name__
+#                     )
+#                 )
+#         if self.cql_symbol is None:
+#             raise QueryOperatorException(
+#                     "{} is not a valid operator, use one with 'cql_symbol' defined".format(
+#                         self.__class__.__name__
+#                     )
+#                 )
+#
+#     def validate_value(self):
+#         """
+#         Checks that the compare value works with this operator
+#
+#         Doesn't do anything by default
+#         """
+#         pass
+#
+#     def get_dict(self):
+#         """
+#         Returns this operators contribution to the cql.query arg dictionanry
+#
+#         ie: if this column's name is colname, and the identifier is colval,
+#         this should return the dict: {'colval':<self.value>}
+#         SELECT * FROM column_family WHERE colname=:colval
+#         """
+#         return self.query_value.get_dict(self.column)
+#
+#     @classmethod
+#     def get_operator(cls, symbol):
+#         if not hasattr(cls, 'opmap'):
+#             QueryOperator.opmap = {}
+#             def _recurse(klass):
+#                 if klass.symbol:
+#                     QueryOperator.opmap[klass.symbol.upper()] = klass
+#                 for subklass in klass.__subclasses__():
+#                     _recurse(subklass)
+#                 pass
+#             _recurse(QueryOperator)
+#         try:
+#             return QueryOperator.opmap[symbol.upper()]
+#         except KeyError:
+#             raise QueryOperatorException("{} doesn't map to a QueryOperator".format(symbol))
+#
+#     # equality operator, used by tests
+#
+#     def __eq__(self, op):
+#         return self.__class__ is op.__class__ and \
+#                 self.column.db_field_name == op.column.db_field_name and \
+#                 self.value == op.value
+#
+#     def __ne__(self, op):
+#         return not (self == op)
+#
+#     def __hash__(self):
+#         return hash(self.column.db_field_name) ^ hash(self.value)
+#
+#
+# class EqualsOperator(QueryOperator):
+#     symbol = 'EQ'
+#     cql_symbol = '='
+#
+#
+# class IterableQueryValue(QueryValue):
+#     def __init__(self, value):
+#         try:
+#             super(IterableQueryValue, self).__init__(value, [uuid4().hex for i in value])
+#         except TypeError:
+#             raise QueryException("in operator arguments must be iterable, {} found".format(value))
+#
+#     def get_dict(self, column):
+#         return dict((i, column.to_database(v)) for (i, v) in zip(self.identifier, self.value))
+#
+#     def get_cql(self):
+#         return '({})'.format(', '.join(':{}'.format(i) for i in self.identifier))
+#
+#
+# class InOperator(EqualsOperator):
+#     symbol = 'IN'
+#     cql_symbol = 'IN'
+#
+#     QUERY_VALUE_WRAPPER = IterableQueryValue
+#
+#
+# class GreaterThanOperator(QueryOperator):
+#     symbol = "GT"
+#     cql_symbol = '>'
+#
+#
+# class GreaterThanOrEqualOperator(QueryOperator):
+#     symbol = "GTE"
+#     cql_symbol = '>='
+#
+#
+# class LessThanOperator(QueryOperator):
+#     symbol = "LT"
+#     cql_symbol = '<'
+#
+#
+# class LessThanOrEqualOperator(QueryOperator):
+#     symbol = "LTE"
+#     cql_symbol = '<='
+#
 
 class AbstractQueryableColumn(object):
     """
@@ -187,22 +189,22 @@ class AbstractQueryableColumn(object):
 
         used in where you'd typically want to use python's `in` operator
         """
-        return statements.WhereClause(unicode(self), operators.InOperator(), item)
+        return WhereClause(unicode(self), InOperator(), item)
 
     def __eq__(self, other):
-        return statements.WhereClause(unicode(self), operators.EqualsOperator(), other)
+        return WhereClause(unicode(self), EqualsOperator(), other)
 
     def __gt__(self, other):
-        return statements.WhereClause(unicode(self), operators.GreaterThanOperator(), other)
+        return WhereClause(unicode(self), GreaterThanOperator(), other)
 
     def __ge__(self, other):
-        return statements.WhereClause(unicode(self), operators.GreaterThanOrEqualOperator(), other)
+        return WhereClause(unicode(self), GreaterThanOrEqualOperator(), other)
 
     def __lt__(self, other):
-        return statements.WhereClause(unicode(self), operators.LessThanOperator(), other)
+        return WhereClause(unicode(self), LessThanOperator(), other)
 
     def __le__(self, other):
-        return statements.WhereClause(unicode(self), operators.LessThanOrEqualOperator(), other)
+        return WhereClause(unicode(self), LessThanOrEqualOperator(), other)
 
 
 class BatchType(object):
@@ -342,7 +344,7 @@ class AbstractQuerySet(object):
         """
         Returns a select clause based on the given filter args
         """
-        return statements.SelectStatement(
+        return SelectStatement(
             self.column_family_name,
             fields=self._select_fields(),
             where=self._where,
@@ -467,7 +469,7 @@ class AbstractQuerySet(object):
         #add arguments to the where clause filters
         clone = copy.deepcopy(self)
         for operator in args:
-            if not isinstance(operator, statements.WhereClause):
+            if not isinstance(operator, WhereClause):
                 raise QueryException('{} is not a valid query operator'.format(operator))
             clone._where.append(operator)
 
@@ -483,10 +485,10 @@ class AbstractQuerySet(object):
                     raise QueryException("Can't resolve column name: '{}'".format(col_name))
 
             #get query operator, or use equals if not supplied
-            operator_class = operators.BaseWhereOperator.get_operator(col_op or 'EQ')
+            operator_class = BaseWhereOperator.get_operator(col_op or 'EQ')
             operator = operator_class()
 
-            clone._where.append(statements.WhereClause(col_name, operator, val))
+            clone._where.append(WhereClause(col_name, operator, val))
 
         return clone
 
