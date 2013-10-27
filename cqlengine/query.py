@@ -540,7 +540,6 @@ class AbstractQuerySet(object):
         if self._batch:
             raise CQLEngineException("Only inserts, updates, and deletes are available in batch mode")
 
-        #TODO: check for previous query execution and return row count if it exists
         if self._result_cache is None:
             query = self._select_query()
             query.count = True

@@ -50,6 +50,14 @@ class BaseClause(object):
     def __str__(self):
         return unicode(self).encode('utf-8')
 
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self.field == other.field and self.value == other.value
+        return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     def get_context_size(self):
         """ returns the number of entries this clause will add to the query context """
         return 1
@@ -77,6 +85,11 @@ class WhereClause(BaseClause):
 
     def __unicode__(self):
         return u'"{}" {} :{}'.format(self.field, self.operator, self.context_id)
+
+    def __eq__(self, other):
+        if super(WhereClause, self).__eq__(other):
+            return self.operator.__class__ == other.operator.__class__
+        return False
 
     def update_context(self, ctx):
         if isinstance(self.operator, InOperator):

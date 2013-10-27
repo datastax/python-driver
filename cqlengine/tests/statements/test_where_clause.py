@@ -16,3 +16,9 @@ class TestWhereClause(TestCase):
         wc.set_context_id(5)
         self.assertEqual('"a" = :5', unicode(wc))
         self.assertEqual('"a" = :5', str(wc))
+
+    def test_equality_method(self):
+        """ tests that 2 identical where clauses evaluate as == """
+        wc1 = WhereClause('a', EqualsOperator(), 'c')
+        wc2 = WhereClause('a', EqualsOperator(), 'c')
+        assert wc1 == wc2
