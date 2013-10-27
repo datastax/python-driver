@@ -539,18 +539,12 @@ class AbstractQuerySet(object):
         """ Returns the number of rows matched by this query """
         if self._batch:
             raise CQLEngineException("Only inserts, updates, and deletes are available in batch mode")
+
         #TODO: check for previous query execution and return row count if it exists
         if self._result_cache is None:
-            qs = ['SELECT COUNT(*)']
-            qs += ['FROM {}'.format(self.column_family_name)]
-            if self._where:
-                qs += ['WHERE {}'.format(self._where_clause())]
-            if self._allow_filtering:
-                qs += ['ALLOW FILTERING']
-
-            qs = ' '.join(qs)
-
-            _, result = execute(qs, self._where_values())
+            query = self._select_query()
+            query.count = True
+            _, result = execute(str(query), query.get_context())
             return result[0][0]
         else:
             return len(self._result_cache)
