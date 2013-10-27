@@ -1,7 +1,40 @@
-from cqlengine.operators import BaseWhereOperator, BaseAssignmentOperator
+from cqlengine.operators import BaseWhereOperator, InOperator
 
 
 class StatementException(Exception): pass
+
+
+class ValueQuoter(object):
+
+    def __init__(self, value):
+        self.value = value
+
+    def __unicode__(self):
+        from cql.query import cql_quote
+        if isinstance(self.value, bool):
+            return 'true' if self.value else 'false'
+        elif isinstance(self.value, (list, tuple)):
+            return '[' + ', '.join([cql_quote(v) for v in self.value]) + ']'
+        elif isinstance(self.value, dict):
+            return '{' + ', '.join([cql_quote(k) + ':' + cql_quote(v) for k,v in self.value.items()]) + '}'
+        elif isinstance(self.value, set):
+            return '{' + ', '.join([cql_quote(v) for v in self.value]) + '}'
+        return cql_quote(self.value)
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self.value == other.value
+        return False
+
+    def __str__(self):
+        return unicode(self).encode('utf-8')
+
+
+class InQuoter(ValueQuoter):
+
+    def __unicode__(self):
+        from cql.query import cql_quote
+        return '(' + ', '.join([cql_quote(v) for v in self.value]) + ')'
 
 
 class BaseClause(object):
@@ -28,7 +61,7 @@ class BaseClause(object):
     def update_context(self, ctx):
         """ updates the query context with this clauses values """
         assert isinstance(ctx, dict)
-        ctx[str(self.context_id)] = self.value
+        ctx[str(self.context_id)] = ValueQuoter(self.value)
 
 
 class WhereClause(BaseClause):
@@ -44,6 +77,12 @@ class WhereClause(BaseClause):
 
     def __unicode__(self):
         return u'"{}" {} :{}'.format(self.field, self.operator, self.context_id)
+
+    def update_context(self, ctx):
+        if isinstance(self.operator, InOperator):
+            ctx[str(self.context_id)] = InQuoter(self.value)
+        else:
+            super(WhereClause, self).update_context(ctx)
 
 
 class AssignmentClause(BaseClause):
