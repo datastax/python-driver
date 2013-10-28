@@ -340,14 +340,15 @@ class AbstractQuerySet(object):
         """ returns the fields to select """
         return []
 
-    def _validate_select(self):
+    def _validate_select_where(self):
         """ put select query validation here """
 
     def _select_query(self):
         """
         Returns a select clause based on the given filter args
         """
-        self._validate_select()
+        if self._where:
+            self._validate_select_where()
         return SelectStatement(
             self.column_family_name,
             fields=self._select_fields(),
@@ -656,10 +657,6 @@ class SimpleQuerySet(AbstractQuerySet):
 
     """
 
-    def _get_select_statement(self):
-        """ Returns the fields to be returned by the select query """
-        return 'SELECT *'
-
     def _get_result_constructor(self, names):
         """
         Returns a function that will be used to instantiate query results
@@ -673,8 +670,8 @@ class ModelQuerySet(AbstractQuerySet):
     """
 
     """
-    def _validate_select(self):
-        """ Checks that a filterset will not create invalid cql """
+    def _validate_select_where(self):
+        """ Checks that a filterset will not create invalid select statement """
         #check that there's either a = or IN relationship with a primary key or indexed field
         equal_ops = [self.model._columns.get(w.field) for w in self._where if isinstance(w.operator, EqualsOperator)]
         token_ops = [self.model._columns.get(w.field) for w in self._where if isinstance(w.operator, Token)]
@@ -688,20 +685,6 @@ class ModelQuerySet(AbstractQuerySet):
                     raise QueryException('Filtering on a clustering key without a partition key is not allowed unless allow_filtering() is called on the querset')
             if any(not w.partition_key for w in token_ops):
                 raise QueryException('The token() function is only supported on the partition key')
-
-    def _get_select_statement(self):
-        """ Returns the fields to be returned by the select query """
-        self._validate_select()
-        if self._defer_fields or self._only_fields:
-            fields = self.model._columns.keys()
-            if self._defer_fields:
-                fields = [f for f in fields if f not in self._defer_fields]
-            elif self._only_fields:
-                fields = self._only_fields
-            db_fields = [self.model._columns[f].db_field_name for f in fields]
-            return 'SELECT {}'.format(', '.join(['"{}"'.format(f) for f in db_fields]))
-        else:
-            return 'SELECT *'
 
     def _select_fields(self):
         if self._defer_fields or self._only_fields:
