@@ -50,6 +50,9 @@ class BaseClause(object):
     def __str__(self):
         return unicode(self).encode('utf-8')
 
+    def __hash__(self):
+        return hash(self.field) ^ hash(self.value)
+
     def __eq__(self, other):
         if isinstance(other, self.__class__):
             return self.field == other.field and self.value == other.value
@@ -85,6 +88,9 @@ class WhereClause(BaseClause):
 
     def __unicode__(self):
         return u'"{}" {} :{}'.format(self.field, self.operator, self.context_id)
+
+    def __hash__(self):
+        return super(WhereClause, self).__hash__() ^ hash(self.operator)
 
     def __eq__(self, other):
         if super(WhereClause, self).__eq__(other):

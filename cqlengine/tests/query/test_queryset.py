@@ -491,11 +491,11 @@ class TestQuerySetConnectionHandling(BaseQuerySetUsage):
         assert q._cur is None
 
 
-
 class TimeUUIDQueryModel(Model):
     partition       = columns.UUID(primary_key=True)
     time            = columns.TimeUUID(primary_key=True)
     data            = columns.Text(required=False)
+
 
 class TestMinMaxTimeUUIDFunctions(BaseCassEngTestCase):
 
