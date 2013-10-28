@@ -114,6 +114,69 @@ class AssignmentClause(BaseClause):
         return self.field, self.context_id
 
 
+class SetUpdateClause(AssignmentClause):
+    """ updates a set collection """
+
+    def __init__(self, field, value, previous=None):
+        super(SetUpdateClause, self).__init__(field, value)
+        self.previous = previous
+        self._assignments = None
+        self._additions = None
+        self._removals = None
+        self._analyzed = False
+
+    def __unicode__(self):
+        qs = []
+        ctx_id = self.context_id
+        if self._assignments:
+            qs += ['"{}" = :{}'.format(self.field, ctx_id)]
+            ctx_id += 1
+        if self._additions:
+            qs += ['"{0}" = "{0}" + :{1}'.format(self.field, ctx_id)]
+            ctx_id += 1
+        if self._removals:
+            qs += ['"{0}" = "{0}" - :{1}'.format(self.field, ctx_id)]
+
+        return ', '.join(qs)
+
+    def _analyze(self):
+        """ works out the updates to be performed """
+        if self.value is None or self.value == self.previous:
+            pass
+        elif self.previous is None or not any({v in self.previous for v in self.value}):
+            self._assignments = self.value
+        else:
+            # partial update time
+            self._additions = (self.value - self.previous) or None
+            self._removals = (self.previous - self.value) or None
+        self._analyzed = True
+
+    def get_context_size(self):
+        if not self._analyzed: self._analyze()
+        return int(bool(self._assignments)) + int(bool(self._additions)) + int(bool(self._removals))
+
+    def update_context(self, ctx):
+        if not self._analyzed: self._analyze()
+        ctx_id = self.context_id
+        if self._assignments:
+            ctx[str(ctx_id)] = self._assignments
+            ctx_id += 1
+        if self._additions:
+            ctx[str(ctx_id)] = self._additions
+            ctx_id += 1
+        if self._removals:
+            ctx[str(ctx_id)] = self._removals
+
+
+
+class ListUpdateClause(AssignmentClause):
+    """ updates a list collection """
+
+
+class MapUpdateClause(AssignmentClause):
+    """ updates a map collection """
+
+
 class BaseCQLStatement(object):
     """ The base cql statement class """
 

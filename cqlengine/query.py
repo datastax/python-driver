@@ -16,7 +16,7 @@ from cqlengine.functions import QueryValue, Token
 #http://www.datastax.com/docs/1.1/references/cql/index
 from cqlengine.operators import InOperator, EqualsOperator, GreaterThanOperator, GreaterThanOrEqualOperator
 from cqlengine.operators import LessThanOperator, LessThanOrEqualOperator, BaseWhereOperator
-from cqlengine.statements import WhereClause, SelectStatement, DeleteStatement
+from cqlengine.statements import WhereClause, SelectStatement, DeleteStatement, UpdateStatement
 
 
 class QueryException(CQLEngineException): pass
@@ -795,7 +795,10 @@ class ModelQuerySet(AbstractQuerySet):
                 ttl_stmt
             )
             ctx.update(self._where_values())
-            execute(qs, ctx, self._consistency)
+            if self._batch:
+                self._batch.add_query(qs, ctx)
+            else:
+                execute(qs, ctx, self._consistency)
 
         if nulled_columns:
             qs = "DELETE {} FROM {} WHERE {}".format(
@@ -803,7 +806,10 @@ class ModelQuerySet(AbstractQuerySet):
                 self.column_family_name,
                 self._where_clause()
             )
-            execute(qs, self._where_values(), self._consistency)
+            if self._batch:
+                self._batch.add_query(qs, self._where_values())
+            else:
+                execute(qs, self._where_values(), self._consistency)
 
 
 class DMLQuery(object):
