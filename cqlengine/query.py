@@ -16,7 +16,7 @@ from cqlengine.functions import QueryValue, Token
 #http://www.datastax.com/docs/1.1/references/cql/index
 from cqlengine.operators import InOperator, EqualsOperator, GreaterThanOperator, GreaterThanOrEqualOperator
 from cqlengine.operators import LessThanOperator, LessThanOrEqualOperator, BaseWhereOperator
-from cqlengine.statements import WhereClause, SelectStatement
+from cqlengine.statements import WhereClause, SelectStatement, DeleteStatement
 
 
 class QueryException(CQLEngineException): pass
@@ -613,23 +613,24 @@ class AbstractQuerySet(object):
     def create(self, **kwargs):
         return self.model(**kwargs).batch(self._batch).ttl(self._ttl).consistency(self._consistency).save()
 
-    #----delete---
-    def delete(self, columns=[]):
+    def delete(self):
         """
         Deletes the contents of a query
         """
         #validate where clause
         partition_key = self.model._primary_keys.values()[0]
-        if not any([c.column.db_field_name == partition_key.db_field_name for c in self._where]):
+        if not any([c.field == partition_key.column_name for c in self._where]):
             raise QueryException("The partition key must be defined on delete queries")
-        qs = ['DELETE FROM {}'.format(self.column_family_name)]
-        qs += ['WHERE {}'.format(self._where_clause())]
-        qs = ' '.join(qs)
+
+        dq = DeleteStatement(
+            self.column_family_name,
+            where=self._where
+        )
 
         if self._batch:
-            self._batch.add_query(qs, self._where_values())
+            self._batch.add_query(str(dq), dq.get_context())
         else:
-            execute(qs, self._where_values())
+            execute(str(dq), dq.get_context())
 
     def __eq__(self, q):
         if len(self._where) == len(q._where):
