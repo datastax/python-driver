@@ -301,7 +301,8 @@ class DeleteStatement(BaseCQLStatement):
 
     def __unicode__(self):
         qs = ['DELETE']
-        qs += [', '.join(['"{}"'.format(f) for f in self.fields]) if self.fields else '*']
+        if self.fields:
+            qs += [', '.join(['"{}"'.format(f) for f in self.fields])]
         qs += ['FROM', self.table]
 
         if self.where_clauses:
