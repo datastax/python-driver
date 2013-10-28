@@ -411,8 +411,14 @@ class TestMapColumn(BaseCassEngTestCase):
         m.int_map = expected
         m.save()
 
+
         m2 = TestMapModel.get(partition=m.partition)
         assert m2.int_map == expected
+
+        m2.int_map = None
+        m2.save()
+        m3 = TestMapModel.get(partition=m.partition)
+        assert m3.int_map != expected
 
     def test_updates_to_none(self):
         """ Tests that setting the field to None works as expected """
