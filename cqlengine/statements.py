@@ -192,6 +192,7 @@ class ListUpdateClause(ContainerUpdateClause):
         self._prepend = None
 
     def __unicode__(self):
+        if not self._analyzed: self._analyze()
         qs = []
         ctx_id = self.context_id
         if self._assignments:
@@ -275,6 +276,21 @@ class MapUpdateClause(ContainerUpdateClause):
     def __init__(self, field, value, previous=None):
         super(MapUpdateClause, self).__init__(field, value, previous)
 
+    def get_context_size(self):
+        if not self._analyzed:
+            self._analyze()
+        raise NotImplementedError('implement this')
+
+    def update_context(self, ctx):
+        if not self._analyzed:
+            self._analyze()
+        raise NotImplementedError('implement this')
+
+    def __unicode__(self):
+        if not self._analyzed:
+            self._analyze()
+        raise NotImplementedError('implement this')
+
 
 class BaseDeleteClause(BaseClause):
     pass
@@ -302,7 +318,26 @@ class MapDeleteClause(BaseDeleteClause):
     def __init__(self, field, value, previous=None):
         super(MapDeleteClause, self).__init__(field, value)
         self.previous = previous
-        self._analysed = False
+        self._analyzed = False
+        self._removals = None
+
+    def _analyze(self):
+        self._analyzed = True
+
+    def update_context(self, ctx):
+        if not self._analyzed:
+            self._analyze()
+        raise NotImplementedError('implement this')
+
+    def get_context_size(self):
+        if not self._analyzed:
+            self._analyze()
+        raise NotImplementedError('implement this')
+
+    def __unicode__(self):
+        if not self._analyzed:
+            self._analyze()
+        raise NotImplementedError('implement this')
 
 
 class BaseCQLStatement(object):

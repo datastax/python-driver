@@ -232,3 +232,13 @@ class ListUpdateClauseTests(TestCase):
         self.assertEqual(ctx, {'0': [1, 2, 3]})
 
 
+class MapUpdateTests(TestCase):
+    pass
+
+
+class MapDeleteTests(TestCase):
+    pass
+
+
+class FieldDeleteTests(TestCase):
+    pass
