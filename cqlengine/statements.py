@@ -114,16 +114,31 @@ class AssignmentClause(BaseClause):
         return self.field, self.context_id
 
 
-class SetUpdateClause(AssignmentClause):
+class ContainerUpdateClause(AssignmentClause):
+
+    def __init__(self, field, value, previous=None):
+        super(ContainerUpdateClause, self).__init__(field, value)
+        self.previous = previous
+        self._assignments = None
+        self._analyzed = False
+
+    def _analyze(self):
+        raise NotImplementedError
+
+    def get_context_size(self):
+        raise NotImplementedError
+
+    def update_context(self, ctx):
+        raise NotImplementedError
+
+
+class SetUpdateClause(ContainerUpdateClause):
     """ updates a set collection """
 
     def __init__(self, field, value, previous=None):
-        super(SetUpdateClause, self).__init__(field, value)
-        self.previous = previous
-        self._assignments = None
+        super(SetUpdateClause, self).__init__(field, value, previous)
         self._additions = None
         self._removals = None
-        self._analyzed = False
 
     def __unicode__(self):
         qs = []
@@ -168,12 +183,91 @@ class SetUpdateClause(AssignmentClause):
             ctx[str(ctx_id)] = self._removals
 
 
-
-class ListUpdateClause(AssignmentClause):
+class ListUpdateClause(ContainerUpdateClause):
     """ updates a list collection """
 
+    def __init__(self, field, value, previous=None):
+        super(ListUpdateClause, self).__init__(field, value, previous)
+        self._append = None
+        self._prepend = None
 
-class MapUpdateClause(AssignmentClause):
+    def __unicode__(self):
+        qs = []
+        ctx_id = self.context_id
+        if self._assignments:
+            qs += ['"{}" = :{}'.format(self.field, ctx_id)]
+            ctx_id += 1
+
+        if self._prepend:
+            qs += ['"{0}" = :{1} + "{0}"'.format(self.field, ctx_id)]
+            ctx_id += 1
+
+        if self._append:
+            qs += ['"{0}" = "{0}" + :{1}'.format(self.field, ctx_id)]
+
+        return ', '.join(qs)
+
+    def get_context_size(self):
+        if not self._analyzed: self._analyze()
+        return int(bool(self._assignments)) + int(bool(self._append)) + int(bool(self._prepend))
+
+    def update_context(self, ctx):
+        if not self._analyzed: self._analyze()
+        ctx_id = self.context_id
+        if self._assignments:
+            ctx[str(ctx_id)] = self._assignments
+            ctx_id += 1
+        if self._prepend:
+            # CQL seems to prepend element at a time, starting
+            # with the element at idx 0, we can either reverse
+            # it here, or have it inserted in reverse
+            ctx[str(ctx_id)] = list(reversed(self._prepend))
+            ctx_id += 1
+        if self._append:
+            ctx[str(ctx_id)] = self._append
+
+    def _analyze(self):
+        """ works out the updates to be performed """
+        if self.value is None or self.value == self.previous:
+            pass
+
+        elif self.previous is None:
+            self._assignments = self.value
+
+        elif len(self.value) < len(self.previous):
+            # if elements have been removed,
+            # rewrite the whole list
+            self._assignments = self.value
+
+        elif len(self.previous) == 0:
+            # if we're updating from an empty
+            # list, do a complete insert
+            self._assignments = self.value
+        else:
+
+            # the max start idx we want to compare
+            search_space = len(self.value) - max(0, len(self.previous)-1)
+
+            # the size of the sub lists we want to look at
+            search_size = len(self.previous)
+
+            for i in range(search_space):
+                #slice boundary
+                j = i + search_size
+                sub = self.value[i:j]
+                idx_cmp = lambda idx: self.previous[idx] == sub[idx]
+                if idx_cmp(0) and idx_cmp(-1) and self.previous == sub:
+                    self._prepend = self.value[:i] or None
+                    self._append = self.value[j:] or None
+                    break
+
+            # if both append and prepend are still None after looking
+            # at both lists, an insert statement will be created
+            if self._prepend is self._append is None:
+                self._assignments = self.value
+
+
+class MapUpdateClause(ContainerUpdateClause):
     """ updates a map collection """
 
 

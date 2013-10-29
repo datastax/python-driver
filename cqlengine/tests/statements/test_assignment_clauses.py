@@ -1,5 +1,5 @@
 from unittest import TestCase
-from cqlengine.statements import AssignmentClause, SetUpdateClause
+from cqlengine.statements import AssignmentClause, SetUpdateClause, ListUpdateClause
 
 
 class AssignmentClauseTests(TestCase):
@@ -112,4 +112,123 @@ class SetUpdateClauseTests(TestCase):
         ctx = {}
         c.update_context(ctx)
         self.assertEqual(ctx, {'0': {3}, '1': {1}})
+
+
+class ListUpdateClauseTests(TestCase):
+
+    def test_update_from_none(self):
+        c = ListUpdateClause('s', [1, 2, 3])
+        c._analyze()
+        c.set_context_id(0)
+
+        self.assertEqual(c._assignments, [1, 2, 3])
+        self.assertIsNone(c._append)
+        self.assertIsNone(c._prepend)
+
+        self.assertEqual(c.get_context_size(), 1)
+        self.assertEqual(str(c), '"s" = :0')
+
+        ctx = {}
+        c.update_context(ctx)
+        self.assertEqual(ctx, {'0': [1, 2, 3]})
+
+    def test_update_from_empty(self):
+        c = ListUpdateClause('s', [1, 2, 3], previous=[])
+        c._analyze()
+        c.set_context_id(0)
+
+        self.assertEqual(c._assignments, [1, 2, 3])
+        self.assertIsNone(c._append)
+        self.assertIsNone(c._prepend)
+
+        self.assertEqual(c.get_context_size(), 1)
+        self.assertEqual(str(c), '"s" = :0')
+
+        ctx = {}
+        c.update_context(ctx)
+        self.assertEqual(ctx, {'0': [1, 2, 3]})
+
+    def test_update_from_different_list(self):
+        c = ListUpdateClause('s', [1, 2, 3], previous=[3, 2, 1])
+        c._analyze()
+        c.set_context_id(0)
+
+        self.assertEqual(c._assignments, [1, 2, 3])
+        self.assertIsNone(c._append)
+        self.assertIsNone(c._prepend)
+
+        self.assertEqual(c.get_context_size(), 1)
+        self.assertEqual(str(c), '"s" = :0')
+
+        ctx = {}
+        c.update_context(ctx)
+        self.assertEqual(ctx, {'0': [1, 2, 3]})
+
+    def test_append(self):
+        c = ListUpdateClause('s', [1, 2, 3, 4], previous=[1, 2])
+        c._analyze()
+        c.set_context_id(0)
+
+        self.assertIsNone(c._assignments)
+        self.assertEqual(c._append, [3, 4])
+        self.assertIsNone(c._prepend)
+
+        self.assertEqual(c.get_context_size(), 1)
+        self.assertEqual(str(c), '"s" = "s" + :0')
+
+        ctx = {}
+        c.update_context(ctx)
+        self.assertEqual(ctx, {'0': [3, 4]})
+
+    def test_prepend(self):
+        c = ListUpdateClause('s', [1, 2, 3, 4], previous=[3, 4])
+        c._analyze()
+        c.set_context_id(0)
+
+        self.assertIsNone(c._assignments)
+        self.assertIsNone(c._append)
+        self.assertEqual(c._prepend, [1, 2])
+
+        self.assertEqual(c.get_context_size(), 1)
+        self.assertEqual(str(c), '"s" = :0 + "s"')
+
+        ctx = {}
+        c.update_context(ctx)
+        # test context list reversal
+        self.assertEqual(ctx, {'0': [2, 1]})
+
+    def test_append_and_prepend(self):
+        c = ListUpdateClause('s', [1, 2, 3, 4, 5, 6], previous=[3, 4])
+        c._analyze()
+        c.set_context_id(0)
+
+        self.assertIsNone(c._assignments)
+        self.assertEqual(c._append, [5, 6])
+        self.assertEqual(c._prepend, [1, 2])
+
+        self.assertEqual(c.get_context_size(), 2)
+        self.assertEqual(str(c), '"s" = :0 + "s", "s" = "s" + :1')
+
+        ctx = {}
+        c.update_context(ctx)
+        # test context list reversal
+        self.assertEqual(ctx, {'0': [2, 1], '1': [5, 6]})
+
+    def test_shrinking_list_update(self):
+        """ tests that updating to a smaller list results in an insert statement """
+        c = ListUpdateClause('s', [1, 2, 3], previous=[1, 2, 3, 4])
+        c._analyze()
+        c.set_context_id(0)
+
+        self.assertEqual(c._assignments, [1, 2, 3])
+        self.assertIsNone(c._append)
+        self.assertIsNone(c._prepend)
+
+        self.assertEqual(c.get_context_size(), 1)
+        self.assertEqual(str(c), '"s" = :0')
+
+        ctx = {}
+        c.update_context(ctx)
+        self.assertEqual(ctx, {'0': [1, 2, 3]})
+
 
