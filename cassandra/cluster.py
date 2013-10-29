@@ -1857,6 +1857,9 @@ class ResponseFuture(object):
         if self._current_pool and self._connection:
             self._current_pool.return_connection(self._connection)
 
+        if self._final_exception:
+            return
+
         if isinstance(response, ResultMessage):
             if response.kind == ResultMessage.KIND_PREPARED:
                 # use self._query to re-use the same host and
