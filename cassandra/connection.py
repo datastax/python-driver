@@ -344,6 +344,10 @@ class Connection(object):
 
         self.send_msg(query, process_result, wait_for_id=True)
 
+    def __str__(self):
+        return "<%s(%r) %s:%d>" % (self.__class__.__name__, id(self), self.host, self.port)
+    __repr__ = __str__
+
 
 class TimedOut(Exception):
     pass
