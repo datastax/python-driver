@@ -1846,6 +1846,9 @@ class ResponseFuture(object):
         Handle the response to our attempt to prepare a statement.
         If it succeeded, run the original query again against the same host.
         """
+        if self._final_exception:
+            return
+
         if isinstance(response, ResultMessage):
             if response.kind == ResultMessage.KIND_PREPARED:
                 # use self._query to re-use the same host and
