@@ -228,7 +228,7 @@ class _HostReconnectionHandler(_ReconnectionHandler):
 
 
 _MAX_SIMULTANEOUS_CREATION = 1
-_NEW_CONNECTION_GRACE_PERIOD = 5
+_MIN_TRASH_INTERVAL = 5
 
 
 class HostConnectionPool(object):
@@ -239,6 +239,7 @@ class HostConnectionPool(object):
     is_shutdown = False
     open_count = 0
     _scheduled_for_creation = 0
+    _next_trash_allowed_at = 0
 
     def __init__(self, host, host_distance, session):
         self.host = host
@@ -258,6 +259,7 @@ class HostConnectionPool(object):
                 conn.set_keyspace_blocking(session.keyspace)
 
         self._trash = set()
+        self._next_trash_allowed_at = time.time()
         self.open_count = core_conns
         log.debug("Finished initializing new connection pool for host %s", self.host)
 
@@ -349,6 +351,7 @@ class HostConnectionPool(object):
             conn = self._session.cluster.connection_factory(self.host.address)
             if self._session.keyspace:
                 conn.set_keyspace_blocking(self._session.keyspace)
+            self._next_trash_allowed_at = time.time() + _MIN_TRASH_INTERVAL
             with self._lock:
                 new_connections = self._connections[:] + [conn]
                 self._connections = new_connections
@@ -435,7 +438,7 @@ class HostConnectionPool(object):
             # because the fact that in_flight dipped below the min at some
             # point is enough to start the trashing procedure
             if len(self._connections) > core_conns and in_flight <= min_reqs and \
-                    time.time() - connection.connected_at >= _NEW_CONNECTION_GRACE_PERIOD:
+                    time.time() >= self._next_trash_allowed_at:
                 self._maybe_trash_connection(connection)
             else:
                 self._signal_available_conn()
@@ -465,6 +468,7 @@ class HostConnectionPool(object):
                 self._trash.add(connection)
 
         if did_trash:
+            self._next_trash_allowed_at = time.time() + _MIN_TRASH_INTERVAL
             log.debug("Trashed connection (%s) to %s", id(connection), self.host)
 
     def _replace(self, connection):
