@@ -1046,6 +1046,7 @@ class Session(object):
         return self.submit(run_add_or_renew_pool)
 
     def remove_pool(self, host):
+        log.debug("Removing connection pool for %r", host)
         pool = self._pools.pop(host, None)
         if pool:
             return self.submit(pool.shutdown)
@@ -1201,6 +1202,7 @@ class ControlConnection(object):
             self._connection = conn
 
         if old:
+            log.debug("[control connection] Closing old connection %r, replacing with %r", old, conn)
             old.close()
 
     def _reconnect_internal(self):
@@ -1234,9 +1236,9 @@ class ControlConnection(object):
         log.debug("[control connection] Opening new connection to %s", host)
         connection = self._cluster.connection_factory(host.address)
 
-        log.debug("[control connection] Established new connection to %s, "
+        log.debug("[control connection] Established new connection %r, "
                   "registering watchers and refreshing schema and topology",
-                  host)
+                  connection)
         try:
             connection.register_watchers({
                 "TOPOLOGY_CHANGE": self._handle_topology_change,
@@ -1404,6 +1406,7 @@ class ControlConnection(object):
         for old_host in self._cluster.metadata.all_hosts():
             if old_host.address != connection.host and \
                     old_host.address not in found_hosts:
+                log.debug("[control connection] Found host that has been removed: %r", old_host)
                 self._cluster.remove_host(old_host)
 
         if partitioner:
