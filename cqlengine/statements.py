@@ -266,9 +266,43 @@ class ListUpdateClause(ContainerUpdateClause):
             if self._prepend is self._append is None:
                 self._assignments = self.value
 
+        self._analyzed = True
+
 
 class MapUpdateClause(ContainerUpdateClause):
     """ updates a map collection """
+
+    def __init__(self, field, value, previous=None):
+        super(MapUpdateClause, self).__init__(field, value, previous)
+
+
+class BaseDeleteClause(BaseClause):
+    pass
+
+
+class FieldDeleteClause(BaseDeleteClause):
+    """ deletes a field from a row """
+
+    def __init__(self, field):
+        super(FieldDeleteClause, self).__init__(field, None)
+
+    def __unicode__(self):
+        return self.field
+
+    def update_context(self, ctx):
+        pass
+
+    def get_context_size(self):
+        return 0
+
+
+class MapDeleteClause(BaseDeleteClause):
+    """ removes keys from a map """
+
+    def __init__(self, field, value, previous=None):
+        super(MapDeleteClause, self).__init__(field, value)
+        self.previous = previous
+        self._analysed = False
 
 
 class BaseCQLStatement(object):
@@ -454,7 +488,15 @@ class DeleteStatement(BaseCQLStatement):
             consistency=consistency,
             where=where,
         )
-        self.fields = [fields] if isinstance(fields, basestring) else (fields or [])
+        for field in fields or []:
+            self.add_field(field)
+
+    def add_field(self, field):
+        if isinstance(field, basestring):
+            field = FieldDeleteClause(field)
+        if not isinstance(field, BaseClause):
+            raise StatementException("only instances of AssignmentClause can be added to statements")
+        self.fields.append(field)
 
     def __unicode__(self):
         qs = ['DELETE']
