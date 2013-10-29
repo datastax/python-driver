@@ -5,6 +5,7 @@ import os
 import socket
 import sys
 from threading import Event, Lock, Thread
+import time
 import traceback
 import Queue
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL, EISCONN, errorcode
@@ -23,7 +24,7 @@ except ImportError:
 
 from cassandra.connection import (Connection, ResponseWaiter, ConnectionShutdown,
                                   ConnectionBusy, ConnectionException, NONBLOCKING,
-                                  TimedOut)
+                                  TimedOut, MAX_STREAM_PER_CONNECTION)
 from cassandra.decoder import RegisterMessage
 from cassandra.marshal import int32_unpack
 
@@ -347,14 +348,27 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
     def wait_for_responses(self, *msgs, **kwargs):
         timeout = kwargs.get('timeout')
         waiter = ResponseWaiter(len(msgs))
-        with self.lock:
-            # we're not checking to make sure in_flight is < 128,
-            # but that's okay because we'll do a blocking wait
-            # on getting a request ID from the queue
-            self.in_flight += len(msgs)
 
-        for i, msg in enumerate(msgs):
-            self.send_msg(msg, partial(waiter.got_response, index=i), wait_for_id=True)
+        # busy wait for sufficient space on the connection
+        messages_sent = 0
+        while True:
+            needed = len(msgs) - messages_sent
+            with self.lock:
+                available = min(needed, MAX_STREAM_PER_CONNECTION - self.in_flight)
+                self.in_flight += available
+
+            for i in range(messages_sent, messages_sent + available):
+                self.send_msg(msgs[i], partial(waiter.got_response, index=i), wait_for_id=True)
+            messages_sent += available
+
+            if messages_sent == len(msgs):
+                break
+            else:
+                if timeout is not None:
+                    timeout -= 0.01
+                    if timeout <= 0.0:
+                        raise TimedOut()
+                time.sleep(0.01)
 
         try:
             return waiter.deliver(timeout)

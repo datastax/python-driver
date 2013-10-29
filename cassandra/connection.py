@@ -49,7 +49,7 @@ else:
     locally_supported_compressions['lz4'] = (lz4_compress, lz4_decompress)
 
 
-MAX_STREAM_PER_CONNECTION = 128
+MAX_STREAM_PER_CONNECTION = 127
 
 PROTOCOL_VERSION = 0x01
 PROTOCOL_VERSION_MASK = 0x7f
