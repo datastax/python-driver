@@ -1681,11 +1681,17 @@ class ResponseFuture(object):
             self._errors[host] = ConnectionException("Pool is shutdown")
             return None
 
+        return self._borrow_conn_and_send_message(host, pool, self.message, self._set_result)
+
+    def _borrow_conn_and_send_message(self, host, pool, message, cb):
+        if cb is None:
+            cb = self._set_result
+
         connection = None
         try:
             # TODO get connectTimeout from cluster settings
             connection = pool.borrow_connection(timeout=2.0)
-            request_id = connection.send_msg(self.message, cb=self._set_result)
+            request_id = connection.send_msg(message, cb=cb)
             self._current_host = host
             self._current_pool = pool
             self._connection = connection
@@ -1791,9 +1797,11 @@ class ResponseFuture(object):
                     prepare_message = PrepareMessage(query=prepared_statement.query_string)
                     # since this might block, run on the executor to avoid hanging
                     # the event loop thread
-                    self.session.submit(self._connection.send_msg,
+                    self.session.submit(self._borrow_conn_and_send_message,
+                                        self._current_host,
+                                        self._current_pool,
                                         prepare_message,
-                                        cb=self._execute_after_prepare)
+                                        self._execute_after_prepare)
                     return
                 else:
                     if hasattr(response, 'to_exception'):
@@ -1846,8 +1854,8 @@ class ResponseFuture(object):
         Handle the response to our attempt to prepare a statement.
         If it succeeded, run the original query again against the same host.
         """
-        if self._final_exception:
-            return
+        if self._current_pool and self._connection:
+            self._current_pool.return_connection(self._connection)
 
         if isinstance(response, ResultMessage):
             if response.kind == ResultMessage.KIND_PREPARED:
@@ -1860,6 +1868,12 @@ class ResponseFuture(object):
                     "on host %s: %s" % (self._current_host, response)))
         elif isinstance(response, ErrorMessage):
             self._set_final_exception(response)
+        elif isinstance(response, ConnectionException):
+            log.debug("Connection error when preparing statement on host %s: %s",
+                      self._current_host, response)
+            # try again on a different host, preparing again if necessary
+            self._errors[self._current_host] = response
+            self.send_request()
         else:
             self._set_final_exception(ConnectionException(
                 "Got unexpected response type when preparing "
