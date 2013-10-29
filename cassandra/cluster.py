@@ -140,7 +140,7 @@ class Cluster(object):
     and returns a dict of credentials for that node.
     """
 
-    load_balancing_policy = RoundRobinPolicy()
+    load_balancing_policy = None
     """
     An instance of :class:`.policies.LoadBalancingPolicy` or
     one of its subclasses.  Defaults to :class:`~.RoundRobinPolicy`.
@@ -272,6 +272,8 @@ class Cluster(object):
 
         if load_balancing_policy is not None:
             self.load_balancing_policy = load_balancing_policy
+        else:
+            self.load_balancing_policy = RoundRobinPolicy()
 
         if reconnection_policy is not None:
             self.reconnection_policy = reconnection_policy
