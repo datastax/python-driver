@@ -1071,7 +1071,7 @@ class Session(object):
             distance = self._load_balancer.distance(host)
             pool = self._pools.get(host)
 
-            if not pool:
+            if not pool or pool.is_shutdown:
                 if distance != HostDistance.IGNORED and host.is_up:
                     self.add_or_renew_pool(host, False)
             elif distance != pool.host_distance:
