@@ -22,9 +22,10 @@ try:
 except ImportError:
     ssl = None  # NOQA
 
+from cassandra import OperationTimedOut
 from cassandra.connection import (Connection, ResponseWaiter, ConnectionShutdown,
                                   ConnectionBusy, ConnectionException, NONBLOCKING,
-                                  TimedOut, MAX_STREAM_PER_CONNECTION)
+                                  MAX_STREAM_PER_CONNECTION)
 from cassandra.decoder import RegisterMessage
 from cassandra.marshal import int32_unpack
 
@@ -97,7 +98,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
             raise conn.last_error
         elif not conn.connected_event.is_set():
             conn.close()
-            raise TimedOut("Timed out creating connection")
+            raise OperationTimedOut("Timed out creating connection")
         else:
             return conn
 
@@ -367,7 +368,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
                 if timeout is not None:
                     timeout -= 0.01
                     if timeout <= 0.0:
-                        raise TimedOut()
+                        raise OperationTimedOut()
                 time.sleep(0.01)
 
         try:

@@ -199,3 +199,7 @@ class AuthenticationFailed(Exception):
     Failed to authenticate.
     """
     pass
+
+
+class OperationTimedOut(Exception):
+    pass

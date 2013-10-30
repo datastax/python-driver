@@ -8,8 +8,9 @@ import time
 import traceback
 import Queue
 
+from cassandra import OperationTimedOut
 from cassandra.connection import (Connection, ResponseWaiter, ConnectionShutdown,
-                                  ConnectionBusy, NONBLOCKING, TimedOut,
+                                  ConnectionBusy, NONBLOCKING,
                                   MAX_STREAM_PER_CONNECTION)
 from cassandra.decoder import RegisterMessage
 from cassandra.marshal import int32_unpack
@@ -100,7 +101,7 @@ class LibevConnection(Connection):
             raise conn.last_error
         elif not conn.connected_event.is_set():
             conn.close()
-            raise TimedOut("Timed out creating new connection")
+            raise OperationTimedOut("Timed out creating new connection")
         else:
             return conn
 
@@ -328,7 +329,7 @@ class LibevConnection(Connection):
                 if timeout is not None:
                     timeout -= 0.01
                     if timeout <= 0.0:
-                        raise TimedOut()
+                        raise OperationTimedOut()
                 time.sleep(0.01)
 
         try:

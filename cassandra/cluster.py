@@ -18,7 +18,7 @@ except ImportError:
 from functools import partial, wraps
 from itertools import groupby
 
-from cassandra import ConsistencyLevel, AuthenticationFailed
+from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut
 from cassandra.connection import ConnectionException, ConnectionShutdown
 from cassandra.decoder import (QueryMessage, ResultMessage,
                                ErrorMessage, ReadTimeoutErrorMessage,
@@ -1938,7 +1938,7 @@ class ResponseFuture(object):
         # otherwise, move onto another host
         self.send_request()
 
-    def result(self):
+    def result(self, timeout=None):
         """
         Return the final result or raise an Exception if errors were
         encountered.  If the final result or error has not been set
@@ -1962,13 +1962,13 @@ class ResponseFuture(object):
         elif self._final_exception:
             raise self._final_exception
         else:
-            self._event.wait()
+            self._event.wait(timeout=timeout)
             if self._final_result is not _NO_RESULT_YET:
                 return self._final_result
             elif self._final_exception:
                 raise self._final_exception
             else:
-                assert False  # shouldn't get here
+                raise OperationTimedOut()
 
     def get_query_trace(self):
         """

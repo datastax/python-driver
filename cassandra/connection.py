@@ -4,7 +4,7 @@ import logging
 from threading import Event, RLock
 from Queue import Queue
 
-from cassandra import ConsistencyLevel, AuthenticationFailed
+from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut
 from cassandra.marshal import int8_unpack, int32_pack
 from cassandra.decoder import (ReadyMessage, AuthenticateMessage, OptionsMessage,
                                StartupMessage, ErrorMessage, CredentialsMessage,
@@ -344,10 +344,6 @@ class Connection(object):
     __repr__ = __str__
 
 
-class TimedOut(Exception):
-    pass
-
-
 class ResponseWaiter(object):
 
     def __init__(self, num_responses):
@@ -371,6 +367,6 @@ class ResponseWaiter(object):
         if self.error:
             raise self.error
         elif not self.event.is_set():
-            raise TimedOut()
+            raise OperationTimedOut()
         else:
             return self.responses
