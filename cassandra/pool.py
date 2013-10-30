@@ -536,3 +536,7 @@ class HostConnectionPool(object):
 
         for conn in self._connections:
             conn.set_keyspace_async(keyspace, connection_finished_setting_keyspace)
+
+    def get_state(self):
+        in_flights = ", ".join([str(c.in_flight) for c in self._connections])
+        return "shutdown: %s, in_flights: %s" % (self.is_shutdown, in_flights)

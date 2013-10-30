@@ -1128,6 +1128,9 @@ class Session(object):
         """ Internal """
         return self.cluster.executor.submit(fn, *args, **kwargs)
 
+    def get_pool_state(self):
+        return dict((host, pool.get_state()) for host, pool in self._pools.items())
+
 
 class _ControlReconnectionHandler(_ReconnectionHandler):
     """
