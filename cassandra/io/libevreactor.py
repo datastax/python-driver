@@ -147,19 +147,27 @@ class LibevConnection(Connection):
                 return
             self.is_closed = True
 
-        log.debug("Closing connection (%s) to %s", id(self), self.host)
+        try:
+            log.debug("Closing connection (%s) to %s", id(self), self.host)
+        except AttributeError:
+            # this can happen on interpreter shutdown
+            pass
+
         if self._read_watcher:
             self._read_watcher.stop()
         if self._write_watcher:
             self._write_watcher.stop()
         self._socket.close()
-        with _loop_lock:
-            _loop_notifier.send()
+
+        if _loop_lock:
+            with _loop_lock:
+                _loop_notifier.send()
 
         # don't leave in-progress operations hanging
         if not self.is_defunct:
-            self._error_all_callbacks(
-                ConnectionShutdown("Connection to %s was closed" % self.host))
+            if ConnectionShutdown:
+                self._error_all_callbacks(
+                    ConnectionShutdown("Connection to %s was closed" % self.host))
 
     def __del__(self):
         self.close()
