@@ -340,7 +340,13 @@ class Connection(object):
         self.send_msg(query, process_result, wait_for_id=True)
 
     def __str__(self):
-        return "<%s(%r) %s:%d>" % (self.__class__.__name__, id(self), self.host, self.port)
+        status = ""
+        if self.is_defunct:
+            status = " (defunct)"
+        elif self.is_closed:
+            status = " (closed)"
+
+        return "<%s(%r) %s:%d%s>" % (self.__class__.__name__, id(self), self.host, self.port, status)
     __repr__ = __str__
 
 
