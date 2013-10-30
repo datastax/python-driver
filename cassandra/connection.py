@@ -1,7 +1,7 @@
 import errno
 from functools import wraps, partial
 import logging
-from threading import Event, Lock, RLock
+from threading import Event, RLock
 from Queue import Queue
 
 from cassandra import ConsistencyLevel, AuthenticationFailed
@@ -141,7 +141,6 @@ class Connection(object):
             self._id_queue.put_nowait(i)
 
         self.lock = RLock()
-        self.id_lock = Lock()
 
     def close(self):
         raise NotImplementedError()
