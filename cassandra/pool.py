@@ -425,9 +425,10 @@ class HostConnectionPool(object):
         else:
             if connection in self._trash:
                 with connection.lock:
-                    if in_flight == 0:
+                    if connection.in_flight == 0:
                         with self._lock:
-                            self._trash.remove(connection)
+                            if connection in self._trash:
+                                self._trash.remove(connection)
                         log.debug("Closing trashed connection (%s) to %s", id(connection), self.host)
                         connection.close()
                 return
