@@ -233,11 +233,21 @@ class ListUpdateClauseTests(TestCase):
 
 
 class MapUpdateTests(TestCase):
-    pass
+
+    def test_update(self):
+        pass
+
+    def test_update_from_null(self):
+        pass
+
+    def test_nulled_columns_arent_included(self):
+        pass
 
 
 class MapDeleteTests(TestCase):
-    pass
+
+    def test_update(self):
+        pass
 
 
 class FieldDeleteTests(TestCase):

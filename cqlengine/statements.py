@@ -275,21 +275,34 @@ class MapUpdateClause(ContainerUpdateClause):
 
     def __init__(self, field, value, previous=None):
         super(MapUpdateClause, self).__init__(field, value, previous)
+        self._updates = None
+
+    def _analyze(self):
+        self._updates = sorted([k for k, v in self.value.items() if v != self.previous.get(k)]) or None
+        self._analyzed = True
 
     def get_context_size(self):
-        if not self._analyzed:
-            self._analyze()
-        raise NotImplementedError('implement this')
+        if not self._analyzed: self._analyze()
+        return len(self._updates or []) * 2
 
     def update_context(self, ctx):
-        if not self._analyzed:
-            self._analyze()
-        raise NotImplementedError('implement this')
+        if not self._analyzed: self._analyze()
+        ctx_id = self.context_id
+        for key in self._updates or []:
+            ctx[str(ctx_id)] = key
+            ctx[str(ctx_id + 1)] = self.value.get(key)
+            ctx_id += 2
 
     def __unicode__(self):
-        if not self._analyzed:
-            self._analyze()
-        raise NotImplementedError('implement this')
+        if not self._analyzed: self._analyze()
+        qs = []
+
+        ctx_id = self.context_id
+        for _ in self._updates or []:
+            qs += ['"{}"[:{}] = :{}'.format(self.field, ctx_id, ctx_id + 1)]
+            ctx_id += 2
+
+        return ', '.join(qs)
 
 
 class BaseDeleteClause(BaseClause):
