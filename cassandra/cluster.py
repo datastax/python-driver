@@ -1804,6 +1804,8 @@ class ResponseFuture(object):
                                        (current_keyspace, prepared_keyspace)))
                         return
 
+                    log.debug("Re-preparing unrecognized prepared statement against host %s: %s",
+                              self._current_host, prepared_statement.query_string)
                     prepare_message = PrepareMessage(query=prepared_statement.query_string)
                     # since this might block, run on the executor to avoid hanging
                     # the event loop thread
