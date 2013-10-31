@@ -1867,7 +1867,10 @@ class ResponseFuture(object):
             if response.kind == ResultMessage.KIND_PREPARED:
                 # use self._query to re-use the same host and
                 # at the same time properly borrow the connection
-                self._query(self._current_host)
+                request_id = self._query(self._current_host)
+                if request_id is None:
+                    # this host errored out, move on to the next
+                    self.send_request()
             else:
                 self._set_final_exception(ConnectionException(
                     "Got unexpected response when preparing statement "
