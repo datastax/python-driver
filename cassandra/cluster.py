@@ -1675,7 +1675,13 @@ class ResponseFuture(object):
         self._set_final_exception(NoHostAvailable(
             "Unable to complete the operation against any hosts", self._errors))
 
-    def _query(self, host):
+    def _query(self, host, message=None, cb=None):
+        if message is None:
+            message = self.message
+
+        if cb is None:
+            cb = self._set_result
+
         pool = self.session._pools.get(host)
         if not pool:
             self._errors[host] = ConnectionException("Host has been marked down or removed")
@@ -1684,27 +1690,28 @@ class ResponseFuture(object):
             self._errors[host] = ConnectionException("Pool is shutdown")
             return None
 
-        return self._borrow_conn_and_send_message(host, pool, self.message, self._set_result)
-
-    def _borrow_conn_and_send_message(self, host, pool, message, cb):
-        if cb is None:
-            cb = self._set_result
-
         connection = None
         try:
             # TODO get connectTimeout from cluster settings
             connection = pool.borrow_connection(timeout=2.0)
             request_id = connection.send_msg(message, cb=cb)
-            self._current_host = host
-            self._current_pool = pool
-            self._connection = connection
-            return request_id
         except Exception as exc:
             log.debug("Error querying host %s", host, exc_info=True)
             self._errors[host] = exc
             if connection:
                 pool.return_connection(connection)
             return None
+
+        self._current_host = host
+        self._current_pool = pool
+        self._connection = connection
+        return request_id
+
+    def _reprepare(self, prepare_message):
+        request_id = self._query(self._current_host, prepare_message, cb=self._execute_after_prepare)
+        if request_id is None:
+            # try to submit the original prepared statement on some other host
+            self.send_request()
 
     def _set_result(self, response):
         try:
@@ -1769,7 +1776,7 @@ class ResponseFuture(object):
                         self._metrics.on_other_error()
                     # need to retry against a different host here
                     log.warn("Host %s is overloaded, retrying against a different "
-                             "host" % (self._current_host))
+                             "host", self._current_host)
                     self._retry(reuse_connection=False, consistency_level=None)
                     return
                 elif isinstance(response, IsBootstrappingErrorMessage):
@@ -1800,11 +1807,7 @@ class ResponseFuture(object):
                     prepare_message = PrepareMessage(query=prepared_statement.query_string)
                     # since this might block, run on the executor to avoid hanging
                     # the event loop thread
-                    self.session.submit(self._borrow_conn_and_send_message,
-                                        self._current_host,
-                                        self._current_pool,
-                                        prepare_message,
-                                        self._execute_after_prepare)
+                    self.session.submit(self._reprepare, prepare_message)
                     return
                 else:
                     if hasattr(response, 'to_exception'):

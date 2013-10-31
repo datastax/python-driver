@@ -366,8 +366,9 @@ class ResponseFutureTests(unittest.TestCase):
 
         session.submit.assert_called_once()
         args, kwargs = session.submit.call_args
-        self.assertIsInstance(args[-2], PrepareMessage)
-        self.assertEquals(args[-2].query, "SELECT * FROM foobar")
+        self.assertEquals(rf._reprepare, args[-2])
+        self.assertIsInstance(args[-1], PrepareMessage)
+        self.assertEquals(args[-1].query, "SELECT * FROM foobar")
 
     def test_prepared_query_not_found_bad_keyspace(self):
         session = self.make_session()
