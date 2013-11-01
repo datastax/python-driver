@@ -276,6 +276,7 @@ class MapUpdateClause(ContainerUpdateClause):
     def __init__(self, field, value, previous=None):
         super(MapUpdateClause, self).__init__(field, value, previous)
         self._updates = None
+        self.previous = self.previous or {}
 
     def _analyze(self):
         self._updates = sorted([k for k, v in self.value.items() if v != self.previous.get(k)]) or None
@@ -316,7 +317,7 @@ class FieldDeleteClause(BaseDeleteClause):
         super(FieldDeleteClause, self).__init__(field, None)
 
     def __unicode__(self):
-        return self.field
+        return '"{}"'.format(self.field)
 
     def update_context(self, ctx):
         pass
@@ -330,27 +331,27 @@ class MapDeleteClause(BaseDeleteClause):
 
     def __init__(self, field, value, previous=None):
         super(MapDeleteClause, self).__init__(field, value)
-        self.previous = previous
+        self.value = self.value or {}
+        self.previous = previous or {}
         self._analyzed = False
         self._removals = None
 
     def _analyze(self):
+        self._removals = sorted([k for k in self.previous if k not in self.value])
         self._analyzed = True
 
     def update_context(self, ctx):
-        if not self._analyzed:
-            self._analyze()
-        raise NotImplementedError('implement this')
+        if not self._analyzed: self._analyze()
+        for idx, key in enumerate(self._removals):
+            ctx[str(self.context_id + idx)] = key
 
     def get_context_size(self):
-        if not self._analyzed:
-            self._analyze()
-        raise NotImplementedError('implement this')
+        if not self._analyzed: self._analyze()
+        return len(self._removals)
 
     def __unicode__(self):
-        if not self._analyzed:
-            self._analyze()
-        raise NotImplementedError('implement this')
+        if not self._analyzed: self._analyze()
+        return ', '.join(['"{}"[:{}]'.format(self.field, self.context_id + i) for i in range(len(self._removals))])
 
 
 class BaseCQLStatement(object):
