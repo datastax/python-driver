@@ -1,5 +1,5 @@
 from unittest import TestCase
-from cqlengine.statements import AssignmentClause, SetUpdateClause, ListUpdateClause
+from cqlengine.statements import AssignmentClause, SetUpdateClause, ListUpdateClause, MapUpdateClause, MapDeleteClause, FieldDeleteClause
 
 
 class AssignmentClauseTests(TestCase):
@@ -235,20 +235,57 @@ class ListUpdateClauseTests(TestCase):
 class MapUpdateTests(TestCase):
 
     def test_update(self):
-        pass
+        c = MapUpdateClause('s', {3: 0, 5: 6}, {5: 0, 3: 4})
+        c._analyze()
+        c.set_context_id(0)
+
+        self.assertEqual(c._updates, [3, 5])
+        self.assertEqual(c.get_context_size(), 4)
+        self.assertEqual(str(c), '"s"[:0] = :1, "s"[:2] = :3')
+
+        ctx = {}
+        c.update_context(ctx)
+        self.assertEqual(ctx, {'0': 3, "1": 0, '2': 5, '3': 6})
 
     def test_update_from_null(self):
-        pass
+        c = MapUpdateClause('s', {3: 0, 5: 6})
+        c._analyze()
+        c.set_context_id(0)
+
+        self.assertEqual(c._updates, [3, 5])
+        self.assertEqual(c.get_context_size(), 4)
+        self.assertEqual(str(c), '"s"[:0] = :1, "s"[:2] = :3')
+
+        ctx = {}
+        c.update_context(ctx)
+        self.assertEqual(ctx, {'0': 3, "1": 0, '2': 5, '3': 6})
 
     def test_nulled_columns_arent_included(self):
-        pass
+        c = MapUpdateClause('s', {3: 0}, {1: 2, 3: 4})
+        c._analyze()
+        c.set_context_id(0)
+
+        self.assertNotIn(1, c._updates)
 
 
 class MapDeleteTests(TestCase):
 
     def test_update(self):
-        pass
+        c = MapDeleteClause('s', {3: 0}, {1: 2, 3: 4, 5: 6})
+        c._analyze()
+        c.set_context_id(0)
+
+        self.assertEqual(c._removals, [1, 5])
+        self.assertEqual(c.get_context_size(), 2)
+        self.assertEqual(str(c), '"s"[:0], "s"[:1]')
+
+        ctx = {}
+        c.update_context(ctx)
+        self.assertEqual(ctx, {'0': 1, '1': 5})
 
 
 class FieldDeleteTests(TestCase):
-    pass
+
+    def test_str(self):
+        f = FieldDeleteClause("blake")
+        assert str(f) == '"blake"'
