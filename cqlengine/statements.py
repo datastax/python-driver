@@ -537,6 +537,7 @@ class DeleteStatement(BaseCQLStatement):
             consistency=consistency,
             where=where,
         )
+        self.fields = []
         for field in fields or []:
             self.add_field(field)
 
