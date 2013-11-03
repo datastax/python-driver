@@ -17,6 +17,7 @@ from cql import OperationalError
 from contextlib import contextmanager
 
 from thrift.transport.TTransport import TTransportException
+from cqlengine.statements import BaseCQLStatement
 
 LOG = logging.getLogger('cqlengine.cql')
 
@@ -230,6 +231,9 @@ class ConnectionPool(object):
 
 
 def execute(query, params=None, consistency_level=None):
+    if isinstance(query, BaseCQLStatement):
+        params = query.get_context()
+        query = str(query)
     params = params or {}
     if consistency_level is None:
         consistency_level = connection_pool._consistency
