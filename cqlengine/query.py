@@ -493,7 +493,7 @@ class AbstractQuerySet(object):
             operator_class = BaseWhereOperator.get_operator(col_op or 'EQ')
             operator = operator_class()
 
-            clone._where.append(WhereClause(col_name, operator, val))
+            clone._where.append(WhereClause(col_name, operator, column.to_database(val)))
 
         return clone
 
