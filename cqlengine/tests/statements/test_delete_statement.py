@@ -20,18 +20,18 @@ class DeleteStatementTests(TestCase):
     def test_none_fields_rendering(self):
         """ tests that a '*' is added if no fields are passed in """
         ds = DeleteStatement('table', None)
-        self.assertTrue(unicode(ds).startswith('DELETE *'), unicode(ds))
-        self.assertTrue(str(ds).startswith('DELETE *'), str(ds))
+        self.assertTrue(unicode(ds).startswith('DELETE FROM'), unicode(ds))
+        self.assertTrue(str(ds).startswith('DELETE FROM'), str(ds))
 
     def test_table_rendering(self):
         ds = DeleteStatement('table', None)
-        self.assertTrue(unicode(ds).startswith('DELETE * FROM table'), unicode(ds))
-        self.assertTrue(str(ds).startswith('DELETE * FROM table'), str(ds))
+        self.assertTrue(unicode(ds).startswith('DELETE FROM table'), unicode(ds))
+        self.assertTrue(str(ds).startswith('DELETE FROM table'), str(ds))
 
     def test_where_clause_rendering(self):
         ds = DeleteStatement('table', None)
         ds.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
-        self.assertEqual(unicode(ds), 'DELETE * FROM table WHERE "a" = :0', unicode(ds))
+        self.assertEqual(unicode(ds), 'DELETE FROM table WHERE "a" = :0', unicode(ds))
 
     def test_context(self):
         ds = DeleteStatement('table', None)

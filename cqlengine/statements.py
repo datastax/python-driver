@@ -554,8 +554,6 @@ class DeleteStatement(BaseCQLStatement):
         qs = ['DELETE']
         if self.fields:
             qs += [', '.join(['{}'.format(f) for f in self.fields])]
-        else:
-            qs += ['*']
         qs += ['FROM', self.table]
 
         if self.where_clauses:
