@@ -9,24 +9,24 @@ class QueryValue(object):
     be passed into .filter() keyword args
     """
 
-    _cql_string = ':{}'
+    format_string = ':{}'
 
-    def __init__(self, value, identifier=None):
+    def __init__(self, value):
         self.value = value
-        self.identifier = uuid1().hex if identifier is None else identifier
+        self.context_id = None
 
-    def get_cql(self):
-        return self._cql_string.format(self.identifier)
+    def __unicode__(self):
+        return self.format_string.format(self.context_id)
 
-    def get_value(self):
-        return self.value
+    def set_context_id(self, ctx_id):
+        self.context_id = ctx_id
 
-    def get_dict(self, column):
-        return {self.identifier: column.to_database(self.get_value())}
+    def get_context_size(self):
+        return 1
 
-    @property
-    def cql(self):
-        return self.get_cql()
+    def update_context(self, ctx):
+        ctx[str(self.context_id)] = self.value
+
 
 class BaseQueryFunction(QueryValue):
     """
@@ -42,7 +42,7 @@ class MinTimeUUID(BaseQueryFunction):
     http://cassandra.apache.org/doc/cql3/CQL.html#timeuuidFun
     """
 
-    _cql_string = 'MinTimeUUID(:{})'
+    format_string = 'MinTimeUUID(:{})'
 
     def __init__(self, value):
         """
@@ -53,14 +53,11 @@ class MinTimeUUID(BaseQueryFunction):
             raise ValidationError('datetime instance is required')
         super(MinTimeUUID, self).__init__(value)
 
-    def get_value(self):
+    def update_context(self, ctx):
         epoch = datetime(1970, 1, 1, tzinfo=self.value.tzinfo)
         offset = epoch.tzinfo.utcoffset(epoch).total_seconds() if epoch.tzinfo else 0
+        ctx[str(self.context_id)] = long(((self.value - epoch).total_seconds() - offset) * 1000)
 
-        return long(((self.value - epoch).total_seconds() - offset) * 1000)
-
-    def get_dict(self, column):
-        return {self.identifier: self.get_value()}
 
 class MaxTimeUUID(BaseQueryFunction):
     """
@@ -69,7 +66,7 @@ class MaxTimeUUID(BaseQueryFunction):
     http://cassandra.apache.org/doc/cql3/CQL.html#timeuuidFun
     """
 
-    _cql_string = 'MaxTimeUUID(:{})'
+    format_string = 'MaxTimeUUID(:{})'
 
     def __init__(self, value):
         """
@@ -80,14 +77,11 @@ class MaxTimeUUID(BaseQueryFunction):
             raise ValidationError('datetime instance is required')
         super(MaxTimeUUID, self).__init__(value)
 
-    def get_value(self):
+    def update_context(self, ctx):
         epoch = datetime(1970, 1, 1, tzinfo=self.value.tzinfo)
         offset = epoch.tzinfo.utcoffset(epoch).total_seconds() if epoch.tzinfo else 0
+        ctx[str(self.context_id)] = long(((self.value - epoch).total_seconds() - offset) * 1000)
 
-        return long(((self.value - epoch).total_seconds() - offset) * 1000)
-
-    def get_dict(self, column):
-        return {self.identifier: self.get_value()}
 
 class Token(BaseQueryFunction):
     """
@@ -99,15 +93,20 @@ class Token(BaseQueryFunction):
     def __init__(self, *values):
         if len(values) == 1 and isinstance(values[0], (list, tuple)):
             values = values[0]
-        super(Token, self).__init__(values, [uuid1().hex for i in values])
+        super(Token, self).__init__(values)
+        self._columns = None
 
-    def get_dict(self, column):
-        items = zip(self.identifier, self.value, column.partition_columns)
-        return dict(
-            (id, col.to_database(val)) for id, val, col in items
-        )
+    def set_columns(self, columns):
+        self._columns = columns
 
-    def get_cql(self):
-        token_args = ', '.join(':{}'.format(id) for id in self.identifier)
+    def get_context_size(self):
+        return len(self.value)
+
+    def __unicode__(self):
+        token_args = ', '.join(':{}'.format(self.context_id + i) for i in range(self.get_context_size()))
         return "token({})".format(token_args)
+
+    def update_context(self, ctx):
+        for i, (col, val) in enumerate(zip(self._columns, self.value)):
+            ctx[str(self.context_id + i)] = col.to_database(val)
 

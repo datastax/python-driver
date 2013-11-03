@@ -1,3 +1,4 @@
+from cqlengine.functions import QueryValue
 from cqlengine.operators import BaseWhereOperator, InOperator
 
 
@@ -78,16 +79,27 @@ class BaseClause(object):
 class WhereClause(BaseClause):
     """ a single where statement used in queries """
 
-    def __init__(self, field, operator, value):
+    def __init__(self, field, operator, value, quote_field=True):
+        """
+
+        :param field:
+        :param operator:
+        :param value:
+        :param quote_field: hack to get the token function rendering properly
+        :return:
+        """
         if not isinstance(operator, BaseWhereOperator):
             raise StatementException(
                 "operator must be of type {}, got {}".format(BaseWhereOperator, type(operator))
             )
         super(WhereClause, self).__init__(field, value)
         self.operator = operator
+        self.query_value = self.value if isinstance(self.value, QueryValue) else QueryValue(self.value)
+        self.quote_field = quote_field
 
     def __unicode__(self):
-        return u'"{}" {} :{}'.format(self.field, self.operator, self.context_id)
+        field = ('"{}"' if self.quote_field else '{}').format(self.field)
+        return u'{} {} {}'.format(field, self.operator, unicode(self.query_value))
 
     def __hash__(self):
         return super(WhereClause, self).__hash__() ^ hash(self.operator)
@@ -97,11 +109,18 @@ class WhereClause(BaseClause):
             return self.operator.__class__ == other.operator.__class__
         return False
 
+    def get_context_size(self):
+        return self.query_value.get_context_size()
+
+    def set_context_id(self, i):
+        super(WhereClause, self).set_context_id(i)
+        self.query_value.set_context_id(i)
+
     def update_context(self, ctx):
         if isinstance(self.operator, InOperator):
             ctx[str(self.context_id)] = InQuoter(self.value)
         else:
-            super(WhereClause, self).update_context(ctx)
+            self.query_value.update_context(ctx)
 
 
 class AssignmentClause(BaseClause):

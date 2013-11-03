@@ -41,6 +41,10 @@ class NamedColumn(AbstractQueryableColumn):
         return self
 
     @property
+    def db_field_name(self):
+        return self.name
+
+    @property
     def cql(self):
         return self.get_cql()
 

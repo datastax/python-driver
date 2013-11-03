@@ -10,7 +10,7 @@ from cqlengine.columns import Counter
 from cqlengine.connection import connection_manager, execute, RowResult
 
 from cqlengine.exceptions import CQLEngineException, ValidationError
-from cqlengine.functions import QueryValue, Token
+from cqlengine.functions import QueryValue, Token, BaseQueryFunction
 
 #CQL 3 reference:
 #http://www.datastax.com/docs/1.1/references/cql/index
@@ -480,12 +480,14 @@ class AbstractQuerySet(object):
 
         for arg, val in kwargs.items():
             col_name, col_op = self._parse_filter_arg(arg)
+            quote_field = True
             #resolve column and operator
             try:
                 column = self.model._get_column(col_name)
             except KeyError:
                 if col_name == 'pk__token':
                     column = columns._PartitionKeysToken(self.model)
+                    quote_field = False
                 else:
                     raise QueryException("Can't resolve column name: '{}'".format(col_name))
 
@@ -497,10 +499,12 @@ class AbstractQuerySet(object):
                 if not isinstance(val, (list, tuple)):
                     raise QueryException('IN queries must use a list/tuple value')
                 query_val = [column.to_database(v) for v in val]
+            elif isinstance(val, BaseQueryFunction):
+                query_val = val
             else:
                 query_val = column.to_database(val)
 
-            clone._where.append(WhereClause(col_name, operator, query_val))
+            clone._where.append(WhereClause(column.db_field_name, operator, query_val, quote_field=quote_field))
 
         return clone
 
