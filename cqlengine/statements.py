@@ -569,11 +569,19 @@ class DeleteStatement(BaseCQLStatement):
         for field in fields or []:
             self.add_field(field)
 
+    def get_context(self):
+        ctx = super(DeleteStatement, self).get_context()
+        for field in self.fields:
+            field.update_context(ctx)
+        return ctx
+
     def add_field(self, field):
         if isinstance(field, basestring):
             field = FieldDeleteClause(field)
         if not isinstance(field, BaseClause):
             raise StatementException("only instances of AssignmentClause can be added to statements")
+        field.set_context_id(self.context_counter)
+        self.context_counter += field.get_context_size()
         self.fields.append(field)
 
     def __unicode__(self):

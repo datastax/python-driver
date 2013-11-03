@@ -16,7 +16,7 @@ from cqlengine.functions import QueryValue, Token, BaseQueryFunction
 #http://www.datastax.com/docs/1.1/references/cql/index
 from cqlengine.operators import InOperator, EqualsOperator, GreaterThanOperator, GreaterThanOrEqualOperator
 from cqlengine.operators import LessThanOperator, LessThanOrEqualOperator, BaseWhereOperator
-from cqlengine.statements import WhereClause, SelectStatement, DeleteStatement, UpdateStatement, AssignmentClause, InsertStatement, BaseCQLStatement
+from cqlengine.statements import WhereClause, SelectStatement, DeleteStatement, UpdateStatement, AssignmentClause, InsertStatement, BaseCQLStatement, MapUpdateClause, MapDeleteClause
 
 
 class QueryException(CQLEngineException): pass
@@ -310,9 +310,9 @@ class AbstractQuerySet(object):
 
     def _execute(self, q, params=None):
         if self._batch:
-            return self._batch.add_query(q, params=params)
+            return self._batch.add_query(q)
         else:
-            return execute(q, params=params, consistency_level=self._consistency)
+            return execute(q, consistency_level=self._consistency)
 
     def __unicode__(self):
         return self._select_query()
@@ -793,21 +793,11 @@ class ModelQuerySet(AbstractQuerySet):
                 us.add_assignment_clause(AssignmentClause(name, col.to_database(val)))
 
         if us.assignments:
-            qs = str(us)
-            ctx = us.get_context()
-            if self._batch:
-                self._batch.add_query(qs, ctx)
-            else:
-                execute(qs, ctx, self._consistency)
+            self._execute(us)
 
         if nulled_columns:
             ds = DeleteStatement(self.column_family_name, fields=nulled_columns, where=self._where)
-            qs = str(ds)
-            ctx = ds.get_context()
-            if self._batch:
-                self._batch.add_query(qs, ctx)
-            else:
-                execute(qs, ctx, self._consistency)
+            self._execute(ds)
 
 
 class DMLQuery(object):
@@ -845,36 +835,27 @@ class DMLQuery(object):
         """
         executes a delete query to remove columns that have changed to null
         """
-        values, field_names, field_ids, field_values, query_values = self._get_query_values()
-
-        # delete nulled columns and removed map keys
-        qs = ['DELETE']
-        query_values = {}
-
-        del_statements = []
-        for k,v in self.instance._values.items():
+        ds = DeleteStatement(self.column_family_name)
+        deleted_fields = False
+        for _, v in self.instance._values.items():
             col = v.column
             if v.deleted:
-                del_statements += ['"{}"'.format(col.db_field_name)]
+                ds.add_field(col.db_field_name)
+                deleted_fields = True
             elif isinstance(col, Map):
-                del_statements += col.get_delete_statement(v.value, v.previous_value, query_values)
+                uc = MapDeleteClause(col.db_field_name, v.value, v.previous_value)
+                if uc.get_context_size() > 0:
+                    ds.add_field(uc)
+                    deleted_fields = True
 
-        if del_statements:
-            qs += [', '.join(del_statements)]
-
-            qs += ['FROM {}'.format(self.column_family_name)]
-
-            qs += ['WHERE']
-            where_statements = []
+        if deleted_fields:
             for name, col in self.model._primary_keys.items():
-                field_id = uuid4().hex
-                query_values[field_id] = field_values[name]
-                where_statements += ['"{}" = :{}'.format(col.db_field_name, field_id)]
-            qs += [' AND '.join(where_statements)]
-
-            qs = ' '.join(qs)
-
-            self._execute(qs, query_values)
+                ds.add_where_clause(WhereClause(
+                    col.db_field_name,
+                    EqualsOperator(),
+                    col.to_database(getattr(self.instance, name))
+                ))
+            self._execute(ds)
 
     def update(self):
         """
