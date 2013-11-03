@@ -1003,21 +1003,20 @@ class DMLQuery(object):
         """ Deletes one instance """
         if self.instance is None:
             raise CQLEngineException("DML Query intance attribute is None")
-        field_values = {}
-        qs = ['DELETE FROM {}'.format(self.column_family_name)]
-        qs += ['WHERE']
-        where_statements = []
+
+        ds = DeleteStatement(self.column_family_name)
         for name, col in self.model._primary_keys.items():
-            field_id = uuid4().hex
-            field_values[field_id] = col.to_database(getattr(self.instance, name))
-            where_statements += ['"{}" = :{}'.format(col.db_field_name, field_id)]
+            ds.add_where_clause(WhereClause(
+                col.db_field_name,
+                EqualsOperator(),
+                col.to_database(getattr(self.instance, name))
+            ))
 
-        qs += [' AND '.join(where_statements)]
-        qs = ' '.join(qs)
-
+        qs = str(ds)
+        ctx = ds.get_context()
         if self._batch:
-            self._batch.add_query(qs, field_values)
+            self._batch.add_query(qs, ctx)
         else:
-            execute(qs, field_values, self._consistency)
+            execute(qs, ctx, self._consistency)
 
 
