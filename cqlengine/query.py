@@ -16,7 +16,7 @@ from cqlengine.functions import QueryValue, Token, BaseQueryFunction
 #http://www.datastax.com/docs/1.1/references/cql/index
 from cqlengine.operators import InOperator, EqualsOperator, GreaterThanOperator, GreaterThanOrEqualOperator
 from cqlengine.operators import LessThanOperator, LessThanOrEqualOperator, BaseWhereOperator
-from cqlengine.statements import WhereClause, SelectStatement, DeleteStatement, UpdateStatement, AssignmentClause, InsertStatement
+from cqlengine.statements import WhereClause, SelectStatement, DeleteStatement, UpdateStatement, AssignmentClause, InsertStatement, BaseCQLStatement
 
 
 class QueryException(CQLEngineException): pass
@@ -229,7 +229,10 @@ class BatchQuery(object):
         self._consistency = consistency
 
     def add_query(self, query, params):
-        self.queries.append((query, params))
+        if not isinstance(query, BaseCQLStatement):
+            raise CQLEngineException('only BaseCQLStatements can be added to a batch query')
+        # TODO: modify query's context id starting point
+        self.queries.append((str(query), query.get_context()))
 
     def consistency(self, consistency):
         self._consistency = consistency
@@ -305,6 +308,12 @@ class AbstractQuerySet(object):
     def column_family_name(self):
         return self.model.column_family_name()
 
+    def _execute(self, q, params=None):
+        if self._batch:
+            return self._batch.add_query(q, params=params)
+        else:
+            return execute(q, params=params, consistency_level=self._consistency)
+
     def __unicode__(self):
         return self._select_query()
 
@@ -364,8 +373,7 @@ class AbstractQuerySet(object):
         if self._batch:
             raise CQLEngineException("Only inserts, updates, and deletes are available in batch mode")
         if self._result_cache is None:
-            query = self._select_query()
-            columns, self._result_cache = execute(unicode(query).encode('utf-8'), query.get_context(), self._consistency)
+            columns, self._result_cache = self._execute(self._select_query())
             self._construct_result = self._get_result_constructor(columns)
 
     def _fill_result_cache_to_idx(self, idx):
@@ -561,7 +569,7 @@ class AbstractQuerySet(object):
         if self._result_cache is None:
             query = self._select_query()
             query.count = True
-            _, result = execute(str(query), query.get_context())
+            _, result = self._execute(query)
             return result[0][0]
         else:
             return len(self._result_cache)
@@ -637,11 +645,7 @@ class AbstractQuerySet(object):
             self.column_family_name,
             where=self._where
         )
-
-        if self._batch:
-            self._batch.add_query(str(dq), dq.get_context())
-        else:
-            execute(str(dq), dq.get_context())
+        self._execute(dq)
 
     def __eq__(self, q):
         if len(self._where) == len(q._where):
@@ -825,6 +829,12 @@ class DMLQuery(object):
         self._ttl = ttl
         self._consistency = consistency
 
+    def _execute(self, q, params=None):
+        if self._batch:
+            return self._batch.add_query(q, params=params)
+        else:
+            return execute(q, params=params, consistency_level=self._consistency)
+
     def batch(self, batch_obj):
         if batch_obj is not None and not isinstance(batch_obj, BatchQuery):
             raise CQLEngineException('batch_obj must be a BatchQuery instance or None')
@@ -864,10 +874,7 @@ class DMLQuery(object):
 
             qs = ' '.join(qs)
 
-            if self._batch:
-                self._batch.add_query(qs, query_values)
-            else:
-                execute(qs, query_values)
+            self._execute(qs, query_values)
 
     def update(self):
         """
@@ -931,10 +938,7 @@ class DMLQuery(object):
         # skip query execution if it's empty
         # caused by pointless update queries
         if qs:
-            if self._batch:
-                self._batch.add_query(qs, query_values)
-            else:
-                execute(qs, query_values, consistency_level=self._consistency)
+            self._execute(qs, query_values)
 
         self._delete_null_columns()
 
@@ -990,13 +994,7 @@ class DMLQuery(object):
         # skip query execution if it's empty
         # caused by pointless update queries
         if not insert.is_empty:
-            qs = str(insert)
-            ctx = insert.get_context()
-
-            if self._batch:
-                self._batch.add_query(qs, ctx)
-            else:
-                execute(qs, ctx, self._consistency)
+            self._execute(insert)
 
         # delete any nulled columns
         self._delete_null_columns()
@@ -1004,7 +1002,7 @@ class DMLQuery(object):
     def delete(self):
         """ Deletes one instance """
         if self.instance is None:
-            raise CQLEngineException("DML Query intance attribute is None")
+            raise CQLEngineException("DML Query instance attribute is None")
 
         ds = DeleteStatement(self.column_family_name)
         for name, col in self.model._primary_keys.items():
@@ -1013,12 +1011,6 @@ class DMLQuery(object):
                 EqualsOperator(),
                 col.to_database(getattr(self.instance, name))
             ))
-
-        qs = str(ds)
-        ctx = ds.get_context()
-        if self._batch:
-            self._batch.add_query(qs, ctx)
-        else:
-            execute(qs, ctx, self._consistency)
+        self._execute(ds)
 
 
