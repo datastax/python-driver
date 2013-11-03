@@ -1,4 +1,4 @@
-from cqlengine import query
+from cqlengine import operators
 from cqlengine.named import NamedKeyspace
 from cqlengine.query import ResultObject
 from cqlengine.tests.query.test_queryset import BaseQuerySetUsage
@@ -21,14 +21,14 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         assert len(query1._where) == 1
 
         op = query1._where[0]
-        assert isinstance(op, query.EqualsOperator)
+        assert isinstance(op, operators.EqualsOperator)
         assert op.value == 5
 
         query2 = query1.filter(expected_result__gte=1)
         assert len(query2._where) == 2
 
         op = query2._where[1]
-        assert isinstance(op, query.GreaterThanOrEqualOperator)
+        assert isinstance(op, operators.GreaterThanOrEqualOperator)
         assert op.value == 1
 
     def test_query_expression_parsing(self):
@@ -37,14 +37,14 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         assert len(query1._where) == 1
 
         op = query1._where[0]
-        assert isinstance(op, query.EqualsOperator)
+        assert isinstance(op.operator, operators.EqualsOperator)
         assert op.value == 5
 
         query2 = query1.filter(self.table.column('expected_result') >= 1)
         assert len(query2._where) == 2
 
         op = query2._where[1]
-        assert isinstance(op, query.GreaterThanOrEqualOperator)
+        assert isinstance(op.operator, operators.GreaterThanOrEqualOperator)
         assert op.value == 1
 
     def test_filter_method_where_clause_generation(self):
