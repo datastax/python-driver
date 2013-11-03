@@ -42,7 +42,7 @@ class SelectStatementTests(TestCase):
     def test_context(self):
         ss = SelectStatement('table')
         ss.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
-        self.assertEqual(ss.get_context(), {0: 'b'})
+        self.assertEqual(ss.get_context(), {'0': 'b'})
 
     def test_additional_rendering(self):
         ss = SelectStatement(

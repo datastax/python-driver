@@ -11,6 +11,6 @@ class BaseClauseTests(TestCase):
         ctx = {}
         ss.set_context_id(10)
         ss.update_context(ctx)
-        assert ctx == {10: 'b'}
+        assert ctx == {'10': 'b'}
 
 

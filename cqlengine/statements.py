@@ -72,7 +72,7 @@ class BaseClause(object):
     def update_context(self, ctx):
         """ updates the query context with this clauses values """
         assert isinstance(ctx, dict)
-        ctx[str(self.context_id)] = ValueQuoter(self.value)
+        ctx[str(self.context_id)] = self.value
 
 
 class WhereClause(BaseClause):
@@ -538,6 +538,8 @@ class DeleteStatement(BaseCQLStatement):
             where=where,
         )
         self.fields = []
+        if isinstance(fields, basestring):
+            fields = [fields]
         for field in fields or []:
             self.add_field(field)
 
@@ -551,7 +553,9 @@ class DeleteStatement(BaseCQLStatement):
     def __unicode__(self):
         qs = ['DELETE']
         if self.fields:
-            qs += [', '.join(['"{}"'.format(f) for f in self.fields])]
+            qs += [', '.join(['{}'.format(f) for f in self.fields])]
+        else:
+            qs += ['*']
         qs += ['FROM', self.table]
 
         if self.where_clauses:

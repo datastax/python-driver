@@ -23,7 +23,7 @@ class UpdateStatementTests(TestCase):
         us.add_assignment_clause(AssignmentClause('a', 'b'))
         us.add_assignment_clause(AssignmentClause('c', 'd'))
         us.add_where_clause(WhereClause('a', EqualsOperator(), 'x'))
-        self.assertEqual(us.get_context(), {0: 'b', 1: 'd', 2: 'x'})
+        self.assertEqual(us.get_context(), {'0': 'b', '1': 'd', '2': 'x'})
 
     def test_additional_rendering(self):
         us = UpdateStatement('table', ttl=60)

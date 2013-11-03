@@ -8,7 +8,8 @@ class DeleteStatementTests(TestCase):
     def test_single_field_is_listified(self):
         """ tests that passing a string field into the constructor puts it into a list """
         ds = DeleteStatement('table', 'field')
-        self.assertEqual(ds.fields, ['field'])
+        self.assertEqual(len(ds.fields), 1)
+        self.assertEqual(ds.fields[0].field, 'field')
 
     def test_field_rendering(self):
         """ tests that fields are properly added to the select statement """
@@ -35,4 +36,4 @@ class DeleteStatementTests(TestCase):
     def test_context(self):
         ds = DeleteStatement('table', None)
         ds.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
-        self.assertEqual(ds.get_context(), {0: 'b'})
+        self.assertEqual(ds.get_context(), {'0': 'b'})
