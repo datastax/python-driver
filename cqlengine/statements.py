@@ -414,6 +414,9 @@ class BaseCQLStatement(object):
     def __str__(self):
         return unicode(self).encode('utf-8')
 
+    def __repr__(self):
+        return self.__unicode__()
+
     @property
     def _where(self):
         return 'WHERE {}'.format(' AND '.join([unicode(c) for c in self.where_clauses]))
@@ -499,6 +502,10 @@ class AssignmentStatement(BaseCQLStatement):
         clause.set_context_id(self.context_counter)
         self.context_counter += clause.get_context_size()
         self.assignments.append(clause)
+
+    @property
+    def is_empty(self):
+        return len(self.assignments) == 0
 
     def get_context(self):
         ctx = super(AssignmentStatement, self).get_context()

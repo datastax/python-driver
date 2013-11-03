@@ -16,7 +16,7 @@ from cqlengine.functions import QueryValue, Token, BaseQueryFunction
 #http://www.datastax.com/docs/1.1/references/cql/index
 from cqlengine.operators import InOperator, EqualsOperator, GreaterThanOperator, GreaterThanOrEqualOperator
 from cqlengine.operators import LessThanOperator, LessThanOrEqualOperator, BaseWhereOperator
-from cqlengine.statements import WhereClause, SelectStatement, DeleteStatement, UpdateStatement, AssignmentClause
+from cqlengine.statements import WhereClause, SelectStatement, DeleteStatement, UpdateStatement, AssignmentClause, InsertStatement
 
 
 class QueryException(CQLEngineException): pass
@@ -938,6 +938,7 @@ class DMLQuery(object):
 
         self._delete_null_columns()
 
+    # TODO: delete
     def _get_query_values(self):
         """
         returns all the data needed to do queries
@@ -970,31 +971,32 @@ class DMLQuery(object):
             raise CQLEngineException("DML Query intance attribute is None")
         assert type(self.instance) == self.model
 
-        values, field_names, field_ids, field_values, query_values = self._get_query_values()
-
-        qs = []
+        nulled_fields = set()
         if self.instance._has_counter or self.instance._can_update():
             return self.update()
         else:
-            qs += ["INSERT INTO {}".format(self.column_family_name)]
-            qs += ["({})".format(', '.join(['"{}"'.format(f) for f in field_names]))]
-            qs += ['VALUES']
-            qs += ["({})".format(', '.join([':'+field_ids[f] for f in field_names]))]
-
-        if self._ttl:
-            qs += ["USING TTL {}".format(self._ttl)]
-
-        qs += []
-        qs = ' '.join(qs)
-
+            insert = InsertStatement(self.column_family_name, ttl=self._ttl)
+            for name, col in self.instance._columns.items():
+                val = getattr(self.instance, name, None)
+                if col._val_is_null(val):
+                    if self.instance._values[name].changed:
+                        nulled_fields.add(col.db_field_name)
+                    continue
+                insert.add_assignment_clause(AssignmentClause(
+                    col.db_field_name,
+                    col.to_database(getattr(self.instance, name, None))
+                ))
 
         # skip query execution if it's empty
         # caused by pointless update queries
-        if qs:
+        if not insert.is_empty:
+            qs = str(insert)
+            ctx = insert.get_context()
+
             if self._batch:
-                self._batch.add_query(qs, query_values)
+                self._batch.add_query(qs, ctx)
             else:
-                execute(qs, query_values, self._consistency)
+                execute(qs, ctx, self._consistency)
 
         # delete any nulled columns
         self._delete_null_columns()
