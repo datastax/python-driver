@@ -112,3 +112,6 @@ class QueryUpdateTests(BaseCassEngTestCase):
             assert row.cluster == i
             assert row.count == (6 if i == 3 else i)
             assert row.text == (None if i == 3 else str(i))
+
+    def test_counter_updates(self):
+        pass

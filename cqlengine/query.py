@@ -16,7 +16,7 @@ from cqlengine.functions import QueryValue, Token
 #http://www.datastax.com/docs/1.1/references/cql/index
 from cqlengine.operators import InOperator, EqualsOperator, GreaterThanOperator, GreaterThanOrEqualOperator
 from cqlengine.operators import LessThanOperator, LessThanOrEqualOperator, BaseWhereOperator
-from cqlengine.statements import WhereClause, SelectStatement, DeleteStatement, UpdateStatement
+from cqlengine.statements import WhereClause, SelectStatement, DeleteStatement, UpdateStatement, AssignmentClause
 
 
 class QueryException(CQLEngineException): pass
@@ -767,9 +767,8 @@ class ModelQuerySet(AbstractQuerySet):
         if not values:
             return
 
-        set_statements = []
-        ctx = {}
         nulled_columns = set()
+        us = UpdateStatement(self.column_family_name, where=self._where, ttl=self._ttl)
         for name, val in values.items():
             col = self.model._columns.get(name)
             # check for nonexistant columns
@@ -784,39 +783,28 @@ class ModelQuerySet(AbstractQuerySet):
                 nulled_columns.add(name)
                 continue
             # add the update statements
-            if isinstance(col, (BaseContainerColumn, Counter)):
-                val_mgr = self.instance._values[name]
-                set_statements += col.get_update_statement(val, val_mgr.previous_value, ctx)
-
+            if isinstance(col, Counter):
+                # TODO: implement counter updates
+                raise NotImplementedError
             else:
-                field_id = uuid4().hex
-                set_statements += ['"{}" = :{}'.format(col.db_field_name, field_id)]
-                ctx[field_id] = val
+                us.add_assignment_clause(AssignmentClause(name, col.to_database(val)))
 
-        if set_statements:
-            ttl_stmt = "USING TTL {}".format(self._ttl) if self._ttl else ""
-            qs = "UPDATE {} SET {} WHERE {} {}".format(
-                self.column_family_name,
-                ', '.join(set_statements),
-                self._where_clause(),
-                ttl_stmt
-            )
-            ctx.update(self._where_values())
+        if us.assignments:
+            qs = str(us)
+            ctx = us.get_context()
             if self._batch:
                 self._batch.add_query(qs, ctx)
             else:
                 execute(qs, ctx, self._consistency)
 
         if nulled_columns:
-            qs = "DELETE {} FROM {} WHERE {}".format(
-                ', '.join(nulled_columns),
-                self.column_family_name,
-                self._where_clause()
-            )
+            ds = DeleteStatement(self.column_family_name, fields=nulled_columns, where=self._where)
+            qs = str(ds)
+            ctx = ds.get_context()
             if self._batch:
-                self._batch.add_query(qs, self._where_values())
+                self._batch.add_query(qs, ctx)
             else:
-                execute(qs, self._where_values(), self._consistency)
+                execute(qs, ctx, self._consistency)
 
 
 class DMLQuery(object):
