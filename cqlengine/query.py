@@ -493,7 +493,14 @@ class AbstractQuerySet(object):
             operator_class = BaseWhereOperator.get_operator(col_op or 'EQ')
             operator = operator_class()
 
-            clone._where.append(WhereClause(col_name, operator, column.to_database(val)))
+            if isinstance(operator, InOperator):
+                if not isinstance(val, (list, tuple)):
+                    raise QueryException('IN queries must use a list/tuple value')
+                query_val = [column.to_database(v) for v in val]
+            else:
+                query_val = column.to_database(val)
+
+            clone._where.append(WhereClause(col_name, operator, query_val))
 
         return clone
 
