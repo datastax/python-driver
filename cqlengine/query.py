@@ -228,7 +228,7 @@ class BatchQuery(object):
         self.timestamp = timestamp
         self._consistency = consistency
 
-    def add_query(self, query, params):
+    def add_query(self, query):
         if not isinstance(query, BaseCQLStatement):
             raise CQLEngineException('only BaseCQLStatements can be added to a batch query')
         # TODO: modify query's context id starting point
@@ -308,7 +308,7 @@ class AbstractQuerySet(object):
     def column_family_name(self):
         return self.model.column_family_name()
 
-    def _execute(self, q, params=None):
+    def _execute(self, q):
         if self._batch:
             return self._batch.add_query(q)
         else:
@@ -819,11 +819,11 @@ class DMLQuery(object):
         self._ttl = ttl
         self._consistency = consistency
 
-    def _execute(self, q, params=None):
+    def _execute(self, q):
         if self._batch:
-            return self._batch.add_query(q, params=params)
+            return self._batch.add_query(q)
         else:
-            return execute(q, params=params, consistency_level=self._consistency)
+            return execute(q, consistency_level=self._consistency)
 
     def batch(self, batch_obj):
         if batch_obj is not None and not isinstance(batch_obj, BatchQuery):
