@@ -51,6 +51,17 @@ class TestSetColumn(BaseCassEngTestCase):
         m.int_set.add(5)
         m.save()
 
+    def test_deleting_last_item_should_succeed(self):
+        m = TestSetModel.create()
+        m.int_set.add(5)
+        m.save()
+        m.int_set.remove(5)
+        m.save()
+
+        m = TestSetModel.get(partition=m.partition)
+        self.assertNotIn(5, m.int_set)
+
+
     def test_empty_set_retrieval(self):
         m = TestSetModel.create()
         m2 = TestSetModel.get(partition=m.partition)
@@ -332,6 +343,18 @@ class TestMapColumn(BaseCassEngTestCase):
         tmp2 = TestMapModel.get(partition=tmp.partition)
         tmp2.int_map['blah'] = 1
 
+    def test_remove_last_entry_works(self):
+        tmp = TestMapModel.create()
+        tmp.text_map["blah"] = datetime.now()
+        tmp.save()
+        del tmp.text_map["blah"]
+        tmp.save()
+
+        tmp = TestMapModel.get(partition=tmp.partition)
+        self.assertNotIn("blah", tmp.int_map)
+
+
+
     def test_io_success(self):
         """ Tests that a basic usage works as expected """
         k1 = uuid4()
@@ -388,8 +411,14 @@ class TestMapColumn(BaseCassEngTestCase):
         m.int_map = expected
         m.save()
 
+
         m2 = TestMapModel.get(partition=m.partition)
         assert m2.int_map == expected
+
+        m2.int_map = None
+        m2.save()
+        m3 = TestMapModel.get(partition=m.partition)
+        assert m3.int_map != expected
 
     def test_updates_to_none(self):
         """ Tests that setting the field to None works as expected """
