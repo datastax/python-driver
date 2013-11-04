@@ -322,6 +322,8 @@ class HostConnectionPool(object):
         with self._lock:
             if self._scheduled_for_creation >= _MAX_SIMULTANEOUS_CREATION:
                 return
+            if self.open_count >= self._session.cluster.get_max_connections_per_host(self.host_distance):
+                return
             self._scheduled_for_creation += 1
 
         log.debug("Submitting task for creation of new Connection to %s", self.host)
