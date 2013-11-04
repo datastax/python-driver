@@ -181,7 +181,7 @@ class SetUpdateClause(ContainerUpdateClause):
         """ works out the updates to be performed """
         if self.value is None or self.value == self.previous:
             pass
-        elif self.previous is None or not any({v in self.previous for v in self.value}):
+        elif self.previous is None:
             self._assignments = self.value
         else:
             # partial update time
