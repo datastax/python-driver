@@ -44,6 +44,17 @@ class SelectStatementTests(TestCase):
         ss.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
         self.assertEqual(ss.get_context(), {'0': 'b'})
 
+    def test_context_id_update(self):
+        """ tests that the right things happen the the context id """
+        ss = SelectStatement('table')
+        ss.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
+        self.assertEqual(ss.get_context(), {'0': 'b'})
+        self.assertEqual(str(ss), 'SELECT * FROM table WHERE "a" = :0')
+
+        ss.update_context_id(5)
+        self.assertEqual(ss.get_context(), {'5': 'b'})
+        self.assertEqual(str(ss), 'SELECT * FROM table WHERE "a" = :5')
+
     def test_additional_rendering(self):
         ss = SelectStatement(
             'table',

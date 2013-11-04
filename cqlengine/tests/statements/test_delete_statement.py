@@ -1,5 +1,5 @@
 from unittest import TestCase
-from cqlengine.statements import DeleteStatement, WhereClause
+from cqlengine.statements import DeleteStatement, WhereClause, MapDeleteClause
 from cqlengine.operators import *
 
 
@@ -32,6 +32,15 @@ class DeleteStatementTests(TestCase):
         ds = DeleteStatement('table', None)
         ds.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
         self.assertEqual(unicode(ds), 'DELETE FROM table WHERE "a" = :0', unicode(ds))
+
+    def test_context_update(self):
+        ds = DeleteStatement('table', None)
+        ds.add_field(MapDeleteClause('d', {1: 2}, {1:2, 3: 4}))
+        ds.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
+
+        ds.update_context_id(7)
+        self.assertEqual(unicode(ds), 'DELETE "d"[:8] FROM table WHERE "a" = :7')
+        self.assertEqual(ds.get_context(), {'7': 'b', '8': 3})
 
     def test_context(self):
         ds = DeleteStatement('table', None)

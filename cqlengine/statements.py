@@ -403,7 +403,8 @@ class BaseCQLStatement(object):
         super(BaseCQLStatement, self).__init__()
         self.table = table
         self.consistency = consistency
-        self.context_counter = 0
+        self.context_id = 0
+        self.context_counter = self.context_id
 
         self.where_clauses = []
         for clause in where or []:
@@ -433,6 +434,13 @@ class BaseCQLStatement(object):
 
     def get_context_size(self):
         return len(self.get_context())
+
+    def update_context_id(self, i):
+        self.context_id = i
+        self.context_counter = self.context_id
+        for clause in self.where_clauses:
+            clause.set_context_id(self.context_counter)
+            self.context_counter += clause.get_context_size()
 
     def __unicode__(self):
         raise NotImplementedError
@@ -517,6 +525,12 @@ class AssignmentStatement(BaseCQLStatement):
         for assignment in assignments or []:
             self.add_assignment_clause(assignment)
 
+    def update_context_id(self, i):
+        super(AssignmentStatement, self).update_context_id(i)
+        for assignment in self.assignments:
+            assignment.set_context_id(self.context_counter)
+            self.context_counter += assignment.get_context_size()
+
     def add_assignment_clause(self, clause):
         """
         adds an assignment clause to this statement
@@ -594,6 +608,12 @@ class DeleteStatement(BaseCQLStatement):
             fields = [fields]
         for field in fields or []:
             self.add_field(field)
+
+    def update_context_id(self, i):
+        super(DeleteStatement, self).update_context_id(i)
+        for field in self.fields:
+            field.set_context_id(self.context_counter)
+            self.context_counter += field.get_context_size()
 
     def get_context(self):
         ctx = super(DeleteStatement, self).get_context()

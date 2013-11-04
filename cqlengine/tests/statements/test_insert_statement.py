@@ -20,6 +20,19 @@ class InsertStatementTests(TestCase):
             'INSERT INTO table ("a", "c") VALUES (:0, :1)'
         )
 
+    def test_context_update(self):
+        ist = InsertStatement('table', None)
+        ist.add_assignment_clause(AssignmentClause('a', 'b'))
+        ist.add_assignment_clause(AssignmentClause('c', 'd'))
+
+        ist.update_context_id(4)
+        self.assertEqual(
+            unicode(ist),
+            'INSERT INTO table ("a", "c") VALUES (:4, :5)'
+        )
+        ctx = ist.get_context()
+        self.assertEqual(ctx, {'4': 'b', '5': 'd'})
+
     def test_additional_rendering(self):
         ist = InsertStatement('table', ttl=60)
         ist.add_assignment_clause(AssignmentClause('a', 'b'))

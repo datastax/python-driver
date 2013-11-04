@@ -25,6 +25,15 @@ class UpdateStatementTests(TestCase):
         us.add_where_clause(WhereClause('a', EqualsOperator(), 'x'))
         self.assertEqual(us.get_context(), {'0': 'b', '1': 'd', '2': 'x'})
 
+    def test_context_update(self):
+        us = UpdateStatement('table')
+        us.add_assignment_clause(AssignmentClause('a', 'b'))
+        us.add_assignment_clause(AssignmentClause('c', 'd'))
+        us.add_where_clause(WhereClause('a', EqualsOperator(), 'x'))
+        us.update_context_id(3)
+        self.assertEqual(unicode(us), 'UPDATE table SET "a" = :4, "c" = :5 WHERE "a" = :3')
+        self.assertEqual(us.get_context(), {'4': 'b', '5': 'd', '3': 'x'})
+
     def test_additional_rendering(self):
         us = UpdateStatement('table', ttl=60)
         us.add_assignment_clause(AssignmentClause('a', 'b'))
