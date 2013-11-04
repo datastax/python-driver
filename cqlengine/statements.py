@@ -329,6 +329,25 @@ class MapUpdateClause(ContainerUpdateClause):
         return ', '.join(qs)
 
 
+class CounterUpdateClause(ContainerUpdateClause):
+
+    def __init__(self, field, value, previous=None, column=None):
+        super(CounterUpdateClause, self).__init__(field, value, previous, column)
+        self.previous = self.previous or 0
+
+    def get_context_size(self):
+        return 1 if self.value != self.previous else 0
+
+    def update_context(self, ctx):
+        if self.value != self.previous:
+            ctx[str(self.context_id)] = self._to_database(abs(self.value - self.previous))
+
+    def __unicode__(self):
+        delta = self.value - self.previous
+        sign = '-' if delta < 0 else '+'
+        return '"{0}" = "{0}" {1} :{2}'.format(self.field, sign, self.context_id)
+
+
 class BaseDeleteClause(BaseClause):
     pass
 

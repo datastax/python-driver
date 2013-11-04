@@ -1,5 +1,5 @@
 from unittest import TestCase
-from cqlengine.statements import AssignmentClause, SetUpdateClause, ListUpdateClause, MapUpdateClause, MapDeleteClause, FieldDeleteClause
+from cqlengine.statements import AssignmentClause, SetUpdateClause, ListUpdateClause, MapUpdateClause, MapDeleteClause, FieldDeleteClause, CounterUpdateClause
 
 
 class AssignmentClauseTests(TestCase):
@@ -266,6 +266,37 @@ class MapUpdateTests(TestCase):
         c.set_context_id(0)
 
         self.assertNotIn(1, c._updates)
+
+
+class CounterUpdateTests(TestCase):
+
+    def test_positive_update(self):
+        c = CounterUpdateClause('a', 5, 3)
+        c.set_context_id(5)
+
+        self.assertEqual(c.get_context_size(), 1)
+        self.assertEqual(str(c), '"a" = "a" + :5')
+
+        ctx = {}
+        c.update_context(ctx)
+        self.assertEqual(ctx, {'5': 2})
+
+    def test_negative_update(self):
+        c = CounterUpdateClause('a', 4, 7)
+        c.set_context_id(3)
+
+        self.assertEqual(c.get_context_size(), 1)
+        self.assertEqual(str(c), '"a" = "a" - :3')
+
+        ctx = {}
+        c.update_context(ctx)
+        self.assertEqual(ctx, {'3': 3})
+
+    def noop_update(self):
+        c = CounterUpdateClause('a', 5, 5)
+        c.set_context_id(5)
+
+        self.assertEqual(c.get_context_size(), 0)
 
 
 class MapDeleteTests(TestCase):
