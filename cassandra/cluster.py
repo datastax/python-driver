@@ -1708,7 +1708,8 @@ class ResponseFuture(object):
         return request_id
 
     def _reprepare(self, prepare_message):
-        request_id = self._query(self._current_host, prepare_message, cb=self._execute_after_prepare)
+        cb = partial(self.session.submit, self._execute_after_prepare)
+        request_id = self._query(self._current_host, prepare_message, cb=cb)
         if request_id is None:
             # try to submit the original prepared statement on some other host
             self.send_request()
