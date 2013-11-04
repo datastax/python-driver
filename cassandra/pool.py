@@ -347,6 +347,7 @@ class HostConnectionPool(object):
 
             self.open_count += 1
 
+        log.debug("Going to open new connection to host %s", self.host)
         try:
             conn = self._session.cluster.connection_factory(self.host.address)
             if self._session.keyspace:
