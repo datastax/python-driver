@@ -231,8 +231,7 @@ class BatchQuery(object):
     def add_query(self, query):
         if not isinstance(query, BaseCQLStatement):
             raise CQLEngineException('only BaseCQLStatements can be added to a batch query')
-        # TODO: modify query's context id starting point
-        self.queries.append((str(query), query.get_context()))
+        self.queries.append(query)
 
     def consistency(self, consistency):
         self._consistency = consistency
@@ -250,9 +249,13 @@ class BatchQuery(object):
 
         query_list = [opener]
         parameters = {}
-        for query, params in self.queries:
-            query_list.append('  ' + query)
-            parameters.update(params)
+        ctx_counter = 0
+        for query in self.queries:
+            query.update_context_id(ctx_counter)
+            ctx = query.get_context()
+            ctx_counter += len(ctx)
+            query_list.append('  ' + str(query))
+            parameters.update(ctx)
 
         query_list.append('APPLY BATCH;')
 
