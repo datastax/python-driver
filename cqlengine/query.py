@@ -16,7 +16,7 @@ from cqlengine.functions import QueryValue, Token, BaseQueryFunction
 #http://www.datastax.com/docs/1.1/references/cql/index
 from cqlengine.operators import InOperator, EqualsOperator, GreaterThanOperator, GreaterThanOrEqualOperator
 from cqlengine.operators import LessThanOperator, LessThanOrEqualOperator, BaseWhereOperator
-from cqlengine.statements import WhereClause, SelectStatement, DeleteStatement, UpdateStatement, AssignmentClause, InsertStatement, BaseCQLStatement, MapUpdateClause, MapDeleteClause, ListUpdateClause, SetUpdateClause
+from cqlengine.statements import WhereClause, SelectStatement, DeleteStatement, UpdateStatement, AssignmentClause, InsertStatement, BaseCQLStatement, MapUpdateClause, MapDeleteClause, ListUpdateClause, SetUpdateClause, CounterUpdateClause
 
 
 class QueryException(CQLEngineException): pass
@@ -883,20 +883,18 @@ class DMLQuery(object):
                 if not val_mgr.changed and not isinstance(col, Counter):
                     continue
 
-                if isinstance(col, List):
-                    clause = ListUpdateClause(col.db_field_name, val, val_mgr.previous_value, column=col)
+                if isinstance(col, (BaseContainerColumn, Counter)):
+                    # get appropriate clause
+                    if isinstance(col, List): klass = ListUpdateClause
+                    elif isinstance(col, Map): klass = MapUpdateClause
+                    elif isinstance(col, Set): klass = SetUpdateClause
+                    elif isinstance(col, Counter): klass = CounterUpdateClause
+                    else: raise RuntimeError
+
+                    # do the stuff
+                    clause = klass(col.db_field_name, val, val_mgr.previous_value, column=col)
                     if clause.get_context_size() > 0:
                         statement.add_assignment_clause(clause)
-                elif isinstance(col, Map):
-                    clause = MapUpdateClause(col.db_field_name, val, val_mgr.previous_value, column=col)
-                    if clause.get_context_size() > 0:
-                        statement.add_assignment_clause(clause)
-                elif isinstance(col, Set):
-                    clause = SetUpdateClause(col.db_field_name, val, val_mgr.previous_value, column=col)
-                    if clause.get_context_size() > 0:
-                        statement.add_assignment_clause(clause)
-                elif isinstance(col, Counter):
-                    raise NotImplementedError
                 else:
                     statement.add_assignment_clause(AssignmentClause(
                         col.db_field_name,
