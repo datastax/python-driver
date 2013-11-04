@@ -1,16 +1,12 @@
 import copy
 from datetime import datetime
-from uuid import uuid4
-from hashlib import md5
-from time import time
-from uuid import uuid1
-from cqlengine import BaseContainerColumn, BaseValueManager, Map, columns
+from cqlengine import BaseContainerColumn, Map, columns
 from cqlengine.columns import Counter, List, Set
 
-from cqlengine.connection import connection_manager, execute, RowResult
+from cqlengine.connection import execute, RowResult
 
 from cqlengine.exceptions import CQLEngineException, ValidationError
-from cqlengine.functions import QueryValue, Token, BaseQueryFunction
+from cqlengine.functions import Token, BaseQueryFunction
 
 #CQL 3 reference:
 #http://www.datastax.com/docs/1.1/references/cql/index
@@ -23,150 +19,6 @@ class QueryException(CQLEngineException): pass
 class DoesNotExist(QueryException): pass
 class MultipleObjectsReturned(QueryException): pass
 
-
-# class QueryOperatorException(QueryException): pass
-#
-#
-# class QueryOperator(object):
-#     # The symbol that identifies this operator in filter kwargs
-#     # ie: colname__<symbol>
-#     symbol = None
-#
-#     # The comparator symbol this operator uses in cql
-#     cql_symbol = None
-#
-#     QUERY_VALUE_WRAPPER = QueryValue
-#
-#     def __init__(self, column, value):
-#         self.column = column
-#         self.value = value
-#
-#         if isinstance(value, QueryValue):
-#             self.query_value = value
-#         else:
-#             self.query_value = self.QUERY_VALUE_WRAPPER(value)
-#
-#         #perform validation on this operator
-#         self.validate_operator()
-#         self.validate_value()
-#
-#     @property
-#     def cql(self):
-#         """
-#         Returns this operator's portion of the WHERE clause
-#         """
-#         return '{} {} {}'.format(self.column.cql, self.cql_symbol, self.query_value.cql)
-#
-#     def validate_operator(self):
-#         """
-#         Checks that this operator can be used on the column provided
-#         """
-#         if self.symbol is None:
-#             raise QueryOperatorException(
-#                     "{} is not a valid operator, use one with 'symbol' defined".format(
-#                         self.__class__.__name__
-#                     )
-#                 )
-#         if self.cql_symbol is None:
-#             raise QueryOperatorException(
-#                     "{} is not a valid operator, use one with 'cql_symbol' defined".format(
-#                         self.__class__.__name__
-#                     )
-#                 )
-#
-#     def validate_value(self):
-#         """
-#         Checks that the compare value works with this operator
-#
-#         Doesn't do anything by default
-#         """
-#         pass
-#
-#     def get_dict(self):
-#         """
-#         Returns this operators contribution to the cql.query arg dictionanry
-#
-#         ie: if this column's name is colname, and the identifier is colval,
-#         this should return the dict: {'colval':<self.value>}
-#         SELECT * FROM column_family WHERE colname=:colval
-#         """
-#         return self.query_value.get_dict(self.column)
-#
-#     @classmethod
-#     def get_operator(cls, symbol):
-#         if not hasattr(cls, 'opmap'):
-#             QueryOperator.opmap = {}
-#             def _recurse(klass):
-#                 if klass.symbol:
-#                     QueryOperator.opmap[klass.symbol.upper()] = klass
-#                 for subklass in klass.__subclasses__():
-#                     _recurse(subklass)
-#                 pass
-#             _recurse(QueryOperator)
-#         try:
-#             return QueryOperator.opmap[symbol.upper()]
-#         except KeyError:
-#             raise QueryOperatorException("{} doesn't map to a QueryOperator".format(symbol))
-#
-#     # equality operator, used by tests
-#
-#     def __eq__(self, op):
-#         return self.__class__ is op.__class__ and \
-#                 self.column.db_field_name == op.column.db_field_name and \
-#                 self.value == op.value
-#
-#     def __ne__(self, op):
-#         return not (self == op)
-#
-#     def __hash__(self):
-#         return hash(self.column.db_field_name) ^ hash(self.value)
-#
-#
-# class EqualsOperator(QueryOperator):
-#     symbol = 'EQ'
-#     cql_symbol = '='
-#
-#
-# class IterableQueryValue(QueryValue):
-#     def __init__(self, value):
-#         try:
-#             super(IterableQueryValue, self).__init__(value, [uuid4().hex for i in value])
-#         except TypeError:
-#             raise QueryException("in operator arguments must be iterable, {} found".format(value))
-#
-#     def get_dict(self, column):
-#         return dict((i, column.to_database(v)) for (i, v) in zip(self.identifier, self.value))
-#
-#     def get_cql(self):
-#         return '({})'.format(', '.join(':{}'.format(i) for i in self.identifier))
-#
-#
-# class InOperator(EqualsOperator):
-#     symbol = 'IN'
-#     cql_symbol = 'IN'
-#
-#     QUERY_VALUE_WRAPPER = IterableQueryValue
-#
-#
-# class GreaterThanOperator(QueryOperator):
-#     symbol = "GT"
-#     cql_symbol = '>'
-#
-#
-# class GreaterThanOrEqualOperator(QueryOperator):
-#     symbol = "GTE"
-#     cql_symbol = '>='
-#
-#
-# class LessThanOperator(QueryOperator):
-#     symbol = "LT"
-#     cql_symbol = '<'
-#
-#
-# class LessThanOrEqualOperator(QueryOperator):
-#     symbol = "LTE"
-#     cql_symbol = '<='
-#
 
 class AbstractQueryableColumn(object):
     """
@@ -318,7 +170,7 @@ class AbstractQuerySet(object):
             return execute(q, consistency_level=self._consistency)
 
     def __unicode__(self):
-        return self._select_query()
+        return unicode(self._select_query())
 
     def __str__(self):
         return str(self.__unicode__())
@@ -328,7 +180,7 @@ class AbstractQuerySet(object):
 
     def __deepcopy__(self, memo):
         clone = self.__class__(self.model)
-        for k,v in self.__dict__.items():
+        for k, v in self.__dict__.items():
             if k in ['_con', '_cur', '_result_cache', '_result_idx']: # don't clone these
                 clone.__dict__[k] = None
             elif k == '_batch':
