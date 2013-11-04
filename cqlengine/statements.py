@@ -313,8 +313,9 @@ class MapUpdateClause(ContainerUpdateClause):
         if not self._analyzed: self._analyze()
         ctx_id = self.context_id
         for key in self._updates or []:
-            ctx[str(ctx_id)] = key
-            ctx[str(ctx_id + 1)] = self._to_database(self.value.get(key))
+            val = self.value.get(key)
+            ctx[str(ctx_id)] = self._column.key_col.to_database(key) if self._column else key
+            ctx[str(ctx_id + 1)] = self._column.value_col.to_database(val) if self._column else val
             ctx_id += 2
 
     def __unicode__(self):
