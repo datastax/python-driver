@@ -296,7 +296,12 @@ class CounterUpdateTests(TestCase):
         c = CounterUpdateClause('a', 5, 5)
         c.set_context_id(5)
 
-        self.assertEqual(c.get_context_size(), 0)
+        self.assertEqual(c.get_context_size(), 1)
+        self.assertEqual(str(c), '"a" = "a" + :5')
+
+        ctx = {}
+        c.update_context(ctx)
+        self.assertEqual(ctx, {'5': 0})
 
 
 class MapDeleteTests(TestCase):

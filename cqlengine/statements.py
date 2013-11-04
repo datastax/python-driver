@@ -337,11 +337,10 @@ class CounterUpdateClause(ContainerUpdateClause):
         self.previous = self.previous or 0
 
     def get_context_size(self):
-        return 1 if self.value != self.previous else 0
+        return 1
 
     def update_context(self, ctx):
-        if self.value != self.previous:
-            ctx[str(self.context_id)] = self._to_database(abs(self.value - self.previous))
+        ctx[str(self.context_id)] = self._to_database(abs(self.value - self.previous))
 
     def __unicode__(self):
         delta = self.value - self.previous
