@@ -228,7 +228,7 @@ class _HostReconnectionHandler(_ReconnectionHandler):
 
 
 _MAX_SIMULTANEOUS_CREATION = 1
-_MIN_TRASH_INTERVAL = 5
+_MIN_TRASH_INTERVAL = 10
 
 
 class HostConnectionPool(object):
