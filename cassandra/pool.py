@@ -543,4 +543,4 @@ class HostConnectionPool(object):
 
     def get_state(self):
         in_flights = ", ".join([str(c.in_flight) for c in self._connections])
-        return "shutdown: %s, in_flights: %s" % (self.is_shutdown, in_flights)
+        return "shutdown: %s, open_count: %d, in_flights: %s" % (self.is_shutdown, self.open_count, in_flights)
