@@ -135,11 +135,15 @@ class AssignmentClause(BaseClause):
 
 class ContainerUpdateClause(AssignmentClause):
 
-    def __init__(self, field, value, previous=None):
+    def __init__(self, field, value, previous=None, column=None):
         super(ContainerUpdateClause, self).__init__(field, value)
         self.previous = previous
         self._assignments = None
         self._analyzed = False
+        self._column = column
+
+    def _to_database(self, val):
+        return self._column.to_database(val) if self._column else val
 
     def _analyze(self):
         raise NotImplementedError
@@ -154,8 +158,8 @@ class ContainerUpdateClause(AssignmentClause):
 class SetUpdateClause(ContainerUpdateClause):
     """ updates a set collection """
 
-    def __init__(self, field, value, previous=None):
-        super(SetUpdateClause, self).__init__(field, value, previous)
+    def __init__(self, field, value, previous=None, column=None):
+        super(SetUpdateClause, self).__init__(field, value, previous, column=column)
         self._additions = None
         self._removals = None
 
@@ -193,20 +197,20 @@ class SetUpdateClause(ContainerUpdateClause):
         if not self._analyzed: self._analyze()
         ctx_id = self.context_id
         if self._assignments:
-            ctx[str(ctx_id)] = self._assignments
+            ctx[str(ctx_id)] = self._to_database(self._assignments)
             ctx_id += 1
         if self._additions:
-            ctx[str(ctx_id)] = self._additions
+            ctx[str(ctx_id)] = self._to_database(self._additions)
             ctx_id += 1
         if self._removals:
-            ctx[str(ctx_id)] = self._removals
+            ctx[str(ctx_id)] = self._to_database(self._removals)
 
 
 class ListUpdateClause(ContainerUpdateClause):
     """ updates a list collection """
 
-    def __init__(self, field, value, previous=None):
-        super(ListUpdateClause, self).__init__(field, value, previous)
+    def __init__(self, field, value, previous=None, column=None):
+        super(ListUpdateClause, self).__init__(field, value, previous, column=column)
         self._append = None
         self._prepend = None
 
@@ -235,16 +239,16 @@ class ListUpdateClause(ContainerUpdateClause):
         if not self._analyzed: self._analyze()
         ctx_id = self.context_id
         if self._assignments:
-            ctx[str(ctx_id)] = self._assignments
+            ctx[str(ctx_id)] = self._to_database(self._assignments)
             ctx_id += 1
         if self._prepend:
             # CQL seems to prepend element at a time, starting
             # with the element at idx 0, we can either reverse
             # it here, or have it inserted in reverse
-            ctx[str(ctx_id)] = list(reversed(self._prepend))
+            ctx[str(ctx_id)] = self._to_database(list(reversed(self._prepend)))
             ctx_id += 1
         if self._append:
-            ctx[str(ctx_id)] = self._append
+            ctx[str(ctx_id)] = self._to_database(self._append)
 
     def _analyze(self):
         """ works out the updates to be performed """
@@ -292,8 +296,8 @@ class ListUpdateClause(ContainerUpdateClause):
 class MapUpdateClause(ContainerUpdateClause):
     """ updates a map collection """
 
-    def __init__(self, field, value, previous=None):
-        super(MapUpdateClause, self).__init__(field, value, previous)
+    def __init__(self, field, value, previous=None, column=None):
+        super(MapUpdateClause, self).__init__(field, value, previous, column=column)
         self._updates = None
         self.previous = self.previous or {}
 
@@ -310,7 +314,7 @@ class MapUpdateClause(ContainerUpdateClause):
         ctx_id = self.context_id
         for key in self._updates or []:
             ctx[str(ctx_id)] = key
-            ctx[str(ctx_id + 1)] = self.value.get(key)
+            ctx[str(ctx_id + 1)] = self._to_database(self.value.get(key))
             ctx_id += 2
 
     def __unicode__(self):
@@ -407,6 +411,9 @@ class BaseCQLStatement(object):
         for clause in self.where_clauses or []:
             clause.update_context(ctx)
         return ctx
+
+    def get_context_size(self):
+        return len(self.get_context())
 
     def __unicode__(self):
         raise NotImplementedError

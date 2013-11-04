@@ -5,7 +5,7 @@ from hashlib import md5
 from time import time
 from uuid import uuid1
 from cqlengine import BaseContainerColumn, BaseValueManager, Map, columns
-from cqlengine.columns import Counter
+from cqlengine.columns import Counter, List, Set
 
 from cqlengine.connection import connection_manager, execute, RowResult
 
@@ -16,7 +16,7 @@ from cqlengine.functions import QueryValue, Token, BaseQueryFunction
 #http://www.datastax.com/docs/1.1/references/cql/index
 from cqlengine.operators import InOperator, EqualsOperator, GreaterThanOperator, GreaterThanOrEqualOperator
 from cqlengine.operators import LessThanOperator, LessThanOrEqualOperator, BaseWhereOperator
-from cqlengine.statements import WhereClause, SelectStatement, DeleteStatement, UpdateStatement, AssignmentClause, InsertStatement, BaseCQLStatement, MapUpdateClause, MapDeleteClause
+from cqlengine.statements import WhereClause, SelectStatement, DeleteStatement, UpdateStatement, AssignmentClause, InsertStatement, BaseCQLStatement, MapUpdateClause, MapDeleteClause, ListUpdateClause, SetUpdateClause
 
 
 class QueryException(CQLEngineException): pass
@@ -868,82 +868,51 @@ class DMLQuery(object):
             raise CQLEngineException("DML Query intance attribute is None")
         assert type(self.instance) == self.model
 
-        values, field_names, field_ids, field_values, query_values = self._get_query_values()
-
-        qs = []
-        qs += ["UPDATE {}".format(self.column_family_name)]
-        qs += ["SET"]
-
-        set_statements = []
+        statement = UpdateStatement(self.column_family_name, ttl=self._ttl)
         #get defined fields and their column names
         for name, col in self.model._columns.items():
             if not col.is_primary_key:
-                val = values.get(name)
+                val = getattr(self.instance, name, None)
+                val_mgr = self.instance._values[name]
 
                 # don't update something that is null
                 if val is None:
                     continue
 
                 # don't update something if it hasn't changed
-                if not self.instance._values[name].changed and not isinstance(col, Counter):
+                if not val_mgr.changed and not isinstance(col, Counter):
                     continue
 
-                # add the update statements
-                if isinstance(col, (BaseContainerColumn, Counter)):
-                    #remove value from query values, the column will handle it
-                    query_values.pop(field_ids.get(name), None)
-
-                    val_mgr = self.instance._values[name]
-                    set_statements += col.get_update_statement(val, val_mgr.previous_value, query_values)
-
+                if isinstance(col, List):
+                    clause = ListUpdateClause(col.db_field_name, val, val_mgr.previous_value, column=col)
+                    if clause.get_context_size() > 0:
+                        statement.add_assignment_clause(clause)
+                elif isinstance(col, Map):
+                    clause = MapUpdateClause(col.db_field_name, val, val_mgr.previous_value, column=col)
+                    if clause.get_context_size() > 0:
+                        statement.add_assignment_clause(clause)
+                elif isinstance(col, Set):
+                    clause = SetUpdateClause(col.db_field_name, val, val_mgr.previous_value, column=col)
+                    if clause.get_context_size() > 0:
+                        statement.add_assignment_clause(clause)
+                elif isinstance(col, Counter):
+                    raise NotImplementedError
                 else:
-                    set_statements += ['"{}" = :{}'.format(col.db_field_name, field_ids[col.db_field_name])]
-        qs += [', '.join(set_statements)]
+                    statement.add_assignment_clause(AssignmentClause(
+                        col.db_field_name,
+                        col.to_database(val)
+                    ))
 
-        qs += ['WHERE']
-
-        where_statements = []
-        for name, col in self.model._primary_keys.items():
-            where_statements += ['"{}" = :{}'.format(col.db_field_name, field_ids[col.db_field_name])]
-
-        qs += [' AND '.join(where_statements)]
-
-        if self._ttl:
-            qs += ["USING TTL {}".format(self._ttl)]
-
-        # clear the qs if there are no set statements and this is not a counter model
-        if not set_statements and not self.instance._has_counter:
-            qs = []
-
-        qs = ' '.join(qs)
-        # skip query execution if it's empty
-        # caused by pointless update queries
-        if qs:
-            self._execute(qs, query_values)
+        if statement.get_context_size() > 0 or self.instance._has_counter:
+            for name, col in self.model._primary_keys.items():
+                statement.add_where_clause(WhereClause(
+                    col.db_field_name,
+                    EqualsOperator(),
+                    col.to_database(getattr(self.instance, name))
+                ))
+            self._execute(statement)
 
         self._delete_null_columns()
-
-    # TODO: delete
-    def _get_query_values(self):
-        """
-        returns all the data needed to do queries
-        """
-        #organize data
-        value_pairs = []
-        values = self.instance._as_dict()
-
-        #get defined fields and their column names
-        for name, col in self.model._columns.items():
-            val = values.get(name)
-            if col._val_is_null(val): continue
-            value_pairs += [(col.db_field_name, val)]
-
-        #construct query string
-        field_names = zip(*value_pairs)[0]
-        field_ids = {n:uuid4().hex for n in field_names}
-        field_values = dict(value_pairs)
-        query_values = {field_ids[n]:field_values[n] for n in field_names}
-        return values, field_names, field_ids, field_values, query_values
 
     def save(self):
         """
