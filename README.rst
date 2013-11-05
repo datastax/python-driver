@@ -31,12 +31,12 @@ the instructions in the section below before installing the driver.
 
 Installation through pip is recommended::
 
-    $ sudo pip install cassandra-driver
+    $ pip install cassandra-driver
 
 If you want to install manually, you can instead do::
 
-    $ sudo pip install futures scales blist # install dependencies
-    $ sudo python setup.py install
+    $ pip install futures scales blist # install dependencies
+    $ python setup.py install
 
 C Extensions
 ^^^^^^^^^^^^
@@ -103,11 +103,11 @@ be used automatically.
 
 For lz4 support::
 
-    sudo pip install lz4
+    $ pip install lz4
 
 For snappy support::
 
-    sudo pip install python-snappy
+    $ pip install python-snappy
 
 (If using a Debian Linux derivative such as Ubuntu, it may be easier to
 just run ``apt-get install python-snappy``.)
