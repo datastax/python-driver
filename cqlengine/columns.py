@@ -321,6 +321,7 @@ class DateTime(Column):
     db_type = 'timestamp'
 
     def to_python(self, value):
+        if value is None: return
         if isinstance(value, datetime):
             return value
         elif isinstance(value, date):
@@ -346,6 +347,7 @@ class Date(Column):
 
 
     def to_python(self, value):
+        if value is None: return
         if isinstance(value, datetime):
             return value.date()
         elif isinstance(value, date):
@@ -355,6 +357,7 @@ class Date(Column):
 
     def to_database(self, value):
         value = super(Date, self).to_database(value)
+        if value is None: return
         if isinstance(value, datetime):
             value = value.date()
         if not isinstance(value, date):

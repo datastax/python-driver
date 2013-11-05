@@ -69,6 +69,14 @@ class TestDatetime(BaseCassEngTestCase):
         dt2 = self.DatetimeTest.objects(test_id=0).first()
         assert dt2.created_at.isoformat() == datetime(today.year, today.month, today.day).isoformat()
 
+    def test_datetime_none(self):
+        dt = self.DatetimeTest.objects.create(test_id=1, created_at=None)
+        dt2 = self.DatetimeTest.objects(test_id=1).first()
+        assert dt2.created_at is None
+
+        dts = self.DatetimeTest.objects.filter(test_id=1).values_list('created_at')
+        assert dts[0][0] is None
+
 
 class TestVarInt(BaseCassEngTestCase):
     class VarIntTest(Model):
@@ -120,6 +128,14 @@ class TestDate(BaseCassEngTestCase):
         assert not isinstance(dt2.created_at, datetime)
         assert isinstance(dt2.created_at, date)
         assert dt2.created_at.isoformat() == now.date().isoformat()
+
+    def test_date_none(self):
+        self.DateTest.objects.create(test_id=1, created_at=None)
+        dt2 = self.DateTest.objects(test_id=1).first()
+        assert dt2.created_at is None
+
+        dts = self.DateTest.objects(test_id=1).values_list('created_at')
+        assert dts[0][0] is None
 
 
 class TestDecimal(BaseCassEngTestCase):
