@@ -3,7 +3,6 @@ from cassandra.query import SimpleStatement
 from cassandra import ConsistencyLevel, WriteTimeout, Unavailable, ReadTimeout
 
 from cassandra.cluster import Cluster, NoHostAvailable
-from cassandra.decoder import QueryMessage
 from tests.integration import get_node, get_cluster
 
 
@@ -133,11 +132,9 @@ class MetricsTests(unittest.TestCase):
         # TODO: Bootstrapping or Overloaded cases
         pass
 
-
     def test_ignore(self):
         # TODO: Look for ways to generate ignores
         pass
-
 
     def test_retry(self):
         # TODO: Look for ways to generate retries
