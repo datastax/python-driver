@@ -259,6 +259,9 @@ class LibevConnection(Connection):
                     else:
                         self._total_reqd_bytes = body_len + 8
                         break
+        else:
+            log.debug("Connection %s closed by server", self)
+            self.close()
 
     def handle_pushed(self, response):
         log.debug("Message pushed from server: %r", response)
