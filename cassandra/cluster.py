@@ -833,7 +833,7 @@ class Session(object):
             future = self.add_or_renew_pool(host, is_host_addition=False)
             future.result()
 
-    def execute(self, query, parameters=None, trace=False):
+    def execute(self, query, parameters=None, trace=False, consistency_level=None):
         """
         Execute the given query and synchronously wait for the response.
 
@@ -860,7 +860,7 @@ class Session(object):
                 "The query argument must be an instance of a subclass of "
                 "cassandra.query.Statement when trace=True")
 
-        future = self.execute_async(query, parameters, trace)
+        future = self.execute_async(query, parameters, trace, consistency_level)
         try:
             result = future.result()
         finally:
@@ -872,7 +872,7 @@ class Session(object):
 
         return result
 
-    def execute_async(self, query, parameters=None, trace=False):
+    def execute_async(self, query, parameters=None, trace=False, consistency_level=None):
         """
         Execute the given query and return a :class:`~.ResponseFuture` object
         which callbacks may be attached to for asynchronous response
@@ -909,21 +909,25 @@ class Session(object):
             ...     log.exception("Operation failed:")
 
         """
+
         if isinstance(query, basestring):
             query = SimpleStatement(query)
         elif isinstance(query, PreparedStatement):
             query = query.bind(parameters)
 
+        if consistency_level is None:
+            consistency_level = query.consistency_level
+
         if isinstance(query, BoundStatement):
             message = ExecuteMessage(
                 query_id=query.prepared_statement.query_id,
                 query_params=query.values,
-                consistency_level=query.consistency_level)
+                consistency_level=consistency_level)
         else:
             query_string = query.query_string
             if parameters:
                 query_string = bind_params(query.query_string, parameters)
-            message = QueryMessage(query=query_string, consistency_level=query.consistency_level)
+            message = QueryMessage(query=query_string, consistency_level=consistency_level)
 
         if trace:
             message.tracing = True
