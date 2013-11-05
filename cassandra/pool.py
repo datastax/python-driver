@@ -82,6 +82,8 @@ class Host(object):
         self._rack = rack
 
     def set_up(self):
+        if not self.is_up:
+            log.debug("Host %s is now marked up", self.address)
         self.conviction_policy.reset()
         self.is_up = True
 

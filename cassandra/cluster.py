@@ -612,7 +612,7 @@ class Cluster(object):
         if self._is_shutdown:
             return
 
-        log.debug("Adding new host %s", host)
+        log.debug("Adding or renewing pools for new host %s and notifying listeners", host)
         self._prepare_all_queries(host)
 
         self.load_balancing_policy.on_add(host)
@@ -634,27 +634,35 @@ class Cluster(object):
                 if futures:
                     return
 
-            # all futures have completed at this point
+            log.debug('All futures have completed for added host %s', host)
+
             for exc in [f for f in futures_results if isinstance(f, Exception)]:
                 log.error("Unexpected failure while adding node %s, will not mark up:", host, exc_info=exc)
                 return
 
             if not all(futures_results):
-                log.debug("Connection pool could not be created, not marking node %s up:", host)
+                log.warn("Connection pool could not be created, not marking node %s up:", host)
                 return
 
-            # mark the host as up and notify all listeners
-            host.set_up()
-            for listener in self.listeners:
-                listener.on_add(host)
-
-            # see if there are any pools to add or remove now that the host is marked up
-            for session in self.sessions:
-                session.update_created_pools()
+            self._finalize_add(host)
 
         for session in self.sessions:
-            future = session.add_or_renew_host(host, is_host_addition=True)
+            future = session.add_or_renew_pool(host, is_host_addition=True)
+            futures.add(future)
             future.add_done_callback(future_completed)
+
+        if not futures:
+            self._finalize_add(host)
+
+    def _finalize_add(self, host):
+        # mark the host as up and notify all listeners
+        host.set_up()
+        for listener in self.listeners:
+            listener.on_add(host)
+
+        # see if there are any pools to add or remove now that the host is marked up
+        for session in self.sessions:
+            session.update_created_pools()
 
     def on_remove(self, host):
         if self._is_shutdown:
