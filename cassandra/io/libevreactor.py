@@ -217,14 +217,17 @@ class LibevConnection(Connection):
 
     def handle_read(self, watcher, revents):
         try:
-            buf = self._socket.recv(self.in_buffer_size)
+            while True:
+                buf = self._socket.recv(self.in_buffer_size)
+                self._iobuf.write(buf)
+                if len(buf) < self.in_buffer_size:
+                    break
         except socket.error as err:
             if err.args[0] not in NONBLOCKING:
                 self.defunct(err)
             return
 
-        if buf:
-            self._iobuf.write(buf)
+        if self._iobuf.tell():
             while True:
                 pos = self._iobuf.tell()
                 if pos < 8 or (self._total_reqd_bytes > 0 and pos < self._total_reqd_bytes):
@@ -256,9 +259,6 @@ class LibevConnection(Connection):
                     else:
                         self._total_reqd_bytes = body_len + 8
                         break
-        else:
-            log.debug("connection (%s) to host %s closed by server", id(self), self.host)
-            self.close()
 
     def handle_pushed(self, response):
         log.debug("Message pushed from server: %r", response)
