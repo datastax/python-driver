@@ -189,10 +189,16 @@ IO_is_active(libevwrapper_IO *self) {
     return PyBool_FromLong(ev_is_active(&self->io));
 }
 
+static PyObject*
+IO_is_pending(libevwrapper_IO *self) {
+    return PyBool_FromLong(ev_is_pending(&self->io));
+}
+
 static PyMethodDef IO_methods[] = {
     {"start", (PyCFunction)IO_start, METH_NOARGS, "Start the watcher"},
     {"stop", (PyCFunction)IO_stop, METH_NOARGS, "Stop the watcher"},
     {"is_active", (PyCFunction)IO_is_active, METH_NOARGS, "Is the watcher active?"},
+    {"is_pending", (PyCFunction)IO_is_pending, METH_NOARGS, "Is the watcher pending?"},
     {NULL}  /* Sentinal */
 };
 
