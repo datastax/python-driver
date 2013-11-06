@@ -472,6 +472,8 @@ class Cluster(object):
         for session in self.sessions:
             session.remove_pool(host)
 
+        self._start_reconnector(host, is_host_addition=False)
+
     def _on_up_future_completed(self, host, futures, results, lock, finished_future):
         with lock:
             futures.discard(finished_future)
@@ -564,6 +566,27 @@ class Cluster(object):
         # for testing purposes
         return futures
 
+    def _start_reconnector(self, host, is_host_addition):
+        schedule = self.reconnection_policy.new_schedule()
+
+        # in order to not hold references to this Cluster open and prevent
+        # proper shutdown when the program ends, we'll just make a closure
+        # of the current Cluster attributes to create new Connections with
+        conn_factory = self._make_connection_factory(host)
+
+        reconnector = _HostReconnectionHandler(
+            host, conn_factory, is_host_addition, self.on_add, self.on_up,
+            self.scheduler, schedule, host.get_and_set_reconnection_handler,
+            new_handler=None)
+
+        old_reconnector = host.get_and_set_reconnection_handler(reconnector)
+        if old_reconnector:
+            log.debug("Old host reconnector found for %s, cancelling", host)
+            old_reconnector.cancel()
+
+        log.debug("Staring reconnector for host %s", host)
+        reconnector.start()
+
     @run_in_executor
     def on_down(self, host, is_host_addition):
         """
@@ -588,25 +611,7 @@ class Cluster(object):
         for listener in self.listeners:
             listener.on_down(host)
 
-        schedule = self.reconnection_policy.new_schedule()
-
-        # in order to not hold references to this Cluster open and prevent
-        # proper shutdown when the program ends, we'll just make a closure
-        # of the current Cluster attributes to create new Connections with
-        conn_factory = self._make_connection_factory(host)
-
-        reconnector = _HostReconnectionHandler(
-            host, conn_factory, is_host_addition, self.on_add, self.on_up,
-            self.scheduler, schedule, host.get_and_set_reconnection_handler,
-            new_handler=None)
-
-        old_reconnector = host.get_and_set_reconnection_handler(reconnector)
-        if old_reconnector:
-            log.debug("Old host reconnector found for %s, cancelling", host)
-            old_reconnector.cancel()
-
-        log.debug("Staring reconnector for host %s", host)
-        reconnector.start()
+        self._start_reconnector(host, is_host_addition)
 
     def on_add(self, host):
         if self._is_shutdown:
