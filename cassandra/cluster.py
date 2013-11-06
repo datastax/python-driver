@@ -1067,9 +1067,9 @@ class Session(object):
         return self.submit(run_add_or_renew_pool)
 
     def remove_pool(self, host):
-        log.debug("Removing connection pool for %r", host)
         pool = self._pools.pop(host, None)
         if pool:
+            log.debug("Removed connection pool for %r", host)
             return self.submit(pool.shutdown)
         else:
             return None
