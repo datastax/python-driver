@@ -270,6 +270,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
                     # complete message yet
                     break
                 else:
+                    # have enough for header, read body len from header
                     self._iobuf.seek(4)
                     body_len = int32_unpack(self._iobuf.read(4))
 
