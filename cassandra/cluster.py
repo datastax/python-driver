@@ -2075,7 +2075,7 @@ class ResponseFuture(object):
         self.add_errback(errback, *errback_args, **(errback_kwargs or {}))
 
     def __str__(self):
-        query = self.query.query_string
+        result = "(no result yet)" if self._final_result is _NO_RESULT_YET else self._final_result
         return "<ResponseFuture: query='%s' request_id=%s result=%s exception=%s host=%s>" \
-               % (query, self._req_id, self._final_result, self._final_exception, self._current_host)
+               % (self.query, self._req_id, result, self._final_exception, self._current_host)
     __repr__ = __str__
