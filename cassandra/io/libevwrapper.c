@@ -354,6 +354,7 @@ initlibevwrapper(void)
     m = Py_InitModule3("libevwrapper", module_methods, "libev wrapper methods");
     PyModule_AddIntConstant(m, "EV_READ", EV_READ);
     PyModule_AddIntConstant(m, "EV_WRITE", EV_WRITE);
+    PyModule_AddIntConstant(m, "EV_ERROR", EV_ERROR);
 
     Py_INCREF(&libevwrapper_LoopType);
     PyModule_AddObject(m, "Loop", (PyObject *)&libevwrapper_LoopType);
