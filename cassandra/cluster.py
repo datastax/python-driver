@@ -837,8 +837,12 @@ class Session(object):
         self._load_balancer = cluster.load_balancing_policy
         self._metrics = cluster.metrics
 
+        # create connection pools in parallel
+        futures = []
         for host in hosts:
-            future = self.add_or_renew_pool(host, is_host_addition=False)
+            futures.append(self.add_or_renew_pool(host, is_host_addition=False))
+
+        for future in futures:
             future.result()
 
     def execute(self, query, parameters=None, trace=False):
