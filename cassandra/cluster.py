@@ -1489,10 +1489,18 @@ class ControlConnection(object):
             start = self._time.time()
             elapsed = 0
             cl = ConsistencyLevel.ONE
-            while elapsed < self._cluster.max_schema_agreement_wait:
+            total_timeout = self._cluster.max_schema_agreement_wait
+            while elapsed < total_timeout:
                 peers_query = QueryMessage(query=self._SELECT_SCHEMA_PEERS, consistency_level=cl)
                 local_query = QueryMessage(query=self._SELECT_SCHEMA_LOCAL, consistency_level=cl)
-                peers_result, local_result = connection.wait_for_responses(peers_query, local_query)
+                try:
+                    timeout = min(2.0, total_timeout - elapsed)
+                    peers_result, local_result = connection.wait_for_responses(peers_query, local_query, timeout=timeout)
+                except OperationTimedOut:
+                    log.debug("[control connection] Timed out waiting for response during schema agreement check")
+                    elapsed = self._time.time() - start
+                    continue
+
                 peers_result = dict_factory(*peers_result.results)
 
                 versions = set()

@@ -87,7 +87,7 @@ class MockConnection(object):
              ["192.168.1.2", "10.0.0.2", "a", "dc1", "rack1", ["2", "102", "202"]]]
         ]
 
-    def wait_for_responses(self, peer_query, local_query):
+    def wait_for_responses(self, peer_query, local_query, timeout=None):
         local_response = ResultMessage(
             kind=ResultMessage.KIND_ROWS, results=self.local_results)
         peer_response = ResultMessage(
