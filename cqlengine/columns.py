@@ -868,8 +868,15 @@ class _PartitionKeysToken(Column):
         self.partition_columns = model._partition_keys.values()
         super(_PartitionKeysToken, self).__init__(partition_key=True)
 
+    @property
+    def db_field_name(self):
+        return 'token({})'.format(', '.join(['"{}"'.format(c.db_field_name) for c in self.partition_columns]))
+
     def to_database(self, value):
-        raise NotImplementedError
+        from cqlengine.functions import Token
+        assert isinstance(value, Token)
+        value.set_columns(self.partition_columns)
+        return value
 
     def get_cql(self):
         return "token({})".format(", ".join(c.cql for c in self.partition_columns))

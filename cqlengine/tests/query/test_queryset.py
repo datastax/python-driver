@@ -14,6 +14,9 @@ from cqlengine import query
 from datetime import timedelta
 from datetime import tzinfo
 
+from cqlengine import statements
+from cqlengine import operators
+
 
 class TzOffset(tzinfo):
     """Minimal implementation of a timezone offset to help testing with timezone
@@ -61,14 +64,17 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         assert len(query1._where) == 1
 
         op = query1._where[0]
-        assert isinstance(op, query.EqualsOperator)
+
+        assert isinstance(op, statements.WhereClause)
+        assert isinstance(op.operator, operators.EqualsOperator)
         assert op.value == 5
 
         query2 = query1.filter(expected_result__gte=1)
         assert len(query2._where) == 2
 
         op = query2._where[1]
-        assert isinstance(op, query.GreaterThanOrEqualOperator)
+        self.assertIsInstance(op, statements.WhereClause)
+        self.assertIsInstance(op.operator, operators.GreaterThanOrEqualOperator)
         assert op.value == 1
 
     def test_query_expression_parsing(self):
@@ -77,14 +83,16 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         assert len(query1._where) == 1
 
         op = query1._where[0]
-        assert isinstance(op, query.EqualsOperator)
+        assert isinstance(op, statements.WhereClause)
+        assert isinstance(op.operator, operators.EqualsOperator)
         assert op.value == 5
 
         query2 = query1.filter(TestModel.expected_result >= 1)
         assert len(query2._where) == 2
 
         op = query2._where[1]
-        assert isinstance(op, query.GreaterThanOrEqualOperator)
+        self.assertIsInstance(op, statements.WhereClause)
+        self.assertIsInstance(op.operator, operators.GreaterThanOrEqualOperator)
         assert op.value == 1
 
     def test_using_invalid_column_names_in_filter_kwargs_raises_error(self):
@@ -107,39 +115,6 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         """
         with self.assertRaises(query.QueryException):
             TestModel.objects(5)
-
-    def test_filter_method_where_clause_generation(self):
-        """
-        Tests the where clause creation
-        """
-        query1 = TestModel.objects(test_id=5)
-        ids = [o.query_value.identifier for o in query1._where]
-        where = query1._where_clause()
-        assert where == '"test_id" = :{}'.format(*ids)
-
-        query2 = query1.filter(expected_result__gte=1)
-        ids = [o.query_value.identifier for o in query2._where]
-        where = query2._where_clause()
-        assert where == '"test_id" = :{} AND "expected_result" >= :{}'.format(*ids)
-
-    def test_query_expression_where_clause_generation(self):
-        """
-        Tests the where clause creation
-        """
-        query1 = TestModel.objects(TestModel.test_id == 5)
-        ids = [o.query_value.identifier for o in query1._where]
-        where = query1._where_clause()
-        assert where == '"test_id" = :{}'.format(*ids)
-
-        query2 = query1.filter(TestModel.expected_result >= 1)
-        ids = [o.query_value.identifier for o in query2._where]
-        where = query2._where_clause()
-        assert where == '"test_id" = :{} AND "expected_result" >= :{}'.format(*ids)
-
-    def test_querystring_generation(self):
-        """
-        Tests the select querystring creation
-        """
 
     def test_queryset_is_immutable(self):
         """
@@ -516,11 +491,11 @@ class TestQuerySetConnectionHandling(BaseQuerySetUsage):
         assert q._cur is None
 
 
-
 class TimeUUIDQueryModel(Model):
     partition       = columns.UUID(primary_key=True)
     time            = columns.TimeUUID(primary_key=True)
     data            = columns.Text(required=False)
+
 
 class TestMinMaxTimeUUIDFunctions(BaseCassEngTestCase):
 

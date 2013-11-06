@@ -33,8 +33,16 @@ class NamedColumn(AbstractQueryableColumn):
     def __init__(self, name):
         self.name = name
 
+    def __unicode__(self):
+        return self.name
+
     def _get_column(self):
+        """ :rtype: NamedColumn """
         return self
+
+    @property
+    def db_field_name(self):
+        return self.name
 
     @property
     def cql(self):

@@ -1,10 +1,12 @@
 from datetime import datetime
-import time
+from cqlengine.columns import DateTime
 
 from cqlengine.tests.base import BaseCassEngTestCase
 from cqlengine import columns, Model
 from cqlengine import functions
 from cqlengine import query
+from cqlengine.statements import WhereClause
+from cqlengine.operators import EqualsOperator
 
 class TestQuerySetOperation(BaseCassEngTestCase):
 
@@ -13,22 +15,26 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         Tests that queries with helper functions are generated properly
         """
         now = datetime.now()
-        col = columns.DateTime()
-        col.set_column_name('time')
-        qry = query.EqualsOperator(col, functions.MaxTimeUUID(now))
+        where = WhereClause('time', EqualsOperator(), functions.MaxTimeUUID(now))
+        where.set_context_id(5)
 
-        assert qry.cql == '"time" = MaxTimeUUID(:{})'.format(qry.value.identifier)
+        self.assertEqual(str(where), '"time" = MaxTimeUUID(:5)')
+        ctx = {}
+        where.update_context(ctx)
+        self.assertEqual(ctx, {'5': DateTime().to_database(now)})
 
     def test_mintimeuuid_function(self):
         """
         Tests that queries with helper functions are generated properly
         """
         now = datetime.now()
-        col = columns.DateTime()
-        col.set_column_name('time')
-        qry = query.EqualsOperator(col, functions.MinTimeUUID(now))
+        where = WhereClause('time', EqualsOperator(), functions.MinTimeUUID(now))
+        where.set_context_id(5)
 
-        assert qry.cql == '"time" = MinTimeUUID(:{})'.format(qry.value.identifier)
+        self.assertEqual(str(where), '"time" = MinTimeUUID(:5)')
+        ctx = {}
+        where.update_context(ctx)
+        self.assertEqual(ctx, {'5': DateTime().to_database(now)})
 
     def test_token_function(self):
 
@@ -39,12 +45,16 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         func = functions.Token('a', 'b')
 
         q = TestModel.objects.filter(pk__token__gt=func)
-        self.assertEquals(q._where[0].cql, 'token("p1", "p2") > token(:{}, :{})'.format(*func.identifier))
+        where = q._where[0]
+        where.set_context_id(1)
+        self.assertEquals(str(where), 'token("p1", "p2") > token(:{}, :{})'.format(1, 2))
 
-        # Token(tuple()) is also possible for convinience
+        # Token(tuple()) is also possible for convenience
         # it (allows for Token(obj.pk) syntax)
         func = functions.Token(('a', 'b'))
 
         q = TestModel.objects.filter(pk__token__gt=func)
-        self.assertEquals(q._where[0].cql, 'token("p1", "p2") > token(:{}, :{})'.format(*func.identifier))
+        where = q._where[0]
+        where.set_context_id(1)
+        self.assertEquals(str(where), 'token("p1", "p2") > token(:{}, :{})'.format(1, 2))
 

@@ -1,5 +1,6 @@
-from cqlengine import query
+from cqlengine import operators
 from cqlengine.named import NamedKeyspace
+from cqlengine.operators import EqualsOperator, GreaterThanOrEqualOperator
 from cqlengine.query import ResultObject
 from cqlengine.tests.query.test_queryset import BaseQuerySetUsage
 from cqlengine.tests.base import BaseCassEngTestCase
@@ -21,14 +22,14 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         assert len(query1._where) == 1
 
         op = query1._where[0]
-        assert isinstance(op, query.EqualsOperator)
+        assert isinstance(op.operator, operators.EqualsOperator)
         assert op.value == 5
 
         query2 = query1.filter(expected_result__gte=1)
         assert len(query2._where) == 2
 
         op = query2._where[1]
-        assert isinstance(op, query.GreaterThanOrEqualOperator)
+        assert isinstance(op.operator, operators.GreaterThanOrEqualOperator)
         assert op.value == 1
 
     def test_query_expression_parsing(self):
@@ -37,14 +38,14 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         assert len(query1._where) == 1
 
         op = query1._where[0]
-        assert isinstance(op, query.EqualsOperator)
+        assert isinstance(op.operator, operators.EqualsOperator)
         assert op.value == 5
 
         query2 = query1.filter(self.table.column('expected_result') >= 1)
         assert len(query2._where) == 2
 
         op = query2._where[1]
-        assert isinstance(op, query.GreaterThanOrEqualOperator)
+        assert isinstance(op.operator, operators.GreaterThanOrEqualOperator)
         assert op.value == 1
 
     def test_filter_method_where_clause_generation(self):
@@ -52,28 +53,46 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         Tests the where clause creation
         """
         query1 = self.table.objects(test_id=5)
-        ids = [o.query_value.identifier for o in query1._where]
-        where = query1._where_clause()
-        assert where == '"test_id" = :{}'.format(*ids)
+        self.assertEqual(len(query1._where), 1)
+        where = query1._where[0]
+        self.assertEqual(where.field, 'test_id')
+        self.assertEqual(where.value, 5)
 
         query2 = query1.filter(expected_result__gte=1)
-        ids = [o.query_value.identifier for o in query2._where]
-        where = query2._where_clause()
-        assert where == '"test_id" = :{} AND "expected_result" >= :{}'.format(*ids)
+        self.assertEqual(len(query2._where), 2)
+
+        where = query2._where[0]
+        self.assertEqual(where.field, 'test_id')
+        self.assertIsInstance(where.operator, EqualsOperator)
+        self.assertEqual(where.value, 5)
+
+        where = query2._where[1]
+        self.assertEqual(where.field, 'expected_result')
+        self.assertIsInstance(where.operator, GreaterThanOrEqualOperator)
+        self.assertEqual(where.value, 1)
 
     def test_query_expression_where_clause_generation(self):
         """
         Tests the where clause creation
         """
         query1 = self.table.objects(self.table.column('test_id') == 5)
-        ids = [o.query_value.identifier for o in query1._where]
-        where = query1._where_clause()
-        assert where == '"test_id" = :{}'.format(*ids)
+        self.assertEqual(len(query1._where), 1)
+        where = query1._where[0]
+        self.assertEqual(where.field, 'test_id')
+        self.assertEqual(where.value, 5)
 
         query2 = query1.filter(self.table.column('expected_result') >= 1)
-        ids = [o.query_value.identifier for o in query2._where]
-        where = query2._where_clause()
-        assert where == '"test_id" = :{} AND "expected_result" >= :{}'.format(*ids)
+        self.assertEqual(len(query2._where), 2)
+
+        where = query2._where[0]
+        self.assertEqual(where.field, 'test_id')
+        self.assertIsInstance(where.operator, EqualsOperator)
+        self.assertEqual(where.value, 5)
+
+        where = query2._where[1]
+        self.assertEqual(where.field, 'expected_result')
+        self.assertIsInstance(where.operator, GreaterThanOrEqualOperator)
+        self.assertEqual(where.value, 1)
 
 
 class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
@@ -87,7 +106,6 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         ks,tn = TestModel.column_family_name().split('.')
         cls.keyspace = NamedKeyspace(ks)
         cls.table = cls.keyspace.table(tn)
-
 
     def test_count(self):
         """ Tests that adding filtering statements affects the count query as expected """

@@ -116,7 +116,7 @@ class TestSetColumn(BaseCassEngTestCase):
         assert len([s for s in statements if '"TEST" = "TEST" +' in s]) == 1
 
     def test_update_from_none(self):
-        """ Tests that updating an 'None' list creates a straight insert statement """
+        """ Tests that updating a 'None' list creates a straight insert statement """
         ctx = {}
         col = columns.Set(columns.Integer, db_field="TEST")
         statements = col.get_update_statement({1, 2, 3, 4}, None, ctx)
