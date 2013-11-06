@@ -10,6 +10,7 @@ import time
 from threading import Lock, RLock, Thread, Event
 import Queue
 import weakref
+from weakref import WeakValueDictionary
 try:
     from weakref import WeakSet
 except ImportError:
@@ -34,10 +35,10 @@ from cassandra.metrics import Metrics
 from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy)
-from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
-                             bind_params, QueryTrace, Statement)
 from cassandra.pool import (_ReconnectionHandler, _HostReconnectionHandler,
                             HostConnectionPool)
+from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
+                             bind_params, QueryTrace, Statement)
 
 # libev is all around faster, so we want to try and default to using that when we can
 try:
@@ -304,7 +305,7 @@ class Cluster(object):
         self.sessions = WeakSet()
         self.metadata = Metadata(self)
         self.control_connection = None
-        self._prepared_statements = {}
+        self._prepared_statements = WeakValueDictionary()
 
         self._min_requests_per_connection = {
             HostDistance.LOCAL: DEFAULT_MIN_REQUESTS,
