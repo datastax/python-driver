@@ -780,11 +780,12 @@ class Cluster(object):
                             log.debug("Got unexpected response when preparing "
                                       "statement on host %s: %r", host, response)
 
-            connection.close()
             log.debug("Done preparing all known prepared statements against host %s", host)
         except Exception:
             # log and ignore
             log.exception("Error trying to prepare all statements on host %s", host)
+        finally:
+            connection.close()
 
     def prepare_on_all_sessions(self, query_id, prepared_statement, excluded_host):
         self._prepared_statements[query_id] = prepared_statement
