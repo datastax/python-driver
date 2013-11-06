@@ -62,20 +62,20 @@ class LibevConnectionTest(unittest.TestCase):
         c = self.make_connection()
 
         # let it write the OptionsMessage
-        c.handle_write(None, None)
+        c.handle_write(None, 0)
 
         # read in a SupportedMessage response
         header = self.make_header_prefix(SupportedMessage)
         options = self.make_options_body()
         c._socket.recv.return_value = self.make_msg(header, options)
-        c.handle_read(None, None)
+        c.handle_read(None, 0)
 
         # let it write out a StartupMessage
-        c.handle_write(None, None)
+        c.handle_write(None, 0)
 
         header = self.make_header_prefix(ReadyMessage, stream_id=1)
         c._socket.recv.return_value = self.make_msg(header)
-        c.handle_read(None, None)
+        c.handle_read(None, 0)
 
         self.assertTrue(c.connected_event.is_set())
 
@@ -83,13 +83,13 @@ class LibevConnectionTest(unittest.TestCase):
         c = self.make_connection()
 
         # let it write the OptionsMessage
-        c.handle_write(None, None)
+        c.handle_write(None, 0)
 
         # read in a SupportedMessage response
         header = self.make_header_prefix(SupportedMessage, version=0xa4)
         options = self.make_options_body()
         c._socket.recv.return_value = self.make_msg(header, options)
-        c.handle_read(None, None)
+        c.handle_read(None, 0)
 
         # make sure it errored correctly
         self.assertTrue(c.is_defunct)
@@ -100,21 +100,21 @@ class LibevConnectionTest(unittest.TestCase):
         c = self.make_connection()
 
         # let it write the OptionsMessage
-        c.handle_write(None, None)
+        c.handle_write(None, 0)
 
         # read in a SupportedMessage response
         header = self.make_header_prefix(SupportedMessage)
         options = self.make_options_body()
         c._socket.recv.return_value = self.make_msg(header, options)
-        c.handle_read(None, None)
+        c.handle_read(None, 0)
 
         # let it write out a StartupMessage
-        c.handle_write(None, None)
+        c.handle_write(None, 0)
 
         header = self.make_header_prefix(ServerError, stream_id=1)
         body = self.make_error_body(ServerError.error_code, ServerError.summary)
         c._socket.recv.return_value = self.make_msg(header, body)
-        c.handle_read(None, None)
+        c.handle_read(None, 0)
 
         # make sure it errored correctly
         self.assertTrue(c.is_defunct)
@@ -126,7 +126,7 @@ class LibevConnectionTest(unittest.TestCase):
 
         # make the OptionsMessage write fail
         c._socket.send.side_effect = socket_error(errno.EIO, "bad stuff!")
-        c.handle_write(None, None)
+        c.handle_write(None, 0)
 
         # make sure it errored correctly
         self.assertTrue(c.is_defunct)
@@ -138,13 +138,13 @@ class LibevConnectionTest(unittest.TestCase):
 
         # make the OptionsMessage write block
         c._socket.send.side_effect = socket_error(errno.EAGAIN, "socket busy")
-        c.handle_write(None, None)
+        c.handle_write(None, 0)
 
         self.assertFalse(c.is_defunct)
 
         # try again with normal behavior
         c._socket.send.side_effect = lambda x: len(x)
-        c.handle_write(None, None)
+        c.handle_write(None, 0)
         self.assertFalse(c.is_defunct)
         self.assertTrue(c._socket.send.call_args is not None)
 
@@ -154,26 +154,21 @@ class LibevConnectionTest(unittest.TestCase):
         # only write the first four bytes of the OptionsMessage
         c._socket.send.side_effect = None
         c._socket.send.return_value = 4
-        c.handle_write(None, None)
+        c.handle_write(None, 0)
 
-        orig_msg = c._socket.send.call_args[0][0]
         self.assertFalse(c.is_defunct)
-
-        # try again with normal behavior
-        c._socket.send.side_effect = lambda x: len(x)
-        c.handle_write(None, None)
-        self.assertFalse(c.is_defunct)
-        self.assertEqual(c._socket.send.call_args[0][0], orig_msg[4:])
+        self.assertEqual(2, c._socket.send.call_count)
+        self.assertEqual(4, len(c._socket.send.call_args[0][0]))
 
     def test_socket_error_on_read(self, *args):
         c = self.make_connection()
 
         # let it write the OptionsMessage
-        c.handle_write(None, None)
+        c.handle_write(None, 0)
 
         # read in a SupportedMessage response
         c._socket.recv.side_effect = socket_error(errno.EIO, "busy socket")
-        c.handle_read(None, None)
+        c.handle_read(None, 0)
 
         # make sure it errored correctly
         self.assertTrue(c.is_defunct)
@@ -189,19 +184,19 @@ class LibevConnectionTest(unittest.TestCase):
 
         # read in the first byte
         c._socket.recv.return_value = message[0]
-        c.handle_read(None, None)
+        c.handle_read(None, 0)
         self.assertEquals(c._iobuf.getvalue(), message[0])
 
         c._socket.recv.return_value = message[1:]
-        c.handle_read(None, None)
+        c.handle_read(None, 0)
         self.assertEquals("", c._iobuf.getvalue())
 
         # let it write out a StartupMessage
-        c.handle_write(None, None)
+        c.handle_write(None, 0)
 
         header = self.make_header_prefix(ReadyMessage, stream_id=1)
         c._socket.recv.return_value = self.make_msg(header)
-        c.handle_read(None, None)
+        c.handle_read(None, 0)
 
         self.assertTrue(c.connected_event.is_set())
         self.assertFalse(c.is_defunct)
@@ -215,20 +210,20 @@ class LibevConnectionTest(unittest.TestCase):
 
         # read in the first nine bytes
         c._socket.recv.return_value = message[:9]
-        c.handle_read(None, None)
+        c.handle_read(None, 0)
         self.assertEquals(c._iobuf.getvalue(), message[:9])
 
         # ... then read in the rest
         c._socket.recv.return_value = message[9:]
-        c.handle_read(None, None)
+        c.handle_read(None, 0)
         self.assertEquals("", c._iobuf.getvalue())
 
         # let it write out a StartupMessage
-        c.handle_write(None, None)
+        c.handle_write(None, 0)
 
         header = self.make_header_prefix(ReadyMessage, stream_id=1)
         c._socket.recv.return_value = self.make_msg(header)
-        c.handle_read(None, None)
+        c.handle_read(None, 0)
 
         self.assertTrue(c.connected_event.is_set())
         self.assertFalse(c.is_defunct)
