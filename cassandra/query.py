@@ -102,10 +102,11 @@ class SimpleStatement(Statement):
     def query_string(self):
         return self._query_string
 
-    def __repr__(self):
+    def __str__(self):
         consistency = ConsistencyLevel.value_to_name[self.consistency_level]
         return (u'<SimpleStatement query="%s", consistency=%s>' %
                 (self.query_string, consistency))
+    __repr__ = __str__
 
 
 class PreparedStatement(object):
@@ -169,10 +170,11 @@ class PreparedStatement(object):
         """
         return BoundStatement(self).bind(values)
 
-    def __repr__(self):
+    def __str__(self):
         consistency = ConsistencyLevel.value_to_name[self.consistency_level]
         return (u'<PreparedStatement query="%s", consistency=%s>' %
                 (self.query_string, consistency))
+    __repr__ = __str__
 
 
 class BoundStatement(Statement):
@@ -267,10 +269,11 @@ class BoundStatement(Statement):
         else:
             return None
 
-    def __repr__(self):
+    def __str__(self):
         consistency = ConsistencyLevel.value_to_name[self.consistency_level]
         return (u'<BoundStatement query="%s", values=%s, consistency=%s>' %
                 (self.prepared_statement.query_string, self.raw_values, consistency))
+    __repr__ = __str__
 
 
 class ValueSequence(object):
