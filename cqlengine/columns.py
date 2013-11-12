@@ -647,7 +647,7 @@ class List(BaseContainerColumn):
         def __nonzero__(self):
             return bool(self.value)
 
-    def __init__(self, value_type, default=set, **kwargs):
+    def __init__(self, value_type, default=list, **kwargs):
         return super(List, self).__init__(value_type=value_type, default=default, **kwargs)
 
     def validate(self, value):
