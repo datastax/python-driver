@@ -19,19 +19,20 @@ Bug Fixes
   against all hosts
 * Improved cleanup and reconnection efforts when reconnection fails
   on a node that has recently come up
-* Use correct consistency level on when retrying failed operations
+* Use correct consistency level when retrying failed operations
   against a different host. (An invalid consistency level was being
   used, causing the retry to fail.)
-* Better error messages for failed prepare() opertaions
+* Better error messages for failed ``Session.prepare()`` opertaions
 * Prepare new statements against all hosts in parallel (formerly
   sequential)
 * Fix failure to save the new current keyspace on connections. (This
   could cause problems for prepared statements and lead to extra
-  operations to continuously re-set the keyspace)
-* Avoid sharing LoadBalancingPolicies across Cluster instances. (When a second
-  Cluster was connected, it effectively mark nodes down for the first Cluster.)
-* Better handling of failures during the re-preparation sequence for unrecognized
-  prepared statements
+  operations to continuously re-set the keyspace.)
+* Avoid sharing ``LoadBalancingPolicies`` across ``Cluster`` instances. (When
+  a second ``Cluster`` was connected, it effectively mark nodes down for the
+  first ``Cluster``.)
+* Better handling of failures during the re-preparation sequence for
+  unrecognized prepared statements
 * Throttle trashing of underutilized connections to avoid trashing newly
   created connections
 * Fix race condition which could result in trashed connections being closed
@@ -56,7 +57,7 @@ Other
 * Don't retain unreferenced prepared statements in the local cache.
   (If many different prepared statements were created, this would
   increase memory usage and greatly increase the amount of time
-  required to being utilizing a node that was added or marked
+  required to begin utilizing a node that was added or marked
   up.)
 
 1.0.0b6
