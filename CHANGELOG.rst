@@ -1,3 +1,64 @@
+1.0.0b7
+=======
+Nov 12, 2013
+
+This release makes many stability improvements, especially around
+prepared statements and node failure handling.  In particular,
+several cases where a request would never be completed (and as a
+result, leave the application hanging) have been resolved.
+
+Features
+--------
+* Add `timeout` kwarg to ``ResponseFuture.result()``
+* Create connection pools to all hosts in parallel when initializing
+  new Sesssions.
+
+Bug Fixes
+---------
+* Properly set exception on ResponseFuture when a query fails
+  against all hosts
+* Improved cleanup and reconnection efforts when reconnection fails
+  on a node that has recently come up
+* Use correct consistency level on when retrying failed operations
+  against a different host. (An invalid consistency level was being
+  used, causing the retry to fail.)
+* Better error messages for failed prepare() opertaions
+* Prepare new statements against all hosts in parallel (formerly
+  sequential)
+* Fix failure to save the new current keyspace on connections. (This
+  could cause problems for prepared statements and lead to extra
+  operations to continuously re-set the keyspace)
+* Avoid sharing LoadBalancingPolicies across Cluster instances. (When a second
+  Cluster was connected, it effectively mark nodes down for the first Cluster.)
+* Better handling of failures during the re-preparation sequence for unrecognized
+  prepared statements
+* Throttle trashing of underutilized connections to avoid trashing newly
+  created connections
+* Fix race condition which could result in trashed connections being closed
+  before the last operations had completed
+* Avoid preparing statements on the event loop thread (which could lead to
+  deadlock)
+* Correctly mark up non-contact point nodes discovered by the control
+  connection. (This lead to prepared statements not being prepared
+  against those hosts, generating extra traffic later when the
+  statements were executed and unrecognized.)
+* Correctly handle large messages through libev
+* Add timeout to schema agreement check queries
+* More complete (and less contended) locking around manipulation of the
+  pending message deque for libev connections
+
+Other
+-----
+* Prepare statements in batches of 10. (When many prepared statements
+  are in use, this allows the driver to start utilizing nodes that
+  were restarted more quickly.)
+* Better debug logging around connection management
+* Don't retain unreferenced prepared statements in the local cache.
+  (If many different prepared statements were created, this would
+  increase memory usage and greatly increase the amount of time
+  required to being utilizing a node that was added or marked
+  up.)
+
 1.0.0b6
 =======
 Oct 22, 2013
