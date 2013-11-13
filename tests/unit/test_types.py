@@ -1,10 +1,9 @@
 import unittest
 import datetime
 import cassandra
-from cassandra.cqltypes import CassandraType, BooleanType, lookup_casstype_simple, lookup_casstype, \
-    AsciiType, LongType, DecimalType, DoubleType, FloatType, Int32Type, UTF8Type, IntegerType, SetType, cql_typename
-
-from cassandra.cluster import Cluster
+from cassandra.cqltypes import (BooleanType, lookup_casstype_simple, lookup_casstype,
+                                LongType, DecimalType, SetType, cql_typename)
+from cassandra.decoder import named_tuple_factory
 
 
 class TypeTests(unittest.TestCase):
@@ -105,3 +104,12 @@ class TypeTests(unittest.TestCase):
 
         self.assertEqual(cql_typename('DateType'), 'timestamp')
         self.assertEqual(cql_typename('org.apache.cassandra.db.marshal.ListType(IntegerType)'), 'list<varint>')
+
+    def test_named_tuple_colname_substitution(self):
+        colnames = ("func(abc)", "[applied]", "func(func(abc))", "foo_bar")
+        rows = [(1, 2, 3, 4)]
+        result = named_tuple_factory(colnames, rows)[0]
+        self.assertEqual(result[0], result.func_abc)
+        self.assertEqual(result[1], result.applied)
+        self.assertEqual(result[2], result.func_func_abc)
+        self.assertEqual(result[3], result.foo_bar)
