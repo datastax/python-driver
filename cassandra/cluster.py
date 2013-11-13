@@ -1593,6 +1593,7 @@ class _Scheduler(object):
             # this can happen on interpreter shutdown
             pass
         self.is_shutdown = True
+        self._scheduled.put_nowait((None, None))
 
     def schedule(self, delay, fn, *args, **kwargs):
         if not self.is_shutdown:
