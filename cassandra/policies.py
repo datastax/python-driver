@@ -517,13 +517,13 @@ class RetryPolicy(object):
         how many replicas needed to respond to meet the requested consistency
         level and how many actually did respond before the coordinator timed
         out the request. `data_retrieved` is a boolean indicating whether
-        any of those responses contained data (as opposed to just a checksum).
+        any of those responses contained data (as opposed to just a digest).
 
         `retry_num` counts how many times the operation has been retried, so
         the first time this method is called, `retry_num` will be 0.
 
         By default, operations will be retried at most once, and only if
-        a sufficient number of replicas responded (with checksums).
+        a sufficient number of replicas responded (with data digests).
         """
         if retry_num != 0:
             return (self.RETHROW, None)
