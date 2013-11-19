@@ -847,7 +847,9 @@ class Session(object):
         # create connection pools in parallel
         futures = []
         for host in hosts:
-            futures.append(self.add_or_renew_pool(host, is_host_addition=False))
+            future = self.add_or_renew_pool(host, is_host_addition=False);
+            if future is not None:
+                futures.append(future)
 
         for future in futures:
             future.result()
