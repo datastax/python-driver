@@ -552,8 +552,9 @@ class Cluster(object):
             callback = partial(self._on_up_future_completed, host, futures, futures_results, futures_lock)
             for session in self.sessions:
                 future = session.add_or_renew_pool(host, is_host_addition=False)
-                future.add_done_callback(callback)
-                futures.add(future)
+                if future is not None:
+                    future.add_done_callback(callback)
+                    futures.add(future)
         except Exception:
             # this shouldn't happen, but just in case, reset the condition
             for future in futures:
@@ -654,8 +655,9 @@ class Cluster(object):
 
         for session in self.sessions:
             future = session.add_or_renew_pool(host, is_host_addition=True)
-            futures.add(future)
-            future.add_done_callback(future_completed)
+            if future is not None:
+                futures.add(future)
+                future.add_done_callback(future_completed)
 
         if not futures:
             self._finalize_add(host)
@@ -847,7 +849,7 @@ class Session(object):
         # create connection pools in parallel
         futures = []
         for host in hosts:
-            future = self.add_or_renew_pool(host, is_host_addition=False);
+            future = self.add_or_renew_pool(host, is_host_addition=False)
             if future is not None:
                 futures.append(future)
 
