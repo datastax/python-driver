@@ -9,6 +9,7 @@
  *
  */
 
+#define PY_SSIZE_T_CLEAN 1
 #include <Python.h>
 #include <stdio.h>
 
@@ -172,7 +173,7 @@ static PyObject *
 murmur3(PyObject *self, PyObject *args)
 {
     const char *key;
-    int *len;
+    Py_ssize_t len;
     uint32_t seed = 0;
 
     if (!PyArg_ParseTuple(args, "s#|I", &key, &len, &seed)) {
