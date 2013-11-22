@@ -11,10 +11,10 @@ sys.path.append(os.path.join(dirname, '..'))
 
 from cassandra.cluster import Cluster
 from cassandra.io.asyncorereactor import AsyncoreConnection
+from cassandra.policies import HostDistance
 from cassandra.query import SimpleStatement
 
 log = logging.getLogger()
-log.setLevel('INFO')
 handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
 log.addHandler(handler)
@@ -31,9 +31,10 @@ except ImportError, exc:
 KEYSPACE = "testkeyspace"
 TABLE = "testtable"
 
-def setup():
+def setup(hosts):
 
-    cluster = Cluster(['127.0.0.1'])
+    cluster = Cluster(hosts)
+    cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
     session = cluster.connect()
 
     rows = session.execute("SELECT keyspace_name FROM system.schema_keyspaces")
@@ -60,8 +61,9 @@ def setup():
         )
         """ % TABLE)
 
-def teardown():
-    cluster = Cluster(['127.0.0.1'])
+def teardown(hosts):
+    cluster = Cluster(hosts)
+    cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
     session = cluster.connect()
     session.execute("DROP KEYSPACE " + KEYSPACE)
 
@@ -69,7 +71,7 @@ def teardown():
 def benchmark(run_fn):
     options, args = parse_options()
     for conn_class in options.supported_reactors:
-        setup()
+        setup(options.hosts)
         log.info("==== %s ====" % (conn_class.__name__,))
 
         cluster = Cluster(options.hosts, metrics_enabled=options.enable_metrics)
@@ -88,10 +90,10 @@ def benchmark(run_fn):
         log.debug("Beginning inserts...")
         start = time.time()
         try:
-            run_fn(session, query, values, options.num_ops)
+            run_fn(session, query, values, options.num_ops, options.threads)
             end = time.time()
         finally:
-            teardown()
+            teardown(options.hosts)
 
         total = end - start
         log.info("Total time: %0.2fs" % total)
@@ -133,9 +135,13 @@ def parse_options():
                       help='only benchmark with libev connections')
     parser.add_option('-m', '--metrics', action='store_true', dest='enable_metrics',
                       help='enable and print metrics for operations')
+    parser.add_option('-l', '--log-level', default='info',
+                      help='logging level: debug, info, warning, or error')
     options, args = parser.parse_args()
 
     options.hosts = options.hosts.split(',')
+
+    log.setLevel(options.log_level.upper())
 
     if options.libev_only:
         if not have_libev:
