@@ -112,6 +112,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         self._callbacks = {}
         self._push_watchers = defaultdict(set)
         self.deque = deque()
+        self.deque_lock = Lock()
 
         with _starting_conns_lock:
             _starting_conns.add(self)
@@ -236,16 +237,20 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
             sent = self.send(next_msg)
         except socket.error as err:
             if (err.args[0] in NONBLOCKING):
-                self.deque.appendleft(next_msg)
+                with self.deque_lock:
+                    self.deque.appendleft(next_msg)
             else:
                 self.defunct(err)
             return
         else:
             if sent < len(next_msg):
-                self.deque.appendleft(next_msg[sent:])
+                with self.deque_lock:
+                    self.deque.appendleft(next_msg[sent:])
 
             if not self.deque:
-                self._writable = False
+                with self.deque_lock:
+                    if not self.deque:
+                        self._writable = False
 
         self._readable = True
 
@@ -314,7 +319,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         else:
             chunks = [data]
 
-        with self.lock:
+        with self.deque_lock:
             self.deque.extend(chunks)
 
         self._writable = True
