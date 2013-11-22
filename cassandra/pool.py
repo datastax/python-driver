@@ -299,24 +299,24 @@ class HostConnectionPool(object):
             # trashing it (through the return_connection process), hold
             # the connection lock from this point until we've incremented
             # its in_flight count
+            need_to_wait = False
             with least_busy.lock:
-
-                # if we have too many requests on this connection but we still
-                # have space to open a new connection against this host, go ahead
-                # and schedule the creation of a new connection
-                if least_busy.in_flight >= max_reqs and len(self._connections) < max_conns:
-                    self._maybe_spawn_new_connection()
 
                 if least_busy.in_flight >= MAX_STREAM_PER_CONNECTION:
                     # once we release the lock, wait for another connection
                     need_to_wait = True
                 else:
-                    need_to_wait = False
                     least_busy.in_flight += 1
 
             if need_to_wait:
                 # wait_for_conn will increment in_flight on the conn
                 least_busy = self._wait_for_conn(timeout)
+
+            # if we have too many requests on this connection but we still
+            # have space to open a new connection against this host, go ahead
+            # and schedule the creation of a new connection
+            if least_busy.in_flight >= max_reqs and len(self._connections) < max_conns:
+                self._maybe_spawn_new_connection()
 
             return least_busy
 
