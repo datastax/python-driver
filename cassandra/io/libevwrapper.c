@@ -20,6 +20,7 @@ Loop_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
         self->loop = ev_default_loop(0);
         if (!self->loop) {
             PyErr_SetString(PyExc_Exception, "Error getting default ev loop");
+            Py_DECREF(self);
             return NULL;
         }
     }
@@ -36,7 +37,7 @@ Loop_init(libevwrapper_Loop *self, PyObject *args, PyObject *kwds) {
 };
 
 static PyObject *
-Loop_start(libevwrapper_Loop *self) {
+Loop_start(libevwrapper_Loop *self, PyObject *args) {
     Py_BEGIN_ALLOW_THREADS
     ev_run(self->loop, 0);
     Py_END_ALLOW_THREADS
@@ -44,7 +45,7 @@ Loop_start(libevwrapper_Loop *self) {
 };
 
 static PyObject *
-Loop_unref(libevwrapper_Loop *self) {
+Loop_unref(libevwrapper_Loop *self, PyObject *args) {
     ev_unref(self->loop);
     Py_RETURN_NONE;
 }
@@ -138,7 +139,7 @@ static int
 IO_init(libevwrapper_IO *self, PyObject *args, PyObject *kwds) {
     PyObject *socket;
     PyObject *callback;
-    libevwrapper_Loop *loop;
+    PyObject *loop;
     int io_flags = 0;
 
     if (!PyArg_ParseTuple(args, "OiOO", &socket, &io_flags, &loop, &callback)) {
@@ -173,24 +174,24 @@ IO_init(libevwrapper_IO *self, PyObject *args, PyObject *kwds) {
 }
 
 static PyObject*
-IO_start(libevwrapper_IO *self) {
+IO_start(libevwrapper_IO *self, PyObject *args) {
     ev_io_start(self->loop->loop, &self->io);
     Py_RETURN_NONE;
 }
 
 static PyObject*
-IO_stop(libevwrapper_IO *self) {
+IO_stop(libevwrapper_IO *self, PyObject *args) {
     ev_io_stop(self->loop->loop, &self->io);
     Py_RETURN_NONE;
 }
 
 static PyObject*
-IO_is_active(libevwrapper_IO *self) {
+IO_is_active(libevwrapper_IO *self, PyObject *args) {
     return PyBool_FromLong(ev_is_active(&self->io));
 }
 
 static PyObject*
-IO_is_pending(libevwrapper_IO *self) {
+IO_is_pending(libevwrapper_IO *self, PyObject *args) {
     return PyBool_FromLong(ev_is_pending(&self->io));
 }
 
@@ -257,7 +258,7 @@ static void async_callback(EV_P_ ev_async *watcher, int revents) {};
 
 static int
 Async_init(libevwrapper_Async *self, PyObject *args, PyObject *kwds) {
-    libevwrapper_Loop *loop;
+    PyObject *loop;
 
     static char *kwlist[] = {"loop", NULL};
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "O", kwlist, &loop)) {
@@ -267,7 +268,7 @@ Async_init(libevwrapper_Async *self, PyObject *args, PyObject *kwds) {
 
     if (loop) {
         Py_INCREF(loop);
-        self->loop = loop;
+        self->loop = (libevwrapper_Loop *)loop;
     } else {
         return -1;
     }
@@ -276,13 +277,13 @@ Async_init(libevwrapper_Async *self, PyObject *args, PyObject *kwds) {
 };
 
 static PyObject *
-Async_start(libevwrapper_Async *self) {
+Async_start(libevwrapper_Async *self, PyObject *args) {
     ev_async_start(self->loop->loop, &self->async);
     Py_RETURN_NONE;
 }
 
 static PyObject *
-Async_send(libevwrapper_Async *self) {
+Async_send(libevwrapper_Async *self, PyObject *args) {
     ev_async_send(self->loop->loop, &self->async);
     Py_RETURN_NONE;
 };
@@ -358,18 +359,25 @@ initlibevwrapper(void)
         return;
 
     m = Py_InitModule3("libevwrapper", module_methods, "libev wrapper methods");
-    PyModule_AddIntConstant(m, "EV_READ", EV_READ);
-    PyModule_AddIntConstant(m, "EV_WRITE", EV_WRITE);
-    PyModule_AddIntConstant(m, "EV_ERROR", EV_ERROR);
+
+    if (PyModule_AddIntConstant(m, "EV_READ", EV_READ) == -1)
+        return;
+    if (PyModule_AddIntConstant(m, "EV_WRITE", EV_WRITE) == -1)
+        return;
+    if (PyModule_AddIntConstant(m, "EV_ERROR", EV_ERROR) == -1)
+        return;
 
     Py_INCREF(&libevwrapper_LoopType);
-    PyModule_AddObject(m, "Loop", (PyObject *)&libevwrapper_LoopType);
+    if (PyModule_AddObject(m, "Loop", (PyObject *)&libevwrapper_LoopType) == -1)
+        return;
 
     Py_INCREF(&libevwrapper_IOType);
-    PyModule_AddObject(m, "IO", (PyObject *)&libevwrapper_IOType);
+    if (PyModule_AddObject(m, "IO", (PyObject *)&libevwrapper_IOType) == -1)
+        return;
 
     Py_INCREF(&libevwrapper_AsyncType);
-    PyModule_AddObject(m, "Async", (PyObject *)&libevwrapper_AsyncType);
+    if (PyModule_AddObject(m, "Async", (PyObject *)&libevwrapper_AsyncType) == -1)
+        return;
 
     if (!PyEval_ThreadsInitialized()) {
         PyEval_InitThreads();
