@@ -153,7 +153,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
             raise ConnectionException("Timed out connecting to %s" % (address[0]))
         if err in (0, EISCONN):
             self.addr = address
-            self.setblocking(0)
+            self.socket.setblocking(0)
             self.handle_connect_event()
         else:
             raise socket.error(err, errorcode[err])
