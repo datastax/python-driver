@@ -1,24 +1,20 @@
-from base import benchmark
-
-import logging
 from itertools import count
-from threading import Event, Thread
+import logging
+from threading import Event
+
+from base import benchmark, BenchmarkThread
 
 log = logging.getLogger(__name__)
 
 initial = object()
 
-class Runner(Thread):
+class Runner(BenchmarkThread):
 
-    def __init__(self, session, query, values, num_queries, *args, **kwargs):
-        self.session = session
-        self.query = query
-        self.values = values
-        self.num_queries = num_queries
+    def __init__(self, *args, **kwargs):
+        BenchmarkThread.__init__(self, *args, **kwargs)
         self.num_started = count()
         self.num_finished = count()
         self.event = Event()
-        Thread.__init__(self)
 
     def handle_error(self, exc):
         log.error("Error on insert: %r", exc)
@@ -36,27 +32,15 @@ class Runner(Thread):
             future.add_callbacks(self.insert_next, self.handle_error)
 
     def run(self):
+        self.start_profile()
+
         for i in range(120):
             self.insert_next(initial)
 
         self.event.wait()
 
-def execute(session, query, values, num_queries, num_threads):
-
-    per_thread = num_queries / num_threads
-    threads = []
-    for i in range(num_threads):
-        thread = Runner(session, query, values, per_thread)
-        thread.daemon = True
-        threads.append(thread)
-
-    for thread in threads:
-        thread.start()
-
-    for thread in threads:
-        while thread.is_alive():
-            thread.join(timeout=0.5)
+        self.finish_profile()
 
 
 if __name__ == "__main__":
-    benchmark(execute)
+    benchmark(Runner)

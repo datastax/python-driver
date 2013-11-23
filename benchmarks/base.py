@@ -1,8 +1,11 @@
+from cProfile import Profile
 import logging
 import os.path
 import sys
+from threading import Thread
 import time
 from optparse import OptionParser
+
 from greplin import scales
 
 dirname = os.path.dirname(os.path.abspath(__file__))
@@ -68,7 +71,7 @@ def teardown(hosts):
     session.execute("DROP KEYSPACE " + KEYSPACE)
 
 
-def benchmark(run_fn):
+def benchmark(thread_class):
     options, args = parse_options()
     for conn_class in options.supported_reactors:
         setup(options.hosts)
@@ -87,10 +90,24 @@ def benchmark(run_fn):
             """.format(table=TABLE))
         values = {'key': 'key', 'a': 'a', 'b': 'b'}
 
+        per_thread = options.num_ops / options.threads
+        threads = []
+
         log.debug("Beginning inserts...")
         start = time.time()
         try:
-            run_fn(session, query, values, options.num_ops, options.threads)
+            for i in range(options.threads):
+                thread = thread_class(i, session, query, values, per_thread, options.profile)
+                thread.daemon = True
+                threads.append(thread)
+
+            for thread in threads:
+                thread.start()
+
+            for thread in threads:
+                while thread.is_alive():
+                    thread.join(timeout=0.5)
+
             end = time.time()
         finally:
             teardown(options.hosts)
@@ -137,6 +154,9 @@ def parse_options():
                       help='enable and print metrics for operations')
     parser.add_option('-l', '--log-level', default='info',
                       help='logging level: debug, info, warning, or error')
+    parser.add_option('-p', '--profile', action='store_true', dest='profile',
+                      help='Profile the run')
+
     options, args = parser.parse_args()
 
     options.hosts = options.hosts.split(',')
@@ -154,3 +174,24 @@ def parse_options():
         options.supported_reactors = supported_reactors
 
     return options, args
+
+
+class BenchmarkThread(Thread):
+
+    def __init__(self, thread_num, session, query, values, num_queries, profile):
+        Thread.__init__(self)
+        self.thread_num = thread_num
+        self.session = session
+        self.query = query
+        self.values = values
+        self.num_queries = num_queries
+        self.profiler = Profile() if profile else None
+
+    def start_profile(self):
+        if self.profiler:
+            self.profiler.enable()
+
+    def finish_profile(self):
+        if self.profiler:
+            self.profiler.disable()
+            self.profiler.dump_stats('profile-%d' % self.thread_num)

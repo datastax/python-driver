@@ -1,24 +1,23 @@
 import logging
 import Queue
-from threading import Thread
 
-from base import benchmark
+from base import benchmark, BenchmarkThread
 
 log = logging.getLogger(__name__)
 
-def execute(session, query, values, num_queries, num_threads):
+class Runner(BenchmarkThread):
 
-    per_thread = num_queries / num_threads
-
-    def run():
+    def run(self):
         futures = Queue.Queue(maxsize=121)
 
-        for i in range(per_thread):
+        self.start_profile()
+
+        for i in range(self.num_queries):
             if i >= 120:
                 old_future = futures.get_nowait()
                 old_future.result()
 
-            future = session.execute_async(query, values)
+            future = self.session.execute_async(self.query, self.values)
             futures.put_nowait(future)
 
         while True:
@@ -27,19 +26,8 @@ def execute(session, query, values, num_queries, num_threads):
             except Queue.Empty:
                 break
 
-    threads = []
-    for i in range(num_threads):
-        thread = Thread(target=run)
-        thread.daemon = True
-        threads.append(thread)
-
-    for thread in threads:
-        thread.start()
-
-    for thread in threads:
-        while thread.is_alive():
-            thread.join(timeout=0.5)
+        self.finish_profile
 
 
 if __name__ == "__main__":
-    benchmark(execute)
+    benchmark(Runner)
