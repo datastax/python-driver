@@ -45,8 +45,8 @@ class TestPolymorphicClassConstruction(BaseCassEngTestCase):
         assert Base._is_polymorphic_base
         assert not M1._is_polymorphic_base
 
-        assert Base._polymorphic_column == Base.type1
-        assert M1._polymorphic_column == M1.type1
+        assert Base._polymorphic_column is Base._columns['type1']
+        assert M1._polymorphic_column is M1._columns['type1']
 
         assert Base._polymorphic_column_name == 'type1'
         assert M1._polymorphic_column_name == 'type1'
