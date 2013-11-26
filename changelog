@@ -1,5 +1,9 @@
 CHANGELOG
 
+0.9.2
+* fixing create keyspace with network topology strategy
+* fixing regression with query expressions
+
 0.9
 * adding update method
 * adding support for ttls
