@@ -6,7 +6,7 @@ from cqlengine.columns import Counter, List, Set
 from cqlengine.connection import execute, RowResult
 
 from cqlengine.exceptions import CQLEngineException, ValidationError
-from cqlengine.functions import Token, BaseQueryFunction
+from cqlengine.functions import Token, BaseQueryFunction, QueryValue
 
 #CQL 3 reference:
 #http://www.datastax.com/docs/1.1/references/cql/index
@@ -35,28 +35,34 @@ class AbstractQueryableColumn(object):
     def __str__(self):
         return str(unicode(self))
 
+    def _to_database(self, val):
+        if isinstance(val, QueryValue):
+            return val
+        else:
+            return self._get_column().to_database(val)
+
     def in_(self, item):
         """
         Returns an in operator
 
-        used in where you'd typically want to use python's `in` operator
+        used where you'd typically want to use python's `in` operator
         """
         return WhereClause(unicode(self), InOperator(), item)
 
     def __eq__(self, other):
-        return WhereClause(unicode(self), EqualsOperator(), other)
+        return WhereClause(unicode(self), EqualsOperator(), self._to_database(other))
 
     def __gt__(self, other):
-        return WhereClause(unicode(self), GreaterThanOperator(), other)
+        return WhereClause(unicode(self), GreaterThanOperator(), self._to_database(other))
 
     def __ge__(self, other):
-        return WhereClause(unicode(self), GreaterThanOrEqualOperator(), other)
+        return WhereClause(unicode(self), GreaterThanOrEqualOperator(), self._to_database(other))
 
     def __lt__(self, other):
-        return WhereClause(unicode(self), LessThanOperator(), other)
+        return WhereClause(unicode(self), LessThanOperator(), self._to_database(other))
 
     def __le__(self, other):
-        return WhereClause(unicode(self), LessThanOrEqualOperator(), other)
+        return WhereClause(unicode(self), LessThanOrEqualOperator(), self._to_database(other))
 
 
 class BatchType(object):

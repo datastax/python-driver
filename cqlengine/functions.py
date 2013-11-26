@@ -53,10 +53,13 @@ class MinTimeUUID(BaseQueryFunction):
             raise ValidationError('datetime instance is required')
         super(MinTimeUUID, self).__init__(value)
 
-    def update_context(self, ctx):
-        epoch = datetime(1970, 1, 1, tzinfo=self.value.tzinfo)
+    def to_database(self, val):
+        epoch = datetime(1970, 1, 1, tzinfo=val.tzinfo)
         offset = epoch.tzinfo.utcoffset(epoch).total_seconds() if epoch.tzinfo else 0
-        ctx[str(self.context_id)] = long(((self.value - epoch).total_seconds() - offset) * 1000)
+        return long(((val - epoch).total_seconds() - offset) * 1000)
+
+    def update_context(self, ctx):
+        ctx[str(self.context_id)] = self.to_database(self.value)
 
 
 class MaxTimeUUID(BaseQueryFunction):
@@ -77,10 +80,13 @@ class MaxTimeUUID(BaseQueryFunction):
             raise ValidationError('datetime instance is required')
         super(MaxTimeUUID, self).__init__(value)
 
-    def update_context(self, ctx):
-        epoch = datetime(1970, 1, 1, tzinfo=self.value.tzinfo)
+    def to_database(self, val):
+        epoch = datetime(1970, 1, 1, tzinfo=val.tzinfo)
         offset = epoch.tzinfo.utcoffset(epoch).total_seconds() if epoch.tzinfo else 0
-        ctx[str(self.context_id)] = long(((self.value - epoch).total_seconds() - offset) * 1000)
+        return long(((val - epoch).total_seconds() - offset) * 1000)
+
+    def update_context(self, ctx):
+        ctx[str(self.context_id)] = self.to_database(self.value)
 
 
 class Token(BaseQueryFunction):
