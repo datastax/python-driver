@@ -1201,6 +1201,7 @@ class ControlConnection(object):
 
     # for testing purposes
     _time = time
+    _is_shutdown = False
 
     def __init__(self, cluster):
         # use a weak reference to allow the Cluster instance to be GC'ed (and
@@ -1216,8 +1217,6 @@ class ControlConnection(object):
 
         self._reconnection_handler = None
         self._reconnection_lock = RLock()
-
-        self._is_shutdown = False
 
     def connect(self):
         if self._is_shutdown:
@@ -1490,6 +1489,9 @@ class ControlConnection(object):
         # a lock is just a simple way to cut down on the number of schema queries
         # we'll make.
         with self._schema_agreement_lock:
+            if self._is_shutdown:
+                return
+
             log.debug("[control connection] Waiting for schema agreement")
             if not connection:
                 connection = self._connection
