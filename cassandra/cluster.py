@@ -779,7 +779,7 @@ class Cluster(object):
                     responses = connection.wait_for_responses(*messages, timeout=2.0)
                     for response in responses:
                         if (not isinstance(response, ResultMessage) or
-                            response.kind != ResultMessage.KIND_PREPARED):
+                                response.kind != ResultMessage.KIND_PREPARED):
                             log.debug("Got unexpected response when preparing "
                                       "statement on host %s: %r", host, response)
 
@@ -932,9 +932,11 @@ class Session(object):
             ...     log.exception("Operation failed:")
 
         """
+        prepared_statement = None
         if isinstance(query, basestring):
             query = SimpleStatement(query)
         elif isinstance(query, PreparedStatement):
+            prepared_statement = query
             query = query.bind(parameters)
 
         if isinstance(query, BoundStatement):
@@ -951,7 +953,9 @@ class Session(object):
         if trace:
             message.tracing = True
 
-        future = ResponseFuture(self, message, query, metrics=self._metrics)
+        future = ResponseFuture(
+            self, message, query, metrics=self._metrics,
+            prepared_statement=prepared_statement)
         future.send_request()
         return future
 
@@ -1544,7 +1548,7 @@ class ControlConnection(object):
             # that errors have already been reported, so we're fine
             if host:
                 self._cluster.signal_connection_failure(
-                        host, self._connection.last_error, is_host_addition=False)
+                    host, self._connection.last_error, is_host_addition=False)
                 return
 
         # if the connection is not defunct or the host already left, reconnect
@@ -1670,12 +1674,13 @@ class ResponseFuture(object):
     _start_time = None
     _metrics = None
 
-    def __init__(self, session, message, query, metrics=None):
+    def __init__(self, session, message, query, metrics=None, prepared_statement=None):
         self.session = session
         self.row_factory = session.row_factory
         self.message = message
         self.query = query
         self._metrics = metrics
+        self.prepared_statement = prepared_statement
         if metrics is not None:
             self._start_time = time.time()
 
@@ -1823,7 +1828,12 @@ class ResponseFuture(object):
                     try:
                         prepared_statement = self.session.cluster._prepared_statements[query_id]
                     except KeyError:
-                        log.error("Tried to execute unknown prepared statement %s", query_id.encode('hex'))
+                        if self.prepared_statement:
+                            query_string = ", " + self.prepared_statement.query_string
+                        else:
+                            query_string = ""
+                        log.error("Tried to execute unknown prepared statement: id=%s%s",
+                                  query_id.encode('hex'), query_string)
                         self._set_final_exception(response)
                         return
 
