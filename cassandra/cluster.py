@@ -680,9 +680,9 @@ class Cluster(object):
         host.set_down()
         self.load_balancing_policy.on_remove(host)
         for session in self.sessions:
-            session.on_remove()
+            session.on_remove(host)
         for listener in self.listeners:
-            listener.on_remove()
+            listener.on_remove(host)
 
     def signal_connection_failure(self, host, connection_exc, is_host_addition):
         is_down = host.signal_connection_failure(connection_exc)
