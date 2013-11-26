@@ -1,5 +1,6 @@
 from uuid import uuid4
 import random
+from datetime import date
 from cqlengine.tests.base import BaseCassEngTestCase
 
 from cqlengine.management import create_table
@@ -238,3 +239,33 @@ class TestQueryQuoting(BaseCassEngTestCase):
         assert model1.insert == model2[0].insert
 
 
+class TestQueryModel(Model):
+    test_id = columns.UUID(primary_key=True, default=uuid4)
+    date = columns.Date(primary_key=True)
+    description = columns.Text()
+
+
+class TestQuerying(BaseCassEngTestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestQuerying, cls).setUpClass()
+        delete_table(TestQueryModel)
+        create_table(TestQueryModel)
+
+    @classmethod
+    def tearDownClass(cls):
+        super(TestQuerying, cls).tearDownClass()
+        delete_table(TestQueryModel)
+
+    def test_query_with_date(self):
+        uid = uuid4()
+        day = date(2013, 11, 26)
+        TestQueryModel.create(test_id=uid, date=day, description=u'foo')
+
+        inst = TestQueryModel.filter(
+            TestQueryModel.test_id == uid,
+            TestQueryModel.date == day).limit(1).first()
+
+        assert inst.test_id == uid
+        assert inst.date == day
