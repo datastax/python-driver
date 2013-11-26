@@ -936,7 +936,6 @@ class Session(object):
         if isinstance(query, basestring):
             query = SimpleStatement(query)
         elif isinstance(query, PreparedStatement):
-            prepared_statement = query
             query = query.bind(parameters)
 
         if isinstance(query, BoundStatement):
@@ -944,6 +943,7 @@ class Session(object):
                 query_id=query.prepared_statement.query_id,
                 query_params=query.values,
                 consistency_level=query.consistency_level)
+            prepared_statement = query.prepared_statement
         else:
             query_string = query.query_string
             if parameters:
