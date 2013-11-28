@@ -1,6 +1,7 @@
 import json
 import warnings
 from cqlengine import SizeTieredCompactionStrategy, LeveledCompactionStrategy
+from cqlengine import ONE
 from cqlengine.named import NamedTable
 
 from cqlengine.connection import connection_manager, execute
@@ -28,7 +29,7 @@ def create_keyspace(name, strategy_class='SimpleStrategy', replication_factor=3,
     :param **replication_values: 1.2 only, additional values to ad to the replication data map
     """
     with connection_manager() as con:
-        _, keyspaces = con.execute("""SELECT keyspace_name FROM system.schema_keyspaces""", {})
+        _, keyspaces = con.execute("""SELECT keyspace_name FROM system.schema_keyspaces""", {}, ONE)
         if name not in [r[0] for r in keyspaces]:
             #try the 1.2 method
             replication_map = {
@@ -55,7 +56,7 @@ def create_keyspace(name, strategy_class='SimpleStrategy', replication_factor=3,
 
 def delete_keyspace(name):
     with connection_manager() as con:
-        _, keyspaces = con.execute("""SELECT keyspace_name FROM system.schema_keyspaces""", {})
+        _, keyspaces = con.execute("""SELECT keyspace_name FROM system.schema_keyspaces""", {}, ONE)
         if name in [r[0] for r in keyspaces]:
             execute("DROP KEYSPACE {}".format(name))
 
@@ -80,7 +81,8 @@ def sync_table(model, create_missing_keyspace=True):
     with connection_manager() as con:
         tables = con.execute(
             "SELECT columnfamily_name from system.schema_columnfamilies WHERE keyspace_name = :ks_name",
-            {'ks_name': ks_name}
+            {'ks_name': ks_name},
+            ONE
         )
     tables = [x[0] for x in tables.results]
 
@@ -115,7 +117,8 @@ def sync_table(model, create_missing_keyspace=True):
     with connection_manager() as con:
         _, idx_names = con.execute(
             "SELECT index_name from system.\"IndexInfo\" WHERE table_name=:table_name",
-            {'table_name': raw_cf_name}
+            {'table_name': raw_cf_name},
+            ONE
         )
 
     idx_names = [i[0] for i in idx_names]
@@ -230,7 +233,7 @@ def get_fields(model):
 
         logger.debug("get_fields %s %s", ks_name, col_family)
 
-        tmp = con.execute(query, {'ks_name':ks_name, 'col_family':col_family})
+        tmp = con.execute(query, {'ks_name': ks_name, 'col_family': col_family}, ONE)
     return [Field(x[0], x[1]) for x in tmp.results]
     # convert to Field named tuples
 
@@ -282,7 +285,8 @@ def drop_table(model):
     with connection_manager() as con:
         _, tables = con.execute(
             "SELECT columnfamily_name from system.schema_columnfamilies WHERE keyspace_name = :ks_name",
-            {'ks_name': ks_name}
+            {'ks_name': ks_name},
+            ONE
         )
     raw_cf_name = model.column_family_name(include_keyspace=False)
     if raw_cf_name not in [t[0] for t in tables]:
