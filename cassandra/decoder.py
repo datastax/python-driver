@@ -801,7 +801,10 @@ def cql_encode_sequence(val):
 
 
 def cql_encode_map_collection(val):
-    return '{ %s }' % ' , '.join('%s : %s' % (cql_quote(k), cql_quote(v))
+    return '{ %s }' % ' , '.join(
+                                 '%s : %s' % (
+                                     cql_encode_native_types(k),
+                                     cql_encode_native_types(v))
                                  for k, v in val.iteritems())
 
 
@@ -811,6 +814,27 @@ def cql_encode_list_collection(val):
 
 def cql_encode_set_collection(val):
     return '{ %s }' % ' , '.join(map(cql_quote, val))
+
+
+def cql_encode_native_types(val):
+    v_type = type(val)
+    if v_type in py_cql_collection_types:
+        encoder = cql_encode_object
+    else:
+        encoder = cql_encoders.get(v_type, cql_encode_object)
+    return encoder(val)
+
+
+def cql_encode_builtin_types(val):
+    return cql_encoders.get(type(val), cql_encode_object)(val)
+
+
+py_cql_collection_types = frozenset((
+    dict,
+    list, tuple,
+    set, frozenset,
+    types.GeneratorType
+))
 
 
 cql_encoders = {
