@@ -809,7 +809,7 @@ def cql_encode_map_collection(val):
 
 
 def cql_encode_list_collection(val):
-    return '[ %s ]' % ' , '.join(map(cql_quote, val))
+    return '[ %s ]' % ' , '.join(map(cql_encode_native_types, val))
 
 
 def cql_encode_set_collection(val):
