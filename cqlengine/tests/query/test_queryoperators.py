@@ -62,3 +62,13 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         self.assertEquals(str(where), 'token("p1", "p2") > token(:{}, :{})'.format(1, 2))
         str(q._select_query())
 
+        # The 'pk__token' virtual column may only be compared to a Token
+        self.assertRaises(query.QueryException, TestModel.objects.filter, pk__token__gt=10)
+
+        # A Token may only be compared to the `pk__token' virtual column
+        func = functions.Token('a', 'b')
+        self.assertRaises(query.QueryException, TestModel.objects.filter, p1__gt=func)
+
+        # The # of arguments to Token must match the # of partition keys
+        func = functions.Token('a')
+        self.assertRaises(query.QueryException, TestModel.objects.filter, pk__token__gt=func)
