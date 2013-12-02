@@ -370,6 +370,7 @@ class AbstractQuerySet(object):
                     raise QueryException(
                         'Token() received {} arguments but model has {} partition keys'.format(
                             len(partition_columns), len(val.value)))
+                val.set_columns(partition_columns)
 
             #get query operator, or use equals if not supplied
             operator_class = BaseWhereOperator.get_operator(col_op or 'EQ')
