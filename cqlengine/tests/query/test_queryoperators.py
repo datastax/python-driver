@@ -49,6 +49,9 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         where.set_context_id(1)
         self.assertEquals(str(where), 'token("p1", "p2") > token(:{}, :{})'.format(1, 2))
 
+        # Verify that a SELECT query can be successfully generated
+        str(q._select_query())
+
         # Token(tuple()) is also possible for convenience
         # it (allows for Token(obj.pk) syntax)
         func = functions.Token(('a', 'b'))
@@ -57,4 +60,5 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         where = q._where[0]
         where.set_context_id(1)
         self.assertEquals(str(where), 'token("p1", "p2") > token(:{}, :{})'.format(1, 2))
+        str(q._select_query())
 
