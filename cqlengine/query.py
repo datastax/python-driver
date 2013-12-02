@@ -355,10 +355,21 @@ class AbstractQuerySet(object):
                 column = self.model._get_column(col_name)
             except KeyError:
                 if col_name == 'pk__token':
+                    if not isinstance(val, Token):
+                        raise QueryException("Virtual column 'pk__token' may only be compared to Token() values")
                     column = columns._PartitionKeysToken(self.model)
                     quote_field = False
                 else:
                     raise QueryException("Can't resolve column name: '{}'".format(col_name))
+
+            if isinstance(val, Token):
+                if col_name != 'pk__token':
+                    raise QueryException("Token() values may only be compared to the 'pk__token' virtual column")
+                partition_columns = column.partition_columns
+                if len(partition_columns) != len(val.value):
+                    raise QueryException(
+                        'Token() received {} arguments but model has {} partition keys'.format(
+                            len(partition_columns), len(val.value)))
 
             #get query operator, or use equals if not supplied
             operator_class = BaseWhereOperator.get_operator(col_op or 'EQ')
