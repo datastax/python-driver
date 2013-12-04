@@ -224,6 +224,13 @@ class Cluster(object):
     If ``libev`` is installed, ``LibevConnection`` will be used instead.
     """
 
+    control_connection_timeout = 2.0
+    """
+    A timeout, in seconds, for queries made by the control connection, such
+    as querying the current schema and information about nodes in the cluster.
+    If set to :const:`None`, there will be no timeout for these queries.
+    """
+
     sessions = None
     control_connection = None
     scheduler = None
@@ -250,7 +257,8 @@ class Cluster(object):
                  sockopts=None,
                  cql_version=None,
                  executor_threads=2,
-                 max_schema_agreement_wait=10):
+                 max_schema_agreement_wait=10,
+                 control_connection_timeout=2.0):
         """
         Any of the mutable Cluster attributes may be set as keyword arguments
         to the constructor.
@@ -295,6 +303,7 @@ class Cluster(object):
         self.sockopts = sockopts
         self.cql_version = cql_version
         self.max_schema_agreement_wait = max_schema_agreement_wait
+        self.control_connection_timeout = control_connection_timeout
 
         self._listeners = set()
         self._listener_lock = Lock()
@@ -335,7 +344,8 @@ class Cluster(object):
         if self.metrics_enabled:
             self.metrics = Metrics(weakref.proxy(self))
 
-        self.control_connection = ControlConnection(self)
+        self.control_connection = ControlConnection(
+                self, self.control_connection_timeout)
 
     def get_min_requests_per_connection(self, host_distance):
         return self._min_requests_per_connection[host_distance]
@@ -1199,11 +1209,13 @@ class ControlConnection(object):
     _SELECT_SCHEMA_PEERS = "SELECT rpc_address, schema_version FROM system.peers"
     _SELECT_SCHEMA_LOCAL = "SELECT schema_version FROM system.local WHERE key='local'"
 
+    _is_shutdown = False
+    _timeout = None
+
     # for testing purposes
     _time = time
-    _is_shutdown = False
 
-    def __init__(self, cluster):
+    def __init__(self, cluster, timeout):
         # use a weak reference to allow the Cluster instance to be GC'ed (and
         # shutdown) since implementing __del__ disables the cycle detector
         self._cluster = weakref.proxy(cluster)
@@ -1211,6 +1223,7 @@ class ControlConnection(object):
         self._balancing_policy.populate(cluster, [])
         self._reconnection_policy = cluster.reconnection_policy
         self._connection = None
+        self._timeout = timeout
 
         self._lock = RLock()
         self._schema_agreement_lock = Lock()
@@ -1368,13 +1381,15 @@ class ControlConnection(object):
         col_query = QueryMessage(query=self._SELECT_COLUMNS + where_clause, consistency_level=cl)
 
         if ks_query:
-            ks_result, cf_result, col_result = connection.wait_for_responses(ks_query, cf_query, col_query)
+            ks_result, cf_result, col_result = connection.wait_for_responses(
+                    ks_query, cf_query, col_query, timeout=self._timeout)
             ks_result = dict_factory(*ks_result.results)
             cf_result = dict_factory(*cf_result.results)
             col_result = dict_factory(*col_result.results)
         else:
             ks_result = None
-            cf_result, col_result = connection.wait_for_responses(cf_query, col_query)
+            cf_result, col_result = connection.wait_for_responses(
+                    cf_query, col_query, timeout=self._timeout)
             cf_result = dict_factory(*cf_result.results)
             col_result = dict_factory(*col_result.results)
 
@@ -1393,7 +1408,8 @@ class ControlConnection(object):
         cl = ConsistencyLevel.ONE
         peers_query = QueryMessage(query=self._SELECT_PEERS, consistency_level=cl)
         local_query = QueryMessage(query=self._SELECT_LOCAL, consistency_level=cl)
-        peers_result, local_result = connection.wait_for_responses(peers_query, local_query)
+        peers_result, local_result = connection.wait_for_responses(
+                peers_query, local_query, timeout=self._timeout)
         peers_result = dict_factory(*peers_result.results)
 
         partitioner = None
@@ -1505,7 +1521,8 @@ class ControlConnection(object):
                 local_query = QueryMessage(query=self._SELECT_SCHEMA_LOCAL, consistency_level=cl)
                 try:
                     timeout = min(2.0, total_timeout - elapsed)
-                    peers_result, local_result = connection.wait_for_responses(peers_query, local_query, timeout=timeout)
+                    peers_result, local_result = connection.wait_for_responses(
+                            peers_query, local_query, timeout=timeout)
                 except OperationTimedOut:
                     log.debug("[control connection] Timed out waiting for response during schema agreement check")
                     elapsed = self._time.time() - start

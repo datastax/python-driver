@@ -7,6 +7,7 @@ from mock import Mock, ANY
 
 from concurrent.futures import ThreadPoolExecutor
 
+from cassandra import OperationTimedOut
 from cassandra.decoder import ResultMessage
 from cassandra.cluster import ControlConnection, Cluster, _Scheduler
 from cassandra.pool import Host
@@ -114,7 +115,7 @@ class ControlConnectionTest(unittest.TestCase):
         self.connection = MockConnection()
         self.time = FakeTime()
 
-        self.control_connection = ControlConnection(self.cluster)
+        self.control_connection = ControlConnection(self.cluster, timeout=0.01)
         self.control_connection._connection = self.connection
         self.control_connection._time = self.time
 
@@ -219,6 +220,26 @@ class ControlConnectionTest(unittest.TestCase):
         self.control_connection.refresh_node_list_and_token_map()
         self.assertEqual(1, len(self.cluster.removed_hosts))
         self.assertEqual(self.cluster.removed_hosts[0].address, "192.168.1.2")
+
+    def test_refresh_nodes_and_tokens_timeout(self):
+
+        def bad_wait_for_responses(*args, **kwargs):
+            self.assertEqual(kwargs['timeout'], self.control_connection._timeout)
+            raise OperationTimedOut()
+
+        self.connection.wait_for_responses = bad_wait_for_responses
+        self.control_connection.refresh_node_list_and_token_map()
+        self.cluster.executor.submit.assert_called_with(self.control_connection._reconnect)
+
+    def test_refresh_schema_timeout(self):
+
+        def bad_wait_for_responses(*args, **kwargs):
+            self.assertEqual(kwargs['timeout'], self.control_connection._timeout)
+            raise OperationTimedOut()
+
+        self.connection.wait_for_responses = bad_wait_for_responses
+        self.control_connection.refresh_schema()
+        self.cluster.executor.submit.assert_called_with(self.control_connection._reconnect)
 
     def test_handle_topology_change(self):
         event = {
