@@ -866,7 +866,7 @@ class Session(object):
         for future in futures:
             future.result()
 
-    def execute(self, query, parameters=None, trace=False):
+    def execute(self, query, parameters=None, timeout=None, trace=False):
         """
         Execute the given query and synchronously wait for the response.
 
@@ -895,7 +895,7 @@ class Session(object):
 
         future = self.execute_async(query, parameters, trace)
         try:
-            result = future.result()
+            result = future.result(timeout)
         finally:
             if trace:
                 try:
