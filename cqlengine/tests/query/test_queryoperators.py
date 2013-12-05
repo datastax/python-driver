@@ -84,6 +84,9 @@ class TestTokenFunction(BaseCassEngTestCase):
         where.set_context_id(1)
         self.assertEquals(str(where), 'token("p1", "p2") > token(:{}, :{})'.format(1, 2))
 
+        # Verify that a SELECT query can be successfully generated
+        str(q._select_query())
+
         # Token(tuple()) is also possible for convenience
         # it (allows for Token(obj.pk) syntax)
         func = functions.Token(('a', 'b'))
@@ -92,4 +95,15 @@ class TestTokenFunction(BaseCassEngTestCase):
         where = q._where[0]
         where.set_context_id(1)
         self.assertEquals(str(where), 'token("p1", "p2") > token(:{}, :{})'.format(1, 2))
+        str(q._select_query())
 
+        # The 'pk__token' virtual column may only be compared to a Token
+        self.assertRaises(query.QueryException, TestModel.objects.filter, pk__token__gt=10)
+
+        # A Token may only be compared to the `pk__token' virtual column
+        func = functions.Token('a', 'b')
+        self.assertRaises(query.QueryException, TestModel.objects.filter, p1__gt=func)
+
+        # The # of arguments to Token must match the # of partition keys
+        func = functions.Token('a')
+        self.assertRaises(query.QueryException, TestModel.objects.filter, pk__token__gt=func)
