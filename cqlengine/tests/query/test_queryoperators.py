@@ -7,6 +7,7 @@ from cqlengine import functions
 from cqlengine import query
 from cqlengine.statements import WhereClause
 from cqlengine.operators import EqualsOperator
+from cqlengine.management import sync_table, drop_table
 
 class TestQuerySetOperation(BaseCassEngTestCase):
 
@@ -36,7 +37,41 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         where.update_context(ctx)
         self.assertEqual(ctx, {'5': DateTime().to_database(now)})
 
+
+class TokenTestModel(Model):
+    key = columns.Integer(primary_key=True)
+    val = columns.Integer()
+
+
+class TestTokenFunction(BaseCassEngTestCase):
+
+    def setUp(self):
+        super(TestTokenFunction, self).setUp()
+        sync_table(TokenTestModel)
+
+    def tearDown(self):
+        super(TestTokenFunction, self).tearDown()
+        drop_table(TokenTestModel)
+
     def test_token_function(self):
+        """ Tests that token functions work properly """
+        assert TokenTestModel.objects().count() == 0
+        for i in range(10):
+            TokenTestModel.create(key=i, val=i)
+        assert TokenTestModel.objects().count() == 10
+        seen_keys = set()
+        last_token = None
+        for instance in TokenTestModel.objects().limit(5):
+            last_token = instance.key
+            seen_keys.add(last_token)
+        assert len(seen_keys) == 5
+        for instance in TokenTestModel.objects(pk__token__gt=functions.Token(last_token)):
+            seen_keys.add(instance.key)
+
+        assert len(seen_keys) == 10
+        assert all([i in seen_keys for i in range(10)])
+
+    def test_compound_pk_token_function(self):
 
         class TestModel(Model):
             p1 = columns.Text(partition_key=True)
