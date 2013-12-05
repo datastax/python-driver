@@ -58,7 +58,7 @@ class MetricsTests(unittest.TestCase):
         try:
             # Test write
             query = SimpleStatement("INSERT INTO test3rf.test (k, v) VALUES (2, 2)", consistency_level=ConsistencyLevel.ALL)
-            self.assertRaises(WriteTimeout, session.execute, query)
+            self.assertRaises(WriteTimeout, session.execute, query, timeout=None)
             self.assertEqual(1, cluster.metrics.stats.write_timeouts)
 
         finally:
@@ -88,7 +88,7 @@ class MetricsTests(unittest.TestCase):
         try:
             # Test read
             query = SimpleStatement("SELECT v FROM test3rf.test WHERE k=%(k)s", consistency_level=ConsistencyLevel.ALL)
-            self.assertRaises(ReadTimeout, session.execute, query, {'k': 1})
+            self.assertRaises(ReadTimeout, session.execute, query, {'k': 1}, timeout=None)
             self.assertEqual(1, cluster.metrics.stats.read_timeouts)
 
         finally:

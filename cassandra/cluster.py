@@ -65,6 +65,9 @@ DEFAULT_MIN_CONNECTIONS_PER_REMOTE_HOST = 1
 DEFAULT_MAX_CONNECTIONS_PER_REMOTE_HOST = 2
 
 
+_NOT_SET = object()
+
+
 class NoHostAvailable(Exception):
     """
     Raised when an operation is attempted but all connections are
@@ -842,6 +845,21 @@ class Session(object):
 
     """
 
+    default_timeout = 10.0
+    """
+    A default timeout, measured in seconds, for queries executed through
+    :meth:`.execute()` or :meth:`.execute_async()`.  This default may be
+    overridden with the `timeout` parameter for either of those methods
+    or the `timeout` parameter for :meth:`~.ResponseFuture.result()`.
+
+    Setting this to :const:`None` will cause no timeouts to be set by default.
+
+    *Note*: This timeout currently has no effect on callbacks registered
+    on a :class:`~.ResponseFuture` through :meth:`~.ResponseFuture.add_callback` or
+    :meth:`~.ResponseFuture.add_errback`; even if a query exceeds this default
+    timeout, neither the registered callback or errback will be called.
+    """
+
     _lock = None
     _pools = None
     _load_balancer = None
@@ -866,7 +884,7 @@ class Session(object):
         for future in futures:
             future.result()
 
-    def execute(self, query, parameters=None, timeout=None, trace=False):
+    def execute(self, query, parameters=None, timeout=_NOT_SET, trace=False):
         """
         Execute the given query and synchronously wait for the response.
 
@@ -880,6 +898,12 @@ class Session(object):
         argument.  If a dict is used, ``%(name)s`` style placeholders must
         be used.
 
+        `timeout` should specify a floating-point timeout (in seconds) after
+        which an :exc:`.OperationTimedOut` exception will be raised if the query
+        has not completed.  If not set, the timeout defaults to
+        :attr:`~.Session.default_timeout`.  If set to :const:`None`, there is
+        no timeout.
+
         If `trace` is set to :const:`True`, an attempt will be made to
         fetch the trace details and attach them to the `query`'s
         :attr:`~.Statement.trace` attribute in the form of a :class:`.QueryTrace`
@@ -888,6 +912,9 @@ class Session(object):
         trace details, the :attr:`~.Statement.trace` attribute will be left as
         :const:`None`.
         """
+        if timeout is _NOT_SET:
+            timeout = self.default_timeout
+
         if trace and not isinstance(query, Statement):
             raise TypeError(
                 "The query argument must be an instance of a subclass of "
@@ -964,7 +991,7 @@ class Session(object):
             message.tracing = True
 
         future = ResponseFuture(
-            self, message, query, metrics=self._metrics,
+            self, message, query, self.default_timeout, metrics=self._metrics,
             prepared_statement=prepared_statement)
         future.send_request()
         return future
@@ -1661,9 +1688,6 @@ def refresh_schema_and_set_result(keyspace, table, control_conn, response_future
         response_future._set_final_result(None)
 
 
-_NO_RESULT_YET = object()
-
-
 class ResponseFuture(object):
     """
     An asynchronous response delivery mechanism that is returned from calls
@@ -1679,9 +1703,10 @@ class ResponseFuture(object):
     row_factory = None
     message = None
     query = None
+    default_timeout = None
 
     _req_id = None
-    _final_result = _NO_RESULT_YET
+    _final_result = _NOT_SET
     _final_exception = None
     _query_trace = None
     _callback = None
@@ -1693,11 +1718,12 @@ class ResponseFuture(object):
     _start_time = None
     _metrics = None
 
-    def __init__(self, session, message, query, metrics=None, prepared_statement=None):
+    def __init__(self, session, message, query, default_timeout=None, metrics=None, prepared_statement=None):
         self.session = session
         self.row_factory = session.row_factory
         self.message = message
         self.query = query
+        self.default_timeout = default_timeout
         self._metrics = metrics
         self.prepared_statement = prepared_statement
         if metrics is not None:
@@ -2008,7 +2034,7 @@ class ResponseFuture(object):
         # otherwise, move onto another host
         self.send_request()
 
-    def result(self, timeout=None):
+    def result(self, timeout=_NOT_SET):
         """
         Return the final result or raise an Exception if errors were
         encountered.  If the final result or error has not been set
@@ -2027,13 +2053,16 @@ class ResponseFuture(object):
             ...     log.exception("Operation failed:")
 
         """
-        if self._final_result is not _NO_RESULT_YET:
+        if timeout is _NOT_SET:
+            timeout = self.default_timeout
+
+        if self._final_result is not _NOT_SET:
             return self._final_result
         elif self._final_exception:
             raise self._final_exception
         else:
             self._event.wait(timeout=timeout)
-            if self._final_result is not _NO_RESULT_YET:
+            if self._final_result is not _NOT_SET:
                 return self._final_result
             elif self._final_exception:
                 raise self._final_exception
@@ -2081,7 +2110,7 @@ class ResponseFuture(object):
             >>> future.add_callback(handle_results, time.time(), should_log=True)
 
         """
-        if self._final_result is not _NO_RESULT_YET:
+        if self._final_result is not _NOT_SET:
             fn(self._final_result, *args, **kwargs)
         else:
             self._callback = (fn, args, kwargs)
@@ -2128,7 +2157,7 @@ class ResponseFuture(object):
         self.add_errback(errback, *errback_args, **(errback_kwargs or {}))
 
     def __str__(self):
-        result = "(no result yet)" if self._final_result is _NO_RESULT_YET else self._final_result
+        result = "(no result yet)" if self._final_result is _NOT_SET else self._final_result
         return "<ResponseFuture: query='%s' request_id=%s result=%s exception=%s host=%s>" \
                % (self.query, self._req_id, result, self._final_exception, self._current_host)
     __repr__ = __str__
