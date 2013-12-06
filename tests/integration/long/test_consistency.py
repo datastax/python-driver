@@ -32,14 +32,15 @@ class ConsistencyTests(unittest.TestCase):
 
         create_schema(session, keyspace, replication_factor=1)
         init(session, keyspace, 12)
-
-        reset_coordinators()
         query(session, keyspace, 12)
+
         assert_queried(1, 0)
         assert_queried(2, 12)
         assert_queried(3, 0)
 
+
         try:
+            reset_coordinators()
             force_stop(2)
             wait_for_down(cluster, 2)
 
@@ -79,7 +80,7 @@ class ConsistencyTests(unittest.TestCase):
                 try:
                     init(session, keyspace, 12, consistency_level=cl)
                     self._cl_expected_failure(cl)
-                except cassandra.Unavailable as e:
+                except (cassandra.Unavailable, cassandra.WriteTimeout) as e:
                     if not cl in [ConsistencyLevel.ONE,
                                   ConsistencyLevel.TWO,
                                   ConsistencyLevel.QUORUM,
@@ -120,6 +121,7 @@ class ConsistencyTests(unittest.TestCase):
 
         create_schema(session, keyspace, replication_factor=2)
         init(session, keyspace, 12)
+        wait_for_up(cluster, 2)
 
         reset_coordinators()
         query(session, keyspace, 12)
