@@ -803,26 +803,17 @@ def cql_encode_sequence(val):
 def cql_encode_map_collection(val):
     return '{ %s }' % ' , '.join(
                                  '%s : %s' % (
-                                     cql_encode_native_types(k),
-                                     cql_encode_native_types(v))
+                                     cql_encode_builtin_types(k),
+                                     cql_encode_builtin_types(v))
                                  for k, v in val.iteritems())
 
 
 def cql_encode_list_collection(val):
-    return '[ %s ]' % ' , '.join(map(cql_encode_native_types, val))
+    return '[ %s ]' % ' , '.join(map(cql_encode_builtin_types, val))
 
 
 def cql_encode_set_collection(val):
-    return '{ %s }' % ' , '.join(map(cql_quote, val))
-
-
-def cql_encode_native_types(val):
-    v_type = type(val)
-    if v_type in py_cql_collection_types:
-        encoder = cql_encode_object
-    else:
-        encoder = cql_encoders.get(v_type, cql_encode_object)
-    return encoder(val)
+    return '{ %s }' % ' , '.join(map(cql_encode_builtin_types, val))
 
 
 def cql_encode_builtin_types(val):
