@@ -265,14 +265,14 @@ class TokenAwarePolicy(LoadBalancingPolicy):
     _cluster_metadata = None
 
     def __init__(self, child_policy):
-        self.child_policy = child_policy
+        self._child_policy = child_policy
 
     def populate(self, cluster, hosts):
         self._cluster_metadata = cluster.metadata
-        self.child_policy.populate(cluster, hosts)
+        self._child_policy.populate(cluster, hosts)
 
     def distance(self, *args, **kwargs):
-        return self.child_policy.distance(*args, **kwargs)
+        return self._child_policy.distance(*args, **kwargs)
 
     def make_query_plan(self, working_keyspace=None, query=None):
         if query and query.keyspace:
@@ -280,7 +280,7 @@ class TokenAwarePolicy(LoadBalancingPolicy):
         else:
             keyspace = working_keyspace
 
-        child = self.child_policy
+        child = self._child_policy
         if query is None:
             for host in child.make_query_plan(keyspace, query):
                 yield host
@@ -303,16 +303,16 @@ class TokenAwarePolicy(LoadBalancingPolicy):
                         yield host
 
     def on_up(self, *args, **kwargs):
-        return self.child_policy.on_up(*args, **kwargs)
+        return self._child_policy.on_up(*args, **kwargs)
 
     def on_down(self, *args, **kwargs):
-        return self.child_policy.on_down(*args, **kwargs)
+        return self._child_policy.on_down(*args, **kwargs)
 
     def on_add(self, *args, **kwargs):
-        return self.child_policy.on_add(*args, **kwargs)
+        return self._child_policy.on_add(*args, **kwargs)
 
     def on_remove(self, *args, **kwargs):
-        return self.child_policy.on_remove(*args, **kwargs)
+        return self._child_policy.on_remove(*args, **kwargs)
 
 
 class ConvictionPolicy(object):
