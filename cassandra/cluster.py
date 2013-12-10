@@ -854,7 +854,7 @@ class Session(object):
 
     Setting this to :const:`None` will cause no timeouts to be set by default.
 
-    *Note*: This timeout currently has no effect on callbacks registered
+    *Important*: This timeout currently has no effect on callbacks registered
     on a :class:`~.ResponseFuture` through :meth:`~.ResponseFuture.add_callback` or
     :meth:`~.ResponseFuture.add_errback`; even if a query exceeds this default
     timeout, neither the registered callback or errback will be called.
