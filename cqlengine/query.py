@@ -318,6 +318,11 @@ class AbstractQuerySet(object):
     def all(self):
         return copy.deepcopy(self)
 
+    def consistency(self, consistency):
+        clone = copy.deepcopy(self)
+        clone._consistency = consistency
+        return clone
+
     def _parse_filter_arg(self, arg):
         """
         Parses a filter arg in the format:
@@ -624,11 +629,6 @@ class ModelQuerySet(AbstractQuerySet):
         clone = self.only(fields)
         clone._values_list = True
         clone._flat_values_list = flat
-        return clone
-
-    def consistency(self, consistency):
-        clone = copy.deepcopy(self)
-        clone._consistency = consistency
         return clone
 
     def ttl(self, ttl):

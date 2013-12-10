@@ -239,8 +239,9 @@ def get_fields(model):
 
 
 def get_table_settings(model):
-    return schema_columnfamilies.get(keyspace_name=model._get_keyspace(),
-                                     columnfamily_name=model.column_family_name(include_keyspace=False))
+    return schema_columnfamilies.objects.consistency(ONE).get(
+        keyspace_name=model._get_keyspace(),
+        columnfamily_name=model.column_family_name(include_keyspace=False))
 
 
 def update_compaction(model):
