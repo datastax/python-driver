@@ -145,6 +145,7 @@ class BatchQueryTests(BaseCassEngTestCase):
             pass
 
         obj = BatchQueryLogModel.objects(k=1)
+        # should be 1 because the batch should execute
         self.assertEqual(1, len(obj))
 
     def test_batch_execute_on_exception_skips_if_not_specified(self):
@@ -163,4 +164,6 @@ class BatchQueryTests(BaseCassEngTestCase):
             pass
 
         obj = BatchQueryLogModel.objects(k=2)
+        
+        # should be 0 because the batch should not execute
         self.assertEqual(0, len(obj))
