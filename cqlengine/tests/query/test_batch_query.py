@@ -140,7 +140,7 @@ class BatchQueryTests(BaseCassEngTestCase):
         try:
             with BatchQuery(execute_on_exception=True) as b:
                 BatchQueryLogModel.batch(b).create(k=1, v=1)
-            raise Exception("Blah")
+                raise Exception("Blah")
         except:
             pass
 
@@ -156,11 +156,11 @@ class BatchQueryTests(BaseCassEngTestCase):
         self.assertEqual(0, len(obj))
 
         try:
-            with BatchQuery(execute_on_exception=True) as b:
+            with BatchQuery() as b:
                 BatchQueryLogModel.batch(b).create(k=2, v=2)
-            raise Exception("Blah")
+                raise Exception("Blah")
         except:
             pass
 
         obj = BatchQueryLogModel.objects(k=2)
-        self.assertEqual(1, len(obj))
+        self.assertEqual(0, len(obj))
