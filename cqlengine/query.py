@@ -78,13 +78,15 @@ class BatchQuery(object):
     """
     _consistency = None
 
-    def __init__(self, batch_type=None, timestamp=None, consistency=None):
+
+    def __init__(self, batch_type=None, timestamp=None, consistency=None, execute_on_exception=False):
         self.queries = []
         self.batch_type = batch_type
         if timestamp is not None and not isinstance(timestamp, datetime):
             raise CQLEngineException('timestamp object must be an instance of datetime')
         self.timestamp = timestamp
         self._consistency = consistency
+        self._execute_on_exception = execute_on_exception
 
     def add_query(self, query):
         if not isinstance(query, BaseCQLStatement):
@@ -125,8 +127,8 @@ class BatchQuery(object):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        #don't execute if there was an exception
-        if exc_type is not None: return
+        #don't execute if there was an exception by default
+        if exc_type is not None and not self._execute_on_exception: return
         self.execute()
 
 
