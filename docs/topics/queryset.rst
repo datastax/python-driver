@@ -312,6 +312,20 @@ Batch Queries
         ExampleModel.objects(id=some_id2).batch(b).delete()
         b.execute()
 
+
+    Typically you will not want the block to execute if an exception occurs inside the `with` block.  However, in the case that this is desirable, it's achievable by using the following syntax:
+
+    .. code-block:: python
+
+        with BatchQuery(execute_on_exception=True) as b:
+            LogEntry.batch(b).create(k=1, v=1)
+            mystery_function() # exception thrown in here
+            LogEntry.batch(b).create(k=1, v=2) # this code is never reached due to the exception, but anything leading up to here will execute in the batch.
+
+    If an exception is thrown somewhere in the block, any statements that have been added to the batch will still be executed.  This is useful for some logging situations.
+
+
+
 QuerySet method reference
 =========================
 
