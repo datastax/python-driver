@@ -820,14 +820,6 @@ def cql_encode_all_types(val):
     return cql_encoders.get(type(val), cql_encode_object)(val)
 
 
-py_cql_collection_types = frozenset((
-    dict,
-    list, tuple,
-    set, frozenset,
-    types.GeneratorType
-))
-
-
 cql_encoders = {
     float: cql_encode_object,
     bytearray: cql_encode_bytes,
