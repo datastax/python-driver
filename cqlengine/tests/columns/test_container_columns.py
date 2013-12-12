@@ -42,6 +42,10 @@ class TestSetColumn(BaseCassEngTestCase):
         super(TestSetColumn, cls).tearDownClass()
         drop_table(TestSetModel)
 
+    def test_add_none_fails(self):
+        with self.assertRaises(ValidationError):
+            m = TestSetModel.create(int_set=set([None]))
+
     def test_empty_set_initial(self):
         """
         tests that sets are set() by default, should never be none
@@ -331,6 +335,13 @@ class TestListColumn(BaseCassEngTestCase):
 
         tmp = TestListModel.get(partition=pkey)
         self.assertEqual(tmp.int_list, [])
+
+    def test_insert_none(self):
+        pkey = uuid4()
+        with self.assertRaises(ValidationError):
+            TestListModel.create(partition=pkey, int_list=[None])
+
+
 
 
 

@@ -574,6 +574,9 @@ class Set(BaseContainerColumn):
             else:
                 raise ValidationError('{} cannot be coerced to a set object'.format(val))
 
+        if None in val:
+            raise ValidationError("None not allowed in a set")
+
         return {self.value_col.validate(v) for v in val}
 
     def to_python(self, value):
@@ -655,6 +658,8 @@ class List(BaseContainerColumn):
         if val is None: return
         if not isinstance(val, (set, list, tuple)):
             raise ValidationError('{} is not a list object'.format(val))
+        if None in val:
+            raise ValidationError("None is not allowed in a list")
         return [self.value_col.validate(v) for v in val]
 
     def to_python(self, value):
