@@ -197,9 +197,9 @@ class ConnectionPool(object):
                 )
                 new_conn.set_cql_version('3.0.0')
                 return new_conn
-            except Exception as e:
-                logging.debug("Could not establish connection to {}:{}".format(host.name, host.port))
-                pass
+            except Exception as exc:
+                logging.debug("Could not establish connection to"
+                              " {}:{} ({!r})".format(host.name, host.port, exc))
 
         raise CQLConnectionError("Could not connect to any server in cluster")
 
