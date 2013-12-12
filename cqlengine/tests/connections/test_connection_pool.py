@@ -2,6 +2,7 @@ from unittest import TestCase
 from cql import OperationalError
 from mock import MagicMock, patch, Mock
 
+from cqlengine import ONE
 from cqlengine.connection import ConnectionPool, Host
 
 
@@ -18,4 +19,4 @@ class OperationalErrorLoggingTest(TestCase):
 
         with patch.object(p, 'get', return_value=MockConnection()):
             with self.assertRaises(OperationalError):
-                p.execute("select * from system.peers", {})
+                p.execute("select * from system.peers", {}, ONE)

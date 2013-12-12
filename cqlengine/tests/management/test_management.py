@@ -1,5 +1,6 @@
 from mock import MagicMock, patch
 
+from cqlengine import ONE
 from cqlengine.exceptions import CQLEngineException
 from cqlengine.management import create_table, delete_table, get_fields
 from cqlengine.tests.base import BaseCassEngTestCase
@@ -22,7 +23,7 @@ class ConnectionPoolFailoverTestCase(BaseCassEngTestCase):
         with patch('cqlengine.connection.cql.connect') as mock:
             mock.side_effect=CQLEngineException
             with self.assertRaises(CQLEngineException):
-                self.pool.execute("select * from system.peers", {})
+                self.pool.execute("select * from system.peers", {}, ONE)
 
     def test_dead_node(self):
         """
