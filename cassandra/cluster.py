@@ -1479,7 +1479,8 @@ class ControlConnection(object):
 
         for old_host in self._cluster.metadata.all_hosts():
             if old_host.address != connection.host and \
-                    old_host.address not in found_hosts:
+                    old_host.address not in found_hosts and \
+                    old_host.address not in self._cluster.contact_points:
                 log.debug("[control connection] Found host that has been removed: %r", old_host)
                 self._cluster.remove_host(old_host)
 
