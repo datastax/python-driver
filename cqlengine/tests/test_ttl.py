@@ -63,6 +63,12 @@ class TTLInstanceUpdateTest(BaseTTLTest):
         query = m.call_args[0][0]
         self.assertIn("USING TTL", query)
 
+    def test_update_syntax_valid(self):
+        # sanity test that ensures the TTL syntax is accepted by cassandra
+        model = TestTTLModel.create(text="goodbye blake")
+        model.ttl(60).update(text="goodbye forever")
+
+
 
 
 
