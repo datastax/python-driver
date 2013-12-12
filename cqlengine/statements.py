@@ -218,7 +218,7 @@ class ListUpdateClause(ContainerUpdateClause):
         if not self._analyzed: self._analyze()
         qs = []
         ctx_id = self.context_id
-        if self._assignments:
+        if self._assignments is not None:
             qs += ['"{}" = :{}'.format(self.field, ctx_id)]
             ctx_id += 1
 
@@ -233,12 +233,12 @@ class ListUpdateClause(ContainerUpdateClause):
 
     def get_context_size(self):
         if not self._analyzed: self._analyze()
-        return int(bool(self._assignments)) + int(bool(self._append)) + int(bool(self._prepend))
+        return int(self._assignments is not None) + int(bool(self._append)) + int(bool(self._prepend))
 
     def update_context(self, ctx):
         if not self._analyzed: self._analyze()
         ctx_id = self.context_id
-        if self._assignments:
+        if self._assignments is not None:
             ctx[str(ctx_id)] = self._to_database(self._assignments)
             ctx_id += 1
         if self._prepend:
@@ -262,6 +262,7 @@ class ListUpdateClause(ContainerUpdateClause):
             # if elements have been removed,
             # rewrite the whole list
             self._assignments = self.value
+
 
         elif len(self.previous) == 0:
             # if we're updating from an empty
