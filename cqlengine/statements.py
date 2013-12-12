@@ -582,14 +582,15 @@ class UpdateStatement(AssignmentStatement):
 
     def __unicode__(self):
         qs = ['UPDATE', self.table]
+
+        if self.ttl:
+            qs += ["USING TTL {}".format(self.ttl)]
+
         qs += ['SET']
         qs += [', '.join([unicode(c) for c in self.assignments])]
 
         if self.where_clauses:
             qs += [self._where]
-
-        if self.ttl:
-            qs += ["USING TTL {}".format(self.ttl)]
 
         return ' '.join(qs)
 
