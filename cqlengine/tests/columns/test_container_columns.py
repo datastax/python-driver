@@ -367,6 +367,15 @@ class TestMapColumn(BaseCassEngTestCase):
         tmp = TestMapModel.create()
         tmp.int_map['blah'] = 1
 
+    def test_add_none_as_map_key(self):
+        with self.assertRaises(ValidationError):
+            TestMapModel.create(int_map={None:1})
+
+    def test_add_none_as_map_value(self):
+        with self.assertRaises(ValidationError):
+            TestMapModel.create(int_map={None:1})
+
+
     def test_empty_retrieve(self):
         tmp = TestMapModel.create()
         tmp2 = TestMapModel.get(partition=tmp.partition)
