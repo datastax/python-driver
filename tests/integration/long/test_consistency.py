@@ -5,7 +5,7 @@ from cassandra.cluster import Cluster
 from cassandra.policies import TokenAwarePolicy, RoundRobinPolicy
 from tests.integration.long.utils import reset_coordinators, force_stop, \
     create_schema, init, query, assert_queried, wait_for_down, wait_for_up, \
-    start
+    start, get_queried
 
 try:
     import unittest2 as unittest
@@ -29,6 +29,8 @@ class ConsistencyTests(unittest.TestCase):
         cluster = Cluster(
             load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()))
         session = cluster.connect()
+        wait_for_up(cluster, 1)
+        wait_for_up(cluster, 2)
 
         create_schema(session, keyspace, replication_factor=1)
         init(session, keyspace, 12)
@@ -37,7 +39,6 @@ class ConsistencyTests(unittest.TestCase):
         assert_queried(1, 0)
         assert_queried(2, 12)
         assert_queried(3, 0)
-
 
         try:
             reset_coordinators()
@@ -57,12 +58,11 @@ class ConsistencyTests(unittest.TestCase):
             ]
 
             # Test writes that expected to complete successfully
-            # BUG: CL.ANY should work
-            # for cl in accepted_list:
-            #     try:
-            #         init(session, keyspace, 12, consistency_level=cl)
-            #     except Exception as e:
-            #         self._cl_failure(cl, e)
+            for cl in accepted_list:
+                try:
+                    init(session, keyspace, 12, consistency_level=cl)
+                except Exception as e:
+                    self._cl_failure(cl, e)
 
             # Test reads that expected to complete successfully
             for cl in accepted_list:
@@ -118,18 +118,19 @@ class ConsistencyTests(unittest.TestCase):
         cluster = Cluster(
             load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()))
         session = cluster.connect()
+        wait_for_up(cluster, 1)
+        wait_for_up(cluster, 2)
 
         create_schema(session, keyspace, replication_factor=2)
         init(session, keyspace, 12)
-        wait_for_up(cluster, 2)
-
-        reset_coordinators()
         query(session, keyspace, 12)
+
         assert_queried(1, 0)
         assert_queried(2, 12)
         assert_queried(3, 0)
 
         try:
+            reset_coordinators()
             force_stop(2)
             wait_for_down(cluster, 2)
 
@@ -159,11 +160,6 @@ class ConsistencyTests(unittest.TestCase):
                 try:
                     reset_coordinators()
                     query(session, keyspace, 12, consistency_level=cl)
-                    # Bug: I believe the Java-Driver does this differently
-                    # and RoundRobins after the ideal token is not available.
-                    # I like the Python Driver's approach, but we should
-                    # probably make all policies act the same way, whichever
-                    # way gets chosen?
                     assert_queried(1, 0)
                     assert_queried(2, 0)
                     assert_queried(3, 12)
@@ -218,14 +214,14 @@ class ConsistencyTests(unittest.TestCase):
 
         create_schema(session, keyspace, replication_factor=3)
         init(session, keyspace, 12)
-
-        reset_coordinators()
         query(session, keyspace, 12)
+
         assert_queried(1, 0)
         assert_queried(2, 12)
         assert_queried(3, 0)
 
         try:
+            reset_coordinators()
             force_stop(2)
             wait_for_down(cluster, 2)
 
@@ -255,10 +251,9 @@ class ConsistencyTests(unittest.TestCase):
                 try:
                     reset_coordinators()
                     query(session, keyspace, 12, consistency_level=cl)
-                    # Bug: I believe the Java-Driver does this differently
-                    assert_queried(1, 12)
+                    assert_queried(1, 0)
                     assert_queried(2, 0)
-                    assert_queried(3, 0)
+                    assert_queried(3, 12)
                 except cassandra.InvalidRequest as e:
                     if not cl in [ConsistencyLevel.ANY]:
                         self._cl_failure(cl, e)
@@ -308,15 +303,18 @@ class ConsistencyTests(unittest.TestCase):
         cluster = Cluster(
             load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()))
         session = cluster.connect()
+        wait_for_up(cluster, 1)
+        wait_for_up(cluster, 2)
 
         create_schema(session, keyspace, replication_factor=3)
         init(session, keyspace, 12)
-
-        reset_coordinators()
         query(session, keyspace, 12)
+
         assert_queried(1, 0)
         assert_queried(2, 12)
         assert_queried(3, 0)
+
+        reset_coordinators()
 
         accepted_list = [
             ConsistencyLevel.ANY,
