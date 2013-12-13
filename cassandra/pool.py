@@ -532,6 +532,10 @@ class HostConnectionPool(object):
         remaining_callbacks = set(self._connections)
         errors = []
 
+        if not remaining_callbacks:
+            callback(self, errors)
+            return
+
         def connection_finished_setting_keyspace(conn, error):
             remaining_callbacks.remove(conn)
             if error:

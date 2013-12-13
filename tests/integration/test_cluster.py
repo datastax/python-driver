@@ -69,6 +69,12 @@ class ClusterTests(unittest.TestCase):
         result2 = session2.execute("SELECT * FROM test")
         self.assertEquals(result, result2)
 
+    def test_set_keyspace_twice(self):
+        cluster = Cluster()
+        session = cluster.connect()
+        session.execute("USE system")
+        session.execute("USE system")
+
     def test_default_connections(self):
         """
         Ensure errors are not thrown when using non-default policies

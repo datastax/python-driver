@@ -1177,6 +1177,10 @@ class Session(object):
         remaining_callbacks = set(self._pools.values())
         errors = {}
 
+        if not remaining_callbacks:
+            callback(errors)
+            return
+
         def pool_finished_setting_keyspace(pool, host_errors):
             remaining_callbacks.remove(pool)
             if host_errors:

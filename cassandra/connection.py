@@ -322,6 +322,7 @@ class Connection(object):
         occurred, otherwise :const:`None`.
         """
         if not keyspace or keyspace == self.keyspace:
+            callback(self, None)
             return
 
         query = QueryMessage(query='USE "%s"' % (keyspace,),
