@@ -349,9 +349,9 @@ class TestCodeCoverage(unittest.TestCase):
             self.assertNotEqual(list(get_replicas('test3rf', ring[0])), [])
 
         for i, token in enumerate(ring):
-            self.assertEqual(get_replicas('test3rf', token), set(owners))
-            self.assertEqual(get_replicas('test2rf', token), set([owners[i], owners[(i + 1) % 3]]))
-            self.assertEqual(get_replicas('test1rf', token), set([owners[i]]))
+            self.assertEqual(set(get_replicas('test3rf', token)), set(owners))
+            self.assertEqual(set(get_replicas('test2rf', token)), set([owners[i], owners[(i + 1) % 3]]))
+            self.assertEqual(set(get_replicas('test1rf', token)), set([owners[i]]))
 
 
 class TokenMetadataTest(unittest.TestCase):
@@ -379,15 +379,15 @@ class TokenMetadataTest(unittest.TestCase):
         # tokens match node tokens exactly
         for token, expected_host in zip(tokens, hosts):
             replicas = token_map.get_replicas("ks", token)
-            self.assertEqual(replicas, set([expected_host]))
+            self.assertEqual(set(replicas), set([expected_host]))
 
         # shift the tokens back by one
         for token, expected_host in zip(tokens[1:], hosts[1:]):
             replicas = token_map.get_replicas("ks", MD5Token(str(token.value - 1)))
-            self.assertEqual(replicas, set([expected_host]))
+            self.assertEqual(set(replicas), set([expected_host]))
 
         # shift the tokens forward by one
         for i, token in enumerate(tokens):
             replicas = token_map.get_replicas("ks", MD5Token(str(token.value + 1)))
             expected_host = hosts[(i + 1) % len(hosts)]
-            self.assertEqual(replicas, set([expected_host]))
+            self.assertEqual(set(replicas), set([expected_host]))
