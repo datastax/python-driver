@@ -315,6 +315,53 @@ class TokenAwarePolicy(LoadBalancingPolicy):
         return self._child_policy.on_remove(*args, **kwargs)
 
 
+class WhiteListRoundRobinPolicy(RoundRobinPolicy):
+    """
+    A subclass of :class:`.RoundRobinPolicy` which evenly
+    distributes queries across all nodes in the cluster,
+    regardless of what datacenter the nodes may be in, but
+    only if that node exists in the list of allowed nodes
+
+    This policy is addresses the issue described in
+    https://datastax-oss.atlassian.net/browse/JAVA-145
+    Where connection errors occur when connection
+    attempts are made to private IP addresses remotely
+    """
+    def __init__(self, hosts):
+        """
+        :param hosts: List of hosts
+        """
+        self._allowed_hosts = hosts
+
+    def populate(self, cluster, hosts):
+        self._live_hosts = set()
+        for host in hosts:
+            if host.address in self._allowed_hosts:
+                self._live_hosts.add(host)
+
+        if len(hosts) <= 1:
+            self._position = 0
+        else:
+            self._position = randint(0, len(hosts) - 1)
+
+    def distance(self, host):
+        if host.address in self._allowed_hosts:
+            return HostDistance.LOCAL
+        else:
+            return HostDistance.IGNORED
+
+    def on_up(self, host):
+        if host.address in self._allowed_hosts:
+            self._live_hosts.add(host)
+
+    def on_add(self, host):
+        if host.address in self._allowed_hosts:
+            self._live_hosts.add(host)
+
+    def on_remove(self, host):
+        self._live_hosts.discard(host)
+
+
 class ConvictionPolicy(object):
     """
     A policy which decides when hosts should be considered down
