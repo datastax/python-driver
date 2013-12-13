@@ -18,7 +18,7 @@ Cassandra CQL 3 Object Mapper for Python
 
 setup(
     name='cqlengine',
-    version='0.9.2-2951ba35de1fc7213121a9b45b7ff679d543c5d3',
+    version=version,
     description='Cassandra CQL 3 Object Mapper for Python',
     long_description=long_desc,
     classifiers = [
