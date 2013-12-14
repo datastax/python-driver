@@ -207,9 +207,12 @@ def get_compaction_options(model):
             raise CQLEngineException("{} is limited to {}".format(key, limited_to_strategy))
 
         if tmp:
-            result[key] = tmp
+            # Explicitly cast the values to strings to be able to compare the
+            # values against introspected values from Cassandra.
+            result[key] = str(tmp)
 
     setter('tombstone_compaction_interval')
+    setter('tombstone_threshold')
 
     setter('bucket_high', SizeTieredCompactionStrategy)
     setter('bucket_low', SizeTieredCompactionStrategy)
@@ -217,7 +220,7 @@ def get_compaction_options(model):
     setter('min_threshold', SizeTieredCompactionStrategy)
     setter('min_sstable_size', SizeTieredCompactionStrategy)
 
-    setter("sstable_size_in_mb", LeveledCompactionStrategy)
+    setter('sstable_size_in_mb', LeveledCompactionStrategy)
 
     return result
 
@@ -245,6 +248,14 @@ def get_table_settings(model):
 
 
 def update_compaction(model):
+    """Updates the compaction options for the given model if necessary.
+
+    :param model: The model to update.
+
+    :return: `True`, if the compaction options were modified in Cassandra,
+        `False` otherwise.
+    :rtype: bool
+    """
     logger.debug("Checking %s for compaction differences", model)
     row = get_table_settings(model)
     # check compaction_strategy_class
@@ -253,13 +264,17 @@ def update_compaction(model):
 
     do_update = not row['compaction_strategy_class'].endswith(model.__compaction__)
 
-    existing_options = row['compaction_strategy_options']
-    existing_options = json.loads(existing_options)
+    existing_options = json.loads(row['compaction_strategy_options'])
+    # The min/max thresholds are stored differently in the system data dictionary
+    existing_options.update({
+        'min_threshold': str(row['min_compaction_threshold']),
+        'max_threshold': str(row['max_compaction_threshold']),
+        })
 
     desired_options = get_compaction_options(model)
     desired_options.pop('class', None)
 
-    for k,v in desired_options.items():
+    for k, v in desired_options.items():
         val = existing_options.pop(k, None)
         if val != v:
             do_update = True
@@ -273,11 +288,15 @@ def update_compaction(model):
         query = "ALTER TABLE {} with compaction = {}".format(cf_name, options)
         logger.debug(query)
         execute(query)
+        return True
+
+    return False
 
 
 def delete_table(model):
     warnings.warn("delete_table has been deprecated in favor of drop_table()", DeprecationWarning)
     return drop_table(model)
+
 
 def drop_table(model):
 
