@@ -85,11 +85,16 @@ def setup(
         host = host.strip()
         host = host.split(':')
         if len(host) == 1:
-            _hosts.append(Host(host[0], 9160))
+            port = 9160
         elif len(host) == 2:
-            _hosts.append(Host(*host))
+            try:
+                port = int(host[1])
+            except ValueError:
+                raise CQLConnectionError("Can't parse {}".format(''.join(host)))
         else:
             raise CQLConnectionError("Can't parse {}".format(''.join(host)))
+
+        _hosts.append(Host(host[0], port))
 
     if not _hosts:
         raise CQLConnectionError("At least one host required")
