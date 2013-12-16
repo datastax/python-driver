@@ -46,8 +46,8 @@ def assert_queried(node, n):
         raise RuntimeError('IP: %s. Expected: %s. Received: %s. Full detail: %s.' % (ip, n, 0, coordinators))
 
 
-def create_schema(session, keyspace, replication_class='SimpleStrategy',
-                  replication_factor=1):
+def create_schema(session, keyspace, replication_class='SS',
+                  replication_factor=1, replication_strategy=None):
 
     results = session.execute(
         'SELECT keyspace_name FROM system.schema_keyspaces')
@@ -55,13 +55,20 @@ def create_schema(session, keyspace, replication_class='SimpleStrategy',
     if keyspace in existing_keyspaces:
         session.execute('DROP KEYSPACE %s' % keyspace)
 
-    if replication_class == 'SimpleStrategy':
+    if replication_class == 'SS':
         ddl = "CREATE KEYSPACE %s WITH replication" \
               " = {'class': 'SimpleStrategy', 'replication_factor': '%s'}"
         session.execute(ddl % (keyspace, replication_factor))
+    elif replication_class == 'NTS':
+        if not replication_strategy:
+            raise Exception('replication_strategy is not set')
 
-        ddl = 'CREATE TABLE %s.cf (k int PRIMARY KEY, i int)'
-        session.execute(ddl % keyspace)
+        ddl = "CREATE KEYSPACE %s" \
+              " WITH replication = { 'class' : 'NetworkTopologyStrategy', %s }"
+        session.execute(ddl % (keyspace, str(replication_strategy)[1:-1]))
+
+    ddl = 'CREATE TABLE %s.cf (k int PRIMARY KEY, i int)'
+    session.execute(ddl % keyspace)
     session.execute('USE %s' % keyspace)
 
     # BUG: probably related to PYTHON-39
