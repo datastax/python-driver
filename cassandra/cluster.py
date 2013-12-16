@@ -283,14 +283,23 @@ class Cluster(object):
             self.auth_provider = auth_provider
 
         if load_balancing_policy is not None:
+            if isinstance(load_balancing_policy, type):
+                raise ValueError("load_balancing_policy must be an instance")
+
             self.load_balancing_policy = load_balancing_policy
         else:
             self.load_balancing_policy = RoundRobinPolicy()
 
         if reconnection_policy is not None:
+            if isinstance(reconnection_policy, type):
+                raise ValueError("reconnection_policy must be an instance")
+
             self.reconnection_policy = reconnection_policy
 
         if default_retry_policy is not None:
+            if isinstance(default_retry_policy, type):
+                raise ValueError("default_retry_policy must be an instance")
+
             self.default_retry_policy = default_retry_policy
 
         if conviction_policy_factory is not None:
