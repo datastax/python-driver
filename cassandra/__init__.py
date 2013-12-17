@@ -60,6 +60,12 @@ class ConsistencyLevel(object):
     Requires a quorum of replicas in each datacenter
     """
 
+    LOCAL_ONE = 10
+    """
+    Sends a request only to replicas in the local datacenter and waits for
+    one response.
+    """
+
 ConsistencyLevel.value_to_name = {
     ConsistencyLevel.ANY: 'ANY',
     ConsistencyLevel.ONE: 'ONE',
@@ -68,7 +74,8 @@ ConsistencyLevel.value_to_name = {
     ConsistencyLevel.QUORUM: 'QUORUM',
     ConsistencyLevel.ALL: 'ALL',
     ConsistencyLevel.LOCAL_QUORUM: 'LOCAL_QUORUM',
-    ConsistencyLevel.EACH_QUORUM: 'EACH_QUORUM'
+    ConsistencyLevel.EACH_QUORUM: 'EACH_QUORUM',
+    ConsistencyLevel.LOCAL_ONE: 'LOCAL_ONE'
 }
 
 ConsistencyLevel.name_to_value = {
@@ -79,7 +86,8 @@ ConsistencyLevel.name_to_value = {
     'QUORUM': ConsistencyLevel.QUORUM,
     'ALL': ConsistencyLevel.ALL,
     'LOCAL_QUORUM': ConsistencyLevel.LOCAL_QUORUM,
-    'EACH_QUORUM': ConsistencyLevel.EACH_QUORUM
+    'EACH_QUORUM': ConsistencyLevel.EACH_QUORUM,
+    'LOCAL_ONE': ConsistencyLevel.LOCAL_ONE
 }
 
 
