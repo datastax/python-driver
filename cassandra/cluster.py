@@ -1686,9 +1686,10 @@ class _Scheduler(object):
 
 def refresh_schema_and_set_result(keyspace, table, control_conn, response_future):
     try:
-        control_conn.refresh_schema(keyspace, table)
+        control_conn._refresh_schema(response_future._connection, keyspace, table)
     except Exception:
         log.exception("Exception refreshing schema in response to schema change:")
+        response_future.session.submit(control_conn.refresh_schema, keyspace, table)
     finally:
         response_future._set_final_result(None)
 
