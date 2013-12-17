@@ -33,17 +33,18 @@ def get_queried(node):
     return coordinators[ip]
 
 
-def assert_queried(node, n):
+def assert_queried(testcase, node, n):
     ip = '127.0.0.%s' % node
     if ip in coordinators:
         if coordinators[ip] == n:
             return
-        raise RuntimeError(
-            'IP: %s. Expected: %s. Received: %s. Full detail: %s.' % (ip, n, coordinators[ip], coordinators))
+        testcase.fail('IP: %s. Expected: %s. Received: %s. Full detail: %s.' % (
+            ip, n, coordinators[ip], coordinators))
     else:
         if n == 0:
             return
-        raise RuntimeError('IP: %s. Expected: %s. Received: %s. Full detail: %s.' % (ip, n, 0, coordinators))
+        testcase.fail('IP: %s. Expected: %s. Received: %s. Full detail: %s.' % (
+            ip, n, 0, coordinators))
 
 
 def create_schema(session, keyspace, replication_class='SS',

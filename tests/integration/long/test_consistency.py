@@ -37,9 +37,9 @@ class ConsistencyTests(unittest.TestCase):
         init(session, keyspace, 12)
         query(session, keyspace, 12)
 
-        assert_queried(1, 0)
-        assert_queried(2, 12)
-        assert_queried(3, 0)
+        assert_queried(self, 1, 0)
+        assert_queried(self, 2, 12)
+        assert_queried(self, 3, 0)
 
         try:
             reset_coordinators()
@@ -126,9 +126,9 @@ class ConsistencyTests(unittest.TestCase):
         init(session, keyspace, 12)
         query(session, keyspace, 12)
 
-        assert_queried(1, 0)
-        assert_queried(2, 12)
-        assert_queried(3, 0)
+        assert_queried(self, 1, 0)
+        assert_queried(self, 2, 12)
+        assert_queried(self, 3, 0)
 
         try:
             reset_coordinators()
@@ -161,9 +161,9 @@ class ConsistencyTests(unittest.TestCase):
                 try:
                     reset_coordinators()
                     query(session, keyspace, 12, consistency_level=cl)
-                    assert_queried(1, 0)
-                    assert_queried(2, 0)
-                    assert_queried(3, 12)
+                    assert_queried(self, 1, 0)
+                    assert_queried(self, 2, 0)
+                    assert_queried(self, 3, 12)
                 except cassandra.InvalidRequest as e:
                     if not cl in [ConsistencyLevel.ANY]:
                         self._cl_failure(cl, e)
@@ -217,9 +217,9 @@ class ConsistencyTests(unittest.TestCase):
         init(session, keyspace, 12)
         query(session, keyspace, 12)
 
-        assert_queried(1, 0)
-        assert_queried(2, 12)
-        assert_queried(3, 0)
+        assert_queried(self, 1, 0)
+        assert_queried(self, 2, 12)
+        assert_queried(self, 3, 0)
 
         try:
             reset_coordinators()
@@ -252,9 +252,9 @@ class ConsistencyTests(unittest.TestCase):
                 try:
                     reset_coordinators()
                     query(session, keyspace, 12, consistency_level=cl)
-                    assert_queried(1, 0)
-                    assert_queried(2, 0)
-                    assert_queried(3, 12)
+                    assert_queried(self, 1, 0)
+                    assert_queried(self, 2, 0)
+                    assert_queried(self, 3, 12)
                 except cassandra.InvalidRequest as e:
                     if not cl in [ConsistencyLevel.ANY]:
                         self._cl_failure(cl, e)
@@ -311,9 +311,9 @@ class ConsistencyTests(unittest.TestCase):
         init(session, keyspace, 12)
         query(session, keyspace, 12)
 
-        assert_queried(1, 0)
-        assert_queried(2, 12)
-        assert_queried(3, 0)
+        assert_queried(self, 1, 0)
+        assert_queried(self, 2, 12)
+        assert_queried(self, 3, 0)
 
         reset_coordinators()
 
@@ -343,9 +343,9 @@ class ConsistencyTests(unittest.TestCase):
             try:
                 reset_coordinators()
                 query(session, keyspace, 12, consistency_level=cl)
-                assert_queried(1, 0)
-                assert_queried(2, 12)
-                assert_queried(3, 0)
+                assert_queried(self, 1, 0)
+                assert_queried(self, 2, 12)
+                assert_queried(self, 3, 0)
             except cassandra.InvalidRequest as e:
                 if not cl in [ConsistencyLevel.ANY]:
                     self._cl_failure(cl, e)
@@ -398,9 +398,9 @@ class ConsistencyTests(unittest.TestCase):
         init(session, keyspace, 12)
         query(session, keyspace, 12)
 
-        assert_queried(1, 0)
-        assert_queried(2, 12)
-        assert_queried(3, 0)
+        assert_queried(self, 1, 0)
+        assert_queried(self, 2, 12)
+        assert_queried(self, 3, 0)
 
         try:
             reset_coordinators()
@@ -433,9 +433,9 @@ class ConsistencyTests(unittest.TestCase):
                 try:
                     reset_coordinators()
                     query(session, keyspace, 12, consistency_level=cl)
-                    assert_queried(1, 0)
-                    assert_queried(2, 0)
-                    assert_queried(3, 12)
+                    assert_queried(self, 1, 0)
+                    assert_queried(self, 2, 0)
+                    assert_queried(self, 3, 12)
                 except cassandra.InvalidRequest as e:
                     if not cl in [ConsistencyLevel.ANY]:
                         self._cl_failure(cl, e)
@@ -491,9 +491,9 @@ class ConsistencyTests(unittest.TestCase):
         init(session, keyspace, 12)
         query(session, keyspace, 12)
 
-        assert_queried(1, 0)
-        assert_queried(2, 12)
-        assert_queried(3, 0)
+        assert_queried(self, 1, 0)
+        assert_queried(self, 2, 12)
+        assert_queried(self, 3, 0)
 
         try:
             reset_coordinators()
@@ -526,9 +526,9 @@ class ConsistencyTests(unittest.TestCase):
                 try:
                     reset_coordinators()
                     query(session, keyspace, 12, consistency_level=cl)
-                    assert_queried(1, 0)
-                    assert_queried(2, 0)
-                    assert_queried(3, 12)
+                    assert_queried(self, 1, 0)
+                    assert_queried(self, 2, 0)
+                    assert_queried(self, 3, 12)
                 except cassandra.InvalidRequest as e:
                     if not cl in [ConsistencyLevel.ANY]:
                         self._cl_failure(cl, e)
@@ -581,13 +581,13 @@ class ConsistencyTests(unittest.TestCase):
         query(session, keyspace, 12)
 
         try:
-            assert_queried(1, 0)
-            assert_queried(2, 12)
-            assert_queried(3, 0)
+            assert_queried(self, 1, 0)
+            assert_queried(self, 2, 12)
+            assert_queried(self, 3, 0)
         except:
-            assert_queried(1, 4)
-            assert_queried(2, 4)
-            assert_queried(3, 4)
+            assert_queried(self, 1, 4)
+            assert_queried(self, 2, 4)
+            assert_queried(self, 3, 4)
 
         try:
             reset_coordinators()
@@ -620,9 +620,9 @@ class ConsistencyTests(unittest.TestCase):
                 try:
                     reset_coordinators()
                     query(session, keyspace, 12, consistency_level=cl)
-                    # assert_queried(1, 0)
-                    # assert_queried(2, 0)
-                    # assert_queried(3, 12)
+                    # assert_queried(self, 1, 0)
+                    # assert_queried(self, 2, 0)
+                    # assert_queried(self, 3, 12)
                 except cassandra.InvalidRequest as e:
                     if not cl in [ConsistencyLevel.ANY]:
                         self._cl_failure(cl, e)
