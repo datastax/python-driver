@@ -6,16 +6,14 @@ from cassandra import ConsistencyLevel
 from tests.integration import get_node
 
 
-coordinators = {}
+coordinators = defaultdict(int)
 
 
 def add_coordinator(future):
     global coordinators
     coordinator = future._current_host.address
-    if coordinator in coordinators:
-        coordinators[coordinator] += 1
-    else:
-        coordinators[coordinator] = 1
+    coordinators[coordinator] += 1
+
     if future._errors:
         print 'future._errors', future._errors
     future.result()
