@@ -1,12 +1,16 @@
+import logging
 import struct
 import time
+
+from collections import defaultdict
 
 from cassandra.query import SimpleStatement
 from cassandra import ConsistencyLevel
 from tests.integration import get_node
 
-
 coordinators = defaultdict(int)
+
+log = logging.getLogger(__name__)
 
 
 def add_coordinator(future):
@@ -15,7 +19,7 @@ def add_coordinator(future):
     coordinators[coordinator] += 1
 
     if future._errors:
-        print 'future._errors', future._errors
+        log.error('future._errors: %s' % future._errors)
     future.result()
 
 
@@ -45,7 +49,7 @@ def assert_queried(testcase, node, n):
             ip, n, 0, coordinators))
 
 
-def create_schema(session, keyspace, replication_class='SS',
+def create_schema(session, keyspace, simple_strategy=True,
                   replication_factor=1, replication_strategy=None):
 
     results = session.execute(
@@ -54,11 +58,11 @@ def create_schema(session, keyspace, replication_class='SS',
     if keyspace in existing_keyspaces:
         session.execute('DROP KEYSPACE %s' % keyspace)
 
-    if replication_class == 'SS':
+    if simple_strategy:
         ddl = "CREATE KEYSPACE %s WITH replication" \
               " = {'class': 'SimpleStrategy', 'replication_factor': '%s'}"
         session.execute(ddl % (keyspace, replication_factor))
-    elif replication_class == 'NTS':
+    else:
         if not replication_strategy:
             raise Exception('replication_strategy is not set')
 
@@ -84,9 +88,9 @@ def init(session, keyspace, n, consistency_level=ConsistencyLevel.ONE):
         session.execute(ss)
 
 
-def query(session, keyspace, n, consistency_level=ConsistencyLevel.ONE):
+def query(session, keyspace, count, consistency_level=ConsistencyLevel.ONE):
     routing_key = struct.pack('>i', 0)
-    for i in range(n):
+    for i in range(count):
         ss = SimpleStatement('SELECT * FROM %s WHERE k = 0' % 'cf',
                              consistency_level=consistency_level,
                              routing_key=routing_key)
