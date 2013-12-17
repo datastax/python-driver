@@ -284,7 +284,7 @@ class Cluster(object):
 
         if load_balancing_policy is not None:
             if isinstance(load_balancing_policy, type):
-                raise ValueError("load_balancing_policy must be an instance")
+                raise TypeError("load_balancing_policy should not be a class, it should be an instance of that class")
 
             self.load_balancing_policy = load_balancing_policy
         else:
@@ -292,13 +292,13 @@ class Cluster(object):
 
         if reconnection_policy is not None:
             if isinstance(reconnection_policy, type):
-                raise ValueError("reconnection_policy must be an instance")
+                raise TypeError("reconnection_policy should not be a class, it should be an instance of that class")
 
             self.reconnection_policy = reconnection_policy
 
         if default_retry_policy is not None:
             if isinstance(default_retry_policy, type):
-                raise ValueError("default_retry_policy must be an instance")
+                raise TypeError("default_retry_policy should not be a class, it should be an instance of that class")
 
             self.default_retry_policy = default_retry_policy
 
