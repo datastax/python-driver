@@ -48,6 +48,7 @@ class MockCluster(object):
     load_balancing_policy = RoundRobinPolicy()
     reconnection_policy = ConstantReconnectionPolicy(2)
     down_host = None
+    contact_points = []
 
     def __init__(self):
         self.metadata = MockMetadata()
