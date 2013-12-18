@@ -131,7 +131,7 @@ class TypeTests(unittest.TestCase):
 
         v1_uuid = uuid1()
         v4_uuid = uuid4()
-        mydatetime = datetime(2013, 1, 1, 1, 1, 1)
+        mydatetime = datetime(2013, 12, 31, 23, 59, 59, 999000)
 
         params = [
             "sometext",
