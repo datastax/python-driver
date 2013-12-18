@@ -8,45 +8,65 @@ from cassandra.query import SimpleStatement
 from cassandra import ConsistencyLevel
 from tests.integration import get_node
 
-coordinators = defaultdict(int)
 
 log = logging.getLogger(__name__)
 
 
-def add_coordinator(future):
-    global coordinators
-    coordinator = future._current_host.address
-    coordinators[coordinator] += 1
+class CoordinatorStats():
+    def __init__(self):
+        self.coordinators = defaultdict(int)
 
-    if future._errors:
-        log.error('future._errors: %s' % future._errors)
-    future.result()
+    def add_coordinator(self, future):
+        coordinator = future._current_host.address
+        self.coordinators[coordinator] += 1
 
-
-def reset_coordinators():
-    global coordinators
-    coordinators = {}
+        if future._errors:
+            log.error('future._errors: %s' % future._errors)
+        future.result()
 
 
-def get_queried(node):
-    ip = '127.0.0.%s' % node
-    if not ip in coordinators:
-        return 0
-    return coordinators[ip]
+    def reset_coordinators(self):
+        self.coordinators = defaultdict(int)
 
 
-def assert_queried(testcase, node, n):
-    ip = '127.0.0.%s' % node
-    if ip in coordinators:
-        if coordinators[ip] == n:
-            return
-        testcase.fail('IP: %s. Expected: %s. Received: %s. Full detail: %s.' % (
-            ip, n, coordinators[ip], coordinators))
-    else:
-        if n == 0:
-            return
-        testcase.fail('IP: %s. Expected: %s. Received: %s. Full detail: %s.' % (
-            ip, n, 0, coordinators))
+    def get_queried(self, node):
+        ip = '127.0.0.%s' % node
+        if not ip in self.coordinators:
+            return 0
+        return self.coordinators[ip]
+
+
+    def assert_queried(self, testcase, node, n):
+        ip = '127.0.0.%s' % node
+        if ip in self.coordinators:
+            if self.coordinators[ip] == n:
+                return
+            testcase.fail('IP: %s. Expected: %s. Received: %s. Full detail: %s.' % (
+                ip, n, self.coordinators[ip], self.coordinators))
+        else:
+            if n == 0:
+                return
+            testcase.fail('IP: %s. Expected: %s. Received: %s. Full detail: %s.' % (
+                ip, n, 0, self.coordinators))
+
+
+    def init(self, session, keyspace, n, consistency_level=ConsistencyLevel.ONE):
+        self.reset_coordinators()
+        # BUG: PYTHON-38
+        # session.execute('USE %s' % keyspace)
+        for i in range(n):
+            ss = SimpleStatement('INSERT INTO %s(k, i) VALUES (0, 0)' % 'cf',
+                                 consistency_level=consistency_level)
+            session.execute(ss)
+
+
+    def query(self, session, keyspace, count, consistency_level=ConsistencyLevel.ONE):
+        routing_key = struct.pack('>i', 0)
+        for i in range(count):
+            ss = SimpleStatement('SELECT * FROM %s WHERE k = 0' % 'cf',
+                                 consistency_level=consistency_level,
+                                 routing_key=routing_key)
+            self.add_coordinator(session.execute_async(ss))
 
 
 def create_schema(session, keyspace, simple_strategy=True,
@@ -76,25 +96,6 @@ def create_schema(session, keyspace, simple_strategy=True,
 
     # BUG: probably related to PYTHON-39
     time.sleep(5)
-
-
-def init(session, keyspace, n, consistency_level=ConsistencyLevel.ONE):
-    reset_coordinators()
-    # BUG: PYTHON-38
-    # session.execute('USE %s' % keyspace)
-    for i in range(n):
-        ss = SimpleStatement('INSERT INTO %s(k, i) VALUES (0, 0)' % 'cf',
-                             consistency_level=consistency_level)
-        session.execute(ss)
-
-
-def query(session, keyspace, count, consistency_level=ConsistencyLevel.ONE):
-    routing_key = struct.pack('>i', 0)
-    for i in range(count):
-        ss = SimpleStatement('SELECT * FROM %s WHERE k = 0' % 'cf',
-                             consistency_level=consistency_level,
-                             routing_key=routing_key)
-        add_coordinator(session.execute_async(ss))
 
 
 def start(node):

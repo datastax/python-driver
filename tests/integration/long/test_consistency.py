@@ -4,9 +4,8 @@ from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster
 from cassandra.policies import TokenAwarePolicy, RoundRobinPolicy, \
     DowngradingConsistencyRetryPolicy
-from tests.integration.long.utils import reset_coordinators, force_stop, \
-    create_schema, init, query, assert_queried, wait_for_down, wait_for_up, \
-    start, get_queried
+from tests.integration.long.utils import force_stop, create_schema, \
+    wait_for_down, wait_for_up, start, CoordinatorStats
 
 try:
     import unittest2 as unittest
@@ -15,6 +14,10 @@ except ImportError:
 
 
 class ConsistencyTests(unittest.TestCase):
+
+    def setUp(self):
+        self.cs = CoordinatorStats()
+
     def _cl_failure(self, consistency_level, e):
         self.fail('%s seen for CL.%s with message: %s' % (
             type(e), ConsistencyLevel.value_to_name[consistency_level],
@@ -34,15 +37,15 @@ class ConsistencyTests(unittest.TestCase):
         wait_for_up(cluster, 2)
 
         create_schema(session, keyspace, replication_factor=1)
-        init(session, keyspace, 12)
-        query(session, keyspace, 12)
+        self.cs.init(session, keyspace, 12)
+        self.cs.query(session, keyspace, 12)
 
-        assert_queried(self, 1, 0)
-        assert_queried(self, 2, 12)
-        assert_queried(self, 3, 0)
+        self.cs.assert_queried(self, 1, 0)
+        self.cs.assert_queried(self, 2, 12)
+        self.cs.assert_queried(self, 3, 0)
 
         try:
-            reset_coordinators()
+            self.cs.reset_coordinators()
             force_stop(2)
             wait_for_down(cluster, 2)
 
@@ -61,14 +64,14 @@ class ConsistencyTests(unittest.TestCase):
             # Test writes that expected to complete successfully
             for cl in accepted_list:
                 try:
-                    init(session, keyspace, 12, consistency_level=cl)
+                    self.cs.init(session, keyspace, 12, consistency_level=cl)
                 except Exception as e:
                     self._cl_failure(cl, e)
 
             # Test reads that expected to complete successfully
             for cl in accepted_list:
                 try:
-                    query(session, keyspace, 12, consistency_level=cl)
+                    self.cs.query(session, keyspace, 12, consistency_level=cl)
                     self._cl_expected_failure(cl)
                 except cassandra.InvalidRequest as e:
                     if not cl in [ConsistencyLevel.ANY]:
@@ -79,7 +82,7 @@ class ConsistencyTests(unittest.TestCase):
             # Test writes that expected to fail
             for cl in fail_list:
                 try:
-                    init(session, keyspace, 12, consistency_level=cl)
+                    self.cs.init(session, keyspace, 12, consistency_level=cl)
                     self._cl_expected_failure(cl)
                 except (cassandra.Unavailable, cassandra.WriteTimeout) as e:
                     if not cl in [ConsistencyLevel.ONE,
@@ -96,7 +99,7 @@ class ConsistencyTests(unittest.TestCase):
             # Test reads that expected to fail
             for cl in fail_list:
                 try:
-                    query(session, keyspace, 12, consistency_level=cl)
+                    self.cs.query(session, keyspace, 12, consistency_level=cl)
                     self._cl_expected_failure(cl)
                 except cassandra.Unavailable as e:
                     if not cl in [ConsistencyLevel.ONE,
@@ -123,15 +126,15 @@ class ConsistencyTests(unittest.TestCase):
         wait_for_up(cluster, 2)
 
         create_schema(session, keyspace, replication_factor=2)
-        init(session, keyspace, 12)
-        query(session, keyspace, 12)
+        self.cs.init(session, keyspace, 12)
+        self.cs.query(session, keyspace, 12)
 
-        assert_queried(self, 1, 0)
-        assert_queried(self, 2, 12)
-        assert_queried(self, 3, 0)
+        self.cs.assert_queried(self, 1, 0)
+        self.cs.assert_queried(self, 2, 12)
+        self.cs.assert_queried(self, 3, 0)
 
         try:
-            reset_coordinators()
+            self.cs.reset_coordinators()
             force_stop(2)
             wait_for_down(cluster, 2)
 
@@ -152,18 +155,18 @@ class ConsistencyTests(unittest.TestCase):
             # Test writes that expected to complete successfully
             for cl in accepted_list:
                 try:
-                    init(session, keyspace, 12, consistency_level=cl)
+                    self.cs.init(session, keyspace, 12, consistency_level=cl)
                 except Exception as e:
                     self._cl_failure(cl, e)
 
             # Test reads that expected to complete successfully
             for cl in accepted_list:
                 try:
-                    reset_coordinators()
-                    query(session, keyspace, 12, consistency_level=cl)
-                    assert_queried(self, 1, 0)
-                    assert_queried(self, 2, 0)
-                    assert_queried(self, 3, 12)
+                    self.cs.reset_coordinators()
+                    self.cs.query(session, keyspace, 12, consistency_level=cl)
+                    self.cs.assert_queried(self, 1, 0)
+                    self.cs.assert_queried(self, 2, 0)
+                    self.cs.assert_queried(self, 3, 12)
                 except cassandra.InvalidRequest as e:
                     if not cl in [ConsistencyLevel.ANY]:
                         self._cl_failure(cl, e)
@@ -173,7 +176,7 @@ class ConsistencyTests(unittest.TestCase):
             # Test writes that expected to fail
             for cl in fail_list:
                 try:
-                    init(session, keyspace, 12, consistency_level=cl)
+                    self.cs.init(session, keyspace, 12, consistency_level=cl)
                     self._cl_expected_failure(cl)
                 except cassandra.Unavailable as e:
                     if not cl in [ConsistencyLevel.ONE,
@@ -190,7 +193,7 @@ class ConsistencyTests(unittest.TestCase):
             # Test reads that expected to fail
             for cl in fail_list:
                 try:
-                    query(session, keyspace, 12, consistency_level=cl)
+                    self.cs.query(session, keyspace, 12, consistency_level=cl)
                     self._cl_expected_failure(cl)
                 except cassandra.Unavailable as e:
                     if not cl in [ConsistencyLevel.ONE,
@@ -214,15 +217,15 @@ class ConsistencyTests(unittest.TestCase):
         session = cluster.connect()
 
         create_schema(session, keyspace, replication_factor=3)
-        init(session, keyspace, 12)
-        query(session, keyspace, 12)
+        self.cs.init(session, keyspace, 12)
+        self.cs.query(session, keyspace, 12)
 
-        assert_queried(self, 1, 0)
-        assert_queried(self, 2, 12)
-        assert_queried(self, 3, 0)
+        self.cs.assert_queried(self, 1, 0)
+        self.cs.assert_queried(self, 2, 12)
+        self.cs.assert_queried(self, 3, 0)
 
         try:
-            reset_coordinators()
+            self.cs.reset_coordinators()
             force_stop(2)
             wait_for_down(cluster, 2)
 
@@ -243,18 +246,18 @@ class ConsistencyTests(unittest.TestCase):
             # Test writes that expected to complete successfully
             for cl in accepted_list:
                 try:
-                    init(session, keyspace, 12, consistency_level=cl)
+                    self.cs.init(session, keyspace, 12, consistency_level=cl)
                 except Exception as e:
                     self._cl_failure(cl, e)
 
             # Test reads that expected to complete successfully
             for cl in accepted_list:
                 try:
-                    reset_coordinators()
-                    query(session, keyspace, 12, consistency_level=cl)
-                    assert_queried(self, 1, 0)
-                    assert_queried(self, 2, 0)
-                    assert_queried(self, 3, 12)
+                    self.cs.reset_coordinators()
+                    self.cs.query(session, keyspace, 12, consistency_level=cl)
+                    self.cs.assert_queried(self, 1, 0)
+                    self.cs.assert_queried(self, 2, 0)
+                    self.cs.assert_queried(self, 3, 12)
                 except cassandra.InvalidRequest as e:
                     if not cl in [ConsistencyLevel.ANY]:
                         self._cl_failure(cl, e)
@@ -264,7 +267,7 @@ class ConsistencyTests(unittest.TestCase):
             # Test writes that expected to fail
             for cl in fail_list:
                 try:
-                    init(session, keyspace, 12, consistency_level=cl)
+                    self.cs.init(session, keyspace, 12, consistency_level=cl)
                     self._cl_expected_failure(cl)
                 except cassandra.Unavailable as e:
                     if not cl in [ConsistencyLevel.ONE,
@@ -281,7 +284,7 @@ class ConsistencyTests(unittest.TestCase):
             # Test reads that expected to fail
             for cl in fail_list:
                 try:
-                    query(session, keyspace, 12, consistency_level=cl)
+                    self.cs.query(session, keyspace, 12, consistency_level=cl)
                     self._cl_expected_failure(cl)
                 except cassandra.Unavailable as e:
                     if not cl in [ConsistencyLevel.ONE,
@@ -308,14 +311,14 @@ class ConsistencyTests(unittest.TestCase):
         wait_for_up(cluster, 2)
 
         create_schema(session, keyspace, replication_factor=3)
-        init(session, keyspace, 12)
-        query(session, keyspace, 12)
+        self.cs.init(session, keyspace, 12)
+        self.cs.query(session, keyspace, 12)
 
-        assert_queried(self, 1, 0)
-        assert_queried(self, 2, 12)
-        assert_queried(self, 3, 0)
+        self.cs.assert_queried(self, 1, 0)
+        self.cs.assert_queried(self, 2, 12)
+        self.cs.assert_queried(self, 3, 0)
 
-        reset_coordinators()
+        self.cs.reset_coordinators()
 
         accepted_list = [
             ConsistencyLevel.ANY,
@@ -334,18 +337,18 @@ class ConsistencyTests(unittest.TestCase):
         # Test writes that expected to complete successfully
         for cl in accepted_list:
             try:
-                init(session, keyspace, 12, consistency_level=cl)
+                self.cs.init(session, keyspace, 12, consistency_level=cl)
             except Exception as e:
                 self._cl_failure(cl, e)
 
         # Test reads that expected to complete successfully
         for cl in accepted_list:
             try:
-                reset_coordinators()
-                query(session, keyspace, 12, consistency_level=cl)
-                assert_queried(self, 1, 0)
-                assert_queried(self, 2, 12)
-                assert_queried(self, 3, 0)
+                self.cs.reset_coordinators()
+                self.cs.query(session, keyspace, 12, consistency_level=cl)
+                self.cs.assert_queried(self, 1, 0)
+                self.cs.assert_queried(self, 2, 12)
+                self.cs.assert_queried(self, 3, 0)
             except cassandra.InvalidRequest as e:
                 if not cl in [ConsistencyLevel.ANY]:
                     self._cl_failure(cl, e)
@@ -355,7 +358,7 @@ class ConsistencyTests(unittest.TestCase):
         # Test writes that expected to fail
         for cl in fail_list:
             try:
-                init(session, keyspace, 12, consistency_level=cl)
+                self.cs.init(session, keyspace, 12, consistency_level=cl)
                 self._cl_expected_failure(cl)
             except cassandra.Unavailable as e:
                 if not cl in [ConsistencyLevel.ONE,
@@ -372,7 +375,7 @@ class ConsistencyTests(unittest.TestCase):
         # Test reads that expected to fail
         for cl in fail_list:
             try:
-                query(session, keyspace, 12, consistency_level=cl)
+                self.cs.query(session, keyspace, 12, consistency_level=cl)
                 self._cl_expected_failure(cl)
             except cassandra.Unavailable as e:
                 if not cl in [ConsistencyLevel.ONE,
@@ -395,15 +398,15 @@ class ConsistencyTests(unittest.TestCase):
         session = cluster.connect()
 
         create_schema(session, keyspace, replication_factor=1)
-        init(session, keyspace, 12)
-        query(session, keyspace, 12)
+        self.cs.init(session, keyspace, 12)
+        self.cs.query(session, keyspace, 12)
 
-        assert_queried(self, 1, 0)
-        assert_queried(self, 2, 12)
-        assert_queried(self, 3, 0)
+        self.cs.assert_queried(self, 1, 0)
+        self.cs.assert_queried(self, 2, 12)
+        self.cs.assert_queried(self, 3, 0)
 
         try:
-            reset_coordinators()
+            self.cs.reset_coordinators()
             force_stop(2)
             wait_for_down(cluster, 2)
 
@@ -424,18 +427,18 @@ class ConsistencyTests(unittest.TestCase):
             # Test writes that expected to complete successfully
             for cl in accepted_list:
                 try:
-                    init(session, keyspace, 12, consistency_level=cl)
+                    self.cs.init(session, keyspace, 12, consistency_level=cl)
                 except Exception as e:
                     self._cl_failure(cl, e)
 
             # Test reads that expected to complete successfully
             for cl in accepted_list:
                 try:
-                    reset_coordinators()
-                    query(session, keyspace, 12, consistency_level=cl)
-                    assert_queried(self, 1, 0)
-                    assert_queried(self, 2, 0)
-                    assert_queried(self, 3, 12)
+                    self.cs.reset_coordinators()
+                    self.cs.query(session, keyspace, 12, consistency_level=cl)
+                    self.cs.assert_queried(self, 1, 0)
+                    self.cs.assert_queried(self, 2, 0)
+                    self.cs.assert_queried(self, 3, 12)
                 except cassandra.InvalidRequest as e:
                     if not cl in [ConsistencyLevel.ANY]:
                         self._cl_failure(cl, e)
@@ -445,7 +448,7 @@ class ConsistencyTests(unittest.TestCase):
             # Test writes that expected to fail
             for cl in fail_list:
                 try:
-                    init(session, keyspace, 12, consistency_level=cl)
+                    self.cs.init(session, keyspace, 12, consistency_level=cl)
                     self._cl_expected_failure(cl)
                 except cassandra.Unavailable as e:
                     if not cl in [ConsistencyLevel.ONE,
@@ -462,7 +465,7 @@ class ConsistencyTests(unittest.TestCase):
             # Test reads that expected to fail
             for cl in fail_list:
                 try:
-                    query(session, keyspace, 12, consistency_level=cl)
+                    self.cs.query(session, keyspace, 12, consistency_level=cl)
                     self._cl_expected_failure(cl)
                 except cassandra.Unavailable as e:
                     if not cl in [ConsistencyLevel.ONE,
@@ -488,15 +491,15 @@ class ConsistencyTests(unittest.TestCase):
         session = cluster.connect()
 
         create_schema(session, keyspace, replication_factor=2)
-        init(session, keyspace, 12)
-        query(session, keyspace, 12)
+        self.cs.init(session, keyspace, 12)
+        self.cs.query(session, keyspace, 12)
 
-        assert_queried(self, 1, 0)
-        assert_queried(self, 2, 12)
-        assert_queried(self, 3, 0)
+        self.cs.assert_queried(self, 1, 0)
+        self.cs.assert_queried(self, 2, 12)
+        self.cs.assert_queried(self, 3, 0)
 
         try:
-            reset_coordinators()
+            self.cs.reset_coordinators()
             force_stop(2)
             wait_for_down(cluster, 2)
 
@@ -517,18 +520,18 @@ class ConsistencyTests(unittest.TestCase):
             # Test writes that expected to complete successfully
             for cl in accepted_list:
                 try:
-                    init(session, keyspace, 12, consistency_level=cl)
+                    self.cs.init(session, keyspace, 12, consistency_level=cl)
                 except Exception as e:
                     self._cl_failure(cl, e)
 
             # Test reads that expected to complete successfully
             for cl in accepted_list:
                 try:
-                    reset_coordinators()
-                    query(session, keyspace, 12, consistency_level=cl)
-                    assert_queried(self, 1, 0)
-                    assert_queried(self, 2, 0)
-                    assert_queried(self, 3, 12)
+                    self.cs.reset_coordinators()
+                    self.cs.query(session, keyspace, 12, consistency_level=cl)
+                    self.cs.assert_queried(self, 1, 0)
+                    self.cs.assert_queried(self, 2, 0)
+                    self.cs.assert_queried(self, 3, 12)
                 except cassandra.InvalidRequest as e:
                     if not cl in [ConsistencyLevel.ANY]:
                         self._cl_failure(cl, e)
@@ -538,7 +541,7 @@ class ConsistencyTests(unittest.TestCase):
             # Test writes that expected to fail
             for cl in fail_list:
                 try:
-                    init(session, keyspace, 12, consistency_level=cl)
+                    self.cs.init(session, keyspace, 12, consistency_level=cl)
                     self._cl_expected_failure(cl)
                 except cassandra.InvalidRequest as e:
                     if not cl in [ConsistencyLevel.LOCAL_QUORUM,
@@ -548,7 +551,7 @@ class ConsistencyTests(unittest.TestCase):
             # Test reads that expected to fail
             for cl in fail_list:
                 try:
-                    query(session, keyspace, 12, consistency_level=cl)
+                    self.cs.query(session, keyspace, 12, consistency_level=cl)
                     self._cl_expected_failure(cl)
                 except cassandra.InvalidRequest as e:
                     if not cl in [ConsistencyLevel.LOCAL_QUORUM,
@@ -564,33 +567,33 @@ class ConsistencyTests(unittest.TestCase):
         cluster = Cluster(
             load_balancing_policy=RoundRobinPolicy(),
             default_retry_policy=DowngradingConsistencyRetryPolicy())
-        self.rfthree_downgradingcl(cluster, keyspace)
+        self.rfthree_downgradingcl(cluster, keyspace, True)
 
     def test_rfthree_tokenaware_downgradingcl(self):
         keyspace = 'test_rfthree_tokenaware_downgradingcl'
         cluster = Cluster(
             load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
             default_retry_policy=DowngradingConsistencyRetryPolicy())
-        self.rfthree_downgradingcl(cluster, keyspace)
+        self.rfthree_downgradingcl(cluster, keyspace, False)
 
-    def rfthree_downgradingcl(self, cluster, keyspace):
+    def rfthree_downgradingcl(self, cluster, keyspace, roundrobin):
         session = cluster.connect()
 
         create_schema(session, keyspace, replication_factor=2)
-        init(session, keyspace, 12)
-        query(session, keyspace, 12)
+        self.cs.init(session, keyspace, 12)
+        self.cs.query(session, keyspace, 12)
+
+        if roundrobin:
+            self.cs.assert_queried(self, 1, 4)
+            self.cs.assert_queried(self, 2, 4)
+            self.cs.assert_queried(self, 3, 4)
+        else:
+            self.cs.assert_queried(self, 1, 0)
+            self.cs.assert_queried(self, 2, 12)
+            self.cs.assert_queried(self, 3, 0)
 
         try:
-            assert_queried(self, 1, 0)
-            assert_queried(self, 2, 12)
-            assert_queried(self, 3, 0)
-        except:
-            assert_queried(self, 1, 4)
-            assert_queried(self, 2, 4)
-            assert_queried(self, 3, 4)
-
-        try:
-            reset_coordinators()
+            self.cs.reset_coordinators()
             force_stop(2)
             wait_for_down(cluster, 2)
 
@@ -611,18 +614,23 @@ class ConsistencyTests(unittest.TestCase):
             # Test writes that expected to complete successfully
             for cl in accepted_list:
                 try:
-                    init(session, keyspace, 12, consistency_level=cl)
+                    self.cs.init(session, keyspace, 12, consistency_level=cl)
                 except Exception as e:
                     self._cl_failure(cl, e)
 
             # Test reads that expected to complete successfully
             for cl in accepted_list:
                 try:
-                    reset_coordinators()
-                    query(session, keyspace, 12, consistency_level=cl)
-                    # assert_queried(self, 1, 0)
-                    # assert_queried(self, 2, 0)
-                    # assert_queried(self, 3, 12)
+                    self.cs.reset_coordinators()
+                    self.cs.query(session, keyspace, 12, consistency_level=cl)
+                    if roundrobin:
+                        self.cs.assert_queried(self, 1, 6)
+                        self.cs.assert_queried(self, 2, 0)
+                        self.cs.assert_queried(self, 3, 6)
+                    else:
+                        self.cs.assert_queried(self, 1, 0)
+                        self.cs.assert_queried(self, 2, 0)
+                        self.cs.assert_queried(self, 3, 12)
                 except cassandra.InvalidRequest as e:
                     if not cl in [ConsistencyLevel.ANY]:
                         self._cl_failure(cl, e)
@@ -632,7 +640,7 @@ class ConsistencyTests(unittest.TestCase):
             # Test writes that expected to fail
             for cl in fail_list:
                 try:
-                    init(session, keyspace, 12, consistency_level=cl)
+                    self.cs.init(session, keyspace, 12, consistency_level=cl)
                     self._cl_expected_failure(cl)
                 except cassandra.InvalidRequest as e:
                     if not cl in [ConsistencyLevel.LOCAL_QUORUM,
@@ -642,7 +650,7 @@ class ConsistencyTests(unittest.TestCase):
             # Test reads that expected to fail
             for cl in fail_list:
                 try:
-                    query(session, keyspace, 12, consistency_level=cl)
+                    self.cs.query(session, keyspace, 12, consistency_level=cl)
                     self._cl_expected_failure(cl)
                 except cassandra.InvalidRequest as e:
                     if not cl in [ConsistencyLevel.LOCAL_QUORUM,
