@@ -52,8 +52,7 @@ class CoordinatorStats():
 
     def init(self, session, keyspace, n, consistency_level=ConsistencyLevel.ONE):
         self.reset_coordinators()
-        # BUG: PYTHON-38
-        # session.execute('USE %s' % keyspace)
+        session.execute('USE %s' % keyspace)
         for i in range(n):
             ss = SimpleStatement('INSERT INTO %s(k, i) VALUES (0, 0)' % 'cf',
                                  consistency_level=consistency_level)
