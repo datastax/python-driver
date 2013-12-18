@@ -94,9 +94,6 @@ def create_schema(session, keyspace, simple_strategy=True,
     session.execute(ddl % keyspace)
     session.execute('USE %s' % keyspace)
 
-    # BUG: probably related to PYTHON-39
-    time.sleep(5)
-
 
 def start(node):
     get_node(node).start()
@@ -114,19 +111,21 @@ def ring(node):
     get_node(node).nodetool('ring')
 
 
-def wait_for_up(cluster, node):
+def wait_for_up(cluster, node, wait=True):
     while True:
         host = cluster.metadata.get_host('127.0.0.%s' % node)
         if host and host.is_up:
             # BUG: shouldn't have to, but we do
-            time.sleep(5)
+            if wait:
+                time.sleep(5)
             return
 
 
-def wait_for_down(cluster, node):
+def wait_for_down(cluster, node, wait=True):
     while True:
         host = cluster.metadata.get_host('127.0.0.%s' % node)
         if not host or not host.is_up:
             # BUG: shouldn't have to, but we do
-            time.sleep(5)
+            if wait:
+                time.sleep(5)
             return

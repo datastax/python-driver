@@ -34,7 +34,7 @@ class ConsistencyTests(unittest.TestCase):
         cluster = Cluster(
             load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()))
         session = cluster.connect()
-        wait_for_up(cluster, 1)
+        wait_for_up(cluster, 1, wait=False)
         wait_for_up(cluster, 2)
 
         create_schema(session, keyspace, replication_factor=1)
@@ -123,7 +123,7 @@ class ConsistencyTests(unittest.TestCase):
         cluster = Cluster(
             load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()))
         session = cluster.connect()
-        wait_for_up(cluster, 1)
+        wait_for_up(cluster, 1, wait=False)
         wait_for_up(cluster, 2)
 
         create_schema(session, keyspace, replication_factor=2)
@@ -308,7 +308,7 @@ class ConsistencyTests(unittest.TestCase):
         cluster = Cluster(
             load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()))
         session = cluster.connect()
-        wait_for_up(cluster, 1)
+        wait_for_up(cluster, 1, wait=False)
         wait_for_up(cluster, 2)
 
         create_schema(session, keyspace, replication_factor=3)
