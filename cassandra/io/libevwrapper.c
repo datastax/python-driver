@@ -17,7 +17,12 @@ Loop_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
 
     self = (libevwrapper_Loop *)type->tp_alloc(type, 0);
     if (self != NULL) {
-        self->loop = ev_default_loop(0);
+        // select is the most portable backend, it is generally the most
+        // efficient for the number of file descriptors we'll be working with,
+        // and the epoll backend seems to occasionally leave write requests
+        // hanging (although I'm not sure if that's due to a misuse of libev
+        // or not)
+        self->loop = ev_default_loop(EVBACKEND_SELECT);
         if (!self->loop) {
             PyErr_SetString(PyExc_Exception, "Error getting default ev loop");
             Py_DECREF(self);
