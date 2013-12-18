@@ -1,3 +1,4 @@
+import traceback
 import cassandra
 
 from cassandra import ConsistencyLevel
@@ -19,13 +20,13 @@ class ConsistencyTests(unittest.TestCase):
         self.cs = CoordinatorStats()
 
     def _cl_failure(self, consistency_level, e):
-        self.fail('%s seen for CL.%s with message: %s' % (
+        self.fail('%s seen for CL.%s:\n\n%s' % (
             type(e), ConsistencyLevel.value_to_name[consistency_level],
-            e.message))
+            traceback.format_exc()))
 
     def _cl_expected_failure(self, cl):
-        self.fail('Test passed at ConsistencyLevel.%s' %
-                  ConsistencyLevel.value_to_name[cl])
+        self.fail('Test passed at ConsistencyLevel.%s:\n\n%s' % (
+                  ConsistencyLevel.value_to_name[cl], traceback.format_exc()))
 
 
     def test_rfone_tokenaware(self):
