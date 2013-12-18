@@ -360,13 +360,15 @@ class SimpleStrategy(ReplicationStrategy):
     def make_token_replica_map(self, token_to_host_owner, ring):
         replica_map = {}
         for i in range(len(ring)):
-            j, hosts = 0, set()
+            j, hosts = 0, list()
             while len(hosts) < self.replication_factor and j < len(ring):
                 token = ring[(i + j) % len(ring)]
-                hosts.add(token_to_host_owner[token])
+                host = token_to_host_owner[token]
+                if not host in hosts:
+                    hosts.append(host)
                 j += 1
 
-            replica_map[ring[i]] = list(sorted(hosts))
+            replica_map[ring[i]] = hosts
         return replica_map
 
     def export_for_schema(self):
@@ -383,7 +385,7 @@ class NetworkTopologyStrategy(ReplicationStrategy):
 
     def make_token_replica_map(self, token_to_host_owner, ring):
         # note: this does not account for hosts having different racks
-        replica_map = defaultdict(set)
+        replica_map = defaultdict(list)
         ring_len = len(ring)
         ring_len_range = range(ring_len)
         dc_rf_map = dict((dc, int(rf))
@@ -400,7 +402,8 @@ class NetworkTopologyStrategy(ReplicationStrategy):
                     # we already have all replicas for this DC
                     continue
 
-                replica_map[ring[i]].add(host)
+                if not host in replica_map[ring[i]]:
+                    replica_map[ring[i]].append(host)
 
                 if remaining[dc] == 1:
                     del remaining[dc]
@@ -408,9 +411,6 @@ class NetworkTopologyStrategy(ReplicationStrategy):
                         break
                 else:
                     remaining[dc] -= 1
-
-            replica_map[ring[i]] = list(sorted(replica_map[ring[i]]))
-
         return replica_map
 
     def export_for_schema(self):
