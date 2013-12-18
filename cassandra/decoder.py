@@ -1,4 +1,5 @@
 from binascii import hexlify
+import calendar
 from collections import namedtuple
 import datetime
 import logging
@@ -788,7 +789,8 @@ def cql_encode_object(val):
 
 
 def cql_encode_datetime(val):
-    return "'%s'" % val.strftime('%Y-%m-%d %H:%M:%S-0000')
+    timestamp = calendar.timegm(val.utctimetuple())
+    return str(long(timestamp * 1e3 + getattr(val, 'microsecond', 0) / 1e3))
 
 
 def cql_encode_date(val):
