@@ -93,6 +93,28 @@ class TTLDescriptor(object):
     def __call__(self, *args, **kwargs):
         raise NotImplementedError
 
+class TimestampDescriptor(object):
+    """
+    returns a query set descriptor with a timestamp specified
+    """
+    def __get__(self, instance, model):
+        if instance:
+            # instance method
+            def timestamp_setter(ts):
+                instance._timestamp = ts
+                return instance
+            return timestamp_setter
+
+        qs = model.__queryset__(model)
+
+        def timestamp_setter(ts):
+            qs._timestamp = ts
+            return qs
+
+        return timestamp_setter
+
+    def __call__(self, *args, **kwargs):
+        raise NotImplementedError
 
 class ConsistencyDescriptor(object):
     """
@@ -200,6 +222,7 @@ class BaseModel(object):
     objects = QuerySetDescriptor()
     ttl = TTLDescriptor()
     consistency = ConsistencyDescriptor()
+    timestamp = TimestampDescriptor()
 
     #table names will be generated automatically from it's model and package name
     #however, you can also define them manually here
@@ -231,8 +254,9 @@ class BaseModel(object):
     __queryset__ = ModelQuerySet
     __dmlquery__ = DMLQuery
 
-    __ttl__ = None
+    #__ttl__ = None # this doesn't seem to be used
     __consistency__ = None # can be set per query
+    __timestamp__ = None # optional timestamp to include with the operation
 
     __read_repair_chance__ = 0.1
 
@@ -257,11 +281,11 @@ class BaseModel(object):
         """
         Pretty printing of models by their primary key
         """
-        return '{} <{}>'.format(self.__class__.__name__, 
+        return '{} <{}>'.format(self.__class__.__name__,
                                 ', '.join(('{}={}'.format(k, getattr(self, k)) for k,v in self._primary_keys.iteritems()))
                                 )
 
-    
+
 
     @classmethod
     def _discover_polymorphic_submodels(cls):

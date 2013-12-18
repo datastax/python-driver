@@ -400,12 +400,13 @@ class MapDeleteClause(BaseDeleteClause):
 class BaseCQLStatement(object):
     """ The base cql statement class """
 
-    def __init__(self, table, consistency=None, where=None):
+    def __init__(self, table, consistency=None, timestamp=None, where=None):
         super(BaseCQLStatement, self).__init__()
         self.table = table
         self.consistency = consistency
         self.context_id = 0
         self.context_counter = self.context_id
+        self.timestamp = timestamp
 
         self.where_clauses = []
         for clause in where or []:
@@ -513,7 +514,8 @@ class AssignmentStatement(BaseCQLStatement):
                  assignments=None,
                  consistency=None,
                  where=None,
-                 ttl=None):
+                 ttl=None,
+                 timestamp=None):
         super(AssignmentStatement, self).__init__(
             table,
             consistency=consistency,
@@ -575,6 +577,9 @@ class InsertStatement(AssignmentStatement):
         if self.ttl:
             qs += ["USING TTL {}".format(self.ttl)]
 
+        if self.timestamp:
+            qs += ["USING TIMESTAMP {}".format(self.timestamp)]
+
         return ' '.join(qs)
 
 
@@ -586,6 +591,8 @@ class UpdateStatement(AssignmentStatement):
 
         if self.ttl:
             qs += ["USING TTL {}".format(self.ttl)]
+        if self.timestamp:
+            qs += ["USING TIMESTAMP {}".format(self.timestamp)]
 
         qs += ['SET']
         qs += [', '.join([unicode(c) for c in self.assignments])]

@@ -684,13 +684,14 @@ class DMLQuery(object):
     _ttl = None
     _consistency = None
 
-    def __init__(self, model, instance=None, batch=None, ttl=None, consistency=None):
+    def __init__(self, model, instance=None, batch=None, ttl=None, consistency=None, timestamp=None):
         self.model = model
         self.column_family_name = self.model.column_family_name()
         self.instance = instance
         self._batch = batch
         self._ttl = ttl
         self._consistency = consistency
+        self._timestamp = timestamp
 
     def _execute(self, q):
         if self._batch:
