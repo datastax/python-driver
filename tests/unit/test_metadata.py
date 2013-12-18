@@ -96,7 +96,7 @@ class TestStrategies(unittest.TestCase):
         nts = NetworkTopologyStrategy({'dc1': 1, 'dc2': 0})
 
         replica_map = nts.make_token_replica_map(token_to_host_owner, ring)
-        self.assertEqual(replica_map[MD5Token(0)], set([host]))
+        self.assertEqual(set(replica_map[MD5Token(0)]), set([host]))
 
     def test_nts_export_for_schema(self):
         # TODO: Cover NetworkTopologyStrategy.export_for_schema()
