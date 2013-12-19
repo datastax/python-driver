@@ -166,6 +166,7 @@ class AbstractQuerySet(object):
         self._batch = None
         self._ttl = None
         self._consistency = None
+        self._timestamp = None
 
     @property
     def column_family_name(self):
@@ -510,7 +511,9 @@ class AbstractQuerySet(object):
         return self._only_or_defer('defer', fields)
 
     def create(self, **kwargs):
-        return self.model(**kwargs).batch(self._batch).ttl(self._ttl).consistency(self._consistency).save()
+        return self.model(**kwargs).batch(self._batch).ttl(self._ttl).\
+            consistency(self._consistency).\
+            timestamp(self._timestamp).save()
 
     def delete(self):
         """

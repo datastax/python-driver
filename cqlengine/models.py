@@ -222,16 +222,18 @@ class BaseModel(object):
     objects = QuerySetDescriptor()
     ttl = TTLDescriptor()
     consistency = ConsistencyDescriptor()
+
+    # custom timestamps, see USING TIMESTAMP X
     timestamp = TimestampDescriptor()
 
-    #table names will be generated automatically from it's model and package name
-    #however, you can also define them manually here
+    # table names will be generated automatically from it's model
+    # however, you can also define them manually here
     __table_name__ = None
 
-    #the keyspace for this model
+    # the keyspace for this model
     __keyspace__ = None
 
-    #polymorphism options
+    # polymorphism options
     __polymorphic_key__ = None
 
     # compaction options

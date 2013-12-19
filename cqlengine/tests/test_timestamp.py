@@ -5,8 +5,10 @@ from datetime import timedelta
 
 import unittest
 from uuid import uuid4
+import mock
 import sure
 from cqlengine import Model, columns
+from cqlengine.connection import ConnectionPool
 from cqlengine.management import sync_table
 from cqlengine.tests.base import BaseCassEngTestCase
 
@@ -16,17 +18,29 @@ class TestTimestampModel(Model):
     count   = columns.Integer()
 
 
-class CreateWithTimestampTest(BaseCassEngTestCase):
-
+class BaseTimestampTest(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
-        super(CreateWithTimestampTest, cls).setUpClass()
+        super(BaseTimestampTest, cls).setUpClass()
         sync_table(TestTimestampModel)
+
+
+class CreateWithTimestampTest(BaseTimestampTest):
 
     def test_batch(self):
         pass
 
-    def test_non_batch(self):
+    def test_non_batch_syntax_integration(self):
         tmp = TestTimestampModel.timestamp(timedelta(seconds=30)).create(count=1)
         tmp.should.be.ok
+
+    def test_non_batch_syntax_unit(self):
+
+        with mock.patch.object(ConnectionPool, "execute") as m:
+            TestTimestampModel.timestamp(timedelta(seconds=30)).create(count=1)
+
+        query = m.call_args[0][0]
+
+        "USING TIMESTAMP".should.be.within(query)
+
 
