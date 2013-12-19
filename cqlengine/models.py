@@ -261,7 +261,7 @@ class BaseModel(object):
 
     #__ttl__ = None # this doesn't seem to be used
     __consistency__ = None # can be set per query
-    __timestamp__ = None # optional timestamp to include with the operation
+    __timestamp__ = None # optional timestamp to include with the operation (USING TIMESTAMP)
 
     __read_repair_chance__ = 0.1
 
@@ -464,6 +464,7 @@ class BaseModel(object):
         self.__dmlquery__(self.__class__, self,
                           batch=self._batch,
                           ttl=self._ttl,
+                          timestamp=self._timestamp,
                           consistency=self.__consistency__).save()
 
         #reset the value managers
@@ -498,6 +499,7 @@ class BaseModel(object):
         self.__dmlquery__(self.__class__, self,
                           batch=self._batch,
                           ttl=self._ttl,
+                          timestamp=self.__timestamp__,
                           consistency=self.__consistency__).update()
 
         #reset the value managers

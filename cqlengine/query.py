@@ -686,6 +686,7 @@ class DMLQuery(object):
     """
     _ttl = None
     _consistency = None
+    _timestamp = None
 
     def __init__(self, model, instance=None, batch=None, ttl=None, consistency=None, timestamp=None):
         self.model = model
@@ -804,7 +805,7 @@ class DMLQuery(object):
         if self.instance._has_counter or self.instance._can_update():
             return self.update()
         else:
-            insert = InsertStatement(self.column_family_name, ttl=self._ttl)
+            insert = InsertStatement(self.column_family_name, ttl=self._ttl, timestamp=self._timestamp)
             for name, col in self.instance._columns.items():
                 val = getattr(self.instance, name, None)
                 if col._val_is_null(val):

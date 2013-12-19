@@ -30,6 +30,11 @@ class CreateWithTimestampTest(BaseTimestampTest):
     def test_batch(self):
         pass
 
+    def test_timestamp_is_set_on_model_queryset(self):
+        delta = timedelta(seconds=30)
+        tmp = TestTimestampModel.timestamp(delta)
+        tmp._timestamp.should.equal(delta)
+
     def test_non_batch_syntax_integration(self):
         tmp = TestTimestampModel.timestamp(timedelta(seconds=30)).create(count=1)
         tmp.should.be.ok
