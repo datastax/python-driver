@@ -64,6 +64,4 @@ class UpdateWithTimestampTest(BaseTimestampTest):
         with mock.patch.object(ConnectionPool, "execute") as m:
             self.instance.timestamp(timedelta(seconds=30)).update(count=2)
 
-        query = m.call_args[0][0]
-
-        "USING TIMESTAMP".should.be.within(query)
+        "USING TIMESTAMP".should.be.within(m.call_args[0][0])

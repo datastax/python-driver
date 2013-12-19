@@ -615,10 +615,16 @@ class UpdateStatement(AssignmentStatement):
     def __unicode__(self):
         qs = ['UPDATE', self.table]
 
+        using_options = []
+
         if self.ttl:
-            qs += ["USING TTL {}".format(self.ttl)]
+            using_options += ["TTL {}".format(self.ttl)]
+
         if self.timestamp:
-            qs += ["USING TIMESTAMP {}".format(self.timestamp)]
+            using_options += ["TIMESTAMP {}".format(self.timestamp_normalized)]
+
+        if using_options:
+            qs += ["USING {}".format(" AND ".join(using_options))]
 
         qs += ['SET']
         qs += [', '.join([unicode(c) for c in self.assignments])]

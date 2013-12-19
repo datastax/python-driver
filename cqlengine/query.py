@@ -647,7 +647,7 @@ class ModelQuerySet(AbstractQuerySet):
             return
 
         nulled_columns = set()
-        us = UpdateStatement(self.column_family_name, where=self._where, ttl=self._ttl)
+        us = UpdateStatement(self.column_family_name, where=self._where, ttl=self._ttl, timestamp=self._timestamp)
         for name, val in values.items():
             col = self.model._columns.get(name)
             # check for nonexistant columns
@@ -746,7 +746,7 @@ class DMLQuery(object):
             raise CQLEngineException("DML Query intance attribute is None")
         assert type(self.instance) == self.model
 
-        statement = UpdateStatement(self.column_family_name, ttl=self._ttl)
+        statement = UpdateStatement(self.column_family_name, ttl=self._ttl, timestamp=self._timestamp)
         #get defined fields and their column names
         for name, col in self.model._columns.items():
             if not col.is_primary_key:

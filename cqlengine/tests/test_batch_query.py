@@ -1,8 +1,10 @@
 from unittest import skip
 from uuid import uuid4
 import random
+import sure
+
 from cqlengine import Model, columns
-from cqlengine.management import delete_table, create_table
+from cqlengine.management import drop_table, sync_table
 from cqlengine.query import BatchQuery
 from cqlengine.tests.base import BaseCassEngTestCase
 
@@ -17,13 +19,13 @@ class BatchQueryTests(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(BatchQueryTests, cls).setUpClass()
-        delete_table(TestMultiKeyModel)
-        create_table(TestMultiKeyModel)
+        drop_table(TestMultiKeyModel)
+        sync_table(TestMultiKeyModel)
 
     @classmethod
     def tearDownClass(cls):
         super(BatchQueryTests, cls).tearDownClass()
-        delete_table(TestMultiKeyModel)
+        drop_table(TestMultiKeyModel)
 
     def setUp(self):
         super(BatchQueryTests, self).setUp()
