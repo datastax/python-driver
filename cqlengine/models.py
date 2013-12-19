@@ -76,7 +76,7 @@ class TTLDescriptor(object):
     """
     def __get__(self, instance, model):
         if instance:
-            instance = copy.deepcopy(instance)
+            #instance = copy.deepcopy(instance)
             # instance method
             def ttl_setter(ts):
                 instance._ttl = ts
@@ -101,7 +101,7 @@ class TimestampDescriptor(object):
     def __get__(self, instance, model):
         if instance:
             # instance method
-            instance = copy.deepcopy(instance)
+            #instance = copy.deepcopy(instance)
             def timestamp_setter(ts):
                 instance._timestamp = ts
                 return instance
@@ -124,7 +124,7 @@ class ConsistencyDescriptor(object):
     """
     def __get__(self, instance, model):
         if instance:
-            instance = copy.deepcopy(instance)
+            #instance = copy.deepcopy(instance)
             def consistency_setter(consistency):
                 instance.__consistency__ = consistency
                 return instance

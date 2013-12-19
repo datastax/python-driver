@@ -45,10 +45,8 @@ class BatchQueryTests(BaseCassEngTestCase):
         with self.assertRaises(TestMultiKeyModel.DoesNotExist):
             TestMultiKeyModel.get(partition=self.pkey, cluster=2)
 
-        with mock.patch.object(ConnectionPool, 'execute') as m:
-            b.execute()
+        b.execute()
 
-        m.call_count.should.be(1)
 
         TestMultiKeyModel.get(partition=self.pkey, cluster=2)
 
