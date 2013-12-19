@@ -80,13 +80,13 @@ class TTLInstanceTest(BaseTTLTest):
         """
         o = TestTTLModel.create(text="whatever")
         o.text = "new stuff"
-        o.ttl(60)
+        o = o.ttl(60)
         self.assertEqual(60, o._ttl)
 
     def test_ttl_is_include_with_query_on_update(self):
         o = TestTTLModel.create(text="whatever")
         o.text = "new stuff"
-        o.ttl(60)
+        o = o.ttl(60)
 
         with mock.patch.object(ConnectionPool, 'execute') as m:
             o.save()

@@ -30,6 +30,12 @@ class CreateWithTimestampTest(BaseTimestampTest):
     def test_batch(self):
         pass
 
+    def test_timestamp_not_included_on_normal_create(self):
+        with mock.patch.object(ConnectionPool, "execute") as m:
+            TestTimestampModel.create(count=2)
+
+        "USING TIMESTAMP".shouldnt.be.within(m.call_args[0][0])
+
     def test_timestamp_is_set_on_model_queryset(self):
         delta = timedelta(seconds=30)
         tmp = TestTimestampModel.timestamp(delta)
@@ -49,3 +55,15 @@ class CreateWithTimestampTest(BaseTimestampTest):
         "USING TIMESTAMP".should.be.within(query)
 
 
+class UpdateWithTimestampTest(BaseTimestampTest):
+    def setUp(self):
+        self.instance = TestTimestampModel.create(count=1)
+
+    def test_instance_update_includes_timestamp_in_query(self):
+
+        with mock.patch.object(ConnectionPool, "execute") as m:
+            self.instance.timestamp(timedelta(seconds=30)).update(count=2)
+
+        query = m.call_args[0][0]
+
+        "USING TIMESTAMP".should.be.within(query)

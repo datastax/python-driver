@@ -451,6 +451,9 @@ class BaseCQLStatement(object):
         we're expecting self.timestamp to be either a long, a datetime, or a timedelta
         :return:
         """
+        if not self.timestamp:
+            return None
+
         if isinstance(self.timestamp, (int, long)):
             return self.timestamp
 
