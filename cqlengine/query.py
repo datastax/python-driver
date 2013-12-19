@@ -526,7 +526,8 @@ class AbstractQuerySet(object):
 
         dq = DeleteStatement(
             self.column_family_name,
-            where=self._where
+            where=self._where,
+            timestamp=self._timestamp
         )
         self._execute(dq)
 
@@ -830,7 +831,7 @@ class DMLQuery(object):
         if self.instance is None:
             raise CQLEngineException("DML Query instance attribute is None")
 
-        ds = DeleteStatement(self.column_family_name)
+        ds = DeleteStatement(self.column_family_name, timestamp=self._timestamp)
         for name, col in self.model._primary_keys.items():
             ds.add_where_clause(WhereClause(
                 col.db_field_name,

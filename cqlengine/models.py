@@ -514,7 +514,7 @@ class BaseModel(object):
 
     def delete(self):
         """ Deletes this instance """
-        self.__dmlquery__(self.__class__, self, batch=self._batch).delete()
+        self.__dmlquery__(self.__class__, self, batch=self._batch, timestamp=self._timestamp).delete()
 
     def get_changed_columns(self):
         """ returns a list of the columns that have been updated since instantiation or save """
@@ -528,7 +528,13 @@ class BaseModel(object):
         self._batch = batch
         return self
 
+    # def __deepcopy__(self):
+    #     tmp = type(self)()
+    #     tmp.__dict__.update(self.__dict__)
+    #     return tmp
+
     batch = hybrid_classmethod(_class_batch, _inst_batch)
+
 
 
 class ModelMetaClass(type):

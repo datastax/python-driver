@@ -65,3 +65,26 @@ class UpdateWithTimestampTest(BaseTimestampTest):
             self.instance.timestamp(timedelta(seconds=30)).update(count=2)
 
         "USING TIMESTAMP".should.be.within(m.call_args[0][0])
+
+class DeleteWithTimestampTest(BaseTimestampTest):
+    def test_non_batch(self):
+        """
+        we don't expect the model to come back at the end because the deletion timestamp should be in the future
+        """
+        uid = uuid4()
+        tmp = TestTimestampModel.create(id=uid, count=1)
+
+        TestTimestampModel.get(id=uid).should.be.ok
+
+        tmp.timestamp(timedelta(seconds=30)).delete()
+
+        tmp = TestTimestampModel.create(id=uid, count=1)
+
+        with self.assertRaises(TestTimestampModel.DoesNotExist):
+            TestTimestampModel.get(id=uid)
+
+
+
+
+
+

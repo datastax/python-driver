@@ -679,11 +679,12 @@ class DeleteStatement(BaseCQLStatement):
         qs += ['FROM', self.table]
 
         delete_option = []
+
         if self.timestamp:
-            delete_option += ["TIMESTAMP {}".format(self.timestamp)]
+            delete_option += ["TIMESTAMP {}".format(self.timestamp_normalized)]
 
         if delete_option:
-            qs += ["USING {}".format(" AND ".join(delete_option))]
+            qs += [" USING {} ".format(" AND ".join(delete_option))]
 
         if self.where_clauses:
             qs += [self._where]
