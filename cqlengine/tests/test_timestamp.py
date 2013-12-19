@@ -76,7 +76,10 @@ class DeleteWithTimestampTest(BaseTimestampTest):
 
         TestTimestampModel.get(id=uid).should.be.ok
 
-        tmp.timestamp(timedelta(seconds=30)).delete()
+        tmp.timestamp(timedelta(seconds=5)).delete()
+
+        with self.assertRaises(TestTimestampModel.DoesNotExist):
+            TestTimestampModel.get(id=uid)
 
         tmp = TestTimestampModel.create(id=uid, count=1)
 

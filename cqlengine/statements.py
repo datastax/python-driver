@@ -448,7 +448,7 @@ class BaseCQLStatement(object):
     @property
     def timestamp_normalized(self):
         """
-        we're expecting self.timestamp to be either a long, a datetime, or a timedelta
+        we're expecting self.timestamp to be either a long, int, a datetime, or a timedelta
         :return:
         """
         if not self.timestamp:
@@ -462,11 +462,7 @@ class BaseCQLStatement(object):
         else:
             tmp = self.timestamp
 
-        epoch = datetime(1970, 1, 1, tzinfo=tmp.tzinfo)
-
-        # do more stuff
-        offset = epoch.tzinfo.utcoffset(epoch).total_seconds() if epoch.tzinfo else 0
-        return long(((tmp - epoch).total_seconds() - offset) * 1000)
+        return long(((tmp - datetime.fromtimestamp(0)).total_seconds()) * 1000000)
 
 
     def __unicode__(self):
