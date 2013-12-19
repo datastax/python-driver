@@ -447,16 +447,23 @@ class BaseCQLStatement(object):
 
     @property
     def timestamp_normalized(self):
-        if isinstance(self.timestamp, int):
-            return self.timestamp
-
-        if isinstance(self.timestamp, datetime):
-            # do stuff
+        """
+        we're expecting self.timestamp to be either a long, a datetime, or a timedelta
+        :return:
+        """
+        if isinstance(self.timestamp, (int, long)):
             return self.timestamp
 
         if isinstance(self.timestamp, timedelta):
-            # do more stuff
-            return self.timestamp
+            tmp = datetime.now() + self.timestamp
+        else:
+            tmp = self.timestamp
+
+        epoch = datetime(1970, 1, 1, tzinfo=tmp.tzinfo)
+
+        # do more stuff
+        offset = epoch.tzinfo.utcoffset(epoch).total_seconds() if epoch.tzinfo else 0
+        return long(((tmp - epoch).total_seconds() - offset) * 1000)
 
 
     def __unicode__(self):
@@ -594,7 +601,7 @@ class InsertStatement(AssignmentStatement):
             qs += ["USING TTL {}".format(self.ttl)]
 
         if self.timestamp:
-            qs += ["USING TIMESTAMP {}".format(self.timestamp)]
+            qs += ["USING TIMESTAMP {}".format(self.timestamp_normalized)]
 
         return ' '.join(qs)
 
