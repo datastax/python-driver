@@ -510,6 +510,10 @@ class UTF8Type(_CassandraType):
         return ustr.encode('utf8')
 
 
+class VarcharType(UTF8Type):
+    typename = 'varchar'
+
+
 class _ParameterizedType(_CassandraType):
     def __init__(self, val):
         if not self.subtypes:

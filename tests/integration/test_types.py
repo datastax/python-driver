@@ -124,7 +124,8 @@ class TypeTests(unittest.TestCase):
                 p timestamp,
                 q uuid,
                 r timeuuid,
-                s varint,
+                s varchar,
+                t varint,
                 PRIMARY KEY (a, b)
             )
         """)
@@ -151,6 +152,7 @@ class TypeTests(unittest.TestCase):
             mydatetime,  # timestamp
             v4_uuid,  # uuid
             v1_uuid,  # timeuuid
+            u"sometext\u1234",  # varchar
             123456789123456789123456789  # varint
         ]
 
@@ -172,12 +174,13 @@ class TypeTests(unittest.TestCase):
             mydatetime,  # timestamp
             v4_uuid,  # uuid
             v1_uuid,  # timeuuid
+            u"sometext\u1234",  # varchar
             123456789123456789123456789  # varint
         )
 
         s.execute("""
-            INSERT INTO mytable (a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO mytable (a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, params)
 
         results = s.execute("SELECT * FROM mytable")
@@ -187,8 +190,8 @@ class TypeTests(unittest.TestCase):
 
         # try the same thing with a prepared statement
         prepared = s.prepare("""
-            INSERT INTO mytable (a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO mytable (a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """)
 
         s.execute(prepared.bind(params))
@@ -200,7 +203,7 @@ class TypeTests(unittest.TestCase):
 
         # query with prepared statement
         prepared = s.prepare("""
-            SELECT a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s FROM mytable
+            SELECT a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t FROM mytable
             """)
         results = s.execute(prepared.bind(()))
 
