@@ -1,6 +1,9 @@
 from unittest import skip
 from uuid import uuid4
 import random
+from cqlengine.connection import ConnectionPool
+
+import mock
 import sure
 
 from cqlengine import Model, columns
@@ -38,12 +41,25 @@ class BatchQueryTests(BaseCassEngTestCase):
         b = BatchQuery()
         inst = TestMultiKeyModel.batch(b).create(partition=self.pkey, cluster=2, count=3, text='4')
 
+
+        with self.assertRaises(TestMultiKeyModel.DoesNotExist):
+            TestMultiKeyModel.get(partition=self.pkey, cluster=2)
+
+        with mock.patch.object(ConnectionPool, 'execute') as m:
+            b.execute()
+
+        m.call_count.should.be(1)
+
+        TestMultiKeyModel.get(partition=self.pkey, cluster=2)
+
+    def test_batch_is_executed(self):
+        b = BatchQuery()
+        inst = TestMultiKeyModel.batch(b).create(partition=self.pkey, cluster=2, count=3, text='4')
+
         with self.assertRaises(TestMultiKeyModel.DoesNotExist):
             TestMultiKeyModel.get(partition=self.pkey, cluster=2)
 
         b.execute()
-
-        TestMultiKeyModel.get(partition=self.pkey, cluster=2)
 
     def test_update_success_case(self):
 
