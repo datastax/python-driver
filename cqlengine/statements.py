@@ -537,6 +537,7 @@ class AssignmentStatement(BaseCQLStatement):
             where=where,
         )
         self.ttl = ttl
+        self.timestamp = timestamp
 
         # add assignments
         self.assignments = []
