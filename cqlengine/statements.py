@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from cqlengine.functions import QueryValue
 from cqlengine.operators import BaseWhereOperator, InOperator
 
@@ -444,6 +445,20 @@ class BaseCQLStatement(object):
             clause.set_context_id(self.context_counter)
             self.context_counter += clause.get_context_size()
 
+    @property
+    def timestamp_normalized(self):
+        if isinstance(self.timestamp, int):
+            return self.timestamp
+
+        if isinstance(self.timestamp, datetime):
+            # do stuff
+            return self.timestamp
+
+        if isinstance(self.timestamp, timedelta):
+            # do more stuff
+            return self.timestamp
+
+
     def __unicode__(self):
         raise NotImplementedError
 
@@ -644,6 +659,13 @@ class DeleteStatement(BaseCQLStatement):
         if self.fields:
             qs += [', '.join(['{}'.format(f) for f in self.fields])]
         qs += ['FROM', self.table]
+
+        delete_option = []
+        if self.timestamp:
+            delete_option += ["TIMESTAMP {}".format(self.timestamp)]
+
+        if delete_option:
+            qs += ["USING {}".format(" AND ".join(delete_option))]
 
         if self.where_clauses:
             qs += [self._where]
