@@ -621,11 +621,12 @@ class UpdateStatement(AssignmentStatement):
 class DeleteStatement(BaseCQLStatement):
     """ a cql delete statement """
 
-    def __init__(self, table, fields=None, consistency=None, where=None):
+    def __init__(self, table, fields=None, consistency=None, where=None, timestamp=None):
         super(DeleteStatement, self).__init__(
             table,
             consistency=consistency,
             where=where,
+            timestamp=timestamp
         )
         self.fields = []
         if isinstance(fields, basestring):
