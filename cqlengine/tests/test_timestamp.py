@@ -36,7 +36,11 @@ class BatchTest(BaseTimestampTest):
 class CreateWithTimestampTest(BaseTimestampTest):
 
     def test_batch(self):
-        assert False
+        with mock.patch.object(ConnectionPool, "execute") as m, BatchQuery() as b:
+            TestTimestampModel.timestamp(timedelta(seconds=10)).batch(b).create(count=1)
+
+        "USING TIMESTAMP".should.be.within(m.call_args[0][0])
+
 
     def test_timestamp_not_included_on_normal_create(self):
         with mock.patch.object(ConnectionPool, "execute") as m:
