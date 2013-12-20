@@ -40,7 +40,7 @@ class CreateWithTimestampTest(BaseTimestampTest):
             TestTimestampModel.timestamp(timedelta(seconds=10)).batch(b).create(count=1)
 
         query = m.call_args[0][0]
-        
+
         query.should.match(r"INSERT.*USING TIMESTAMP")
         query.should_not.match(r"TIMESTAMP.*INSERT")
 
@@ -76,11 +76,19 @@ class UpdateWithTimestampTest(BaseTimestampTest):
         self.instance = TestTimestampModel.create(count=1)
 
     def test_instance_update_includes_timestamp_in_query(self):
+        # not a batch
 
         with mock.patch.object(ConnectionPool, "execute") as m:
             self.instance.timestamp(timedelta(seconds=30)).update(count=2)
 
         "USING TIMESTAMP".should.be.within(m.call_args[0][0])
+
+    def test_instance_update_in_batch(self):
+        with mock.patch.object(ConnectionPool, "execute") as m, BatchQuery() as b:
+            self.instance.batch(b).timestamp(timedelta(seconds=30)).update(count=2)
+
+        query = m.call_args[0][0]
+        "USING TIMESTAMP".should.be.within(query)
 
 class DeleteWithTimestampTest(BaseTimestampTest):
     def test_non_batch(self):
