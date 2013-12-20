@@ -24,6 +24,12 @@ class BaseTimestampTest(BaseCassEngTestCase):
         super(BaseTimestampTest, cls).setUpClass()
         sync_table(TestTimestampModel)
 
+class BatchTest(BaseTimestampTest):
+    def test_batch_is_included(self):
+        with mock.patch.object(ConnectionPool, "execute") as m, BatchQuery(timestamp=timedelta(seconds=30)) as b:
+            TestTimestampModel.batch(b).create(count=1)
+
+        "USING TIMESTAMP".should.be.within(m.call_args[0][0])
 
 
 

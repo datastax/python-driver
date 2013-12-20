@@ -3,6 +3,8 @@ CHANGELOG
 0.11.0 (in progress)
 
 * support for USING TIMESTAMP <microseconds from epoch>
+  - allows for long, timedelta, and datetime
+* fixed use of USING TIMESTAMP in batches
 
 0.10.0
 

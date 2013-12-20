@@ -1,5 +1,5 @@
 import copy
-from datetime import datetime
+from datetime import datetime, timedelta
 from cqlengine import BaseContainerColumn, Map, columns
 from cqlengine.columns import Counter, List, Set
 
@@ -82,7 +82,7 @@ class BatchQuery(object):
     def __init__(self, batch_type=None, timestamp=None, consistency=None, execute_on_exception=False):
         self.queries = []
         self.batch_type = batch_type
-        if timestamp is not None and not isinstance(timestamp, datetime):
+        if timestamp is not None and not isinstance(timestamp, (datetime, timedelta)):
             raise CQLEngineException('timestamp object must be an instance of datetime')
         self.timestamp = timestamp
         self._consistency = consistency
@@ -103,8 +103,16 @@ class BatchQuery(object):
 
         opener = 'BEGIN ' + (self.batch_type + ' ' if self.batch_type else '') + ' BATCH'
         if self.timestamp:
-            epoch = datetime(1970, 1, 1)
-            ts = long((self.timestamp - epoch).total_seconds() * 1000)
+
+            if isinstance(self.timestamp, (int, long)):
+                ts = self.timestamp
+            elif isinstance(self.timestamp, timedelta):
+                ts = long((datetime.now() + self.timestamp - datetime.fromtimestamp(0)).total_seconds() * 1000000)
+            elif isinstance(self.timestamp, datetime):
+                ts = long((self.timestamp - datetime.fromtimestamp(0)).total_seconds() * 1000000)
+            else:
+                raise ValueError("Batch expects a long, a timedelta, or a datetime")
+
             opener += ' USING TIMESTAMP {}'.format(ts)
 
         query_list = [opener]
