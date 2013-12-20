@@ -1,5 +1,13 @@
 CHANGELOG
 
+0.11.0
+
+* support for USING TIMESTAMP <microseconds from epoch>
+
+0.10.0
+
+* support for execute_on_exception within batches
+
 0.9.2
 * fixing create keyspace with network topology strategy
 * fixing regression with query expressions

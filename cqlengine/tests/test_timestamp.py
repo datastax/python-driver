@@ -7,7 +7,7 @@ import unittest
 from uuid import uuid4
 import mock
 import sure
-from cqlengine import Model, columns
+from cqlengine import Model, columns, BatchQuery
 from cqlengine.connection import ConnectionPool
 from cqlengine.management import sync_table
 from cqlengine.tests.base import BaseCassEngTestCase
@@ -25,10 +25,12 @@ class BaseTimestampTest(BaseCassEngTestCase):
         sync_table(TestTimestampModel)
 
 
+
+
 class CreateWithTimestampTest(BaseTimestampTest):
 
     def test_batch(self):
-        pass
+        assert False
 
     def test_timestamp_not_included_on_normal_create(self):
         with mock.patch.object(ConnectionPool, "execute") as m:
