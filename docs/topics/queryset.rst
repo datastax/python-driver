@@ -377,6 +377,9 @@ QuerySet method reference
 
         Enables the (usually) unwise practive of querying on a clustering key without also defining a partition key
 
+    .. method:: timestamp(timestamp_or_long_or_datetime)
+
+        Allows for custom timestamps to be saved with the record.
 
     .. method:: ttl(ttl_in_seconds)
 

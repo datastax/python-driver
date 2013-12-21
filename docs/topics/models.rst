@@ -141,6 +141,10 @@ Model Methods
 
         Sets the batch object to run instance updates and inserts queries with.
 
+    .. method:: timestamp(timedelta_or_datetime)
+
+        Sets the timestamp for the query
+
     .. method:: ttl(ttl_in_sec)
 
         Sets the ttl values to run instance updates and inserts queries with.

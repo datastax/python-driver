@@ -1,7 +1,7 @@
 """
 Tests surrounding the blah.timestamp( timedelta(seconds=30) ) format.
 """
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 import unittest
 from uuid import uuid4
@@ -129,6 +129,39 @@ class DeleteWithTimestampTest(BaseTimestampTest):
 
         with self.assertRaises(TestTimestampModel.DoesNotExist):
             TestTimestampModel.get(id=uid)
+
+    def test_blind_delete_with_datetime(self):
+        """
+        we don't expect the model to come back at the end because the deletion timestamp should be in the future
+        """
+        uid = uuid4()
+        tmp = TestTimestampModel.create(id=uid, count=1)
+
+        TestTimestampModel.get(id=uid).should.be.ok
+
+        plus_five_seconds = datetime.now() + timedelta(seconds=5)
+
+        TestTimestampModel.objects(id=uid).timestamp(plus_five_seconds).delete()
+
+        with self.assertRaises(TestTimestampModel.DoesNotExist):
+            TestTimestampModel.get(id=uid)
+
+        tmp = TestTimestampModel.create(id=uid, count=1)
+
+        with self.assertRaises(TestTimestampModel.DoesNotExist):
+            TestTimestampModel.get(id=uid)
+
+    def test_delete_in_the_past(self):
+        uid = uuid4()
+        tmp = TestTimestampModel.create(id=uid, count=1)
+
+        TestTimestampModel.get(id=uid).should.be.ok
+
+        # delete the in past, should not affect the object created above
+        TestTimestampModel.objects(id=uid).timestamp(timedelta(seconds=-60)).delete()
+
+        TestTimestampModel.get(id=uid)
+
 
 
 
