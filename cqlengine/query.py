@@ -650,6 +650,11 @@ class ModelQuerySet(AbstractQuerySet):
         clone._ttl = ttl
         return clone
 
+    def timestamp(self, timestamp):
+        clone = copy.deepcopy(self)
+        clone._timestamp = timestamp
+        return clone
+
     def update(self, **values):
         """ Updates the rows in this queryset """
         if not values:
