@@ -339,6 +339,123 @@ static PyTypeObject libevwrapper_AsyncType = {
     (initproc)Async_init,            /* tp_init */
 };
 
+typedef struct libevwrapper_Prepare {
+    PyObject_HEAD
+    struct ev_prepare prepare;
+    struct libevwrapper_Loop *loop;
+    PyObject *callback;
+} libevwrapper_Prepare;
+
+static void
+Prepare_dealloc(libevwrapper_Prepare *self) {
+    Py_XDECREF(self->loop);
+    Py_XDECREF(self->callback);
+    self->ob_type->tp_free((PyObject *)self);
+}
+
+static void prepare_callback(struct ev_loop *loop, ev_prepare *watcher, int revents) {
+    libevwrapper_Prepare *self = watcher->data;
+
+    PyGILState_STATE gstate;
+    gstate = PyGILState_Ensure();
+
+    PyObject *result = PyObject_CallFunction(self->callback, "O", self);
+    if (!result) {
+        PyErr_WriteUnraisable(self->callback);
+    }
+    Py_XDECREF(result);
+
+    PyGILState_Release(gstate);
+}
+
+static int
+Prepare_init(libevwrapper_Prepare *self, PyObject *args, PyObject *kwds) {
+    PyObject *callback;
+    PyObject *loop;
+
+    if (!PyArg_ParseTuple(args, "OO", &loop, &callback)) {
+        return -1;
+    }
+
+    if (loop) {
+        Py_INCREF(loop);
+        self->loop = (libevwrapper_Loop *)loop;
+    } else {
+        return -1;
+    }
+
+    if (callback) {
+        if (!PyCallable_Check(callback)) {
+            PyErr_SetString(PyExc_TypeError, "callback parameter must be callable");
+            Py_XDECREF(loop);
+            return -1;
+        }
+        Py_INCREF(callback);
+        self->callback = callback;
+    }
+    ev_prepare_init(&self->prepare, prepare_callback);
+    self->prepare.data = self;
+    return 0;
+}
+
+static PyObject *
+Prepare_start(libevwrapper_Prepare *self, PyObject *args) {
+    ev_prepare_start(self->loop->loop, &self->prepare);
+    Py_RETURN_NONE;
+}
+
+static PyObject *
+Prepare_stop(libevwrapper_Prepare *self, PyObject *args) {
+    ev_prepare_stop(self->loop->loop, &self->prepare);
+    Py_RETURN_NONE;
+}
+
+static PyMethodDef Prepare_methods[] = {
+    {"start", (PyCFunction)Prepare_start, METH_NOARGS, "Start the Prepare watcher"},
+    {"stop", (PyCFunction)Prepare_stop, METH_NOARGS, "Stop the Prepare watcher"},
+    {NULL}  /* Sentinal */
+};
+
+static PyTypeObject libevwrapper_PrepareType = {
+    PyObject_HEAD_INIT(NULL)
+    0,                               /*ob_size*/
+    "cassandra.io.libevwrapper.Prepare",  /*tp_name*/
+    sizeof(libevwrapper_Prepare),    /*tp_basicsize*/
+    0,                               /*tp_itemsize*/
+    (destructor)Prepare_dealloc,     /*tp_dealloc*/
+    0,                               /*tp_print*/
+    0,                               /*tp_getattr*/
+    0,                               /*tp_setattr*/
+    0,                               /*tp_compare*/
+    0,                               /*tp_repr*/
+    0,                               /*tp_as_number*/
+    0,                               /*tp_as_sequence*/
+    0,                               /*tp_as_mapping*/
+    0,                               /*tp_hash */
+    0,                               /*tp_call*/
+    0,                               /*tp_str*/
+    0,                               /*tp_getattro*/
+    0,                               /*tp_setattro*/
+    0,                               /*tp_as_buffer*/
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /*tp_flags*/
+    "Prepare objects",               /* tp_doc */
+    0,                               /* tp_traverse */
+    0,                               /* tp_clear */
+    0,                               /* tp_richcompare */
+    0,                               /* tp_weaklistoffset */
+    0,                               /* tp_iter */
+    0,                               /* tp_iternext */
+    Prepare_methods,                 /* tp_methods */
+    0,                               /* tp_members */
+    0,                               /* tp_getset */
+    0,                               /* tp_base */
+    0,                               /* tp_dict */
+    0,                               /* tp_descr_get */
+    0,                               /* tp_descr_set */
+    0,                               /* tp_dictoffset */
+    (initproc)Prepare_init,          /* tp_init */
+};
+
 static PyMethodDef module_methods[] = {
     {NULL}  /* Sentinal */
 };
@@ -357,6 +474,10 @@ initlibevwrapper(void)
 
     libevwrapper_IOType.tp_new = PyType_GenericNew;
     if (PyType_Ready(&libevwrapper_IOType) < 0)
+        return;
+
+    libevwrapper_PrepareType.tp_new = PyType_GenericNew;
+    if (PyType_Ready(&libevwrapper_PrepareType) < 0)
         return;
 
     libevwrapper_AsyncType.tp_new = PyType_GenericNew;
@@ -378,6 +499,10 @@ initlibevwrapper(void)
 
     Py_INCREF(&libevwrapper_IOType);
     if (PyModule_AddObject(m, "IO", (PyObject *)&libevwrapper_IOType) == -1)
+        return;
+
+    Py_INCREF(&libevwrapper_PrepareType);
+    if (PyModule_AddObject(m, "Prepare", (PyObject *)&libevwrapper_PrepareType) == -1)
         return;
 
     Py_INCREF(&libevwrapper_AsyncType);

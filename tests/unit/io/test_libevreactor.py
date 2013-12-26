@@ -24,6 +24,8 @@ except ImportError as exc:
 
 @patch('socket.socket')
 @patch('cassandra.io.libevwrapper.IO')
+@patch('cassandra.io.libevwrapper.Prepare')
+@patch('cassandra.io.libevwrapper.Async')
 @patch('cassandra.io.libevreactor._start_loop')
 class LibevConnectionTest(unittest.TestCase):
 

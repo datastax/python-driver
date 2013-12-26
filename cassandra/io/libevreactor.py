@@ -87,6 +87,17 @@ class LibevConnection(Connection):
     An implementation of :class:`.Connection` that utilizes libev.
     """
 
+    # class-level set of all connections; only replaced with a new copy
+    # while holding _conn_set_lock, never modified in place
+    _live_conns = set()
+    # newly created connections that need their write/read watcher started
+    _new_conns = set()
+    # recently closed connections that need their write/read watcher stopped
+    _closed_conns = set()
+    _conn_set_lock = Lock()
+
+    _write_watcher_is_active = False
+
     _total_reqd_bytes = 0
     _read_watcher = None
     _write_watcher = None
@@ -104,6 +115,65 @@ class LibevConnection(Connection):
             raise OperationTimedOut("Timed out creating new connection")
         else:
             return conn
+
+    @classmethod
+    def _connection_created(cls, conn):
+        with cls._conn_set_lock:
+            new_live_conns = cls._live_conns.copy()
+            new_live_conns.add(conn)
+            cls._live_conns = new_live_conns
+
+            new_new_conns = cls._new_conns.copy()
+            new_new_conns.add(conn)
+            cls._new_conns = new_new_conns
+
+    @classmethod
+    def _connection_destroyed(cls, conn):
+        with cls._conn_set_lock:
+            new_live_conns = cls._live_conns.copy()
+            new_live_conns.discard(conn)
+            cls._live_conns = new_live_conns
+
+            new_closed_conns = cls._closed_conns.copy()
+            new_closed_conns.add(conn)
+            cls._closed_conns = new_closed_conns
+
+    @classmethod
+    def loop_will_run(cls, prepare):
+        changed = False
+        for conn in cls._live_conns:
+            if not conn.deque and conn._write_watcher_is_active:
+                conn._write_watcher.stop()
+                conn._write_watcher_is_active = False
+                changed = True
+            elif conn.deque and not conn._write_watcher_is_active:
+                conn._write_watcher.start()
+                conn._write_watcher_is_active = True
+                changed = True
+
+        if cls._new_conns:
+            with cls._conn_set_lock:
+                to_start = cls._new_conns
+                cls._new_conns = set()
+
+            for conn in to_start:
+                conn._read_watcher.start()
+
+            changed = True
+
+        if cls._closed_conns:
+            with cls._conn_set_lock:
+                to_stop = cls._closed_conns
+                cls._closed_conns = set()
+
+            for conn in to_stop:
+                conn._write_watcher.stop()
+                conn._read_watcher.stop()
+
+            changed = True
+
+        if changed:
+            _loop_notifier.send()
 
     def __init__(self, *args, **kwargs):
         Connection.__init__(self, *args, **kwargs)
@@ -129,19 +199,17 @@ class LibevConnection(Connection):
             for args in self.sockopts:
                 self._socket.setsockopt(*args)
 
-        self._read_watcher = libev.IO(self._socket._sock, libev.EV_READ, _loop, self.handle_read)
-        self._write_watcher = libev.IO(self._socket._sock, libev.EV_WRITE, _loop, self.handle_write)
         with _loop_lock:
-            self._read_watcher.start()
-            self._write_watcher.start()
+            self._read_watcher = libev.IO(self._socket._sock, libev.EV_READ, _loop, self.handle_read)
+            self._write_watcher = libev.IO(self._socket._sock, libev.EV_WRITE, _loop, self.handle_write)
 
         self._send_options_message()
 
+        self.__class__._connection_created(self)
+
         # start the global event loop if needed
-        if not _start_loop():
-            # if the loop was already started, notify it
-            with _loop_lock:
-                _loop_notifier.send()
+        _start_loop()
+        _loop_notifier.send()
 
     def close(self):
         with self.lock:
@@ -150,14 +218,9 @@ class LibevConnection(Connection):
             self.is_closed = True
 
         log.debug("Closing connection (%s) to %s", id(self), self.host)
-        with _loop_lock:
-            if self._read_watcher:
-                self._read_watcher.stop()
-            if self._write_watcher:
-                self._write_watcher.stop()
+        self.__class__._connection_destroyed(self)
+        _loop_notifier.send()
         self._socket.close()
-        with _loop_lock:
-            _loop_notifier.send()
 
         # don't leave in-progress operations hanging
         if not self.is_defunct:
@@ -205,11 +268,6 @@ class LibevConnection(Connection):
                 with self._deque_lock:
                     next_msg = self.deque.popleft()
             except IndexError:
-                with self._deque_lock:
-                    if not self.deque:
-                        with _loop_lock:
-                            if self._write_watcher.is_active():
-                                self._write_watcher.stop()
                 return
 
             try:
@@ -218,7 +276,6 @@ class LibevConnection(Connection):
                 if (err.args[0] in NONBLOCKING):
                     with self._deque_lock:
                         self.deque.appendleft(next_msg)
-                    _loop_notifier.send()
                 else:
                     self.defunct(err)
                 return
@@ -226,14 +283,6 @@ class LibevConnection(Connection):
                 if sent < len(next_msg):
                     with self._deque_lock:
                         self.deque.appendleft(next_msg[sent:])
-                    _loop_notifier.send()
-                elif not self.deque:
-                    with self._deque_lock:
-                        if not self.deque:
-                            with _loop_lock:
-                                if self._write_watcher.is_active():
-                                    self._write_watcher.stop()
-                    return
 
     def handle_read(self, watcher, revents):
         if revents & libev.EV_ERROR:
@@ -305,10 +354,6 @@ class LibevConnection(Connection):
 
         with self._deque_lock:
             self.deque.extend(chunks)
-
-        with _loop_lock:
-            if not self._write_watcher.is_active():
-                self._write_watcher.start()
             _loop_notifier.send()
 
     def send_msg(self, msg, cb, wait_for_id=False):
@@ -372,3 +417,9 @@ class LibevConnection(Connection):
         for event_type, callback in type_callback_dict.items():
             self._push_watchers[event_type].add(callback)
         self.wait_for_response(RegisterMessage(event_list=type_callback_dict.keys()))
+
+
+_preparer = libev.Prepare(_loop, LibevConnection.loop_will_run)
+# prevent _preparer from keeping the loop from returning
+_loop.unref()
+_preparer.start()
