@@ -351,7 +351,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
         self.assertEqual(policy.distance(remote_host), HostDistance.IGNORED)
 
         # dc2 isn't registered in the policy's live_hosts dict
-        policy.child_policy.used_hosts_per_remote_dc = 1
+        policy._child_policy.used_hosts_per_remote_dc = 1
         self.assertEqual(policy.distance(remote_host), HostDistance.IGNORED)
 
         # make sure the policy has both dcs registered
