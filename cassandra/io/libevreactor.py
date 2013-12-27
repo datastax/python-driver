@@ -143,7 +143,8 @@ class LibevConnection(Connection):
         changed = False
         for conn in cls._live_conns:
             if not conn.deque and conn._write_watcher_is_active:
-                conn._write_watcher.stop()
+                if conn._write_watcher:
+                    conn._write_watcher.stop()
                 conn._write_watcher_is_active = False
                 changed = True
             elif conn.deque and not conn._write_watcher_is_active:
@@ -169,7 +170,7 @@ class LibevConnection(Connection):
             for conn in to_stop:
                 if conn._write_watcher:
                     conn._write_watcher.stop()
-                if conn._write_watcher:
+                if conn._read_watcher:
                     conn._read_watcher.stop()
 
             changed = True
