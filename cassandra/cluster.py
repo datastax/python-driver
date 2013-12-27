@@ -433,6 +433,8 @@ class Cluster(object):
                     self.shutdown()
                     raise
 
+            self.load_balancing_policy.check_supported()
+
         session = self._new_session()
         if keyspace:
             session.set_keyspace(keyspace)
@@ -1250,9 +1252,6 @@ class ControlConnection(object):
         # use a weak reference to allow the Cluster instance to be GC'ed (and
         # shutdown) since implementing __del__ disables the cycle detector
         self._cluster = weakref.proxy(cluster)
-        self._balancing_policy = cluster.load_balancing_policy
-        self._balancing_policy.populate(cluster, [])
-        self._reconnection_policy = cluster.reconnection_policy
         self._connection = None
         self._timeout = timeout
 
@@ -1290,7 +1289,7 @@ class ControlConnection(object):
         a connection to that host.
         """
         errors = {}
-        for host in self._balancing_policy.make_query_plan():
+        for host in self._cluster.load_balancing_policy.make_query_plan():
             try:
                 return self._try_connect(host)
             except ConnectionException as exc:
@@ -1341,7 +1340,7 @@ class ControlConnection(object):
             self._set_new_connection(self._reconnect_internal())
         except NoHostAvailable:
             # make a retry schedule (which includes backoff)
-            schedule = self._reconnection_policy.new_schedule()
+            schedule = self.cluster.reconnection_policy.new_schedule()
 
             with self._reconnection_lock:
 
