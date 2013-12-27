@@ -109,6 +109,15 @@ class LoadBalancingPolicy(HostStateListener):
         """
         raise NotImplementedError()
 
+    def check_supported(self):
+        """
+        This will be called after the cluster Metadata has been initialized.
+        If the load balancing policy implementation cannot be supported for
+        some reason (such as a missing C extension), this is the point at
+        which it should raise an exception.
+        """
+        pass
+
 
 class RoundRobinPolicy(LoadBalancingPolicy):
     """
@@ -270,6 +279,15 @@ class TokenAwarePolicy(LoadBalancingPolicy):
     def populate(self, cluster, hosts):
         self._cluster_metadata = cluster.metadata
         self._child_policy.populate(cluster, hosts)
+
+    def check_supported(self):
+        if not self._cluster_metadata.can_support_partitioner():
+            raise Exception(
+                '%s cannot be used with the cluster partitioner (%s) because '
+                'the relevant C extension for this driver was not compiled. '
+                'See the installation instructions for details on building '
+                'and installing the C extensions.' % (self.__class__.__name__,
+                self._cluster_metadata.partitioner))
 
     def distance(self, *args, **kwargs):
         return self._child_policy.distance(*args, **kwargs)

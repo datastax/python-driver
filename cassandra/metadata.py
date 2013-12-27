@@ -261,10 +261,6 @@ class Metadata(object):
             token_class = MD5Token
         elif partitioner.endswith('Murmur3Partitioner'):
             token_class = Murmur3Token
-            if murmur3 is None:
-                log.warning(
-                    "The murmur3 C extension is not available, token awareness "
-                    "cannot be supported for the Murmur3Partitioner")
         elif partitioner.endswith('ByteOrderedPartitioner'):
             token_class = BytesToken
         else:
@@ -296,6 +292,12 @@ class Metadata(object):
             return t.get_replicas(keyspace, t.token_class.from_key(key))
         except NoMurmur3:
             return []
+
+    def can_support_partitioner(self):
+        if self.partitioner.endswith('Murmur3Partitioner') and murmur3 is None:
+            return False
+        else:
+            return True
 
     def add_host(self, address):
         cluster = self.cluster_ref()
