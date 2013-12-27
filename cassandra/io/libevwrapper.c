@@ -124,7 +124,7 @@ static void io_callback(struct ev_loop *loop, ev_io *watcher, int revents) {
     if (revents & EV_ERROR && errno) {
         result = PyObject_CallFunction(self->callback, "Obi", self, revents, errno);
     } else {
-        PyObject *result = PyObject_CallFunction(self->callback, "Ob", self, revents);
+        result = PyObject_CallFunction(self->callback, "Ob", self, revents);
     }
     if (!result) {
         PyErr_WriteUnraisable(self->callback);
