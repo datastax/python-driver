@@ -261,9 +261,14 @@ class LibevConnection(Connection):
                          "failed connection (%s) to host %s:",
                          id(self), self.host, exc_info=True)
 
-    def handle_write(self, watcher, revents):
+    def handle_write(self, watcher, revents, errno=None):
         if revents & libev.EV_ERROR:
-            self.defunct(Exception("lbev reported an error"))
+            if errno:
+                exc = IOError(errno, os.strerror(errno))
+            else:
+                exc = Exception("libev reported an error")
+
+            self.defunct(exc)
             return
 
         while True:
@@ -287,9 +292,14 @@ class LibevConnection(Connection):
                     with self._deque_lock:
                         self.deque.appendleft(next_msg[sent:])
 
-    def handle_read(self, watcher, revents):
+    def handle_read(self, watcher, revents, errno=None):
         if revents & libev.EV_ERROR:
-            self.defunct(Exception("lbev reported an error"))
+            if errno:
+                exc = IOError(errno, os.strerror(errno))
+            else:
+                exc = Exception("libev reported an error")
+
+            self.defunct(exc)
             return
         try:
             while True:
