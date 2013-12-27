@@ -120,15 +120,15 @@ IO_dealloc(libevwrapper_IO *self) {
 static void io_callback(struct ev_loop *loop, ev_io *watcher, int revents) {
     PyGILState_STATE gstate;
     if (revents & EV_ERROR) {
+        gstate = PyGILState_Ensure();
         if (!PyErr_Occurred()) {
-            gstate = PyGILState_Ensure();
             if (errno) {
                 PyErr_SetFromErrno(PyExc_IOError);
             } else {
                 PyErr_SetString(PyExc_IOError, "libev errored");
             }
-            PyGILState_Release(gstate);
         }
+        PyGILState_Release(gstate);
     } else {
         libevwrapper_IO *self = watcher->data;
 
