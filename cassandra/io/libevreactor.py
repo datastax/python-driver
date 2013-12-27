@@ -167,8 +167,10 @@ class LibevConnection(Connection):
                 cls._closed_conns = set()
 
             for conn in to_stop:
-                conn._write_watcher.stop()
-                conn._read_watcher.stop()
+                if conn._write_watcher:
+                    conn._write_watcher.stop()
+                if conn._write_watcher:
+                    conn._read_watcher.stop()
 
             changed = True
 
