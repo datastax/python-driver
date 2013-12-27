@@ -118,26 +118,28 @@ IO_dealloc(libevwrapper_IO *self) {
 };
 
 static void io_callback(struct ev_loop *loop, ev_io *watcher, int revents) {
-    if (revents & EV_ERROR) {
-        if (errno) {
-            PyErr_SetFromErrno(PyExc_IOError);
-        } else {
-            PyErr_SetString(PyExc_IOError, "libev errored");
-        }
-    }
-
-    libevwrapper_IO *self = watcher->data;
-
     PyGILState_STATE gstate;
-    gstate = PyGILState_Ensure();
+    if (revents & EV_ERROR) {
+        if (!PyErr_Occurred()) {
+            gstate = PyGILState_Ensure();
+            if (errno) {
+                PyErr_SetFromErrno(PyExc_IOError);
+            } else {
+                PyErr_SetString(PyExc_IOError, "libev errored");
+            }
+            PyGILState_Release(gstate);
+        }
+    } else {
+        libevwrapper_IO *self = watcher->data;
 
-    PyObject *result = PyObject_CallFunction(self->callback, "Ob", self, revents);
-    if (!result) {
-        PyErr_WriteUnraisable(self->callback);
+        gstate = PyGILState_Ensure();
+        PyObject *result = PyObject_CallFunction(self->callback, "Ob", self, revents);
+        if (!result) {
+            PyErr_WriteUnraisable(self->callback);
+        }
+        Py_XDECREF(result);
+        PyGILState_Release(gstate);
     }
-    Py_XDECREF(result);
-
-    PyGILState_Release(gstate);
 };
 
 static int
