@@ -1,3 +1,44 @@
+1.0.0 Final
+===========
+(In Progress)
+
+Bug Fixes
+---------
+* Prevent leak of Scheduler thread (even with proper shutdown)
+* Correctly handle ignored hosts, which are common with the
+  DCAwareRoundRobinPolicy
+* Hold strong reference to prepared statement while executing it to avoid
+  garbage collection
+* Add NullHandler logging handler to the cassandra package to avoid
+  warnings about there being no configured logger
+* Fix bad handling of nodes that have been removed from the cluster
+* Properly escape string types within cql collections
+* Handle setting the same keyspace twice in a row
+* Avoid race condition during schema agreement checks that could result
+  in schema update queries returning before all nodes had seen the change
+* Preserve millisecond-level precision in datetimes when performing inserts
+  with simple (non-prepared) statements
+* Properly defunct connections when libev reports an error by setting
+  errno instead of simply logging the error
+* Fix endless hanging of some requests when using the libev reactor
+
+Features
+--------
+* Add default query timeout to ``Session``
+* Add timeout parameter to ``Session.execute()``
+* Add ``WhiteListRoundRobinPolicy`` as a load balancing policy option
+* Support for consistency level ``LOCAL_ONE``
+
+Other
+-----
+* Raise Exception if ``TokenAwarePolicy`` is used against a cluster using the
+  ``Murmur3Partitioner`` if the murmur3 C extension has not been compiled
+* Add encoder mapping for ``OrderedDict``
+* Use timeouts on all control connection queries
+* Benchmark improvements, including command line options and eay
+  multithreading support
+* Reduced lock contention when using the asyncore reactor
+
 1.0.0b7
 =======
 Nov 12, 2013
