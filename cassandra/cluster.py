@@ -241,6 +241,7 @@ class Cluster(object):
     _is_shutdown = False
     _is_setup = False
     _prepared_statements = None
+    _prepared_statement_lock = Lock()
 
     _listeners = None
     _listener_lock = None
@@ -357,7 +358,7 @@ class Cluster(object):
             self.metrics = Metrics(weakref.proxy(self))
 
         self.control_connection = ControlConnection(
-                self, self.control_connection_timeout)
+            self, self.control_connection_timeout)
 
     def get_min_requests_per_connection(self, host_distance):
         return self._min_requests_per_connection[host_distance]
@@ -815,7 +816,8 @@ class Cluster(object):
             connection.close()
 
     def prepare_on_all_sessions(self, query_id, prepared_statement, excluded_host):
-        self._prepared_statements[query_id] = prepared_statement
+        with self._prepared_statement_lock:
+            self._prepared_statements[query_id] = prepared_statement
         for session in self.sessions:
             session.prepare_on_all_hosts(prepared_statement.query_string, excluded_host)
 
@@ -1421,14 +1423,14 @@ class ControlConnection(object):
 
         if ks_query:
             ks_result, cf_result, col_result = connection.wait_for_responses(
-                    ks_query, cf_query, col_query, timeout=self._timeout)
+                ks_query, cf_query, col_query, timeout=self._timeout)
             ks_result = dict_factory(*ks_result.results)
             cf_result = dict_factory(*cf_result.results)
             col_result = dict_factory(*col_result.results)
         else:
             ks_result = None
             cf_result, col_result = connection.wait_for_responses(
-                    cf_query, col_query, timeout=self._timeout)
+                cf_query, col_query, timeout=self._timeout)
             cf_result = dict_factory(*cf_result.results)
             col_result = dict_factory(*col_result.results)
 
@@ -1448,7 +1450,7 @@ class ControlConnection(object):
         peers_query = QueryMessage(query=self._SELECT_PEERS, consistency_level=cl)
         local_query = QueryMessage(query=self._SELECT_LOCAL, consistency_level=cl)
         peers_result, local_result = connection.wait_for_responses(
-                peers_query, local_query, timeout=self._timeout)
+            peers_query, local_query, timeout=self._timeout)
         peers_result = dict_factory(*peers_result.results)
 
         partitioner = None
@@ -1562,7 +1564,7 @@ class ControlConnection(object):
                 try:
                     timeout = min(2.0, total_timeout - elapsed)
                     peers_result, local_result = connection.wait_for_responses(
-                            peers_query, local_query, timeout=timeout)
+                        peers_query, local_query, timeout=timeout)
                 except OperationTimedOut:
                     log.debug("[control connection] Timed out waiting for response during schema agreement check")
                     elapsed = self._time.time() - start
@@ -1883,7 +1885,14 @@ class ResponseFuture(object):
                     self._retry(reuse_connection=False, consistency_level=None)
                     return
                 elif isinstance(response, PreparedQueryNotFound):
-                    query_id = response.info
+                    if self.prepared_statement:
+                        query_id = self.prepared_statement.query_id
+                        assert query_id == response.info, \
+                            "Got different query ID in server response (%s) than we " \
+                            "had before (%s)" % (response.info, query_id)
+                    else:
+                        query_id = response.info
+
                     try:
                         prepared_statement = self.session.cluster._prepared_statements[query_id]
                     except KeyError:
