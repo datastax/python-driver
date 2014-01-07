@@ -305,14 +305,18 @@ class Connection(object):
             # the keyspace probably doesn't exist
             raise ire.to_exception()
         except Exception as exc:
-            raise self.defunct(ConnectionException(
-                "Problem while setting keyspace: %r" % (exc,), self.host))
+            conn_exc = ConnectionException(
+                "Problem while setting keyspace: %r" % (exc,), self.host)
+            self.defunct(conn_exc)
+            raise conn_exc
 
         if isinstance(result, ResultMessage):
             self.keyspace = keyspace
         else:
-            raise self.defunct(ConnectionException(
-                "Problem while setting keyspace: %r" % (result,), self.host))
+            conn_exc = ConnectionException(
+                "Problem while setting keyspace: %r" % (result,), self.host)
+            self.defunct(conn_exc)
+            raise conn_exc
 
     def set_keyspace_async(self, keyspace, callback):
         """
