@@ -227,32 +227,28 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         self.close()
 
     def handle_write(self):
-        try:
-            next_msg = self.deque.popleft()
-        except IndexError:
-            self._writable = False
-            return
-
-        try:
-            sent = self.send(next_msg)
-        except socket.error as err:
-            if (err.args[0] in NONBLOCKING):
+        while True:
+            try:
                 with self.deque_lock:
-                    self.deque.appendleft(next_msg)
+                    next_msg = self.deque.popleft()
+            except IndexError:
+                self._writable = False
+                return
+
+            try:
+                sent = self.send(next_msg)
+                self._readable = True
+            except socket.error as err:
+                if (err.args[0] in NONBLOCKING):
+                    with self.deque_lock:
+                        self.deque.appendleft(next_msg)
+                else:
+                    self.defunct(err)
+                return
             else:
-                self.defunct(err)
-            return
-        else:
-            if sent < len(next_msg):
-                with self.deque_lock:
-                    self.deque.appendleft(next_msg[sent:])
-
-            if not self.deque:
-                with self.deque_lock:
-                    if not self.deque:
-                        self._writable = False
-
-        self._readable = True
+                if sent < len(next_msg):
+                    with self.deque_lock:
+                        self.deque.appendleft(next_msg[sent:])
 
     def handle_read(self):
         try:
