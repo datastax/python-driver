@@ -225,5 +225,3 @@ class HostConnectionPoolTests(unittest.TestCase):
         self.assertEqual(a, b, 'Two Host instances should be equal when sharing.')
         self.assertNotEqual(a, c, 'Two Host instances should NOT be equal when using two different addresses.')
         self.assertNotEqual(b, c, 'Two Host instances should NOT be equal when using two different addresses.')
-
-        self.assertFalse(a == '127.0.0.1')

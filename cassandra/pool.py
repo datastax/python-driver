@@ -107,9 +107,6 @@ class Host(object):
             return old
 
     def __eq__(self, other):
-        if not isinstance(other, Host):
-            return False
-
         return self.address == other.address
 
     def __str__(self):
