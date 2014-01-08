@@ -1434,6 +1434,7 @@ class ControlConnection(object):
             cf_result = dict_factory(*cf_result.results)
             col_result = dict_factory(*col_result.results)
 
+        log.debug("[control connection] Fetched schema, rebuilding metadata")
         self._cluster.metadata.rebuild_schema(keyspace, table, ks_result, cf_result, col_result)
 
     def refresh_node_list_and_token_map(self):
@@ -1499,6 +1500,7 @@ class ControlConnection(object):
                 self._cluster.remove_host(old_host)
 
         if partitioner:
+            log.debug("[control connection] Fetched ring info, rebuilding metadata")
             self._cluster.metadata.rebuild_token_map(partitioner, token_map)
 
     def _handle_topology_change(self, event):
