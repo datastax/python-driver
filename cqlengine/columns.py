@@ -372,7 +372,7 @@ class UUID(Column):
     """
     db_type = 'uuid'
 
-    re_uuid = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
+    re_uuid = re.compile(r'[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}')
 
     def validate(self, value):
         val = super(UUID, self).validate(value)
