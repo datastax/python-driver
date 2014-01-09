@@ -1,10 +1,8 @@
 import logging
-import cassandra
 
 from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster
 from cassandra.query import SimpleStatement
-
 
 try:
     import unittest2 as unittest
@@ -13,16 +11,16 @@ except ImportError:
 
 log = logging.getLogger(__name__)
 
+
 class SchemaTests(unittest.TestCase):
+
     def test_recreates(self):
         cluster = Cluster()
         session = cluster.connect()
-
-
         replication_factor = 3
 
         for i in range(2):
-            for keyspace in range(0, 100):
+            for keyspace in range(5):
                 keyspace = 'ks_%s' % keyspace
                 results = session.execute('SELECT keyspace_name FROM system.schema_keyspaces')
                 existing_keyspaces = [row[0] for row in results]
@@ -31,8 +29,10 @@ class SchemaTests(unittest.TestCase):
                     log.debug(ddl)
                     session.execute(ddl)
 
-                ddl = "CREATE KEYSPACE %s WITH replication" \
-                      " = {'class': 'SimpleStrategy', 'replication_factor': '%s'}" % (keyspace, replication_factor)
+                ddl = """
+                    CREATE KEYSPACE %s
+                    WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '%s'}
+                    """ % (keyspace, str(replication_factor))
                 log.debug(ddl)
                 session.execute(ddl)
 
