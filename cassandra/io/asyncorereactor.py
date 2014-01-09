@@ -181,7 +181,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
 
     def defunct(self, exc):
         with self.lock:
-            if self.is_defunct:
+            if self.is_defunct or self.is_closed:
                 return
             self.is_defunct = True
 
@@ -199,8 +199,11 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         return exc
 
     def _error_all_callbacks(self, exc):
+        with self.lock:
+            callbacks = self._callbacks
+            self._callbacks = {}
         new_exc = ConnectionShutdown(str(exc))
-        for cb in self._callbacks.values():
+        for cb in callbacks:
             try:
                 cb(new_exc)
             except Exception:
