@@ -357,13 +357,16 @@ class Connection(object):
 
 class ResponseWaiter(object):
 
-    def __init__(self, num_responses):
+    def __init__(self, connection, num_responses):
+        self.connection = connection
         self.pending = num_responses
         self.error = None
         self.responses = [None] * num_responses
         self.event = Event()
 
     def got_response(self, response, index):
+        with self.connection.lock:
+            self.connection.in_flight -= 1
         if isinstance(response, Exception):
             self.error = response
             self.event.set()

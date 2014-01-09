@@ -347,7 +347,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
 
     def wait_for_responses(self, *msgs, **kwargs):
         timeout = kwargs.get('timeout')
-        waiter = ResponseWaiter(len(msgs))
+        waiter = ResponseWaiter(self, len(msgs))
 
         # busy wait for sufficient space on the connection
         messages_sent = 0
@@ -370,11 +370,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
                         raise OperationTimedOut()
                 time.sleep(0.01)
 
-        try:
-            return waiter.deliver(timeout)
-        finally:
-            with self.lock:
-                self.in_flight -= len(msgs)
+        return waiter.deliver(timeout)
 
     def register_watcher(self, event_type, callback):
         self._push_watchers[event_type].add(callback)
