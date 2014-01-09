@@ -130,7 +130,7 @@ class Metadata(object):
         new_table_metas = {}
         for table_row in cf_results:
             table_meta = self._build_table_metadata(
-                keyspace_meta, table_row, col_def_rows[table_row.columnfamily_name])
+                keyspace_meta, table_row, col_def_rows[table_row['columnfamily_name']])
             new_table_metas[table_meta.name] = table_meta
 
         keyspace_meta.tables = new_table_metas
