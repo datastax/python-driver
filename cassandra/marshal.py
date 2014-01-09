@@ -1,8 +1,9 @@
 import struct
 
+
 def _make_packer(format_string):
     try:
-        packer = struct.Struct(format_string) # new in Python 2.5
+        packer = struct.Struct(format_string)  # new in Python 2.5
     except AttributeError:
         pack = lambda x: struct.pack(format_string, x)
         unpack = lambda s: struct.unpack(format_string, s)
@@ -22,11 +23,13 @@ uint8_pack, uint8_unpack = _make_packer('>B')
 float_pack, float_unpack = _make_packer('>f')
 double_pack, double_unpack = _make_packer('>d')
 
+
 def varint_unpack(term):
     val = int(term.encode('hex'), 16)
     if (ord(term[0]) & 128) != 0:
         val = val - (1 << (len(term) * 8))
     return val
+
 
 def bitlength(n):
     bitlen = 0
@@ -34,6 +37,7 @@ def bitlength(n):
         n >>= 1
         bitlen += 1
     return bitlen
+
 
 def varint_pack(big):
     pos = True

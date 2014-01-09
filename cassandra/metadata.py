@@ -425,6 +425,7 @@ class SimpleStrategy(ReplicationStrategy):
 
         return self.replication_factor == other.replication_factor
 
+
 class NetworkTopologyStrategy(ReplicationStrategy):
 
     name = "NetworkTopologyStrategy"
@@ -499,6 +500,7 @@ class NetworkTopologyStrategy(ReplicationStrategy):
             return False
 
         return self.dc_replication_factors == other.dc_replication_factors
+
 
 class LocalStrategy(ReplicationStrategy):
 

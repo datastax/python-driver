@@ -6,6 +6,7 @@ from cassandra import ConsistencyLevel
 
 log = logging.getLogger(__name__)
 
+
 class HostDistance(object):
     """
     A measure of how "distant" a node is from the client, which

@@ -38,6 +38,7 @@ _loop.unref()
 _loop_started = None
 _loop_lock = Lock()
 
+
 def _run_loop():
     while True:
         end_condition = _loop.start()
@@ -52,6 +53,7 @@ def _run_loop():
                 global _loop_started
                 _loop_started = False
                 break
+
 
 def _start_loop():
     global _loop_started

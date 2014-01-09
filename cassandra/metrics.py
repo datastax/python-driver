@@ -5,6 +5,7 @@ from greplin import scales
 
 log = logging.getLogger(__name__)
 
+
 class Metrics(object):
 
     request_timer = None

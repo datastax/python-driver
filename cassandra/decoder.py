@@ -31,6 +31,7 @@ from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
 
 log = logging.getLogger(__name__)
 
+
 class NotSupportedError(Exception):
     pass
 
@@ -74,6 +75,7 @@ def ordered_dict_factory(colnames, rows):
 
 _message_types_by_name = {}
 _message_types_by_opcode = {}
+
 
 class _register_msg_type(type):
     def __init__(cls, name, bases, dct):

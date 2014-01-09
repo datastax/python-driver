@@ -51,15 +51,18 @@ try:
 except ImportError:  # Python <2.7
     from cassandra.util import OrderedDict # NOQA
 
+
 def trim_if_startswith(s, prefix):
     if s.startswith(prefix):
         return s[len(prefix):]
     return s
 
+
 def unix_time_from_uuid1(u):
     return (u.get_time() - 0x01B21DD213814000) / 10000000.0
 
 _casstypes = {}
+
 
 class CassandraTypeType(type):
     """
@@ -391,6 +394,7 @@ class IntegerType(_CassandraType):
 
 have_ipv6_packing = hasattr(socket, 'inet_ntop')
 
+
 class InetAddressType(_CassandraType):
     typename = 'inet'
 
@@ -481,6 +485,7 @@ class DateType(_CassandraType):
             converted = v * 1e3
 
         return int64_pack(long(converted))
+
 
 class TimeUUIDType(DateType):
     typename = 'timeuuid'

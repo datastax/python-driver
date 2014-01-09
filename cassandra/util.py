@@ -26,6 +26,7 @@ from __future__ import with_statement
 
 from UserDict import DictMixin
 
+
 class OrderedDict(dict, DictMixin):
     """ A dictionary which maintains the insertion order of keys. """
 

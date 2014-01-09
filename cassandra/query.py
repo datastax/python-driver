@@ -13,6 +13,7 @@ from cassandra.cqltypes import unix_time_from_uuid1
 from cassandra.decoder import (cql_encoders, cql_encode_object,
                                cql_encode_sequence)
 
+
 class Statement(object):
     """
     An abstract class representing a single query. There are two subclasses:
