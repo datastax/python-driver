@@ -862,7 +862,10 @@ class TokenMap(object):
 
     def replica_map_for_keyspace(self, ks_metadata):
         strategy = ks_metadata.replication_strategy
-        return strategy.make_token_replica_map(self.token_to_host_owner, self.ring)
+        if strategy:
+            return strategy.make_token_replica_map(self.token_to_host_owner, self.ring)
+        else:
+            return None
 
     def remove_keyspace(self, keyspace):
         del self.tokens_to_hosts_by_ks[keyspace]
