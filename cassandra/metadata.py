@@ -76,7 +76,7 @@ class Metadata(object):
         """
         return "\n".join(ks.export_as_string() for ks in self.keyspaces.values())
 
-    def rebuild_schema(self, keyspace, table, ks_results, cf_results, col_results):
+    def rebuild_schema(self, ks_results, cf_results, col_results):
         """
         Rebuild the view of the current schema from a fresh set of rows from
         the system schema tables.
@@ -94,40 +94,82 @@ class Metadata(object):
             cfname = row["columnfamily_name"]
             col_def_rows[ksname][cfname].append(row)
 
-        # either table or ks_results must be None
-        if not table:
-            # ks_results is not None
-            added_keyspaces = set()
-            for row in ks_results:
-                keyspace_meta = self._build_keyspace_metadata(row)
-                for table_row in cf_def_rows.get(keyspace_meta.name, []):
-                    table_meta = self._build_table_metadata(
-                        keyspace_meta, table_row, col_def_rows[keyspace_meta.name])
-                    keyspace_meta.tables[table_meta.name] = table_meta
+        current_keyspaces = set()
+        for row in ks_results:
+            keyspace_meta = self._build_keyspace_metadata(row)
+            for table_row in cf_def_rows.get(keyspace_meta.name, []):
+                table_meta = self._build_table_metadata(
+                    keyspace_meta, table_row, col_def_rows[keyspace_meta.name])
+                keyspace_meta.tables[table_meta.name] = table_meta
 
-                added_keyspaces.add(keyspace_meta.name)
-                self.keyspaces[keyspace_meta.name] = keyspace_meta
+            current_keyspaces.add(keyspace_meta.name)
+            old_keyspace_meta = self.keyspaces.get(keyspace_meta.name, None)
+            self.keyspaces[keyspace_meta.name] = keyspace_meta
+            if old_keyspace_meta:
+                self._keyspace_updated(keyspace_meta.name)
+            else:
+                self._keyspace_added(keyspace_meta.name)
 
-            if not keyspace:
-                # remove not-just-added keyspaces
-                self.keyspaces = dict((name, meta) for name, meta in self.keyspaces.items()
-                                      if name in added_keyspaces)
-            if self.token_map:
-                self.token_map.rebuild(self.keyspaces.values())
+        # remove not-just-added keyspaces
+        removed_keyspaces = [ksname for ksname in self.keyspaces.keys()
+                             if ksname not in current_keyspaces]
+        self.keyspaces = dict((name, meta) for name, meta in self.keyspaces.items()
+                              if name in current_keyspaces)
+        for ksname in removed_keyspaces:
+            self._keyspace_removed(ksname)
+
+    def keyspace_changed(self, keyspace, ks_results, cf_results, col_results):
+        col_def_rows = defaultdict(list)
+        for row in col_results:
+            cfname = row["columnfamily_name"]
+            col_def_rows[cfname].append(row)
+
+        keyspace_meta = self._build_keyspace_metadata(ks_results[0])
+        old_keyspace_meta = self.keyspaces[keyspace]
+
+        new_table_metas = {}
+        for table_row in cf_results:
+            table_meta = self._build_table_metadata(
+                keyspace_meta, table_row, col_def_rows[table_row.columnfamily_name])
+            new_table_metas[table_meta.name] = table_meta
+
+        keyspace_meta.tables = new_table_metas
+
+        self.keyspaces[keyspace] = keyspace_meta
+        if old_keyspace_meta:
+            if (keyspace_meta.replication_strategy != old_keyspace_meta.replication_strategy):
+                self._keyspace_updated(keyspace)
         else:
-            # keyspace is not None, table is not None
-            try:
-                keyspace_meta = self.keyspaces[keyspace]
-            except KeyError:
-                # we're trying to update a table in a keyspace we don't know
-                # about, something went wrong.
-                # TODO log error, submit schema refresh
-                pass
-            if keyspace in cf_def_rows:
-                for table_row in cf_def_rows[keyspace]:
-                    table_meta = self._build_table_metadata(
-                        keyspace_meta, table_row, col_def_rows[keyspace])
-                    keyspace_meta.tables[table_meta.name] = table_meta
+            self._keyspace_added(keyspace)
+
+    def table_changed(self, keyspace, table, cf_results, col_results):
+        try:
+            keyspace_meta = self.keyspaces[keyspace]
+        except KeyError:
+            # we're trying to update a table in a keyspace we don't know about
+            log.error("Tried to update schema for table '%s' in unknown keyspace '%s'",
+                      table, keyspace)
+            return
+
+        if not cf_results:
+            # the table was removed
+            del keyspace_meta.tables[table]
+        else:
+            assert len(cf_results) == 1
+            keyspace_meta.tables[table] = self._build_table_metadata(
+                keyspace_meta, cf_results[0], col_results)
+
+    def _keyspace_added(self, ksname):
+        if self.token_map:
+            self.token_map.rebuild_keyspace(ksname)
+
+    def _keyspace_updated(self, ksname):
+        if self.token_map:
+            self.token_map.rebuild_keyspace(ksname)
+
+    def _keyspace_removed(self, ksname):
+        if self.token_map:
+            self.token_map.remove_keyspace(ksname)
 
     def _build_keyspace_metadata(self, row):
         name = row["keyspace_name"]
@@ -278,8 +320,7 @@ class Metadata(object):
 
         all_tokens = sorted(ring)
         self.token_map = TokenMap(
-                token_class, token_to_host_owner, all_tokens,
-                self.keyspaces.values())
+                token_class, token_to_host_owner, all_tokens, self)
 
     def get_replicas(self, keyspace, key):
         """
@@ -378,6 +419,12 @@ class SimpleStrategy(ReplicationStrategy):
         return "{'class': 'SimpleStrategy', 'replication_factor': '%d'}" \
                % (self.replication_factor,)
 
+    def __eq__(self, other):
+        if not isinstance(other, SimpleStrategy):
+            return False
+
+        return self.replication_factor == other.replication_factor
+
 class NetworkTopologyStrategy(ReplicationStrategy):
 
     name = "NetworkTopologyStrategy"
@@ -447,6 +494,11 @@ class NetworkTopologyStrategy(ReplicationStrategy):
             ret += ", '%s': '%d'" % (dc, repl_factor)
         return ret + "}"
 
+    def __eq__(self, other):
+        if not isinstance(other, NetworkTopologyStrategy):
+            return False
+
+        return self.dc_replication_factors == other.dc_replication_factors
 
 class LocalStrategy(ReplicationStrategy):
 
@@ -457,6 +509,9 @@ class LocalStrategy(ReplicationStrategy):
 
     def export_for_schema(self):
         return "{'class': 'LocalStrategy'}"
+
+    def __eq__(self, other):
+        return isinstance(other, LocalStrategy)
 
 
 class KeyspaceMetadata(object):
@@ -783,33 +838,26 @@ class TokenMap(object):
     An ordered list of :class:`.Token` instances in the ring.
     """
 
-    def __init__(self, token_class, token_to_host_owner, all_tokens, keyspaces):
+    _metadata = None
+
+    def __init__(self, token_class, token_to_host_owner, all_tokens, metadata):
         self.token_class = token_class
         self.ring = all_tokens
         self.token_to_host_owner = token_to_host_owner
 
         self.tokens_to_hosts_by_ks = {}
-        self.rebuild(keyspaces)
+        self._metadata = metadata
 
-    def rebuild(self, current_keyspaces):
-        """
-        Given an up-to-date list of :class:`.KeyspaceMetadata` instances, rebuild
-        the per-keyspace replication map.
-        """
-        tokens_to_hosts_by_ks = {}
-        for ks_metadata in current_keyspaces:
-            strategy = ks_metadata.replication_strategy
-            if strategy is None:
-                token_to_hosts = defaultdict(set)
-                for token, host in self.token_to_host_owner.items():
-                    token_to_hosts[token].add(host)
-                tokens_to_hosts_by_ks[ks_metadata.name] = token_to_hosts
-            else:
-                tokens_to_hosts_by_ks[ks_metadata.name] = \
-                        strategy.make_token_replica_map(
-                                self.token_to_host_owner, self.ring)
+    def rebuild_keyspace(self, keyspace):
+        self.tokens_to_hosts_by_ks[keyspace] = \
+            self.replica_map_for_keyspace(self._metadata.keyspaces[keyspace])
 
-        self.tokens_to_hosts_by_ks = tokens_to_hosts_by_ks
+    def replica_map_for_keyspace(self, ks_metadata):
+        strategy = ks_metadata.replication_strategy
+        return strategy.make_token_replica_map(self.token_to_host_owner, self.ring)
+
+    def remove_keyspace(self, keyspace):
+        del self.tokens_to_hosts_by_ks[keyspace]
 
     def get_replicas(self, keyspace, token):
         """
@@ -818,7 +866,10 @@ class TokenMap(object):
         """
         tokens_to_hosts = self.tokens_to_hosts_by_ks.get(keyspace, None)
         if tokens_to_hosts is None:
-            return set()
+            self.rebuild_keyspace(keyspace)
+            tokens_to_hosts = self.tokens_to_hosts_by_ks.get(keyspace, None)
+            if tokens_to_hosts is None:
+                return []
 
         point = bisect_left(self.ring, token)
         if point == 0 and token != self.ring[0]:

@@ -3,10 +3,12 @@ try:
 except ImportError:
     import unittest # noqa
 
+from mock import Mock
+
 from cassandra import AlreadyExists
 
 from cassandra.cluster import Cluster
-from cassandra.metadata import KeyspaceMetadata, TableMetadata, Token, MD5Token, TokenMap
+from cassandra.metadata import Metadata, KeyspaceMetadata, TableMetadata, Token, MD5Token, TokenMap
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
@@ -374,7 +376,8 @@ class TokenMetadataTest(unittest.TestCase):
         hosts = [Host("ip%d" % i, SimpleConvictionPolicy) for i in range(len(tokens))]
         token_to_primary_replica = dict(zip(tokens, hosts))
         keyspace = KeyspaceMetadata("ks", True, "SimpleStrategy", {"replication_factor": "1"})
-        token_map = TokenMap(MD5Token, token_to_primary_replica, tokens, [keyspace])
+        metadata = Mock(spec=Metadata, keyspaces={'ks': keyspace})
+        token_map = TokenMap(MD5Token, token_to_primary_replica, tokens, metadata)
 
         # tokens match node tokens exactly
         for token, expected_host in zip(tokens, hosts):

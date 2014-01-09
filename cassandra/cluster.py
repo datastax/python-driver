@@ -1435,7 +1435,12 @@ class ControlConnection(object):
             col_result = dict_factory(*col_result.results)
 
         log.debug("[control connection] Fetched schema, rebuilding metadata")
-        self._cluster.metadata.rebuild_schema(keyspace, table, ks_result, cf_result, col_result)
+        if table:
+            self._cluster.metadata.table_changed(keyspace, table, cf_result, col_result)
+        elif keyspace:
+            self._cluster.metadata.keyspace_changed(keyspace, ks_result, cf_result, col_result)
+        else:
+            self._cluster.metadata.rebuild_schema(ks_result, cf_result, col_result)
 
     def refresh_node_list_and_token_map(self):
         try:
