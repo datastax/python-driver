@@ -179,12 +179,6 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
             self._error_all_callbacks(
                 ConnectionShutdown("Connection to %s was closed" % self.host))
 
-    def __del__(self):
-        try:
-            self.close()
-        except TypeError:
-            pass
-
     def defunct(self, exc):
         with self.lock:
             if self.is_defunct:

@@ -232,9 +232,6 @@ class LibevConnection(Connection):
             self._error_all_callbacks(
                 ConnectionShutdown("Connection to %s was closed" % self.host))
 
-    def __del__(self):
-        self.close()
-
     def defunct(self, exc):
         with self.lock:
             if self.is_defunct:
