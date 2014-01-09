@@ -119,18 +119,24 @@ class Metadata(object):
             self._keyspace_removed(ksname)
 
     def keyspace_changed(self, keyspace, ks_results, cf_results, col_results):
+        if not ks_results:
+            if keyspace in self.keyspaces:
+                del self.keyspaces[keyspace]
+                self._keyspace_removed(keyspace)
+            return
+
         col_def_rows = defaultdict(list)
         for row in col_results:
             cfname = row["columnfamily_name"]
             col_def_rows[cfname].append(row)
 
         keyspace_meta = self._build_keyspace_metadata(ks_results[0])
-        old_keyspace_meta = self.keyspaces[keyspace]
+        old_keyspace_meta = self.keyspaces.get(keyspace, None)
 
         new_table_metas = {}
         for table_row in cf_results:
             table_meta = self._build_table_metadata(
-                keyspace_meta, table_row, col_def_rows[table_row['columnfamily_name']])
+                keyspace_meta, table_row, col_def_rows)
             new_table_metas[table_meta.name] = table_meta
 
         keyspace_meta.tables = new_table_metas
@@ -157,7 +163,7 @@ class Metadata(object):
         else:
             assert len(cf_results) == 1
             keyspace_meta.tables[table] = self._build_table_metadata(
-                keyspace_meta, cf_results[0], col_results)
+                    keyspace_meta, cf_results[0], {table: col_results})
 
     def _keyspace_added(self, ksname):
         if self.token_map:
