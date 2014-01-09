@@ -509,6 +509,9 @@ class HostConnectionPool(object):
             conn.close()
             self.open_count -= 1
 
+        for conn in self._trash:
+            conn.close()
+
     def ensure_core_connections(self):
         if self.is_shutdown:
             return
