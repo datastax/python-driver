@@ -6,7 +6,7 @@ class NullHandler(logging.Handler):
     def emit(self, record):
         pass
 
-# logging.getLogger('cassandra').addHandler(NullHandler())
+logging.getLogger('cassandra').addHandler(NullHandler())
 
 
 __version_info__ = (1, 0, '0b7', 'post')
