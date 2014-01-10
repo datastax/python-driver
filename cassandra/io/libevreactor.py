@@ -418,7 +418,13 @@ class LibevConnection(Connection):
                         raise OperationTimedOut()
                 time.sleep(0.01)
 
-        return waiter.deliver(timeout)
+        try:
+            return waiter.deliver(timeout)
+        except OperationTimedOut:
+            raise
+        except Exception, exc:
+            self.defunct(exc)
+            raise
 
     def register_watcher(self, event_type, callback):
         self._push_watchers[event_type].add(callback)

@@ -785,7 +785,6 @@ class Cluster(object):
                 self.control_connection.wait_for_schema_agreement(connection)
             except Exception:
                 log.debug("Error waiting for schema agreement before preparing statements against host %s", host, exc_info=True)
-                # TODO: potentially error out the connection?
 
             statements = self._prepared_statements.values()
             for keyspace, ks_statements in groupby(statements, lambda s: s.keyspace):
