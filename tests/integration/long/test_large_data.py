@@ -137,9 +137,6 @@ class LargeDataTests(unittest.TestCase):
             for i in range(330):
                 self.assertEqual(row[create_column_name(i)], i)
 
-
-
-
     def test_wide_rows(self):
         table = 'wide_rows'
 
@@ -152,7 +149,6 @@ class LargeDataTests(unittest.TestCase):
 
         self.wide_rows(session, table, 0)
 
-
     def test_wide_batch_rows(self):
         table = 'wide_batch_rows'
 
@@ -164,7 +160,6 @@ class LargeDataTests(unittest.TestCase):
         session.execute('CREATE TABLE %s (k INT, i INT, PRIMARY KEY(k, i))' % table)
 
         self.wide_batch_rows(session, table, 0)
-
 
     def test_wide_byte_rows(self):
         table = 'wide_byte_rows'
@@ -189,7 +184,6 @@ class LargeDataTests(unittest.TestCase):
         session.execute('CREATE TABLE %s (k int PRIMARY KEY, txt text)' % table)
 
         self.large_text(session, table, 0)
-
 
     def test_wide_table(self):
         table = 'wide_table'
