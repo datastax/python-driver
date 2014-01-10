@@ -102,12 +102,9 @@ class LargeDataTests(unittest.TestCase):
             self.assertEqual(row['i'], bb)
             i += 1
 
-
     def large_text(self, session, table, key):
         # Create ultra-long text
-        text = ''
-        for i in range(1000000):
-            text += str(i)
+        text = 'a' * 1000000
 
         # Write
         session.execute(SimpleStatement("INSERT INTO %s (k, txt) VALUES (%s, '%s')"
@@ -121,25 +118,13 @@ class LargeDataTests(unittest.TestCase):
         for row in result:
             self.assertEqual(row['txt'], text)
 
-
     def wide_table(self, session, table, key):
         # Write
         insert_statement = 'INSERT INTO %s (key, '
-
-        column_names = []
-        for i in range(330):
-            column_names.append(create_column_name(i))
-        insert_statement += ', '.join(column_names)
-
+        insert_statement += ', '.join(create_column_name(i) for i in range(330))
         insert_statement += ') VALUES (%s, '
-
-        values = []
-        for i in range(330):
-            values.append(str(i))
-        insert_statement += ', '.join(values)
-
+        insert_statement += ', '.join(str(i) for i in range(330))
         insert_statement += ')'
-
         insert_statement = insert_statement % (table, key)
 
         session.execute(SimpleStatement(insert_statement, consistency_level=ConsistencyLevel.QUORUM))
@@ -215,10 +200,7 @@ class LargeDataTests(unittest.TestCase):
 
         create_schema(session, self.keyspace)
         table_declaration = 'CREATE TABLE %s (key INT PRIMARY KEY, '
-        column_names = []
-        for i in range(330):
-            column_names.append(create_column_name(i))
-        table_declaration += ' INT, '.join(column_names)
+        table_declaration += ' INT, '.join(create_column_name(i) for i in range(330))
         table_declaration += ' INT)'
         session.execute(table_declaration % table)
 
