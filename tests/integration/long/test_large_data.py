@@ -1,3 +1,4 @@
+import Queue
 from struct import pack
 import unittest
 
@@ -30,22 +31,37 @@ class LargeDataTests(unittest.TestCase):
         self.keyspace = 'large_data'
 
     def wide_rows(self, session, table, key):
-        # Write
+        # Write via async futures
+        futures = Queue.Queue(maxsize=121)
+
         for i in range(100000):
+            if i > 0 and i % 120 == 0:
+                # clear the existing queue
+                while True:
+                    try:
+                        futures.get_nowait().result()
+                    except Queue.Empty:
+                        break
+
             statement = SimpleStatement('INSERT INTO %s (k, i) VALUES (%s, %s)'
                                         % (table, key, i),
                                         consistency_level=ConsistencyLevel.QUORUM)
-            session.execute(statement)
+
+            future = session.execute_async(statement)
+            futures.put_nowait(future)
+
+        while True:
+            try:
+                futures.get_nowait().result()
+            except Queue.Empty:
+                break
 
         # Read
         results = session.execute('SELECT i FROM %s WHERE k=%s' % (table, key))
 
         # Verify
-        i = 0
-        for row in results:
+        for i, row in enumerate(results):
             self.assertEqual(row['i'], i)
-            i += 1
-
 
     def wide_batch_rows(self, session, table, key):
         # Write
