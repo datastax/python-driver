@@ -76,10 +76,8 @@ class LargeDataTests(unittest.TestCase):
         results = session.execute('SELECT i FROM %s WHERE k=%s' % (table, key))
 
         # Verify
-        i = 0
-        for row in results:
+        for i, row in enumerate(results):
             self.assertEqual(row['i'], i)
-            i += 1
 
     def wide_byte_rows(self, session, table, key):
         # Build small ByteBuffer sample
@@ -97,10 +95,8 @@ class LargeDataTests(unittest.TestCase):
 
         # Verify
         bb = pack('>H', 0xCAFE)
-        i = 0
         for row in results:
             self.assertEqual(row['i'], bb)
-            i += 1
 
     def large_text(self, session, table, key):
         # Create ultra-long text
