@@ -81,16 +81,14 @@ class LargeDataTests(unittest.TestCase):
             self.assertEqual(row['i'], i)
             i += 1
 
-
-
     def wide_byte_rows(self, session, table, key):
         # Build small ByteBuffer sample
         bb = '0xCAFE'
 
         # Write
         for i in range(1000000):
-            statement = SimpleStatement('INSERT INTO %s (k, i) VALUES (%s, %s)'
-                                        % (table, key, str(bb)),
+            statement = SimpleStatement('INSERT INTO %s (k, i, v) VALUES (%s, %s, %s)'
+                                        % (table, key, i, str(bb)),
                                         consistency_level=ConsistencyLevel.QUORUM)
             session.execute(statement)
 
@@ -191,10 +189,9 @@ class LargeDataTests(unittest.TestCase):
         session.row_factory = dict_factory
 
         create_schema(session, self.keyspace)
-        session.execute('CREATE TABLE %s (k INT, i BLOB, PRIMARY KEY(k, i))' % table)
+        session.execute('CREATE TABLE %s (k INT, i INT, v BLOB, PRIMARY KEY(k, i))' % table)
 
         self.wide_byte_rows(session, table, 0)
-
 
     def test_large_text(self):
         table = 'large_text'
