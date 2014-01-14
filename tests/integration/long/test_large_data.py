@@ -2,8 +2,6 @@ import Queue
 from struct import pack
 import unittest
 
-import cassandra
-
 from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster
 from cassandra.decoder import dict_factory
@@ -30,11 +28,17 @@ class LargeDataTests(unittest.TestCase):
     def setUp(self):
         self.keyspace = 'large_data'
 
-    def wide_rows(self, session, table, key):
-        # Write via async futures
-        futures = Queue.Queue(maxsize=121)
+    def make_session_and_keyspace(self):
+        cluster = Cluster()
+        session = cluster.connect()
+        session.row_factory = dict_factory
 
-        for i in range(100000):
+        create_schema(session, self.keyspace)
+        return session
+
+    def batch_futures(self, session, statement_generator):
+        futures = Queue.Queue(maxsize=121)
+        for i, statement in enumerate(statement_generator):
             if i > 0 and i % 120 == 0:
                 # clear the existing queue
                 while True:
@@ -42,10 +46,6 @@ class LargeDataTests(unittest.TestCase):
                         futures.get_nowait().result()
                     except Queue.Empty:
                         break
-
-            statement = SimpleStatement('INSERT INTO %s (k, i) VALUES (%s, %s)'
-                                        % (table, key, i),
-                                        consistency_level=ConsistencyLevel.QUORUM)
 
             future = session.execute_async(statement)
             futures.put_nowait(future)
@@ -56,142 +56,110 @@ class LargeDataTests(unittest.TestCase):
             except Queue.Empty:
                 break
 
+    def test_wide_rows(self):
+        table = 'wide_rows'
+        session = self.make_session_and_keyspace()
+        session.execute('CREATE TABLE %s (k INT, i INT, PRIMARY KEY(k, i))' % table)
+
+        # Write via async futures
+        self.batch_futures(
+            session,
+            (SimpleStatement('INSERT INTO %s (k, i) VALUES (0, %s)' % (table, i),
+                            consistency_level=ConsistencyLevel.QUORUM)
+             for i in range(1000000)))
+
         # Read
-        results = session.execute('SELECT i FROM %s WHERE k=%s' % (table, key))
+        results = session.execute('SELECT i FROM %s WHERE k=%s' % (table, 0))
 
         # Verify
         for i, row in enumerate(results):
             self.assertEqual(row['i'], i)
 
-    def wide_batch_rows(self, session, table, key):
+    def test_wide_batch_rows(self):
+        table = 'wide_batch_rows'
+        session = self.make_session_and_keyspace()
+        session.execute('CREATE TABLE %s (k INT, i INT, PRIMARY KEY(k, i))' % table)
+
         # Write
         statement = 'BEGIN BATCH '
         for i in range(2000):
-            statement += 'INSERT INTO %s (k, i) VALUES (%s, %s) ' % (table, key, i)
+            statement += 'INSERT INTO %s (k, i) VALUES (%s, %s) ' % (table, 0, i)
         statement += 'APPLY BATCH'
         statement = SimpleStatement(statement, consistency_level=ConsistencyLevel.QUORUM)
         session.execute(statement)
 
         # Read
-        results = session.execute('SELECT i FROM %s WHERE k=%s' % (table, key))
+        results = session.execute('SELECT i FROM %s WHERE k=%s' % (table, 0))
 
         # Verify
         for i, row in enumerate(results):
             self.assertEqual(row['i'], i)
 
-    def wide_byte_rows(self, session, table, key):
+    def test_wide_byte_rows(self):
+        table = 'wide_byte_rows'
+        session = self.make_session_and_keyspace()
+        session.execute('CREATE TABLE %s (k INT, i INT, v BLOB, PRIMARY KEY(k, i))' % table)
+
         # Build small ByteBuffer sample
         bb = '0xCAFE'
 
         # Write
-        for i in range(1000000):
-            statement = SimpleStatement('INSERT INTO %s (k, i, v) VALUES (%s, %s, %s)'
-                                        % (table, key, i, str(bb)),
-                                        consistency_level=ConsistencyLevel.QUORUM)
-            session.execute(statement)
+        self.batch_futures(
+            session,
+            (SimpleStatement('INSERT INTO %s (k, i, v) VALUES (0, %s, %s)' % (table, i, str(bb)),
+                            consistency_level=ConsistencyLevel.QUORUM)
+             for i in range(1000000)))
 
         # Read
-        results = session.execute('SELECT i FROM %s WHERE k=%s' % (table, key))
+        results = session.execute('SELECT i, v FROM %s WHERE k=%s' % (table, 0))
 
         # Verify
         bb = pack('>H', 0xCAFE)
         for row in results:
-            self.assertEqual(row['i'], bb)
+            self.assertEqual(row['v'], bb)
 
-    def large_text(self, session, table, key):
+    def test_large_text(self):
+        table = 'large_text'
+        session = self.make_session_and_keyspace()
+        session.execute('CREATE TABLE %s (k int PRIMARY KEY, txt text)' % table)
+
         # Create ultra-long text
         text = 'a' * 1000000
 
         # Write
         session.execute(SimpleStatement("INSERT INTO %s (k, txt) VALUES (%s, '%s')"
-                                        % (table, key, text),
+                                        % (table, 0, text),
                                         consistency_level=ConsistencyLevel.QUORUM))
 
         # Read
-        result = session.execute('SELECT * FROM %s WHERE k=%s' % (table, key))
+        result = session.execute('SELECT * FROM %s WHERE k=%s' % (table, 0))
 
         # Verify
         for row in result:
             self.assertEqual(row['txt'], text)
 
-    def wide_table(self, session, table, key):
+    def test_wide_table(self):
+        table = 'wide_table'
+        session = self.make_session_and_keyspace()
+        table_declaration = 'CREATE TABLE %s (key INT PRIMARY KEY, '
+        table_declaration += ' INT, '.join(create_column_name(i) for i in range(330))
+        table_declaration += ' INT)'
+        session.execute(table_declaration % table)
+
         # Write
         insert_statement = 'INSERT INTO %s (key, '
         insert_statement += ', '.join(create_column_name(i) for i in range(330))
         insert_statement += ') VALUES (%s, '
         insert_statement += ', '.join(str(i) for i in range(330))
         insert_statement += ')'
-        insert_statement = insert_statement % (table, key)
+        insert_statement = insert_statement % (table, 0)
 
         session.execute(SimpleStatement(insert_statement, consistency_level=ConsistencyLevel.QUORUM))
 
         # Read
-        result = session.execute('SELECT * FROM %s WHERE key=%s' % (table, key))
+        result = session.execute('SELECT * FROM %s WHERE key=%s' % (table, 0))
 
         # Verify
         for row in result:
             for i in range(330):
                 self.assertEqual(row[create_column_name(i)], i)
-
-    def test_wide_rows(self):
-        table = 'wide_rows'
-
-        cluster = Cluster()
-        session = cluster.connect()
-        session.row_factory = dict_factory
-
-        create_schema(session, self.keyspace)
-        session.execute('CREATE TABLE %s (k INT, i INT, PRIMARY KEY(k, i))' % table)
-
-        self.wide_rows(session, table, 0)
-
-    def test_wide_batch_rows(self):
-        table = 'wide_batch_rows'
-
-        cluster = Cluster()
-        session = cluster.connect()
-        session.row_factory = dict_factory
-
-        create_schema(session, self.keyspace)
-        session.execute('CREATE TABLE %s (k INT, i INT, PRIMARY KEY(k, i))' % table)
-
-        self.wide_batch_rows(session, table, 0)
-
-    def test_wide_byte_rows(self):
-        table = 'wide_byte_rows'
-
-        cluster = Cluster()
-        session = cluster.connect()
-        session.row_factory = dict_factory
-
-        create_schema(session, self.keyspace)
-        session.execute('CREATE TABLE %s (k INT, i INT, v BLOB, PRIMARY KEY(k, i))' % table)
-
-        self.wide_byte_rows(session, table, 0)
-
-    def test_large_text(self):
-        table = 'large_text'
-
-        cluster = Cluster()
-        session = cluster.connect()
-        session.row_factory = dict_factory
-
-        create_schema(session, self.keyspace)
-        session.execute('CREATE TABLE %s (k int PRIMARY KEY, txt text)' % table)
-
-        self.large_text(session, table, 0)
-
-    def test_wide_table(self):
-        table = 'wide_table'
-
-        cluster = Cluster()
-        session = cluster.connect()
-        session.row_factory = dict_factory
-
-        create_schema(session, self.keyspace)
-        table_declaration = 'CREATE TABLE %s (key INT PRIMARY KEY, '
-        table_declaration += ' INT, '.join(create_column_name(i) for i in range(330))
-        table_declaration += ' INT)'
-        session.execute(table_declaration % table)
-
-        self.wide_table(session, table, 0)
