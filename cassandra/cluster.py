@@ -1904,14 +1904,14 @@ class ResponseFuture(object):
                     try:
                         prepared_statement = self.session.cluster._prepared_statements[query_id]
                     except KeyError:
-                        if self.prepared_statement:
-                            query_string = ", " + self.prepared_statement.query_string
+                        if not self.prepared_statement:
+                            log.error("Tried to execute unknown prepared statement: id=%s",
+                                      query_id.encode('hex'))
+                            self._set_final_exception(response)
+                            return
                         else:
-                            query_string = ""
-                        log.error("Tried to execute unknown prepared statement: id=%s%s",
-                                  query_id.encode('hex'), query_string)
-                        self._set_final_exception(response)
-                        return
+                            prepared_statement = self.prepared_statement
+                            self.session.cluster._prepared_statements[query_id] = prepared_statement
 
                     current_keyspace = self._connection.keyspace
                     prepared_keyspace = prepared_statement.keyspace
