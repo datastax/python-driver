@@ -800,7 +800,7 @@ class Cluster(object):
                 for ks_chunk in chunks:
                     messages = [PrepareMessage(query=s.query_string) for s in ks_chunk]
                     # TODO: make this timeout configurable somehow?
-                    responses = connection.wait_for_responses(*messages, timeout=2.0)
+                    responses = connection.wait_for_responses(*messages, timeout=5.0)
                     for response in responses:
                         if (not isinstance(response, ResultMessage) or
                                 response.kind != ResultMessage.KIND_PREPARED):
