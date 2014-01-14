@@ -203,7 +203,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
             callbacks = self._callbacks
             self._callbacks = {}
         new_exc = ConnectionShutdown(str(exc))
-        for cb in callbacks:
+        for cb in callbacks.values():
             try:
                 cb(new_exc)
             except Exception:
