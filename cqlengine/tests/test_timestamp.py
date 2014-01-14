@@ -110,6 +110,21 @@ class DeleteWithTimestampTest(BaseTimestampTest):
         with self.assertRaises(TestTimestampModel.DoesNotExist):
             TestTimestampModel.get(id=uid)
 
+        # calling .timestamp sets the TS on the model
+        tmp.timestamp(timedelta(seconds=5))
+        tmp._timestamp.should.be.ok
+
+        # calling save clears the set timestamp
+        tmp.save()
+        tmp._timestamp.shouldnt.be.ok
+
+        tmp.timestamp(timedelta(seconds=5))
+        tmp.update()
+        tmp._timestamp.shouldnt.be.ok
+
+
+
+
 
     def test_blind_delete(self):
         """

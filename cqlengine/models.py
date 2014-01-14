@@ -475,6 +475,9 @@ class BaseModel(object):
             v.reset_previous_value()
         self._is_persisted = True
 
+        self._ttl = None
+        self._timestamp = None
+
         return self
 
     def update(self, **values):
@@ -510,6 +513,9 @@ class BaseModel(object):
             v.reset_previous_value()
         self._is_persisted = True
 
+        self._ttl = None
+        self._timestamp = None
+
         return self
 
     def delete(self):
@@ -528,10 +534,6 @@ class BaseModel(object):
         self._batch = batch
         return self
 
-    # def __deepcopy__(self):
-    #     tmp = type(self)()
-    #     tmp.__dict__.update(self.__dict__)
-    #     return tmp
 
     batch = hybrid_classmethod(_class_batch, _inst_batch)
 
