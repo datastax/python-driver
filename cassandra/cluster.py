@@ -808,6 +808,8 @@ class Cluster(object):
                                       "statement on host %s: %r", host, response)
 
             log.debug("Done preparing all known prepared statements against host %s", host)
+        except OperationTimedOut:
+            log.warn("Timed out trying to prepare all statements on host %s", host)
         except Exception:
             # log and ignore
             log.exception("Error trying to prepare all statements on host %s", host)
