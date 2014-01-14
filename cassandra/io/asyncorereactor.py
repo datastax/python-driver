@@ -246,6 +246,8 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
                 if sent < len(next_msg):
                     with self.deque_lock:
                         self.deque.appendleft(next_msg[sent:])
+                    if sent == 0:
+                        return
 
     def handle_read(self):
         try:
