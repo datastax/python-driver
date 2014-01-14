@@ -2,9 +2,10 @@ CHANGELOG
 
 0.11.0 (in progress)
 
-* support for USING TIMESTAMP <microseconds from epoch>
+* support for USING TIMESTAMP <microseconds from epoch> via a .timestamp(timedelta(seconds=30)) syntax
   - allows for long, timedelta, and datetime
 * fixed use of USING TIMESTAMP in batches
+* clear TTL and timestamp off models after persisting to DB
 
 0.10.0
 
