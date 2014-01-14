@@ -1045,7 +1045,7 @@ class Session(object):
         Intended for internal use only.
         """
         futures = []
-        for host in self._pools:
+        for host in self._pools[:]:
             if host != excluded_host and host.is_up:
                 future = ResponseFuture(self, PrepareMessage(query=query), None)
 
