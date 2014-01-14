@@ -3,6 +3,7 @@ Connection pooling and host management.
 """
 
 import logging
+import socket
 import time
 from threading import RLock, Condition
 import weakref
@@ -331,6 +332,8 @@ class HostConnectionPool(object):
     def _create_new_connection(self):
         try:
             self._add_conn_if_under_max()
+        except (ConnectionException, socket.error), exc:
+            log.warn("Failed to create new connection to %s: %s", self.host, exc)
         except Exception:
             log.exception("Unexpectedly failed to create new connection")
         finally:
@@ -361,8 +364,8 @@ class HostConnectionPool(object):
                       id(conn), self.host)
             self._signal_available_conn()
             return True
-        except ConnectionException as exc:
-            log.exception("Failed to add new connection to pool for host %s", self.host)
+        except (ConnectionException, socket.error) as exc:
+            log.warn("Failed to add new connection to pool for host %s: %s", self.host, exc)
             with self._lock:
                 self.open_count -= 1
             if self._session.cluster.signal_connection_failure(self.host, exc, is_host_addition=False):
