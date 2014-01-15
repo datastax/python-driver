@@ -235,7 +235,7 @@ class BaseModel(object):
     # compaction options
     __compaction__ = None
     __compaction_tombstone_compaction_interval__ = None
-    __compaction_tombstone_threshold = None
+    __compaction_tombstone_threshold__ = None
 
     # compaction - size tiered options
     __compaction_bucket_high__ = None

@@ -39,7 +39,7 @@ class SizeTieredCompactionTest(BaseCompactionTest):
     def test_min_threshold(self):
         self.model.__compaction_min_threshold__ = 2
         result = get_compaction_options(self.model)
-        assert result['min_threshold'] == 2
+        assert result['min_threshold'] == '2'
 
 
 class LeveledCompactionTest(BaseCompactionTest):
@@ -69,7 +69,7 @@ class LeveledCompactionTest(BaseCompactionTest):
         with patch.object(self.model, '__compaction_sstable_size_in_mb__', 32):
             result = get_compaction_options(self.model)
 
-        assert result['sstable_size_in_mb'] == 32
+        assert result['sstable_size_in_mb'] == '32'
 
 
 class LeveledcompactionTestTable(Model):
@@ -89,6 +89,42 @@ class AlterTableTest(BaseCassEngTestCase):
         with patch('cqlengine.management.update_compaction') as mock:
             sync_table(LeveledcompactionTestTable)
         assert mock.called == 1
+
+    def test_compaction_not_altered_without_changes_leveled(self):
+        from cqlengine.management import update_compaction
+
+        class LeveledCompactionChangesDetectionTest(Model):
+            __compaction__ = LeveledCompactionStrategy
+            __compaction_sstable_size_in_mb__ = 160
+            __compaction_tombstone_threshold__ = 0.125
+            __compaction_tombstone_compaction_interval__ = 3600
+
+            pk = columns.Integer(primary_key=True)
+
+        drop_table(LeveledCompactionChangesDetectionTest)
+        sync_table(LeveledCompactionChangesDetectionTest)
+
+        assert not update_compaction(LeveledCompactionChangesDetectionTest)
+
+    def test_compaction_not_altered_without_changes_sizetiered(self):
+        from cqlengine.management import update_compaction
+
+        class SizeTieredCompactionChangesDetectionTest(Model):
+            __compaction__ = SizeTieredCompactionStrategy
+            __compaction_bucket_high__ = 20
+            __compaction_bucket_low__ = 10
+            __compaction_max_threshold__ = 200
+            __compaction_min_threshold__ = 100
+            __compaction_min_sstable_size__ = 1000
+            __compaction_tombstone_threshold__ = 0.125
+            __compaction_tombstone_compaction_interval__ = 3600
+
+            pk = columns.Integer(primary_key=True)
+
+        drop_table(SizeTieredCompactionChangesDetectionTest)
+        sync_table(SizeTieredCompactionChangesDetectionTest)
+
+        assert not update_compaction(SizeTieredCompactionChangesDetectionTest)
 
     def test_alter_actually_alters(self):
         tmp = copy.deepcopy(LeveledcompactionTestTable)
