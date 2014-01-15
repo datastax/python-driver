@@ -1,6 +1,5 @@
 from collections import OrderedDict
 import re
-import copy
 from cqlengine import columns
 from cqlengine.exceptions import ModelException, CQLEngineException, ValidationError
 from cqlengine.query import ModelQuerySet, DMLQuery, AbstractQueryableColumn
@@ -101,19 +100,13 @@ class TimestampDescriptor(object):
     def __get__(self, instance, model):
         if instance:
             # instance method
-            #instance = copy.deepcopy(instance)
             def timestamp_setter(ts):
                 instance._timestamp = ts
                 return instance
             return timestamp_setter
 
-        qs = model.__queryset__(model)
+        return model.objects.timestamp
 
-        def timestamp_setter(ts):
-            qs._timestamp = ts
-            return qs
-
-        return timestamp_setter
 
     def __call__(self, *args, **kwargs):
         raise NotImplementedError
