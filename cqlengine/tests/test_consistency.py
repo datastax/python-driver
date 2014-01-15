@@ -76,3 +76,19 @@ class TestConsistency(BaseConsistencyTest):
 
         args = m.call_args
         self.assertEqual(ALL, args[0][2])
+
+
+    def test_delete(self):
+        # ensures we always carry consistency through on delete statements
+        t = TestConsistencyModel.create(text="bacon and eggs")
+        t.text = "ham and cheese sandwich"
+        uid = t.id
+
+        with mock.patch.object(ConnectionPool, 'execute') as m:
+            t.consistency(ALL).delete()
+
+        with mock.patch.object(ConnectionPool, 'execute') as m:
+            TestConsistencyModel.objects(id=uid).consistency(ALL).delete()
+
+        args = m.call_args
+        self.assertEqual(ALL, args[0][2])

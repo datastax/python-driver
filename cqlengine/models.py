@@ -513,7 +513,7 @@ class BaseModel(object):
 
     def delete(self):
         """ Deletes this instance """
-        self.__dmlquery__(self.__class__, self, batch=self._batch, timestamp=self._timestamp).delete()
+        self.__dmlquery__(self.__class__, self, batch=self._batch, timestamp=self._timestamp, consistency=self.__consistency__).delete()
 
     def get_changed_columns(self):
         """ returns a list of the columns that have been updated since instantiation or save """
