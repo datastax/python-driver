@@ -31,7 +31,7 @@ the instructions in the section below before installing the driver.
 
 Installation through pip is recommended::
 
-    $ pip install cassandra-driver
+    $ pip install cassandra-driver --pre
 
 If you want to install manually, you can instead do::
 
