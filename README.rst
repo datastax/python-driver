@@ -1,5 +1,9 @@
 DataStax Python Driver for Apache Cassandra (Beta)
 ==================================================
+
+.. image:: https://travis-ci.org/datastax/python-driver.png?branch=master
+   :target: https://travis-ci.org/datastax/python-driver
+
 A Python client driver for Apache Cassandra.  This driver works exclusively
 with the Cassandra Query Language v3 (CQL3) and Cassandra's native
 protocol.  As such, only Cassandra 1.2+ is supported.
