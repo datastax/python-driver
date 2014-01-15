@@ -25,6 +25,7 @@ long_description = ""
 with open("README.rst") as f:
     long_description = f.read()
 
+
 class DocCommand(Command):
 
     description = "generate or test documentation"
@@ -162,7 +163,7 @@ def run_setup(extensions):
         packages=['cassandra', 'cassandra.io'],
         include_package_data=True,
         install_requires=dependencies,
-        tests_require=['nose', 'mock', 'ccm'],
+        tests_require=['nose', 'mock', 'ccm', 'unittest2'],
         classifiers=[
             'Development Status :: 4 - Beta',
             'Intended Audience :: Developers',

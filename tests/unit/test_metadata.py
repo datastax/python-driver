@@ -1,4 +1,7 @@
-import unittest
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest # noqa
 
 import cassandra
 from cassandra.metadata import (TableMetadata, Murmur3Token, MD5Token,
@@ -127,6 +130,7 @@ class TestStrategies(unittest.TestCase):
         self.assertItemsEqual(rf3_replicas[MD5Token(0)], [host1, host2, host3])
         self.assertItemsEqual(rf3_replicas[MD5Token(100)], [host2, host3, host1])
         self.assertItemsEqual(rf3_replicas[MD5Token(200)], [host3, host1, host2])
+
 
 class TestTokens(unittest.TestCase):
 
