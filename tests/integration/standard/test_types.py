@@ -7,7 +7,10 @@ from decimal import Decimal
 from datetime import datetime
 from uuid import uuid1, uuid4
 
-from blist import sortedset
+try:
+    from blist import sortedset
+except ImportError:
+    sortedset = set  # noqa
 
 from cassandra import InvalidRequest
 from cassandra.cluster import Cluster
@@ -146,7 +149,7 @@ class TypeTests(unittest.TestCase):
             "1.2.3.4",  # inet
             12345,  # int
             ['a', 'b', 'c'],  # list<text> collection
-            {1, 2, 3},  # set<int> collection
+            set([1, 2, 3]),  # set<int> collection
             {'a': 1, 'b': 2},  # map<text, int> collection
             "text",  # text
             mydatetime,  # timestamp

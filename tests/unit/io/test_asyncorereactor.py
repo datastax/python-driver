@@ -23,14 +23,16 @@ from cassandra.io.asyncorereactor import AsyncoreConnection
 
 class LibevConnectionTest(unittest.TestCase):
 
-    def setUp(self):
-        self.socket_patcher = patch('socket.socket', spec=socket.socket)
-        self.mock_socket = self.socket_patcher.start()
-        self.mock_socket().connect_ex.return_value = 0
-        self.mock_socket().getsockopt.return_value = 0
+    @classmethod
+    def setUpClass(cls):
+        cls.socket_patcher = patch('socket.socket', spec=socket.socket)
+        cls.mock_socket = cls.socket_patcher.start()
+        cls.mock_socket().connect_ex.return_value = 0
+        cls.mock_socket().getsockopt.return_value = 0
 
-    def tearDown(self):
-        self.socket_patcher.stop()
+    @classmethod
+    def tearDownClass(cls):
+        cls.socket_patcher.stop()
 
     def make_connection(self):
         c = AsyncoreConnection('1.2.3.4')

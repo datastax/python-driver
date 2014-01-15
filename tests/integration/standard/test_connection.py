@@ -15,6 +15,7 @@ try:
 except ImportError:
     LibevConnection = None
 
+
 class ConnectionTest(object):
 
     klass = None
@@ -176,7 +177,7 @@ class LibevConnectionTest(ConnectionTest, unittest.TestCase):
 
     klass = LibevConnection
 
-    @classmethod
-    def setup_class(cls):
+    def setUp(self):
         if LibevConnection is None:
-            raise unittest.SkipTest('pyev does not appear to be installed properly')
+            raise unittest.SkipTest(
+                'libev does not appear to be installed properly')

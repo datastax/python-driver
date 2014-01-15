@@ -5,6 +5,7 @@ import datetime
 import logging
 import re
 import socket
+import sys
 import types
 from uuid import UUID
 
@@ -782,8 +783,13 @@ def cql_encode_str(val):
     return cql_quote(val)
 
 
-def cql_encode_bytes(val):
-    return '0x' + hexlify(val)
+if sys.version_info >= (2, 7):
+    def cql_encode_bytes(val):
+        return '0x' + hexlify(val)
+else:
+    # python 2.6 requires string or read-only buffer for hexlify
+    def cql_encode_bytes(val):
+        return '0x' + hexlify(buffer(val))
 
 
 def cql_encode_object(val):
@@ -826,6 +832,7 @@ def cql_encode_all_types(val):
 
 cql_encoders = {
     float: cql_encode_object,
+    buffer: cql_encode_bytes,
     bytearray: cql_encode_bytes,
     str: cql_encode_str,
     unicode: cql_encode_unicode,

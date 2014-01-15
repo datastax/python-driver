@@ -10,6 +10,7 @@ from cassandra.policies import RoundRobinPolicy, ExponentialReconnectionPolicy, 
 
 from cassandra.cluster import Cluster, NoHostAvailable
 
+
 class ClusterTests(unittest.TestCase):
 
     def test_basic(self):
@@ -100,7 +101,7 @@ class ClusterTests(unittest.TestCase):
             cluster.shutdown()
             self.fail('A double cluster.shutdown() should throw an error.')
         except Exception as e:
-            self.assertEqual(e.message, 'The Cluster was already shutdown')
+            self.assertIn('The Cluster was already shutdown', str(e))
 
     def test_connect_to_already_shutdown_cluster(self):
         """

@@ -8,11 +8,13 @@ from mock import Mock
 from cassandra import AlreadyExists
 
 from cassandra.cluster import Cluster
-from cassandra.metadata import Metadata, KeyspaceMetadata, TableMetadata, Token, MD5Token, TokenMap
+from cassandra.metadata import (Metadata, KeyspaceMetadata, TableMetadata,
+                                Token, MD5Token, TokenMap, murmur3)
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
 from tests.integration import get_cluster
+
 
 class SchemaMetadataTest(unittest.TestCase):
 
@@ -276,7 +278,9 @@ class SchemaMetadataTest(unittest.TestCase):
         self.assertEqual(d_index, statements[1])
         self.assertEqual(e_index, statements[2])
 
+
 class TestCodeCoverage(unittest.TestCase):
+
     def test_export_schema(self):
         """
         Test export schema functionality
@@ -326,6 +330,9 @@ class TestCodeCoverage(unittest.TestCase):
         """
         Ensure cluster.metadata.get_replicas return correctly when not attached to keyspace
         """
+        if murmur3 is None:
+            raise unittest.SkipTest('the murmur3 extension is not available')
+
         cluster = Cluster()
         self.assertEqual(cluster.metadata.get_replicas('test3rf', 'key'), [])
 

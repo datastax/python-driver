@@ -1,4 +1,8 @@
-import unittest
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest # noqa
+
 from cassandra.query import SimpleStatement
 from cassandra import ConsistencyLevel, WriteTimeout, Unavailable, ReadTimeout
 
