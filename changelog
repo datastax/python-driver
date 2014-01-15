@@ -7,6 +7,7 @@ CHANGELOG
 * fixed use of USING TIMESTAMP in batches
 * clear TTL and timestamp off models after persisting to DB
 * allows UUID without - (Thanks to Michael Haddad, github.com/mahall)
+* fixes regarding syncing schema settings (thanks Kai Lautaportti github.com/dokai)
 
 0.10.0
 
