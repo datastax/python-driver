@@ -8,7 +8,11 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from blist import sortedset
+try:
+    from blist import sortedset
+except ImportError:
+    sortedset = set
+
 try:
     from collections import OrderedDict
 except ImportError:  # Python <2.7
@@ -84,6 +88,7 @@ if platform.python_implementation() == 'CPython':
     # Only run tests for entries which depend on internal python ordering under
     # CPython
     marshalled_value_pairs += marshalled_value_pairs_unsafe
+
 
 class TestUnmarshal(unittest.TestCase):
     def test_unmarshalling(self):

@@ -19,8 +19,9 @@ from cassandra.marshal import uint8_pack, uint32_pack
 
 try:
     from cassandra.io.libevreactor import LibevConnection
-except ImportError as exc:
-    raise unittest.SkipTest('libev does not appear to be installed correctly: %s' % (exc,))
+except ImportError:
+    LibevConnection = None  # noqa
+
 
 @patch('socket.socket')
 @patch('cassandra.io.libevwrapper.IO')
@@ -28,6 +29,10 @@ except ImportError as exc:
 @patch('cassandra.io.libevwrapper.Async')
 @patch('cassandra.io.libevreactor._start_loop')
 class LibevConnectionTest(unittest.TestCase):
+
+    def setUp(self):
+        if LibevConnection is None:
+            raise unittest.SkipTest('libev does not appear to be installed correctly')
 
     def make_connection(self):
         c = LibevConnection('1.2.3.4')

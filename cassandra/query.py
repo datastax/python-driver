@@ -229,7 +229,7 @@ class BoundStatement(Statement):
 
                 try:
                     self.values.append(col_type.serialize(value))
-                except struct.error:
+                except (TypeError, struct.error):
                     col_name = col_spec[2]
                     expected_type = col_type
                     actual_type = type(value)

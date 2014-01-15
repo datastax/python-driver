@@ -7,7 +7,7 @@ import cassandra
 from cassandra.metadata import (TableMetadata, Murmur3Token, MD5Token,
                                 BytesToken, ReplicationStrategy,
                                 NetworkTopologyStrategy, SimpleStrategy,
-                                LocalStrategy)
+                                LocalStrategy, NoMurmur3)
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
@@ -203,22 +203,22 @@ class TestTokens(unittest.TestCase):
         for keyword in non_valid_keywords:
             self.assertEqual(table_metadata.is_valid_name(keyword), False)
 
-    def test_token_values(self):
-        """
-        Spot check token classes and values
-        """
+    def test_murmur3_tokens(self):
+        try:
+            murmur3_token = Murmur3Token(cassandra.metadata.MIN_LONG - 1)
+            self.assertEqual(murmur3_token.hash_fn('123'), -7468325962851647638)
+            self.assertEqual(murmur3_token.hash_fn(str(cassandra.metadata.MAX_LONG)), 7162290910810015547)
+            self.assertEqual(str(murmur3_token), '<Murmur3Token: -9223372036854775809L>')
+        except NoMurmur3:
+            raise unittest.SkipTest('The murmur3 extension is not available')
 
-        # spot check murmur3
-        murmur3_token = Murmur3Token(cassandra.metadata.MIN_LONG - 1)
-        self.assertEqual(murmur3_token.hash_fn('123'), -7468325962851647638)
-        self.assertEqual(murmur3_token.hash_fn(str(cassandra.metadata.MAX_LONG)), 7162290910810015547)
-        self.assertEqual(str(murmur3_token), '<Murmur3Token: -9223372036854775809L>')
-
+    def test_md5_tokens(self):
         md5_token = MD5Token(cassandra.metadata.MIN_LONG - 1)
         self.assertEqual(md5_token.hash_fn('123'), 42767516990368493138776584305024125808L)
         self.assertEqual(md5_token.hash_fn(str(cassandra.metadata.MAX_LONG)), 28528976619278518853815276204542453639L)
         self.assertEqual(str(md5_token), '<MD5Token: -9223372036854775809L>')
 
+    def test_bytes_tokens(self):
         bytes_token = BytesToken(str(cassandra.metadata.MIN_LONG - 1))
         self.assertEqual(bytes_token.hash_fn('123'), '123')
         self.assertEqual(bytes_token.hash_fn(123), 123)
