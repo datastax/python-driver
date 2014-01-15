@@ -162,6 +162,33 @@ class TestDecimal(BaseCassEngTestCase):
         dt2 = self.DecimalTest.objects(test_id=0).first()
         assert dt2.dec_val == D('5')
 
+class TestUUID(BaseCassEngTestCase):
+    class UUIDTest(Model):
+        test_id = Integer(primary_key=True)
+        a_uuid = UUID(default=uuid4())
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestUUID, cls).setUpClass()
+        create_table(cls.UUIDTest)
+
+    @classmethod
+    def tearDownClass(cls):
+        super(TestUUID, cls).tearDownClass()
+        delete_table(cls.UUIDTest)  
+
+    def test_uuid_str_with_dashes(self):
+        a_uuid = uuid4()
+        t0 = self.UUIDTest.create(test_id=0, a_uuid=str(a_uuid))
+        t1 = self.UUIDTest.get(test_id=0)
+        assert a_uuid == t1.a_uuid
+
+    def test_uuid_str_no_dashes(self):
+        a_uuid = uuid4()
+        t0 = self.UUIDTest.create(test_id=1, a_uuid=a_uuid.hex)
+        t1 = self.UUIDTest.get(test_id=1)
+        assert a_uuid == t1.a_uuid
+
 class TestTimeUUID(BaseCassEngTestCase):
     class TimeUUIDTest(Model):
         test_id = Integer(primary_key=True)
