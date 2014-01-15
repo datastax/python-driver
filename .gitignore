@@ -3,6 +3,7 @@
 *.swo
 *.so
 *.egg-info
+.tox
 build
 MANIFEST
 dist

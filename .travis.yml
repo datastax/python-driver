@@ -1,0 +1,16 @@
+language: python
+python: 2.7
+env:
+  - TOX_ENV=py26
+  - TOX_ENV=py27
+  - TOX_ENV=pypy
+
+before_install:
+  - sudo apt-get update -y
+  - sudo apt-get install -y build-essential python-dev
+  - sudo apt-get install -y libev4 libev-dev
+install:
+  - pip install tox
+
+script:
+  - tox -e $TOX_ENV
