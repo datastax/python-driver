@@ -220,8 +220,14 @@ class Connection(object):
             return
 
         if not isinstance(options_response, SupportedMessage):
-            log.error("Did not get expected SupportedMessage response; instead, got: %s", options_response)
-            raise ConnectionException("Did not get expected SupportedMessage response; instead, got: %s" % (options_response,))
+            if isinstance(options_response, ConnectionException):
+                raise options_response
+            else:
+                log.error("Did not get expected SupportedMessage response; " \
+                          "instead, got: %s", options_response)
+                raise ConnectionException("Did not get expected SupportedMessage " \
+                                          "response; instead, got: %s" \
+                                          % (options_response,))
 
         log.debug("Received options response on new connection (%s) from %s",
                   id(self), self.host)
