@@ -219,3 +219,33 @@ class TypeTests(unittest.TestCase):
 
         for expected, actual in zip(expected_vals, results[0]):
             self.assertEquals(expected, actual)
+
+    def test_timezone_aware_datetimes(self):
+        """ Ensure timezone-aware datetimes are converted to timestamps correctly """
+        try:
+            import pytz
+        except ImportError, exc:
+            raise unittest.SkipTest('pytz is not available: %r' % (exc,))
+
+        dt = datetime(1997, 8, 29, 11, 14)
+        eastern_tz = pytz.timezone('US/Eastern')
+        eastern_tz.localize(dt)
+
+        c = Cluster()
+        s = c.connect()
+
+        s.execute("""CREATE KEYSPACE tz_aware_test
+            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}""")
+        s.set_keyspace("tz_aware_test")
+        s.execute("CREATE TABLE mytable (a ascii PRIMARY KEY, b timestamp)")
+
+        # test non-prepared statement
+        s.execute("INSERT INTO mytable (a, b) VALUES ('key1', %s)", parameters=(dt,))
+        result = s.execute("SELECT b FROM mytable WHERE a='key1'")[0].b
+        self.assertEquals(dt.utctimetuple(), result.utctimetuple())
+
+        # test prepared statement
+        prepared = s.prepare("INSERT INTO mytable (a, b) VALUES ('key2', ?)")
+        s.execute(prepared, parameters=(dt,))
+        result = s.execute("SELECT b FROM mytable WHERE a='key2'")[0].b
+        self.assertEquals(dt.utctimetuple(), result.utctimetuple())
