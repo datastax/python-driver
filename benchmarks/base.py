@@ -29,10 +29,11 @@ try:
     have_libev = True
     supported_reactors.append(LibevConnection)
 except ImportError, exc:
-    log.warning("Not benchmarking libev reactor: %s" % (exc,))
+    pass
 
 KEYSPACE = "testkeyspace"
 TABLE = "testtable"
+
 
 def setup(hosts):
 
@@ -63,6 +64,7 @@ def setup(hosts):
             PRIMARY KEY (thekey, col1)
         )
         """ % TABLE)
+
 
 def teardown(hosts):
     cluster = Cluster(hosts)
@@ -163,15 +165,17 @@ def parse_options():
 
     log.setLevel(options.log_level.upper())
 
-    if options.libev_only:
+    if options.asyncore_only:
+        options.supported_reactors = [AsyncoreConnection]
+    elif options.libev_only:
         if not have_libev:
             log.error("libev is not available")
             sys.exit(1)
         options.supported_reactors = [LibevConnection]
-    elif options.asyncore_only:
-        options.supported_reactors = [AsyncoreConnection]
     else:
         options.supported_reactors = supported_reactors
+        if not have_libev:
+            log.warning("Not benchmarking libev reactor because libev is not available")
 
     return options, args
 
