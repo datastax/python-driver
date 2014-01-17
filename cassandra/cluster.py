@@ -918,9 +918,8 @@ class Session(object):
     If the `trace` parameter for :meth:`~.execute()` or :meth:`~.execute_async()`
     is :const:`True`, the driver will repeatedly attempt to fetch trace
     details for the query (using exponential backoff) until this limit is
-    hit.  If the limit is passed, :exc:`cassandra.query.TraceUnavailable`
-    will be raised.
-    """
+    hit.  If the limit is passed, an error will be logged and the
+    :attr:`.Statement.trace` will be left as :const:`None`. """
 
     _lock = None
     _pools = None
