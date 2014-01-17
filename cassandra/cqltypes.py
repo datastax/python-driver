@@ -476,6 +476,7 @@ class DateType(_CassandraType):
 
     @staticmethod
     def serialize(v):
+        global _have_warned_about_timestamps
         try:
             converted = calendar.timegm(v.utctimetuple())
             converted = converted * 1e3 + getattr(v, 'microsecond', 0) / 1e3
@@ -485,7 +486,6 @@ class DateType(_CassandraType):
                 raise TypeError('DateType arguments must be a datetime or timestamp')
 
             if not _have_warned_about_timestamps:
-                global _have_warned_about_timestamps
                 _have_warned_about_timestamps = True
                 warnings.warn("timestamp columns in Cassandra hold a number of "
                     "milliseconds since the unix epoch.  Currently, when executing "
