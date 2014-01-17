@@ -4,8 +4,8 @@
 .. automodule:: cassandra.pool
 
 .. autoclass:: Host ()
-   :members:
-   :exclude-members: set_location_info, get_and_set_reconnection_handler
+    :members:
+    :exclude-members: set_location_info, get_and_set_reconnection_handler
 
-.. autoclass:: HealthMonitor ()
-   :members:
+.. autoexception:: NoConnectionsAvailable
+    :members:

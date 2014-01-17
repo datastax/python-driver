@@ -402,7 +402,11 @@ class ReplicationStrategy(object):
 class SimpleStrategy(ReplicationStrategy):
 
     name = "SimpleStrategy"
+
     replication_factor = None
+    """
+    The replication factor for this keyspace.
+    """
 
     def __init__(self, replication_factor):
         self.replication_factor = int(replication_factor)
@@ -435,7 +439,11 @@ class SimpleStrategy(ReplicationStrategy):
 class NetworkTopologyStrategy(ReplicationStrategy):
 
     name = "NetworkTopologyStrategy"
+
     dc_replication_factors = None
+    """
+    A map of datacenter names to the replication factor for that DC.
+    """
 
     def __init__(self, dc_replication_factors):
         self.dc_replication_factors = dc_replication_factors

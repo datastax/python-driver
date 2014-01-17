@@ -5,6 +5,7 @@ This module houses the main classes you will interact with,
 
 from concurrent.futures import ThreadPoolExecutor
 import logging
+import socket
 import sys
 import time
 from threading import Lock, RLock, Thread, Event
@@ -132,6 +133,13 @@ class Cluster(object):
     The server-side port to open connections to. Defaults to 9042.
     """
 
+    cql_version = None
+    """
+    If a specific version of CQL should be used, this may be set to that
+    string version.  Otherwise, the highest CQL version supported by the
+    server will be automatically used.
+    """
+
     compression = True
     """
     Whether or not compression should be enabled when possible. Defaults to
@@ -173,7 +181,8 @@ class Cluster(object):
 
     metrics_enabled = False
     """
-    Whether or not metric collection is enabled.
+    Whether or not metric collection is enabled.  If enabled, :attr:`.metrics`
+    will be an instance of :class:`.metrics.Metrics`.
     """
 
     metrics = None
@@ -373,18 +382,42 @@ class Cluster(object):
         self._max_requests_per_connection[host_distance] = max_requests
 
     def get_core_connections_per_host(self, host_distance):
+        """
+        Gets the minimum number of connections that will be opened for each
+        host with :class:`~.HostDistance` equal to `host_distance`. The default
+        is 2 for :attr:`~HostDistance.LOCAL` and 1 for
+        :attr:`~HostDistance.REMOTE`.
+        """
         return self._core_connections_per_host[host_distance]
 
     def set_core_connections_per_host(self, host_distance, core_connections):
+        """
+        Sets the minimum number of connections that will be opened for each
+        host with :class:`~.HostDistance` equal to `host_distance`. The default
+        is 2 for :attr:`~HostDistance.LOCAL` and 1 for
+        :attr:`~HostDistance.REMOTE`.
+        """
         old = self._core_connections_per_host[host_distance]
         self._core_connections_per_host[host_distance] = core_connections
         if old < core_connections:
-            self.ensure_core_connections()
+            self._ensure_core_connections()
 
     def get_max_connections_per_host(self, host_distance):
+        """
+        Gets the maximum number of connections that will be opened for each
+        host with :class:`~.HostDistance` equal to `host_distance`. The default
+        is 8 for :attr:`~HostDistance.LOCAL` and 2 for
+        :attr:`~HostDistance.REMOTE`.
+        """
         return self._max_connections_per_host[host_distance]
 
     def set_max_connections_per_host(self, host_distance, max_connections):
+        """
+        Gets the maximum number of connections that will be opened for each
+        host with :class:`~.HostDistance` equal to `host_distance`. The default
+        is 2 for :attr:`~HostDistance.LOCAL` and 1 for
+        :attr:`~HostDistance.REMOTE`.
+        """
         self._max_connections_per_host[host_distance] = max_connections
 
     def connection_factory(self, address, *args, **kwargs):
@@ -453,6 +486,9 @@ class Cluster(object):
     def shutdown(self):
         """
         Closes all sessions and connection associated with this Cluster.
+        To ensure all connections are properly closed, **you should always
+        call shutdown() on a Cluster instance when you are done with it**.
+
         Once shutdown, a Cluster should not be used for any purpose.
         """
         with self._lock:
@@ -756,7 +792,7 @@ class Cluster(object):
         with self._listener_lock:
             return self._listeners.copy()
 
-    def ensure_core_connections(self):
+    def _ensure_core_connections(self):
         """
         If any host has fewer than the configured number of core connections
         open, attempt to open connections until that number is met.
@@ -810,8 +846,9 @@ class Cluster(object):
             log.debug("Done preparing all known prepared statements against host %s", host)
         except OperationTimedOut:
             log.warn("Timed out trying to prepare all statements on host %s", host)
+        except (ConnectionException, socket.error) as exc:
+            log.warn("Error trying to prepare all statements on host %s: %r", host, exc)
         except Exception:
-            # log and ignore
             log.exception("Error trying to prepare all statements on host %s", host)
         finally:
             connection.close()
@@ -864,13 +901,13 @@ class Session(object):
     A default timeout, measured in seconds, for queries executed through
     :meth:`.execute()` or :meth:`.execute_async()`.  This default may be
     overridden with the `timeout` parameter for either of those methods
-    or the `timeout` parameter for :meth:`~.ResponseFuture.result()`.
+    or the `timeout` parameter for :meth:`.ResponseFuture.result()`.
 
     Setting this to :const:`None` will cause no timeouts to be set by default.
 
-    *Important*: This timeout currently has no effect on callbacks registered
-    on a :class:`~.ResponseFuture` through :meth:`~.ResponseFuture.add_callback` or
-    :meth:`~.ResponseFuture.add_errback`; even if a query exceeds this default
+    **Important**: This timeout currently has no effect on callbacks registered
+    on a :class:`~.ResponseFuture` through :meth:`.ResponseFuture.add_callback` or
+    :meth:`.ResponseFuture.add_errback`; even if a query exceeds this default
     timeout, neither the registered callback or errback will be called.
     """
 
@@ -951,7 +988,7 @@ class Session(object):
         Execute the given query and return a :class:`~.ResponseFuture` object
         which callbacks may be attached to for asynchronous response
         delivery.  You may also call :meth:`~.ResponseFuture.result()`
-        on the ``ResponseFuture`` to syncronously block for results at
+        on the :class:`.ResponseFuture` to syncronously block for results at
         any time.
 
         If `trace` is set to :const:`True`, you may call
@@ -1018,7 +1055,20 @@ class Session(object):
             >>> session = cluster.connect("mykeyspace")
             >>> query = "INSERT INTO users (id, name, age) VALUES (?, ?, ?)"
             >>> prepared = session.prepare(query)
-            >>> session.execute(prepared.bind((user.id, user.name, user.age)))
+            >>> session.execute(prepared, (user.id, user.name, user.age))
+
+        Or you may bind values to the prepared statement ahead of time::
+
+            >>> prepared = session.prepare(query)
+            >>> bound_stmt = prepared.bind((user.id, user.name, user.age))
+            >>> session.execute(bound_stmt)
+
+        Of course, prepared statements may (and should) be reused::
+
+            >>> prepared = session.prepare(query)
+            >>> for user in users:
+            ...     bound = prepared.bind((user.id, user.name, user.age))
+            ...     session.execute(bound)
 
         """
         message = PrepareMessage(query=query)
@@ -1723,10 +1773,16 @@ class ResponseFuture(object):
        :meth:`.add_callback()`, :meth:`.add_errback()`, and
        :meth:`.add_callbacks()`.
     """
+
+    query = None
+    """
+    The :class:`~.Statement` instance that is being executed through this
+    :class:`.ResponseFuture`.
+    """
+
     session = None
     row_factory = None
     message = None
-    query = None
     default_timeout = None
 
     _req_id = None
@@ -2071,6 +2127,12 @@ class ResponseFuture(object):
         encountered.  If the final result or error has not been set
         yet, this method will block until that time.
 
+        You may set a timeout (in seconds) with the `timeout` parameter.
+        By default, the :attr:`~.default_timeout` for the :class:`.Session`
+        this was created through will be used for the timeout on this
+        operation.  If the timeout is exceeded, an
+        :exc:`cassandra.OperationTimedOut` will be raised.
+
         Example usage::
 
             >>> future = session.execute_async("SELECT * FROM mycf")
@@ -2127,6 +2189,10 @@ class ResponseFuture(object):
 
         If the final result has already been seen when this method is called,
         the callback will be called immediately (before this method returns).
+
+        **Important**: if the callback you attach results in an exception being
+        raised, **the exception will be ignored**, so please ensure your
+        callback handles all error cases that you care about.
 
         Usage example::
 

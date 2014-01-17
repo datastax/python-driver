@@ -38,11 +38,16 @@ class Host(object):
 
     conviction_policy = None
     """
-    A class:`ConvictionPolicy` instance for determining when this node should
+    A :class:`~.ConvictionPolicy` instance for determining when this node should
     be marked up or down.
     """
 
     is_up = None
+    """
+    :const:`True` if the node is considered up, :const:`False` if it is
+    considered down, and :const:`None` if it is not known if the node is
+    up or down.
+    """
 
     _datacenter = None
     _rack = None

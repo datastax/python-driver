@@ -3,6 +3,14 @@
 
 .. module:: cassandra
 
+.. data:: __version_info__
+
+   The version of the driver in a tuple format
+
+.. data:: __version__
+
+   The version of the driver in a string format
+
 .. autoclass:: ConsistencyLevel
    :members:
 
@@ -18,6 +26,9 @@
 .. autoexception:: WriteTimeout()
    :members:
 
+.. autoexception:: AlreadyExists()
+   :members:
+
 .. autoexception:: InvalidRequest()
    :members:
 
@@ -25,4 +36,7 @@
    :members:
 
 .. autoexception:: AuthenticationFailed()
+   :members:
+
+.. autoexception:: OperationTimedOut()
    :members:
