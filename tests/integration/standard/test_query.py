@@ -8,6 +8,7 @@ from cassandra.cluster import Cluster
 
 
 class QueryTest(unittest.TestCase):
+
     def test_query(self):
         cluster = Cluster()
         session = cluster.connect()

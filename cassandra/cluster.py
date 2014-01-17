@@ -911,6 +911,17 @@ class Session(object):
     timeout, neither the registered callback or errback will be called.
     """
 
+    max_trace_wait = 2.0
+    """
+    The maximum amount of time (in seconds) the driver will wait for trace
+    details to be populated server-side for a query before giving up.
+    If the `trace` parameter for :meth:`~.execute()` or :meth:`~.execute_async()`
+    is :const:`True`, the driver will repeatedly attempt to fetch trace
+    details for the query (using exponential backoff) until this limit is
+    hit.  If the limit is passed, :exc:`cassandra.query.TraceUnavailable`
+    will be raised.
+    """
+
     _lock = None
     _pools = None
     _load_balancer = None
@@ -977,7 +988,7 @@ class Session(object):
         finally:
             if trace:
                 try:
-                    query.trace = future.get_query_trace()
+                    query.trace = future.get_query_trace(self.max_trace_wait)
                 except Exception:
                     log.exception("Unable to fetch query trace:")
 
@@ -2162,17 +2173,19 @@ class ResponseFuture(object):
             else:
                 raise OperationTimedOut()
 
-    def get_query_trace(self):
+    def get_query_trace(self, max_wait=None):
         """
         Returns the :class:`~.query.QueryTrace` instance representing a trace
         of the last attempt for this operation, or :const:`None` if tracing was
         not enabled for this query.  Note that this may raise an exception if
-        there are problems retrieving the trace details from Cassandra.
+        there are problems retrieving the trace details from Cassandra. If the
+        trace is not available after `max_wait` seconds,
+        :exc:`cassandra.query.TraceUnavailable` will be raised.
         """
         if not self._query_trace:
             return None
 
-        self._query_trace.populate()
+        self._query_trace.populate(max_wait)
         return self._query_trace
 
     def add_callback(self, fn, *args, **kwargs):

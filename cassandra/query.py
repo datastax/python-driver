@@ -13,6 +13,9 @@ from cassandra.cqltypes import unix_time_from_uuid1
 from cassandra.decoder import (cql_encoders, cql_encode_object,
                                cql_encode_sequence)
 
+import logging
+log = logging.getLogger(__name__)
+
 
 class Statement(object):
     """
@@ -386,27 +389,29 @@ class QueryTrace(object):
     _SELECT_SESSIONS_FORMAT = "SELECT * FROM system_traces.sessions WHERE session_id = %s"
     _SELECT_EVENTS_FORMAT = "SELECT * FROM system_traces.events WHERE session_id = %s"
     _BASE_RETRY_SLEEP = 0.003
-    _MAX_ATTEMPTS = 5
 
     def __init__(self, trace_id, session):
         self.trace_id = trace_id
         self._session = session
 
-    def populate(self):
+    def populate(self, max_wait=2.0):
         """
         Retrieves the actual tracing details from Cassandra and populates the
         attributes of this instance.  Because tracing details are stored
         asynchronously by Cassandra, this may need to retry the session
-        detail fetch up to five times before raising :exc:`.TraceUnavailable`.
-
-        Currently intended for internal use only.
+        detail fetch.  If the trace is still not available after `max_wait`
+        seconds, :exc:`.TraceUnavailable` will be raised; if `max_wait` is
+        :const:`None`, this will retry forever.
         """
         attempt = 0
-        while attempt <= self._MAX_ATTEMPTS:
-            attempt += 1
+        start = time.time()
+        while True:
+            if max_wait is not None and time.time() - start >= max_wait:
+                raise TraceUnavailable("Trace information was not available within %f seconds" % (max_wait,))
             session_results = self._session.execute(self._SELECT_SESSIONS_FORMAT, (self.trace_id,))
             if not session_results or session_results[0].duration is None:
-                time.sleep(self._BASE_RETRY_SLEEP * attempt)
+                time.sleep(self._BASE_RETRY_SLEEP * (2 ** attempt))
+                attempt += 1
                 continue
 
             session_row = session_results[0]
@@ -419,6 +424,7 @@ class QueryTrace(object):
             event_results = self._session.execute(self._SELECT_EVENTS_FORMAT, (self.trace_id,))
             self.events = tuple(TraceEvent(r.activity, r.event_id, r.source, r.source_elapsed, r.thread)
                                 for r in event_results)
+            break
 
     def __str__(self):
         return "%s [%s] coordinator: %s, started at: %s, duration: %s, parameters: %s" \
