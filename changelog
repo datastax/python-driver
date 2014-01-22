@@ -1,6 +1,10 @@
 CHANGELOG
 
-0.11.0 (in progress)
+0.11.1 (in progress)
+
+* Normalize and unquote boolean values.
+
+0.11.0
 
 * support for USING TIMESTAMP <microseconds from epoch> via a .timestamp(timedelta(seconds=30)) syntax
   - allows for long, timedelta, and datetime
