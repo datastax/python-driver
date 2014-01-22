@@ -444,6 +444,8 @@ class Boolean(Column):
 
     def validate(self, value):
         """ Always returns a Python boolean. """
+        if isinstance(value, self.Quoter):
+            value = value.value
         return bool(value)
 
     def to_python(self, value):
