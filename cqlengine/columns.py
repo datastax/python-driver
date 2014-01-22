@@ -442,11 +442,15 @@ class Boolean(Column):
         def __str__(self):
             return 'true' if self.value else 'false'
 
-    def to_python(self, value):
+    def validate(self, value):
+        """ Always returns a Python boolean. """
         return bool(value)
 
+    def to_python(self, value):
+        return self.validate(value)
+
     def to_database(self, value):
-        return self.Quoter(bool(value))
+        return self.Quoter(self.validate(value))
 
 
 class Float(Column):
