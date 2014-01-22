@@ -228,13 +228,19 @@ def get_fields(model):
     col_family = model.column_family_name(include_keyspace=False)
 
     with connection_manager() as con:
-        query = "SELECT column_name, validator FROM system.schema_columns \
+        query = "SELECT * FROM system.schema_columns \
                  WHERE keyspace_name = :ks_name AND columnfamily_name = :col_family"
 
         logger.debug("get_fields %s %s", ks_name, col_family)
 
         tmp = con.execute(query, {'ks_name': ks_name, 'col_family': col_family}, ONE)
-    return [Field(x[0], x[1]) for x in tmp.results]
+
+    column_indices = [tmp.columns.index('column_name'), tmp.columns.index('validator')]
+    try:
+        type_index = tmp.columns.index('type')
+        return [Field(x[column_indices[0]], x[column_indices[1]]) for x in tmp.results if x[type_index] == 'regular']
+    except ValueError:
+        return [Field(x[column_indices[0]], x[column_indices[1]]) for x in tmp.results]
     # convert to Field named tuples
 
 
