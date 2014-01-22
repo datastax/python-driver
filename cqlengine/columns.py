@@ -353,17 +353,16 @@ class DateTime(Column):
 class Date(Column):
     db_type = 'timestamp'
 
-
     def to_python(self, value):
         if value is None: return
         if isinstance(value, datetime):
             return value.date()
         elif isinstance(value, date):
             return value
-        else:
-            value = DateType.deserialize(value)
-
-        return datetime.utcfromtimestamp(value).date()
+        try:
+            return datetime.utcfromtimestamp(value).date()
+        except TypeError:
+            return datetime.utcfromtimestamp(DateType.deserialize(value)).date()
 
     def to_database(self, value):
         value = super(Date, self).to_database(value)
