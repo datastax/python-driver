@@ -23,7 +23,6 @@ recommended at this time.
 Features to be Added
 --------------------
 * C extension for encoding/decoding messages
-* Authentication/security feature support
 * Twisted, gevent support
 * Python 3 support
 * IPv6 Support
