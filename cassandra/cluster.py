@@ -601,6 +601,7 @@ class Cluster(object):
                 reconnector.cancel()
 
             self._prepare_all_queries(host)
+            log.debug("Done preparing all queries for host %s", host)
 
             for session in self.sessions:
                 session.remove_pool(host)
@@ -617,7 +618,7 @@ class Cluster(object):
                     future.add_done_callback(callback)
                     futures.add(future)
         except Exception:
-            log.exception("Unexpected failure handling node %s being marked up:")
+            log.exception("Unexpected failure handling node %s being marked up:", host)
             for future in futures:
                 future.cancel()
 
