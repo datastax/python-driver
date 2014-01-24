@@ -788,7 +788,7 @@ if sys.version_info >= (2, 7):
         return '0x' + hexlify(val)
 else:
     # python 2.6 requires string or read-only buffer for hexlify
-    def cql_encode_bytes(val):
+    def cql_encode_bytes(val):  # noqa
         return '0x' + hexlify(buffer(val))
 
 
@@ -848,5 +848,5 @@ cql_encoders = {
     tuple: cql_encode_list_collection,
     set: cql_encode_set_collection,
     frozenset: cql_encode_set_collection,
-    types.GeneratorType: cql_encode_sequence
+    types.GeneratorType: cql_encode_list_collection
 }
