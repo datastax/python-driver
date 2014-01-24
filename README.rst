@@ -18,7 +18,7 @@ recommended at this time.
 * `JIRA <https://datastax-oss.atlassian.net/browse/PYTHON>`_
 * `Mailing List <https://groups.google.com/a/lists.datastax.com/forum/#!forum/python-driver-user>`_
 * IRC: #datastax-drivers on irc.freenode.net (you can use `freenode's web-based client <http://webchat.freenode.net/?channels=#datastax-drivers>`_)
-* `API Documentation <http://datastax.github.io/python-driver/api/index.html>`_
+* `Documentation <http://datastax.github.io/python-driver/index.html>`_
 
 Features to be Added
 --------------------
