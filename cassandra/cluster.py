@@ -617,9 +617,12 @@ class Cluster(object):
                     future.add_done_callback(callback)
                     futures.add(future)
         except Exception:
-            # this shouldn't happen, but just in case, reset the condition
+            log.exception("Unexpected failure handling node %s being marked up:")
             for future in futures:
                 future.cancel()
+
+            self._cleanup_failed_on_up_handling(host)
+
             host._handle_node_up_condition.acquire()
             host._currently_handling_node_up = False
             host._handle_node_up_condition.notify()
