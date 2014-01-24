@@ -25,7 +25,7 @@ class ParamBindingTest(unittest.TestCase):
 
     def test_generator_param(self):
         result = bind_params("%s", ((i for i in xrange(3)),))
-        self.assertEquals(result, "( 0 , 1 , 2 )")
+        self.assertEquals(result, "[ 0 , 1 , 2 ]")
 
     def test_none_param(self):
         result = bind_params("%s", (None,))
