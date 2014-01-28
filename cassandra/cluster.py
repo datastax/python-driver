@@ -1582,7 +1582,7 @@ class ControlConnection(object):
         change_type = event["change_type"]
         addr, port = event["address"]
         if change_type == "NEW_NODE":
-            self._cluster.scheduler.schedule(1, self._cluster.add_host, addr, signal=True)
+            self._cluster.scheduler.schedule(10, self._cluster.add_host, addr, signal=True)
         elif change_type == "REMOVED_NODE":
             host = self._cluster.metadata.get_host(addr)
             self._cluster.scheduler.schedule(0, self._cluster.remove_host, host)
