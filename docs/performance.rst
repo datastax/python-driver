@@ -18,7 +18,10 @@ node `ccm <https://github.com/pcmanus/ccm>`_ cluster running on the same laptop
 with version 1.2.13 of Cassandra. I suggest testing these benchmarks against your
 own cluster when tuning the driver for optimal throughput or latency.
 
-The 1.0.0 version of the driver was used with all default settings.
+The 1.0.0 version of the driver was used with all default settings.  For these
+benchmarks, the driver was configured to use the ``libev`` reactor.  You can also run
+the benchmarks using the ``asyncore`` event loop (:class:`~.AsyncoreConnection`) 
+by using the ``--asyncore-only`` command line option. 
 
 Each benchmark completes 100,000 small inserts. The replication factor for the
 keyspace was three, so all nodes were replicas for the inserted rows.
