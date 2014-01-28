@@ -48,7 +48,7 @@ which sets the default keyspace for all queries made through that :class:`~.Sess
 
 .. code-block:: python
 
-    from cassandra.cluster import Cluster, Session
+    from cassandra.cluster import Cluster
 
     cluster = Cluster(['10.1.1.3', '10.1.1.4', '10.1.1.5'])
     session = cluster.connect('mykeyspace')
@@ -100,7 +100,8 @@ by unpacking them or accessing fields by position:
 If you prefer another result format, such as a ``dict`` per row, you
 can change the :attr:`~.Session.row_factory` attribute.
 
-For queries that will be run repeatedly, you should use `Prepared statements <#prepared-statements>`_.
+For queries that will be run repeatedly, you should use
+`Prepared statements <#prepared-statements>`_.
 
 Passing Parameters to CQL Queries
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

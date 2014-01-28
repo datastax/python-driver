@@ -1005,7 +1005,7 @@ class Session(object):
     def execute_async(self, query, parameters=None, trace=False):
         """
         Execute the given query and return a :class:`~.ResponseFuture` object
-        to which callbacks may be attached to for asynchronous response
+        which callbacks may be attached to for asynchronous response
         delivery.  You may also call :meth:`~.ResponseFuture.result()`
         on the :class:`.ResponseFuture` to syncronously block for results at
         any time.
