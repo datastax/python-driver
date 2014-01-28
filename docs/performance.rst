@@ -16,12 +16,12 @@ in the driver repository.  They were executed on a laptop with 16 GiB of RAM, an
 and a 2 GHz, four core CPU with hyperthreading.  The Cassandra cluster was a three
 node `ccm <https://github.com/pcmanus/ccm>`_ cluster running on the same laptop
 with version 1.2.13 of Cassandra. I suggest testing these benchmarks against your
- own cluster when tuning the driver for optimal throughput or latency.
+own cluster when tuning the driver for optimal throughput or latency.
 
 The 1.0.0 version of the driver was used with all default settings.
 
 Each benchmark completes 100,000 small inserts. The replication factor for the
- keyspace was three, so all nodes were replicas for the inserted rows.
+keyspace was three, so all nodes were replicas for the inserted rows.
 
 Synchronous Execution (`sync.py <https://github.com/datastax/python-driver/blob/master/benchmarks/sync.py>`_)
 -------------------------------------------------------------------------------------------------------------
