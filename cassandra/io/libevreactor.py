@@ -86,7 +86,7 @@ def defunct_on_error(f):
 
 class LibevConnection(Connection):
     """
-    An implementation of :class:`.Connection` that utilizes libev.
+    An implementation of :class:`.Connection` that uses libev for its event loop.
     """
 
     # class-level set of all connections; only replaced with a new copy

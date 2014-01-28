@@ -5,21 +5,22 @@ First, make sure you have the driver properly :doc:`installed <installation>`.
 
 Connecting to Cassandra
 -----------------------
-Before we can start executing any queries against Cassandra we need to setup
-our :class:`~.Cluster`. As the name suggests, you will typically have one
+Before we can start executing any queries against a Cassandra cluster we need to setup
+an instance of :class:`~.Cluster`. As the name suggests, you will typically have one
 instance of :class:`~.Cluster` for each Cassandra cluster you want to interact
 with.
 
-The simplest way to create a :class:`~.Cluster` is like this
+The simplest way to create a :class:`~.Cluster` is like this:
 
 .. code-block:: python
 
     from cassandra.cluster import Cluster
+
     cluster = Cluster(['10.1.1.3', '10.1.1.4', '10.1.1.5'])
 
-The set of IP addresses we pass to the :class:`~.Cluster` are simply
+The set of IP addresses we pass to the :class:`~.Cluster` is simply
 an initial set of contact points.  After the driver connects to one
-of these addresses it will automatically discover the rest of the
+of these nodes it will *automatically discover* the rest of the
 nodes in the cluster and connect to them, so you don't need to list
 every node in your cluster.
 
@@ -47,6 +48,8 @@ which sets the default keyspace for all queries made through that :class:`~.Sess
 
 .. code-block:: python
 
+    from cassandra.cluster import Cluster, Session
+
     cluster = Cluster(['10.1.1.3', '10.1.1.4', '10.1.1.5'])
     session = cluster.connect('mykeyspace')
 
@@ -63,8 +66,8 @@ by executing a ``USE <keyspace>`` query:
 
 Executing Queries
 -----------------
-Now that we have a :class:`.Session` we can begin to execute queries. The most
-basic and natural way to execute a query is to use :meth:`~.Session.execute()`:
+Now that we have a :class:`.Session` we can begin to execute queries. The simplest
+way to execute a query is to use :meth:`~.Session.execute()`:
 
 .. code-block:: python
 
@@ -96,6 +99,8 @@ by unpacking them or accessing fields by position:
 
 If you prefer another result format, such as a ``dict`` per row, you
 can change the :attr:`~.Session.row_factory` attribute.
+
+For queries that will be run repeatedly, you should use `Prepared statements <#prepared-statements>`_.
 
 Passing Parameters to CQL Queries
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

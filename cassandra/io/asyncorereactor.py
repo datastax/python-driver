@@ -80,7 +80,7 @@ def _start_loop():
 
 class AsyncoreConnection(Connection, asyncore.dispatcher):
     """
-    An implementation of :class:`.Connection` that utilizes the ``asyncore``
+    An implementation of :class:`.Connection` that uses the ``asyncore``
     module in the Python standard library for its event loop.
     """
 

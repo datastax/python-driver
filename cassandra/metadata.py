@@ -536,12 +536,12 @@ class KeyspaceMetadata(object):
     """
 
     name = None
-    """ The string name of the keyspace """
+    """ The string name of the keyspace. """
 
     durable_writes = True
     """
     A boolean indicating whether durable writes are enabled for this keyspace
-    or not
+    or not.
     """
 
     replication_strategy = None
@@ -575,10 +575,10 @@ class TableMetadata(object):
     """
 
     keyspace = None
-    """ An instance of :class:`~.KeyspaceMetadata` """
+    """ An instance of :class:`~.KeyspaceMetadata`. """
 
     name = None
-    """ The string name of the table """
+    """ The string name of the table. """
 
     partition_key = None
     """
@@ -952,7 +952,7 @@ class Murmur3Token(Token):
             raise NoMurmur3()
 
     def __init__(self, token):
-        """ `token` should be an int or string representing the token """
+        """ `token` should be an int or string representing the token. """
         self.value = int(token)
 
 
@@ -966,7 +966,7 @@ class MD5Token(Token):
         return abs(varint_unpack(md5(key).digest()))
 
     def __init__(self, token):
-        """ `token` should be an int or string representing the token """
+        """ `token` should be an int or string representing the token. """
         self.value = int(token)
 
 
@@ -976,7 +976,7 @@ class BytesToken(Token):
     """
 
     def __init__(self, token_string):
-        """ `token_string` should be string representing the token """
+        """ `token_string` should be string representing the token. """
         if not isinstance(token_string, basestring):
             raise TypeError(
                 "Tokens for ByteOrderedPartitioner should be strings (got %s)"

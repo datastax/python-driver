@@ -74,7 +74,7 @@ class ConnectionException(Exception):
 
 class ConnectionShutdown(ConnectionException):
     """
-    Raised when a connection has been defuncted or closed.
+    Raised when a connection has been marked as defunct or has been closed.
     """
     pass
 

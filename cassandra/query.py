@@ -118,6 +118,9 @@ class PreparedStatement(object):
     A statement that has been prepared against at least one Cassandra node.
     Instances of this class should not be created directly, but through
     :meth:`.Session.prepare()`.
+
+    A :class:`.PreparedStatement` should be prepared only once. Re-preparing a statement
+    may affect performance (as the operation requires a network roundtrip).
     """
 
     column_metadata = None
@@ -169,7 +172,7 @@ class PreparedStatement(object):
     def bind(self, values):
         """
         Creates and returns a :class:`BoundStatement` instance using `values`.
-        The `values` parameter *must* be a sequence, such as a tuple or list,
+        The `values` parameter **must** be a sequence, such as a tuple or list,
         even if there is only one value to bind.
         """
         return BoundStatement(self).bind(values)

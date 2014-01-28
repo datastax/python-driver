@@ -17,16 +17,16 @@ Installation through pip
 packages.  It will handle installing all python dependencies for the driver at
 the same time as the driver itself.  To install the driver::
 
-    pip install --pre cassandra-driver
+    pip install cassandra-driver
 
-The ``--pre`` option is only needed while the python driver is still marked as
-a beta package.
+You can use ``pip install --pre cassandra-driver`` if you need to install a beta version.
 
 Manual Installation
 -------------------
 You can always install the driver directly from a source checkout or tarball.
 When installing manually, ensure the python dependencies are already
-installed: ``futures``, ``scales``, and ``blist``.
+installed. You can find the list of dependencies in
+`requirements.txt <https://github.com/datastax/python-driver/blob/master/requirements.txt>`_.
 
 Once the dependencies are installed, simply run::
 
@@ -39,8 +39,9 @@ The driver has several **optional** features that have non-Python dependencies.
 C Extensions
 ^^^^^^^^^^^^
 By default, two C extensions are compiled: one that adds support
-for token-aware routing with the Murmur3Partitioner, and one that
-allows you to use libev for the event loop, which improves performance.
+for token-aware routing with the ``Murmur3Partitioner``, and one that
+allows you to use `libev <http://software.schmorp.de/pkg/libev.html>`_
+for the event loop, which improves performance.
 
 When installing manually through setup.py, you can disable both with
 the ``--no-extensions`` option, or selectively disable one or the other

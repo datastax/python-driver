@@ -877,7 +877,7 @@ class Session(object):
 
     Queries and statements can be executed through ``Session`` instances
     using the :meth:`~.Session.execute()` and :meth:`~.Session.execute_async()`
-    method.
+    methods.
 
     Example usage::
 
@@ -898,10 +898,10 @@ class Session(object):
     returned row will be a named tuple.  You can alternatively
     use any of the following:
 
-      - :func:`cassandra.decoder.tuple_factory`
-      - :func:`cassandra.decoder.named_tuple_factory`
-      - :func:`cassandra.decoder.dict_factory`
-      - :func:`cassandra.decoder.ordered_dict_factory`
+      - :func:`cassandra.decoder.tuple_factory` - return a result row as a tuple
+      - :func:`cassandra.decoder.named_tuple_factory` - return a result row as a named tuple
+      - :func:`cassandra.decoder.dict_factory` - return a result row as a dict
+      - :func:`cassandra.decoder.ordered_dict_factory` - return a result row as an OrderedDict
 
     """
 
@@ -1005,7 +1005,7 @@ class Session(object):
     def execute_async(self, query, parameters=None, trace=False):
         """
         Execute the given query and return a :class:`~.ResponseFuture` object
-        which callbacks may be attached to for asynchronous response
+        to which callbacks may be attached to for asynchronous response
         delivery.  You may also call :meth:`~.ResponseFuture.result()`
         on the :class:`.ResponseFuture` to syncronously block for results at
         any time.
@@ -1089,6 +1089,8 @@ class Session(object):
             ...     bound = prepared.bind((user.id, user.name, user.age))
             ...     session.execute(bound)
 
+        **Important**: PreparedStatements should be prepared only once.
+        Preparing the same query more than once will likely affect performance.
         """
         message = PrepareMessage(query=query)
         future = ResponseFuture(self, message, query=None)
