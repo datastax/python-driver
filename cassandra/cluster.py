@@ -1760,7 +1760,8 @@ class _Scheduler(object):
                         return
                     if run_at <= time.time():
                         fn, args, kwargs = task
-                        self._executor.submit(fn, *args, **kwargs)
+                        future = self._executor.submit(fn, *args, **kwargs)
+                        future.add_done_callback(self._log_if_failed)
                     else:
                         self._scheduled.put_nowait((run_at, task))
                         break
@@ -1768,6 +1769,13 @@ class _Scheduler(object):
                 pass
 
             time.sleep(0.1)
+
+    def _log_if_failed(self, future):
+        exc = future.exception()
+        if exc:
+            log.warn(
+                "An internally scheduled tasked failed with an unhandled exception:",
+                exc_info=exc)
 
 
 def refresh_schema_and_set_result(keyspace, table, control_conn, response_future):
