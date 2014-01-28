@@ -4,6 +4,8 @@
 *.so
 *.egg-info
 .tox
+.idea/
+.python-version
 build
 MANIFEST
 dist
