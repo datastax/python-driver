@@ -821,6 +821,7 @@ class Cluster(object):
             return
 
         log.debug("Preparing all known prepared statements against host %s", host)
+        connection = None
         try:
             connection = self.connection_factory(host.address)
             try:
@@ -857,7 +858,8 @@ class Cluster(object):
         except Exception:
             log.exception("Error trying to prepare all statements on host %s", host)
         finally:
-            connection.close()
+            if connection:
+                connection.close()
 
     def prepare_on_all_sessions(self, query_id, prepared_statement, excluded_host):
         with self._prepared_statement_lock:
