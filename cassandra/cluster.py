@@ -655,7 +655,7 @@ class Cluster(object):
         reconnector.start()
 
     @run_in_executor
-    def on_down(self, host, is_host_addition):
+    def on_down(self, host, is_host_addition, force_if_down=False):
         """
         Intended for internal use only.
         """
@@ -663,7 +663,7 @@ class Cluster(object):
             return
 
         with host.lock:
-            if (not host.is_up) or host.is_currently_reconnecting():
+            if (not (host.is_up or force_if_down)) or host.is_currently_reconnecting():
                 return
 
             host.set_down()
@@ -686,6 +686,7 @@ class Cluster(object):
 
         log.debug("Adding or renewing pools for new host %s and notifying listeners", host)
         self._prepare_all_queries(host)
+        log.debug("Done preparing queries for new host %s", host)
 
         self.load_balancing_policy.on_add(host)
         self.control_connection.on_add(host)
@@ -713,7 +714,7 @@ class Cluster(object):
                 return
 
             if not all(futures_results):
-                log.warn("Connection pool could not be created, not marking node %s up:", host)
+                log.warn("Connection pool could not be created, not marking node %s up", host)
                 return
 
             self._finalize_add(host)
@@ -754,7 +755,7 @@ class Cluster(object):
     def signal_connection_failure(self, host, connection_exc, is_host_addition):
         is_down = host.signal_connection_failure(connection_exc)
         if is_down:
-            self.on_down(host, is_host_addition)
+            self.on_down(host, is_host_addition, force_if_down=True)
         return is_down
 
     def add_host(self, address, signal):
@@ -1179,7 +1180,7 @@ class Session(object):
                 self.cluster.signal_connection_failure(host, conn_exc, is_host_addition)
                 return False
             except Exception as conn_exc:
-                log.debug("Signaling connection failure during Session.add_host: %s", conn_exc)
+                log.warn("Failed to create connection pool for new host %s: %s", host, conn_exc)
                 self.cluster.signal_connection_failure(host, conn_exc, is_host_addition)
                 return False
 
