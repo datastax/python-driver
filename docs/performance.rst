@@ -266,6 +266,6 @@ All of the patterns here may be used over multiple processes using the
 module.  Multiple processes will scale significantly better than multiple
 threads will, so if high throughput is your goal, consider this option.
 
-Just be sure to **never share any :class:`~.Cluster`, :class:`~.Session`,
-or :class:`~.ResponseFuture` objects across multiple processes**. These
+Just be sure to **never share any** :class:`~.Cluster`, :class:`~.Session`,
+**or** :class:`~.ResponseFuture` **objects across multiple processes**. These
 objects should all be created after forking the process, not before.
