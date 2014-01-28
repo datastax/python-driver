@@ -9,6 +9,7 @@ Contents:
    api/index
    installation
    getting_started
+   performance
 
 Indices and Tables
 ==================
