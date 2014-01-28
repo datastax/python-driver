@@ -164,7 +164,8 @@ class _ReconnectionHandler(object):
                 self.on_reconnection(conn)
                 self.callback(*(self.callback_args), **(self.callback_kwargs))
         finally:
-            conn.close()
+            if conn:
+                conn.close()
 
     def cancel(self):
         self._cancelled = True
