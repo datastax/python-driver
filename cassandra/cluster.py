@@ -718,13 +718,15 @@ class Cluster(object):
 
             self._finalize_add(host)
 
+        have_future = False
         for session in self.sessions:
             future = session.add_or_renew_pool(host, is_host_addition=True)
             if future is not None:
+                have_future = True
                 futures.add(future)
                 future.add_done_callback(future_completed)
 
-        if not futures:
+        if not have_future:
             self._finalize_add(host)
 
     def _finalize_add(self, host):
