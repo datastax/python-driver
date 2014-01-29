@@ -76,10 +76,15 @@ marshalled_value_pairs = (
     ('\x00\x01\x00\x10\xafYC\xa3\xea<\x11\xe1\xabc\xc4,\x03"y\xf0', 'ListType(TimeUUIDType)', (UUID(bytes='\xafYC\xa3\xea<\x11\xe1\xabc\xc4,\x03"y\xf0'),)),
 )
 
+ordered_dict_value = OrderedDict()
+ordered_dict_value[u'\u307fbob'] = 199
+ordered_dict_value[u''] = -1
+ordered_dict_value[u'\\'] = 0
+
 # these following entries work for me right now, but they're dependent on
 # vagaries of internal python ordering for unordered types
 marshalled_value_pairs_unsafe = (
-    ('\x00\x03\x00\x06\xe3\x81\xbfbob\x00\x04\x00\x00\x00\xc7\x00\x00\x00\x04\xff\xff\xff\xff\x00\x01\\\x00\x04\x00\x00\x00\x00', 'MapType(UTF8Type, Int32Type)', OrderedDict({u'\u307fbob': 199, u'': -1, u'\\': 0})),
+    ('\x00\x03\x00\x06\xe3\x81\xbfbob\x00\x04\x00\x00\x00\xc7\x00\x00\x00\x04\xff\xff\xff\xff\x00\x01\\\x00\x04\x00\x00\x00\x00', 'MapType(UTF8Type, Int32Type)', ordered_dict_value),
     ('\x00\x02\x00\x08@\x01\x99\x99\x99\x99\x99\x9a\x00\x08@\x14\x00\x00\x00\x00\x00\x00', 'SetType(DoubleType)', sortedset([2.2, 5.0])),
     ('\x00', 'IntegerType', 0),
 )
