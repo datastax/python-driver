@@ -42,7 +42,7 @@ class ParamBindingTest(unittest.TestCase):
 
     def test_set_collection(self):
         result = bind_params("%s", (set(['a', 'b']),))
-        self.assertIn(result, ("{ 'a' , 'b' }", "{ 'b', 'a' }"))
+        self.assertIn(result, ("{ 'a' , 'b' }", "{ 'b' , 'a' }"))
 
     def test_map_collection(self):
         vals = OrderedDict()
