@@ -8,6 +8,11 @@ from cassandra.query import PreparedStatement, BoundStatement
 from cassandra.query import InvalidParameterTypeError
 from cassandra.cqltypes import Int32Type
 
+try:
+    from collections import OrderedDict
+except ImportError:  # Python <2.7
+    from cassandra.util import OrderedDict # NOQA
+
 
 class ParamBindingTest(unittest.TestCase):
 
@@ -36,12 +41,16 @@ class ParamBindingTest(unittest.TestCase):
         self.assertEquals(result, "[ 'a' , 'b' , 'c' ]")
 
     def test_set_collection(self):
-        result = bind_params("%s", (set(['a', 'b', 'c']),))
-        self.assertEquals(result, "{ 'a' , 'c' , 'b' }")
+        result = bind_params("%s", (set(['a', 'b']),))
+        self.assertIn(result, ("{ 'a' , 'b' }", "{ 'b', 'a' }"))
 
     def test_map_collection(self):
-        result = bind_params("%s", ({'a': 'a', 'b': 'b'},))
-        self.assertEquals(result, "{ 'a' : 'a' , 'b' : 'b' }")
+        vals = OrderedDict()
+        vals['a'] = 'a'
+        vals['b'] = 'b'
+        vals['c'] = 'c'
+        result = bind_params("%s", (vals,))
+        self.assertEquals(result, "{ 'a' : 'a' , 'b' : 'b' , 'c' : 'c' }")
 
     def test_quote_escaping(self):
         result = bind_params("%s", ("""'ef''ef"ef""ef'""",))
