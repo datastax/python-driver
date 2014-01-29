@@ -1,6 +1,6 @@
 1.0.0 Final
 ===========
-(In Progress)
+Jan 29, 2014
 
 Bug Fixes
 ---------
@@ -21,6 +21,14 @@ Bug Fixes
 * Properly defunct connections when libev reports an error by setting
   errno instead of simply logging the error
 * Fix endless hanging of some requests when using the libev reactor
+* Always start a reconnection process when we fail to connect to
+  a newly bootstrapped node
+* Generators map to CQL lists, not key sequences
+* Always defunct connections when an internal operation fails
+* Correctly break from handle_write() if nothing was sent (asyncore
+  reactor only)
+* Avoid potential double-erroring of callbacks when a connection
+  becomes defunct
 
 Features
 --------
@@ -28,6 +36,8 @@ Features
 * Add timeout parameter to ``Session.execute()``
 * Add ``WhiteListRoundRobinPolicy`` as a load balancing policy option
 * Support for consistency level ``LOCAL_ONE``
+* Make the backoff for fetching traces exponentially increasing and
+  configurable
 
 Other
 -----
@@ -38,6 +48,11 @@ Other
 * Benchmark improvements, including command line options and eay
   multithreading support
 * Reduced lock contention when using the asyncore reactor
+* Warn when non-datetimes are used for 'timestamp' column values in
+  prepared statements
+* Add requirements.txt and test-requirements.txt
+* TravisCI integration for running unit tests against Python 2.6,
+  Python 2.7, and PyPy
 
 1.0.0b7
 =======

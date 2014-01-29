@@ -165,7 +165,7 @@ def run_setup(extensions):
         install_requires=dependencies,
         tests_require=['nose', 'mock', 'ccm', 'unittest2', 'PyYAML'],
         classifiers=[
-            'Development Status :: 4 - Beta',
+            'Development Status :: 5 - Production/Stable',
             'Intended Audience :: Developers',
             'License :: OSI Approved :: Apache Software License',
             'Natural Language :: English',
