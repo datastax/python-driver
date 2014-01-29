@@ -1,5 +1,5 @@
-DataStax Python Driver for Apache Cassandra (Beta)
-==================================================
+DataStax Python Driver for Apache Cassandra
+===========================================
 
 .. image:: https://travis-ci.org/datastax/python-driver.png?branch=master
    :target: https://travis-ci.org/datastax/python-driver
