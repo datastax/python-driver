@@ -20,7 +20,7 @@ For more complete installation instructions, see the
 Documentation
 -------------
 
-Here are a couple of links for getting up to speed:
+A couple of links for getting up to speed:
 
 * `Installation <http://datastax.github.io/python-driver/installation.html>`_
 * `Getting started guide <http://datastax.github.io/python-driver/getting_started.html>`_
