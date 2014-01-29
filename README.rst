@@ -19,8 +19,15 @@ For more complete installation instructions, see the
 
 Documentation
 -------------
-All documentation for the python driver, including installation details, API documentation,
-and a Getting Started guide, can be found `here <http://datastax.github.io/python-driver/index.html>`_.
+
+A couple of links for getting up to speed:
+
+* `Installation <http://datastax.github.io/python-driver/installation.html>`_
+* `Getting started guide <http://datastax.github.io/python-driver/getting_started.html>`_
+* `API docs <http://datastax.github.io/python-driver/api/index.html>`_
+
+There are also some 
+`notes on performance <http://datastax.github.io/python-driver/performance.html>`_.
 
 Reporting Problems
 ------------------
