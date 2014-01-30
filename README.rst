@@ -26,8 +26,9 @@ A couple of links for getting up to speed:
 * `Getting started guide <http://datastax.github.io/python-driver/getting_started.html>`_
 * `API docs <http://datastax.github.io/python-driver/api/index.html>`_
 
-There are also some 
-`notes on performance <http://datastax.github.io/python-driver/performance.html>`_.
+You can also find some 
+`notes about the performance <http://datastax.github.io/python-driver/performance.html>`_
+on the `documentation page <http://datastax.github.io/python-driver/index.html>`_.
 
 Reporting Problems
 ------------------

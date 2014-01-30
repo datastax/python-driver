@@ -110,3 +110,7 @@ For snappy support::
 
 (If using a Debian Linux derivative such as Ubuntu, it may be easier to
 just run ``apt-get install python-snappy``.)
+
+Setting SSL
+-----------
+Andrew Mussey has published a thorough guide on `Using SSL with the DataStax Python driver <http://blog.amussey.com/post/64036730812/cassandra-2-0-client-server-ssl-with-datastax-python>`_.
