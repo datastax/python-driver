@@ -383,18 +383,18 @@ class Cluster(object):
 
     def get_core_connections_per_host(self, host_distance):
         """
-        Gets the minimum number of connections that will be opened for each
-        host with :class:`~.HostDistance` equal to `host_distance`. The default
-        is 2 for :attr:`~HostDistance.LOCAL` and 1 for
+        Gets the minimum number of connections per Session that will be opened
+        for each host with :class:`~.HostDistance` equal to `host_distance`.
+        The default is 2 for :attr:`~HostDistance.LOCAL` and 1 for
         :attr:`~HostDistance.REMOTE`.
         """
         return self._core_connections_per_host[host_distance]
 
     def set_core_connections_per_host(self, host_distance, core_connections):
         """
-        Sets the minimum number of connections that will be opened for each
-        host with :class:`~.HostDistance` equal to `host_distance`. The default
-        is 2 for :attr:`~HostDistance.LOCAL` and 1 for
+        Sets the minimum number of connections per Session that will be opened
+        for each host with :class:`~.HostDistance` equal to `host_distance`.
+        The default is 2 for :attr:`~HostDistance.LOCAL` and 1 for
         :attr:`~HostDistance.REMOTE`.
         """
         old = self._core_connections_per_host[host_distance]
@@ -404,18 +404,18 @@ class Cluster(object):
 
     def get_max_connections_per_host(self, host_distance):
         """
-        Gets the maximum number of connections that will be opened for each
-        host with :class:`~.HostDistance` equal to `host_distance`. The default
-        is 8 for :attr:`~HostDistance.LOCAL` and 2 for
+        Gets the maximum number of connections per Session that will be opened
+        for each host with :class:`~.HostDistance` equal to `host_distance`.
+        The default is 8 for :attr:`~HostDistance.LOCAL` and 2 for
         :attr:`~HostDistance.REMOTE`.
         """
         return self._max_connections_per_host[host_distance]
 
     def set_max_connections_per_host(self, host_distance, max_connections):
         """
-        Gets the maximum number of connections that will be opened for each
-        host with :class:`~.HostDistance` equal to `host_distance`. The default
-        is 2 for :attr:`~HostDistance.LOCAL` and 1 for
+        Gets the maximum number of connections per Session that will be opened
+        for each host with :class:`~.HostDistance` equal to `host_distance`.
+        The default is 2 for :attr:`~HostDistance.LOCAL` and 1 for
         :attr:`~HostDistance.REMOTE`.
         """
         self._max_connections_per_host[host_distance] = max_connections
