@@ -278,6 +278,12 @@ class SchemaMetadataTest(unittest.TestCase):
         self.assertEqual(d_index, statements[1])
         self.assertEqual(e_index, statements[2])
 
+        # make sure indexes are included in KeyspaceMetadata.export_as_string()
+        ksmeta = self.cluster.metadata.keyspaces[self.ksname]
+        statement = ksmeta.export_as_string()
+        self.assertIn('CREATE INDEX d_index', statement)
+        self.assertIn('CREATE INDEX e_index', statement)
+
 
 class TestCodeCoverage(unittest.TestCase):
 

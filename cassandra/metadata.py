@@ -561,7 +561,7 @@ class KeyspaceMetadata(object):
         self.tables = {}
 
     def export_as_string(self):
-        return "\n".join([self.as_cql_query()] + [t.as_cql_query() for t in self.tables.values()])
+        return "\n".join([self.as_cql_query()] + [t.export_as_string() for t in self.tables.values()])
 
     def as_cql_query(self):
         ret = "CREATE KEYSPACE %s WITH REPLICATION = %s " % \

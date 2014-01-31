@@ -1,3 +1,11 @@
+1.0.1
+=====
+(In Progress)
+
+Bug Fixes
+---------
+* Include table indexes in ``KeyspaceMetadata.export_as_string()``
+
 1.0.0 Final
 ===========
 Jan 29, 2014
