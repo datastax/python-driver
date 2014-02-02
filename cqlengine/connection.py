@@ -142,9 +142,9 @@ class ConnectionPool(object):
         a new one.
         """
         try:
-            # get with blocking=False (default) returns an item if one
+            # get with block=False returns an item if one
             # is immediately available, else raises the Empty exception
-            return self._queue.get()
+            return self._queue.get(block=False)
         except queue.Empty:
             try:
                 return self._create_connection()
