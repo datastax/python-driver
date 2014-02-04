@@ -182,28 +182,26 @@ flight at any time:
     from itertools import count
     from threading import Event
 
+    sentinal = object()
+    num_queries = 100000
     num_started = count()
     num_finished = count()
-    initial = object()
     finished_event = Event()
 
-    def handle_error(exc):
-        log.error("Error on insert: %r", exc)
-
-    def insert_next(previous_result):
-        current_num = num_started.next()
-
-        if previous_result is not initial:
-            num = next(num_finished)
-            if num >= 100000:
+    def insert_next(previous_result=sentinal):
+        if previous_result is not sentinal:
+            if isinstance(previous_result, BaseException):
+                log.error("Error on insert: %r", previous_result)
+            if num_finished.next() >= num_queries:
                 finished_event.set()
 
-        if current_num <= 100000:
+        if num_started.next() <= num_queries:
             future = session.execute_async(query)
-            future.add_callbacks(insert_next, handle_error)
+            # NOTE: this callback also handles errors
+            future.add_callbacks(insert_next, insert_next)
 
-    for i in range(120):
-        insert_next(initial)
+    for i in range(min(120, num_queries)):
+        insert_next()
 
     finished_event.wait()
 
