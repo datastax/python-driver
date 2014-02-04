@@ -9,7 +9,7 @@ from base import benchmark, BenchmarkThread
 log = logging.getLogger(__name__)
 
 
-sentinal = object()
+sentinel = object()
 
 
 class Runner(BenchmarkThread):
@@ -20,8 +20,8 @@ class Runner(BenchmarkThread):
         self.num_finished = count()
         self.event = Event()
 
-    def insert_next(self, previous_result=sentinal):
-        if previous_result is not sentinal:
+    def insert_next(self, previous_result=sentinel):
+        if previous_result is not sentinel:
             if isinstance(previous_result, BaseException):
                 log.error("Error on insert: %r", previous_result)
             if self.num_finished.next() >= self.num_queries:
