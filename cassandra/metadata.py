@@ -924,7 +924,7 @@ class Token(object):
         return self.value == other.value
 
     def __hash__(self):
-        return self.value
+        return hash(self.value)
 
     def __repr__(self):
         return "<%s: %r>" % (self.__class__.__name__, self.value)
