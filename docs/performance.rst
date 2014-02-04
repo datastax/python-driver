@@ -182,14 +182,14 @@ flight at any time:
     from itertools import count
     from threading import Event
 
-    sentinal = object()
+    sentinel = object()
     num_queries = 100000
     num_started = count()
     num_finished = count()
     finished_event = Event()
 
-    def insert_next(previous_result=sentinal):
-        if previous_result is not sentinal:
+    def insert_next(previous_result=sentinel):
+        if previous_result is not sentinel:
             if isinstance(previous_result, BaseException):
                 log.error("Error on insert: %r", previous_result)
             if num_finished.next() >= num_queries:
