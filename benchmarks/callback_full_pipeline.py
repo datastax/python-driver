@@ -1,12 +1,16 @@
-from itertools import count
 import logging
+
+from itertools import count
 from threading import Event
 
 from base import benchmark, BenchmarkThread
 
+
 log = logging.getLogger(__name__)
 
-initial = object()
+
+sentinel = object()
+
 
 class Runner(BenchmarkThread):
 
@@ -16,26 +20,22 @@ class Runner(BenchmarkThread):
         self.num_finished = count()
         self.event = Event()
 
-    def handle_error(self, exc):
-        log.error("Error on insert: %r", exc)
-
-    def insert_next(self, previous_result):
-        current_num = self.num_started.next()
-
-        if previous_result is not initial:
-            num = next(self.num_finished)
-            if num >= self.num_queries:
+    def insert_next(self, previous_result=sentinel):
+        if previous_result is not sentinel:
+            if isinstance(previous_result, BaseException):
+                log.error("Error on insert: %r", previous_result)
+            if self.num_finished.next() >= self.num_queries:
                 self.event.set()
 
-        if current_num <= self.num_queries:
+        if self.num_started.next() <= self.num_queries:
             future = self.session.execute_async(self.query, self.values)
-            future.add_callbacks(self.insert_next, self.handle_error)
+            future.add_callbacks(self.insert_next, self.insert_next)
 
     def run(self):
         self.start_profile()
 
-        for i in range(120):
-            self.insert_next(initial)
+        for _ in xrange(min(120, self.num_queries)):
+            self.insert_next()
 
         self.event.wait()
 
