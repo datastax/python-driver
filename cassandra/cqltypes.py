@@ -528,7 +528,15 @@ class UTF8Type(_CassandraType):
 
     @staticmethod
     def serialize(ustr):
-        return ustr.encode('utf8')
+        # ustr.encode('utf8') fails when the string is already encoded
+        # this is common if your data comes through other database drivers (e.g. odbc, psycopg2, etc.)
+        if isinstance(ustr, unicode): # check type explicitly. Unicode will encode successfuly.
+            return ustr.encode('utf8')
+        # otherwise, our input string is either already encoded or not unicode to begin with.
+        # since all cassandra strings are utf-8, we can validate that the ustr is already encoded utf-8 by decoding it
+        else:
+            ustr.decode('utf-8') # will raise UnicodeDecodeError if not utf8 encoded byte string.
+            return ustr # definitely valid :)
 
 
 class VarcharType(UTF8Type):
