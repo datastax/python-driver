@@ -449,7 +449,7 @@ class BaseModel(object):
         return [self[k] for k in self]
 
     def items(self):
-        """ Returns a dictionnary of columns's IDs/values. """
+        """ Returns a list of columns's IDs/values. """
         return [(k, self[k]) for k in self]
 
     def _as_dict(self):
