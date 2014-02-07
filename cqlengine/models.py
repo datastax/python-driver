@@ -421,6 +421,37 @@ class BaseModel(object):
             val = col.validate(getattr(self, name))
             setattr(self, name, val)
 
+    ### Let an instance be used like a dict of its columns keys/values
+
+    def __iter__(self):
+        """ Iterate over column ids. """
+        for column_id in self._columns.keys():
+            yield column_id
+
+    def __getitem__(self, key):
+        """ Returns column's value. """
+        if not isinstance(key, basestring):
+            raise TypeError
+        if key not in self._columns.keys():
+            raise KeyError
+        return getattr(self, key)
+
+    def __len__(self):
+        """ Returns the number of columns defined on that model. """
+        return len(self._columns.keys())
+
+    def keys(self):
+        """ Returns list of column's IDs. """
+        return [k for k in self]
+
+    def values(self):
+        """ Returns list of column's values. """
+        return [self[k] for k in self]
+
+    def items(self):
+        """ Returns a dictionnary of columns's IDs/values. """
+        return [(k, self[k]) for k in self]
+
     def _as_dict(self):
         """ Returns a map of column names to cleaned values """
         values = self._dynamic_columns or {}
