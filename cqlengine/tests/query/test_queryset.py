@@ -127,6 +127,20 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         assert len(query2._where) == 2
         assert len(query1._where) == 1
 
+    def test_queryset_limit_immutability(self):
+        """
+        Tests that calling a queryset function that changes it's state returns a new queryset with same limit
+        """
+        query1 = TestModel.objects(test_id=5).limit(1)
+        assert query1._limit == 1
+
+        query2 = query1.filter(expected_result__gte=1)
+        assert query2._limit == 1
+
+        query3 = query1.filter(expected_result__gte=1).limit(2)
+        assert query1._limit == 1
+        assert query3._limit == 2
+
     def test_the_all_method_duplicates_queryset(self):
         """
         Tests that calling all on a queryset with previously defined filters duplicates queryset
