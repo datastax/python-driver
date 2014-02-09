@@ -215,8 +215,8 @@ class SetUpdateClause(ContainerUpdateClause):
 class ListUpdateClause(ContainerUpdateClause):
     """ updates a list collection """
 
-    def __init__(self, field, value, previous=None, column=None):
-        super(ListUpdateClause, self).__init__(field, value, previous, column=column)
+    def __init__(self, field, value, operation=None, previous=None, column=None):
+        super(ListUpdateClause, self).__init__(field, value, operation, previous, column=column)
         self._append = None
         self._prepend = None
 
@@ -261,6 +261,14 @@ class ListUpdateClause(ContainerUpdateClause):
         if self.value is None or self.value == self.previous:
             pass
 
+        elif self._operation == "append":
+            self._append = self.value
+
+        elif self._operation == "prepend":
+            # self.value is a Quoter but we reverse self._prepend later as if
+            # it's a list, so we have to set it to the underlying list
+            self._prepend = self.value.value
+
         elif self.previous is None:
             self._assignments = self.value
 
@@ -268,7 +276,6 @@ class ListUpdateClause(ContainerUpdateClause):
             # if elements have been removed,
             # rewrite the whole list
             self._assignments = self.value
-
 
         elif len(self.previous) == 0:
             # if we're updating from an empty

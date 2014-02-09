@@ -14,6 +14,7 @@ class TestQueryUpdateModel(Model):
     count       = columns.Integer(required=False)
     text        = columns.Text(required=False, index=True)
     text_set    = columns.Set(columns.Text, required=False)
+    text_list   = columns.List(columns.Text, required=False)
 
 class QueryUpdateTests(BaseCassEngTestCase):
 
@@ -159,3 +160,25 @@ class QueryUpdateTests(BaseCassEngTestCase):
                 text_set__remove={'afsd'})
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
         self.assertEqual(obj.text_set, {"foo"})
+
+    def test_list_append_updates(self):
+        partition = uuid4()
+        cluster = 1
+        TestQueryUpdateModel.objects.create(
+                partition=partition, cluster=cluster, text_list=["foo"])
+        TestQueryUpdateModel.objects(
+                partition=partition, cluster=cluster).update(
+                text_list__append=['bar'])
+        obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
+        self.assertEqual(obj.text_list, ["foo", "bar"])
+
+    def test_list_prepend_updates(self):
+        partition = uuid4()
+        cluster = 1
+        TestQueryUpdateModel.objects.create(
+                partition=partition, cluster=cluster, text_list=["foo"])
+        TestQueryUpdateModel.objects(
+                partition=partition, cluster=cluster).update(
+                text_list__prepend=['bar'])
+        obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
+        self.assertEqual(obj.text_list, ["bar", "foo"])
