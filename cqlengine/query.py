@@ -663,24 +663,34 @@ class ModelQuerySet(AbstractQuerySet):
         nulled_columns = set()
         us = UpdateStatement(self.column_family_name, where=self._where, ttl=self._ttl, timestamp=self._timestamp)
         for name, val in values.items():
-            col = self.model._columns.get(name)
+            col_name, col_op = self._parse_filter_arg(name)
+            col = self.model._columns.get(col_name)
             # check for nonexistant columns
             if col is None:
-                raise ValidationError("{}.{} has no column named: {}".format(self.__module__, self.model.__name__, name))
+                raise ValidationError("{}.{} has no column named: {}".format(self.__module__, self.model.__name__, col_name))
             # check for primary key update attempts
             if col.is_primary_key:
-                raise ValidationError("Cannot apply update to primary key '{}' for {}.{}".format(name, self.__module__, self.model.__name__))
+                raise ValidationError("Cannot apply update to primary key '{}' for {}.{}".format(col_name, self.__module__, self.model.__name__))
 
             val = col.validate(val)
             if val is None:
-                nulled_columns.add(name)
+                nulled_columns.add(col_name)
                 continue
+
             # add the update statements
             if isinstance(col, Counter):
                 # TODO: implement counter updates
                 raise NotImplementedError
+            elif isinstance(col, BaseContainerColumn):
+                if isinstance(col, List): klass = ListUpdateClause
+                elif isinstance(col, Map): klass = MapUpdateClause
+                elif isinstance(col, Set): klass = SetUpdateClause
+                else: raise RuntimeError
+                us.add_assignment_clause(klass(
+                    col_name, col.to_database(val), operation=col_op))
             else:
-                us.add_assignment_clause(AssignmentClause(name, col.to_database(val)))
+                us.add_assignment_clause(AssignmentClause(
+                    col_name, col.to_database(val)))
 
         if us.assignments:
             self._execute(us)

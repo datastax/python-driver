@@ -136,10 +136,11 @@ class AssignmentClause(BaseClause):
 
 class ContainerUpdateClause(AssignmentClause):
 
-    def __init__(self, field, value, previous=None, column=None):
+    def __init__(self, field, value, operation=None, previous=None, column=None):
         super(ContainerUpdateClause, self).__init__(field, value)
         self.previous = previous
         self._assignments = None
+        self._operation = operation
         self._analyzed = False
         self._column = column
 
@@ -159,8 +160,8 @@ class ContainerUpdateClause(AssignmentClause):
 class SetUpdateClause(ContainerUpdateClause):
     """ updates a set collection """
 
-    def __init__(self, field, value, previous=None, column=None):
-        super(SetUpdateClause, self).__init__(field, value, previous, column=column)
+    def __init__(self, field, value, operation=None, previous=None, column=None):
+        super(SetUpdateClause, self).__init__(field, value, operation, previous, column=column)
         self._additions = None
         self._removals = None
 
@@ -182,6 +183,8 @@ class SetUpdateClause(ContainerUpdateClause):
         """ works out the updates to be performed """
         if self.value is None or self.value == self.previous:
             pass
+        elif self._operation == "add":
+            self._additions = self.value
         elif self.previous is None:
             self._assignments = self.value
         else:
