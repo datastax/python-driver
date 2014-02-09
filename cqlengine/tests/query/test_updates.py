@@ -135,3 +135,14 @@ class QueryUpdateTests(BaseCassEngTestCase):
                 partition=partition, cluster=cluster).update(text_set__add={'bar'})
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
         self.assertEqual(obj.text_set, {"bar"})
+
+    def test_set_remove_updates(self):
+        partition = uuid4()
+        cluster = 1
+        TestQueryUpdateModel.objects.create(
+                partition=partition, cluster=cluster, text_set={"foo", "baz"})
+        TestQueryUpdateModel.objects(
+                partition=partition, cluster=cluster).update(
+                text_set__remove={'foo'})
+        obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
+        self.assertEqual(obj.text_set, {"baz"})
