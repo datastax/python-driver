@@ -125,3 +125,13 @@ class QueryUpdateTests(BaseCassEngTestCase):
                 partition=partition, cluster=cluster).update(text_set__add={'bar'})
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
         self.assertEqual(obj.text_set, {"foo", "bar"})
+
+    def test_set_add_updates_new_record(self):
+        """ If the key doesn't exist yet, an update creates the record
+        """
+        partition = uuid4()
+        cluster = 1
+        TestQueryUpdateModel.objects(
+                partition=partition, cluster=cluster).update(text_set__add={'bar'})
+        obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
+        self.assertEqual(obj.text_set, {"bar"})
