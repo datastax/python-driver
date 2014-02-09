@@ -146,3 +146,16 @@ class QueryUpdateTests(BaseCassEngTestCase):
                 text_set__remove={'foo'})
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
         self.assertEqual(obj.text_set, {"baz"})
+
+    def test_set_remove_new_record(self):
+        """ Removing something not in the set should silently do nothing
+        """
+        partition = uuid4()
+        cluster = 1
+        TestQueryUpdateModel.objects.create(
+                partition=partition, cluster=cluster, text_set={"foo"})
+        TestQueryUpdateModel.objects(
+                partition=partition, cluster=cluster).update(
+                text_set__remove={'afsd'})
+        obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
+        self.assertEqual(obj.text_set, {"foo"})
