@@ -15,6 +15,7 @@ class TestQueryUpdateModel(Model):
     text        = columns.Text(required=False, index=True)
     text_set    = columns.Set(columns.Text, required=False)
     text_list   = columns.List(columns.Text, required=False)
+    text_map    = columns.Map(columns.Text, columns.Text, required=False)
 
 class QueryUpdateTests(BaseCassEngTestCase):
 
@@ -183,3 +184,16 @@ class QueryUpdateTests(BaseCassEngTestCase):
                 text_list__prepend=['bar', 'baz'])
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
         self.assertEqual(obj.text_list, ["bar", "baz", "foo"])
+
+    def test_map_merge_updates(self):
+        """ Merge a dictionary into existing value """
+        partition = uuid4()
+        cluster = 1
+        TestQueryUpdateModel.objects.create(
+                partition=partition, cluster=cluster,
+                text_map={"foo": '1', "bar": '2'})
+        TestQueryUpdateModel.objects(
+                partition=partition, cluster=cluster).update(
+                text_map__merge={"bar": '3', "baz": '4'})
+        obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
+        self.assertEqual(obj.text_map, {"foo": '1', "bar": '3', "baz": '4'})

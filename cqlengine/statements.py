@@ -310,13 +310,16 @@ class ListUpdateClause(ContainerUpdateClause):
 class MapUpdateClause(ContainerUpdateClause):
     """ updates a map collection """
 
-    def __init__(self, field, value, previous=None, column=None):
-        super(MapUpdateClause, self).__init__(field, value, previous, column=column)
+    def __init__(self, field, value, operation=None, previous=None, column=None):
+        super(MapUpdateClause, self).__init__(field, value, operation, previous, column=column)
         self._updates = None
         self.previous = self.previous or {}
 
     def _analyze(self):
-        self._updates = sorted([k for k, v in self.value.items() if v != self.previous.get(k)]) or None
+        if self._operation == "merge":
+            self._updates = self.value.value
+        else:
+            self._updates = sorted([k for k, v in self.value.items() if v != self.previous.get(k)]) or None
         self._analyzed = True
 
     def get_context_size(self):
@@ -326,8 +329,7 @@ class MapUpdateClause(ContainerUpdateClause):
     def update_context(self, ctx):
         if not self._analyzed: self._analyze()
         ctx_id = self.context_id
-        for key in self._updates or []:
-            val = self.value.get(key)
+        for key, val in self._updates.items():
             ctx[str(ctx_id)] = self._column.key_col.to_database(key) if self._column else key
             ctx[str(ctx_id + 1)] = self._column.value_col.to_database(val) if self._column else val
             ctx_id += 2

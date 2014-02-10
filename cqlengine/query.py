@@ -681,9 +681,10 @@ class ModelQuerySet(AbstractQuerySet):
             if isinstance(col, Counter):
                 # TODO: implement counter updates
                 raise NotImplementedError
-            elif isinstance(col, (List, Set)):
+            elif isinstance(col, (List, Set, Map)):
                 if isinstance(col, List): klass = ListUpdateClause
                 elif isinstance(col, Set): klass = SetUpdateClause
+                elif isinstance(col, Map): klass = MapUpdateClause
                 else: raise RuntimeError
                 us.add_assignment_clause(klass(
                     col_name, col.to_database(val), operation=col_op))
