@@ -197,3 +197,22 @@ class QueryUpdateTests(BaseCassEngTestCase):
                 text_map__merge={"bar": '3', "baz": '4'})
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
         self.assertEqual(obj.text_map, {"foo": '1', "bar": '3', "baz": '4'})
+
+    def test_map_merge_none_deletes_key(self):
+        """ The CQL behavior is if you set a key in a map to null it deletes
+        that key from the map.  Test that this works with __merge.
+
+        This test fails because of a bug in the cql python library not
+        converting None to null (and the cql library is no longer in active
+        developement).
+        """
+        # partition = uuid4()
+        # cluster = 1
+        # TestQueryUpdateModel.objects.create(
+        #         partition=partition, cluster=cluster,
+        #         text_map={"foo": '1', "bar": '2'})
+        # TestQueryUpdateModel.objects(
+        #         partition=partition, cluster=cluster).update(
+        #         text_map__merge={"bar": None})
+        # obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
+        # self.assertEqual(obj.text_map, {"foo": '1'})
