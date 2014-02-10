@@ -173,12 +173,13 @@ class QueryUpdateTests(BaseCassEngTestCase):
         self.assertEqual(obj.text_list, ["foo", "bar"])
 
     def test_list_prepend_updates(self):
+        """ Prepend two things since order is reversed by default by CQL """
         partition = uuid4()
         cluster = 1
         TestQueryUpdateModel.objects.create(
                 partition=partition, cluster=cluster, text_list=["foo"])
         TestQueryUpdateModel.objects(
                 partition=partition, cluster=cluster).update(
-                text_list__prepend=['bar'])
+                text_list__prepend=['bar', 'baz'])
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
-        self.assertEqual(obj.text_list, ["bar", "foo"])
+        self.assertEqual(obj.text_list, ["bar", "baz", "foo"])
