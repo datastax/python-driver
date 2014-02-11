@@ -146,10 +146,7 @@ class ConnectionPool(object):
             # is immediately available, else raises the Empty exception
             return self._queue.get(block=False)
         except queue.Empty:
-            try:
-                return self._create_connection()
-            except CQLConnectionError as cqle:
-                raise cqle
+            return self._create_connection()
 
     def put(self, conn):
         """
