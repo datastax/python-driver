@@ -2,7 +2,8 @@ CHANGELOG
 
 0.11.1 (in progress)
 
-* Normalize and unquote boolean values.
+* Normalize and unquote boolean values. (Thanks Kevin Deldycke github.com/kdeldycke)
+* Fix race condition in connection manager (Thanks Roey Berman github.com/bergundy)
 
 0.11.0
 
@@ -10,7 +11,7 @@ CHANGELOG
   - allows for long, timedelta, and datetime
 * fixed use of USING TIMESTAMP in batches
 * clear TTL and timestamp off models after persisting to DB
-* allows UUID without - (Thanks to Michael Haddad, github.com/mahall)
+* allows UUID without dashes - (Thanks to Michael Hall, github.com/mahall)
 * fixes regarding syncing schema settings (thanks Kai Lautaportti github.com/dokai)
 
 0.10.0
