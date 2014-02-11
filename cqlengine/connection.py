@@ -3,7 +3,11 @@
 #http://cassandra.apache.org/doc/cql/CQL.html
 
 from collections import namedtuple
-import Queue
+try:
+    import Queue as queue
+except ImportError:
+    # python 3
+    import queue
 import random
 
 import cql
@@ -118,7 +122,7 @@ class ConnectionPool(object):
         self._consistency = consistency
         self._timeout = timeout
 
-        self._queue = Queue.Queue(maxsize=_max_connections)
+        self._queue = queue.Queue(maxsize=_max_connections)
 
     def clear(self):
         """
@@ -138,11 +142,14 @@ class ConnectionPool(object):
         a new one.
         """
         try:
-            if self._queue.empty():
+            # get with block=False returns an item if one
+            # is immediately available, else raises the Empty exception
+            return self._queue.get(block=False)
+        except queue.Empty:
+            try:
                 return self._create_connection()
-            return self._queue.get()
-        except CQLConnectionError as cqle:
-            raise cqle
+            except CQLConnectionError as cqle:
+                raise cqle
 
     def put(self, conn):
         """
