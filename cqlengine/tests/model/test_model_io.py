@@ -1,6 +1,7 @@
 from uuid import uuid4
 import random
 from datetime import date
+from operator import itemgetter
 from cqlengine.tests.base import BaseCassEngTestCase
 
 from cqlengine.management import create_table
@@ -42,6 +43,26 @@ class TestModelIO(BaseCassEngTestCase):
 
         for cname in tm._columns.keys():
             self.assertEquals(getattr(tm, cname), getattr(tm2, cname))
+
+    def test_model_read_as_dict(self):
+        """
+        Tests that columns of an instance can be read as a dict.
+        """
+        tm = TestModel.create(count=8, text='123456789', a_bool=True)
+        column_dict = {
+            'id': tm.id,
+            'count': tm.count,
+            'text': tm.text,
+            'a_bool': tm.a_bool,
+        }
+        self.assertEquals(sorted(tm.keys()), sorted(column_dict.keys()))
+        self.assertEquals(sorted(tm.values()), sorted(column_dict.values()))
+        self.assertEquals(
+            sorted(tm.items(), key=itemgetter(0)),
+            sorted(column_dict.items(), key=itemgetter(0)))
+        self.assertEquals(len(tm), len(column_dict))
+        for column_id in column_dict.keys():
+            self.assertEqual(tm[column_id], column_dict[column_id])
 
     def test_model_updating_works_properly(self):
         """

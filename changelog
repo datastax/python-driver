@@ -13,6 +13,7 @@ CHANGELOG
 * clear TTL and timestamp off models after persisting to DB
 * allows UUID without dashes - (Thanks to Michael Hall, github.com/mahall)
 * fixes regarding syncing schema settings (thanks Kai Lautaportti github.com/dokai)
+* allow acces to instance columns as if it is a dict
 
 0.10.0
 
