@@ -106,6 +106,9 @@ def defunct_on_error(f):
     return wrapper
 
 
+DEFAULT_CQL_VERSION = '3.0.0'
+
+
 class Connection(object):
 
     in_buffer_size = 4096
@@ -211,8 +214,16 @@ class Connection(object):
 
     @defunct_on_error
     def _send_options_message(self):
-        log.debug("Sending initial options message for new connection (%s) to %s", id(self), self.host)
-        self.send_msg(OptionsMessage(), self._handle_options_response)
+        if self.cql_version is None and (not self.compression or not locally_supported_compressions):
+            log.debug("Not sending options message for new connection(%s) to %s "
+                      "because compression is disabled and a cql version was not "
+                      "specified", id(self), self.host)
+            self._compressor = None
+            self.cql_version = DEFAULT_CQL_VERSION
+            self._send_startup_message()
+        else:
+            log.debug("Sending initial options message for new connection (%s) to %s", id(self), self.host)
+            self.send_msg(OptionsMessage(), self._handle_options_response)
 
     @defunct_on_error
     def _handle_options_response(self, options_response):
@@ -231,36 +242,42 @@ class Connection(object):
 
         log.debug("Received options response on new connection (%s) from %s",
                   id(self), self.host)
-        self.supported_cql_versions = options_response.cql_versions
-        self.remote_supported_compressions = options_response.options['COMPRESSION']
+        supported_cql_versions = options_response.cql_versions
+        remote_supported_compressions = options_response.options['COMPRESSION']
 
         if self.cql_version:
-            if self.cql_version not in self.supported_cql_versions:
+            if self.cql_version not in supported_cql_versions:
                 raise ProtocolError(
                     "cql_version %r is not supported by remote (w/ native "
                     "protocol). Supported versions: %r"
-                    % (self.cql_version, self.supported_cql_versions))
+                    % (self.cql_version, supported_cql_versions))
         else:
-            self.cql_version = self.supported_cql_versions[0]
+            self.cql_version = supported_cql_versions[0]
 
-        opts = {}
         self._compressor = None
+        compression_type = None
         if self.compression:
             overlap = (set(locally_supported_compressions.keys()) &
-                       set(self.remote_supported_compressions))
+                       set(remote_supported_compressions))
             if len(overlap) == 0:
                 log.debug("No available compression types supported on both ends."
                           " locally supported: %r. remotely supported: %r",
                           locally_supported_compressions.keys(),
-                          self.remote_supported_compressions)
+                          remote_supported_compressions)
             else:
                 compression_type = iter(overlap).next()  # choose any
-                opts['COMPRESSION'] = compression_type
                 # set the decompressor here, but set the compressor only after
                 # a successful Ready message
                 self._compressor, self.decompressor = \
                     locally_supported_compressions[compression_type]
 
+        self._send_startup_message(compression_type)
+
+    @defunct_on_error
+    def _send_startup_message(self, compression=None):
+        opts = {}
+        if compression:
+            opts['COMPRESSION'] = compression
         sm = StartupMessage(cqlversion=self.cql_version, options=opts)
         self.send_msg(sm, cb=self._handle_startup_response)
 
