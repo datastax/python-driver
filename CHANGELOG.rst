@@ -5,6 +5,13 @@
 Bug Fixes
 ---------
 * Include table indexes in ``KeyspaceMetadata.export_as_string()``
+* Fix broken token awareness on ByteOrderedPartitioner
+
+Other
+-----
+* Skip sending OPTIONS message on connection creation if compression is
+  disabled or not available and a CQL version has not been explicitly
+  set
 
 1.0.0 Final
 ===========
