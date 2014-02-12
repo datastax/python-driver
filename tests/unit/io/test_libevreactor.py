@@ -35,7 +35,7 @@ class LibevConnectionTest(unittest.TestCase):
             raise unittest.SkipTest('libev does not appear to be installed correctly')
 
     def make_connection(self):
-        c = LibevConnection('1.2.3.4')
+        c = LibevConnection('1.2.3.4', cql_version='3.0.1')
         c._socket = Mock()
         c._socket.send.side_effect = lambda x: len(x)
         return c

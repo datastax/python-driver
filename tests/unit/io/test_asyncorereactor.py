@@ -21,7 +21,7 @@ from cassandra.marshal import uint8_pack, uint32_pack
 from cassandra.io.asyncorereactor import AsyncoreConnection
 
 
-class LibevConnectionTest(unittest.TestCase):
+class AsyncoreConnectionTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -35,7 +35,7 @@ class LibevConnectionTest(unittest.TestCase):
         cls.socket_patcher.stop()
 
     def make_connection(self):
-        c = AsyncoreConnection('1.2.3.4')
+        c = AsyncoreConnection('1.2.3.4', cql_version='3.0.1')
         c.socket = Mock()
         c.socket.send.side_effect = lambda x: len(x)
         return c
