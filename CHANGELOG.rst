@@ -6,6 +6,8 @@ Bug Fixes
 ---------
 * Include table indexes in ``KeyspaceMetadata.export_as_string()``
 * Fix broken token awareness on ByteOrderedPartitioner
+* Always close socket when defuncting error'ed connections to avoid a potential
+  file descriptor leak
 
 Other
 -----

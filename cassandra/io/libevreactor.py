@@ -246,6 +246,7 @@ class LibevConnection(Connection):
             log.debug("Defuncting connection (%s) to %s: %s", id(self), self.host, exc)
 
         self.last_error = exc
+        self.close()
         self._error_all_callbacks(exc)
         self.connected_event.set()
         return exc

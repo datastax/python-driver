@@ -173,11 +173,11 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         with _starting_conns_lock:
             _starting_conns.discard(self)
 
-        # don't leave in-progress operations hanging
-        self.connected_event.set()
         if not self.is_defunct:
             self._error_all_callbacks(
                 ConnectionShutdown("Connection to %s was closed" % self.host))
+            # don't leave in-progress operations hanging
+            self.connected_event.set()
 
     def defunct(self, exc):
         with self.lock:
@@ -194,6 +194,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
                       id(self), self.host, exc)
 
         self.last_error = exc
+        self.close()
         self._error_all_callbacks(exc)
         self.connected_event.set()
         return exc
