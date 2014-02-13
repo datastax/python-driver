@@ -8,6 +8,7 @@ Bug Fixes
 * Fix broken token awareness on ByteOrderedPartitioner
 * Always close socket when defuncting error'ed connections to avoid a potential
   file descriptor leak
+* Handle "custom" types (such as the replaced DateType) correctly
 
 Other
 -----

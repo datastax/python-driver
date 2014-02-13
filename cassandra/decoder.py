@@ -28,7 +28,7 @@ from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 DoubleType, FloatType, Int32Type,
                                 InetAddressType, IntegerType, ListType,
                                 LongType, MapType, SetType, TimeUUIDType,
-                                UTF8Type, UUIDType)
+                                UTF8Type, UUIDType, lookup_casstype)
 
 log = logging.getLogger(__name__)
 
@@ -424,6 +424,9 @@ class QueryMessage(_MessageType):
         write_consistency_level(f, self.consistency_level)
 
 
+CUSTOM_TYPE = object()
+
+
 class ResultMessage(_MessageType):
     opcode = 0x08
     name = 'RESULT'
@@ -436,6 +439,7 @@ class ResultMessage(_MessageType):
     KIND_SCHEMA_CHANGE = 0x0005
 
     type_codes = {
+        0x0000: CUSTOM_TYPE,
         0x0001: AsciiType,
         0x0002: LongType,
         0x0003: BytesType,
@@ -525,8 +529,8 @@ class ResultMessage(_MessageType):
         try:
             typeclass = cls.type_codes[optid]
         except KeyError:
-            raise NotSupportedError("Unknown data type code 0x%x. Have to skip"
-                                    " entire result set." % optid)
+            raise NotSupportedError("Unknown data type code 0x%04x. Have to skip"
+                                    " entire result set." % (optid,))
         if typeclass in (ListType, SetType):
             subtype = cls.read_type(f)
             typeclass = typeclass.apply_parameters(subtype)
@@ -534,6 +538,10 @@ class ResultMessage(_MessageType):
             keysubtype = cls.read_type(f)
             valsubtype = cls.read_type(f)
             typeclass = typeclass.apply_parameters(keysubtype, valsubtype)
+        elif typeclass == CUSTOM_TYPE:
+            classname = read_string(f)
+            typeclass = lookup_casstype(classname)
+
         return typeclass
 
     @staticmethod
