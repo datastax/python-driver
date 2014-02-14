@@ -10,8 +10,7 @@ from socket import error as socket_error
 
 from mock import patch, Mock
 
-from cassandra.connection import (PROTOCOL_VERSION,
-                                  HEADER_DIRECTION_TO_CLIENT,
+from cassandra.connection import (HEADER_DIRECTION_TO_CLIENT,
                                   ConnectionException)
 
 from cassandra.decoder import (write_stringmultimap, write_int, write_string,
@@ -40,7 +39,7 @@ class AsyncoreConnectionTest(unittest.TestCase):
         c.socket.send.side_effect = lambda x: len(x)
         return c
 
-    def make_header_prefix(self, message_class, version=PROTOCOL_VERSION, stream_id=0):
+    def make_header_prefix(self, message_class, version=2, stream_id=0):
         return ''.join(map(uint8_pack, [
             0xff & (HEADER_DIRECTION_TO_CLIENT | version),
             0,  # flags (compression)

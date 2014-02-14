@@ -7,14 +7,16 @@ from StringIO import StringIO
 
 from mock import Mock, ANY
 
-from cassandra.connection import (Connection, PROTOCOL_VERSION,
-                                  HEADER_DIRECTION_TO_CLIENT,
+from cassandra.connection import (Connection, HEADER_DIRECTION_TO_CLIENT,
                                   HEADER_DIRECTION_FROM_CLIENT, ProtocolError)
 from cassandra.decoder import (write_stringmultimap, write_int, write_string,
                                SupportedMessage)
 from cassandra.marshal import uint8_pack, uint32_pack
 
+
 class ConnectionTest(unittest.TestCase):
+
+    protocol_version = 2
 
     def make_connection(self):
         c = Connection('1.2.3.4')
@@ -22,7 +24,7 @@ class ConnectionTest(unittest.TestCase):
         c._socket.send.side_effect = lambda x: len(x)
         return c
 
-    def make_header_prefix(self, message_class, version=PROTOCOL_VERSION, stream_id=0):
+    def make_header_prefix(self, message_class, version=2, stream_id=0):
         return ''.join(map(uint8_pack, [
             0xff & (HEADER_DIRECTION_TO_CLIENT | version),
             0,  # flags (compression)
@@ -72,7 +74,7 @@ class ConnectionTest(unittest.TestCase):
 
         # read in a SupportedMessage response
         header = ''.join(map(uint8_pack, [
-            0xff & (HEADER_DIRECTION_FROM_CLIENT | PROTOCOL_VERSION),
+            0xff & (HEADER_DIRECTION_FROM_CLIENT | self.protocol_version),
             0,  # flags (compression)
             0,
             SupportedMessage.opcode  # opcode
@@ -133,7 +135,7 @@ class ConnectionTest(unittest.TestCase):
         Ensure the following methods throw NIE's. If not, come back and test them.
         """
 
-        c  = self.make_connection()
+        c = self.make_connection()
 
         self.assertRaises(NotImplementedError, c.close)
         self.assertRaises(NotImplementedError, c.defunct, None)

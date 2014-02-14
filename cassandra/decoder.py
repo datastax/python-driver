@@ -41,9 +41,6 @@ class InternalError(Exception):
     pass
 
 
-PROTOCOL_VERSION = 0x01
-PROTOCOL_VERSION_MASK = 0x7f
-
 HEADER_DIRECTION_FROM_CLIENT = 0x00
 HEADER_DIRECTION_TO_CLIENT = 0x80
 HEADER_DIRECTION_MASK = 0x80
@@ -100,11 +97,11 @@ class _MessageType(object):
                                  % (self.__class__.__name__, pname))
             setattr(self, pname, pval)
 
-    def to_string(self, stream_id, compression=None):
+    def to_string(self, stream_id, protocol_version, compression=None):
         body = StringIO()
         self.send_body(body)
         body = body.getvalue()
-        version = PROTOCOL_VERSION | HEADER_DIRECTION_FROM_CLIENT
+        version = protocol_version | HEADER_DIRECTION_FROM_CLIENT
         flags = 0
         if compression is not None and len(body) > 0:
             body = compression(body)
@@ -114,24 +111,6 @@ class _MessageType(object):
         msglen = int32_pack(len(body))
         msg_parts = map(int8_pack, (version, flags, stream_id, self.opcode)) + [msglen, body]
         return ''.join(msg_parts)
-
-    def send(self, f, streamid, compression=None):
-        body = StringIO()
-        self.send_body(body)
-        body = body.getvalue()
-        version = PROTOCOL_VERSION | HEADER_DIRECTION_FROM_CLIENT
-        flags = 0
-        if compression is not None and len(body) > 0:
-            body = compression(body)
-            flags |= 0x01
-        if self.tracing:
-            flags |= 0x02
-        msglen = int32_pack(len(body))
-        header = ''.join(map(int8_pack, (version, flags, streamid, self.opcode))) \
-                 + msglen
-        f.write(header)
-        if len(body) > 0:
-            f.write(body)
 
     def __str__(self):
         paramstrs = ['%s=%r' % (pname, getattr(self, pname)) for pname in self.params]

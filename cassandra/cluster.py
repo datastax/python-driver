@@ -140,6 +140,9 @@ class Cluster(object):
     server will be automatically used.
     """
 
+    # TODO: docs
+    protocol_version = 2
+
     compression = True
     """
     Whether or not compression should be enabled when possible. Defaults to
@@ -269,6 +272,7 @@ class Cluster(object):
                  ssl_options=None,
                  sockopts=None,
                  cql_version=None,
+                 protocol_version=1,
                  executor_threads=2,
                  max_schema_agreement_wait=10,
                  control_connection_timeout=2.0):
@@ -324,6 +328,7 @@ class Cluster(object):
         self.ssl_options = ssl_options
         self.sockopts = sockopts
         self.cql_version = cql_version
+        self.protocol_version = protocol_version
         self.max_schema_agreement_wait = max_schema_agreement_wait
         self.control_connection_timeout = control_connection_timeout
 
@@ -441,6 +446,7 @@ class Cluster(object):
         kwargs_dict['sockopts'] = self.sockopts
         kwargs_dict['ssl_options'] = self.ssl_options
         kwargs_dict['cql_version'] = self.cql_version
+        kwargs_dict['protocol_version'] = self.protocol_version
 
         return kwargs_dict
 

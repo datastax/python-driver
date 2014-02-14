@@ -342,7 +342,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
             request_id = self._id_queue.get()
 
         self._callbacks[request_id] = cb
-        self.push(msg.to_string(request_id, compression=self.compressor))
+        self.push(msg.to_string(request_id, self.protocol_version, compression=self.compressor))
         return request_id
 
     def wait_for_response(self, msg, timeout=None):

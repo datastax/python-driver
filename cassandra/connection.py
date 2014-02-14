@@ -51,7 +51,6 @@ else:
 
 MAX_STREAM_PER_CONNECTION = 127
 
-PROTOCOL_VERSION = 0x01
 PROTOCOL_VERSION_MASK = 0x7f
 
 HEADER_DIRECTION_FROM_CLIENT = 0x00
@@ -115,6 +114,7 @@ class Connection(object):
     out_buffer_size = 4096
 
     cql_version = None
+    protocol_version = 2
 
     keyspace = None
     compression = True
@@ -130,7 +130,7 @@ class Connection(object):
 
     def __init__(self, host='127.0.0.1', port=9042, credentials=None,
                  ssl_options=None, sockopts=None, compression=True,
-                 cql_version=None):
+                 cql_version=None, protocol_version=2):
         self.host = host
         self.port = port
         self.credentials = credentials
@@ -138,6 +138,7 @@ class Connection(object):
         self.sockopts = sockopts
         self.compression = compression
         self.cql_version = cql_version
+        self.protocol_version = protocol_version
 
         self._id_queue = Queue(MAX_STREAM_PER_CONNECTION)
         for i in range(MAX_STREAM_PER_CONNECTION):
@@ -179,8 +180,10 @@ class Connection(object):
         try:
             # check that the protocol version is supported
             given_version = version & PROTOCOL_VERSION_MASK
-            if given_version != PROTOCOL_VERSION:
-                raise ProtocolError("Unsupported CQL protocol version: %d" % given_version)
+            if given_version != self.protocol_version:
+                msg = "Server protocol version (%d) does not match the specified driver protocol version (%d). " +\
+                      "Consider setting Cluster.protocol_version to %d."
+                raise ProtocolError(msg % (given_version, self.protocol_version, given_version))
 
             # check that the header direction is correct
             if version & HEADER_DIRECTION_MASK != HEADER_DIRECTION_TO_CLIENT:
