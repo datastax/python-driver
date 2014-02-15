@@ -220,7 +220,26 @@ class BoundStatement(Statement):
         sequence, even if you are only binding one value.
         """
         col_meta = self.prepared_statement.column_metadata
-        if len(values) > len(col_meta):
+
+        dict_values = []
+        if isinstance(values, dict):
+            dict_values = values
+            arranged_values = []
+            for col in col_meta:
+                arranged_values.append(values[col[2]])
+            values = arranged_values
+
+        if len(values) > len(col_meta) or len(dict_values) > len(col_meta):
+            columns = set()
+            for col in col_meta:
+                columns.add(col[2])
+            if dict_values:
+                difference = set(dict_values.keys()).difference(columns)
+                msg = "Too many arguments provided to bind() (got %d, expected %d). " + \
+                      "Unexpected keys %s"
+                msg = msg % (len(values), len(col_meta), difference)
+                raise ValueError(msg)
+
             raise ValueError(
                 "Too many arguments provided to bind() (got %d, expected %d)" %
                 (len(values), len(col_meta)))
