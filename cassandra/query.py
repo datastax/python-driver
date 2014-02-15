@@ -226,7 +226,13 @@ class BoundStatement(Statement):
             dict_values = values
             arranged_values = []
             for col in col_meta:
-                arranged_values.append(values[col[2]])
+                try:
+                    arranged_values.append(values[col[2]])
+                except KeyError:
+                    raise KeyError(
+                        'Column name `%s` not found in bound dict.' %
+                        (col[2]))
+
             values = arranged_values
 
         if len(values) > len(col_meta) or len(dict_values) > len(col_meta):
