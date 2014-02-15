@@ -242,7 +242,7 @@ class BoundStatement(Statement):
             if dict_values:
                 difference = set(dict_values.keys()).difference(columns)
                 msg = "Too many arguments provided to bind() (got %d, expected %d). " + \
-                      "Unexpected keys %s"
+                      "Unexpected keys %s."
                 msg = msg % (len(values), len(col_meta), difference)
                 raise ValueError(msg)
 
