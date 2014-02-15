@@ -232,7 +232,6 @@ class BoundStatement(Statement):
                     raise KeyError(
                         'Column name `%s` not found in bound dict.' %
                         (col[2]))
-
             values = arranged_values
 
         if len(values) > len(col_meta) or len(dict_values) > len(col_meta):
