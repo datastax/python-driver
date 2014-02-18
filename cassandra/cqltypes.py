@@ -528,7 +528,11 @@ class UTF8Type(_CassandraType):
 
     @staticmethod
     def serialize(ustr):
-        return ustr.encode('utf8')
+        try:
+            return ustr.encode('utf-8')
+        except UnicodeDecodeError:
+            # already utf-8
+            return ustr
 
 
 class VarcharType(UTF8Type):
