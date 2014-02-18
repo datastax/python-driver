@@ -1,4 +1,4 @@
-from bisect import bisect_left
+from bisect import bisect_right
 from collections import defaultdict
 try:
     from collections import OrderedDict
@@ -890,7 +890,10 @@ class TokenMap(object):
             if tokens_to_hosts is None:
                 return []
 
-        point = bisect_left(self.ring, token)
+        # token range ownership is exclusive on the LHS (the start token), so
+        # we use bisect_right, which, in the case of a tie/exact match,
+        # picks an insertion point to the right of the existing match
+        point = bisect_right(self.ring, token)
         if point == len(self.ring):
             return tokens_to_hosts[self.ring[0]]
         else:

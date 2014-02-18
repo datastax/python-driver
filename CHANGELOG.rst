@@ -5,6 +5,8 @@
 Bug Fixes
 ---------
 * Include table indexes in ``KeyspaceMetadata.export_as_string()``
+* Fix token-aware routing for tokens that fall before the first node token in
+  the ring and tokens that exactly match a node's token
 
 1.0.0 Final
 ===========
