@@ -15,6 +15,7 @@ Bug Fixes
   resulting in an OperationTimedOut error.
 * Don't break tracing when a Session's row_factory is not the default
   namedtuple_factory.
+* Handle data that is already utf8-encoded for UTF8Type values
 
 Other
 -----
