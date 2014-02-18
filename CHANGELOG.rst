@@ -19,6 +19,7 @@ Other
 * Skip sending OPTIONS message on connection creation if compression is
   disabled or not available and a CQL version has not been explicitly
   set
+* Add details about errors and the last queried host to ``OperationTimedOut``
 
 1.0.0 Final
 ===========
