@@ -1039,6 +1039,12 @@ class Session(object):
             ...     log.exception("Operation failed:")
 
         """
+        future = self._create_response_future(query, parameters, trace)
+        future.send_request()
+        return future
+
+    def _create_response_future(self, query, parameters, trace):
+        """ Returns the ResponseFuture before calling send_request() on it """
         prepared_statement = None
         if isinstance(query, basestring):
             query = SimpleStatement(query)
@@ -1060,11 +1066,9 @@ class Session(object):
         if trace:
             message.tracing = True
 
-        future = ResponseFuture(
+        return ResponseFuture(
             self, message, query, self.default_timeout, metrics=self._metrics,
             prepared_statement=prepared_statement)
-        future.send_request()
-        return future
 
     def prepare(self, query):
         """

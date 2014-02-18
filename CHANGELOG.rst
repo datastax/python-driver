@@ -13,6 +13,8 @@ Bug Fixes
   Cassandra is a multiple of the read buffer size.  Previously, if no more data
   became available to read on the socket, the message would never be processed,
   resulting in an OperationTimedOut error.
+* Don't break tracing when a Session's row_factory is not the default
+  namedtuple_factory.
 
 Other
 -----

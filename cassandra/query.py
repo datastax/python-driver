@@ -8,10 +8,10 @@ from datetime import datetime, timedelta
 import struct
 import time
 
-from cassandra import ConsistencyLevel
+from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.cqltypes import unix_time_from_uuid1
 from cassandra.decoder import (cql_encoders, cql_encode_object,
-                               cql_encode_sequence)
+                               cql_encode_sequence, named_tuple_factory)
 
 import logging
 log = logging.getLogger(__name__)
@@ -409,9 +409,13 @@ class QueryTrace(object):
         attempt = 0
         start = time.time()
         while True:
-            if max_wait is not None and time.time() - start >= max_wait:
+            time_spent = time.time() - start
+            if max_wait is not None and time_spent >= max_wait:
                 raise TraceUnavailable("Trace information was not available within %f seconds" % (max_wait,))
-            session_results = self._session.execute(self._SELECT_SESSIONS_FORMAT, (self.trace_id,))
+
+            session_results = self._execute(
+                self._SELECT_SESSIONS_FORMAT, (self.trace_id,), time_spent, max_wait)
+
             if not session_results or session_results[0].duration is None:
                 time.sleep(self._BASE_RETRY_SLEEP * (2 ** attempt))
                 attempt += 1
@@ -424,10 +428,24 @@ class QueryTrace(object):
             self.coordinator = session_row.coordinator
             self.parameters = session_row.parameters
 
-            event_results = self._session.execute(self._SELECT_EVENTS_FORMAT, (self.trace_id,))
+            time_spent = time.time() - start
+            event_results = self._execute(
+                self._SELECT_EVENTS_FORMAT, (self.trace_id,), time_spent, max_wait)
             self.events = tuple(TraceEvent(r.activity, r.event_id, r.source, r.source_elapsed, r.thread)
                                 for r in event_results)
             break
+
+    def _execute(self, query, parameters, time_spent, max_wait):
+        # in case the user switched the row factory, set it to namedtuple for this query
+        future = self._session._create_response_future(query, parameters, trace=False)
+        future.row_factory = named_tuple_factory
+        future.send_request()
+
+        timeout = (max_wait - time_spent) if max_wait is not None else None
+        try:
+            return future.result(timeout=timeout)
+        except OperationTimedOut:
+            raise TraceUnavailable("Trace information was not available within %f seconds" % (max_wait,))
 
     def __str__(self):
         return "%s [%s] coordinator: %s, started at: %s, duration: %s, parameters: %s" \
