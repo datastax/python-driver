@@ -9,6 +9,10 @@ Bug Fixes
 * Always close socket when defuncting error'ed connections to avoid a potential
   file descriptor leak
 * Handle "custom" types (such as the replaced DateType) correctly
+* With libevreactor, correctly handle EAGAIN/EWOULDBLOCK when the message from
+  Cassandra is a multiple of the read buffer size.  Previously, if no more data
+  became available to read on the socket, the message would never be processed,
+  resulting in an OperationTimedOut error.
 
 Other
 -----

@@ -4,6 +4,7 @@ except ImportError:
     import unittest # noqa
 
 import errno
+import os
 from StringIO import StringIO
 from socket import error as socket_error
 
@@ -15,7 +16,7 @@ from cassandra.connection import (PROTOCOL_VERSION,
 
 from cassandra.decoder import (write_stringmultimap, write_int, write_string,
                                SupportedMessage, ReadyMessage, ServerError)
-from cassandra.marshal import uint8_pack, uint32_pack
+from cassandra.marshal import uint8_pack, uint32_pack, int32_pack
 
 try:
     from cassandra.io.libevreactor import LibevConnection
@@ -85,6 +86,40 @@ class LibevConnectionTest(unittest.TestCase):
         c.handle_read(None, 0)
 
         self.assertTrue(c.connected_event.is_set())
+        return c
+
+    def test_egain_on_buffer_size(self, *args):
+        # get a connection that's already fully started
+        c = self.test_successful_connection()
+
+        header = '\x00\x00\x00\x00' + int32_pack(20000)
+        responses = [
+            header + ('a' * (4096 - len(header))),
+            'a' * 4096,
+            socket_error(errno.EAGAIN),
+            'a' * 100,
+            socket_error(errno.EAGAIN)]
+
+        def side_effect(*args):
+            response = responses.pop(0)
+            if isinstance(response, socket_error):
+                raise response
+            else:
+                return response
+
+        c._socket.recv.side_effect = side_effect
+        c.handle_read(None, 0)
+        self.assertEquals(c._total_reqd_bytes, 20000 + len(header))
+        # the EAGAIN prevents it from reading the last 100 bytes
+        c._iobuf.seek(0, os.SEEK_END)
+        pos = c._iobuf.tell()
+        self.assertEquals(pos, 4096 + 4096)
+
+        # now tell it to read the last 100 bytes
+        c.handle_read(None, 0)
+        c._iobuf.seek(0, os.SEEK_END)
+        pos = c._iobuf.tell()
+        self.assertEquals(pos, 4096 + 4096 + 100)
 
     def test_protocol_error(self, *args):
         c = self.make_connection()
