@@ -16,6 +16,8 @@ Bug Fixes
 * Don't break tracing when a Session's row_factory is not the default
   namedtuple_factory.
 * Handle data that is already utf8-encoded for UTF8Type values
+* Fix token-aware routing for tokens that fall before the first node token in
+  the ring and tokens that exactly match a node's token
 
 Other
 -----

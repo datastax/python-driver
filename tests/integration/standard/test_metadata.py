@@ -365,8 +365,8 @@ class TestCodeCoverage(unittest.TestCase):
 
         for i, token in enumerate(ring):
             self.assertEqual(set(get_replicas('test3rf', token)), set(owners))
-            self.assertEqual(set(get_replicas('test2rf', token)), set([owners[i], owners[(i + 1) % 3]]))
-            self.assertEqual(set(get_replicas('test1rf', token)), set([owners[i]]))
+            self.assertEqual(set(get_replicas('test2rf', token)), set([owners[(i + 1) % 3], owners[(i + 2) % 3]]))
+            self.assertEqual(set(get_replicas('test1rf', token)), set([owners[(i + 1) % 3]]))
 
 
 class TokenMetadataTest(unittest.TestCase):
@@ -393,12 +393,13 @@ class TokenMetadataTest(unittest.TestCase):
         token_map = TokenMap(MD5Token, token_to_primary_replica, tokens, metadata)
 
         # tokens match node tokens exactly
-        for token, expected_host in zip(tokens, hosts):
+        for i, token in enumerate(tokens):
+            expected_host = hosts[(i + 1) % len(hosts)]
             replicas = token_map.get_replicas("ks", token)
             self.assertEqual(set(replicas), set([expected_host]))
 
         # shift the tokens back by one
-        for token, expected_host in zip(tokens[1:], hosts[1:]):
+        for token, expected_host in zip(tokens, hosts):
             replicas = token_map.get_replicas("ks", MD5Token(str(token.value - 1)))
             self.assertEqual(set(replicas), set([expected_host]))
 
