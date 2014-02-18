@@ -891,9 +891,7 @@ class TokenMap(object):
                 return []
 
         point = bisect_left(self.ring, token)
-        if point == 0 and token != self.ring[0]:
-            return tokens_to_hosts[self.ring[-1]]
-        elif point == len(self.ring):
+        if point == len(self.ring):
             return tokens_to_hosts[self.ring[0]]
         else:
             return tokens_to_hosts[self.ring[point]]
