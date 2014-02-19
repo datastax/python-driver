@@ -16,12 +16,6 @@ Releasing
   so that it looks like ``(x, y, z, 'post')``
 * Commit and push
 
-Running the Tests
-=================
-In order for the extensions to be built and used in the test, run::
-
-    python setup.py nosetests
-
 Building the Docs
 =================
 Sphinx is required to build the docs. You probably want to install through apt,
@@ -48,3 +42,26 @@ For example::
     cp -R docs/_build/1.0.0-beta1/* ~/python-driver-docs/
     cd ~/python-driver-docs
     git push origin gh-pages
+
+Running the Tests
+=================
+In order for the extensions to be built and used in the test, run::
+
+    python setup.py nosetests
+
+You can run a specific test module or package like so::
+
+    python setup.py nosetests -w tests/unit/
+
+If you want to test all of python 2.6, 2.7, and pypy, use tox (this is what
+TravisCI runs)::
+
+    tox
+
+By default, tox only runs the unit tests because I haven't put in the effort
+to get the integration tests to run on TravicCI.  However, the integration
+tests should work locally.  To run them, edit the following line in tox.ini::
+
+    commands = {envpython} setup.py build_ext --inplace nosetests --verbosity=2 tests/unit/
+
+and change ``tests/unit/`` to ``tests/``.
