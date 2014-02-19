@@ -1,6 +1,6 @@
 1.0.1
 =====
-(In Progress)
+Feb 19, 2014
 
 Bug Fixes
 ---------
