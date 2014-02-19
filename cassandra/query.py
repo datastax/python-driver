@@ -489,7 +489,10 @@ class TraceEvent(object):
         self.description = description
         self.datetime = datetime.utcfromtimestamp(unix_time_from_uuid1(timeuuid))
         self.source = source
-        self.source_elapsed = timedelta(microseconds=source_elapsed)
+        if source_elapsed is not None:
+            self.source_elapsed = timedelta(microseconds=source_elapsed)
+        else:
+            self.source_elapsed = None
         self.thread_name = thread_name
 
     def __str__(self):

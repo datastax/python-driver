@@ -18,6 +18,8 @@ Bug Fixes
 * Handle data that is already utf8-encoded for UTF8Type values
 * Fix token-aware routing for tokens that fall before the first node token in
   the ring and tokens that exactly match a node's token
+* Tolerate null source_elapsed values for Trace events.  These may not be
+  set when events complete after the main operation has already completed.
 
 Other
 -----
