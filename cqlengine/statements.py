@@ -350,7 +350,7 @@ class MapUpdateClause(ContainerUpdateClause):
 class CounterUpdateClause(ContainerUpdateClause):
 
     def __init__(self, field, value, previous=None, column=None):
-        super(CounterUpdateClause, self).__init__(field, value, previous, column)
+        super(CounterUpdateClause, self).__init__(field, value, previous=previous, column=column)
         self.previous = self.previous or 0
 
     def get_context_size(self):

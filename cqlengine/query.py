@@ -794,7 +794,8 @@ class DMLQuery(object):
                     else: raise RuntimeError
 
                     # do the stuff
-                    clause = klass(col.db_field_name, val, val_mgr.previous_value, column=col)
+                    clause = klass(col.db_field_name, val,
+                            previous=val_mgr.previous_value, column=col)
                     if clause.get_context_size() > 0:
                         statement.add_assignment_clause(clause)
                 else:
