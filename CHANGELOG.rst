@@ -1,3 +1,14 @@
+1.0.2
+=====
+In Progress
+
+Bug Fixes
+---------
+* With asyncorereactor, correctly handle EAGAIN/EWOULDBLOCK when the message from
+  Cassandra is a multiple of the read buffer size.  Previously, if no more data
+  became available to read on the socket, the message would never be processed,
+  resulting in an OperationTimedOut error.
+
 1.0.1
 =====
 Feb 19, 2014
