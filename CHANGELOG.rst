@@ -9,6 +9,12 @@ Bug Fixes
   became available to read on the socket, the message would never be processed,
   resulting in an OperationTimedOut error.
 
+Other
+-----
+* Remove ignored ``tracing_enabled`` parameter for ``SimpleStatement``.  The
+  correct way to trace a query is by setting the ``trace`` argument to ``True``
+  in ``Session.execute()`` and ``Session.execute_async()``.
+
 1.0.1
 =====
 Feb 19, 2014

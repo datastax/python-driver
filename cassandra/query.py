@@ -45,10 +45,8 @@ class Statement(object):
 
     _routing_key = None
 
-    def __init__(self, retry_policy=None, tracing_enabled=False,
-                 consistency_level=None, routing_key=None):
+    def __init__(self, retry_policy=None, consistency_level=None, routing_key=None):
         self.retry_policy = retry_policy
-        self.tracing_enabled = tracing_enabled
         if consistency_level is not None:
             self.consistency_level = consistency_level
         self._routing_key = routing_key
