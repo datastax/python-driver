@@ -502,6 +502,8 @@ class DateType(_CassandraType):
 
         return int64_pack(long(converted))
 
+class TimestampType(DateType):
+    pass
 
 class TimeUUIDType(DateType):
     typename = 'timeuuid'
