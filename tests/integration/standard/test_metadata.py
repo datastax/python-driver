@@ -138,8 +138,8 @@ class SchemaMetadataTest(unittest.TestCase):
         self.assertEqual([], tablemeta.clustering_key)
         self.assertEqual([u'a', u'b', u'c'], sorted(tablemeta.columns.keys()))
 
-        for option in TableMetadata.recognized_options:
-            self.assertTrue(option in tablemeta.options)
+        for option in tablemeta.options:
+            self.assertIn(option, TableMetadata.recognized_options)
 
         self.check_create_statement(tablemeta, create_statement)
 

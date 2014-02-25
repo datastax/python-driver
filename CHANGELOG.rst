@@ -13,6 +13,8 @@ Bug Fixes
   KeyspaceMetadata and TableMetadata.
 * Decode TimestampType as DateType.  (Cassandra replaced DateType with
   TimestampType to fix sorting of pre-unix epoch dates in CASSANDRA-5723.)
+* Handle latest table options when parsing the schema and generating
+  CREATE statements.
 
 Other
 -----
