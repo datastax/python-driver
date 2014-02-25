@@ -564,9 +564,9 @@ class KeyspaceMetadata(object):
         return "\n".join([self.as_cql_query()] + [t.export_as_string() for t in self.tables.values()])
 
     def as_cql_query(self):
-        ret = "CREATE KEYSPACE %s WITH REPLICATION = %s " % \
+        ret = "CREATE KEYSPACE %s WITH replication = %s " % \
               (self.name, self.replication_strategy.export_for_schema())
-        return ret + (' AND DURABLE_WRITES = %s;' % ("true" if self.durable_writes else "false"))
+        return ret + (' AND durable_writes = %s;' % ("true" if self.durable_writes else "false"))
 
 
 class TableMetadata(object):
