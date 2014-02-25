@@ -295,7 +295,7 @@ class TestCodeCoverage(unittest.TestCase):
         cluster = Cluster()
         cluster.connect()
 
-        self.assertIsInstance(cluster.metadata.export_schema_as_string(), unicode)
+        self.assertIsInstance(cluster.metadata.export_schema_as_string(), basestring)
 
     def test_export_keyspace_schema(self):
         """
@@ -307,8 +307,38 @@ class TestCodeCoverage(unittest.TestCase):
 
         for keyspace in cluster.metadata.keyspaces:
             keyspace_metadata = cluster.metadata.keyspaces[keyspace]
-            self.assertIsInstance(keyspace_metadata.export_as_string(), unicode)
-            self.assertIsInstance(keyspace_metadata.as_cql_query(), unicode)
+            self.assertIsInstance(keyspace_metadata.export_as_string(), basestring)
+            self.assertIsInstance(keyspace_metadata.as_cql_query(), basestring)
+
+    def test_case_sensitivity(self):
+        """
+        Test that names that need to be escaped in CREATE statements are
+        """
+
+        cluster = Cluster()
+        session = cluster.connect()
+
+        ksname = 'AnInterestingKeyspace'
+        cfname = 'AnInterestingTable'
+
+        session.execute("""
+            CREATE KEYSPACE "%s"
+            WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
+            """ % (ksname,))
+        session.execute("""
+            CREATE TABLE "%s"."%s" (
+                k int PRIMARY KEY,
+                "MyColumn" int )
+            """ % (ksname, cfname))
+        session.execute("""
+            CREATE INDEX myindex ON "%s"."%s" ("MyColumn")
+            """ % (ksname, cfname))
+
+        ksmeta = cluster.metadata.keyspaces[ksname]
+        schema = ksmeta.export_as_string()
+        self.assertIn('CREATE KEYSPACE "AnInterestingKeyspace"', schema)
+        self.assertIn('CREATE TABLE "AnInterestingKeyspace"."AnInterestingTable"', schema)
+        self.assertIn('CREATE INDEX myindex ON "AnInterestingKeyspace"."AnInterestingTable" ("MyColumn")', schema)
 
     def test_already_exists_exceptions(self):
         """

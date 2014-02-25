@@ -8,6 +8,9 @@ Bug Fixes
   Cassandra is a multiple of the read buffer size.  Previously, if no more data
   became available to read on the socket, the message would never be processed,
   resulting in an OperationTimedOut error.
+* Double quote keyspace and table names that require them (those using
+  uppercase characters or keywords) when generating CREATE statements through
+  KeyspaceMetadata and TableMetadata.
 
 Other
 -----

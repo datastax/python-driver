@@ -564,8 +564,9 @@ class KeyspaceMetadata(object):
         return "\n".join([self.as_cql_query()] + [t.export_as_string() for t in self.tables.values()])
 
     def as_cql_query(self):
-        ret = "CREATE KEYSPACE %s WITH replication = %s " % \
-              (self.name, self.replication_strategy.export_for_schema())
+        ret = "CREATE KEYSPACE %s WITH replication = %s " % (
+            protect_name(self.name),
+            self.replication_strategy.export_for_schema())
         return ret + (' AND durable_writes = %s;' % ("true" if self.durable_writes else "false"))
 
 
@@ -653,7 +654,10 @@ class TableMetadata(object):
         creations are not included).  If `formatted` is set to :const:`True`,
         extra whitespace will be added to make the query human readable.
         """
-        ret = "CREATE TABLE %s.%s (%s" % (self.keyspace.name, self.name, "\n" if formatted else "")
+        ret = "CREATE TABLE %s.%s (%s" % (
+            protect_name(self.keyspace.name),
+            protect_name(self.name),
+            "\n" if formatted else "")
 
         if formatted:
             column_join = ",\n"
@@ -695,7 +699,7 @@ class TableMetadata(object):
         if self.clustering_key:
             cluster_str = "CLUSTERING ORDER BY "
 
-            clustering_names = self.protect_names([c.name for c in self.clustering_key])
+            clustering_names = protect_names([c.name for c in self.clustering_key])
 
             if self.options.get("is_compact_storage") and \
                     not issubclass(self.comparator, types.CompositeType):
@@ -724,39 +728,46 @@ class TableMetadata(object):
         if value is not None:
             if name == "comment":
                 value = value or ""
-            return "%s = %s" % (name, self.protect_value(value))
+            return "%s = %s" % (name, protect_value(value))
 
-    def protect_name(self, name):
-        if isinstance(name, unicode):
-            name = name.encode('utf8')
-        return self.maybe_escape_name(name)
 
-    def protect_names(self, names):
-        return map(self.protect_name, names)
+def protect_name(name):
+    if isinstance(name, unicode):
+        name = name.encode('utf8')
+    return maybe_escape_name(name)
 
-    def protect_value(self, value):
-        if value is None:
-            return 'NULL'
-        if isinstance(value, (int, float, bool)):
-            return str(value)
-        return "'%s'" % value.replace("'", "''")
 
-    valid_cql3_word_re = re.compile(r'^[a-z][0-9a-z_]*$')
+def protect_names(names):
+    return map(protect_name, names)
 
-    def is_valid_name(self, name):
-        if name is None:
-            return False
-        if name.lower() in _keywords - _unreserved_keywords:
-            return False
-        return self.valid_cql3_word_re.match(name) is not None
 
-    def maybe_escape_name(self, name):
-        if self.is_valid_name(name):
-            return name
-        return self.escape_name(name)
+def protect_value(value):
+    if value is None:
+        return 'NULL'
+    if isinstance(value, (int, float, bool)):
+        return str(value)
+    return "'%s'" % value.replace("'", "''")
 
-    def escape_name(self, name):
-        return '"%s"' % (name.replace('"', '""'),)
+
+valid_cql3_word_re = re.compile(r'^[a-z][0-9a-z_]*$')
+
+
+def is_valid_name(name):
+    if name is None:
+        return False
+    if name.lower() in _keywords - _unreserved_keywords:
+        return False
+    return valid_cql3_word_re.match(name) is not None
+
+
+def maybe_escape_name(name):
+    if is_valid_name(name):
+        return name
+    return escape_name(name)
+
+
+def escape_name(name):
+    return '"%s"' % (name.replace('"', '""'),)
 
 
 class ColumnMetadata(object):
@@ -825,7 +836,11 @@ class IndexMetadata(object):
         Returns a CQL query that can be used to recreate this index.
         """
         table = self.column.table
-        return "CREATE INDEX %s ON %s.%s (%s)" % (self.name, table.keyspace.name, table.name, self.column.name)
+        return "CREATE INDEX %s ON %s.%s (%s)" % (
+            self.name,  # Cassandra doesn't like quoted index names for some reason
+            protect_name(table.keyspace.name),
+            protect_name(table.name),
+            protect_name(self.column.name))
 
 
 class TokenMap(object):
