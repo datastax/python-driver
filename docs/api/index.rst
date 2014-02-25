@@ -1,9 +1,6 @@
 API Documentation
 =================
 
-Cassandra Modules
------------------
-
 .. toctree::
    :maxdepth: 2
 
