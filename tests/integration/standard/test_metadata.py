@@ -327,8 +327,12 @@ class TestCodeCoverage(unittest.TestCase):
             """ % (ksname,))
         session.execute("""
             CREATE TABLE "%s"."%s" (
-                k int PRIMARY KEY,
-                "MyColumn" int )
+                k int,
+                "A" int,
+                "B" int,
+                "MyColumn" int,
+                PRIMARY KEY (k, "A"))
+            WITH CLUSTERING ORDER BY ("A" DESC)
             """ % (ksname, cfname))
         session.execute("""
             CREATE INDEX myindex ON "%s"."%s" ("MyColumn")
@@ -338,6 +342,11 @@ class TestCodeCoverage(unittest.TestCase):
         schema = ksmeta.export_as_string()
         self.assertIn('CREATE KEYSPACE "AnInterestingKeyspace"', schema)
         self.assertIn('CREATE TABLE "AnInterestingKeyspace"."AnInterestingTable"', schema)
+        self.assertIn('"A" int', schema)
+        self.assertIn('"B" int', schema)
+        self.assertIn('"MyColumn" int', schema)
+        self.assertIn('PRIMARY KEY (k, "A")', schema)
+        self.assertIn('WITH CLUSTERING ORDER BY ("A" DESC)', schema)
         self.assertIn('CREATE INDEX myindex ON "AnInterestingKeyspace"."AnInterestingTable" ("MyColumn")', schema)
 
     def test_already_exists_exceptions(self):

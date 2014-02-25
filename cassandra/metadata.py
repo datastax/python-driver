@@ -668,7 +668,7 @@ class TableMetadata(object):
 
         columns = []
         for col in self.columns.values():
-            columns.append("%s %s" % (col.name, col.typestring))
+            columns.append("%s %s" % (protect_name(col.name), col.typestring))
 
         if len(self.partition_key) == 1 and not self.clustering_key:
             columns[0] += " PRIMARY KEY"
@@ -680,12 +680,12 @@ class TableMetadata(object):
             ret += "%s%sPRIMARY KEY (" % (column_join, padding)
 
             if len(self.partition_key) > 1:
-                ret += "(%s)" % ", ".join(col.name for col in self.partition_key)
+                ret += "(%s)" % ", ".join(protect_name(col.name) for col in self.partition_key)
             else:
                 ret += self.partition_key[0].name
 
             if self.clustering_key:
-                ret += ", %s" % ", ".join(col.name for col in self.clustering_key)
+                ret += ", %s" % ", ".join(protect_name(col.name) for col in self.clustering_key)
 
             ret += ")"
 
