@@ -5,6 +5,7 @@ from datetime import date
 import re
 from uuid import uuid1, uuid4
 from cql.query import cql_quote
+from cql.cqltypes import DateType
 
 from cqlengine.exceptions import ValidationError
 
@@ -209,7 +210,11 @@ class Bytes(Column):
     def to_database(self, value):
         val = super(Bytes, self).to_database(value)
         if val is None: return
-        return val.encode('hex')
+        return '0x' + val.encode('hex')
+
+    def to_python(self, value):
+        #return value[2:].decode('hex')
+        return value
 
 
 class Ascii(Column):
@@ -326,7 +331,10 @@ class DateTime(Column):
             return value
         elif isinstance(value, date):
             return datetime(*(value.timetuple()[:6]))
-        return datetime.utcfromtimestamp(value)
+        try:
+            return datetime.utcfromtimestamp(value)
+        except TypeError:
+            return datetime.utcfromtimestamp(DateType.deserialize(value))
 
     def to_database(self, value):
         value = super(DateTime, self).to_database(value)
@@ -345,15 +353,16 @@ class DateTime(Column):
 class Date(Column):
     db_type = 'timestamp'
 
-
     def to_python(self, value):
         if value is None: return
         if isinstance(value, datetime):
             return value.date()
         elif isinstance(value, date):
             return value
-
-        return datetime.utcfromtimestamp(value).date()
+        try:
+            return datetime.utcfromtimestamp(value).date()
+        except TypeError:
+            return datetime.utcfromtimestamp(DateType.deserialize(value)).date()
 
     def to_database(self, value):
         value = super(Date, self).to_database(value)

@@ -6,6 +6,25 @@ from cqlengine.operators import BaseWhereOperator, InOperator
 class StatementException(Exception): pass
 
 
+# Monkey patch cql_quote to allow raw hex values
+import cql.query
+
+
+def cql_quote_replacement(term):
+    if isinstance(term, basestring) and term.startswith('0x'):
+        if isinstance(term, unicode):
+            return term.encode('utf8')
+        else:
+            return term
+    elif isinstance(term, unicode):
+        return "'%s'" % cql.query.__escape_quotes(term.encode('utf8'))
+    elif isinstance(term, (str, bool)):
+        return "'%s'" % cql.query.__escape_quotes(str(term))
+    else:
+        return str(term)
+cql.query.cql_quote = cql_quote_replacement
+
+
 class ValueQuoter(object):
 
     def __init__(self, value):
