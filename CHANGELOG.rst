@@ -11,6 +11,8 @@ Bug Fixes
 * Double quote keyspace and table names that require them (those using
   uppercase characters or keywords) when generating CREATE statements through
   KeyspaceMetadata and TableMetadata.
+* Decode TimestampType as DateType.  (Cassandra replaced DateType with
+  TimestampType to fix sorting of pre-unix epoch dates in CASSANDRA-5723.)
 
 Other
 -----
