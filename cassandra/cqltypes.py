@@ -315,7 +315,10 @@ class DecimalType(_CassandraType):
 
     @staticmethod
     def serialize(dec):
-        sign, digits, exponent = dec.as_tuple()
+        try:
+            sign, digits, exponent = dec.as_tuple()
+        except AttributeError:
+            raise TypeError("Non-Decimal type received for Decimal value")
         unscaled = int(''.join([str(digit) for digit in digits]))
         if sign:
             unscaled *= -1
@@ -333,7 +336,10 @@ class UUIDType(_CassandraType):
 
     @staticmethod
     def serialize(uuid):
-        return uuid.bytes
+        try:
+            return uuid.bytes
+        except AttributeError:
+            raise TypeError("Got a non-UUID object for a UUID value")
 
 
 class BooleanType(_CassandraType):
@@ -349,7 +355,7 @@ class BooleanType(_CassandraType):
 
     @staticmethod
     def serialize(truth):
-        return int8_pack(bool(truth))
+        return int8_pack(truth)
 
 
 class AsciiType(_CassandraType):
@@ -502,8 +508,10 @@ class DateType(_CassandraType):
 
         return int64_pack(long(converted))
 
+
 class TimestampType(DateType):
     pass
+
 
 class TimeUUIDType(DateType):
     typename = 'timeuuid'
@@ -517,7 +525,10 @@ class TimeUUIDType(DateType):
 
     @staticmethod
     def serialize(timeuuid):
-        return timeuuid.bytes
+        try:
+            return timeuuid.bytes
+        except AttributeError:
+            raise TypeError("Got a non-UUID object for a UUID value")
 
 
 class UTF8Type(_CassandraType):
@@ -584,6 +595,9 @@ class _SimpleParameterizedType(_ParameterizedType):
 
     @classmethod
     def serialize_safe(cls, items):
+        if isinstance(items, basestring):
+            raise TypeError("Received a string for a type that expects a sequence")
+
         subtype, = cls.subtypes
         buf = StringIO()
         buf.write(uint16_pack(len(items)))
@@ -640,7 +654,11 @@ class MapType(_ParameterizedType):
         subkeytype, subvaltype = cls.subtypes
         buf = StringIO()
         buf.write(uint16_pack(len(themap)))
-        for key, val in themap.iteritems():
+        try:
+            items = themap.iteritems()
+        except AttributeError:
+            raise TypeError("Got a non-map object for a map value")
+        for key, val in items:
             keybytes = subkeytype.to_binary(key)
             valbytes = subvaltype.to_binary(val)
             buf.write(uint16_pack(len(keybytes)))
