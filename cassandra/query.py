@@ -238,10 +238,9 @@ class BoundStatement(Statement):
                     expected_type = col_type
                     actual_type = type(value)
 
-                    err = InvalidParameterTypeError(col_name=col_name,
-                                                    expected_type=expected_type,
-                                                    actual_type=actual_type)
-                    raise err
+                    message = ('Received an argument of invalid type for column "%s". '
+                               'Expected: %s, Got: %s' % (col_name, expected_type, actual_type))
+                    raise TypeError(message)
 
         return self
 
@@ -317,24 +316,6 @@ class TraceUnavailable(Exception):
     Raised when complete trace details cannot be fetched from Cassandra.
     """
     pass
-
-
-class InvalidParameterTypeError(TypeError):
-    """
-    Raised when a used tries to bind a prepared statement with an argument of an
-    invalid type.
-    """
-
-    def __init__(self, col_name, expected_type, actual_type):
-        self.col_name = col_name
-        self.expected_type = expected_type
-        self.actual_type = actual_type
-
-        values = (self.col_name, self.expected_type, self.actual_type)
-        message = ('Received an argument of invalid type for column "%s". '
-                   'Expected: %s, Got: %s' % values)
-
-        super(InvalidParameterTypeError, self).__init__(message)
 
 
 class QueryTrace(object):

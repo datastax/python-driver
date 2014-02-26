@@ -5,7 +5,6 @@ except ImportError:
 
 from cassandra.query import bind_params, ValueSequence
 from cassandra.query import PreparedStatement, BoundStatement
-from cassandra.query import InvalidParameterTypeError
 from cassandra.cqltypes import Int32Type
 
 try:
@@ -79,19 +78,10 @@ class BoundStatementTestCase(unittest.TestCase):
 
         try:
             bound_statement.bind(values)
-        except InvalidParameterTypeError as e:
-            self.assertEqual(e.col_name, 'foo1')
-            self.assertEqual(e.expected_type, Int32Type)
-            self.assertEqual(e.actual_type, str)
-        else:
-            self.fail('Passed invalid type but exception was not thrown')
-
-        try:
-            bound_statement.bind(values)
         except TypeError as e:
-            self.assertEqual(e.col_name, 'foo1')
-            self.assertEqual(e.expected_type, Int32Type)
-            self.assertEqual(e.actual_type, str)
+            self.assertIn('foo1', str(e))
+            self.assertIn('Int32Type', str(e))
+            self.assertIn('str', str(e))
         else:
             self.fail('Passed invalid type but exception was not thrown')
 
@@ -99,9 +89,9 @@ class BoundStatementTestCase(unittest.TestCase):
 
         try:
             bound_statement.bind(values)
-        except InvalidParameterTypeError as e:
-            self.assertEqual(e.col_name, 'foo2')
-            self.assertEqual(e.expected_type, Int32Type)
-            self.assertEqual(e.actual_type, list)
+        except TypeError as e:
+            self.assertIn('foo2', str(e))
+            self.assertIn('Int32Type', str(e))
+            self.assertIn('list', str(e))
         else:
             self.fail('Passed invalid type but exception was not thrown')

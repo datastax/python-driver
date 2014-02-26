@@ -21,6 +21,9 @@ Other
 * Remove ignored ``tracing_enabled`` parameter for ``SimpleStatement``.  The
   correct way to trace a query is by setting the ``trace`` argument to ``True``
   in ``Session.execute()`` and ``Session.execute_async()``.
+* Raise TypeError instead of cassandra.query.InvalidParameterTypeError when
+  a parameter for a prepared statement has the wrong type; remove
+  cassandra.query.InvalidParameterTypeError.
 
 1.0.1
 =====
