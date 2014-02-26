@@ -14,6 +14,11 @@ except ImportError:
 
 from cassandra import InvalidRequest
 from cassandra.cluster import Cluster
+from cassandra.decoder import dict_factory
+try:
+    from collections import OrderedDict
+except ImportError:
+    from cassandra.util import OrderedDict  # noqa
 
 from tests.integration import get_server_versions
 
@@ -100,16 +105,8 @@ class TypeTests(unittest.TestCase):
         for expected, actual in zip(expected_vals, results[0]):
             self.assertEquals(expected, actual)
 
-    def test_basic_types(self):
-        c = Cluster()
-        s = c.connect()
-        s.execute("""
-            CREATE KEYSPACE typetests
-            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}
-            """)
-        s.set_keyspace("typetests")
-        s.execute("""
-            CREATE TABLE mytable (
+    create_type_table = """
+        CREATE TABLE mytable (
                 a text,
                 b text,
                 c ascii,
@@ -131,7 +128,17 @@ class TypeTests(unittest.TestCase):
                 t varint,
                 PRIMARY KEY (a, b)
             )
-        """)
+        """
+
+    def test_basic_types(self):
+        c = Cluster()
+        s = c.connect()
+        s.execute("""
+            CREATE KEYSPACE typetests
+            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}
+            """)
+        s.set_keyspace("typetests")
+        s.execute(self.create_type_table)
 
         v1_uuid = uuid1()
         v4_uuid = uuid4()
@@ -219,6 +226,109 @@ class TypeTests(unittest.TestCase):
 
         for expected, actual in zip(expected_vals, results[0]):
             self.assertEquals(expected, actual)
+
+    def test_empty_strings_and_nones(self):
+        c = Cluster()
+        s = c.connect()
+        s.execute("""
+            CREATE KEYSPACE test_empty_values
+            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}
+            """)
+        s.set_keyspace("test_empty_values")
+        s.execute(self.create_type_table)
+
+        s.execute("INSERT INTO mytable (a, b) VALUES ('a', 'b')")
+        s.row_factory = dict_factory
+        results = s.execute("""
+            SELECT c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t FROM mytable
+            """)
+        self.assertTrue(all(x is None for x in results[0].values()))
+
+        prepared = s.prepare("""
+            SELECT c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t FROM mytable
+            """)
+        results = s.execute(prepared.bind(()))
+        self.assertTrue(all(x is None for x in results[0].values()))
+
+        # insert empty strings for string-like fields and fetch them
+        s.execute("INSERT INTO mytable (a, b, c, o, s, l, n) VALUES ('a', 'b', %s, %s, %s, %s, %s)",
+                  ('', '', '', [''], {'': 3}))
+        self.assertEquals(
+            {'c': '', 'o': '', 's': '', 'l': ('', ), 'n': OrderedDict({'': 3})},
+            s.execute("SELECT c, o, s, l, n FROM mytable WHERE a='a' AND b='b'")[0])
+
+        self.assertEquals(
+            {'c': '', 'o': '', 's': '', 'l': ('', ), 'n': OrderedDict({'': 3})},
+            s.execute(s.prepare("SELECT c, o, s, l, n FROM mytable WHERE a='a' AND b='b'"), [])[0])
+
+        # non-string types shouldn't accept empty strings
+        for col in ('d', 'f', 'g', 'h', 'i', 'k', 'l', 'm', 'n', 'q', 'r', 't'):
+            query = "INSERT INTO mytable (a, b, %s) VALUES ('a', 'b', %%s)" % (col, )
+            try:
+                s.execute(query, [''])
+            except InvalidRequest:
+                pass
+            else:
+                self.fail("Expected an InvalidRequest error when inserting an "
+                          "emptry string for column %s" % (col, ))
+
+            prepared = s.prepare("INSERT INTO mytable (a, b, %s) VALUES ('a', 'b', ?)" % (col, ))
+            try:
+                s.execute(prepared, [''])
+            except TypeError:
+                pass
+            else:
+                self.fail("Expected an InvalidRequest error when inserting an "
+                          "emptry string for column %s with a prepared statement" % (col, ))
+
+        # insert values for all columns
+        values = ['a', 'b', 'a', 1, True, Decimal('1.0'), 0.1, 0.1,
+                  "1.2.3.4", 1, ['a'], set([1]), {'a': 1}, 'a',
+                  datetime.now(), uuid4(), uuid1(), 'a', 1]
+        s.execute("""
+            INSERT INTO mytable (a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, values)
+
+        # then insert None, which should null them out
+        null_values = values[:2] + ([None] * (len(values) - 2))
+        s.execute("""
+            INSERT INTO mytable (a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, null_values)
+
+        results = s.execute("""
+            SELECT c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t FROM mytable
+            """)
+        self.assertEqual([], [(name, val) for (name, val) in results[0].items() if val is not None])
+
+        prepared = s.prepare("""
+            SELECT c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t FROM mytable
+            """)
+        results = s.execute(prepared.bind(()))
+        self.assertEqual([], [(name, val) for (name, val) in results[0].items() if val is not None])
+
+        # do the same thing again, but use a prepared statement to insert the nulls
+        s.execute("""
+            INSERT INTO mytable (a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, values)
+        prepared = s.prepare("""
+            INSERT INTO mytable (a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """)
+        s.execute(prepared, null_values)
+
+        results = s.execute("""
+            SELECT c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t FROM mytable
+            """)
+        self.assertEqual([], [(name, val) for (name, val) in results[0].items() if val is not None])
+
+        prepared = s.prepare("""
+            SELECT c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t FROM mytable
+            """)
+        results = s.execute(prepared.bind(()))
+        self.assertEqual([], [(name, val) for (name, val) in results[0].items() if val is not None])
 
     def test_timezone_aware_datetimes(self):
         """ Ensure timezone-aware datetimes are converted to timestamps correctly """
