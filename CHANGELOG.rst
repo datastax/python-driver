@@ -25,6 +25,8 @@ Other
   a parameter for a prepared statement has the wrong type; remove
   cassandra.query.InvalidParameterTypeError.
 * More consistent type checking for query parameters
+* Add option to a return special object for empty string values for non-string
+  columns
 
 1.0.1
 =====

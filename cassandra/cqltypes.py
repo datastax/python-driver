@@ -152,11 +152,34 @@ def lookup_casstype(casstype):
         raise ValueError("Don't know how to parse type string %r: %s" % (casstype, e))
 
 
+class EmptyValue(object):
+    """ See _CassandraType.support_empty_values """
+
+    def __str__(self):
+        return "EMPTY"
+    __repr__ = __str__
+
+EMPTY = EmptyValue()
+
+
 class _CassandraType(object):
     __metaclass__ = CassandraTypeType
     subtypes = ()
     num_subtypes = 0
     empty_binary_ok = False
+
+    support_empty_values = False
+    """
+    Back in the Thrift days, empty strings were used for "null" values of
+    all types, including non-string types.  For most users, an empty
+    string value in an int column is the same as being null/not present,
+    so the driver normally returns None in this case.  (For string-like
+    types, it *will* return an empty string by default instead of None.)
+
+    To avoid this behavior, set this to :const:`True`. Instead of returning
+    None for empty string values, the EMPTY singleton (an instance
+    of EmptyValue) will be returned.
+    """
 
     def __init__(self, val):
         self.val = self.validate(val)
@@ -181,8 +204,10 @@ class _CassandraType(object):
         for more information. This method differs in that if None or the empty
         string is passed in, None may be returned.
         """
-        if byts is None or (byts == '' and not cls.empty_binary_ok):
+        if byts is None:
             return None
+        elif byts == '' and not cls.empty_binary_ok:
+            return EMPTY if cls.support_empty_values else None
         return cls.deserialize(byts)
 
     @classmethod

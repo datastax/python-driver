@@ -14,6 +14,7 @@ except ImportError:
 
 from cassandra import InvalidRequest
 from cassandra.cluster import Cluster
+from cassandra.cqltypes import Int32Type, EMPTY
 from cassandra.decoder import dict_factory
 try:
     from collections import OrderedDict
@@ -231,10 +232,10 @@ class TypeTests(unittest.TestCase):
         c = Cluster()
         s = c.connect()
         s.execute("""
-            CREATE KEYSPACE test_empty_values
+            CREATE KEYSPACE test_empty_strings_and_nones
             WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}
             """)
-        s.set_keyspace("test_empty_values")
+        s.set_keyspace("test_empty_strings_and_nones")
         s.execute(self.create_type_table)
 
         s.execute("INSERT INTO mytable (a, b) VALUES ('a', 'b')")
@@ -329,6 +330,23 @@ class TypeTests(unittest.TestCase):
             """)
         results = s.execute(prepared.bind(()))
         self.assertEqual([], [(name, val) for (name, val) in results[0].items() if val is not None])
+
+    def test_empty_values(self):
+        c = Cluster()
+        s = c.connect()
+        s.execute("""
+            CREATE KEYSPACE test_empty_values
+            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}
+            """)
+        s.set_keyspace("test_empty_values")
+        s.execute("CREATE TABLE mytable (a text PRIMARY KEY, b int)")
+        s.execute("INSERT INTO mytable (a, b) VALUES ('a', blobAsInt(0x))")
+        try:
+            Int32Type.support_empty_values = True
+            results = s.execute("SELECT b FROM mytable WHERE a='a'")[0]
+            self.assertIs(EMPTY, results.b)
+        finally:
+            Int32Type.support_empty_values = False
 
     def test_timezone_aware_datetimes(self):
         """ Ensure timezone-aware datetimes are converted to timestamps correctly """
