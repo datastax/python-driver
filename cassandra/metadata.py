@@ -1,4 +1,4 @@
-from bisect import bisect_left
+from bisect import bisect_right
 from collections import defaultdict
 try:
     from collections import OrderedDict
@@ -274,13 +274,13 @@ class Metadata(object):
                 column_meta = self._build_column_metadata(table_meta, col_row)
                 table_meta.columns[column_meta.name] = column_meta
 
-        table_meta.options = self._build_table_options(row, is_compact)
+        table_meta.options = self._build_table_options(row)
+        table_meta.is_compact_storage = is_compact
         return table_meta
 
-    def _build_table_options(self, row, is_compact_storage):
+    def _build_table_options(self, row):
         """ Setup the mostly-non-schema table options, like caching settings """
-        options = dict((o, row.get(o)) for o in TableMetadata.recognized_options)
-        options["is_compact_storage"] = is_compact_storage
+        options = dict((o, row.get(o)) for o in TableMetadata.recognized_options if o in row)
         return options
 
     def _build_column_metadata(self, table_metadata, row):
@@ -564,9 +564,10 @@ class KeyspaceMetadata(object):
         return "\n".join([self.as_cql_query()] + [t.export_as_string() for t in self.tables.values()])
 
     def as_cql_query(self):
-        ret = "CREATE KEYSPACE %s WITH REPLICATION = %s " % \
-              (self.name, self.replication_strategy.export_for_schema())
-        return ret + (' AND DURABLE_WRITES = %s;' % ("true" if self.durable_writes else "false"))
+        ret = "CREATE KEYSPACE %s WITH replication = %s " % (
+            protect_name(self.name),
+            self.replication_strategy.export_for_schema())
+        return ret + (' AND durable_writes = %s;' % ("true" if self.durable_writes else "false"))
 
 
 class TableMetadata(object):
@@ -610,6 +611,8 @@ class TableMetadata(object):
     A dict mapping column names to :class:`.ColumnMetadata` instances.
     """
 
+    is_compact_storage = False
+
     options = None
     """
     A dict mapping table option names to their specific settings for this
@@ -617,11 +620,28 @@ class TableMetadata(object):
     """
 
     recognized_options = (
-            "comment", "read_repair_chance",  # "local_read_repair_chance",
-            "replicate_on_write", "gc_grace_seconds", "bloom_filter_fp_chance",
-            "caching", "compaction_strategy_class", "compaction_strategy_options",
-            "min_compaction_threshold", "max_compression_threshold",
-            "compression_parameters")
+        "comment",
+        "read_repair_chance",
+        "dclocal_read_repair_chance",
+        "replicate_on_write",
+        "gc_grace_seconds",
+        "bloom_filter_fp_chance",
+        "caching",
+        "compaction_strategy_class",
+        "compaction_strategy_options",
+        "min_compaction_threshold",
+        "max_compression_threshold",
+        "compression_parameters",
+        "min_index_interval",
+        "max_index_interval",
+        "index_interval",
+        "speculative_retry",
+        "rows_per_partition_to_cache",
+        "memtable_flush_period_in_ms",
+        "populate_io_cache_on_flush",
+        "compaction",
+        "compression",
+        "default_time_to_live")
 
     def __init__(self, keyspace_metadata, name, partition_key=None, clustering_key=None, columns=None, options=None):
         self.keyspace = keyspace_metadata
@@ -653,7 +673,10 @@ class TableMetadata(object):
         creations are not included).  If `formatted` is set to :const:`True`,
         extra whitespace will be added to make the query human readable.
         """
-        ret = "CREATE TABLE %s.%s (%s" % (self.keyspace.name, self.name, "\n" if formatted else "")
+        ret = "CREATE TABLE %s.%s (%s" % (
+            protect_name(self.keyspace.name),
+            protect_name(self.name),
+            "\n" if formatted else "")
 
         if formatted:
             column_join = ",\n"
@@ -664,7 +687,7 @@ class TableMetadata(object):
 
         columns = []
         for col in self.columns.values():
-            columns.append("%s %s" % (col.name, col.typestring))
+            columns.append("%s %s" % (protect_name(col.name), col.typestring))
 
         if len(self.partition_key) == 1 and not self.clustering_key:
             columns[0] += " PRIMARY KEY"
@@ -676,12 +699,12 @@ class TableMetadata(object):
             ret += "%s%sPRIMARY KEY (" % (column_join, padding)
 
             if len(self.partition_key) > 1:
-                ret += "(%s)" % ", ".join(col.name for col in self.partition_key)
+                ret += "(%s)" % ", ".join(protect_name(col.name) for col in self.partition_key)
             else:
                 ret += self.partition_key[0].name
 
             if self.clustering_key:
-                ret += ", %s" % ", ".join(col.name for col in self.clustering_key)
+                ret += ", %s" % ", ".join(protect_name(col.name) for col in self.clustering_key)
 
             ret += ")"
 
@@ -689,15 +712,15 @@ class TableMetadata(object):
         ret += "%s) WITH " % ("\n" if formatted else "")
 
         option_strings = []
-        if self.options.get("is_compact_storage"):
+        if self.is_compact_storage:
             option_strings.append("COMPACT STORAGE")
 
         if self.clustering_key:
             cluster_str = "CLUSTERING ORDER BY "
 
-            clustering_names = self.protect_names([c.name for c in self.clustering_key])
+            clustering_names = protect_names([c.name for c in self.clustering_key])
 
-            if self.options.get("is_compact_storage") and \
+            if self.is_compact_storage and \
                     not issubclass(self.comparator, types.CompositeType):
                 subtypes = [self.comparator]
             else:
@@ -711,52 +734,61 @@ class TableMetadata(object):
             cluster_str += "(%s)" % ", ".join(inner)
             option_strings.append(cluster_str)
 
-        option_strings.extend(map(self._make_option_str, self.recognized_options))
-        option_strings = filter(lambda x: x is not None, option_strings)
+        option_strings.extend(self._make_option_strings())
 
         join_str = "\n    AND " if formatted else " AND "
         ret += join_str.join(option_strings)
 
         return ret
 
-    def _make_option_str(self, name):
-        value = self.options.get(name)
-        if value is not None:
-            if name == "comment":
-                value = value or ""
-            return "%s = %s" % (name, self.protect_value(value))
+    def _make_option_strings(self):
+        ret = []
+        for name, value in sorted(self.options.items()):
+            if value is not None:
+                if name == "comment":
+                    value = value or ""
+                ret.append("%s = %s" % (name, protect_value(value)))
 
-    def protect_name(self, name):
-        if isinstance(name, unicode):
-            name = name.encode('utf8')
-        return self.maybe_escape_name(name)
+        return ret
 
-    def protect_names(self, names):
-        return map(self.protect_name, names)
 
-    def protect_value(self, value):
-        if value is None:
-            return 'NULL'
-        if isinstance(value, (int, float, bool)):
-            return str(value)
-        return "'%s'" % value.replace("'", "''")
+def protect_name(name):
+    if isinstance(name, unicode):
+        name = name.encode('utf8')
+    return maybe_escape_name(name)
 
-    valid_cql3_word_re = re.compile(r'^[a-z][0-9a-z_]*$')
 
-    def is_valid_name(self, name):
-        if name is None:
-            return False
-        if name.lower() in _keywords - _unreserved_keywords:
-            return False
-        return self.valid_cql3_word_re.match(name) is not None
+def protect_names(names):
+    return map(protect_name, names)
 
-    def maybe_escape_name(self, name):
-        if self.is_valid_name(name):
-            return name
-        return self.escape_name(name)
 
-    def escape_name(self, name):
-        return '"%s"' % (name.replace('"', '""'),)
+def protect_value(value):
+    if value is None:
+        return 'NULL'
+    if isinstance(value, (int, float, bool)):
+        return str(value)
+    return "'%s'" % value.replace("'", "''")
+
+
+valid_cql3_word_re = re.compile(r'^[a-z][0-9a-z_]*$')
+
+
+def is_valid_name(name):
+    if name is None:
+        return False
+    if name.lower() in _keywords - _unreserved_keywords:
+        return False
+    return valid_cql3_word_re.match(name) is not None
+
+
+def maybe_escape_name(name):
+    if is_valid_name(name):
+        return name
+    return escape_name(name)
+
+
+def escape_name(name):
+    return '"%s"' % (name.replace('"', '""'),)
 
 
 class ColumnMetadata(object):
@@ -825,7 +857,11 @@ class IndexMetadata(object):
         Returns a CQL query that can be used to recreate this index.
         """
         table = self.column.table
-        return "CREATE INDEX %s ON %s.%s (%s)" % (self.name, table.keyspace.name, table.name, self.column.name)
+        return "CREATE INDEX %s ON %s.%s (%s)" % (
+            self.name,  # Cassandra doesn't like quoted index names for some reason
+            protect_name(table.keyspace.name),
+            protect_name(table.name),
+            protect_name(self.column.name))
 
 
 class TokenMap(object):
@@ -890,10 +926,11 @@ class TokenMap(object):
             if tokens_to_hosts is None:
                 return []
 
-        point = bisect_left(self.ring, token)
-        if point == 0 and token != self.ring[0]:
-            return tokens_to_hosts[self.ring[-1]]
-        elif point == len(self.ring):
+        # token range ownership is exclusive on the LHS (the start token), so
+        # we use bisect_right, which, in the case of a tie/exact match,
+        # picks an insertion point to the right of the existing match
+        point = bisect_right(self.ring, token)
+        if point == len(self.ring):
             return tokens_to_hosts[self.ring[0]]
         else:
             return tokens_to_hosts[self.ring[point]]

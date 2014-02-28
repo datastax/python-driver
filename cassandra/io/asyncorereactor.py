@@ -260,7 +260,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         except socket.error as err:
             if err.args[0] not in NONBLOCKING:
                 self.defunct(err)
-            return
+                return
 
         if self._iobuf.tell():
             while True:
