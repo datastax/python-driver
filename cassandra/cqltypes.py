@@ -116,16 +116,17 @@ def parse_casstype_args(typestring):
     for tok in tokens:
         if tok == '(':
             args.append([])
+            args.append([])
         elif tok == ')':
             arglist = args.pop()
+            names = args.pop()
             ctype = args[-1].pop()
-            paramized = ctype.apply_parameters(*arglist)
+            paramized = ctype.apply_parameters(*arglist, names=names)
             args[-1].append(paramized)
         else:
             if ':' in tok:
-                # ignore those column name hex encoding bit; we have the
-                # proper column name from elsewhere
-                tok = tok.rsplit(':', 1)[-1]
+                name, tok = tok.rsplit(':', 1)
+                args[-2].append(name)
             ctype = lookup_casstype_simple(tok)
             args[-1].append(ctype)
 
@@ -264,7 +265,7 @@ class _CassandraType(object):
         return '%s(%s)' % (cname, sublist)
 
     @classmethod
-    def apply_parameters(cls, *subtypes):
+    def apply_parameters(cls, *subtypes, **kwargs):
         """
         Given a set of other CassandraTypes, create a new subtype of this type
         using them as parameters. This is how composite types are constructed.
