@@ -4,7 +4,9 @@ specifying consistency levels and retry policies for individual
 queries.
 """
 
+from collections import namedtuple
 from datetime import datetime, timedelta
+import re
 import struct
 import time
 
@@ -12,9 +14,35 @@ from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.cqltypes import unix_time_from_uuid1
 from cassandra.encoder import (cql_encoders, cql_encode_object,
                                cql_encode_sequence)
+from cassandra.util import OrderedDict
 
 import logging
 log = logging.getLogger(__name__)
+
+
+NON_ALPHA_REGEX = re.compile('\W')
+END_UNDERSCORE_REGEX = re.compile('^_*(\w*[a-zA-Z0-9])_*$')
+
+
+def _clean_column_name(name):
+    return END_UNDERSCORE_REGEX.sub("\g<1>", NON_ALPHA_REGEX.sub("_", name))
+
+
+def tuple_factory(colnames, rows):
+    return rows
+
+
+def named_tuple_factory(colnames, rows):
+    Row = namedtuple('Row', map(_clean_column_name, colnames))
+    return [Row(*row) for row in rows]
+
+
+def dict_factory(colnames, rows):
+    return [dict(zip(colnames, row)) for row in rows]
+
+
+def ordered_dict_factory(colnames, rows):
+    return [OrderedDict(zip(colnames, row)) for row in rows]
 
 
 class Statement(object):

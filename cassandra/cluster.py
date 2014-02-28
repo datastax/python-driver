@@ -29,8 +29,8 @@ from cassandra.decoder import (QueryMessage, ResultMessage,
                                OverloadedErrorMessage,
                                PrepareMessage, ExecuteMessage,
                                PreparedQueryNotFound,
-                               IsBootstrappingErrorMessage, named_tuple_factory,
-                               dict_factory)
+                               IsBootstrappingErrorMessage,
+                               BatchMessage)
 from cassandra.metadata import Metadata
 from cassandra.metrics import Metrics
 from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
@@ -39,7 +39,8 @@ from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
 from cassandra.pool import (_ReconnectionHandler, _HostReconnectionHandler,
                             HostConnectionPool)
 from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
-                             bind_params, QueryTrace, Statement)
+                             bind_params, QueryTrace, Statement, named_tuple_factory,
+                             dict_factory)
 
 # libev is all around faster, so we want to try and default to using that when we can
 try:
@@ -904,10 +905,10 @@ class Session(object):
     returned row will be a named tuple.  You can alternatively
     use any of the following:
 
-      - :func:`cassandra.decoder.tuple_factory` - return a result row as a tuple
-      - :func:`cassandra.decoder.named_tuple_factory` - return a result row as a named tuple
-      - :func:`cassandra.decoder.dict_factory` - return a result row as a dict
-      - :func:`cassandra.decoder.ordered_dict_factory` - return a result row as an OrderedDict
+      - :func:`cassandra.query.tuple_factory` - return a result row as a tuple
+      - :func:`cassandra.query.named_tuple_factory` - return a result row as a named tuple
+      - :func:`cassandra.query.dict_factory` - return a result row as a dict
+      - :func:`cassandra.query.ordered_dict_factory` - return a result row as an OrderedDict
 
     """
 

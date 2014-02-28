@@ -1,5 +1,4 @@
 import logging
-import re
 import socket
 from uuid import UUID
 
@@ -19,7 +18,6 @@ from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 InetAddressType, IntegerType, ListType,
                                 LongType, MapType, SetType, TimeUUIDType,
                                 UTF8Type, UUIDType, lookup_casstype)
-from cassandra.util import OrderedDict
 
 log = logging.getLogger(__name__)
 
@@ -35,31 +33,6 @@ class InternalError(Exception):
 HEADER_DIRECTION_FROM_CLIENT = 0x00
 HEADER_DIRECTION_TO_CLIENT = 0x80
 HEADER_DIRECTION_MASK = 0x80
-
-
-NON_ALPHA_REGEX = re.compile('\W')
-END_UNDERSCORE_REGEX = re.compile('^_*(\w*[a-zA-Z0-9])_*$')
-
-
-def _clean_column_name(name):
-    return END_UNDERSCORE_REGEX.sub("\g<1>", NON_ALPHA_REGEX.sub("_", name))
-
-
-def tuple_factory(colnames, rows):
-    return rows
-
-
-def named_tuple_factory(colnames, rows):
-    Row = namedtuple('Row', map(_clean_column_name, colnames))
-    return [Row(*row) for row in rows]
-
-
-def dict_factory(colnames, rows):
-    return [dict(zip(colnames, row)) for row in rows]
-
-
-def ordered_dict_factory(colnames, rows):
-    return [OrderedDict(zip(colnames, row)) for row in rows]
 
 
 _message_types_by_name = {}
