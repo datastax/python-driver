@@ -10,8 +10,8 @@ import time
 
 from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.cqltypes import unix_time_from_uuid1
-from cassandra.decoder import (cql_encoders, cql_encode_object,
-                               cql_encode_sequence, named_tuple_factory)
+from cassandra.encoder import (cql_encoders, cql_encode_object,
+                               cql_encode_sequence)
 
 import logging
 log = logging.getLogger(__name__)
