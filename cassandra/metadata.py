@@ -1,9 +1,5 @@
 from bisect import bisect_right
 from collections import defaultdict
-try:
-    from collections import OrderedDict
-except ImportError:  # Python <2.7
-    from cassandra.util import OrderedDict # NOQA
 from hashlib import md5
 from itertools import islice, cycle
 import json
@@ -21,6 +17,7 @@ except ImportError:
 import cassandra.cqltypes as types
 from cassandra.marshal import varint_unpack
 from cassandra.pool import Host
+from cassandra.util import OrderedDict
 
 log = logging.getLogger(__name__)
 

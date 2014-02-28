@@ -5,11 +5,7 @@ except ImportError:
 
 from cassandra.cluster import Cluster
 from cassandra.decoder import tuple_factory, named_tuple_factory, dict_factory, ordered_dict_factory
-
-try:
-    from collections import OrderedDict
-except ImportError:  # Python <2.7
-    from cassandra.util import OrderedDict # NOQA
+from cassandra.util import OrderedDict
 
 
 class TestFactories(unittest.TestCase):

@@ -6,11 +6,7 @@ except ImportError:
 from cassandra.query import bind_params, ValueSequence
 from cassandra.query import PreparedStatement, BoundStatement
 from cassandra.cqltypes import Int32Type
-
-try:
-    from collections import OrderedDict
-except ImportError:  # Python <2.7
-    from cassandra.util import OrderedDict # NOQA
+from cassandra.util import OrderedDict
 
 
 class ParamBindingTest(unittest.TestCase):

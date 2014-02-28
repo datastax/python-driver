@@ -10,11 +10,6 @@ import types
 from uuid import UUID
 
 try:
-    from collections import OrderedDict
-except ImportError:  # Python <2.7
-    from cassandra.util import OrderedDict # NOQA
-
-try:
     from cStringIO import StringIO
 except ImportError:
     from StringIO import StringIO  # ignore flake8 warning: # NOQA
@@ -30,6 +25,7 @@ from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 InetAddressType, IntegerType, ListType,
                                 LongType, MapType, SetType, TimeUUIDType,
                                 UTF8Type, UUIDType, lookup_casstype)
+from cassandra.util import OrderedDict
 
 log = logging.getLogger(__name__)
 

@@ -16,10 +16,7 @@ from cassandra import InvalidRequest
 from cassandra.cluster import Cluster
 from cassandra.cqltypes import Int32Type, EMPTY
 from cassandra.decoder import dict_factory
-try:
-    from collections import OrderedDict
-except ImportError:
-    from cassandra.util import OrderedDict  # noqa
+from cassandra.util import OrderedDict
 
 from tests.integration import get_server_versions
 

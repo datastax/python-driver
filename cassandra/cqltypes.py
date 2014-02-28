@@ -31,6 +31,7 @@ from cassandra.marshal import (int8_pack, int8_unpack, uint16_pack, uint16_unpac
                                int32_pack, int32_unpack, int64_pack, int64_unpack,
                                float_pack, float_unpack, double_pack, double_unpack,
                                varint_pack, varint_unpack)
+from cassandra.util import OrderedDict
 
 apache_cassandra_type_prefix = 'org.apache.cassandra.db.marshal.'
 
@@ -45,11 +46,6 @@ except ImportError:
         "You can find the blist library here: https://pypi.python.org/pypi/blist/")
 
     sortedset = set
-
-try:
-    from collections import OrderedDict
-except ImportError:  # Python <2.7
-    from cassandra.util import OrderedDict # NOQA
 
 
 def trim_if_startswith(s, prefix):

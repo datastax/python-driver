@@ -13,13 +13,8 @@ try:
 except ImportError:
     sortedset = set
 
-try:
-    from collections import OrderedDict
-except ImportError:  # Python <2.7
-    from cassandra.util import OrderedDict # NOQA
-
-
 from cassandra.cqltypes import lookup_casstype
+from cassandra.util import OrderedDict
 
 marshalled_value_pairs = (
     # binary form, type, python native type
