@@ -259,3 +259,12 @@ class OperationTimedOut(Exception):
         self.last_host = last_host
         message = "errors=%s, last_host=%s" % (self.errors, self.last_host)
         Exception.__init__(self, message)
+
+
+class UnsupportedOperation(Exception):
+    """
+    An attempt was made to use a feature that is not supported by the
+    selected protocol version.  See :attr:`Cluster.protocol_version`
+    for more details.
+    """
+    pass

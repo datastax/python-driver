@@ -20,7 +20,8 @@ except ImportError:
     from StringIO import StringIO  # ignore flake8 warning: # NOQA
 
 from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
-                       AlreadyExists, InvalidRequest, Unauthorized)
+                       AlreadyExists, InvalidRequest, Unauthorized,
+                       UnsupportedOperation)
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
                                int8_pack, int8_unpack)
 from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
@@ -87,6 +88,7 @@ class _MessageType(object):
     params = ()
 
     tracing = False
+    since_protocol_version = 1
 
     def __init__(self, **kwargs):
         for pname in self.params:
@@ -98,6 +100,13 @@ class _MessageType(object):
             setattr(self, pname, pval)
 
     def to_string(self, stream_id, protocol_version, compression=None):
+        if protocol_version < self.since_protocol_version:
+            raise UnsupportedOperation(
+                "The protocol version in use (currently %d, configurable through "
+                "Cluster.protocol_version) does not support this operation, "
+                "which requires a protocol version of %d or higher."
+                % (protocol_version, self.since_protocol_version))
+
         body = StringIO()
         self.send_body(body)
         body = body.getvalue()
