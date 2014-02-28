@@ -15,6 +15,8 @@ Bug Fixes
   TimestampType to fix sorting of pre-unix epoch dates in CASSANDRA-5723.)
 * Handle latest table options when parsing the schema and generating
   CREATE statements.
+* Avoid 'Set changed size during iteration' during query plan generation
+  when hosts go up or down
 
 Other
 -----
