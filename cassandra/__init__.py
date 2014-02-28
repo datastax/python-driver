@@ -60,6 +60,19 @@ class ConsistencyLevel(object):
     Requires a quorum of replicas in each datacenter
     """
 
+    SERIAL = 8
+    """
+    For conditional inserts/updates that utilize Cassandra's lightweight
+    transactions, this requires consensus among all replicas for the
+    modified data.
+    """
+
+    LOCAL_SERIAL = 9
+    """
+    Like :attr:`~ConsistencyLevel.SERIAL`, but only requires consensus
+    among replicas in the local datacenter.
+    """
+
     LOCAL_ONE = 10
     """
     Sends a request only to replicas in the local datacenter and waits for
@@ -75,6 +88,8 @@ ConsistencyLevel.value_to_name = {
     ConsistencyLevel.ALL: 'ALL',
     ConsistencyLevel.LOCAL_QUORUM: 'LOCAL_QUORUM',
     ConsistencyLevel.EACH_QUORUM: 'EACH_QUORUM',
+    ConsistencyLevel.SERIAL: 'SERIAL',
+    ConsistencyLevel.LOCAL_SERIAL: 'LOCAL_SERIAL',
     ConsistencyLevel.LOCAL_ONE: 'LOCAL_ONE'
 }
 
@@ -87,6 +102,8 @@ ConsistencyLevel.name_to_value = {
     'ALL': ConsistencyLevel.ALL,
     'LOCAL_QUORUM': ConsistencyLevel.LOCAL_QUORUM,
     'EACH_QUORUM': ConsistencyLevel.EACH_QUORUM,
+    'SERIAL': ConsistencyLevel.SERIAL,
+    'LOCAL_SERIAL': ConsistencyLevel.LOCAL_SERIAL,
     'LOCAL_ONE': ConsistencyLevel.LOCAL_ONE
 }
 
