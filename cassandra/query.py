@@ -308,6 +308,81 @@ class BoundStatement(Statement):
     __repr__ = __str__
 
 
+class BatchType(object):
+
+    LOGGED = None
+    """
+    Atomic batch operation.
+    """
+
+    UNLOGGED = None
+    """
+    Non-atomic batch operation.
+    """
+
+    COUNTER = None
+    """
+    Batches of counter operations.
+    """
+
+    def __init__(self, name, value):
+        self.name = name
+        self.value = value
+
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return "BatchType<%s>" % (self.name, )
+
+
+BatchType.LOGGED = BatchType(0, "LOGGED")
+BatchType.UNLOGGED = BatchType(0, "UNLOGGED")
+BatchType.COUNTER = BatchType(0, "COUNTER")
+
+
+class BatchStatement(Statement):
+
+    batch_type = None
+
+    _statements_and_parameters = None
+
+    def __init__(self, batch_type=BatchType.LOGGED, retry_policy=None,
+                 consistency_level=None):
+        self.batch_type = batch_type
+        self._statements_and_parameters = []
+        Statement.__init__(self, retry_policy=retry_policy, consistency_level=consistency_level)
+
+    def add(self, statement, parameters=None):
+        if isinstance(statement, basestring):
+            if parameters:
+                self._statements_and_parameters.append(
+                    (bind_params(statement, parameters), ()))
+            else:
+                self._statements_and_parameters.append((statement, ()))
+        else:
+            try:
+                # see if it's a PreparedStatement
+                string_or_id = statement.query_id
+            except AttributeError:
+                # it must be a SimpleStatement
+                string_or_id = statement.query_string
+
+            parameters = () if parameters is None else parameters
+            self._statements_and_parameters.append((string_or_id, parameters))
+        return self
+
+    def add_all(self, statements, parameters):
+        for statement, value in zip(statements, parameters):
+            self.add(statement, parameters)
+
+    def __str__(self):
+        consistency = ConsistencyLevel.value_to_name[self.consistency_level]
+        return (u'<BatchStatement type=%s, statements=%d, consistency=%s>' %
+                (self.batch_type, len(self._statements_and_values), consistency))
+    __repr__ = __str__
+
+
 class ValueSequence(object):
     """
     A wrapper class that is used to specify that a sequence of values should

@@ -108,15 +108,6 @@ ConsistencyLevel.name_to_value = {
 }
 
 
-class BatchType(object):
-
-    LOGGED = 0
-
-    UNLOGGED = 1
-
-    COUNTER = 2
-
-
 class Unavailable(Exception):
     """
     There were not enough live replicas to satisfy the requested consistency
