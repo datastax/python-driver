@@ -18,10 +18,15 @@ except ImportError as e:
 
 CLUSTER_NAME = 'test_cluster'
 CCM_CLUSTER = None
+DEFAULT_CASSANDRA_VERSION = '1.2.15'
+
 
 path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ccm')
 if not os.path.exists(path):
     os.mkdir(path)
+
+cass_version = None
+cql_version = None
 
 
 def get_server_versions():
@@ -29,6 +34,11 @@ def get_server_versions():
     Probe system.local table to determine Cassandra and CQL version.
     Returns a tuple of (cassandra_version, cql_version).
     """
+    global cass_version, cql_version
+
+    if cass_version is not None:
+        return (cass_version, cql_version)
+
     c = Cluster()
     s = c.connect()
     s.set_keyspace('system')
@@ -65,7 +75,8 @@ def setup_package():
             cluster.clear()
         except Exception:
             log.debug("Creating new ccm test cluster")
-            cluster = CCMCluster(path, CLUSTER_NAME, cassandra_version='1.2.9')
+            version = os.getenv("CASSANDRA_VERSION", DEFAULT_CASSANDRA_VERSION)
+            cluster = CCMCluster(path, CLUSTER_NAME, cassandra_version=version)
             cluster.set_configuration_options({'start_native_transport': True})
             common.switch_cluster(path, CLUSTER_NAME)
             cluster.populate(3)
