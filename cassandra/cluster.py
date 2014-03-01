@@ -39,8 +39,8 @@ from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
 from cassandra.pool import (_ReconnectionHandler, _HostReconnectionHandler,
                             HostConnectionPool)
 from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
-                             bind_params, QueryTrace, Statement, named_tuple_factory,
-                             dict_factory)
+                             BatchStatement, bind_params, encode_params,
+                             QueryTrace, Statement, named_tuple_factory, dict_factory)
 
 # libev is all around faster, so we want to try and default to using that when we can
 try:
@@ -941,6 +941,7 @@ class Session(object):
     _pools = None
     _load_balancer = None
     _metrics = None
+    _protocol_version = None
 
     def __init__(self, cluster, hosts):
         self.cluster = cluster
@@ -950,6 +951,7 @@ class Session(object):
         self._pools = {}
         self._load_balancer = cluster.load_balancing_policy
         self._metrics = cluster.metrics
+        self._protocol_version = self.cluster.protocol_version
 
         # create connection pools in parallel
         futures = []
@@ -1052,23 +1054,32 @@ class Session(object):
 
     def _create_response_future(self, query, parameters, trace):
         """ Returns the ResponseFuture before calling send_request() on it """
+
         prepared_statement = None
+
         if isinstance(query, basestring):
             query = SimpleStatement(query)
         elif isinstance(query, PreparedStatement):
             query = query.bind(parameters)
 
-        if isinstance(query, BoundStatement):
+        if isinstance(query, SimpleStatement):
+            if self._protocol_version >= 2:
+                if parameters:
+                    parameters = encode_params(parameters)
+                message = QueryMessage(
+                    query=query.query_string, consistency_level=query.consistency_level,
+                    parameters=parameters)
+            else:
+                query_string = query.query_string
+                if parameters:
+                    query_string = bind_params(query.query_string, parameters)
+                message = QueryMessage(query=query_string, consistency_level=query.consistency_level)
+        elif isinstance(query, BoundStatement):
             message = ExecuteMessage(
                 query_id=query.prepared_statement.query_id,
                 query_params=query.values,
                 consistency_level=query.consistency_level)
             prepared_statement = query.prepared_statement
-        else:
-            query_string = query.query_string
-            if parameters:
-                query_string = bind_params(query.query_string, parameters)
-            message = QueryMessage(query=query_string, consistency_level=query.consistency_level)
 
         if trace:
             message.tracing = True
