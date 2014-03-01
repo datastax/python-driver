@@ -15,7 +15,7 @@ except ImportError:
 from cassandra import InvalidRequest
 from cassandra.cluster import Cluster
 from cassandra.cqltypes import Int32Type, EMPTY
-from cassandra.decoder import dict_factory
+from cassandra.query import dict_factory
 from cassandra.util import OrderedDict
 
 from tests.integration import get_server_versions

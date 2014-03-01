@@ -4,7 +4,7 @@ except ImportError:
     import unittest # noqa
 
 from cassandra.cluster import Cluster
-from cassandra.decoder import tuple_factory, named_tuple_factory, dict_factory, ordered_dict_factory
+from cassandra.query import tuple_factory, named_tuple_factory, dict_factory, ordered_dict_factory
 from cassandra.util import OrderedDict
 
 

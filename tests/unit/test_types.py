@@ -3,7 +3,7 @@ import datetime
 import cassandra
 from cassandra.cqltypes import (BooleanType, lookup_casstype_simple, lookup_casstype,
                                 LongType, DecimalType, SetType, cql_typename)
-from cassandra.decoder import named_tuple_factory
+from cassandra.query import named_tuple_factory
 
 
 class TypeTests(unittest.TestCase):

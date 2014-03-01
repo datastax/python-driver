@@ -3,9 +3,9 @@ try:
 except ImportError:
     import unittest # noqa
 
-from cassandra.query import PreparedStatement, BoundStatement, ValueSequence, SimpleStatement
+from cassandra.query import (PreparedStatement, BoundStatement, ValueSequence,
+                             SimpleStatement, dict_factory)
 from cassandra.cluster import Cluster
-from cassandra.decoder import dict_factory
 
 
 class QueryTest(unittest.TestCase):
