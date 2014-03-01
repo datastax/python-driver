@@ -8,8 +8,7 @@ except ImportError:
     from StringIO import StringIO  # ignore flake8 warning: # NOQA
 
 from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
-                       AlreadyExists, InvalidRequest, Unauthorized,
-                       UnsupportedOperation)
+                       AlreadyExists, InvalidRequest, Unauthorized)
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
                                int8_pack, int8_unpack)
 from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
@@ -18,6 +17,7 @@ from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 InetAddressType, IntegerType, ListType,
                                 LongType, MapType, SetType, TimeUUIDType,
                                 UTF8Type, UUIDType, lookup_casstype)
+from cassandra.query import SimpleStatement
 
 log = logging.getLogger(__name__)
 
@@ -51,7 +51,6 @@ class _MessageType(object):
     params = ()
 
     tracing = False
-    since_protocol_version = 1
 
     def __init__(self, **kwargs):
         for pname in self.params:
@@ -63,13 +62,6 @@ class _MessageType(object):
             setattr(self, pname, pval)
 
     def to_string(self, stream_id, protocol_version, compression=None):
-        if protocol_version < self.since_protocol_version:
-            raise UnsupportedOperation(
-                "The protocol version in use (currently %d, configurable through "
-                "Cluster.protocol_version) does not support this operation, "
-                "which requires a protocol version of %d or higher."
-                % (protocol_version, self.since_protocol_version))
-
         body = StringIO()
         self.send_body(body)
         body = body.getvalue()
@@ -519,6 +511,28 @@ class ExecuteMessage(_MessageType):
         write_short(f, len(self.query_params))
         for param in self.query_params:
             write_value(f, param)
+        write_consistency_level(f, self.consistency_level)
+
+
+class BatchMessage(_MessageType):
+    opcode = 0x0D
+    name = 'BATCH'
+    params = ('batch_type', 'queries', 'consistency_level',)
+
+    def send_body(self, f):
+        write_byte(f, self.batch_type.value)
+        write_short(f, len(self.queries))
+        for query, params in self.queries:
+            if isinstance(f, SimpleStatement):
+                write_byte(f, 0)
+                write_longstring(f, query.query_string)
+            else:
+                write_byte(f, 1)
+                write_short(f, query.query_id)
+            write_short(f, len(params))
+            for param in params:
+                write_value(f, param)
+
         write_consistency_level(f, self.consistency_level)
 
 

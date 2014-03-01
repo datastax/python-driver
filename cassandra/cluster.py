@@ -20,7 +20,8 @@ except ImportError:
 from functools import partial, wraps
 from itertools import groupby
 
-from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut
+from cassandra import (ConsistencyLevel, AuthenticationFailed,
+                       OperationTimedOut, UnsupportedOperation)
 from cassandra.connection import ConnectionException, ConnectionShutdown
 from cassandra.decoder import (QueryMessage, ResultMessage,
                                ErrorMessage, ReadTimeoutErrorMessage,
@@ -1080,6 +1081,16 @@ class Session(object):
                 query_params=query.values,
                 consistency_level=query.consistency_level)
             prepared_statement = query.prepared_statement
+        elif isinstance(query, BatchStatement):
+            if self._protocol_version < 2:
+                raise UnsupportedOperation(
+                    "BatchStatement execution is only supported with protocol version "
+                    "2 or higher (supported in Cassandra 2.0 and higher).  Consider "
+                    "setting Cluster.protocol_version to 2 to support this operation.")
+            message = BatchMessage(
+                batch_type=query.batch_type,
+                queries=query._statements_and_values,
+                consistency_level=query.consistency_level)
 
         if trace:
             message.tracing = True
