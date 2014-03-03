@@ -5,6 +5,8 @@ except ImportError:
 
 from itertools import islice, cycle
 from mock import Mock
+from random import randint
+import sys
 import struct
 from threading import Thread
 
@@ -88,11 +90,51 @@ class TestRoundRobinPolicy(unittest.TestCase):
         map(lambda t: t.start(), threads)
         map(lambda t: t.join(), threads)
 
+    def test_thread_safety_during_modification(self):
+        hosts = range(100)
+        policy = RoundRobinPolicy()
+        policy.populate(None, hosts)
+
+        errors = []
+
+        def check_query_plan():
+            try:
+                for i in xrange(100):
+                    list(policy.make_query_plan())
+            except Exception as exc:
+                errors.append(exc)
+
+        def host_up():
+            for i in xrange(1000):
+                policy.on_up(randint(0, 99))
+
+        def host_down():
+            for i in xrange(1000):
+                policy.on_down(randint(0, 99))
+
+        threads = []
+        for i in range(5):
+            threads.append(Thread(target=check_query_plan))
+            threads.append(Thread(target=host_up))
+            threads.append(Thread(target=host_down))
+
+        # make the GIL switch after every instruction, maximizing
+        # the chace of race conditions
+        original_interval = sys.getcheckinterval()
+        try:
+            sys.setcheckinterval(0)
+            map(lambda t: t.start(), threads)
+            map(lambda t: t.join(), threads)
+        finally:
+            sys.setcheckinterval(original_interval)
+
+        if errors:
+            self.fail("Saw errors: %s" % (errors,))
+
     def test_no_live_nodes(self):
         """
         Ensure query plan for a downed cluster will execute without errors
         """
-
         hosts = [0, 1, 2, 3]
         policy = RoundRobinPolicy()
         policy.populate(None, hosts)
@@ -407,6 +449,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
         policy.on_down(hosts[3])
         qplan = list(policy.make_query_plan())
         self.assertEqual(qplan, [])
+
 
 class ConvictionPolicyTest(unittest.TestCase):
     def test_not_implemented(self):

@@ -138,8 +138,8 @@ class SchemaMetadataTest(unittest.TestCase):
         self.assertEqual([], tablemeta.clustering_key)
         self.assertEqual([u'a', u'b', u'c'], sorted(tablemeta.columns.keys()))
 
-        for option in TableMetadata.recognized_options:
-            self.assertTrue(option in tablemeta.options)
+        for option in tablemeta.options:
+            self.assertIn(option, TableMetadata.recognized_options)
 
         self.check_create_statement(tablemeta, create_statement)
 
@@ -295,7 +295,7 @@ class TestCodeCoverage(unittest.TestCase):
         cluster = Cluster()
         cluster.connect()
 
-        self.assertIsInstance(cluster.metadata.export_schema_as_string(), unicode)
+        self.assertIsInstance(cluster.metadata.export_schema_as_string(), basestring)
 
     def test_export_keyspace_schema(self):
         """
@@ -307,8 +307,47 @@ class TestCodeCoverage(unittest.TestCase):
 
         for keyspace in cluster.metadata.keyspaces:
             keyspace_metadata = cluster.metadata.keyspaces[keyspace]
-            self.assertIsInstance(keyspace_metadata.export_as_string(), unicode)
-            self.assertIsInstance(keyspace_metadata.as_cql_query(), unicode)
+            self.assertIsInstance(keyspace_metadata.export_as_string(), basestring)
+            self.assertIsInstance(keyspace_metadata.as_cql_query(), basestring)
+
+    def test_case_sensitivity(self):
+        """
+        Test that names that need to be escaped in CREATE statements are
+        """
+
+        cluster = Cluster()
+        session = cluster.connect()
+
+        ksname = 'AnInterestingKeyspace'
+        cfname = 'AnInterestingTable'
+
+        session.execute("""
+            CREATE KEYSPACE "%s"
+            WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
+            """ % (ksname,))
+        session.execute("""
+            CREATE TABLE "%s"."%s" (
+                k int,
+                "A" int,
+                "B" int,
+                "MyColumn" int,
+                PRIMARY KEY (k, "A"))
+            WITH CLUSTERING ORDER BY ("A" DESC)
+            """ % (ksname, cfname))
+        session.execute("""
+            CREATE INDEX myindex ON "%s"."%s" ("MyColumn")
+            """ % (ksname, cfname))
+
+        ksmeta = cluster.metadata.keyspaces[ksname]
+        schema = ksmeta.export_as_string()
+        self.assertIn('CREATE KEYSPACE "AnInterestingKeyspace"', schema)
+        self.assertIn('CREATE TABLE "AnInterestingKeyspace"."AnInterestingTable"', schema)
+        self.assertIn('"A" int', schema)
+        self.assertIn('"B" int', schema)
+        self.assertIn('"MyColumn" int', schema)
+        self.assertIn('PRIMARY KEY (k, "A")', schema)
+        self.assertIn('WITH CLUSTERING ORDER BY ("A" DESC)', schema)
+        self.assertIn('CREATE INDEX myindex ON "AnInterestingKeyspace"."AnInterestingTable" ("MyColumn")', schema)
 
     def test_already_exists_exceptions(self):
         """
@@ -365,8 +404,8 @@ class TestCodeCoverage(unittest.TestCase):
 
         for i, token in enumerate(ring):
             self.assertEqual(set(get_replicas('test3rf', token)), set(owners))
-            self.assertEqual(set(get_replicas('test2rf', token)), set([owners[i], owners[(i + 1) % 3]]))
-            self.assertEqual(set(get_replicas('test1rf', token)), set([owners[i]]))
+            self.assertEqual(set(get_replicas('test2rf', token)), set([owners[(i + 1) % 3], owners[(i + 2) % 3]]))
+            self.assertEqual(set(get_replicas('test1rf', token)), set([owners[(i + 1) % 3]]))
 
 
 class TokenMetadataTest(unittest.TestCase):
@@ -393,12 +432,13 @@ class TokenMetadataTest(unittest.TestCase):
         token_map = TokenMap(MD5Token, token_to_primary_replica, tokens, metadata)
 
         # tokens match node tokens exactly
-        for token, expected_host in zip(tokens, hosts):
+        for i, token in enumerate(tokens):
+            expected_host = hosts[(i + 1) % len(hosts)]
             replicas = token_map.get_replicas("ks", token)
             self.assertEqual(set(replicas), set([expected_host]))
 
         # shift the tokens back by one
-        for token, expected_host in zip(tokens[1:], hosts[1:]):
+        for token, expected_host in zip(tokens, hosts):
             replicas = token_map.get_replicas("ks", MD5Token(str(token.value - 1)))
             self.assertEqual(set(replicas), set([expected_host]))
 

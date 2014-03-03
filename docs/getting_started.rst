@@ -123,7 +123,7 @@ when you execute:
 
 It is translated to the following CQL query:
 
-.. code-block:: SQL
+.. code-block::
 
     INSERT INTO users (name, credits, user_id)
     VALUES ('John O''Reilly', 42, 2644bada-852c-11e3-89fb-e0b9a54a6d93)
@@ -297,7 +297,7 @@ There are a few important things to remember when working with callbacks:
 
 
 Setting a Consistency Level
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+---------------------------
 The consistency level used for a query determines how many of the
 replicas of the data you are interacting with need to respond for
 the query to be considered a success.
@@ -345,3 +345,34 @@ is different than for simple, non-prepared statements (although future versions
 of the driver may use the same placeholders for both).  Cassandra 2.0 added
 support for named placeholders; the 1.0 version of the driver does not support
 them, but the 2.0 version will.
+
+Setting a Consistency Level with Prepared Statements
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+To specify a consistency level for prepared statements, you have two options.
+
+The first is to set a default consistency level for every execution of the
+prepared statement:
+
+.. code-block:: python
+
+    from cassandra import ConsistencyLevel
+
+    cluster = Cluster()
+    session = cluster.connect("mykeyspace")
+    user_lookup_stmt = session.prepare("SELECT * FROM users WHERE user_id=?")
+    user_lookup_stmt.consistency_level = ConsistencyLevel.QUORUM
+
+    # these will both use QUORUM
+    user1 = session.execute(user_lookup_stmt, [user_id1])[0]
+    user2 = session.execute(user_lookup_stmt, [user_id2])[0]
+
+The second option is to create a :class:`~.BoundStatement` from the
+:class:`~.PreparedStatement` and binding paramaters and set a consistency
+level on that:
+
+.. code-block:: python
+
+    # override the QUORUM default
+    user3_lookup = user_lookup_stmt.bind([user_id3]
+    user3_lookup.consistency_level = ConsistencyLevel.ALL
+    user3 = session.execute(user3_lookup)

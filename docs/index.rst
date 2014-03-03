@@ -1,8 +1,6 @@
 Python Cassandra Driver
 =======================
 
-Contents:
-
 .. toctree::
    :maxdepth: 2
 

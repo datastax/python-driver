@@ -1,6 +1,38 @@
+1.0.2
+=====
+In Progress
+
+Bug Fixes
+---------
+* With asyncorereactor, correctly handle EAGAIN/EWOULDBLOCK when the message from
+  Cassandra is a multiple of the read buffer size.  Previously, if no more data
+  became available to read on the socket, the message would never be processed,
+  resulting in an OperationTimedOut error.
+* Double quote keyspace, table and column names that require them (those using
+  uppercase characters or keywords) when generating CREATE statements through
+  KeyspaceMetadata and TableMetadata.
+* Decode TimestampType as DateType.  (Cassandra replaced DateType with
+  TimestampType to fix sorting of pre-unix epoch dates in CASSANDRA-5723.)
+* Handle latest table options when parsing the schema and generating
+  CREATE statements.
+* Avoid 'Set changed size during iteration' during query plan generation
+  when hosts go up or down
+
+Other
+-----
+* Remove ignored ``tracing_enabled`` parameter for ``SimpleStatement``.  The
+  correct way to trace a query is by setting the ``trace`` argument to ``True``
+  in ``Session.execute()`` and ``Session.execute_async()``.
+* Raise TypeError instead of cassandra.query.InvalidParameterTypeError when
+  a parameter for a prepared statement has the wrong type; remove
+  cassandra.query.InvalidParameterTypeError.
+* More consistent type checking for query parameters
+* Add option to a return special object for empty string values for non-string
+  columns
+
 1.0.1
 =====
-(In Progress)
+Feb 19, 2014
 
 Bug Fixes
 ---------
@@ -9,12 +41,24 @@ Bug Fixes
 * Always close socket when defuncting error'ed connections to avoid a potential
   file descriptor leak
 * Handle "custom" types (such as the replaced DateType) correctly
+* With libevreactor, correctly handle EAGAIN/EWOULDBLOCK when the message from
+  Cassandra is a multiple of the read buffer size.  Previously, if no more data
+  became available to read on the socket, the message would never be processed,
+  resulting in an OperationTimedOut error.
+* Don't break tracing when a Session's row_factory is not the default
+  namedtuple_factory.
+* Handle data that is already utf8-encoded for UTF8Type values
+* Fix token-aware routing for tokens that fall before the first node token in
+  the ring and tokens that exactly match a node's token
+* Tolerate null source_elapsed values for Trace events.  These may not be
+  set when events complete after the main operation has already completed.
 
 Other
 -----
 * Skip sending OPTIONS message on connection creation if compression is
   disabled or not available and a CQL version has not been explicitly
   set
+* Add details about errors and the last queried host to ``OperationTimedOut``
 
 1.0.0 Final
 ===========

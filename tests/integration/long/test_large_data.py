@@ -31,6 +31,7 @@ class LargeDataTests(unittest.TestCase):
     def make_session_and_keyspace(self):
         cluster = Cluster()
         session = cluster.connect()
+        session.default_timeout = 20.0  # increase the default timeout
         session.row_factory = dict_factory
 
         create_schema(session, self.keyspace)

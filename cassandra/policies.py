@@ -1,6 +1,7 @@
 from itertools import islice, cycle, groupby, repeat
 import logging
 from random import randint
+from threading import Lock
 
 from cassandra import ConsistencyLevel
 
@@ -78,6 +79,11 @@ class LoadBalancingPolicy(HostStateListener):
     custom behavior.
     """
 
+    _hosts_lock = None
+
+    def __init__(self):
+        self._hosts_lock = Lock()
+
     def distance(self, host):
         """
         Returns a measure of how remote a :class:`~.pool.Host` is in
@@ -130,7 +136,7 @@ class RoundRobinPolicy(LoadBalancingPolicy):
     """
 
     def populate(self, cluster, hosts):
-        self._live_hosts = set(hosts)
+        self._live_hosts = frozenset(hosts)
         if len(hosts) <= 1:
             self._position = 0
         else:
@@ -145,24 +151,29 @@ class RoundRobinPolicy(LoadBalancingPolicy):
         pos = self._position
         self._position += 1
 
-        length = len(self._live_hosts)
+        hosts = self._live_hosts
+        length = len(hosts)
         if length:
             pos %= length
-            return list(islice(cycle(self._live_hosts), pos, pos + length))
+            return list(islice(cycle(hosts), pos, pos + length))
         else:
             return []
 
     def on_up(self, host):
-        self._live_hosts.add(host)
+        with self._hosts_lock:
+            self._live_hosts = self._live_hosts.union((host, ))
 
     def on_down(self, host):
-        self._live_hosts.discard(host)
+        with self._hosts_lock:
+            self._live_hosts = self._live_hosts.difference((host, ))
 
     def on_add(self, host):
-        self._live_hosts.add(host)
+        with self._hosts_lock:
+            self._live_hosts = self._live_hosts.union((host, ))
 
     def on_remove(self, host):
-        self._live_hosts.remove(host)
+        with self._hosts_lock:
+            self._live_hosts = self._live_hosts.difference((host, ))
 
 
 class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
@@ -191,13 +202,14 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
         self.local_dc = local_dc
         self.used_hosts_per_remote_dc = used_hosts_per_remote_dc
         self._dc_live_hosts = {}
+        LoadBalancingPolicy.__init__(self)
 
     def _dc(self, host):
         return host.datacenter or self.local_dc
 
     def populate(self, cluster, hosts):
         for dc, dc_hosts in groupby(hosts, lambda h: self._dc(h)):
-            self._dc_live_hosts[dc] = set(dc_hosts)
+            self._dc_live_hosts[dc] = frozenset(dc_hosts)
 
         # position is currently only used for local hosts
         local_live = self._dc_live_hosts.get(self.local_dc)
@@ -244,16 +256,28 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
                 yield host
 
     def on_up(self, host):
-        self._dc_live_hosts.setdefault(self._dc(host), set()).add(host)
+        dc = self._dc(host)
+        with self._hosts_lock:
+            current_hosts = self._dc_live_hosts.setdefault(dc, frozenset())
+            self._dc_live_hosts[dc] = current_hosts.union((host, ))
 
     def on_down(self, host):
-        self._dc_live_hosts.setdefault(self._dc(host), set()).discard(host)
+        dc = self._dc(host)
+        with self._hosts_lock:
+            current_hosts = self._dc_live_hosts.setdefault(dc, frozenset())
+            self._dc_live_hosts[dc] = current_hosts.difference((host, ))
 
     def on_add(self, host):
-        self._dc_live_hosts.setdefault(self._dc(host), set()).add(host)
+        dc = self._dc(host)
+        with self._hosts_lock:
+            current_hosts = self._dc_live_hosts.setdefault(dc, frozenset())
+            self._dc_live_hosts[dc] = current_hosts.union((host, ))
 
     def on_remove(self, host):
-        self._dc_live_hosts.setdefault(self._dc(host), set()).discard(host)
+        dc = self._dc(host)
+        with self._hosts_lock:
+            current_hosts = self._dc_live_hosts.setdefault(dc, frozenset())
+            self._dc_live_hosts[dc] = current_hosts.difference((host, ))
 
 
 class TokenAwarePolicy(LoadBalancingPolicy):
@@ -351,12 +375,10 @@ class WhiteListRoundRobinPolicy(RoundRobinPolicy):
         :param hosts: List of hosts
         """
         self._allowed_hosts = hosts
+        RoundRobinPolicy.__init__(self)
 
     def populate(self, cluster, hosts):
-        self._live_hosts = set()
-        for host in hosts:
-            if host.address in self._allowed_hosts:
-                self._live_hosts.add(host)
+        self._live_hosts = frozenset(h for h in hosts if h.address in self._allowed_hosts)
 
         if len(hosts) <= 1:
             self._position = 0
@@ -371,14 +393,11 @@ class WhiteListRoundRobinPolicy(RoundRobinPolicy):
 
     def on_up(self, host):
         if host.address in self._allowed_hosts:
-            self._live_hosts.add(host)
+            RoundRobinPolicy.on_up(self, host)
 
     def on_add(self, host):
         if host.address in self._allowed_hosts:
-            self._live_hosts.add(host)
-
-    def on_remove(self, host):
-        self._live_hosts.discard(host)
+            RoundRobinPolicy.on_add(self, host)
 
 
 class ConvictionPolicy(object):

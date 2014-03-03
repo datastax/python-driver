@@ -152,11 +152,34 @@ def lookup_casstype(casstype):
         raise ValueError("Don't know how to parse type string %r: %s" % (casstype, e))
 
 
+class EmptyValue(object):
+    """ See _CassandraType.support_empty_values """
+
+    def __str__(self):
+        return "EMPTY"
+    __repr__ = __str__
+
+EMPTY = EmptyValue()
+
+
 class _CassandraType(object):
     __metaclass__ = CassandraTypeType
     subtypes = ()
     num_subtypes = 0
     empty_binary_ok = False
+
+    support_empty_values = False
+    """
+    Back in the Thrift days, empty strings were used for "null" values of
+    all types, including non-string types.  For most users, an empty
+    string value in an int column is the same as being null/not present,
+    so the driver normally returns None in this case.  (For string-like
+    types, it *will* return an empty string by default instead of None.)
+
+    To avoid this behavior, set this to :const:`True`. Instead of returning
+    None for empty string values, the EMPTY singleton (an instance
+    of EmptyValue) will be returned.
+    """
 
     def __init__(self, val):
         self.val = self.validate(val)
@@ -181,8 +204,10 @@ class _CassandraType(object):
         for more information. This method differs in that if None or the empty
         string is passed in, None may be returned.
         """
-        if byts is None or (byts == '' and not cls.empty_binary_ok):
+        if byts is None:
             return None
+        elif byts == '' and not cls.empty_binary_ok:
+            return EMPTY if cls.support_empty_values else None
         return cls.deserialize(byts)
 
     @classmethod
@@ -315,7 +340,10 @@ class DecimalType(_CassandraType):
 
     @staticmethod
     def serialize(dec):
-        sign, digits, exponent = dec.as_tuple()
+        try:
+            sign, digits, exponent = dec.as_tuple()
+        except AttributeError:
+            raise TypeError("Non-Decimal type received for Decimal value")
         unscaled = int(''.join([str(digit) for digit in digits]))
         if sign:
             unscaled *= -1
@@ -333,7 +361,10 @@ class UUIDType(_CassandraType):
 
     @staticmethod
     def serialize(uuid):
-        return uuid.bytes
+        try:
+            return uuid.bytes
+        except AttributeError:
+            raise TypeError("Got a non-UUID object for a UUID value")
 
 
 class BooleanType(_CassandraType):
@@ -349,7 +380,7 @@ class BooleanType(_CassandraType):
 
     @staticmethod
     def serialize(truth):
-        return int8_pack(bool(truth))
+        return int8_pack(truth)
 
 
 class AsciiType(_CassandraType):
@@ -503,6 +534,10 @@ class DateType(_CassandraType):
         return int64_pack(long(converted))
 
 
+class TimestampType(DateType):
+    pass
+
+
 class TimeUUIDType(DateType):
     typename = 'timeuuid'
 
@@ -515,7 +550,10 @@ class TimeUUIDType(DateType):
 
     @staticmethod
     def serialize(timeuuid):
-        return timeuuid.bytes
+        try:
+            return timeuuid.bytes
+        except AttributeError:
+            raise TypeError("Got a non-UUID object for a UUID value")
 
 
 class UTF8Type(_CassandraType):
@@ -528,7 +566,11 @@ class UTF8Type(_CassandraType):
 
     @staticmethod
     def serialize(ustr):
-        return ustr.encode('utf8')
+        try:
+            return ustr.encode('utf-8')
+        except UnicodeDecodeError:
+            # already utf-8
+            return ustr
 
 
 class VarcharType(UTF8Type):
@@ -578,6 +620,9 @@ class _SimpleParameterizedType(_ParameterizedType):
 
     @classmethod
     def serialize_safe(cls, items):
+        if isinstance(items, basestring):
+            raise TypeError("Received a string for a type that expects a sequence")
+
         subtype, = cls.subtypes
         buf = StringIO()
         buf.write(uint16_pack(len(items)))
@@ -634,7 +679,11 @@ class MapType(_ParameterizedType):
         subkeytype, subvaltype = cls.subtypes
         buf = StringIO()
         buf.write(uint16_pack(len(themap)))
-        for key, val in themap.iteritems():
+        try:
+            items = themap.iteritems()
+        except AttributeError:
+            raise TypeError("Got a non-map object for a map value")
+        for key, val in items:
             keybytes = subkeytype.to_binary(key)
             valbytes = subvaltype.to_binary(val)
             buf.write(uint16_pack(len(keybytes)))
