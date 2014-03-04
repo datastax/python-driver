@@ -286,7 +286,7 @@ class Metadata(object):
     def _build_column_metadata(self, table_metadata, row):
         name = row["column_name"]
         data_type = types.lookup_casstype(row["validator"])
-        is_static = row["type"] == "static"
+        is_static = row.get("type", None) == "static"
         column_meta = ColumnMetadata(table_metadata, name, data_type, is_static=is_static)
         index_meta = self._build_index_metadata(column_meta, row)
         column_meta.index = index_meta
