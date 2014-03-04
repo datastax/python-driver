@@ -1,5 +1,9 @@
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
+
 from binascii import unhexlify
-import unittest
 import datetime
 import cassandra
 from cassandra.cqltypes import (BooleanType, lookup_casstype_simple, lookup_casstype,
