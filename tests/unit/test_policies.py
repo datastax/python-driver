@@ -5,6 +5,8 @@ except ImportError:
 
 from itertools import islice, cycle
 from mock import Mock
+from random import randint
+import sys
 import struct
 from threading import Thread
 
@@ -88,11 +90,51 @@ class TestRoundRobinPolicy(unittest.TestCase):
         map(lambda t: t.start(), threads)
         map(lambda t: t.join(), threads)
 
+    def test_thread_safety_during_modification(self):
+        hosts = range(100)
+        policy = RoundRobinPolicy()
+        policy.populate(None, hosts)
+
+        errors = []
+
+        def check_query_plan():
+            try:
+                for i in xrange(100):
+                    list(policy.make_query_plan())
+            except Exception as exc:
+                errors.append(exc)
+
+        def host_up():
+            for i in xrange(1000):
+                policy.on_up(randint(0, 99))
+
+        def host_down():
+            for i in xrange(1000):
+                policy.on_down(randint(0, 99))
+
+        threads = []
+        for i in range(5):
+            threads.append(Thread(target=check_query_plan))
+            threads.append(Thread(target=host_up))
+            threads.append(Thread(target=host_down))
+
+        # make the GIL switch after every instruction, maximizing
+        # the chace of race conditions
+        original_interval = sys.getcheckinterval()
+        try:
+            sys.setcheckinterval(0)
+            map(lambda t: t.start(), threads)
+            map(lambda t: t.join(), threads)
+        finally:
+            sys.setcheckinterval(original_interval)
+
+        if errors:
+            self.fail("Saw errors: %s" % (errors,))
+
     def test_no_live_nodes(self):
         """
         Ensure query plan for a downed cluster will execute without errors
         """
-
         hosts = [0, 1, 2, 3]
         policy = RoundRobinPolicy()
         policy.populate(None, hosts)
@@ -130,14 +172,14 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
 
         # allow all of the remote hosts to be used
         policy = DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=2)
-        policy.populate(None, hosts)
+        policy.populate(Mock(spec=Metadata), hosts)
         qplan = list(policy.make_query_plan())
         self.assertEqual(set(qplan[:2]), local_hosts)
         self.assertEqual(set(qplan[2:]), remote_hosts)
 
         # allow only one of the remote hosts to be used
         policy = DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=1)
-        policy.populate(None, hosts)
+        policy.populate(Mock(spec=Metadata), hosts)
         qplan = list(policy.make_query_plan())
         self.assertEqual(set(qplan[:2]), local_hosts)
 
@@ -147,7 +189,7 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
 
         # allow no remote hosts to be used
         policy = DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=0)
-        policy.populate(None, hosts)
+        policy.populate(Mock(spec=Metadata), hosts)
         qplan = list(policy.make_query_plan())
         self.assertEqual(2, len(qplan))
         self.assertEqual(local_hosts, set(qplan))
@@ -156,7 +198,7 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
         policy = DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=0)
         host = Host("ip1", SimpleConvictionPolicy)
         host.set_location_info("dc1", "rack1")
-        policy.populate(None, [host])
+        policy.populate(Mock(spec=Metadata), [host])
 
         self.assertEqual(policy.distance(host), HostDistance.LOCAL)
 
@@ -170,14 +212,14 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
         self.assertEqual(policy.distance(remote_host), HostDistance.IGNORED)
 
         # make sure the policy has both dcs registered
-        policy.populate(None, [host, remote_host])
+        policy.populate(Mock(spec=Metadata), [host, remote_host])
         self.assertEqual(policy.distance(remote_host), HostDistance.REMOTE)
 
         # since used_hosts_per_remote_dc is set to 1, only the first
         # remote host in dc2 will be REMOTE, the rest are IGNORED
         second_remote_host = Host("ip3", SimpleConvictionPolicy)
         second_remote_host.set_location_info("dc2", "rack1")
-        policy.populate(None, [host, remote_host, second_remote_host])
+        policy.populate(Mock(spec=Metadata), [host, remote_host, second_remote_host])
         distances = set([policy.distance(remote_host), policy.distance(second_remote_host)])
         self.assertEqual(distances, set([HostDistance.REMOTE, HostDistance.IGNORED]))
 
@@ -189,7 +231,7 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
             h.set_location_info("dc2", "rack1")
 
         policy = DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=1)
-        policy.populate(None, hosts)
+        policy.populate(Mock(spec=Metadata), hosts)
         policy.on_down(hosts[0])
         policy.on_remove(hosts[2])
 
@@ -231,7 +273,7 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
             hosts.append(h)
 
         policy = DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=1)
-        policy.populate(None, hosts)
+        policy.populate(Mock(spec=Metadata), hosts)
 
         for host in hosts:
             policy.on_down(host)
@@ -257,6 +299,8 @@ class TokenAwarePolicyTest(unittest.TestCase):
         cluster = Mock(spec=Cluster)
         cluster.metadata = Mock(spec=Metadata)
         hosts = [Host(str(i), SimpleConvictionPolicy) for i in range(4)]
+        for host in hosts:
+            host.set_up()
 
         def get_replicas(keyspace, packed_key):
             index = struct.unpack('>i', packed_key)[0]
@@ -286,6 +330,8 @@ class TokenAwarePolicyTest(unittest.TestCase):
         cluster = Mock(spec=Cluster)
         cluster.metadata = Mock(spec=Metadata)
         hosts = [Host(str(i), SimpleConvictionPolicy) for i in range(4)]
+        for host in hosts:
+            host.set_up()
         for h in hosts[:2]:
             h.set_location_info("dc1", "rack1")
         for h in hosts[2:]:
@@ -324,7 +370,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
 
     class FakeCluster:
         def __init__(self):
-            self.metadata = None
+            self.metadata = Mock(spec=Metadata)
 
     def test_get_distance(self):
         """
@@ -347,7 +393,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
         self.assertEqual(policy.distance(remote_host), HostDistance.IGNORED)
 
         # dc2 isn't registered in the policy's live_hosts dict
-        policy.child_policy.used_hosts_per_remote_dc = 1
+        policy._child_policy.used_hosts_per_remote_dc = 1
         self.assertEqual(policy.distance(remote_host), HostDistance.IGNORED)
 
         # make sure the policy has both dcs registered
@@ -361,7 +407,6 @@ class TokenAwarePolicyTest(unittest.TestCase):
         policy.populate(self.FakeCluster(), [host, remote_host, second_remote_host])
         distances = set([policy.distance(remote_host), policy.distance(second_remote_host)])
         self.assertEqual(distances, set([HostDistance.REMOTE, HostDistance.IGNORED]))
-
 
     def test_status_updates(self):
         """
@@ -404,6 +449,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
         policy.on_down(hosts[3])
         qplan = list(policy.make_query_plan())
         self.assertEqual(qplan, [])
+
 
 class ConvictionPolicyTest(unittest.TestCase):
     def test_not_implemented(self):
@@ -468,7 +514,7 @@ class ConstantReconnectionPolicyTest(unittest.TestCase):
         max_attempts = -100
 
         try:
-            policy = ConstantReconnectionPolicy(delay=delay, max_attempts=max_attempts)
+            ConstantReconnectionPolicy(delay=delay, max_attempts=max_attempts)
             self.fail('max_attempts should throw ValueError when negative')
         except ValueError:
             pass

@@ -14,7 +14,7 @@ try:
     from ccmlib.cluster import Cluster as CCMCluster
     from ccmlib import common
 except ImportError as e:
-    raise unittest.SkipTest('ccm is a dependency for integration tests')
+    raise unittest.SkipTest('ccm is a dependency for integration tests:', e)
 
 CLUSTER_NAME = 'test_cluster'
 CCM_CLUSTER = None
@@ -52,8 +52,10 @@ def _tuple_version(version_string):
 def get_cluster():
     return CCM_CLUSTER
 
+
 def get_node(node_id):
     return CCM_CLUSTER.nodes['node%s' % node_id]
+
 
 def setup_package():
     try:
@@ -77,6 +79,7 @@ def setup_package():
     global CCM_CLUSTER
     CCM_CLUSTER = cluster
     setup_test_keyspace()
+
 
 def setup_test_keyspace():
     cluster = Cluster()

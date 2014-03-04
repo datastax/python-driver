@@ -1,3 +1,4 @@
+import platform
 import os
 import sys
 import warnings
@@ -8,10 +9,10 @@ try:
 except ImportError:
     has_subprocess = False
 
-from distribute_setup import use_setuptools
-use_setuptools()
+import ez_setup
+ez_setup.use_setuptools()
 
-from setuptools import setup, Feature
+from setuptools import setup
 from distutils.command.build_ext import build_ext
 from distutils.core import Extension
 from distutils.errors import (CCompilerError, DistutilsPlatformError,
@@ -24,7 +25,8 @@ long_description = ""
 with open("README.rst") as f:
     long_description = f.read()
 
-class doc(Command):
+
+class DocCommand(Command):
 
     description = "generate or test documentation"
 
@@ -65,6 +67,21 @@ class doc(Command):
             print ""
             print "Documentation step '%s' performed, results here:" % mode
             print "   %s/" % path
+
+
+class BuildFailed(Exception):
+
+    def __init__(self, ext):
+        self.ext = ext
+
+
+murmur3_ext = Extension('cassandra.murmur3',
+                        sources=['cassandra/murmur3.c'])
+
+libev_ext = Extension('cassandra.io.libevwrapper',
+                      sources=['cassandra/io/libevwrapper.c'],
+                      include_dirs=['/usr/include/libev'],
+                      libraries=['ev'])
 
 
 class build_extensions(build_ext):
@@ -122,79 +139,85 @@ On OSX, via homebrew:
             sys.stderr.write('%s\n' % str(exc))
             name = "The %s extension" % (ext.name,)
             warnings.warn(self.error_message % (name,))
+            raise BuildFailed(ext)
 
-murmur3_ext = Feature(
-    "Token-aware routing support for Murmur3",
-    standard=True,
-    ext_modules=[Extension('cassandra.murmur3',
-                           sources=['cassandra/murmur3.c'])])
 
-libev_support = Feature(
-    "Libev event loop support",
-    standard=True,
-    ext_modules=[Extension('cassandra.io.libevwrapper',
-                           sources=['cassandra/io/libevwrapper.c'],
-                           include_dirs=['/usr/include/libev'],
-                           libraries=['ev']
-                           )])
+def run_setup(extensions):
+    kw = {'cmdclass': {'doc': DocCommand}}
+    if extensions:
+        kw['cmdclass']['build_ext'] = build_extensions
+        kw['ext_modules'] = extensions
 
-features = {
-    "murmur3": murmur3_ext,
-    "libev": libev_support,
-}
+    dependencies = ['futures', 'scales', 'blist']
+    if platform.python_implementation() != "CPython":
+        dependencies.remove('blist')
 
+    setup(
+        name='cassandra-driver',
+        version=__version__,
+        description='Python driver for Cassandra',
+        long_description=long_description,
+        url='http://github.com/datastax/python-driver',
+        author='Tyler Hobbs',
+        author_email='tyler@datastax.com',
+        packages=['cassandra', 'cassandra.io'],
+        include_package_data=True,
+        install_requires=dependencies,
+        tests_require=['nose', 'mock', 'ccm', 'unittest2', 'PyYAML'],
+        classifiers=[
+            'Development Status :: 5 - Production/Stable',
+            'Intended Audience :: Developers',
+            'License :: OSI Approved :: Apache Software License',
+            'Natural Language :: English',
+            'Operating System :: OS Independent',
+            'Programming Language :: Python',
+            'Programming Language :: Python :: 2',
+            'Programming Language :: Python :: 2.6',
+            'Programming Language :: Python :: 2.7',
+            'Topic :: Software Development :: Libraries :: Python Modules'
+        ],
+        **kw)
+
+extensions = [murmur3_ext, libev_ext]
 if "--no-extensions" in sys.argv:
     sys.argv = [a for a in sys.argv if a != "--no-extensions"]
-    features = {}
+    extensions = []
 elif "--no-murmur3" in sys.argv:
     sys.argv = [a for a in sys.argv if a != "--no-murmur3"]
-    features.pop("murmur3")
+    extensions.remove(murmur3_ext)
 elif "--no-libev" in sys.argv:
     sys.argv = [a for a in sys.argv if a != "--no-libev"]
-    features.pop("libev")
+    extensions.remove(libev_ext)
 
-if (sys.platform.startswith("java")
-        or sys.platform == "cli"
-        or "PyPy" in sys.version):
-    sys.stderr.write("""
+platform_unsupported_msg = \
+"""
 ===============================================================================
 The optional C extensions are not supported on this platform.
 ===============================================================================
-    """)
-    features = {}
-elif sys.byteorder == "big":
-    sys.stderr.write("""
+"""
+
+arch_unsupported_msg = \
+"""
 ===============================================================================
 The optional C extensions are not supported on big-endian systems.
 ===============================================================================
-    """)
-    features = {}
+"""
 
-setup(
-    name='cassandra-driver',
-    version=__version__,
-    description='Python driver for Cassandra',
-    long_description=long_description,
-    url='http://github.com/datastax/python-driver',
-    author='Tyler Hobbs',
-    author_email='tyler@datastax.com',
-    packages=["cassandra", "cassandra.io"],
-    features=features,
-    install_requires=['futures', 'scales', 'blist'],
-    tests_require=['nose', 'mock', 'ccm'],
-    cmdclass={"build_ext": build_extensions,
-              "doc": doc},
-    classifiers=[
-        'Development Status :: 3 - Alpha',
-        'Intended Audience :: Developers',
-        'License :: OSI Approved :: Apache Software License',
-        'Natural Language :: English',
-        'Operating System :: OS Independent',
-        'Programming Language :: Python',
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.6',
-        'Programming Language :: Python :: 2.7',
-        'Topic :: Software Development :: Libraries :: Python Modules'
-    ]
+if extensions:
+    if (sys.platform.startswith("java")
+            or sys.platform == "cli"
+            or "PyPy" in sys.version):
+        sys.stderr.write(platform_unsupported_msg)
+        extensions = ()
+    elif sys.byteorder == "big":
+        sys.stderr.write(arch_unsupported_msg)
+        extensions = ()
 
-)
+while True:
+    # try to build as many of the extensions as we can
+    try:
+        run_setup(extensions)
+    except BuildFailed as failure:
+        extensions.remove(failure.ext)
+    else:
+        break

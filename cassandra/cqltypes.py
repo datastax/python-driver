@@ -20,6 +20,7 @@ import socket
 import time
 from datetime import datetime
 from uuid import UUID
+import warnings
 
 try:
     from cStringIO import StringIO
@@ -35,22 +36,33 @@ apache_cassandra_type_prefix = 'org.apache.cassandra.db.marshal.'
 
 _number_types = frozenset((int, long, float))
 
-from blist import sortedset
+try:
+    from blist import sortedset
+except ImportError:
+    warnings.warn(
+        "The blist library is not available, so a normal set will "
+        "be used in place of blist.sortedset for set collection values. "
+        "You can find the blist library here: https://pypi.python.org/pypi/blist/")
+
+    sortedset = set
 
 try:
     from collections import OrderedDict
 except ImportError:  # Python <2.7
     from cassandra.util import OrderedDict # NOQA
 
+
 def trim_if_startswith(s, prefix):
     if s.startswith(prefix):
         return s[len(prefix):]
     return s
 
+
 def unix_time_from_uuid1(u):
     return (u.get_time() - 0x01B21DD213814000) / 10000000.0
 
 _casstypes = {}
+
 
 class CassandraTypeType(type):
     """
@@ -100,24 +112,29 @@ def parse_casstype_args(typestring):
     tokens, remainder = casstype_scanner.scan(typestring)
     if remainder:
         raise ValueError("weird characters %r at end" % remainder)
-    args = [[]]
+
+    # use a stack of (types, names) lists
+    args = [([], [])]
     for tok in tokens:
         if tok == '(':
-            args.append([])
+            args.append(([], []))
         elif tok == ')':
-            arglist = args.pop()
-            ctype = args[-1].pop()
-            paramized = ctype.apply_parameters(*arglist)
-            args[-1].append(paramized)
+            types, names = args.pop()
+            prev_types, prev_names = args[-1]
+            prev_types[-1] = prev_types[-1].apply_parameters(types, names)
         else:
+            types, names = args[-1]
             if ':' in tok:
-                # ignore those column name hex encoding bit; we have the
-                # proper column name from elsewhere
-                tok = tok.rsplit(':', 1)[-1]
-            ctype = lookup_casstype_simple(tok)
-            args[-1].append(ctype)
+                name, tok = tok.rsplit(':', 1)
+                names.append(name)
+            else:
+                names.append(None)
 
-    return args[0][0]
+            ctype = lookup_casstype_simple(tok)
+            types.append(ctype)
+
+    # return the first (outer) type, which will have all parameters applied
+    return args[0][0][0]
 
 
 def lookup_casstype(casstype):
@@ -140,11 +157,34 @@ def lookup_casstype(casstype):
         raise ValueError("Don't know how to parse type string %r: %s" % (casstype, e))
 
 
+class EmptyValue(object):
+    """ See _CassandraType.support_empty_values """
+
+    def __str__(self):
+        return "EMPTY"
+    __repr__ = __str__
+
+EMPTY = EmptyValue()
+
+
 class _CassandraType(object):
     __metaclass__ = CassandraTypeType
     subtypes = ()
     num_subtypes = 0
     empty_binary_ok = False
+
+    support_empty_values = False
+    """
+    Back in the Thrift days, empty strings were used for "null" values of
+    all types, including non-string types.  For most users, an empty
+    string value in an int column is the same as being null/not present,
+    so the driver normally returns None in this case.  (For string-like
+    types, it *will* return an empty string by default instead of None.)
+
+    To avoid this behavior, set this to :const:`True`. Instead of returning
+    None for empty string values, the EMPTY singleton (an instance
+    of EmptyValue) will be returned.
+    """
 
     def __init__(self, val):
         self.val = self.validate(val)
@@ -169,8 +209,10 @@ class _CassandraType(object):
         for more information. This method differs in that if None or the empty
         string is passed in, None may be returned.
         """
-        if byts is None or (byts == '' and not cls.empty_binary_ok):
+        if byts is None:
             return None
+        elif byts == '' and not cls.empty_binary_ok:
+            return EMPTY if cls.support_empty_values else None
         return cls.deserialize(byts)
 
     @classmethod
@@ -227,13 +269,16 @@ class _CassandraType(object):
         return '%s(%s)' % (cname, sublist)
 
     @classmethod
-    def apply_parameters(cls, *subtypes):
+    def apply_parameters(cls, subtypes, names=None):
         """
         Given a set of other CassandraTypes, create a new subtype of this type
         using them as parameters. This is how composite types are constructed.
 
             >>> MapType.apply_parameters(DateType, BooleanType)
             <class 'cassandra.types.MapType(DateType, BooleanType)'>
+
+        `subtypes` will be a sequence of CassandraTypes.  If provided, `names`
+        will be an equally long sequence of column names or Nones.
         """
         if cls.num_subtypes != 'UNKNOWN' and len(subtypes) != cls.num_subtypes:
             raise ValueError("%s types require %d subtypes (%d given)"
@@ -303,7 +348,10 @@ class DecimalType(_CassandraType):
 
     @staticmethod
     def serialize(dec):
-        sign, digits, exponent = dec.as_tuple()
+        try:
+            sign, digits, exponent = dec.as_tuple()
+        except AttributeError:
+            raise TypeError("Non-Decimal type received for Decimal value")
         unscaled = int(''.join([str(digit) for digit in digits]))
         if sign:
             unscaled *= -1
@@ -321,7 +369,10 @@ class UUIDType(_CassandraType):
 
     @staticmethod
     def serialize(uuid):
-        return uuid.bytes
+        try:
+            return uuid.bytes
+        except AttributeError:
+            raise TypeError("Got a non-UUID object for a UUID value")
 
 
 class BooleanType(_CassandraType):
@@ -337,7 +388,7 @@ class BooleanType(_CassandraType):
 
     @staticmethod
     def serialize(truth):
-        return int8_pack(bool(truth))
+        return int8_pack(truth)
 
 
 class AsciiType(_CassandraType):
@@ -381,6 +432,7 @@ class IntegerType(_CassandraType):
 
 
 have_ipv6_packing = hasattr(socket, 'inet_ntop')
+
 
 class InetAddressType(_CassandraType):
     typename = 'inet'
@@ -426,6 +478,8 @@ cql_time_formats = (
     '%Y-%m-%d'
 )
 
+_have_warned_about_timestamps = False
+
 
 class DateType(_CassandraType):
     typename = 'timestamp'
@@ -461,6 +515,7 @@ class DateType(_CassandraType):
 
     @staticmethod
     def serialize(v):
+        global _have_warned_about_timestamps
         try:
             converted = calendar.timegm(v.utctimetuple())
             converted = converted * 1e3 + getattr(v, 'microsecond', 0) / 1e3
@@ -469,9 +524,27 @@ class DateType(_CassandraType):
             if type(v) not in _number_types:
                 raise TypeError('DateType arguments must be a datetime or timestamp')
 
+            if not _have_warned_about_timestamps:
+                _have_warned_about_timestamps = True
+                warnings.warn("timestamp columns in Cassandra hold a number of "
+                    "milliseconds since the unix epoch.  Currently, when executing "
+                    "prepared statements, this driver multiplies timestamp "
+                    "values by 1000 so that the result of time.time() "
+                    "can be used directly.  However, the driver cannot "
+                    "match this behavior for non-prepared statements, "
+                    "so the 2.0 version of the driver will no longer multiply "
+                    "timestamps by 1000.  It is suggested that you simply use "
+                    "datetime.datetime objects for 'timestamp' values to avoid "
+                    "any ambiguity and to guarantee a smooth upgrade of the "
+                    "driver.")
             converted = v * 1e3
 
         return int64_pack(long(converted))
+
+
+class TimestampType(DateType):
+    pass
+
 
 class TimeUUIDType(DateType):
     typename = 'timeuuid'
@@ -485,7 +558,10 @@ class TimeUUIDType(DateType):
 
     @staticmethod
     def serialize(timeuuid):
-        return timeuuid.bytes
+        try:
+            return timeuuid.bytes
+        except AttributeError:
+            raise TypeError("Got a non-UUID object for a UUID value")
 
 
 class UTF8Type(_CassandraType):
@@ -498,7 +574,15 @@ class UTF8Type(_CassandraType):
 
     @staticmethod
     def serialize(ustr):
-        return ustr.encode('utf8')
+        try:
+            return ustr.encode('utf-8')
+        except UnicodeDecodeError:
+            # already utf-8
+            return ustr
+
+
+class VarcharType(UTF8Type):
+    typename = 'varchar'
 
 
 class _ParameterizedType(_CassandraType):
@@ -544,6 +628,9 @@ class _SimpleParameterizedType(_ParameterizedType):
 
     @classmethod
     def serialize_safe(cls, items):
+        if isinstance(items, basestring):
+            raise TypeError("Received a string for a type that expects a sequence")
+
         subtype, = cls.subtypes
         buf = StringIO()
         buf.write(uint16_pack(len(items)))
@@ -600,7 +687,11 @@ class MapType(_ParameterizedType):
         subkeytype, subvaltype = cls.subtypes
         buf = StringIO()
         buf.write(uint16_pack(len(themap)))
-        for key, val in themap.iteritems():
+        try:
+            items = themap.iteritems()
+        except AttributeError:
+            raise TypeError("Got a non-map object for a map value")
+        for key, val in items:
             keybytes = subkeytype.to_binary(key)
             valbytes = subvaltype.to_binary(val)
             buf.write(uint16_pack(len(keybytes)))

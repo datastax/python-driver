@@ -4,11 +4,12 @@ except ImportError:
     import unittest # noqa
 
 import cassandra
-from cassandra.query import SimpleStatement
+from cassandra.query import SimpleStatement, TraceUnavailable
 from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.policies import RoundRobinPolicy, ExponentialReconnectionPolicy, RetryPolicy, SimpleConvictionPolicy, HostDistance
 
 from cassandra.cluster import Cluster, NoHostAvailable
+
 
 class ClusterTests(unittest.TestCase):
 
@@ -69,12 +70,18 @@ class ClusterTests(unittest.TestCase):
         result2 = session2.execute("SELECT * FROM test")
         self.assertEquals(result, result2)
 
+    def test_set_keyspace_twice(self):
+        cluster = Cluster()
+        session = cluster.connect()
+        session.execute("USE system")
+        session.execute("USE system")
+
     def test_default_connections(self):
         """
         Ensure errors are not thrown when using non-default policies
         """
 
-        cluster = Cluster(
+        Cluster(
             load_balancing_policy=RoundRobinPolicy(),
             reconnection_policy=ExponentialReconnectionPolicy(1.0, 600.0),
             default_retry_policy=RetryPolicy(),
@@ -94,7 +101,7 @@ class ClusterTests(unittest.TestCase):
             cluster.shutdown()
             self.fail('A double cluster.shutdown() should throw an error.')
         except Exception as e:
-            self.assertEqual(e.message, 'The Cluster was already shutdown')
+            self.assertIn('The Cluster was already shutdown', str(e))
 
     def test_connect_to_already_shutdown_cluster(self):
         """
@@ -177,28 +184,6 @@ class ClusterTests(unittest.TestCase):
 
         self.assertIn("newkeyspace", cluster.metadata.keyspaces)
 
-    def test_on_down_and_up(self):
-        """
-        Test on_down and on_up handling
-        """
-
-        cluster = Cluster()
-        session = cluster.connect()
-        host = cluster.metadata.all_hosts()[0]
-        host.monitor.signal_connection_failure(None)
-        cluster.on_down(host)
-        self.assertNotIn(host, session._pools)
-        host_reconnector = host._reconnection_handler
-        self.assertNotEqual(None, host_reconnector)
-
-        host.monitor.is_up = True
-
-        cluster.on_up(host)
-
-        self.assertEqual(None, host._reconnection_handler)
-        self.assertTrue(host_reconnector._cancelled)
-        self.assertIn(host, session._pools)
-
     def test_trace(self):
         """
         Ensure trace can be requested for async and non-async queries
@@ -228,6 +213,16 @@ class ClusterTests(unittest.TestCase):
         future = session.execute_async(statement2)
         future.result()
         self.assertEqual(None, future.get_query_trace())
+
+    def test_trace_timeout(self):
+        cluster = Cluster()
+        session = cluster.connect()
+
+        query = "SELECT * FROM system.local"
+        statement = SimpleStatement(query)
+        future = session.execute_async(statement, trace=True)
+        future.result()
+        self.assertRaises(TraceUnavailable, future.get_query_trace, -1.0)
 
     def test_string_coverage(self):
         """

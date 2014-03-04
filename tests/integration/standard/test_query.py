@@ -1,9 +1,15 @@
-import unittest
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest # noqa
+
 from cassandra.query import PreparedStatement, BoundStatement, ValueSequence, SimpleStatement
 from cassandra.cluster import Cluster
+from cassandra.decoder import dict_factory
 
 
 class QueryTest(unittest.TestCase):
+
     def test_query(self):
         cluster = Cluster()
         session = cluster.connect()
@@ -18,7 +24,6 @@ class QueryTest(unittest.TestCase):
         self.assertIsInstance(bound, BoundStatement)
         session.execute(bound)
         self.assertEqual(bound.routing_key, '\x00\x00\x00\x01')
-
 
     def test_value_sequence(self):
         """
@@ -44,6 +49,21 @@ class QueryTest(unittest.TestCase):
         str(statement.trace)
         for event in statement.trace.events:
             str(event)
+
+    def test_trace_ignores_row_factory(self):
+        cluster = Cluster()
+        session = cluster.connect()
+        session.row_factory = dict_factory
+
+        query = "SELECT * FROM system.local"
+        statement = SimpleStatement(query)
+        session.execute(statement, trace=True)
+
+        # Ensure this does not throw an exception
+        str(statement.trace)
+        for event in statement.trace.events:
+            str(event)
+
 
 class PreparedStatementTests(unittest.TestCase):
 
@@ -139,6 +159,7 @@ class PreparedStatementTests(unittest.TestCase):
 
         bound.prepared_statement.column_metadata = None
         self.assertEqual(bound.keyspace, None)
+
 
 class PrintStatementTests(unittest.TestCase):
     """

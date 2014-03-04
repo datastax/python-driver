@@ -1,5 +1,8 @@
-import unittest
-import cassandra
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest # noqa
+
 from cassandra.cluster import Cluster
 from cassandra.decoder import tuple_factory, named_tuple_factory, dict_factory, ordered_dict_factory
 
@@ -7,6 +10,7 @@ try:
     from collections import OrderedDict
 except ImportError:  # Python <2.7
     from cassandra.util import OrderedDict # NOQA
+
 
 class TestFactories(unittest.TestCase):
     """
@@ -77,7 +81,6 @@ class TestFactories(unittest.TestCase):
         self.assertEqual(result[0].k, 1)
         self.assertEqual(result[1].k, result[1].v)
         self.assertEqual(result[1].k, 2)
-
 
     def test_dict_factory(self):
         cluster = Cluster()

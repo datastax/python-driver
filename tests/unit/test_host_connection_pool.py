@@ -8,8 +8,9 @@ from threading import Thread, Event
 
 from cassandra.cluster import Session
 from cassandra.connection import Connection, MAX_STREAM_PER_CONNECTION
-from cassandra.pool import Host, HostConnectionPool, NoConnectionsAvailable, HealthMonitor
+from cassandra.pool import Host, HostConnectionPool, NoConnectionsAvailable
 from cassandra.policies import HostDistance, SimpleConvictionPolicy
+
 
 class HostConnectionPoolTests(unittest.TestCase):
 
@@ -32,7 +33,7 @@ class HostConnectionPoolTests(unittest.TestCase):
         c = pool.borrow_connection(timeout=0.01)
         self.assertIs(c, conn)
         self.assertEqual(1, conn.in_flight)
-        conn.set_keyspace.assert_called_once_with('foobarkeyspace')
+        conn.set_keyspace_blocking.assert_called_once_with('foobarkeyspace')
 
         pool.return_connection(conn)
         self.assertEqual(0, conn.in_flight)
@@ -102,10 +103,11 @@ class HostConnectionPoolTests(unittest.TestCase):
         session.submit.side_effect = fire_event
 
         def get_conn():
+            conn.reset_mock()
             c = pool.borrow_connection(1.0)
             self.assertIs(conn, c)
             self.assertEqual(1, conn.in_flight)
-            conn.set_keyspace.assert_called_once_with('foobarkeyspace')
+            conn.set_keyspace_blocking.assert_called_once_with('foobarkeyspace')
             pool.return_connection(c)
 
         t = Thread(target=get_conn)
@@ -156,7 +158,7 @@ class HostConnectionPoolTests(unittest.TestCase):
 
         pool.borrow_connection(timeout=0.01)
         conn.is_defunct = True
-        host.monitor.signal_connection_failure.return_value = False
+        session.cluster.signal_connection_failure.return_value = False
         pool.return_connection(conn)
 
         # the connection should be closed a new creation scheduled
@@ -166,7 +168,6 @@ class HostConnectionPoolTests(unittest.TestCase):
 
     def test_return_defunct_connection_on_down_host(self):
         host = Mock(spec=Host, address='ip1')
-        host.monitor = Mock(spec=HealthMonitor)
         session = self.make_session()
         conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=False)
         session.cluster.connection_factory.return_value = conn
@@ -176,11 +177,11 @@ class HostConnectionPoolTests(unittest.TestCase):
 
         pool.borrow_connection(timeout=0.01)
         conn.is_defunct = True
-        host.monitor.signal_connection_failure.return_value = True
+        session.cluster.signal_connection_failure.return_value = True
         pool.return_connection(conn)
 
         # the connection should be closed a new creation scheduled
-        host.monitor.signal_connection_failure.assert_called_once()
+        session.cluster.signal_connection_failure.assert_called_once()
         conn.close.assert_called_once()
         self.assertFalse(session.submit.called)
         self.assertTrue(pool.is_shutdown)
@@ -196,7 +197,7 @@ class HostConnectionPoolTests(unittest.TestCase):
 
         pool.borrow_connection(timeout=0.01)
         conn.is_closed = True
-        host.monitor.signal_connection_failure.return_value = False
+        session.cluster.signal_connection_failure.return_value = False
         pool.return_connection(conn)
 
         # a new creation should be scheduled
@@ -224,5 +225,3 @@ class HostConnectionPoolTests(unittest.TestCase):
         self.assertEqual(a, b, 'Two Host instances should be equal when sharing.')
         self.assertNotEqual(a, c, 'Two Host instances should NOT be equal when using two different addresses.')
         self.assertNotEqual(b, c, 'Two Host instances should NOT be equal when using two different addresses.')
-
-        self.assertFalse(a == '127.0.0.1')

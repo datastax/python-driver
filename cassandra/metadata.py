@@ -1,10 +1,11 @@
-from bisect import bisect_left
+from bisect import bisect_right
 from collections import defaultdict
 try:
     from collections import OrderedDict
 except ImportError:  # Python <2.7
     from cassandra.util import OrderedDict # NOQA
 from hashlib import md5
+from itertools import islice, cycle
 import json
 import logging
 import re
@@ -75,7 +76,7 @@ class Metadata(object):
         """
         return "\n".join(ks.export_as_string() for ks in self.keyspaces.values())
 
-    def rebuild_schema(self, keyspace, table, ks_results, cf_results, col_results):
+    def rebuild_schema(self, ks_results, cf_results, col_results):
         """
         Rebuild the view of the current schema from a fresh set of rows from
         the system schema tables.
@@ -93,40 +94,88 @@ class Metadata(object):
             cfname = row["columnfamily_name"]
             col_def_rows[ksname][cfname].append(row)
 
-        # either table or ks_results must be None
-        if not table:
-            # ks_results is not None
-            added_keyspaces = set()
-            for row in ks_results:
-                keyspace_meta = self._build_keyspace_metadata(row)
-                for table_row in cf_def_rows.get(keyspace_meta.name, []):
-                    table_meta = self._build_table_metadata(
-                        keyspace_meta, table_row, col_def_rows[keyspace_meta.name])
-                    keyspace_meta.tables[table_meta.name] = table_meta
+        current_keyspaces = set()
+        for row in ks_results:
+            keyspace_meta = self._build_keyspace_metadata(row)
+            for table_row in cf_def_rows.get(keyspace_meta.name, []):
+                table_meta = self._build_table_metadata(
+                    keyspace_meta, table_row, col_def_rows[keyspace_meta.name])
+                keyspace_meta.tables[table_meta.name] = table_meta
 
-                added_keyspaces.add(keyspace_meta.name)
-                self.keyspaces[keyspace_meta.name] = keyspace_meta
+            current_keyspaces.add(keyspace_meta.name)
+            old_keyspace_meta = self.keyspaces.get(keyspace_meta.name, None)
+            self.keyspaces[keyspace_meta.name] = keyspace_meta
+            if old_keyspace_meta:
+                self._keyspace_updated(keyspace_meta.name)
+            else:
+                self._keyspace_added(keyspace_meta.name)
 
-            if not keyspace:
-                # remove not-just-added keyspaces
-                self.keyspaces = dict((name, meta) for name, meta in self.keyspaces.items()
-                                      if name in added_keyspaces)
-            if self.token_map:
-                self.token_map.rebuild(self.keyspaces.values())
+        # remove not-just-added keyspaces
+        removed_keyspaces = [ksname for ksname in self.keyspaces.keys()
+                             if ksname not in current_keyspaces]
+        self.keyspaces = dict((name, meta) for name, meta in self.keyspaces.items()
+                              if name in current_keyspaces)
+        for ksname in removed_keyspaces:
+            self._keyspace_removed(ksname)
+
+    def keyspace_changed(self, keyspace, ks_results, cf_results, col_results):
+        if not ks_results:
+            if keyspace in self.keyspaces:
+                del self.keyspaces[keyspace]
+                self._keyspace_removed(keyspace)
+            return
+
+        col_def_rows = defaultdict(list)
+        for row in col_results:
+            cfname = row["columnfamily_name"]
+            col_def_rows[cfname].append(row)
+
+        keyspace_meta = self._build_keyspace_metadata(ks_results[0])
+        old_keyspace_meta = self.keyspaces.get(keyspace, None)
+
+        new_table_metas = {}
+        for table_row in cf_results:
+            table_meta = self._build_table_metadata(
+                keyspace_meta, table_row, col_def_rows)
+            new_table_metas[table_meta.name] = table_meta
+
+        keyspace_meta.tables = new_table_metas
+
+        self.keyspaces[keyspace] = keyspace_meta
+        if old_keyspace_meta:
+            if (keyspace_meta.replication_strategy != old_keyspace_meta.replication_strategy):
+                self._keyspace_updated(keyspace)
         else:
-            # keyspace is not None, table is not None
-            try:
-                keyspace_meta = self.keyspaces[keyspace]
-            except KeyError:
-                # we're trying to update a table in a keyspace we don't know
-                # about, something went wrong.
-                # TODO log error, submit schema refresh
-                pass
-            if keyspace in cf_def_rows:
-                for table_row in cf_def_rows[keyspace]:
-                    table_meta = self._build_table_metadata(
-                        keyspace_meta, table_row, col_def_rows[keyspace])
-                    keyspace_meta.tables[table_meta.name] = table_meta
+            self._keyspace_added(keyspace)
+
+    def table_changed(self, keyspace, table, cf_results, col_results):
+        try:
+            keyspace_meta = self.keyspaces[keyspace]
+        except KeyError:
+            # we're trying to update a table in a keyspace we don't know about
+            log.error("Tried to update schema for table '%s' in unknown keyspace '%s'",
+                      table, keyspace)
+            return
+
+        if not cf_results:
+            # the table was removed
+            del keyspace_meta.tables[table]
+        else:
+            assert len(cf_results) == 1
+            keyspace_meta.tables[table] = self._build_table_metadata(
+                    keyspace_meta, cf_results[0], {table: col_results})
+
+    def _keyspace_added(self, ksname):
+        if self.token_map:
+            self.token_map.rebuild_keyspace(ksname)
+
+    def _keyspace_updated(self, ksname):
+        if self.token_map:
+            self.token_map.rebuild_keyspace(ksname)
+
+    def _keyspace_removed(self, ksname):
+        if self.token_map:
+            self.token_map.remove_keyspace(ksname)
 
     def _build_keyspace_metadata(self, row):
         name = row["keyspace_name"]
@@ -225,19 +274,20 @@ class Metadata(object):
                 column_meta = self._build_column_metadata(table_meta, col_row)
                 table_meta.columns[column_meta.name] = column_meta
 
-        table_meta.options = self._build_table_options(row, is_compact)
+        table_meta.options = self._build_table_options(row)
+        table_meta.is_compact_storage = is_compact
         return table_meta
 
-    def _build_table_options(self, row, is_compact_storage):
+    def _build_table_options(self, row):
         """ Setup the mostly-non-schema table options, like caching settings """
-        options = dict((o, row.get(o)) for o in TableMetadata.recognized_options)
-        options["is_compact_storage"] = is_compact_storage
+        options = dict((o, row.get(o)) for o in TableMetadata.recognized_options if o in row)
         return options
 
     def _build_column_metadata(self, table_metadata, row):
         name = row["column_name"]
         data_type = types.lookup_casstype(row["validator"])
-        column_meta = ColumnMetadata(table_metadata, name, data_type)
+        is_static = row.get("type", None) == "static"
+        column_meta = ColumnMetadata(table_metadata, name, data_type, is_static=is_static)
         index_meta = self._build_index_metadata(column_meta, row)
         column_meta.index = index_meta
         return column_meta
@@ -261,10 +311,6 @@ class Metadata(object):
             token_class = MD5Token
         elif partitioner.endswith('Murmur3Partitioner'):
             token_class = Murmur3Token
-            if murmur3 is None:
-                log.warning(
-                    "The murmur3 C extension is not available, token awareness "
-                    "cannot be supported for the Murmur3Partitioner")
         elif partitioner.endswith('ByteOrderedPartitioner'):
             token_class = BytesToken
         else:
@@ -281,8 +327,7 @@ class Metadata(object):
 
         all_tokens = sorted(ring)
         self.token_map = TokenMap(
-                token_class, token_to_host_owner, all_tokens,
-                self.keyspaces.values())
+                token_class, token_to_host_owner, all_tokens, self)
 
     def get_replicas(self, keyspace, key):
         """
@@ -297,6 +342,12 @@ class Metadata(object):
         except NoMurmur3:
             return []
 
+    def can_support_partitioner(self):
+        if self.partitioner.endswith('Murmur3Partitioner') and murmur3 is None:
+            return False
+        else:
+            return True
+
     def add_host(self, address):
         cluster = self.cluster_ref()
         with self._hosts_lock:
@@ -306,7 +357,6 @@ class Metadata(object):
             else:
                 return None
 
-        new_host.monitor.register(cluster)
         return new_host
 
     def remove_host(self, host):
@@ -353,7 +403,11 @@ class ReplicationStrategy(object):
 class SimpleStrategy(ReplicationStrategy):
 
     name = "SimpleStrategy"
+
     replication_factor = None
+    """
+    The replication factor for this keyspace.
+    """
 
     def __init__(self, replication_factor):
         self.replication_factor = int(replication_factor)
@@ -361,55 +415,92 @@ class SimpleStrategy(ReplicationStrategy):
     def make_token_replica_map(self, token_to_host_owner, ring):
         replica_map = {}
         for i in range(len(ring)):
-            j, hosts = 0, set()
+            j, hosts = 0, list()
             while len(hosts) < self.replication_factor and j < len(ring):
                 token = ring[(i + j) % len(ring)]
-                hosts.add(token_to_host_owner[token])
+                host = token_to_host_owner[token]
+                if not host in hosts:
+                    hosts.append(host)
                 j += 1
 
             replica_map[ring[i]] = hosts
-
         return replica_map
 
     def export_for_schema(self):
         return "{'class': 'SimpleStrategy', 'replication_factor': '%d'}" \
                % (self.replication_factor,)
 
+    def __eq__(self, other):
+        if not isinstance(other, SimpleStrategy):
+            return False
+
+        return self.replication_factor == other.replication_factor
+
+
 class NetworkTopologyStrategy(ReplicationStrategy):
 
     name = "NetworkTopologyStrategy"
+
     dc_replication_factors = None
+    """
+    A map of datacenter names to the replication factor for that DC.
+    """
 
     def __init__(self, dc_replication_factors):
         self.dc_replication_factors = dc_replication_factors
 
     def make_token_replica_map(self, token_to_host_owner, ring):
         # note: this does not account for hosts having different racks
-        replica_map = defaultdict(set)
+        replica_map = defaultdict(list)
         ring_len = len(ring)
         ring_len_range = range(ring_len)
         dc_rf_map = dict((dc, int(rf))
                          for dc, rf in self.dc_replication_factors.items() if rf > 0)
         dcs = dict((h, h.datacenter) for h in set(token_to_host_owner.values()))
 
+        # build a map of DCs to lists of indexes into `ring` for tokens that
+        # belong to that DC
+        dc_to_token_offset = defaultdict(list)
+        for i, token in enumerate(ring):
+            host = token_to_host_owner[token]
+            dc_to_token_offset[dcs[host]].append(i)
+
+        # A map of DCs to an index into the dc_to_token_offset value for that dc.
+        # This is how we keep track of advancing around the ring for each DC.
+        dc_to_current_index = defaultdict(int)
+
         for i in ring_len_range:
             remaining = dc_rf_map.copy()
-            for j in ring_len_range:
-                token = ring[(i + j) % ring_len]
-                host = token_to_host_owner[token]
-                dc = dcs[host]
-                if not dc in remaining:
-                    # we already have all replicas for this DC
+            replicas = replica_map[ring[i]]
+
+            # go through each DC and find the replicas in that DC
+            for dc in dc_to_token_offset.keys():
+                if dc not in remaining:
                     continue
 
-                replica_map[ring[i]].add(host)
+                # advance our per-DC index until we're up to at least the
+                # current token in the ring
+                token_offsets = dc_to_token_offset[dc]
+                index = dc_to_current_index[dc]
+                num_tokens = len(token_offsets)
+                while index < num_tokens and token_offsets[index] < i:
+                    index += 1
+                dc_to_current_index[dc] = index
 
-                if remaining[dc] == 1:
-                    del remaining[dc]
-                    if not remaining:
+                # now add the next RF distinct token owners to the set of
+                # replicas for this DC
+                for token_offset in islice(cycle(token_offsets), index, index + num_tokens):
+                    host = token_to_host_owner[ring[token_offset]]
+                    if host in replicas:
+                        continue
+
+                    replicas.append(host)
+                    dc_remaining = remaining[dc] - 1
+                    if dc_remaining == 0:
+                        del remaining[dc]
                         break
-                else:
-                    remaining[dc] -= 1
+                    else:
+                        remaining[dc] = dc_remaining
 
         return replica_map
 
@@ -418,6 +509,12 @@ class NetworkTopologyStrategy(ReplicationStrategy):
         for dc, repl_factor in self.dc_replication_factors:
             ret += ", '%s': '%d'" % (dc, repl_factor)
         return ret + "}"
+
+    def __eq__(self, other):
+        if not isinstance(other, NetworkTopologyStrategy):
+            return False
+
+        return self.dc_replication_factors == other.dc_replication_factors
 
 
 class LocalStrategy(ReplicationStrategy):
@@ -430,6 +527,9 @@ class LocalStrategy(ReplicationStrategy):
     def export_for_schema(self):
         return "{'class': 'LocalStrategy'}"
 
+    def __eq__(self, other):
+        return isinstance(other, LocalStrategy)
+
 
 class KeyspaceMetadata(object):
     """
@@ -437,12 +537,12 @@ class KeyspaceMetadata(object):
     """
 
     name = None
-    """ The string name of the keyspace """
+    """ The string name of the keyspace. """
 
     durable_writes = True
     """
     A boolean indicating whether durable writes are enabled for this keyspace
-    or not
+    or not.
     """
 
     replication_strategy = None
@@ -462,12 +562,13 @@ class KeyspaceMetadata(object):
         self.tables = {}
 
     def export_as_string(self):
-        return "\n".join([self.as_cql_query()] + [t.as_cql_query() for t in self.tables.values()])
+        return "\n".join([self.as_cql_query()] + [t.export_as_string() for t in self.tables.values()])
 
     def as_cql_query(self):
-        ret = "CREATE KEYSPACE %s WITH REPLICATION = %s " % \
-              (self.name, self.replication_strategy.export_for_schema())
-        return ret + (' AND DURABLE_WRITES = %s;' % ("true" if self.durable_writes else "false"))
+        ret = "CREATE KEYSPACE %s WITH replication = %s " % (
+            protect_name(self.name),
+            self.replication_strategy.export_for_schema())
+        return ret + (' AND durable_writes = %s;' % ("true" if self.durable_writes else "false"))
 
 
 class TableMetadata(object):
@@ -476,10 +577,10 @@ class TableMetadata(object):
     """
 
     keyspace = None
-    """ An instance of :class:`~.KeyspaceMetadata` """
+    """ An instance of :class:`~.KeyspaceMetadata`. """
 
     name = None
-    """ The string name of the table """
+    """ The string name of the table. """
 
     partition_key = None
     """
@@ -511,6 +612,8 @@ class TableMetadata(object):
     A dict mapping column names to :class:`.ColumnMetadata` instances.
     """
 
+    is_compact_storage = False
+
     options = None
     """
     A dict mapping table option names to their specific settings for this
@@ -518,11 +621,28 @@ class TableMetadata(object):
     """
 
     recognized_options = (
-            "comment", "read_repair_chance",  # "local_read_repair_chance",
-            "replicate_on_write", "gc_grace_seconds", "bloom_filter_fp_chance",
-            "caching", "compaction_strategy_class", "compaction_strategy_options",
-            "min_compaction_threshold", "max_compression_threshold",
-            "compression_parameters")
+        "comment",
+        "read_repair_chance",
+        "dclocal_read_repair_chance",
+        "replicate_on_write",
+        "gc_grace_seconds",
+        "bloom_filter_fp_chance",
+        "caching",
+        "compaction_strategy_class",
+        "compaction_strategy_options",
+        "min_compaction_threshold",
+        "max_compression_threshold",
+        "compression_parameters",
+        "min_index_interval",
+        "max_index_interval",
+        "index_interval",
+        "speculative_retry",
+        "rows_per_partition_to_cache",
+        "memtable_flush_period_in_ms",
+        "populate_io_cache_on_flush",
+        "compaction",
+        "compression",
+        "default_time_to_live")
 
     def __init__(self, keyspace_metadata, name, partition_key=None, clustering_key=None, columns=None, options=None):
         self.keyspace = keyspace_metadata
@@ -554,7 +674,10 @@ class TableMetadata(object):
         creations are not included).  If `formatted` is set to :const:`True`,
         extra whitespace will be added to make the query human readable.
         """
-        ret = "CREATE TABLE %s.%s (%s" % (self.keyspace.name, self.name, "\n" if formatted else "")
+        ret = "CREATE TABLE %s.%s (%s" % (
+            protect_name(self.keyspace.name),
+            protect_name(self.name),
+            "\n" if formatted else "")
 
         if formatted:
             column_join = ",\n"
@@ -565,7 +688,7 @@ class TableMetadata(object):
 
         columns = []
         for col in self.columns.values():
-            columns.append("%s %s" % (col.name, col.typestring))
+            columns.append("%s %s%s" % (protect_name(col.name), col.typestring, ' static' if col.is_static else ''))
 
         if len(self.partition_key) == 1 and not self.clustering_key:
             columns[0] += " PRIMARY KEY"
@@ -577,12 +700,12 @@ class TableMetadata(object):
             ret += "%s%sPRIMARY KEY (" % (column_join, padding)
 
             if len(self.partition_key) > 1:
-                ret += "(%s)" % ", ".join(col.name for col in self.partition_key)
+                ret += "(%s)" % ", ".join(protect_name(col.name) for col in self.partition_key)
             else:
                 ret += self.partition_key[0].name
 
             if self.clustering_key:
-                ret += ", %s" % ", ".join(col.name for col in self.clustering_key)
+                ret += ", %s" % ", ".join(protect_name(col.name) for col in self.clustering_key)
 
             ret += ")"
 
@@ -590,15 +713,15 @@ class TableMetadata(object):
         ret += "%s) WITH " % ("\n" if formatted else "")
 
         option_strings = []
-        if self.options.get("is_compact_storage"):
+        if self.is_compact_storage:
             option_strings.append("COMPACT STORAGE")
 
         if self.clustering_key:
             cluster_str = "CLUSTERING ORDER BY "
 
-            clustering_names = self.protect_names([c.name for c in self.clustering_key])
+            clustering_names = protect_names([c.name for c in self.clustering_key])
 
-            if self.options.get("is_compact_storage") and \
+            if self.is_compact_storage and \
                     not issubclass(self.comparator, types.CompositeType):
                 subtypes = [self.comparator]
             else:
@@ -612,52 +735,61 @@ class TableMetadata(object):
             cluster_str += "(%s)" % ", ".join(inner)
             option_strings.append(cluster_str)
 
-        option_strings.extend(map(self._make_option_str, self.recognized_options))
-        option_strings = filter(lambda x: x is not None, option_strings)
+        option_strings.extend(self._make_option_strings())
 
         join_str = "\n    AND " if formatted else " AND "
         ret += join_str.join(option_strings)
 
         return ret
 
-    def _make_option_str(self, name):
-        value = self.options.get(name)
-        if value is not None:
-            if name == "comment":
-                value = value or ""
-            return "%s = %s" % (name, self.protect_value(value))
+    def _make_option_strings(self):
+        ret = []
+        for name, value in sorted(self.options.items()):
+            if value is not None:
+                if name == "comment":
+                    value = value or ""
+                ret.append("%s = %s" % (name, protect_value(value)))
 
-    def protect_name(self, name):
-        if isinstance(name, unicode):
-            name = name.encode('utf8')
-        return self.maybe_escape_name(name)
+        return ret
 
-    def protect_names(self, names):
-        return map(self.protect_name, names)
 
-    def protect_value(self, value):
-        if value is None:
-            return 'NULL'
-        if isinstance(value, (int, float, bool)):
-            return str(value)
-        return "'%s'" % value.replace("'", "''")
+def protect_name(name):
+    if isinstance(name, unicode):
+        name = name.encode('utf8')
+    return maybe_escape_name(name)
 
-    valid_cql3_word_re = re.compile(r'^[a-z][0-9a-z_]*$')
 
-    def is_valid_name(self, name):
-        if name is None:
-            return False
-        if name.lower() in _keywords - _unreserved_keywords:
-            return False
-        return self.valid_cql3_word_re.match(name) is not None
+def protect_names(names):
+    return map(protect_name, names)
 
-    def maybe_escape_name(self, name):
-        if self.is_valid_name(name):
-            return name
-        return self.escape_name(name)
 
-    def escape_name(self, name):
-        return '"%s"' % (name.replace('"', '""'),)
+def protect_value(value):
+    if value is None:
+        return 'NULL'
+    if isinstance(value, (int, float, bool)):
+        return str(value)
+    return "'%s'" % value.replace("'", "''")
+
+
+valid_cql3_word_re = re.compile(r'^[a-z][0-9a-z_]*$')
+
+
+def is_valid_name(name):
+    if name is None:
+        return False
+    if name.lower() in _keywords - _unreserved_keywords:
+        return False
+    return valid_cql3_word_re.match(name) is not None
+
+
+def maybe_escape_name(name):
+    if is_valid_name(name):
+        return name
+    return escape_name(name)
+
+
+def escape_name(name):
+    return '"%s"' % (name.replace('"', '""'),)
 
 
 class ColumnMetadata(object):
@@ -679,11 +811,18 @@ class ColumnMetadata(object):
     :class:`.IndexMetadata`, otherwise :const:`None`.
     """
 
-    def __init__(self, table_metadata, column_name, data_type, index_metadata=None):
+    is_static = False
+    """
+    If this column is static (available in Cassandra 2.1+), this will
+    be :const:`True`, otherwise :const:`False`.
+    """
+
+    def __init__(self, table_metadata, column_name, data_type, index_metadata=None, is_static=False):
         self.table = table_metadata
         self.name = column_name
         self.data_type = data_type
         self.index = index_metadata
+        self.is_static = is_static
 
     @property
     def typestring(self):
@@ -726,7 +865,11 @@ class IndexMetadata(object):
         Returns a CQL query that can be used to recreate this index.
         """
         table = self.column.table
-        return "CREATE INDEX %s ON %s.%s (%s)" % (self.name, table.keyspace.name, table.name, self.column.name)
+        return "CREATE INDEX %s ON %s.%s (%s)" % (
+            self.name,  # Cassandra doesn't like quoted index names for some reason
+            protect_name(table.keyspace.name),
+            protect_name(table.name),
+            protect_name(self.column.name))
 
 
 class TokenMap(object):
@@ -755,33 +898,29 @@ class TokenMap(object):
     An ordered list of :class:`.Token` instances in the ring.
     """
 
-    def __init__(self, token_class, token_to_host_owner, all_tokens, keyspaces):
+    _metadata = None
+
+    def __init__(self, token_class, token_to_host_owner, all_tokens, metadata):
         self.token_class = token_class
         self.ring = all_tokens
         self.token_to_host_owner = token_to_host_owner
 
         self.tokens_to_hosts_by_ks = {}
-        self.rebuild(keyspaces)
+        self._metadata = metadata
 
-    def rebuild(self, current_keyspaces):
-        """
-        Given an up-to-date list of :class:`.KeyspaceMetadata` instances, rebuild
-        the per-keyspace replication map.
-        """
-        tokens_to_hosts_by_ks = {}
-        for ks_metadata in current_keyspaces:
-            strategy = ks_metadata.replication_strategy
-            if strategy is None:
-                token_to_hosts = defaultdict(set)
-                for token, host in self.token_to_host_owner.items():
-                    token_to_hosts[token].add(host)
-                tokens_to_hosts_by_ks[ks_metadata.name] = token_to_hosts
-            else:
-                tokens_to_hosts_by_ks[ks_metadata.name] = \
-                        strategy.make_token_replica_map(
-                                self.token_to_host_owner, self.ring)
+    def rebuild_keyspace(self, keyspace):
+        self.tokens_to_hosts_by_ks[keyspace] = \
+            self.replica_map_for_keyspace(self._metadata.keyspaces[keyspace])
 
-        self.tokens_to_hosts_by_ks = tokens_to_hosts_by_ks
+    def replica_map_for_keyspace(self, ks_metadata):
+        strategy = ks_metadata.replication_strategy
+        if strategy:
+            return strategy.make_token_replica_map(self.token_to_host_owner, self.ring)
+        else:
+            return None
+
+    def remove_keyspace(self, keyspace):
+        del self.tokens_to_hosts_by_ks[keyspace]
 
     def get_replicas(self, keyspace, token):
         """
@@ -790,12 +929,16 @@ class TokenMap(object):
         """
         tokens_to_hosts = self.tokens_to_hosts_by_ks.get(keyspace, None)
         if tokens_to_hosts is None:
-            return set()
+            self.rebuild_keyspace(keyspace)
+            tokens_to_hosts = self.tokens_to_hosts_by_ks.get(keyspace, None)
+            if tokens_to_hosts is None:
+                return []
 
-        point = bisect_left(self.ring, token)
-        if point == 0 and token != self.ring[0]:
-            return tokens_to_hosts[self.ring[-1]]
-        elif point == len(self.ring):
+        # token range ownership is exclusive on the LHS (the start token), so
+        # we use bisect_right, which, in the case of a tie/exact match,
+        # picks an insertion point to the right of the existing match
+        point = bisect_right(self.ring, token)
+        if point == len(self.ring):
             return tokens_to_hosts[self.ring[0]]
         else:
             return tokens_to_hosts[self.ring[point]]
@@ -826,7 +969,7 @@ class Token(object):
         return self.value == other.value
 
     def __hash__(self):
-        return self.value
+        return hash(self.value)
 
     def __repr__(self):
         return "<%s: %r>" % (self.__class__.__name__, self.value)
@@ -854,7 +997,7 @@ class Murmur3Token(Token):
             raise NoMurmur3()
 
     def __init__(self, token):
-        """ `token` should be an int or string representing the token """
+        """ `token` should be an int or string representing the token. """
         self.value = int(token)
 
 
@@ -868,7 +1011,7 @@ class MD5Token(Token):
         return abs(varint_unpack(md5(key).digest()))
 
     def __init__(self, token):
-        """ `token` should be an int or string representing the token """
+        """ `token` should be an int or string representing the token. """
         self.value = int(token)
 
 
@@ -878,7 +1021,7 @@ class BytesToken(Token):
     """
 
     def __init__(self, token_string):
-        """ `token_string` should be string representing the token """
+        """ `token_string` should be string representing the token. """
         if not isinstance(token_string, basestring):
             raise TypeError(
                 "Tokens for ByteOrderedPartitioner should be strings (got %s)"

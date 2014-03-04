@@ -1,10 +1,12 @@
 from itertools import islice, cycle, groupby, repeat
 import logging
 from random import randint
+from threading import Lock
 
 from cassandra import ConsistencyLevel
 
 log = logging.getLogger(__name__)
+
 
 class HostDistance(object):
     """
@@ -42,7 +44,29 @@ class HostDistance(object):
     """
 
 
-class LoadBalancingPolicy(object):
+class HostStateListener(object):
+
+    def on_up(self, host):
+        """ Called when a node is marked up. """
+        raise NotImplementedError()
+
+    def on_down(self, host):
+        """ Called when a node is marked down. """
+        raise NotImplementedError()
+
+    def on_add(self, host):
+        """
+        Called when a node is added to the cluster.  The newly added node
+        should be considered up.
+        """
+        raise NotImplementedError()
+
+    def on_remove(self, host):
+        """ Called when a node is removed from the cluster. """
+        raise NotImplementedError()
+
+
+class LoadBalancingPolicy(HostStateListener):
     """
     Load balancing policies are used to decide how to distribute
     requests among all possible coordinator nodes in the cluster.
@@ -54,6 +78,11 @@ class LoadBalancingPolicy(object):
     You may also use subclasses of :class:`.LoadBalancingPolicy` for
     custom behavior.
     """
+
+    _hosts_lock = None
+
+    def __init__(self):
+        self._hosts_lock = Lock()
 
     def distance(self, host):
         """
@@ -87,35 +116,14 @@ class LoadBalancingPolicy(object):
         """
         raise NotImplementedError()
 
-    def on_up(self, host):
+    def check_supported(self):
         """
-        Called when a :class:`~.pool.Host`'s :class:`~.HealthMonitor`
-        marks the node up.
+        This will be called after the cluster Metadata has been initialized.
+        If the load balancing policy implementation cannot be supported for
+        some reason (such as a missing C extension), this is the point at
+        which it should raise an exception.
         """
-        raise NotImplementedError()
-
-    def on_down(self, host):
-        """
-        Called when a :class:`~.pool.Host`'s :class:`~.HealthMonitor`
-        marks the node down.
-        """
-        raise NotImplementedError()
-
-    def on_add(self, host):
-        """
-        Called when a :class:`.Cluster` instance is first created and
-        the initial contact points are added as well as when a new
-        :class:`~.pool.Host` is discovered in the cluster, which may
-        happen the first time the ring topology is examined or when
-        a new node joins the cluster.
-        """
-        raise NotImplementedError()
-
-    def on_remove(self, host):
-        """
-        Called when a :class:`~.pool.Host` leaves the cluster.
-        """
-        raise NotImplementedError()
+        pass
 
 
 class RoundRobinPolicy(LoadBalancingPolicy):
@@ -128,7 +136,7 @@ class RoundRobinPolicy(LoadBalancingPolicy):
     """
 
     def populate(self, cluster, hosts):
-        self._live_hosts = set(hosts)
+        self._live_hosts = frozenset(hosts)
         if len(hosts) <= 1:
             self._position = 0
         else:
@@ -143,24 +151,29 @@ class RoundRobinPolicy(LoadBalancingPolicy):
         pos = self._position
         self._position += 1
 
-        length = len(self._live_hosts)
+        hosts = self._live_hosts
+        length = len(hosts)
         if length:
             pos %= length
-            return list(islice(cycle(self._live_hosts), pos, pos + length))
+            return list(islice(cycle(hosts), pos, pos + length))
         else:
             return []
 
     def on_up(self, host):
-        self._live_hosts.add(host)
+        with self._hosts_lock:
+            self._live_hosts = self._live_hosts.union((host, ))
 
     def on_down(self, host):
-        self._live_hosts.discard(host)
+        with self._hosts_lock:
+            self._live_hosts = self._live_hosts.difference((host, ))
 
     def on_add(self, host):
-        self._live_hosts.add(host)
+        with self._hosts_lock:
+            self._live_hosts = self._live_hosts.union((host, ))
 
     def on_remove(self, host):
-        self._live_hosts.remove(host)
+        with self._hosts_lock:
+            self._live_hosts = self._live_hosts.difference((host, ))
 
 
 class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
@@ -189,13 +202,14 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
         self.local_dc = local_dc
         self.used_hosts_per_remote_dc = used_hosts_per_remote_dc
         self._dc_live_hosts = {}
+        LoadBalancingPolicy.__init__(self)
 
     def _dc(self, host):
         return host.datacenter or self.local_dc
 
     def populate(self, cluster, hosts):
         for dc, dc_hosts in groupby(hosts, lambda h: self._dc(h)):
-            self._dc_live_hosts[dc] = set(dc_hosts)
+            self._dc_live_hosts[dc] = frozenset(dc_hosts)
 
         # position is currently only used for local hosts
         local_live = self._dc_live_hosts.get(self.local_dc)
@@ -242,16 +256,28 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
                 yield host
 
     def on_up(self, host):
-        self._dc_live_hosts.setdefault(self._dc(host), set()).add(host)
+        dc = self._dc(host)
+        with self._hosts_lock:
+            current_hosts = self._dc_live_hosts.setdefault(dc, frozenset())
+            self._dc_live_hosts[dc] = current_hosts.union((host, ))
 
     def on_down(self, host):
-        self._dc_live_hosts.setdefault(self._dc(host), set()).discard(host)
+        dc = self._dc(host)
+        with self._hosts_lock:
+            current_hosts = self._dc_live_hosts.setdefault(dc, frozenset())
+            self._dc_live_hosts[dc] = current_hosts.difference((host, ))
 
     def on_add(self, host):
-        self._dc_live_hosts.setdefault(self._dc(host), set()).add(host)
+        dc = self._dc(host)
+        with self._hosts_lock:
+            current_hosts = self._dc_live_hosts.setdefault(dc, frozenset())
+            self._dc_live_hosts[dc] = current_hosts.union((host, ))
 
     def on_remove(self, host):
-        self._dc_live_hosts.setdefault(self._dc(host), set()).discard(host)
+        dc = self._dc(host)
+        with self._hosts_lock:
+            current_hosts = self._dc_live_hosts.setdefault(dc, frozenset())
+            self._dc_live_hosts[dc] = current_hosts.difference((host, ))
 
 
 class TokenAwarePolicy(LoadBalancingPolicy):
@@ -273,14 +299,23 @@ class TokenAwarePolicy(LoadBalancingPolicy):
     _cluster_metadata = None
 
     def __init__(self, child_policy):
-        self.child_policy = child_policy
+        self._child_policy = child_policy
 
     def populate(self, cluster, hosts):
         self._cluster_metadata = cluster.metadata
-        self.child_policy.populate(cluster, hosts)
+        self._child_policy.populate(cluster, hosts)
+
+    def check_supported(self):
+        if not self._cluster_metadata.can_support_partitioner():
+            raise Exception(
+                '%s cannot be used with the cluster partitioner (%s) because '
+                'the relevant C extension for this driver was not compiled. '
+                'See the installation instructions for details on building '
+                'and installing the C extensions.' % (self.__class__.__name__,
+                self._cluster_metadata.partitioner))
 
     def distance(self, *args, **kwargs):
-        return self.child_policy.distance(*args, **kwargs)
+        return self._child_policy.distance(*args, **kwargs)
 
     def make_query_plan(self, working_keyspace=None, query=None):
         if query and query.keyspace:
@@ -288,7 +323,7 @@ class TokenAwarePolicy(LoadBalancingPolicy):
         else:
             keyspace = working_keyspace
 
-        child = self.child_policy
+        child = self._child_policy
         if query is None:
             for host in child.make_query_plan(keyspace, query):
                 yield host
@@ -300,7 +335,7 @@ class TokenAwarePolicy(LoadBalancingPolicy):
             else:
                 replicas = self._cluster_metadata.get_replicas(keyspace, routing_key)
                 for replica in replicas:
-                    if replica.monitor.is_up and \
+                    if replica.is_up and \
                             child.distance(replica) == HostDistance.LOCAL:
                         yield replica
 
@@ -311,16 +346,58 @@ class TokenAwarePolicy(LoadBalancingPolicy):
                         yield host
 
     def on_up(self, *args, **kwargs):
-        return self.child_policy.on_up(*args, **kwargs)
+        return self._child_policy.on_up(*args, **kwargs)
 
     def on_down(self, *args, **kwargs):
-        return self.child_policy.on_down(*args, **kwargs)
+        return self._child_policy.on_down(*args, **kwargs)
 
     def on_add(self, *args, **kwargs):
-        return self.child_policy.on_add(*args, **kwargs)
+        return self._child_policy.on_add(*args, **kwargs)
 
     def on_remove(self, *args, **kwargs):
-        return self.child_policy.on_remove(*args, **kwargs)
+        return self._child_policy.on_remove(*args, **kwargs)
+
+
+class WhiteListRoundRobinPolicy(RoundRobinPolicy):
+    """
+    A subclass of :class:`.RoundRobinPolicy` which evenly
+    distributes queries across all nodes in the cluster,
+    regardless of what datacenter the nodes may be in, but
+    only if that node exists in the list of allowed nodes
+
+    This policy is addresses the issue described in
+    https://datastax-oss.atlassian.net/browse/JAVA-145
+    Where connection errors occur when connection
+    attempts are made to private IP addresses remotely
+    """
+    def __init__(self, hosts):
+        """
+        :param hosts: List of hosts
+        """
+        self._allowed_hosts = hosts
+        RoundRobinPolicy.__init__(self)
+
+    def populate(self, cluster, hosts):
+        self._live_hosts = frozenset(h for h in hosts if h.address in self._allowed_hosts)
+
+        if len(hosts) <= 1:
+            self._position = 0
+        else:
+            self._position = randint(0, len(hosts) - 1)
+
+    def distance(self, host):
+        if host.address in self._allowed_hosts:
+            return HostDistance.LOCAL
+        else:
+            return HostDistance.IGNORED
+
+    def on_up(self, host):
+        if host.address in self._allowed_hosts:
+            RoundRobinPolicy.on_up(self, host)
+
+    def on_add(self, host):
+        if host.address in self._allowed_hosts:
+            RoundRobinPolicy.on_add(self, host)
 
 
 class ConvictionPolicy(object):
@@ -369,7 +446,7 @@ class SimpleConvictionPolicy(ConvictionPolicy):
 class ReconnectionPolicy(object):
     """
     This class and its subclasses govern how frequently an attempt is made
-    to reconnect to nodes that are marked dead.
+    to reconnect to nodes that are marked as dead.
 
     If custom behavior is needed, this class may be subclassed.
     """
@@ -525,13 +602,13 @@ class RetryPolicy(object):
         how many replicas needed to respond to meet the requested consistency
         level and how many actually did respond before the coordinator timed
         out the request. `data_retrieved` is a boolean indicating whether
-        any of those responses contained data (as opposed to just a checksum).
+        any of those responses contained data (as opposed to just a digest).
 
         `retry_num` counts how many times the operation has been retried, so
         the first time this method is called, `retry_num` will be 0.
 
         By default, operations will be retried at most once, and only if
-        a sufficient number of replicas responded (with checksums).
+        a sufficient number of replicas responded (with data digests).
         """
         if retry_num != 0:
             return (self.RETHROW, None)
@@ -623,7 +700,7 @@ class DowngradingConsistencyRetryPolicy(RetryPolicy):
     **BEWARE**: This policy may retry queries using a lower consistency
     level than the one initially requested. By doing so, it may break
     consistency guarantees. In other words, if you use this retry policy,
-    there is cases (documented below) where a read at :attr:`~.QUORUM`
+    there are cases (documented below) where a read at :attr:`~.QUORUM`
     *may not* see a preceding write at :attr:`~.QUORUM`. Do not use this
     policy unless you have understood the cases where this can happen and
     are ok with that. It is also recommended to subclass this class so
@@ -633,7 +710,7 @@ class DowngradingConsistencyRetryPolicy(RetryPolicy):
     This policy implements the same retries as :class:`.RetryPolicy`,
     but on top of that, it also retries in the following cases:
 
-    * On a read timeout: if the number of replica that responded is
+    * On a read timeout: if the number of replicas that responded is
       greater than one but lower than is required by the requested
       consistency level, the operation is retried at a lower consistency
       level.
@@ -645,7 +722,7 @@ class DowngradingConsistencyRetryPolicy(RetryPolicy):
     * On an unavailable exception: if at least one replica is alive, the
       operation is retried at a lower consistency level.
 
-    The reasoning being this retry policy is as follows:. If, based
+    The reasoning behind this retry policy is as follows: if, based
     on the information the Cassandra coordinator node returns, retrying the
     operation with the initially requested consistency has a chance to
     succeed, do it. Otherwise, if based on that information we know the

@@ -1,37 +1,25 @@
-# Licensed to the Apache Software Foundation (ASF) under one
-# or more contributor license agreements.  See the NOTICE file
-# distributed with this work for additional information
-# regarding copyright ownership.  The ASF licenses this file
-# to you under the Apache License, Version 2.0 (the
-# "License"); you may not use this file except in compliance
-# with the License.  You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 from binascii import hexlify
+import calendar
 from collections import namedtuple
+import datetime
+import logging
+import re
+import socket
+import sys
+import types
+from uuid import UUID
+
 try:
     from collections import OrderedDict
 except ImportError:  # Python <2.7
     from cassandra.util import OrderedDict # NOQA
 
-import datetime
-import logging
-import socket
-import types
-from uuid import UUID
 try:
     from cStringIO import StringIO
 except ImportError:
     from StringIO import StringIO  # ignore flake8 warning: # NOQA
 
-from cassandra import (ConsistencyLevel, Unavailable, WriteTimeout, ReadTimeout,
+from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
                        AlreadyExists, InvalidRequest, Unauthorized)
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
                                int8_pack, int8_unpack)
@@ -40,9 +28,10 @@ from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 DoubleType, FloatType, Int32Type,
                                 InetAddressType, IntegerType, ListType,
                                 LongType, MapType, SetType, TimeUUIDType,
-                                UTF8Type, UUIDType)
+                                UTF8Type, UUIDType, lookup_casstype)
 
 log = logging.getLogger(__name__)
+
 
 class NotSupportedError(Exception):
     pass
@@ -60,12 +49,20 @@ HEADER_DIRECTION_TO_CLIENT = 0x80
 HEADER_DIRECTION_MASK = 0x80
 
 
+NON_ALPHA_REGEX = re.compile('\W')
+END_UNDERSCORE_REGEX = re.compile('^_*(\w*[a-zA-Z0-9])_*$')
+
+
+def _clean_column_name(name):
+    return END_UNDERSCORE_REGEX.sub("\g<1>", NON_ALPHA_REGEX.sub("_", name))
+
+
 def tuple_factory(colnames, rows):
     return rows
 
 
 def named_tuple_factory(colnames, rows):
-    Row = namedtuple('Row', colnames)
+    Row = namedtuple('Row', map(_clean_column_name, colnames))
     return [Row(*row) for row in rows]
 
 
@@ -79,6 +76,7 @@ def ordered_dict_factory(colnames, rows):
 
 _message_types_by_name = {}
 _message_types_by_opcode = {}
+
 
 class _register_msg_type(type):
     def __init__(cls, name, bases, dct):
@@ -156,7 +154,7 @@ def decode_response(stream_id, flags, opcode, body, decompressor=None):
         trace_id = None
 
     if flags:
-        log.warn("Unknown protocol flags set: %02x. May cause problems." % flags)
+        log.warn("Unknown protocol flags set: %02x. May cause problems.", flags)
 
     msg_class = _message_types_by_opcode[opcode]
     msg = msg_class.recv_body(body)
@@ -166,6 +164,7 @@ def decode_response(stream_id, flags, opcode, body, decompressor=None):
 
 
 error_classes = {}
+
 
 class ErrorMessage(_MessageType, Exception):
     opcode = 0x00
@@ -425,6 +424,9 @@ class QueryMessage(_MessageType):
         write_consistency_level(f, self.consistency_level)
 
 
+CUSTOM_TYPE = object()
+
+
 class ResultMessage(_MessageType):
     opcode = 0x08
     name = 'RESULT'
@@ -437,6 +439,7 @@ class ResultMessage(_MessageType):
     KIND_SCHEMA_CHANGE = 0x0005
 
     type_codes = {
+        0x0000: CUSTOM_TYPE,
         0x0001: AsciiType,
         0x0002: LongType,
         0x0003: BytesType,
@@ -526,15 +529,19 @@ class ResultMessage(_MessageType):
         try:
             typeclass = cls.type_codes[optid]
         except KeyError:
-            raise NotSupportedError("Unknown data type code 0x%x. Have to skip"
-                                    " entire result set." % optid)
+            raise NotSupportedError("Unknown data type code 0x%04x. Have to skip"
+                                    " entire result set." % (optid,))
         if typeclass in (ListType, SetType):
             subtype = cls.read_type(f)
-            typeclass = typeclass.apply_parameters(subtype)
+            typeclass = typeclass.apply_parameters((subtype,))
         elif typeclass == MapType:
             keysubtype = cls.read_type(f)
             valsubtype = cls.read_type(f)
-            typeclass = typeclass.apply_parameters(keysubtype, valsubtype)
+            typeclass = typeclass.apply_parameters((keysubtype, valsubtype))
+        elif typeclass == CUSTOM_TYPE:
+            classname = read_string(f)
+            typeclass = lookup_casstype(classname)
+
         return typeclass
 
     @staticmethod
@@ -641,7 +648,7 @@ def write_short(f, s):
 
 
 def read_consistency_level(f):
-    return ConsistencyLevel.value_to_name[read_short(f)]
+    return read_short(f)
 
 
 def write_consistency_level(f, cl):
@@ -784,8 +791,13 @@ def cql_encode_str(val):
     return cql_quote(val)
 
 
-def cql_encode_bytes(val):
-    return '0x' + hexlify(val)
+if sys.version_info >= (2, 7):
+    def cql_encode_bytes(val):
+        return '0x' + hexlify(val)
+else:
+    # python 2.6 requires string or read-only buffer for hexlify
+    def cql_encode_bytes(val):  # noqa
+        return '0x' + hexlify(buffer(val))
 
 
 def cql_encode_object(val):
@@ -793,7 +805,8 @@ def cql_encode_object(val):
 
 
 def cql_encode_datetime(val):
-    return "'%s'" % val.strftime('%Y-%m-%d %H:%M:%S-0000')
+    timestamp = calendar.timegm(val.utctimetuple())
+    return str(long(timestamp * 1e3 + getattr(val, 'microsecond', 0) / 1e3))
 
 
 def cql_encode_date(val):
@@ -806,20 +819,28 @@ def cql_encode_sequence(val):
 
 
 def cql_encode_map_collection(val):
-    return '{ %s }' % ' , '.join('%s : %s' % (cql_quote(k), cql_quote(v))
+    return '{ %s }' % ' , '.join(
+                                 '%s : %s' % (
+                                     cql_encode_all_types(k),
+                                     cql_encode_all_types(v))
                                  for k, v in val.iteritems())
 
 
 def cql_encode_list_collection(val):
-    return '[ %s ]' % ' , '.join(map(cql_quote, val))
+    return '[ %s ]' % ' , '.join(map(cql_encode_all_types, val))
 
 
 def cql_encode_set_collection(val):
-    return '{ %s }' % ' , '.join(map(cql_quote, val))
+    return '{ %s }' % ' , '.join(map(cql_encode_all_types, val))
+
+
+def cql_encode_all_types(val):
+    return cql_encoders.get(type(val), cql_encode_object)(val)
 
 
 cql_encoders = {
     float: cql_encode_object,
+    buffer: cql_encode_bytes,
     bytearray: cql_encode_bytes,
     str: cql_encode_str,
     unicode: cql_encode_unicode,
@@ -830,9 +851,10 @@ cql_encoders = {
     datetime.datetime: cql_encode_datetime,
     datetime.date: cql_encode_date,
     dict: cql_encode_map_collection,
+    OrderedDict: cql_encode_map_collection,
     list: cql_encode_list_collection,
     tuple: cql_encode_list_collection,
     set: cql_encode_set_collection,
     frozenset: cql_encode_set_collection,
-    types.GeneratorType: cql_encode_sequence
+    types.GeneratorType: cql_encode_list_collection
 }

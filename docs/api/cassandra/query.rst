@@ -25,5 +25,3 @@
    :members:
 
 .. autoexception:: TraceUnavailable
-
-.. autoexception:: InvalidParameterTypeError

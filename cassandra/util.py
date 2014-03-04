@@ -26,6 +26,7 @@ from __future__ import with_statement
 
 from UserDict import DictMixin
 
+
 class OrderedDict(dict, DictMixin):
     """ A dictionary which maintains the insertion order of keys. """
 
@@ -167,6 +168,7 @@ class _IterationGuard(object):
 class WeakSet(object):
     def __init__(self, data=None):
         self.data = set()
+
         def _remove(item, selfref=ref(self)):
             self = selfref()
             if self is not None:
@@ -174,6 +176,7 @@ class WeakSet(object):
                     self._pending_removals.append(item)
                 else:
                     self.data.discard(item)
+
         self._remove = _remove
         # A list of keys to be removed
         self._pending_removals = []
@@ -274,6 +277,7 @@ class WeakSet(object):
             self.data.clear()
         else:
             self.data.difference_update(ref(item) for item in other)
+
     def __isub__(self, other):
         if self._pending_removals:
             self._commit_removals()
@@ -291,6 +295,7 @@ class WeakSet(object):
         if self._pending_removals:
             self._commit_removals()
         self.data.intersection_update(ref(item) for item in other)
+
     def __iand__(self, other):
         if self._pending_removals:
             self._commit_removals()
@@ -327,6 +332,7 @@ class WeakSet(object):
             self.data.clear()
         else:
             self.data.symmetric_difference_update(ref(item) for item in other)
+
     def __ixor__(self, other):
         if self._pending_removals:
             self._commit_removals()

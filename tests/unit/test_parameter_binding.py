@@ -5,8 +5,12 @@ except ImportError:
 
 from cassandra.query import bind_params, ValueSequence
 from cassandra.query import PreparedStatement, BoundStatement
-from cassandra.query import InvalidParameterTypeError
 from cassandra.cqltypes import Int32Type
+
+try:
+    from collections import OrderedDict
+except ImportError:  # Python <2.7
+    from cassandra.util import OrderedDict # NOQA
 
 
 class ParamBindingTest(unittest.TestCase):
@@ -25,7 +29,7 @@ class ParamBindingTest(unittest.TestCase):
 
     def test_generator_param(self):
         result = bind_params("%s", ((i for i in xrange(3)),))
-        self.assertEquals(result, "( 0 , 1 , 2 )")
+        self.assertEquals(result, "[ 0 , 1 , 2 ]")
 
     def test_none_param(self):
         result = bind_params("%s", (None,))
@@ -36,12 +40,16 @@ class ParamBindingTest(unittest.TestCase):
         self.assertEquals(result, "[ 'a' , 'b' , 'c' ]")
 
     def test_set_collection(self):
-        result = bind_params("%s", (set(['a', 'b', 'c']),))
-        self.assertEquals(result, "{ 'a' , 'c' , 'b' }")
+        result = bind_params("%s", (set(['a', 'b']),))
+        self.assertIn(result, ("{ 'a' , 'b' }", "{ 'b' , 'a' }"))
 
     def test_map_collection(self):
-        result = bind_params("%s", ({'a': 'a', 'b': 'b'},))
-        self.assertEquals(result, "{ 'a' : 'a' , 'b' : 'b' }")
+        vals = OrderedDict()
+        vals['a'] = 'a'
+        vals['b'] = 'b'
+        vals['c'] = 'c'
+        result = bind_params("%s", (vals,))
+        self.assertEquals(result, "{ 'a' : 'a' , 'b' : 'b' , 'c' : 'c' }")
 
     def test_quote_escaping(self):
         result = bind_params("%s", ("""'ef''ef"ef""ef'""",))
@@ -70,19 +78,10 @@ class BoundStatementTestCase(unittest.TestCase):
 
         try:
             bound_statement.bind(values)
-        except InvalidParameterTypeError as e:
-            self.assertEqual(e.col_name, 'foo1')
-            self.assertEqual(e.expected_type, Int32Type)
-            self.assertEqual(e.actual_type, str)
-        else:
-            self.fail('Passed invalid type but exception was not thrown')
-
-        try:
-            bound_statement.bind(values)
         except TypeError as e:
-            self.assertEqual(e.col_name, 'foo1')
-            self.assertEqual(e.expected_type, Int32Type)
-            self.assertEqual(e.actual_type, str)
+            self.assertIn('foo1', str(e))
+            self.assertIn('Int32Type', str(e))
+            self.assertIn('str', str(e))
         else:
             self.fail('Passed invalid type but exception was not thrown')
 
@@ -90,9 +89,9 @@ class BoundStatementTestCase(unittest.TestCase):
 
         try:
             bound_statement.bind(values)
-        except InvalidParameterTypeError as e:
-            self.assertEqual(e.col_name, 'foo2')
-            self.assertEqual(e.expected_type, Int32Type)
-            self.assertEqual(e.actual_type, list)
+        except TypeError as e:
+            self.assertIn('foo2', str(e))
+            self.assertIn('Int32Type', str(e))
+            self.assertIn('list', str(e))
         else:
             self.fail('Passed invalid type but exception was not thrown')

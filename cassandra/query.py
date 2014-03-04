@@ -8,10 +8,14 @@ from datetime import datetime, timedelta
 import struct
 import time
 
-from cassandra import ConsistencyLevel
+from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.cqltypes import unix_time_from_uuid1
 from cassandra.decoder import (cql_encoders, cql_encode_object,
-                               cql_encode_sequence)
+                               cql_encode_sequence, named_tuple_factory)
+
+import logging
+log = logging.getLogger(__name__)
+
 
 class Statement(object):
     """
@@ -41,10 +45,8 @@ class Statement(object):
 
     _routing_key = None
 
-    def __init__(self, retry_policy=None, tracing_enabled=False,
-                 consistency_level=None, routing_key=None):
+    def __init__(self, retry_policy=None, consistency_level=None, routing_key=None):
         self.retry_policy = retry_policy
-        self.tracing_enabled = tracing_enabled
         if consistency_level is not None:
             self.consistency_level = consistency_level
         self._routing_key = routing_key
@@ -102,10 +104,11 @@ class SimpleStatement(Statement):
     def query_string(self):
         return self._query_string
 
-    def __repr__(self):
+    def __str__(self):
         consistency = ConsistencyLevel.value_to_name[self.consistency_level]
         return (u'<SimpleStatement query="%s", consistency=%s>' %
                 (self.query_string, consistency))
+    __repr__ = __str__
 
 
 class PreparedStatement(object):
@@ -113,6 +116,9 @@ class PreparedStatement(object):
     A statement that has been prepared against at least one Cassandra node.
     Instances of this class should not be created directly, but through
     :meth:`.Session.prepare()`.
+
+    A :class:`.PreparedStatement` should be prepared only once. Re-preparing a statement
+    may affect performance (as the operation requires a network roundtrip).
     """
 
     column_metadata = None
@@ -164,15 +170,16 @@ class PreparedStatement(object):
     def bind(self, values):
         """
         Creates and returns a :class:`BoundStatement` instance using `values`.
-        The `values` parameter *must* be a sequence, such as a tuple or list,
+        The `values` parameter **must** be a sequence, such as a tuple or list,
         even if there is only one value to bind.
         """
         return BoundStatement(self).bind(values)
 
-    def __repr__(self):
+    def __str__(self):
         consistency = ConsistencyLevel.value_to_name[self.consistency_level]
         return (u'<PreparedStatement query="%s", consistency=%s>' %
                 (self.query_string, consistency))
+    __repr__ = __str__
 
 
 class BoundStatement(Statement):
@@ -226,15 +233,14 @@ class BoundStatement(Statement):
 
                 try:
                     self.values.append(col_type.serialize(value))
-                except struct.error:
+                except (TypeError, struct.error):
                     col_name = col_spec[2]
                     expected_type = col_type
                     actual_type = type(value)
 
-                    err = InvalidParameterTypeError(col_name=col_name,
-                                                    expected_type=expected_type,
-                                                    actual_type=actual_type)
-                    raise err
+                    message = ('Received an argument of invalid type for column "%s". '
+                               'Expected: %s, Got: %s' % (col_name, expected_type, actual_type))
+                    raise TypeError(message)
 
         return self
 
@@ -267,10 +273,11 @@ class BoundStatement(Statement):
         else:
             return None
 
-    def __repr__(self):
+    def __str__(self):
         consistency = ConsistencyLevel.value_to_name[self.consistency_level]
         return (u'<BoundStatement query="%s", values=%s, consistency=%s>' %
                 (self.prepared_statement.query_string, self.raw_values, consistency))
+    __repr__ = __str__
 
 
 class ValueSequence(object):
@@ -283,7 +290,7 @@ class ValueSequence(object):
     For example::
 
         >>> my_user_ids = ('alice', 'bob', 'charles')
-        >>> query = "SELECT * FROM users WHERE user_id IN ?"
+        >>> query = "SELECT * FROM users WHERE user_id IN %s"
         >>> session.execute(query, parameters=[ValueSequence(my_user_ids)])
 
     """
@@ -309,24 +316,6 @@ class TraceUnavailable(Exception):
     Raised when complete trace details cannot be fetched from Cassandra.
     """
     pass
-
-
-class InvalidParameterTypeError(TypeError):
-    """
-    Raised when a used tries to bind a prepared statement with an argument of an
-    invalid type.
-    """
-
-    def __init__(self, col_name, expected_type, actual_type):
-        self.col_name = col_name
-        self.expected_type = expected_type
-        self.actual_type = actual_type
-
-        values = (self.col_name, self.expected_type, self.actual_type)
-        message = ('Received an argument of invalid type for column "%s". '
-                   'Expected: %s, Got: %s' % values)
-
-        super(InvalidParameterTypeError, self).__init__(message)
 
 
 class QueryTrace(object):
@@ -382,27 +371,33 @@ class QueryTrace(object):
     _SELECT_SESSIONS_FORMAT = "SELECT * FROM system_traces.sessions WHERE session_id = %s"
     _SELECT_EVENTS_FORMAT = "SELECT * FROM system_traces.events WHERE session_id = %s"
     _BASE_RETRY_SLEEP = 0.003
-    _MAX_ATTEMPTS = 5
 
     def __init__(self, trace_id, session):
         self.trace_id = trace_id
         self._session = session
 
-    def populate(self):
+    def populate(self, max_wait=2.0):
         """
         Retrieves the actual tracing details from Cassandra and populates the
         attributes of this instance.  Because tracing details are stored
         asynchronously by Cassandra, this may need to retry the session
-        detail fetch up to five times before raising :exc:`.TraceUnavailable`.
-
-        Currently intended for internal use only.
+        detail fetch.  If the trace is still not available after `max_wait`
+        seconds, :exc:`.TraceUnavailable` will be raised; if `max_wait` is
+        :const:`None`, this will retry forever.
         """
         attempt = 0
-        while attempt <= self._MAX_ATTEMPTS:
-            attempt += 1
-            session_results = self._session.execute(self._SELECT_SESSIONS_FORMAT, (self.trace_id,))
+        start = time.time()
+        while True:
+            time_spent = time.time() - start
+            if max_wait is not None and time_spent >= max_wait:
+                raise TraceUnavailable("Trace information was not available within %f seconds" % (max_wait,))
+
+            session_results = self._execute(
+                self._SELECT_SESSIONS_FORMAT, (self.trace_id,), time_spent, max_wait)
+
             if not session_results or session_results[0].duration is None:
-                time.sleep(self._BASE_RETRY_SLEEP * attempt)
+                time.sleep(self._BASE_RETRY_SLEEP * (2 ** attempt))
+                attempt += 1
                 continue
 
             session_row = session_results[0]
@@ -412,9 +407,24 @@ class QueryTrace(object):
             self.coordinator = session_row.coordinator
             self.parameters = session_row.parameters
 
-            event_results = self._session.execute(self._SELECT_EVENTS_FORMAT, (self.trace_id,))
+            time_spent = time.time() - start
+            event_results = self._execute(
+                self._SELECT_EVENTS_FORMAT, (self.trace_id,), time_spent, max_wait)
             self.events = tuple(TraceEvent(r.activity, r.event_id, r.source, r.source_elapsed, r.thread)
                                 for r in event_results)
+            break
+
+    def _execute(self, query, parameters, time_spent, max_wait):
+        # in case the user switched the row factory, set it to namedtuple for this query
+        future = self._session._create_response_future(query, parameters, trace=False)
+        future.row_factory = named_tuple_factory
+        future.send_request()
+
+        timeout = (max_wait - time_spent) if max_wait is not None else None
+        try:
+            return future.result(timeout=timeout)
+        except OperationTimedOut:
+            raise TraceUnavailable("Trace information was not available within %f seconds" % (max_wait,))
 
     def __str__(self):
         return "%s [%s] coordinator: %s, started at: %s, duration: %s, parameters: %s" \
@@ -458,7 +468,10 @@ class TraceEvent(object):
         self.description = description
         self.datetime = datetime.utcfromtimestamp(unix_time_from_uuid1(timeuuid))
         self.source = source
-        self.source_elapsed = timedelta(microseconds=source_elapsed)
+        if source_elapsed is not None:
+            self.source_elapsed = timedelta(microseconds=source_elapsed)
+        else:
+            self.source_elapsed = None
         self.thread_name = thread_name
 
     def __str__(self):

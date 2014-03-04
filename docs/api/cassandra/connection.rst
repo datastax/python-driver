@@ -4,5 +4,6 @@
 .. module:: cassandra.connection
 
 .. autoexception:: ConnectionException ()
+.. autoexception:: ConnectionShutdown ()
 .. autoexception:: ConnectionBusy ()
 .. autoexception:: ProtocolError ()
