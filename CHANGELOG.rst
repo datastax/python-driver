@@ -1,3 +1,12 @@
+1.0.3
+=====
+In Progress
+
+Other
+-----
+* Don't ignore column names when parsing typestrings.  This is needed for
+  user-defined type support.  (github issue #90)
+
 1.0.2
 =====
 March 4, 2014
