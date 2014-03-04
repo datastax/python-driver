@@ -806,11 +806,15 @@ class ColumnMetadata(object):
     data_type = None
 
     index = None
-
-    is_static = False
     """
     If an index exists on this column, this is an instance of
     :class:`.IndexMetadata`, otherwise :const:`None`.
+    """
+
+    is_static = False
+    """
+    If this column is static (available in Cassandra 2.1+), this will
+    be :const:`True`, otherwise :const:`False`.
     """
 
     def __init__(self, table_metadata, column_name, data_type, index_metadata=None, is_static=False):

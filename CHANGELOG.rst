@@ -2,6 +2,11 @@
 =====
 In Progress
 
+Features
+--------
+* Support static columns in schemas, which are available starting in
+  Cassandra 2.1. (github issue #91)
+
 Other
 -----
 * Don't ignore column names when parsing typestrings.  This is needed for
