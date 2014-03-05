@@ -14,6 +14,7 @@ from cassandra.decoder import (write_stringmultimap, write_int, write_string,
                                SupportedMessage)
 from cassandra.marshal import uint8_pack, uint32_pack
 
+
 class ConnectionTest(unittest.TestCase):
 
     def make_connection(self):
@@ -132,13 +133,8 @@ class ConnectionTest(unittest.TestCase):
         """
         Ensure the following methods throw NIE's. If not, come back and test them.
         """
-
-        c  = self.make_connection()
+        c = self.make_connection()
 
         self.assertRaises(NotImplementedError, c.close)
-        self.assertRaises(NotImplementedError, c.defunct, None)
-        self.assertRaises(NotImplementedError, c.send_msg, None, None)
-        self.assertRaises(NotImplementedError, c.wait_for_response, None)
-        self.assertRaises(NotImplementedError, c.wait_for_responses)
         self.assertRaises(NotImplementedError, c.register_watcher, None, None)
         self.assertRaises(NotImplementedError, c.register_watchers, None)
