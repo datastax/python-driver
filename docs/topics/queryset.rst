@@ -29,7 +29,7 @@ Retrieving all objects
 .. _retrieving-objects-with-filters:
 
 Retrieving objects with filters
-----------------------------------------
+-------------------------------
     Typically, you'll want to query only a subset of the records in your database.
 
     That can be accomplished with the QuerySet's ``.filter(\*\*)`` method.
@@ -156,7 +156,7 @@ Filtering Operators
 
             # or the nicer syntax
 
-            Automobile.objects.filter(Automobile.manufacturer == 'Tesla')
+            q.filter(Automobile.year >= 2010)
 
     :attr:`< (__lt) <query.QueryOperator.LessThanOperator>`
 
@@ -270,7 +270,7 @@ Values Lists
 
 
 Batch Queries
-===============
+=============
 
     cqlengine now supports batch queries using the BatchQuery class. Batch queries can be started and stopped manually, or within a context manager. To add queries to the batch object, you just need to precede the create/save/delete call with a call to batch, and pass in the batch object.
 
