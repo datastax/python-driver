@@ -385,7 +385,7 @@ class AbstractQuerySet(object):
                 if len(partition_columns) != len(val.value):
                     raise QueryException(
                         'Token() received {} arguments but model has {} partition keys'.format(
-                            len(partition_columns), len(val.value)))
+                            len(val.value), len(partition_columns)))
                 val.set_columns(partition_columns)
 
             #get query operator, or use equals if not supplied

@@ -144,6 +144,19 @@ class TestBooleanIO(BaseColumnIOTest):
     pkey_val = True
     data_val = False
 
+    def comparator_converter(self, val):
+        return val.value if isinstance(val, columns.Boolean.Quoter) else val
+
+class TestBooleanQuoter(BaseColumnIOTest):
+
+    column = columns.Boolean
+
+    pkey_val = True
+    data_val = columns.Boolean.Quoter(False)
+
+    def comparator_converter(self, val):
+        return val.value if isinstance(val, columns.Boolean.Quoter) else val
+
 class TestFloatIO(BaseColumnIOTest):
 
     column = columns.Float

@@ -263,7 +263,7 @@ Extending Model Validation
 
 
 Compaction Options
-====================
+==================
 
     As of cqlengine 0.7 we've added support for specifying compaction options.  cqlengine will only use your compaction options if you have a strategy set.  When a table is synced, it will be altered to match the compaction options set on your table.  This means that if you are changing settings manually they will be changed back on resync.  Do not use the compaction settings of cqlengine if you want to manage your compaction settings manually.
 
