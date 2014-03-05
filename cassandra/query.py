@@ -337,8 +337,8 @@ class BatchType(object):
 
 
 BatchType.LOGGED = BatchType(0, "LOGGED")
-BatchType.UNLOGGED = BatchType(0, "UNLOGGED")
-BatchType.COUNTER = BatchType(0, "COUNTER")
+BatchType.UNLOGGED = BatchType(1, "UNLOGGED")
+BatchType.COUNTER = BatchType(2, "COUNTER")
 
 
 class BatchStatement(Statement):
