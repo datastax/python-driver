@@ -4,11 +4,9 @@ from gevent.event import Event
 from gevent.queue import Queue
 
 from collections import defaultdict
-from functools import partial
 import logging
 import os
 import sys
-import traceback
 
 try:
     from cStringIO import StringIO
@@ -17,8 +15,8 @@ except ImportError:
 
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL
 
-from cassandra.connection import (Connection, ResponseWaiter, ConnectionShutdown,
-                                  ConnectionBusy)
+from cassandra import OperationTimedOut
+from cassandra.connection import Connection, ConnectionShutdown
 from cassandra.decoder import RegisterMessage
 from cassandra.marshal import int32_unpack
 
@@ -45,15 +43,19 @@ class GeventConnection(Connection):
 
     @classmethod
     def factory(cls, *args, **kwargs):
+        timeout = kwargs.pop('timeout', 5.0)
         conn = cls(*args, **kwargs)
-        conn.connected_event.wait()
+        conn.connected_event.wait(timeout)
         if conn.last_error:
             raise conn.last_error
+        elif not conn.connected_event.is_set():
+            conn.close()
+            raise OperationTimedOut("Timed out creating connection")
         else:
             return conn
 
     def __init__(self, *args, **kwargs):
-        super(GeventConnection, self).__init__(*args, **kwargs)
+        Connection.__init__(self, *args, **kwargs)
 
         self.connected_event = Event()
         self._iobuf = StringIO()
@@ -75,11 +77,12 @@ class GeventConnection(Connection):
         self._send_options_message()
 
     def close(self):
-        if self.is_closed:
-            return
-        self.is_closed = True
+        with self.lock:
+            if self.is_closed:
+                return
+            self.is_closed = True
 
-        log.debug("Closing connection to %s" % (self.host,))
+        log.debug("Closing connection (%s) to %s" % (id(self), self.host))
         if self._read_watcher:
             self._read_watcher.kill()
         if self._write_watcher:
@@ -88,39 +91,11 @@ class GeventConnection(Connection):
             self._socket.close()
         log.debug("Closed socket to %s" % (self.host,))
 
-        # don't leave in-progress operations hanging
-        self.connected_event.set()
         if not self.is_defunct:
-            self._error_all_callbacks(
+            self.error_all_callbacks(
                 ConnectionShutdown("Connection to %s was closed" % self.host))
-
-    def __del__(self):
-        try:
-            self.close()
-        except TypeError:
-            pass
-
-    def defunct(self, exc):
-        if self.is_defunct:
-            return
-        self.is_defunct = True
-
-        trace = traceback.format_exc(exc)
-        if trace != "None":
-            log.debug("Defuncting connection to %s: %s\n%s",
-                      self.host, exc, traceback.format_exc(exc))
-        else:
-            log.debug("Defuncting connection to %s: %s", self.host, exc)
-
-        self.last_error = exc
-        self._error_all_callbacks(exc)
-        self.connected_event.set()
-        return exc
-
-    def _error_all_callbacks(self, exc):
-        new_exc = ConnectionShutdown(str(exc))
-        for cb in self._callbacks.values():
-            cb(new_exc)
+            # don't leave in-progress operations hanging
+            self.connected_event.set()
 
     def handle_error(self):
         self.defunct(sys.exc_info()[1])
@@ -201,43 +176,10 @@ class GeventConnection(Connection):
                 log.debug("connection closed by server")
                 self.close()
 
-    def handle_pushed(self, response):
-        for cb in self._push_watchers.get(response.event_type, []):
-            try:
-                cb(response.event_args)
-            except Exception:
-                log.exception("Pushed event handler errored, ignoring:")
-
     def push(self, data):
         chunk_size = self.out_buffer_size
         for i in xrange(0, len(data), chunk_size):
-            self._write_queue.put(data[i:i+chunk_size])
-
-    def send_msg(self, msg, cb):
-        if self.is_defunct:
-            raise ConnectionShutdown("Connection to %s is defunct" % self.host)
-        elif self.is_closed:
-            raise ConnectionShutdown("Connection to %s is closed" % self.host)
-
-        try:
-            request_id = self._id_queue.get_nowait()
-        except Queue.EMPTY:
-            raise ConnectionBusy(
-                "Connection to %s is at the max number of requests" % self.host)
-
-        self._callbacks[request_id] = cb
-        self.push(msg.to_string(request_id, compression=self.compressor))
-        return request_id
-
-    def wait_for_response(self, msg):
-        return self.wait_for_responses(msg)[0]
-
-    def wait_for_responses(self, *msgs):
-        waiter = ResponseWaiter(len(msgs))
-        for i, msg in enumerate(msgs):
-            self.send_msg(msg, partial(waiter.got_response, index=i))
-
-        return waiter.deliver()
+            self._write_queue.put(data[i:i + chunk_size])
 
     def register_watcher(self, event_type, callback):
         self._push_watchers[event_type].add(callback)
