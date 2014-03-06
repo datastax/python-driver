@@ -42,8 +42,8 @@ from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
 from cassandra.pool import (_ReconnectionHandler, _HostReconnectionHandler,
                             HostConnectionPool)
 from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
-                             BatchStatement, bind_params, encode_params,
-                             QueryTrace, Statement, named_tuple_factory, dict_factory)
+                             BatchStatement, bind_params, QueryTrace, Statement,
+                             named_tuple_factory, dict_factory)
 
 # libev is all around faster, so we want to try and default to using that when we can
 try:
@@ -1066,16 +1066,10 @@ class Session(object):
             query = query.bind(parameters)
 
         if isinstance(query, SimpleStatement):
-            if self._protocol_version >= 2:
-                if parameters:
-                    parameters = encode_params(parameters)
-                message = QueryMessage(
-                    query.query_string, query.consistency_level, parameters)
-            else:
-                query_string = query.query_string
-                if parameters:
-                    query_string = bind_params(query.query_string, parameters)
-                message = QueryMessage(query_string, query.consistency_level)
+            query_string = query.query_string
+            if parameters:
+                query_string = bind_params(query.query_string, parameters)
+            message = QueryMessage(query_string, query.consistency_level)
         elif isinstance(query, BoundStatement):
             message = ExecuteMessage(
                 query.prepared_statement.query_id, query.values, query.consistency_level)

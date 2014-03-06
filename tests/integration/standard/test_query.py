@@ -25,6 +25,7 @@ class QueryTest(unittest.TestCase):
         self.assertIsInstance(prepared, PreparedStatement)
         bound = prepared.bind((1, None))
         self.assertIsInstance(bound, BoundStatement)
+        self.assertEqual(2, len(bound.values))
         session.execute(bound)
         self.assertEqual(bound.routing_key, '\x00\x00\x00\x01')
 
@@ -211,7 +212,7 @@ class BatchStatementTests(unittest.TestCase):
 
         batch = BatchStatement(BatchType.LOGGED)
         for i in range(10):
-            batch.add("INSERT INTO test3rf.test (k, v) VALUES (?, ?)", (i, i))
+            batch.add("INSERT INTO test3rf.test (k, v) VALUES (%s, %s)", (i, i))
 
         session.execute(batch)
         session.execute_async(batch).result()

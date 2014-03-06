@@ -405,17 +405,13 @@ class ValueSequence(object):
         return cql_encode_sequence(self.sequence)
 
 
-def encode_params(params):
+def bind_params(query, params):
     if isinstance(params, dict):
-        return dict((k, cql_encoders.get(type(v), cql_encode_object)(v))
+        return query % dict((k, cql_encoders.get(type(v), cql_encode_object)(v))
                     for k, v in params.iteritems())
     else:
-        return tuple(cql_encoders.get(type(v), cql_encode_object)(v)
+        return query % tuple(cql_encoders.get(type(v), cql_encode_object)(v)
                      for v in params)
-
-
-def bind_params(query, params):
-    return query % encode_params(params)
 
 
 class TraceUnavailable(Exception):
