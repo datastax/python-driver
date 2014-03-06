@@ -357,7 +357,7 @@ class BatchStatement(Statement):
         if isinstance(statement, basestring):
             if parameters:
                 self._statements_and_parameters.append(
-                    (bind_params(statement, parameters), ()))
+                    (statement, encode_params(parameters)))
             else:
                 self._statements_and_parameters.append((statement, ()))
         else:
