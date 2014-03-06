@@ -383,6 +383,20 @@ class QueryMessage(_MessageType):
     def send_body(self, f, protocol_version):
         write_longstring(f, self.query)
         write_consistency_level(f, self.consistency_level)
+        if protocol_version < 2:
+            assert not self.values, "QueryMessage got unbound values with protocol v1"
+            return
+
+        flags = 0x00
+        if self.values:
+            flags |= self._VALUES_FLAG
+
+        write_byte(f, flags)
+
+        if self.values:
+            write_short(f, len(self.values))
+            for value in self.values:
+                write_value(f, value)
 
 
 CUSTOM_TYPE = object()
