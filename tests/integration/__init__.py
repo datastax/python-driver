@@ -68,14 +68,15 @@ def get_node(node_id):
 
 
 def setup_package():
+    version = os.getenv("CASSANDRA_VERSION", DEFAULT_CASSANDRA_VERSION)
     try:
         try:
             cluster = CCMCluster.load(path, CLUSTER_NAME)
             log.debug("Found existing ccm test cluster, clearing")
             cluster.clear()
+            cluster.set_cassandra_dir(cassandra_version=version)
         except Exception:
-            log.debug("Creating new ccm test cluster")
-            version = os.getenv("CASSANDRA_VERSION", DEFAULT_CASSANDRA_VERSION)
+            log.debug("Creating new ccm test cluster with version %s", version)
             cluster = CCMCluster(path, CLUSTER_NAME, cassandra_version=version)
             cluster.set_configuration_options({'start_native_transport': True})
             common.switch_cluster(path, CLUSTER_NAME)
