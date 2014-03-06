@@ -1,6 +1,6 @@
-===============
-Managing Schmas
-===============
+================
+Managing Schemas
+================
 
 **Users of versions < 0.4, please read this post before upgrading:** `Breaking Changes`_
 
