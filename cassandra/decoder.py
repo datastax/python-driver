@@ -17,7 +17,6 @@ from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 InetAddressType, IntegerType, ListType,
                                 LongType, MapType, SetType, TimeUUIDType,
                                 UTF8Type, UUIDType, lookup_casstype)
-from cassandra.query import SimpleStatement
 
 log = logging.getLogger(__name__)
 
@@ -567,13 +566,13 @@ class BatchMessage(_MessageType):
     def send_body(self, f, protocol_version):
         write_byte(f, self.batch_type.value)
         write_short(f, len(self.queries))
-        for query, params in self.queries:
-            if isinstance(f, SimpleStatement):
+        for string_or_query_id, params in self.queries:
+            if isinstance(string_or_query_id, basestring):
                 write_byte(f, 0)
-                write_longstring(f, query.query_string)
+                write_longstring(f, string_or_query_id)
             else:
                 write_byte(f, 1)
-                write_short(f, query.query_id)
+                write_short(f, string_or_query_id)
             write_short(f, len(params))
             for param in params:
                 write_value(f, param)
