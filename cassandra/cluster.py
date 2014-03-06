@@ -274,7 +274,7 @@ class Cluster(object):
                  ssl_options=None,
                  sockopts=None,
                  cql_version=None,
-                 protocol_version=1,
+                 protocol_version=2,
                  executor_threads=2,
                  max_schema_agreement_wait=10,
                  control_connection_timeout=2.0):
