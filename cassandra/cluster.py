@@ -31,7 +31,9 @@ from cassandra.decoder import (QueryMessage, ResultMessage,
                                PrepareMessage, ExecuteMessage,
                                PreparedQueryNotFound,
                                IsBootstrappingErrorMessage,
-                               BatchMessage)
+                               BatchMessage, RESULT_KIND_PREPARED,
+                               RESULT_KIND_SET_KEYSPACE, RESULT_KIND_ROWS,
+                               RESULT_KIND_SCHEMA_CHANGE)
 from cassandra.metadata import Metadata
 from cassandra.metrics import Metrics
 from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
@@ -855,7 +857,7 @@ class Cluster(object):
                     responses = connection.wait_for_responses(*messages, timeout=5.0)
                     for response in responses:
                         if (not isinstance(response, ResultMessage) or
-                                response.kind != ResultMessage.KIND_PREPARED):
+                                response.kind != RESULT_KIND_PREPARED):
                             log.debug("Got unexpected response when preparing "
                                       "statement on host %s: %r", host, response)
 
@@ -1068,18 +1070,15 @@ class Session(object):
                 if parameters:
                     parameters = encode_params(parameters)
                 message = QueryMessage(
-                    query=query.query_string, consistency_level=query.consistency_level,
-                    parameters=parameters)
+                    query.query_string, query.consistency_level, parameters)
             else:
                 query_string = query.query_string
                 if parameters:
                     query_string = bind_params(query.query_string, parameters)
-                message = QueryMessage(query=query_string, consistency_level=query.consistency_level)
+                message = QueryMessage(query_string, query.consistency_level)
         elif isinstance(query, BoundStatement):
             message = ExecuteMessage(
-                query_id=query.prepared_statement.query_id,
-                query_params=query.values,
-                consistency_level=query.consistency_level)
+                query.prepared_statement.query_id, query.values, query.consistency_level)
             prepared_statement = query.prepared_statement
         elif isinstance(query, BatchStatement):
             if self._protocol_version < 2:
@@ -1088,9 +1087,8 @@ class Session(object):
                     "2 or higher (supported in Cassandra 2.0 and higher).  Consider "
                     "setting Cluster.protocol_version to 2 to support this operation.")
             message = BatchMessage(
-                batch_type=query.batch_type,
-                queries=query._statements_and_values,
-                consistency_level=query.consistency_level)
+                query.batch_type, query._statements_and_parameters,
+                query.consistency_level)
 
         if trace:
             message.tracing = True
@@ -1949,7 +1947,7 @@ class ResponseFuture(object):
                 self._query_trace = QueryTrace(trace_id, self.session)
 
             if isinstance(response, ResultMessage):
-                if response.kind == ResultMessage.KIND_SET_KEYSPACE:
+                if response.kind == RESULT_KIND_SET_KEYSPACE:
                     session = getattr(self, 'session', None)
                     # since we're running on the event loop thread, we need to
                     # use a non-blocking method for setting the keyspace on
@@ -1961,7 +1959,7 @@ class ResponseFuture(object):
                     if session:
                         session._set_keyspace_for_all_pools(
                             response.results, self._set_keyspace_completed)
-                elif response.kind == ResultMessage.KIND_SCHEMA_CHANGE:
+                elif response.kind == RESULT_KIND_SCHEMA_CHANGE:
                     # refresh the schema before responding, but do it in another
                     # thread instead of the event loop thread
                     self.session.submit(
@@ -1972,7 +1970,7 @@ class ResponseFuture(object):
                         self)
                 else:
                     results = getattr(response, 'results', None)
-                    if results is not None and response.kind == ResultMessage.KIND_ROWS:
+                    if results is not None and response.kind == RESULT_KIND_ROWS:
                         results = self.row_factory(*results)
                     self._set_final_result(results)
             elif isinstance(response, ErrorMessage):
@@ -2107,7 +2105,7 @@ class ResponseFuture(object):
             return
 
         if isinstance(response, ResultMessage):
-            if response.kind == ResultMessage.KIND_PREPARED:
+            if response.kind == RESULT_KIND_PREPARED:
                 # use self._query to re-use the same host and
                 # at the same time properly borrow the connection
                 request_id = self._query(self._current_host)

@@ -48,18 +48,8 @@ class _register_msg_type(type):
 
 class _MessageType(object):
     __metaclass__ = _register_msg_type
-    params = ()
 
     tracing = False
-
-    def __init__(self, **kwargs):
-        for pname in self.params:
-            try:
-                pval = kwargs[pname]
-            except KeyError:
-                raise ValueError("%s instances need the %s keyword parameter"
-                                 % (self.__class__.__name__, pname))
-            setattr(self, pname, pval)
 
     def to_string(self, stream_id, protocol_version, compression=None):
         body = StringIO()
@@ -77,9 +67,15 @@ class _MessageType(object):
         return ''.join(msg_parts)
 
     def __str__(self):
-        paramstrs = ['%s=%r' % (pname, getattr(self, pname)) for pname in self.params]
+        paramstrs = ['%s=%r' % (pname, getattr(self, pname)) for pname in _get_params(self)]
         return '<%s(%s)>' % (self.__class__.__name__, ', '.join(paramstrs))
     __repr__ = __str__
+
+
+def _get_params(message_obj):
+    base_attrs = dir(_MessageType)
+    return [a for a in dir(message_obj)
+            if a not in base_attrs and not a.startswith('_') and not callable(getattr(message_obj, a))]
 
 
 def decode_response(stream_id, flags, opcode, body, decompressor=None):
@@ -112,8 +108,12 @@ error_classes = {}
 class ErrorMessage(_MessageType, Exception):
     opcode = 0x00
     name = 'ERROR'
-    params = ('code', 'message', 'info')
     summary = 'Unknown'
+
+    def __init__(self, code, message, info):
+        self.code = code
+        self.message = message
+        self.info = info
 
     @classmethod
     def recv_body(cls, f):
@@ -290,12 +290,15 @@ class AlreadyExistsException(ConfigurationException):
 class StartupMessage(_MessageType):
     opcode = 0x01
     name = 'STARTUP'
-    params = ('cqlversion', 'options')
 
     KNOWN_OPTION_KEYS = set((
         'CQL_VERSION',
         'COMPRESSION',
     ))
+
+    def __init__(self, cqlversion, options):
+        self.cqlversion = cqlversion
+        self.options = options
 
     def send_body(self, f):
         optmap = self.options.copy()
@@ -306,7 +309,6 @@ class StartupMessage(_MessageType):
 class ReadyMessage(_MessageType):
     opcode = 0x02
     name = 'READY'
-    params = ()
 
     @classmethod
     def recv_body(cls, f):
@@ -316,7 +318,9 @@ class ReadyMessage(_MessageType):
 class AuthenticateMessage(_MessageType):
     opcode = 0x03
     name = 'AUTHENTICATE'
-    params = ('authenticator',)
+
+    def __init__(self, authenticator):
+        self.authenticator = authenticator
 
     @classmethod
     def recv_body(cls, f):
@@ -327,7 +331,9 @@ class AuthenticateMessage(_MessageType):
 class CredentialsMessage(_MessageType):
     opcode = 0x04
     name = 'CREDENTIALS'
-    params = ('creds',)
+
+    def __init__(self, creds):
+        self.creds = creds
 
     def send_body(self, f):
         write_short(f, len(self.creds))
@@ -339,7 +345,6 @@ class CredentialsMessage(_MessageType):
 class OptionsMessage(_MessageType):
     opcode = 0x05
     name = 'OPTIONS'
-    params = ()
 
     def send_body(self, f):
         pass
@@ -348,7 +353,10 @@ class OptionsMessage(_MessageType):
 class SupportedMessage(_MessageType):
     opcode = 0x06
     name = 'SUPPORTED'
-    params = ('cql_versions', 'options',)
+
+    def __init__(self, cql_versions, options):
+        self.cql_versions = cql_versions
+        self.options = options
 
     @classmethod
     def recv_body(cls, f):
@@ -360,7 +368,17 @@ class SupportedMessage(_MessageType):
 class QueryMessage(_MessageType):
     opcode = 0x07
     name = 'QUERY'
-    params = ('query', 'consistency_level',)
+
+    _VALUES_FLAG = 0x01
+    _SKIP_METADATA_FLAG = 0x01
+    _PAGE_SIZE_FLAG = 0x04
+    _WITH_PAGING_STATE_SIZE_FLAG = 0x08
+    _WITH_SERIAL_CONSISTENCY_FLAG = 0x10
+
+    def __init__(self, query, consistency_level, values=None):
+        self.query = query
+        self.consistency_level = consistency_level
+        self.values = values
 
     def send_body(self, f):
         write_longstring(f, self.query)
@@ -369,19 +387,18 @@ class QueryMessage(_MessageType):
 
 CUSTOM_TYPE = object()
 
+RESULT_KIND_VOID = 0x0001
+RESULT_KIND_ROWS = 0x0002
+RESULT_KIND_SET_KEYSPACE = 0x0003
+RESULT_KIND_PREPARED = 0x0004
+RESULT_KIND_SCHEMA_CHANGE = 0x0005
+
 
 class ResultMessage(_MessageType):
     opcode = 0x08
     name = 'RESULT'
-    params = ('kind', 'results',)
 
-    KIND_VOID = 0x0001
-    KIND_ROWS = 0x0002
-    KIND_SET_KEYSPACE = 0x0003
-    KIND_PREPARED = 0x0004
-    KIND_SCHEMA_CHANGE = 0x0005
-
-    type_codes = {
+    _type_codes = {
         0x0000: CUSTOM_TYPE,
         0x0001: AsciiType,
         0x0002: LongType,
@@ -404,21 +421,25 @@ class ResultMessage(_MessageType):
         0x0022: SetType,
     }
 
-    FLAGS_GLOBAL_TABLES_SPEC = 0x0001
+    _FLAGS_GLOBAL_TABLES_SPEC = 0x0001
+
+    def __init__(self, kind, results):
+        self.kind = kind
+        self.results = results
 
     @classmethod
     def recv_body(cls, f):
         kind = read_int(f)
-        if kind == cls.KIND_VOID:
+        if kind == RESULT_KIND_VOID:
             results = None
-        elif kind == cls.KIND_ROWS:
+        elif kind == RESULT_KIND_ROWS:
             results = cls.recv_results_rows(f)
-        elif kind == cls.KIND_SET_KEYSPACE:
+        elif kind == RESULT_KIND_SET_KEYSPACE:
             ksname = read_string(f)
             results = ksname
-        elif kind == cls.KIND_PREPARED:
+        elif kind == RESULT_KIND_PREPARED:
             results = cls.recv_results_prepared(f)
-        elif kind == cls.KIND_SCHEMA_CHANGE:
+        elif kind == RESULT_KIND_SCHEMA_CHANGE:
             results = cls.recv_results_schema_change(f)
         return cls(kind=kind, results=results)
 
@@ -441,7 +462,7 @@ class ResultMessage(_MessageType):
     @classmethod
     def recv_results_metadata(cls, f):
         flags = read_int(f)
-        glob_tblspec = bool(flags & cls.FLAGS_GLOBAL_TABLES_SPEC)
+        glob_tblspec = bool(flags & cls._FLAGS_GLOBAL_TABLES_SPEC)
         colcount = read_int(f)
         if glob_tblspec:
             ksname = read_string(f)
@@ -470,7 +491,7 @@ class ResultMessage(_MessageType):
     def read_type(cls, f):
         optid = read_short(f)
         try:
-            typeclass = cls.type_codes[optid]
+            typeclass = cls._type_codes[optid]
         except KeyError:
             raise NotSupportedError("Unknown data type code 0x%04x. Have to skip"
                                     " entire result set." % (optid,))
@@ -495,7 +516,9 @@ class ResultMessage(_MessageType):
 class PrepareMessage(_MessageType):
     opcode = 0x09
     name = 'PREPARE'
-    params = ('query',)
+
+    def __init__(self, query):
+        self.query = query
 
     def send_body(self, f):
         write_longstring(f, self.query)
@@ -504,7 +527,11 @@ class PrepareMessage(_MessageType):
 class ExecuteMessage(_MessageType):
     opcode = 0x0A
     name = 'EXECUTE'
-    params = ('query_id', 'query_params', 'consistency_level',)
+
+    def __init__(self, query_id, query_params, consistency_level):
+        self.query_id = query_id
+        self.query_params = query_params
+        self.consistency_level = consistency_level
 
     def send_body(self, f):
         write_string(f, self.query_id)
@@ -517,7 +544,11 @@ class ExecuteMessage(_MessageType):
 class BatchMessage(_MessageType):
     opcode = 0x0D
     name = 'BATCH'
-    params = ('batch_type', 'queries', 'consistency_level',)
+
+    def __init__(self, batch_type, queries, consistency_level):
+        self.batch_type = batch_type
+        self.queries = queries
+        self.consistency_level = consistency_level
 
     def send_body(self, f):
         write_byte(f, self.batch_type.value)
@@ -546,16 +577,21 @@ known_event_types = frozenset((
 class RegisterMessage(_MessageType):
     opcode = 0x0B
     name = 'REGISTER'
-    params = ('event_list',)
 
-    def send_body(self, f):
+    def __init__(self, event_list):
+        self.event_list = event_list
+
+    def send_body(self, f, protocol_version):
         write_stringlist(f, self.event_list)
 
 
 class EventMessage(_MessageType):
     opcode = 0x0C
     name = 'EVENT'
-    params = ('event_type', 'event_args')
+
+    def __init__(self, event_type, event_args):
+        self.event_type = event_type
+        self.event_args = event_args
 
     @classmethod
     def recv_body(cls, f):

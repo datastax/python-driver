@@ -8,13 +8,14 @@ from mock import Mock, ANY
 from concurrent.futures import ThreadPoolExecutor
 
 from cassandra import OperationTimedOut
-from cassandra.decoder import ResultMessage
+from cassandra.decoder import ResultMessage, RESULT_KIND_ROWS
 from cassandra.cluster import ControlConnection, Cluster, _Scheduler
 from cassandra.pool import Host
 from cassandra.policies import (SimpleConvictionPolicy, RoundRobinPolicy,
                                 ConstantReconnectionPolicy)
 
 PEER_IP = "foobar"
+
 
 class MockMetadata(object):
 
@@ -91,9 +92,9 @@ class MockConnection(object):
 
     def wait_for_responses(self, peer_query, local_query, timeout=None):
         local_response = ResultMessage(
-            kind=ResultMessage.KIND_ROWS, results=self.local_results)
+            kind=RESULT_KIND_ROWS, results=self.local_results)
         peer_response = ResultMessage(
-            kind=ResultMessage.KIND_ROWS, results=self.peer_results)
+            kind=RESULT_KIND_ROWS, results=self.peer_results)
         return (peer_response, local_response)
 
 
