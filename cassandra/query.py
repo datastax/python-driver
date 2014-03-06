@@ -356,20 +356,20 @@ class BatchStatement(Statement):
     def add(self, statement, parameters=None):
         if isinstance(statement, basestring):
             if parameters:
-                self._statements_and_parameters.append(
-                    (statement, encode_params(parameters)))
-            else:
-                self._statements_and_parameters.append((statement, ()))
+                statement = bind_params(statement, parameters)
+            self._statements_and_parameters.append((statement, ()))
         else:
             try:
                 # see if it's a PreparedStatement
-                string_or_id = statement.query_id
+                query_id = statement.query_id
+                self._statements_and_parameters.append(
+                    (query_id, () if parameters is None else parameters))
             except AttributeError:
                 # it must be a SimpleStatement
-                string_or_id = statement.query_string
-
-            parameters = () if parameters is None else parameters
-            self._statements_and_parameters.append((string_or_id, parameters))
+                query_string = statement.query_string
+                if parameters:
+                    query_string = bind_params(query_string, parameters)
+                self._statements_and_parameters.append((query_string, ()))
         return self
 
     def add_all(self, statements, parameters):
