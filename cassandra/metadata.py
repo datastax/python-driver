@@ -631,7 +631,7 @@ class TableMetadata(object):
         "compaction_strategy_class",
         "compaction_strategy_options",
         "min_compaction_threshold",
-        "max_compression_threshold",
+        "max_compaction_threshold",
         "compression_parameters",
         "min_index_interval",
         "max_index_interval",
