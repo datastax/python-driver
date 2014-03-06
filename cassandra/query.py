@@ -336,9 +336,9 @@ class BatchType(object):
         return "BatchType<%s>" % (self.name, )
 
 
-BatchType.LOGGED = BatchType(0, "LOGGED")
-BatchType.UNLOGGED = BatchType(1, "UNLOGGED")
-BatchType.COUNTER = BatchType(2, "COUNTER")
+BatchType.LOGGED = BatchType("LOGGED", 0)
+BatchType.UNLOGGED = BatchType("UNLOGGED", 1)
+BatchType.COUNTER = BatchType("COUNTER", 2)
 
 
 class BatchStatement(Statement):
