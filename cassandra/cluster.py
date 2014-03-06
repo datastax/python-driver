@@ -1473,6 +1473,8 @@ class ControlConnection(object):
         try:
             if self._connection:
                 self._refresh_schema(self._connection, keyspace, table)
+        except ReferenceError:
+            pass  # our weak reference to the Cluster is no good
         except Exception:
             log.debug("[control connection] Error refreshing schema", exc_info=True)
             self._signal_error()
@@ -1519,6 +1521,8 @@ class ControlConnection(object):
         try:
             if self._connection:
                 self._refresh_node_list_and_token_map(self._connection)
+        except ReferenceError:
+            pass  # our weak reference to the Cluster is no good
         except Exception:
             log.debug("[control connection] Error refreshing node list and token map", exc_info=True)
             self._signal_error()
