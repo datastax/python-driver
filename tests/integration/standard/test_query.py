@@ -4,8 +4,11 @@ except ImportError:
     import unittest # noqa
 
 from cassandra.query import (PreparedStatement, BoundStatement, ValueSequence,
-                             SimpleStatement, dict_factory)
+                             SimpleStatement, BatchStatement, BatchType,
+                             dict_factory)
 from cassandra.cluster import Cluster
+
+from tests.integration import get_server_versions
 
 
 class QueryTest(unittest.TestCase):
@@ -191,3 +194,24 @@ class PrintStatementTests(unittest.TestCase):
         bound = prepared.bind((1, 2))
         self.assertEqual(str(bound),
                          '<BoundStatement query="INSERT INTO test3rf.test (k, v) VALUES (?, ?)", values=(1, 2), consistency=ONE>')
+
+
+class BatchStatementTests(unittest.TestCase):
+
+    def setUp(self):
+        cass_version, _ = get_server_versions()
+        if cass_version < (2, 0):
+            raise unittest.SkipTest(
+                "Cassandra 2.0+ is required for BATCH operations, currently testing against %r"
+                % (cass_version,))
+
+    def test_string_statements(self):
+        cluster = Cluster(protocol_version=2)
+        session = cluster.connect()
+
+        batch = BatchStatement(BatchType.LOGGED)
+        for i in range(10):
+            batch.add("INSERT INTO test3rf.test (k, v) VALUES (?, ?)", (i, i))
+
+        session.execute(batch)
+        session.execute_async(batch).result()
