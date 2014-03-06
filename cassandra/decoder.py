@@ -53,7 +53,7 @@ class _MessageType(object):
 
     def to_string(self, stream_id, protocol_version, compression=None):
         body = StringIO()
-        self.send_body(body)
+        self.send_body(body, protocol_version)
         body = body.getvalue()
         version = protocol_version | HEADER_DIRECTION_FROM_CLIENT
         flags = 0
@@ -300,7 +300,7 @@ class StartupMessage(_MessageType):
         self.cqlversion = cqlversion
         self.options = options
 
-    def send_body(self, f):
+    def send_body(self, f, protocol_version):
         optmap = self.options.copy()
         optmap['CQL_VERSION'] = self.cqlversion
         write_stringmap(f, optmap)
@@ -335,7 +335,7 @@ class CredentialsMessage(_MessageType):
     def __init__(self, creds):
         self.creds = creds
 
-    def send_body(self, f):
+    def send_body(self, f, protocol_version):
         write_short(f, len(self.creds))
         for credkey, credval in self.creds.items():
             write_string(f, credkey)
@@ -346,7 +346,7 @@ class OptionsMessage(_MessageType):
     opcode = 0x05
     name = 'OPTIONS'
 
-    def send_body(self, f):
+    def send_body(self, f, protocol_version):
         pass
 
 
@@ -380,7 +380,7 @@ class QueryMessage(_MessageType):
         self.consistency_level = consistency_level
         self.values = values
 
-    def send_body(self, f):
+    def send_body(self, f, protocol_version):
         write_longstring(f, self.query)
         write_consistency_level(f, self.consistency_level)
 
@@ -520,7 +520,7 @@ class PrepareMessage(_MessageType):
     def __init__(self, query):
         self.query = query
 
-    def send_body(self, f):
+    def send_body(self, f, protocol_version):
         write_longstring(f, self.query)
 
 
@@ -533,7 +533,7 @@ class ExecuteMessage(_MessageType):
         self.query_params = query_params
         self.consistency_level = consistency_level
 
-    def send_body(self, f):
+    def send_body(self, f, protocol_version):
         write_string(f, self.query_id)
         write_short(f, len(self.query_params))
         for param in self.query_params:
@@ -550,7 +550,7 @@ class BatchMessage(_MessageType):
         self.queries = queries
         self.consistency_level = consistency_level
 
-    def send_body(self, f):
+    def send_body(self, f, protocol_version):
         write_byte(f, self.batch_type.value)
         write_short(f, len(self.queries))
         for query, params in self.queries:
