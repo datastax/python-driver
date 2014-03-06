@@ -364,38 +364,27 @@ class SupportedMessage(_MessageType):
         return cls(cql_versions=cql_versions, options=options)
 
 
+# used for QueryMessage and ExecuteMessage
+_VALUES_FLAG = 0x01
+_SKIP_METADATA_FLAG = 0x01
+_PAGE_SIZE_FLAG = 0x04
+_WITH_PAGING_STATE_SIZE_FLAG = 0x08
+_WITH_SERIAL_CONSISTENCY_FLAG = 0x10
+
+
 class QueryMessage(_MessageType):
     opcode = 0x07
     name = 'QUERY'
 
-    _VALUES_FLAG = 0x01
-    _SKIP_METADATA_FLAG = 0x01
-    _PAGE_SIZE_FLAG = 0x04
-    _WITH_PAGING_STATE_SIZE_FLAG = 0x08
-    _WITH_SERIAL_CONSISTENCY_FLAG = 0x10
-
-    def __init__(self, query, consistency_level, values=None):
+    def __init__(self, query, consistency_level):
         self.query = query
         self.consistency_level = consistency_level
-        self.values = values
 
     def send_body(self, f, protocol_version):
         write_longstring(f, self.query)
         write_consistency_level(f, self.consistency_level)
-        if protocol_version < 2:
-            assert not self.values, "QueryMessage got unbound values with protocol v1"
-            return
-
         flags = 0x00
-        if self.values:
-            flags |= self._VALUES_FLAG
-
         write_byte(f, flags)
-
-        if self.values:
-            write_short(f, len(self.values))
-            for value in self.values:
-                write_value(f, value)
 
 
 CUSTOM_TYPE = object()
@@ -548,10 +537,18 @@ class ExecuteMessage(_MessageType):
 
     def send_body(self, f, protocol_version):
         write_string(f, self.query_id)
-        write_short(f, len(self.query_params))
-        for param in self.query_params:
-            write_value(f, param)
-        write_consistency_level(f, self.consistency_level)
+        if protocol_version == 1:
+            write_short(f, len(self.query_params))
+            for param in self.query_params:
+                write_value(f, param)
+            write_consistency_level(f, self.consistency_level)
+        else:
+            write_consistency_level(f, self.consistency_level)
+            flags = _VALUES_FLAG
+            write_byte(f, flags)
+            write_short(f, len(self.query_params))
+            for param in self.query_params:
+                write_value(f, param)
 
 
 class BatchMessage(_MessageType):
