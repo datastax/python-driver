@@ -15,7 +15,6 @@ sys.path.append(os.path.join(dirname, '..'))
 from cassandra.cluster import Cluster
 from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.policies import HostDistance
-from cassandra.query import SimpleStatement
 
 log = logging.getLogger()
 handler = logging.StreamHandler()
@@ -86,11 +85,10 @@ def benchmark(thread_class):
         log.debug("Sleeping for two seconds...")
         time.sleep(2.0)
 
-        query = SimpleStatement("""
-            INSERT INTO {table} (thekey, col1, col2)
-            VALUES (%(key)s, %(a)s, %(b)s)
+        query = session.prepare("""
+            INSERT INTO {table} (thekey, col1, col2) VALUES (?, ?, ?))
             """.format(table=TABLE))
-        values = {'key': 'key', 'a': 'a', 'b': 'b'}
+        values = ('key', 'a', 'b')
 
         per_thread = options.num_ops / options.threads
         threads = []
