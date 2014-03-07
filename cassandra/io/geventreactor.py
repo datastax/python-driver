@@ -112,14 +112,14 @@ class GeventConnection(Connection):
                 next_msg = self._write_queue.get()
                 run_select()
             except Exception as exc:
-                log.exception("Exception during write loop for %s:", self)
+                log.debug("Exception during write select() for %s: %s", self, exc)
                 self.defunct(exc)
                 return
 
             try:
                 self._socket.sendall(next_msg)
             except socket.error as err:
-                log.exception("Exception during write loop for %s:", self)
+                log.debug("Exception during socket sendall for %s: %s", self, err)
                 self.defunct(err)
                 return  # Leave the write loop
 
@@ -129,7 +129,7 @@ class GeventConnection(Connection):
             try:
                 run_select()
             except Exception as exc:
-                log.exception("Exception during read loop for %s:", self)
+                log.debug("Exception during read select() for %s: %s", self, exc)
                 self.defunct(exc)
                 return
 
@@ -138,7 +138,7 @@ class GeventConnection(Connection):
                 self._iobuf.write(buf)
             except socket.error as err:
                 if not is_timeout(err):
-                    log.exception("Exception during read loop for %s:", self)
+                    log.debug("Exception during socket recv for %s: %s", self, err)
                     self.defunct(err)
                     return  # leave the read loop
 
