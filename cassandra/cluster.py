@@ -254,7 +254,7 @@ class Cluster(object):
     control_connection = None
     scheduler = None
     executor = None
-    _is_shutdown = False
+    is_shutdown = False
     _is_setup = False
     _prepared_statements = None
     _prepared_statement_lock = Lock()
@@ -461,7 +461,7 @@ class Cluster(object):
         operations on the ``Session``.
         """
         with self._lock:
-            if self._is_shutdown:
+            if self.is_shutdown:
                 raise Exception("Cluster is already shut down")
 
             if not self._is_setup:
@@ -502,10 +502,10 @@ class Cluster(object):
         Once shutdown, a Cluster should not be used for any purpose.
         """
         with self._lock:
-            if self._is_shutdown:
+            if self.is_shutdown:
                 raise Exception("The Cluster was already shutdown")
             else:
-                self._is_shutdown = True
+                self.is_shutdown = True
 
         if self.scheduler:
             self.scheduler.shutdown()
@@ -525,7 +525,7 @@ class Cluster(object):
         # Sessions while they are still being used (in case there are no
         # longer any references to this Cluster object, but there are
         # still references to the Session object)
-        if not self._is_shutdown:
+        if not self.is_shutdown:
             if self.scheduler:
                 self.scheduler.shutdown()
             if self.control_connection:
@@ -589,7 +589,7 @@ class Cluster(object):
         """
         Intended for internal use only.
         """
-        if self._is_shutdown:
+        if self.is_shutdown:
             return
 
         host._handle_node_up_condition.acquire()
@@ -669,7 +669,7 @@ class Cluster(object):
         """
         Intended for internal use only.
         """
-        if self._is_shutdown:
+        if self.is_shutdown:
             return
 
         with host.lock:
@@ -691,7 +691,7 @@ class Cluster(object):
         self._start_reconnector(host, is_host_addition)
 
     def on_add(self, host):
-        if self._is_shutdown:
+        if self.is_shutdown:
             return
 
         log.debug("Adding or renewing pools for new host %s and notifying listeners", host)
@@ -751,7 +751,7 @@ class Cluster(object):
             session.update_created_pools()
 
     def on_remove(self, host):
-        if self._is_shutdown:
+        if self.is_shutdown:
             return
 
         log.debug("Removing host %s", host)
@@ -1481,7 +1481,7 @@ class ControlConnection(object):
 
     def _submit(self, *args, **kwargs):
         try:
-            if not self._cluster._is_shutdown:
+            if not self._cluster.is_shutdown:
                 return self._cluster.executor.submit(*args, **kwargs)
         except ReferenceError:
             pass
@@ -1512,7 +1512,7 @@ class ControlConnection(object):
             self._signal_error()
 
     def _refresh_schema(self, connection, keyspace=None, table=None):
-        if self._cluster._is_shutdown:
+        if self._cluster.is_shutdown:
             return
 
         self.wait_for_schema_agreement(connection)

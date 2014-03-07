@@ -499,11 +499,11 @@ class ResultMessage(_MessageType):
                                     " entire result set." % (optid,))
         if typeclass in (ListType, SetType):
             subtype = cls.read_type(f)
-            typeclass = typeclass.apply_parameters(subtype)
+            typeclass = typeclass.apply_parameters((subtype,))
         elif typeclass == MapType:
             keysubtype = cls.read_type(f)
             valsubtype = cls.read_type(f)
-            typeclass = typeclass.apply_parameters(keysubtype, valsubtype)
+            typeclass = typeclass.apply_parameters((keysubtype, valsubtype))
         elif typeclass == CUSTOM_TYPE:
             classname = read_string(f)
             typeclass = lookup_casstype(classname)

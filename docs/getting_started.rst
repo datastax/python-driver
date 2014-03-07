@@ -121,9 +121,7 @@ when you execute:
         ("John O'Reilly", 42, uuid.uuid1())
     )
 
-It is translated to the following CQL query:
-
-.. code-block::
+It is translated to the following CQL query::
 
     INSERT INTO users (name, credits, user_id)
     VALUES ('John O''Reilly', 42, 2644bada-852c-11e3-89fb-e0b9a54a6d93)

@@ -50,6 +50,7 @@ class MockCluster(object):
     reconnection_policy = ConstantReconnectionPolicy(2)
     down_host = None
     contact_points = []
+    is_shutdown = False
 
     def __init__(self):
         self.metadata = MockMetadata()

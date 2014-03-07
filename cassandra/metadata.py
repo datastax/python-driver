@@ -283,7 +283,8 @@ class Metadata(object):
     def _build_column_metadata(self, table_metadata, row):
         name = row["column_name"]
         data_type = types.lookup_casstype(row["validator"])
-        column_meta = ColumnMetadata(table_metadata, name, data_type)
+        is_static = row.get("type", None) == "static"
+        column_meta = ColumnMetadata(table_metadata, name, data_type, is_static=is_static)
         index_meta = self._build_index_metadata(column_meta, row)
         column_meta.index = index_meta
         return column_meta
@@ -684,7 +685,7 @@ class TableMetadata(object):
 
         columns = []
         for col in self.columns.values():
-            columns.append("%s %s" % (protect_name(col.name), col.typestring))
+            columns.append("%s %s%s" % (protect_name(col.name), col.typestring, ' static' if col.is_static else ''))
 
         if len(self.partition_key) == 1 and not self.clustering_key:
             columns[0] += " PRIMARY KEY"
@@ -807,11 +808,18 @@ class ColumnMetadata(object):
     :class:`.IndexMetadata`, otherwise :const:`None`.
     """
 
-    def __init__(self, table_metadata, column_name, data_type, index_metadata=None):
+    is_static = False
+    """
+    If this column is static (available in Cassandra 2.1+), this will
+    be :const:`True`, otherwise :const:`False`.
+    """
+
+    def __init__(self, table_metadata, column_name, data_type, index_metadata=None, is_static=False):
         self.table = table_metadata
         self.name = column_name
         self.data_type = data_type
         self.index = index_metadata
+        self.is_static = is_static
 
     @property
     def typestring(self):
