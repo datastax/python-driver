@@ -795,7 +795,7 @@ def protect_value(value):
     if value is None:
         return 'NULL'
     if isinstance(value, (int, float, bool)):
-        return str(value)
+        return str(value).lower()
     return "'%s'" % value.replace("'", "''")
 
 

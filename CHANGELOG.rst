@@ -11,6 +11,7 @@ Bug Fixes
 ---------
 * Correctly supply compaction and compression parameters in CREATE statements
   for tables when working with Cassandra 2.0+
+* Lowercase boolean literals when generating schemas
 
 Other
 -----

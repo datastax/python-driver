@@ -169,8 +169,8 @@ class TestNameEscaping(unittest.TestCase):
         """
         Test cassandra.metadata.protect_value output
         """
-        self.assertEqual(protect_value(True), "True")
-        self.assertEqual(protect_value(False), "False")
+        self.assertEqual(protect_value(True), "true")
+        self.assertEqual(protect_value(False), "false")
         self.assertEqual(protect_value(3.14), '3.14')
         self.assertEqual(protect_value(3), '3')
         self.assertEqual(protect_value('test'), "'test'")
