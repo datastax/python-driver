@@ -628,7 +628,7 @@ class TableMetadata(object):
         "compaction_strategy_class",
         "compaction_strategy_options",
         "min_compaction_threshold",
-        "max_compression_threshold",
+        "max_compaction_threshold",
         "compression_parameters",
         "min_index_interval",
         "max_index_interval",
@@ -640,6 +640,11 @@ class TableMetadata(object):
         "compaction",
         "compression",
         "default_time_to_live")
+
+    compaction_options = {
+        "min_compaction_threshold": "min_threshold",
+        "max_compaction_threshold": "max_threshold",
+        "compaction_strategy_class": "class"}
 
     def __init__(self, keyspace_metadata, name, partition_key=None, clustering_key=None, columns=None, options=None):
         self.keyspace = keyspace_metadata
@@ -741,13 +746,36 @@ class TableMetadata(object):
 
     def _make_option_strings(self):
         ret = []
-        for name, value in sorted(self.options.items()):
+        options_copy = dict(self.options.items())
+        if not options_copy.get('compaction'):
+            options_copy.pop('compaction', None)
+
+            actual_options = json.loads(options_copy.pop('compaction_strategy_options', '{}'))
+            for system_table_name, compact_option_name in self.compaction_options.items():
+                value = options_copy.pop(system_table_name, None)
+                if value:
+                    actual_options.setdefault(compact_option_name, value)
+
+            compaction_option_strings = ["'%s': '%s'" % (k, v) for k, v in actual_options.items()]
+            ret.append('compaction = {%s}' % ', '.join(compaction_option_strings))
+
+        for system_table_name in self.compaction_options.keys():
+            options_copy.pop(system_table_name, None)  # delete if present
+        options_copy.pop('compaction_strategy_option', None)
+
+        if not options_copy.get('compression'):
+            params = json.loads(options_copy.pop('compression_parameters', '{}'))
+            if params:
+                param_strings = ["'%s': '%s'" % (k, v) for k, v in params.items()]
+                ret.append('compression = {%s}' % ', '.join(param_strings))
+
+        for name, value in options_copy.items():
             if value is not None:
                 if name == "comment":
                     value = value or ""
                 ret.append("%s = %s" % (name, protect_value(value)))
 
-        return ret
+        return list(sorted(ret))
 
 
 def protect_name(name):
