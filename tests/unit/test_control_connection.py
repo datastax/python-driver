@@ -16,6 +16,7 @@ from cassandra.policies import (SimpleConvictionPolicy, RoundRobinPolicy,
 
 PEER_IP = "foobar"
 
+
 class MockMetadata(object):
 
     def __init__(self):
@@ -49,6 +50,7 @@ class MockCluster(object):
     reconnection_policy = ConstantReconnectionPolicy(2)
     down_host = None
     contact_points = []
+    _is_shutdown = False
 
     def __init__(self):
         self.metadata = MockMetadata()
