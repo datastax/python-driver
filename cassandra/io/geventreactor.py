@@ -4,6 +4,7 @@ from gevent.event import Event
 from gevent.queue import Queue
 
 from collections import defaultdict
+from functools import partial
 import logging
 import os
 import sys
@@ -105,41 +106,43 @@ class GeventConnection(Connection):
         self.close()
 
     def handle_write(self):
-        wlist = (self._socket,)
-
+        run_select = partial(select.select, (), (self._socket,), ())
         while True:
             try:
                 next_msg = self._write_queue.get()
-                select.select((), wlist, ())
-            except Exception as err:
-                log.debug("Write loop: got error %s" % err)
+                run_select()
+            except Exception as exc:
+                log.exception("Exception during write loop for %s:", self)
+                self.defunct(exc)
                 return
 
             try:
                 self._socket.sendall(next_msg)
             except socket.error as err:
-                log.debug("Write loop: got error, defuncting socket and exiting")
+                log.exception("Exception during write loop for %s:", self)
                 self.defunct(err)
                 return  # Leave the write loop
 
     def handle_read(self):
-        rlist = (self._socket,)
-
+        run_select = partial(select.select, (self._socket,), (), ())
         while True:
             try:
-                select.select(rlist, (), ())
-            except Exception as err:
+                run_select()
+            except Exception as exc:
+                log.exception("Exception during read loop for %s:", self)
+                self.defunct(exc)
                 return
 
             try:
                 buf = self._socket.recv(self.in_buffer_size)
+                self._iobuf.write(buf)
             except socket.error as err:
                 if not is_timeout(err):
+                    log.exception("Exception during read loop for %s:", self)
                     self.defunct(err)
                     return  # leave the read loop
 
-            if buf:
-                self._iobuf.write(buf)
+            if self._iobuf.tell():
                 while True:
                     pos = self._iobuf.tell()
                     if pos < 8 or (self._total_reqd_bytes > 0 and pos < self._total_reqd_bytes):
@@ -150,14 +153,13 @@ class GeventConnection(Connection):
                     else:
                         # have enough for header, read body len from header
                         self._iobuf.seek(4)
-                        body_len_bytes = self._iobuf.read(4)
-                        body_len = int32_unpack(body_len_bytes)
+                        body_len = int32_unpack(self._iobuf.read(4))
 
                         # seek to end to get length of current buffer
                         self._iobuf.seek(0, os.SEEK_END)
                         pos = self._iobuf.tell()
 
-                        if pos - 8 >= body_len:
+                        if pos >= body_len + 8:
                             # read message header and body
                             self._iobuf.seek(0)
                             msg = self._iobuf.read(8 + body_len)
@@ -175,6 +177,7 @@ class GeventConnection(Connection):
             else:
                 log.debug("connection closed by server")
                 self.close()
+                return
 
     def push(self, data):
         chunk_size = self.out_buffer_size
