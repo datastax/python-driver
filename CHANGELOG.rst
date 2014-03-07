@@ -12,6 +12,9 @@ Bug Fixes
 * Correctly supply compaction and compression parameters in CREATE statements
   for tables when working with Cassandra 2.0+
 * Lowercase boolean literals when generating schemas
+* Ignore SSL_ERROR_WANT_READ and SSL_ERROR_WANT_WRITE socket errors.  Previously,
+  these resulted in the connection being defuncted, but they can safely be
+  ignored by the driver.
 
 Other
 -----

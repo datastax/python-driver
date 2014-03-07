@@ -311,7 +311,11 @@ class LibevConnection(Connection):
                 if len(buf) < self.in_buffer_size:
                     break
         except socket.error as err:
-            if err.args[0] not in NONBLOCKING:
+            if ssl and isinstance(err, ssl.SSLError):
+                if err.args[0] not in (ssl.SSL_ERROR_WANT_READ, ssl.SSL_ERROR_WANT_WRITE):
+                    self.defunct(err)
+                    return
+            elif err.args[0] not in NONBLOCKING:
                 self.defunct(err)
                 return
 
