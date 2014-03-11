@@ -64,6 +64,9 @@ class TestModelIO(BaseCassEngTestCase):
         for column_id in column_dict.keys():
             self.assertEqual(tm[column_id], column_dict[column_id])
 
+        tm['count'] = 6
+        self.assertEqual(tm.count, 6)
+
     def test_model_updating_works_properly(self):
         """
         Tests that subsequent saves after initial model creation work

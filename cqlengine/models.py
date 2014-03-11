@@ -436,6 +436,14 @@ class BaseModel(object):
             raise KeyError
         return getattr(self, key)
 
+    def __setitem__(self, key, val):
+        """ Sets a column's value. """
+        if not isinstance(key, basestring):
+            raise TypeError
+        if key not in self._columns.keys():
+            raise KeyError
+        return setattr(self, key, val)
+
     def __len__(self):
         """ Returns the number of columns defined on that model. """
         return len(self._columns.keys())
