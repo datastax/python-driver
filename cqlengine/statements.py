@@ -483,7 +483,6 @@ class BaseCQLStatement(object):
 
         return long(((tmp - datetime.fromtimestamp(0)).total_seconds()) * 1000000)
 
-
     def __unicode__(self):
         raise NotImplementedError
 
