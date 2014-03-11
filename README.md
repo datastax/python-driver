@@ -20,6 +20,7 @@ pip install cqlengine
 
 ```python
 #first, define a model
+import uuid
 from cqlengine import columns
 from cqlengine.models import Model
 
