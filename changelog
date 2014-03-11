@@ -1,9 +1,10 @@
 CHANGELOG
 
-0.11.1 (in progress)
+0.12.0 (in progress)
 
 * Normalize and unquote boolean values. (Thanks Kevin Deldycke github.com/kdeldycke)
 * Fix race condition in connection manager (Thanks Roey Berman github.com/bergundy)
+* allow access to instance columns as if it is a dict (Thanks Kevin Deldycke github.com/kdeldycke)
 
 0.11.0
 
@@ -13,7 +14,6 @@ CHANGELOG
 * clear TTL and timestamp off models after persisting to DB
 * allows UUID without dashes - (Thanks to Michael Hall, github.com/mahall)
 * fixes regarding syncing schema settings (thanks Kai Lautaportti github.com/dokai)
-* allow acces to instance columns as if it is a dict
 
 0.10.0
 
