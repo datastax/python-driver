@@ -312,3 +312,24 @@ Compaction Options
             __compaction_tombstone_compaction_interval__ = 86400
 
     Tables may use `LeveledCompactionStrategy` or `SizeTieredCompactionStrategy`.  Both options are available in the top level cqlengine module.  To reiterate, you will need to set your `__compaction__` option explicitly in order for cqlengine to handle any of your settings.
+
+Manipulating model instances as dictionaries
+============================================
+
+    As of cqlengine 0.12, we've added support for treating model instances like dictionaries. See below for examples
+
+    .. code-block:: python
+
+        class Person(Model):
+            first_name  = columns.Text()
+            last_name = columns.Text()
+
+        kevin = Person.create(first_name="Kevin", last_name="Deldycke")
+        dict(kevin)  # returns {'first_name': 'Kevin', 'last_name': 'Deldycke'}
+        kevin['first_name']  # returns 'Kevin'
+        kevin.keys()  # returns ['first_name', 'last_name']
+        kevin.values()  # returns ['Kevin', 'Deldycke']
+        kevin.items()  # returns [('first_name', 'Kevin'), ('last_name', 'Deldycke')]
+
+        kevin['first_name'] = 'KEVIN5000'  # changes the models first name
+
