@@ -8,7 +8,16 @@ from cassandra import OperationTimedOut
 from cassandra.connection import Connection, ConnectionShutdown, NONBLOCKING
 from cassandra.decoder import RegisterMessage
 from cassandra.marshal import int32_unpack
-import cassandra.io.libevwrapper as libev
+try:
+    import cassandra.io.libevwrapper as libev
+except ImportError:
+    raise ImportError(
+        "The C extension needed to use libev was not found.  This "
+        "probably means that you didn't have the required build dependencies "
+        "when installing the driver.  See "
+        "http://datastax.github.io/python-driver/installation.html#c-extensions "
+        "for instructions on installing build dependencies and building "
+        "the C extension.")
 
 try:
     from cStringIO import StringIO
@@ -261,7 +270,11 @@ class LibevConnection(Connection):
                 if len(buf) < self.in_buffer_size:
                     break
         except socket.error as err:
-            if err.args[0] not in NONBLOCKING:
+            if ssl and isinstance(err, ssl.SSLError):
+                if err.args[0] not in (ssl.SSL_ERROR_WANT_READ, ssl.SSL_ERROR_WANT_WRITE):
+                    self.defunct(err)
+                    return
+            elif err.args[0] not in NONBLOCKING:
                 self.defunct(err)
                 return
 

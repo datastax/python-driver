@@ -12,11 +12,15 @@ Bug Fixes
 * Correctly supply compaction and compression parameters in CREATE statements
   for tables when working with Cassandra 2.0+
 * Lowercase boolean literals when generating schemas
+* Ignore SSL_ERROR_WANT_READ and SSL_ERROR_WANT_WRITE socket errors.  Previously,
+  these resulted in the connection being defuncted, but they can safely be
+  ignored by the driver.
 
 Other
 -----
 * Don't ignore column names when parsing typestrings.  This is needed for
   user-defined type support.  (github issue #90)
+* Better error message when libevwrapper is not found
 
 1.0.2
 =====
