@@ -1906,6 +1906,8 @@ class ResponseFuture(object):
         except Exception as exc:
             log.debug("Error querying host %s", host, exc_info=True)
             self._errors[host] = exc
+            if self._metrics is not None:
+                self._metrics.on_connection_error()
             if connection:
                 pool.return_connection(connection)
             return None
