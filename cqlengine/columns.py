@@ -778,6 +778,12 @@ class Map(BaseContainerColumn):
             cq = cql_quote
             return '{' + ', '.join([cq(k) + ':' + cq(v) for k,v in self.value.items()]) + '}'
 
+        def get(self, key):
+            return self.value.get(key)
+
+        def keys(self):
+            return self.value.keys()
+
     def __init__(self, key_type, value_type, default=dict, **kwargs):
         """
         :param key_type: a column class indicating the types of the key

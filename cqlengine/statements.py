@@ -155,10 +155,11 @@ class AssignmentClause(BaseClause):
 
 class ContainerUpdateClause(AssignmentClause):
 
-    def __init__(self, field, value, previous=None, column=None):
+    def __init__(self, field, value, operation=None, previous=None, column=None):
         super(ContainerUpdateClause, self).__init__(field, value)
         self.previous = previous
         self._assignments = None
+        self._operation = operation
         self._analyzed = False
         self._column = column
 
@@ -178,8 +179,8 @@ class ContainerUpdateClause(AssignmentClause):
 class SetUpdateClause(ContainerUpdateClause):
     """ updates a set collection """
 
-    def __init__(self, field, value, previous=None, column=None):
-        super(SetUpdateClause, self).__init__(field, value, previous, column=column)
+    def __init__(self, field, value, operation=None, previous=None, column=None):
+        super(SetUpdateClause, self).__init__(field, value, operation, previous, column=column)
         self._additions = None
         self._removals = None
 
@@ -201,6 +202,10 @@ class SetUpdateClause(ContainerUpdateClause):
         """ works out the updates to be performed """
         if self.value is None or self.value == self.previous:
             pass
+        elif self._operation == "add":
+            self._additions = self.value
+        elif self._operation == "remove":
+            self._removals = self.value
         elif self.previous is None:
             self._assignments = self.value
         else:
@@ -229,8 +234,8 @@ class SetUpdateClause(ContainerUpdateClause):
 class ListUpdateClause(ContainerUpdateClause):
     """ updates a list collection """
 
-    def __init__(self, field, value, previous=None, column=None):
-        super(ListUpdateClause, self).__init__(field, value, previous, column=column)
+    def __init__(self, field, value, operation=None, previous=None, column=None):
+        super(ListUpdateClause, self).__init__(field, value, operation, previous, column=column)
         self._append = None
         self._prepend = None
 
@@ -275,6 +280,14 @@ class ListUpdateClause(ContainerUpdateClause):
         if self.value is None or self.value == self.previous:
             pass
 
+        elif self._operation == "append":
+            self._append = self.value
+
+        elif self._operation == "prepend":
+            # self.value is a Quoter but we reverse self._prepend later as if
+            # it's a list, so we have to set it to the underlying list
+            self._prepend = self.value.value
+
         elif self.previous is None:
             self._assignments = self.value
 
@@ -282,7 +295,6 @@ class ListUpdateClause(ContainerUpdateClause):
             # if elements have been removed,
             # rewrite the whole list
             self._assignments = self.value
-
 
         elif len(self.previous) == 0:
             # if we're updating from an empty
@@ -317,13 +329,16 @@ class ListUpdateClause(ContainerUpdateClause):
 class MapUpdateClause(ContainerUpdateClause):
     """ updates a map collection """
 
-    def __init__(self, field, value, previous=None, column=None):
-        super(MapUpdateClause, self).__init__(field, value, previous, column=column)
+    def __init__(self, field, value, operation=None, previous=None, column=None):
+        super(MapUpdateClause, self).__init__(field, value, operation, previous, column=column)
         self._updates = None
         self.previous = self.previous or {}
 
     def _analyze(self):
-        self._updates = sorted([k for k, v in self.value.items() if v != self.previous.get(k)]) or None
+        if self._operation == "update":
+            self._updates = self.value.keys()
+        else:
+            self._updates = sorted([k for k, v in self.value.items() if v != self.previous.get(k)]) or None
         self._analyzed = True
 
     def get_context_size(self):
@@ -354,7 +369,7 @@ class MapUpdateClause(ContainerUpdateClause):
 class CounterUpdateClause(ContainerUpdateClause):
 
     def __init__(self, field, value, previous=None, column=None):
-        super(CounterUpdateClause, self).__init__(field, value, previous, column)
+        super(CounterUpdateClause, self).__init__(field, value, previous=previous, column=column)
         self.previous = self.previous or 0
 
     def get_context_size(self):

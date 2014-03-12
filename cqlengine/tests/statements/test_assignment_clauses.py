@@ -16,7 +16,7 @@ class AssignmentClauseTests(TestCase):
 class SetUpdateClauseTests(TestCase):
 
     def test_update_from_none(self):
-        c = SetUpdateClause('s', {1, 2}, None)
+        c = SetUpdateClause('s', {1, 2}, previous=None)
         c._analyze()
         c.set_context_id(0)
 
@@ -33,7 +33,7 @@ class SetUpdateClauseTests(TestCase):
 
     def test_null_update(self):
         """ tests setting a set to None creates an empty update statement """
-        c = SetUpdateClause('s', None, {1, 2})
+        c = SetUpdateClause('s', None, previous={1, 2})
         c._analyze()
         c.set_context_id(0)
 
@@ -50,7 +50,7 @@ class SetUpdateClauseTests(TestCase):
 
     def test_no_update(self):
         """ tests an unchanged value creates an empty update statement """
-        c = SetUpdateClause('s', {1, 2}, {1, 2})
+        c = SetUpdateClause('s', {1, 2}, previous={1, 2})
         c._analyze()
         c.set_context_id(0)
 
@@ -66,7 +66,7 @@ class SetUpdateClauseTests(TestCase):
         self.assertEqual(ctx, {})
 
     def test_additions(self):
-        c = SetUpdateClause('s', {1, 2, 3}, {1, 2})
+        c = SetUpdateClause('s', {1, 2, 3}, previous={1, 2})
         c._analyze()
         c.set_context_id(0)
 
@@ -82,7 +82,7 @@ class SetUpdateClauseTests(TestCase):
         self.assertEqual(ctx, {'0': {3}})
 
     def test_removals(self):
-        c = SetUpdateClause('s', {1, 2}, {1, 2, 3})
+        c = SetUpdateClause('s', {1, 2}, previous={1, 2, 3})
         c._analyze()
         c.set_context_id(0)
 
@@ -98,7 +98,7 @@ class SetUpdateClauseTests(TestCase):
         self.assertEqual(ctx, {'0': {3}})
 
     def test_additions_and_removals(self):
-        c = SetUpdateClause('s', {2, 3}, {1, 2})
+        c = SetUpdateClause('s', {2, 3}, previous={1, 2})
         c._analyze()
         c.set_context_id(0)
 

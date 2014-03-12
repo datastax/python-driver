@@ -13,7 +13,9 @@ class TestQueryUpdateModel(Model):
     cluster     = columns.Integer(primary_key=True)
     count       = columns.Integer(required=False)
     text        = columns.Text(required=False, index=True)
-
+    text_set    = columns.Set(columns.Text, required=False)
+    text_list   = columns.List(columns.Text, required=False)
+    text_map    = columns.Map(columns.Text, columns.Text, required=False)
 
 class QueryUpdateTests(BaseCassEngTestCase):
 
@@ -115,3 +117,102 @@ class QueryUpdateTests(BaseCassEngTestCase):
 
     def test_counter_updates(self):
         pass
+
+    def test_set_add_updates(self):
+        partition = uuid4()
+        cluster = 1
+        TestQueryUpdateModel.objects.create(
+                partition=partition, cluster=cluster, text_set={"foo"})
+        TestQueryUpdateModel.objects(
+                partition=partition, cluster=cluster).update(text_set__add={'bar'})
+        obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
+        self.assertEqual(obj.text_set, {"foo", "bar"})
+
+    def test_set_add_updates_new_record(self):
+        """ If the key doesn't exist yet, an update creates the record
+        """
+        partition = uuid4()
+        cluster = 1
+        TestQueryUpdateModel.objects(
+                partition=partition, cluster=cluster).update(text_set__add={'bar'})
+        obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
+        self.assertEqual(obj.text_set, {"bar"})
+
+    def test_set_remove_updates(self):
+        partition = uuid4()
+        cluster = 1
+        TestQueryUpdateModel.objects.create(
+                partition=partition, cluster=cluster, text_set={"foo", "baz"})
+        TestQueryUpdateModel.objects(
+                partition=partition, cluster=cluster).update(
+                text_set__remove={'foo'})
+        obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
+        self.assertEqual(obj.text_set, {"baz"})
+
+    def test_set_remove_new_record(self):
+        """ Removing something not in the set should silently do nothing
+        """
+        partition = uuid4()
+        cluster = 1
+        TestQueryUpdateModel.objects.create(
+                partition=partition, cluster=cluster, text_set={"foo"})
+        TestQueryUpdateModel.objects(
+                partition=partition, cluster=cluster).update(
+                text_set__remove={'afsd'})
+        obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
+        self.assertEqual(obj.text_set, {"foo"})
+
+    def test_list_append_updates(self):
+        partition = uuid4()
+        cluster = 1
+        TestQueryUpdateModel.objects.create(
+                partition=partition, cluster=cluster, text_list=["foo"])
+        TestQueryUpdateModel.objects(
+                partition=partition, cluster=cluster).update(
+                text_list__append=['bar'])
+        obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
+        self.assertEqual(obj.text_list, ["foo", "bar"])
+
+    def test_list_prepend_updates(self):
+        """ Prepend two things since order is reversed by default by CQL """
+        partition = uuid4()
+        cluster = 1
+        TestQueryUpdateModel.objects.create(
+                partition=partition, cluster=cluster, text_list=["foo"])
+        TestQueryUpdateModel.objects(
+                partition=partition, cluster=cluster).update(
+                text_list__prepend=['bar', 'baz'])
+        obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
+        self.assertEqual(obj.text_list, ["bar", "baz", "foo"])
+
+    def test_map_update_updates(self):
+        """ Merge a dictionary into existing value """
+        partition = uuid4()
+        cluster = 1
+        TestQueryUpdateModel.objects.create(
+                partition=partition, cluster=cluster,
+                text_map={"foo": '1', "bar": '2'})
+        TestQueryUpdateModel.objects(
+                partition=partition, cluster=cluster).update(
+                text_map__update={"bar": '3', "baz": '4'})
+        obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
+        self.assertEqual(obj.text_map, {"foo": '1', "bar": '3', "baz": '4'})
+
+    def test_map_update_none_deletes_key(self):
+        """ The CQL behavior is if you set a key in a map to null it deletes
+        that key from the map.  Test that this works with __update.
+
+        This test fails because of a bug in the cql python library not
+        converting None to null (and the cql library is no longer in active
+        developement).
+        """
+        # partition = uuid4()
+        # cluster = 1
+        # TestQueryUpdateModel.objects.create(
+        #         partition=partition, cluster=cluster,
+        #         text_map={"foo": '1', "bar": '2'})
+        # TestQueryUpdateModel.objects(
+        #         partition=partition, cluster=cluster).update(
+        #         text_map__update={"bar": None})
+        # obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
+        # self.assertEqual(obj.text_map, {"foo": '1'})
