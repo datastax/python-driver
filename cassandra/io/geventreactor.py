@@ -7,7 +7,6 @@ from collections import defaultdict
 from functools import partial
 import logging
 import os
-import sys
 
 try:
     from cStringIO import StringIO
@@ -97,9 +96,6 @@ class GeventConnection(Connection):
                 ConnectionShutdown("Connection to %s was closed" % self.host))
             # don't leave in-progress operations hanging
             self.connected_event.set()
-
-    def handle_error(self):
-        self.defunct(sys.exc_info()[1])
 
     def handle_close(self):
         log.debug("connection closed by server")
