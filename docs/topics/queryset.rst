@@ -400,3 +400,57 @@ QuerySet method reference
         Per column validation will be performed, but instance level validation will not
         (`Model.validate` is not called).
 
+        The queryset update method also supports blindly adding and removing elements from container columns, without
+        loading a model instance from Cassandra.
+
+        Using the syntax `.update(column_name={x, y, z})` will overwrite the contents of the container, like updating a
+        non container column. However, adding `__<operation>` to the end of the keyword arg, makes the update call add
+        or remove items from the collection, without overwriting then entire column.
+
+
+        Given the model below, here are the operations that can be performed on the different container columns:
+
+        .. code-block:: python
+
+            class Row(Model):
+                row_id      = columns.Integer(primary_key=True)
+                set_column  = columns.Set(Integer)
+                list_column = columns.Set(Integer)
+                map_column  = columns.Set(Integer, Integer)
+
+        :class:`~cqlengine.columns.Set`
+
+        - `add`: adds the elements of the given set to the column
+        - `remove`: removes the elements of the given set to the column
+
+
+        .. code-block:: python
+
+            # add elements to a set
+            Row.objects(row_id=5).update(set_column__add={6})
+
+            # remove elements to a set
+            Row.objects(row_id=5).update(set_column__remove={4})
+
+        :class:`~cqlengine.columns.List`
+
+        - `append`: appends the elements of the given list to the end of the column
+        - `prepend`: prepends the elements of the given list to the beginning of the column
+
+        .. code-block:: python
+
+            # append items to a list
+            Row.objects(row_id=5).update(list_column__append=[6, 7])
+
+            # prepend items to a list
+            Row.objects(row_id=5).update(list_column__prepend=[1, 2])
+
+
+        :class:`~cqlengine.columns.Map`
+
+        - `update`: adds the given keys/values to the columns, creating new entries if they didn't exist, and overwriting old ones if they did
+
+        .. code-block:: python
+
+            # add items to a map
+            Row.objects(row_id=5).update(map_column__update={1: 2, 3: 4})
