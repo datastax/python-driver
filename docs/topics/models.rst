@@ -316,7 +316,7 @@ Compaction Options
 Manipulating model instances as dictionaries
 ============================================
 
-    As of cqlengine 0.12, we've added support for treating model instances like dictionaries. See below for examples
+    As of cqlengine 0.12, we've added support for treating model instances like dictionaries. See below for examples.
 
     .. code-block:: python
 
