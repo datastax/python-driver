@@ -20,7 +20,6 @@ CLUSTER_NAME = 'test_cluster'
 CCM_CLUSTER = None
 DEFAULT_CASSANDRA_VERSION = '2.0.5'
 
-
 path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ccm')
 if not os.path.exists(path):
     os.mkdir(path)
