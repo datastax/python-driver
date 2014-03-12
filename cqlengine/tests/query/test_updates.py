@@ -185,7 +185,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
         self.assertEqual(obj.text_list, ["bar", "baz", "foo"])
 
-    def test_map_merge_updates(self):
+    def test_map_update_updates(self):
         """ Merge a dictionary into existing value """
         partition = uuid4()
         cluster = 1
@@ -194,13 +194,13 @@ class QueryUpdateTests(BaseCassEngTestCase):
                 text_map={"foo": '1', "bar": '2'})
         TestQueryUpdateModel.objects(
                 partition=partition, cluster=cluster).update(
-                text_map__merge={"bar": '3', "baz": '4'})
+                text_map__update={"bar": '3', "baz": '4'})
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
         self.assertEqual(obj.text_map, {"foo": '1', "bar": '3', "baz": '4'})
 
-    def test_map_merge_none_deletes_key(self):
+    def test_map_update_none_deletes_key(self):
         """ The CQL behavior is if you set a key in a map to null it deletes
-        that key from the map.  Test that this works with __merge.
+        that key from the map.  Test that this works with __update.
 
         This test fails because of a bug in the cql python library not
         converting None to null (and the cql library is no longer in active
@@ -213,6 +213,6 @@ class QueryUpdateTests(BaseCassEngTestCase):
         #         text_map={"foo": '1', "bar": '2'})
         # TestQueryUpdateModel.objects(
         #         partition=partition, cluster=cluster).update(
-        #         text_map__merge={"bar": None})
+        #         text_map__update={"bar": None})
         # obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
         # self.assertEqual(obj.text_map, {"foo": '1'})

@@ -335,7 +335,7 @@ class MapUpdateClause(ContainerUpdateClause):
         self.previous = self.previous or {}
 
     def _analyze(self):
-        if self._operation == "merge":
+        if self._operation == "update":
             self._updates = self.value.keys()
         else:
             self._updates = sorted([k for k, v in self.value.items() if v != self.previous.get(k)]) or None
