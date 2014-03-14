@@ -84,8 +84,6 @@ Column Options
     :attr:`~cqlengine.columns.BaseColumn.index`
         If True, an index will be created for this column. Defaults to False.
 
-        *Note: Indexes can only be created on models with one primary key*
-
     :attr:`~cqlengine.columns.BaseColumn.db_field`
         Explicitly sets the name of the column in the database table. If this is left blank, the column name will be
         the same as the name of the column attribute. Defaults to None.
