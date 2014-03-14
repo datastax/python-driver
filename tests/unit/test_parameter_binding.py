@@ -1,3 +1,5 @@
+import six
+
 try:
     import unittest2 as unittest
 except ImportError:
@@ -11,6 +13,9 @@ try:
     from collections import OrderedDict
 except ImportError:  # Python <2.7
     from cassandra.util import OrderedDict # NOQA
+
+if six.PY3:
+    xrange = range
 
 
 class ParamBindingTest(unittest.TestCase):

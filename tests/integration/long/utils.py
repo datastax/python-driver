@@ -1,3 +1,4 @@
+from __future__ import print_function
 import logging
 import time
 
@@ -77,7 +78,7 @@ def force_stop(node):
 
 
 def ring(node):
-    print 'From node%s:' % node
+    print('From node%s:' % node)
     get_node(node).nodetool('ring')
 
 

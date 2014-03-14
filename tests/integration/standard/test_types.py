@@ -352,7 +352,7 @@ class TypeTests(unittest.TestCase):
         """ Ensure timezone-aware datetimes are converted to timestamps correctly """
         try:
             import pytz
-        except ImportError, exc:
+        except ImportError as exc:
             raise unittest.SkipTest('pytz is not available: %r' % (exc,))
 
         dt = datetime(1997, 8, 29, 11, 14)
