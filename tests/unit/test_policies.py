@@ -1,3 +1,5 @@
+import six
+
 try:
     import unittest2 as unittest
 except ImportError:
@@ -21,6 +23,9 @@ from cassandra.policies import (RoundRobinPolicy, DCAwareRoundRobinPolicy,
                                 LoadBalancingPolicy, ConvictionPolicy, ReconnectionPolicy, FallthroughRetryPolicy)
 from cassandra.pool import Host
 from cassandra.query import Statement
+
+if six.PY3:
+    xrange = range
 
 
 class TestLoadBalancingPolicy(unittest.TestCase):

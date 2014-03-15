@@ -5,7 +5,10 @@ except ImportError:
 
 import errno
 import os
-from StringIO import StringIO
+try:
+    from StringIO import StringIO
+except ImportError:
+    from io import StringIO
 from socket import error as socket_error
 
 from mock import patch, Mock
