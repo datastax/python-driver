@@ -522,3 +522,23 @@ class TestMapColumn(BaseCassEngTestCase):
 #        assert len([v for v in ctx.values() if [7,8,9] == v.value]) == 1
 #        assert len([s for s in statements if '"TEST" = "TEST" +' in s]) == 1
 #        assert len([s for s in statements if '+ "TEST"' in s]) == 1
+
+class TestCamelMapModel(Model):
+    partition = columns.UUID(primary_key=True, default=uuid4)
+    camelMap = columns.Map(columns.Text, columns.Integer, required=False)
+
+class TestCamelMapColumn(BaseCassEngTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super(TestCamelMapColumn, cls).setUpClass()
+        drop_table(TestCamelMapModel)
+        sync_table(TestCamelMapModel)
+
+    @classmethod
+    def tearDownClass(cls):
+        super(TestCamelMapColumn, cls).tearDownClass()
+        drop_table(TestCamelMapModel)
+
+    def test_camelcase_column(self):
+        TestCamelMapModel.create(partition=None, camelMap={'blah': 1})
+
