@@ -2,7 +2,8 @@ import errno
 from functools import wraps, partial
 import logging
 from threading import Event, RLock
-from Queue import Queue
+
+from six.moves.queue import Queue
 
 from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut
 from cassandra.marshal import int8_unpack, int32_pack

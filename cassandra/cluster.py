@@ -2,14 +2,17 @@
 This module houses the main classes you will interact with,
 :class:`.Cluster` and :class:`.Session`.
 """
-
 from concurrent.futures import ThreadPoolExecutor
 import logging
 import socket
 import sys
 import time
 from threading import Lock, RLock, Thread, Event
-import Queue
+
+import six
+from six.moves import xrange
+from six.moves import queue as Queue
+
 import weakref
 from weakref import WeakValueDictionary
 try:
@@ -50,6 +53,9 @@ try:
     from cassandra.io.libevreactor import LibevConnection as DefaultConnection
 except ImportError:
     from cassandra.io.asyncorereactor import AsyncoreConnection as DefaultConnection  # NOQA
+
+## Python 3 support #########
+#############################
 
 # Forces load of utf8 encoding module to avoid deadlock that occurs
 # if code that is being imported tries to import the module in a seperate
@@ -1060,7 +1066,7 @@ class Session(object):
 
         prepared_statement = None
 
-        if isinstance(query, basestring):
+        if isinstance(query, six.string_types):
             query = SimpleStatement(query)
         elif isinstance(query, PreparedStatement):
             query = query.bind(parameters)

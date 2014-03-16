@@ -3,10 +3,7 @@ try:
 except ImportError:
     import unittest # noqa
 
-try:
-    from StringIO import StringIO
-except ImportError:
-    from io import StringIO
+from six.moves import StringIO
 
 from mock import Mock, ANY
 

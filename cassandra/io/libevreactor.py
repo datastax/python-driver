@@ -6,7 +6,10 @@ import socket
 from threading import Event, Lock, Thread
 import time
 import traceback
-import Queue
+
+from six.moves.queue import Queue
+from six.moves import cStringIO as StringIO
+from six.moves import xrange
 
 from cassandra import OperationTimedOut
 from cassandra.connection import (Connection, ResponseWaiter, ConnectionShutdown,
@@ -25,10 +28,6 @@ except ImportError:
         "for instructions on installing build dependencies and building "
         "the C extension.")
 
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO  # ignore flake8 warning: # NOQA
 
 try:
     import ssl
@@ -436,7 +435,7 @@ class LibevConnection(Connection):
             return waiter.deliver(timeout)
         except OperationTimedOut:
             raise
-        except Exception, exc:
+        except Exception as exc:
             self.defunct(exc)
             raise
 

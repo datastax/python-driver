@@ -1,5 +1,3 @@
-import six
-
 try:
     import unittest2 as unittest
 except ImportError:
@@ -10,8 +8,7 @@ from cassandra.query import PreparedStatement, BoundStatement
 from cassandra.cqltypes import Int32Type
 from cassandra.util import OrderedDict
 
-if six.PY3:
-    xrange = range
+from six.moves import xrange
 
 
 class ParamBindingTest(unittest.TestCase):

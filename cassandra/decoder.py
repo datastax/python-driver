@@ -2,10 +2,8 @@ import logging
 import socket
 from uuid import UUID
 
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO  # ignore flake8 warning: # NOQA
+from six.moves import cStringIO as StringIO
+from six.moves import xrange
 
 from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
                        AlreadyExists, InvalidRequest, Unauthorized)
@@ -17,6 +15,8 @@ from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 InetAddressType, IntegerType, ListType,
                                 LongType, MapType, SetType, TimeUUIDType,
                                 UTF8Type, UUIDType, lookup_casstype)
+import six
+
 
 log = logging.getLogger(__name__)
 
@@ -564,7 +564,7 @@ class BatchMessage(_MessageType):
         write_byte(f, self.batch_type.value)
         write_short(f, len(self.queries))
         for string_or_query_id, params in self.queries:
-            if isinstance(string_or_query_id, basestring):
+            if isinstance(string_or_query_id, six.string_types):
                 write_byte(f, 0)
                 write_longstring(f, string_or_query_id)
             else:
@@ -679,7 +679,7 @@ def read_binary_string(f):
 
 
 def write_string(f, s):
-    if isinstance(s, unicode):
+    if isinstance(s, six.text_type):
         s = s.encode('utf8')
     write_short(f, len(s))
     f.write(s)
@@ -692,7 +692,7 @@ def read_longstring(f):
 
 
 def write_longstring(f, s):
-    if isinstance(s, unicode):
+    if isinstance(s, six.text_type):
         s = s.encode('utf8')
     write_int(f, len(s))
     f.write(s)

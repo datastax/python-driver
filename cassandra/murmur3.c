@@ -202,6 +202,11 @@ initmurmur3(void)
 
 #else
 
+PyMODINIT_FUNC
+PyInit_murmur3(void)
+{
+
+}
 /* Python 3.x */
 // TODO
 

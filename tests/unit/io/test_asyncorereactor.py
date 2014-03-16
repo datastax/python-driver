@@ -5,10 +5,9 @@ except ImportError:
 
 import errno
 import os
-try:
-    from StringIO import StringIO
-except ImportError:
-    from io import StringIO
+
+from six.moves import StringIO
+
 import socket
 from socket import error as socket_error
 

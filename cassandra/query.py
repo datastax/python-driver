@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 import re
 import struct
 import time
+import six
 
 from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.cqltypes import unix_time_from_uuid1
@@ -354,7 +355,7 @@ class BatchStatement(Statement):
         Statement.__init__(self, retry_policy=retry_policy, consistency_level=consistency_level)
 
     def add(self, statement, parameters=None):
-        if isinstance(statement, basestring):
+        if isinstance(statement, six.string_types):
             if parameters:
                 statement = bind_params(statement, parameters)
             self._statements_and_parameters.append((statement, ()))

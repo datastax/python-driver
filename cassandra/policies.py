@@ -5,6 +5,8 @@ from threading import Lock
 
 from cassandra import ConsistencyLevel
 
+from six.moves import xrange
+
 log = logging.getLogger(__name__)
 
 

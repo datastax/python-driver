@@ -149,7 +149,7 @@ def run_setup(extensions):
         kw['cmdclass']['build_ext'] = build_extensions
         kw['ext_modules'] = extensions
 
-    dependencies = ['futures', 'scales', 'blist', 'six']
+    dependencies = ['futures', 'scales', 'blist', 'six >=1.6']
     if platform.python_implementation() != "CPython":
         dependencies.remove('blist')
 

@@ -7,15 +7,13 @@ import sys
 from threading import Event, Lock, Thread
 import time
 import traceback
-import Queue
+
+from six.moves import queue as Queue
+from six.moves import cStringIO as StringIO
+from six.moves import xrange
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL, EISCONN, errorcode
 
 import asyncore
-
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO  # ignore flake8 warning: # NOQA
 
 try:
     import ssl
@@ -381,7 +379,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
             return waiter.deliver(timeout)
         except OperationTimedOut:
             raise
-        except Exception, exc:
+        except Exception as exc:
             self.defunct(exc)
             raise
 

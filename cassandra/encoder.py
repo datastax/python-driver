@@ -4,8 +4,13 @@ import datetime
 import sys
 import types
 from uuid import UUID
+import six
 
 from cassandra.util import OrderedDict
+
+if six.PY3:
+    unicode = str
+    long = int
 
 
 def cql_quote(term):
@@ -78,13 +83,10 @@ def cql_encode_all_types(val):
 
 cql_encoders = {
     float: cql_encode_object,
-    buffer: cql_encode_bytes,
     bytearray: cql_encode_bytes,
     str: cql_encode_str,
-    unicode: cql_encode_unicode,
     types.NoneType: cql_encode_none,
     int: cql_encode_object,
-    long: cql_encode_object,
     UUID: cql_encode_object,
     datetime.datetime: cql_encode_datetime,
     datetime.date: cql_encode_date,
@@ -96,3 +98,10 @@ cql_encoders = {
     frozenset: cql_encode_set_collection,
     types.GeneratorType: cql_encode_list_collection
 }
+
+if six.PY2:
+    cql_encoders.update({
+        buffer: cql_encode_bytes,
+        unicode: cql_encode_unicode,
+        long: cql_encode_object,
+    })

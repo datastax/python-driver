@@ -22,10 +22,9 @@ from datetime import datetime
 from uuid import UUID
 import warnings
 
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO  # NOQA
+import six
+from six.moves import cStringIO as StringIO
+from six.moves import xrange
 
 from cassandra.marshal import (int8_pack, int8_unpack, uint16_pack, uint16_unpack,
                                int32_pack, int32_unpack, int64_pack, int64_unpack,
@@ -35,7 +34,12 @@ from cassandra.util import OrderedDict
 
 apache_cassandra_type_prefix = 'org.apache.cassandra.db.marshal.'
 
-_number_types = frozenset((int, long, float))
+## Python 3 support #########
+if six.PY3:
+    _number_types = frozenset((int, float))
+else:
+    _number_types = frozenset((int, long, float))
+#############################
 
 try:
     from blist import sortedset
@@ -482,7 +486,7 @@ class DateType(_CassandraType):
 
     @classmethod
     def validate(cls, date):
-        if isinstance(date, basestring):
+        if isinstance(date, six.string_types):
             date = cls.interpret_datestring(date)
         return date
 
@@ -624,7 +628,7 @@ class _SimpleParameterizedType(_ParameterizedType):
 
     @classmethod
     def serialize_safe(cls, items):
-        if isinstance(items, basestring):
+        if isinstance(items, six.string_types):
             raise TypeError("Received a string for a type that expects a sequence")
 
         subtype, = cls.subtypes
@@ -733,7 +737,7 @@ class ReversedType(_ParameterizedType):
 
 
 def is_counter_type(t):
-    if isinstance(t, basestring):
+    if isinstance(t, six.string_types):
         t = lookup_casstype(t)
     return issubclass(t, CounterColumnType)
 
