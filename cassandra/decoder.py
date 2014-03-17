@@ -2,8 +2,9 @@ import logging
 import socket
 from uuid import UUID
 
-from six.moves import cStringIO as StringIO
+# from six.moves import cStringIO as StringIO
 from six.moves import xrange
+from six import BytesIO
 
 from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
                        AlreadyExists, InvalidRequest, Unauthorized)
@@ -50,8 +51,8 @@ class _MessageType(object):
 
     tracing = False
 
-    def to_string(self, stream_id, protocol_version, compression=None):
-        body = StringIO()
+    def to_binary(self, stream_id, protocol_version, compression=None):
+        body = BytesIO()
         self.send_body(body, protocol_version)
         body = body.getvalue()
         version = protocol_version | HEADER_DIRECTION_FROM_CLIENT
@@ -62,8 +63,8 @@ class _MessageType(object):
         if self.tracing:
             flags |= 0x02
         msglen = int32_pack(len(body))
-        msg_parts = map(int8_pack, (version, flags, stream_id, self.opcode)) + [msglen, body]
-        return ''.join(msg_parts)
+        msg_parts = [int8_pack(i) for i in (version, flags, stream_id, self.opcode)] + [msglen, body]
+        return six.binary_type().join(msg_parts)
 
     def __str__(self):
         paramstrs = ['%s=%r' % (pname, getattr(self, pname)) for pname in _get_params(self)]
@@ -84,7 +85,7 @@ def decode_response(stream_id, flags, opcode, body, decompressor=None):
         body = decompressor(body)
         flags ^= 0x01
 
-    body = StringIO(body)
+    body = BytesIO(body)
     if flags & 0x02:
         trace_id = UUID(bytes=body.read(16))
         flags ^= 0x02

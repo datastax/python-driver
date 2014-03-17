@@ -82,10 +82,10 @@ def cql_encode_all_types(val):
 
 
 cql_encoders = {
+    six.binary_type: cql_encode_bytes,
     float: cql_encode_object,
     bytearray: cql_encode_bytes,
     str: cql_encode_str,
-    types.NoneType: cql_encode_none,
     int: cql_encode_object,
     UUID: cql_encode_object,
     datetime.datetime: cql_encode_datetime,
@@ -104,4 +104,10 @@ if six.PY2:
         buffer: cql_encode_bytes,
         unicode: cql_encode_unicode,
         long: cql_encode_object,
+        types.NoneType: cql_encode_none,
+    })
+else:
+    cql_encoders.update({
+        memoryview: cql_encode_bytes,
+        None: cql_encode_none,
     })

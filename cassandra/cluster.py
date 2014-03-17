@@ -54,9 +54,6 @@ try:
 except ImportError:
     from cassandra.io.asyncorereactor import AsyncoreConnection as DefaultConnection  # NOQA
 
-## Python 3 support #########
-#############################
-
 # Forces load of utf8 encoding module to avoid deadlock that occurs
 # if code that is being imported tries to import the module in a seperate
 # thread.

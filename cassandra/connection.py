@@ -170,7 +170,7 @@ class Connection(object):
 
     @defunct_on_error
     def process_msg(self, msg, body_len):
-        version, flags, stream_id, opcode = map(int8_unpack, msg[:4])
+        version, flags, stream_id, opcode = (int8_unpack(f) for f in msg[:4])
         if stream_id < 0:
             callback = None
         else:

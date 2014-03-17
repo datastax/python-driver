@@ -8,8 +8,8 @@ from threading import Event, Lock, Thread
 import time
 import traceback
 
+from six import BytesIO
 from six.moves import queue as Queue
-from six.moves import cStringIO as StringIO
 from six.moves import xrange
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL, EISCONN, errorcode
 
@@ -105,7 +105,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         asyncore.dispatcher.__init__(self)
 
         self.connected_event = Event()
-        self._iobuf = StringIO()
+        self._iobuf = BytesIO()
 
         self._callbacks = {}
         self._push_watchers = defaultdict(set)
@@ -288,7 +288,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
 
                         # leave leftover in current buffer
                         leftover = self._iobuf.read()
-                        self._iobuf = StringIO()
+                        self._iobuf = BytesIO()
                         self._iobuf.write(leftover)
 
                         self._total_reqd_bytes = 0
@@ -344,7 +344,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
             request_id = self._id_queue.get()
 
         self._callbacks[request_id] = cb
-        self.push(msg.to_string(request_id, self.protocol_version, compression=self.compressor))
+        self.push(msg.to_binary(request_id, self.protocol_version, compression=self.compressor))
         return request_id
 
     def wait_for_response(self, msg, timeout=None):
