@@ -21,6 +21,7 @@ Other
 * Don't ignore column names when parsing typestrings.  This is needed for
   user-defined type support.  (github issue #90)
 * Better error message when libevwrapper is not found
+* Only try to import scales when metrics are enabled (github issue #92)
 
 1.0.2
 =====
