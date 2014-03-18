@@ -183,10 +183,10 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
                 return
             self.is_defunct = True
 
-        trace = traceback.format_exc(exc)
+        trace = traceback.format_exc() #exc)
         if trace != "None":
             log.debug("Defuncting connection (%s) to %s: %s\n%s",
-                      id(self), self.host, exc, traceback.format_exc(exc))
+                      id(self), self.host, exc, traceback.format_exc())
         else:
             log.debug("Defuncting connection (%s) to %s: %s",
                       id(self), self.host, exc)

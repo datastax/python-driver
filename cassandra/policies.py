@@ -5,7 +5,7 @@ from threading import Lock
 
 from cassandra import ConsistencyLevel
 
-from six.moves import xrange
+from six.moves import range
 
 log = logging.getLogger(__name__)
 
@@ -512,7 +512,7 @@ class ExponentialReconnectionPolicy(ReconnectionPolicy):
         self.max_delay = max_delay
 
     def new_schedule(self):
-        return (min(self.base_delay * (2 ** i), self.max_delay) for i in xrange(64))
+        return (min(self.base_delay * (2 ** i), self.max_delay) for i in range(64))
 
 
 class WriteType(object):

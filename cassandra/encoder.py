@@ -8,9 +8,9 @@ import six
 
 from cassandra.util import OrderedDict
 
-if six.PY3:
-    unicode = str
-    long = int
+# if six.PY3:
+#     unicode = str
+#     long = int
 
 
 def cql_quote(term):

@@ -7,6 +7,7 @@ import logging
 import re
 from threading import RLock
 import weakref
+import six
 
 murmur3 = None
 try:
@@ -779,7 +780,7 @@ class TableMetadata(object):
 
 
 def protect_name(name):
-    if isinstance(name, unicode):
+    if isinstance(name, six.text_type):
         name = name.encode('utf8')
     return maybe_escape_name(name)
 
@@ -1047,7 +1048,7 @@ class BytesToken(Token):
 
     def __init__(self, token_string):
         """ `token_string` should be string representing the token. """
-        if not isinstance(token_string, basestring):
+        if not isinstance(token_string, six.string_types):
             raise TypeError(
                 "Tokens for ByteOrderedPartitioner should be strings (got %s)"
                 % (type(token_string),))
