@@ -15,6 +15,8 @@ Bug Fixes
 * Ignore SSL_ERROR_WANT_READ and SSL_ERROR_WANT_WRITE socket errors.  Previously,
   these resulted in the connection being defuncted, but they can safely be
   ignored by the driver.
+* Don't reconnect the control connection every time Cluster.connect() is
+  called
 
 Other
 -----

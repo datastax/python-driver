@@ -464,19 +464,20 @@ class Cluster(object):
 
                 self.load_balancing_policy.populate(
                     weakref.proxy(self), self.metadata.all_hosts())
+
+                if self.control_connection:
+                    try:
+                        self.control_connection.connect()
+                        log.debug("Control connection created")
+                    except Exception:
+                        log.exception("Control connection failed to connect, "
+                                      "shutting down Cluster:")
+                        self.shutdown()
+                        raise
+
+                self.load_balancing_policy.check_supported()
+
                 self._is_setup = True
-
-            if self.control_connection:
-                try:
-                    self.control_connection.connect()
-                    log.debug("Control connection created")
-                except Exception:
-                    log.exception("Control connection failed to connect, "
-                                  "shutting down Cluster:")
-                    self.shutdown()
-                    raise
-
-            self.load_balancing_policy.check_supported()
 
         session = self._new_session()
         if keyspace:
