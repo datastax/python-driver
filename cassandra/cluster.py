@@ -1855,6 +1855,7 @@ class ResponseFuture(object):
         self.default_timeout = default_timeout
         self._metrics = metrics
         self.prepared_statement = prepared_statement
+        self._callback_lock = Lock()
         if metrics is not None:
             self._start_time = time.time()
 
@@ -2125,7 +2126,8 @@ class ResponseFuture(object):
                 del self.session  # clear reference cycles
             except AttributeError:
                 pass
-        self._final_result = response
+        with self._callback_lock:
+            self._final_result = response
         self._event.set()
         if self._callback:
             fn, args, kwargs = self._callback
@@ -2138,7 +2140,8 @@ class ResponseFuture(object):
             del self.session  # clear reference cycles
         except AttributeError:
             pass
-        self._final_exception = response
+        with self._callback_lock:
+            self._final_exception = response
         self._event.set()
         if self._errback:
             fn, args, kwargs = self._errback
@@ -2258,10 +2261,14 @@ class ResponseFuture(object):
             >>> future.add_callback(handle_results, time.time(), should_log=True)
 
         """
-        if self._final_result is not _NOT_SET:
+        run_now = False
+        with self._callback_lock:
+            if self._final_result is not _NOT_SET:
+                run_now = True
+            else:
+                self._callback = (fn, args, kwargs)
+        if run_now:
             fn(self._final_result, *args, **kwargs)
-        else:
-            self._callback = (fn, args, kwargs)
         return self
 
     def add_errback(self, fn, *args, **kwargs):
@@ -2270,10 +2277,14 @@ class ResponseFuture(object):
         An Exception instance will be passed as the first positional argument
         to `fn`.
         """
-        if self._final_exception:
+        run_now = False
+        with self._callback_lock:
+            if self._final_exception:
+                run_now = True
+            else:
+                self._errback = (fn, args, kwargs)
+        if run_now:
             fn(self._final_exception, *args, **kwargs)
-        else:
-            self._errback = (fn, args, kwargs)
         return self
 
     def add_callbacks(self, callback, errback,
