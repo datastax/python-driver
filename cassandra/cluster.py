@@ -32,7 +32,6 @@ from cassandra.decoder import (QueryMessage, ResultMessage,
                                IsBootstrappingErrorMessage, named_tuple_factory,
                                dict_factory)
 from cassandra.metadata import Metadata
-from cassandra.metrics import Metrics
 from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy)
@@ -364,6 +363,7 @@ class Cluster(object):
         self._lock = RLock()
 
         if self.metrics_enabled:
+            from cassandra.metrics import Metrics
             self.metrics = Metrics(weakref.proxy(self))
 
         self.control_connection = ControlConnection(
