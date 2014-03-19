@@ -245,6 +245,8 @@ class BoundStatement(Statement):
         and returns this instance.  Note that `values` *must* be a
         sequence, even if you are only binding one value.
         """
+        if values is None:
+            values = ()
         col_meta = self.prepared_statement.column_metadata
         if len(values) > len(col_meta):
             raise ValueError(
