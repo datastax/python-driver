@@ -252,10 +252,10 @@ class BatchStatementTests(unittest.TestCase):
 
     def test_no_parameters(self):
         batch = BatchStatement(BatchType.LOGGED)
-        batch.add("INSERT INTO test3rf.test (k, v), VALUES (0, 0)")
-        batch.add("INSERT INTO test3rf.test (k, v), VALUES (1, 1)", ())
-        batch.add(SimpleStatement("INSERT INTO test3rf.test (k, v), VALUES (2, 2)"))
-        batch.add(SimpleStatement("INSERT INTO test3rf.test (k, v), VALUES (3, 3)"), ())
+        batch.add("INSERT INTO test3rf.test (k, v) VALUES (0, 0)")
+        batch.add("INSERT INTO test3rf.test (k, v) VALUES (1, 1)", ())
+        batch.add(SimpleStatement("INSERT INTO test3rf.test (k, v) VALUES (2, 2)"))
+        batch.add(SimpleStatement("INSERT INTO test3rf.test (k, v) VALUES (3, 3)"), ())
 
         prepared = self.session.prepare("INSERT INTO test3rf.test (k, v) VALUES (4, 4)")
         batch.add(prepared)
@@ -264,3 +264,5 @@ class BatchStatementTests(unittest.TestCase):
         batch.add(prepared.bind([]), ())
 
         self.assertRaises(ValueError, batch.add, prepared.bind([]), (1, 2, 3))
+
+        self.session.execute(batch)
