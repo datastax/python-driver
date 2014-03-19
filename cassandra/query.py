@@ -362,14 +362,15 @@ class BatchStatement(Statement):
             try:
                 # see if it's a PreparedStatement
                 query_id = statement.query_id
+                bound_statement = statement.bind(parameters)
                 self._statements_and_parameters.append(
-                    (query_id, () if parameters is None else parameters))
+                    (True, query_id, () if parameters is None else bound_statement.values))
             except AttributeError:
                 # it must be a SimpleStatement
                 query_string = statement.query_string
                 if parameters:
                     query_string = bind_params(query_string, parameters)
-                self._statements_and_parameters.append((query_string, ()))
+                self._statements_and_parameters.append((False, query_string, ()))
         return self
 
     def add_all(self, statements, parameters):
@@ -379,7 +380,7 @@ class BatchStatement(Statement):
     def __str__(self):
         consistency = ConsistencyLevel.value_to_name[self.consistency_level]
         return (u'<BatchStatement type=%s, statements=%d, consistency=%s>' %
-                (self.batch_type, len(self._statements_and_values), consistency))
+                (self.batch_type, len(self._statements_and_parameters), consistency))
     __repr__ = __str__
 
 
