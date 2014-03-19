@@ -759,13 +759,13 @@ class Cluster(object):
             self.on_down(host, is_host_addition, force_if_down=True)
         return is_down
 
-    def add_host(self, address, signal):
+    def add_host(self, address, datacenter=None, rack=None, signal=True):
         """
         Called when adding initial contact points and when the control
         connection subsequently discovers a new node.  Intended for internal
         use only.
         """
-        new_host = self.metadata.add_host(address)
+        new_host = self.metadata.add_host(address, datacenter, rack)
         if new_host and signal:
             log.info("New Cassandra host %s added", address)
             self.on_add(new_host)
@@ -1580,10 +1580,13 @@ class ControlConnection(object):
             found_hosts.add(addr)
 
             host = self._cluster.metadata.get_host(addr)
+            datacenter = row.get("data_center")
+            rack = row.get("rack")
             if host is None:
                 log.debug("[control connection] Found new host to connect to: %s", addr)
-                host = self._cluster.add_host(addr, signal=True)
-            host.set_location_info(row.get("data_center"), row.get("rack"))
+                host = self._cluster.add_host(addr, datacenter, rack, signal=True)
+            else:
+                self._update_location_info(host, datacenter, rack)
 
             tokens = row.get("tokens")
             if partitioner and tokens:
@@ -1600,11 +1603,22 @@ class ControlConnection(object):
             log.debug("[control connection] Fetched ring info, rebuilding metadata")
             self._cluster.metadata.rebuild_token_map(partitioner, token_map)
 
+    def _update_location_info(self, host, datacenter, rack):
+        if host.datacenter == datacenter and host.rack == rack:
+            return
+
+        # If the dc/rack information changes, we need to update the load balancing policy.
+        # For that, we remove and re-add the node against the policy. Not the most elegant, and assumes
+        # that the policy will update correctly, but in practice this should work.
+        self._cluster.load_balancing_policy.on_down(host)
+        host.set_location_info(datacenter, rack)
+        self._cluster.load_balancing_policy.on_up(host)
+
     def _handle_topology_change(self, event):
         change_type = event["change_type"]
         addr, port = event["address"]
         if change_type == "NEW_NODE":
-            self._cluster.scheduler.schedule(10, self._cluster.add_host, addr, signal=True)
+            self._cluster.scheduler.schedule(10, self.refresh_node_list_and_token_map)
         elif change_type == "REMOVED_NODE":
             host = self._cluster.metadata.get_host(addr)
             self._cluster.scheduler.schedule(0, self._cluster.remove_host, host)
@@ -1618,7 +1632,7 @@ class ControlConnection(object):
         if change_type == "UP":
             if host is None:
                 # this is the first time we've seen the node
-                self._cluster.scheduler.schedule(1, self._cluster.add_host, addr, signal=True)
+                self._cluster.scheduler.schedule(1, self.refresh_node_list_and_token_map)
             else:
                 # this will be run by the scheduler
                 self._cluster.scheduler.schedule(1, self._cluster.on_up, host)

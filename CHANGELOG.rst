@@ -21,6 +21,8 @@ Bug Fixes
   if the callback was added outside of the event loop thread (github issue #95)
 * Properly escape keyspace name in Session.set_keyspace().  Previously, the
   keyspace name was quoted, but any quotes in the string were not escaped.
+* Avoid adding hosts to the load balancing policy before their datacenter
+  and rack information has been set, if possible.
 
 Other
 -----
