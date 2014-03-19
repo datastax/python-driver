@@ -940,6 +940,15 @@ class Session(object):
     hit.  If the limit is passed, an error will be logged and the
     :attr:`.Statement.trace` will be left as :const:`None`. """
 
+    default_fetch_size = 5000
+    """
+    By default, this many rows will be fetched at a time.  This can be
+    specified per-query through :attr:`~Statement.fetch_size`.
+
+    This only takes effect when protocol version 2 or higher is used.
+    See :attr:`~Cluster.protocol_version` for details.
+    """
+
     _lock = None
     _pools = None
     _load_balancer = None
@@ -1065,16 +1074,21 @@ class Session(object):
         elif isinstance(query, PreparedStatement):
             query = query.bind(parameters)
 
+        fetch_size = query.fetch_size
+        if not fetch_size and self._protocol_version >= 2:
+            fetch_size = self.default_fetch_size
+
         if isinstance(query, SimpleStatement):
             query_string = query.query_string
             if parameters:
                 query_string = bind_params(query.query_string, parameters)
             message = QueryMessage(
-                query_string, query.consistency_level, query.serial_consistency_level)
+                query_string, query.consistency_level, query.serial_consistency_level,
+                fetch_size=fetch_size)
         elif isinstance(query, BoundStatement):
             message = ExecuteMessage(
                 query.prepared_statement.query_id, query.values, query.consistency_level,
-                query.serial_consistency_level)
+                query.serial_consistency_level, fetch_size=fetch_size)
             prepared_statement = query.prepared_statement
         elif isinstance(query, BatchStatement):
             if self._protocol_version < 2:
@@ -1869,6 +1883,7 @@ class ResponseFuture(object):
     _query_retries = 0
     _start_time = None
     _metrics = None
+    _paging_state = None
 
     def __init__(self, session, message, query, default_timeout=None, metrics=None, prepared_statement=None):
         self.session = session
@@ -1982,6 +1997,7 @@ class ResponseFuture(object):
                 else:
                     results = getattr(response, 'results', None)
                     if results is not None and response.kind == RESULT_KIND_ROWS:
+                        self._paging_state = response.paging_state
                         results = self.row_factory(*results)
                     self._set_final_result(results)
             elif isinstance(response, ErrorMessage):

@@ -71,16 +71,20 @@ class Statement(object):
     to :attr:`.ConsistencyLevel.ONE`.
     """
 
+    fetch_size = None
+
     _serial_consistency_level = None
     _routing_key = None
 
     def __init__(self, retry_policy=None, consistency_level=None, routing_key=None,
-                 serial_consistency_level=None):
+                 serial_consistency_level=None, fetch_size=None):
         self.retry_policy = retry_policy
         if consistency_level is not None:
             self.consistency_level = consistency_level
         if serial_consistency_level is not None:
             self.serial_consistency_level = serial_consistency_level
+        if fetch_size is not None:
+            self.fetch_size = None
         self._routing_key = routing_key
 
     def _get_routing_key(self):
@@ -210,7 +214,8 @@ class PreparedStatement(object):
     serial_consistency_level = None
 
     def __init__(self, column_metadata, query_id, routing_key_indexes, query, keyspace,
-                 consistency_level=ConsistencyLevel.ONE, serial_consistency_level=None):
+                 consistency_level=ConsistencyLevel.ONE, serial_consistency_level=None,
+                 fetch_size=None):
         self.column_metadata = column_metadata
         self.query_id = query_id
         self.routing_key_indexes = routing_key_indexes
@@ -218,6 +223,7 @@ class PreparedStatement(object):
         self.keyspace = keyspace
         self.consistency_level = consistency_level
         self.serial_consistency_level = serial_consistency_level
+        self.fetch_size = fetch_size
 
     @classmethod
     def from_message(cls, query_id, column_metadata, cluster_metadata, query, keyspace):

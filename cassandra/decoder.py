@@ -374,7 +374,7 @@ class SupportedMessage(_MessageType):
 _VALUES_FLAG = 0x01
 _SKIP_METADATA_FLAG = 0x01
 _PAGE_SIZE_FLAG = 0x04
-_WITH_PAGING_STATE_SIZE_FLAG = 0x08
+_WITH_PAGING_STATE_FLAG = 0x08
 _WITH_SERIAL_CONSISTENCY_FLAG = 0x10
 
 
@@ -382,28 +382,50 @@ class QueryMessage(_MessageType):
     opcode = 0x07
     name = 'QUERY'
 
-    def __init__(self, query, consistency_level, serial_consistency_level=None):
+    def __init__(self, query, consistency_level, serial_consistency_level=None,
+                 fetch_size=None, paging_state=None):
         self.query = query
         self.consistency_level = consistency_level
         self.serial_consistency_level = serial_consistency_level
+        self.fetch_size = fetch_size
+        self.paging_state = paging_state
 
     def send_body(self, f, protocol_version):
         write_longstring(f, self.query)
         write_consistency_level(f, self.consistency_level)
         flags = 0x00
         if self.serial_consistency_level:
-            if protocol_version < 2:
+            if protocol_version >= 2:
+                flags |= _WITH_SERIAL_CONSISTENCY_FLAG
+            else:
                 raise UnsupportedOperation(
                     "Serial consistency levels require the use of protocol version "
                     "2 or higher. Consider setting Cluster.protocol_version to 2 "
                     "to support serial consistency levels.")
+
+        if self.fetch_size:
+            if protocol_version >= 2:
+                flags |= _PAGE_SIZE_FLAG
             else:
-                flags |= _WITH_SERIAL_CONSISTENCY_FLAG
+                raise UnsupportedOperation(
+                    "Automatic query paging may only be used with protocol version "
+                    "2 or higher. Consider setting Cluster.protocol_version to 2.")
+
+        if self.paging_state:
+            if protocol_version >= 2:
+                flags |= _WITH_PAGING_STATE_FLAG
+            else:
+                raise UnsupportedOperation(
+                    "Automatic query paging may only be used with protocol version "
+                    "2 or higher. Consider setting Cluster.protocol_version to 2.")
 
         write_byte(f, flags)
+        if self.fetch_size:
+            write_int(f, self.fetch_size)
+        if self.paging_state:
+            write_longstring(f, self.paging_state)
         if self.serial_consistency_level:
             write_consistency_level(f, self.serial_consistency_level)
-
 
 CUSTOM_TYPE = object()
 
@@ -417,6 +439,10 @@ RESULT_KIND_SCHEMA_CHANGE = 0x0005
 class ResultMessage(_MessageType):
     opcode = 0x08
     name = 'RESULT'
+
+    kind = None
+    results = None
+    paging_state = None
 
     _type_codes = {
         0x0000: CUSTOM_TYPE,
@@ -442,18 +468,22 @@ class ResultMessage(_MessageType):
     }
 
     _FLAGS_GLOBAL_TABLES_SPEC = 0x0001
+    _HAS_MORE_PAGES_FLAG = 0x0002
+    _NO_METADATA_FLAG = 0x0004
 
-    def __init__(self, kind, results):
+    def __init__(self, kind, results, paging_state=None):
         self.kind = kind
         self.results = results
+        self.paging_state = paging_state
 
     @classmethod
     def recv_body(cls, f):
         kind = read_int(f)
+        paging_state = None
         if kind == RESULT_KIND_VOID:
             results = None
         elif kind == RESULT_KIND_ROWS:
-            results = cls.recv_results_rows(f)
+            paging_state, results = cls.recv_results_rows(f)
         elif kind == RESULT_KIND_SET_KEYSPACE:
             ksname = read_string(f)
             results = ksname
@@ -461,22 +491,24 @@ class ResultMessage(_MessageType):
             results = cls.recv_results_prepared(f)
         elif kind == RESULT_KIND_SCHEMA_CHANGE:
             results = cls.recv_results_schema_change(f)
-        return cls(kind=kind, results=results)
+        return cls(kind, results, paging_state)
 
     @classmethod
     def recv_results_rows(cls, f):
-        column_metadata = cls.recv_results_metadata(f)
+        paging_state, column_metadata = cls.recv_results_metadata(f)
         rowcount = read_int(f)
         rows = [cls.recv_row(f, len(column_metadata)) for x in xrange(rowcount)]
         colnames = [c[2] for c in column_metadata]
         coltypes = [c[3] for c in column_metadata]
-        return (colnames, [tuple(ctype.from_binary(val) for ctype, val in zip(coltypes, row))
-                           for row in rows])
+        return (
+            paging_state,
+            (colnames, [tuple(ctype.from_binary(val) for ctype, val in zip(coltypes, row))
+                        for row in rows]))
 
     @classmethod
     def recv_results_prepared(cls, f):
         query_id = read_binary_string(f)
-        column_metadata = cls.recv_results_metadata(f)
+        _, column_metadata = cls.recv_results_metadata(f)
         return (query_id, column_metadata)
 
     @classmethod
@@ -484,6 +516,10 @@ class ResultMessage(_MessageType):
         flags = read_int(f)
         glob_tblspec = bool(flags & cls._FLAGS_GLOBAL_TABLES_SPEC)
         colcount = read_int(f)
+        if flags & cls._HAS_MORE_PAGES_FLAG:
+            paging_state = read_binary_longstring(f)
+        else:
+            paging_state = None
         if glob_tblspec:
             ksname = read_string(f)
             cfname = read_string(f)
@@ -498,7 +534,7 @@ class ResultMessage(_MessageType):
             colname = read_string(f)
             coltype = cls.read_type(f)
             column_metadata.append((colksname, colcfname, colname, coltype))
-        return column_metadata
+        return paging_state, column_metadata
 
     @classmethod
     def recv_results_schema_change(cls, f):
@@ -548,11 +584,15 @@ class ExecuteMessage(_MessageType):
     opcode = 0x0A
     name = 'EXECUTE'
 
-    def __init__(self, query_id, query_params, consistency_level, serial_consistency_level=None):
+    def __init__(self, query_id, query_params, consistency_level,
+                 serial_consistency_level=None, fetch_size=None,
+                 paging_state=None):
         self.query_id = query_id
         self.query_params = query_params
         self.consistency_level = consistency_level
         self.serial_consistency_level = serial_consistency_level
+        self.fetch_size = fetch_size
+        self.paging_state = paging_state
 
     def send_body(self, f, protocol_version):
         write_string(f, self.query_id)
@@ -562,6 +602,10 @@ class ExecuteMessage(_MessageType):
                     "Serial consistency levels require the use of protocol version "
                     "2 or higher. Consider setting Cluster.protocol_version to 2 "
                     "to support serial consistency levels.")
+            if self.fetch_size or self.paging_state:
+                raise UnsupportedOperation(
+                    "Automatic query paging may only be used with protocol version "
+                    "2 or higher. Consider setting Cluster.protocol_version to 2.")
             write_short(f, len(self.query_params))
             for param in self.query_params:
                 write_value(f, param)
@@ -571,10 +615,18 @@ class ExecuteMessage(_MessageType):
             flags = _VALUES_FLAG
             if self.serial_consistency_level:
                 flags |= _WITH_SERIAL_CONSISTENCY_FLAG
+            if self.fetch_size:
+                flags |= _PAGE_SIZE_FLAG
+            if self.paging_state:
+                flags |= _WITH_PAGING_STATE_FLAG
             write_byte(f, flags)
             write_short(f, len(self.query_params))
             for param in self.query_params:
                 write_value(f, param)
+            if self.fetch_size:
+                write_int(f, self.fetch_size)
+            if self.paging_state:
+                write_longstring(f, self.paging_state)
             if self.serial_consistency_level:
                 write_consistency_level(f, self.serial_consistency_level)
 
@@ -714,10 +766,14 @@ def write_string(f, s):
     f.write(s)
 
 
-def read_longstring(f):
+def read_binary_longstring(f):
     size = read_int(f)
     contents = f.read(size)
-    return contents.decode('utf8')
+    return contents
+
+
+def read_longstring(f):
+    return read_binary_longstring().decode('utf8')
 
 
 def write_longstring(f, s):
