@@ -17,6 +17,8 @@ Bug Fixes
   ignored by the driver.
 * Don't reconnect the control connection every time Cluster.connect() is
   called
+* Avoid race condition that could leave ResponseFuture callbacks uncalled
+  if the callback was added outside of the event loop thread (github issue #95)
 
 Other
 -----
