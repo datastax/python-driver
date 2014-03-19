@@ -31,7 +31,7 @@ from cassandra.decoder import (QueryMessage, ResultMessage,
                                PreparedQueryNotFound,
                                IsBootstrappingErrorMessage, named_tuple_factory,
                                dict_factory)
-from cassandra.metadata import Metadata
+from cassandra.metadata import Metadata, protect_name
 from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy)
@@ -1253,7 +1253,7 @@ class Session(object):
         Set the default keyspace for all queries made through this Session.
         This operation blocks until complete.
         """
-        self.execute('USE "%s"' % (keyspace,))
+        self.execute('USE %s' % (protect_name(keyspace),))
 
     def _set_keyspace_for_all_pools(self, keyspace, callback):
         """

@@ -19,6 +19,8 @@ Bug Fixes
   called
 * Avoid race condition that could leave ResponseFuture callbacks uncalled
   if the callback was added outside of the event loop thread (github issue #95)
+* Properly escape keyspace name in Session.set_keyspace().  Previously, the
+  keyspace name was quoted, but any quotes in the string were not escaped.
 
 Other
 -----
