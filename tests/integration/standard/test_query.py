@@ -7,6 +7,7 @@ from cassandra.query import (PreparedStatement, BoundStatement, ValueSequence,
                              SimpleStatement, BatchStatement, BatchType,
                              dict_factory)
 from cassandra.cluster import Cluster
+from cassandra.policies import HostDistance
 
 from tests.integration import get_server_versions
 
@@ -206,13 +207,45 @@ class BatchStatementTests(unittest.TestCase):
                 "Cassandra 2.0+ is required for BATCH operations, currently testing against %r"
                 % (cass_version,))
 
-    def test_string_statements(self):
-        cluster = Cluster(protocol_version=2)
-        session = cluster.connect()
+        self.cluster = Cluster(protocol_version=2)
+        self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
+        self.session = self.cluster.connect()
 
+    def tearDown(self):
+        self.cluster.shutdown()
+
+    def test_string_statements(self):
         batch = BatchStatement(BatchType.LOGGED)
         for i in range(10):
             batch.add("INSERT INTO test3rf.test (k, v) VALUES (%s, %s)", (i, i))
 
-        session.execute(batch)
-        session.execute_async(batch).result()
+        self.session.execute(batch)
+        self.session.execute_async(batch).result()
+
+    def test_simple_statements(self):
+        batch = BatchStatement(BatchType.LOGGED)
+        for i in range(10):
+            batch.add(SimpleStatement("INSERT INTO test3rf.test (k, v) VALUES (%s, %s)"), (i, i))
+
+        self.session.execute(batch)
+        self.session.execute_async(batch).result()
+
+    def test_prepared_statements(self):
+        prepared = self.session.prepare("INSERT INTO test3rf.test (k, v) VALUES (?, ?)")
+
+        batch = BatchStatement(BatchType.LOGGED)
+        for i in range(10):
+            batch.add(prepared, (i, i))
+
+        self.session.execute(batch)
+        self.session.execute_async(batch).result()
+
+    def test_bound_statements(self):
+        prepared = self.session.prepare("INSERT INTO test3rf.test (k, v) VALUES (?, ?)")
+
+        batch = BatchStatement(BatchType.LOGGED)
+        for i in range(10):
+            batch.add(prepared.bind((i, i)))
+
+        self.session.execute(batch)
+        self.session.execute_async(batch).result()

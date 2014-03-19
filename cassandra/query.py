@@ -357,20 +357,25 @@ class BatchStatement(Statement):
         if isinstance(statement, basestring):
             if parameters:
                 statement = bind_params(statement, parameters)
-            self._statements_and_parameters.append((statement, ()))
+            self._statements_and_parameters.append((False, statement, ()))
+        elif isinstance(statement, PreparedStatement):
+            query_id = statement.query_id
+            bound_statement = statement.bind(parameters)
+            self._statements_and_parameters.append(
+                (True, query_id, () if parameters is None else bound_statement.values))
+        elif isinstance(statement, BoundStatement):
+            if parameters:
+                raise ValueError(
+                    "Parameters cannot be passed with a BoundStatement "
+                    "to BatchStatement.add()")
+            self._statements_and_parameters.append(
+                (True, statement.prepared_statement.query_id, statement.values))
         else:
-            try:
-                # see if it's a PreparedStatement
-                query_id = statement.query_id
-                bound_statement = statement.bind(parameters)
-                self._statements_and_parameters.append(
-                    (True, query_id, () if parameters is None else bound_statement.values))
-            except AttributeError:
-                # it must be a SimpleStatement
-                query_string = statement.query_string
-                if parameters:
-                    query_string = bind_params(query_string, parameters)
-                self._statements_and_parameters.append((False, query_string, ()))
+            # it must be a SimpleStatement
+            query_string = statement.query_string
+            if parameters:
+                query_string = bind_params(query_string, parameters)
+            self._statements_and_parameters.append((False, query_string, ()))
         return self
 
     def add_all(self, statements, parameters):
