@@ -71,12 +71,16 @@ class Statement(object):
     to :attr:`.ConsistencyLevel.ONE`.
     """
 
+    _serial_consistency_level = None
     _routing_key = None
 
-    def __init__(self, retry_policy=None, consistency_level=None, routing_key=None):
+    def __init__(self, retry_policy=None, consistency_level=None, routing_key=None,
+                 serial_consistency_level=None):
         self.retry_policy = retry_policy
         if consistency_level is not None:
             self.consistency_level = consistency_level
+        if serial_consistency_level is not None:
+            self.serial_consistency_level = serial_consistency_level
         self._routing_key = routing_key
 
     def _get_routing_key(self):
@@ -103,6 +107,52 @@ class Statement(object):
         If the partition key is a composite, a list or tuple must be passed in.
         Each key component should be in its packed (binary) format, so all
         components should be strings.
+        """)
+
+    def _get_serial_consistency_level(self):
+        return self._serial_consistency_level
+
+    def _set_serial_consistency_level(self, serial_consistency_level):
+        acceptable = (None, ConsistencyLevel.SERIAL, ConsistencyLevel.LOCAL_SERIAL)
+        if serial_consistency_level not in acceptable:
+            raise ValueError(
+                "serial_consistency_level must be either ConsistencyLevel.SERIAL "
+                "or ConsistencyLevel.LOCAL_SERIAL")
+
+    def _del_serial_consistency_level(self):
+        self._serial_consistency_level = None
+
+    serial_consistency_level = property(
+         _get_serial_consistency_level,
+         _set_serial_consistency_level,
+         _del_serial_consistency_level,
+        """
+        The serial consistency level is only used by conditional updates
+        (``INSERT``, ``UPDATE`` and ``DELETE`` with an ``IF`` condition).  For
+        those, the ``serial_consistency_level`` defines the consistency level of
+        the serial phase (or "paxos" phase) while the normal
+        :attr:`~.consistency_level` defines the consistency for the "learn" phase,
+        i.e. what type of reads will be guaranteed to see the update right away.
+        For example, if a conditional write has a :attr:`~.consistency_level` of
+        :attr:`~.ConsistencyLevel.QUORUM` (and is successful), then a
+        :attr:`~.ConsistencyLevel.QUORUM` read is guaranteed to see that write.
+        But if the regular :attr:`~.consistency_level` of that write is
+        :attr:`~.ConsistencyLevel.ANY`, then only a read with a
+        :attr`~.consistency_level` of :attr:`~.ConsistencyLevel.SERIAL` is
+        guaranteed to see it (even a read with consistency
+        :attr:`~.ConsistencyLevel.ALL` is not guaranteed to be enough).
+
+        The serial consistency can only be one of :attr:`~ConsistencyLevel.SERIAL`
+        or :attr:`~ConsistencyLevel.LOCAL_SERIAL`. While ``SERIAL`` guarantees full
+        linearizability (with other ``SERIAL`` updates), ``LOCAL_SERIAL`` only
+        guarantees it in the local data center.
+
+        The serial consistency level is ignored for any query that is not a
+        conditional update. Serial reads should use the regular
+        :attr:`consistency_level`.
+
+        Serial consistency levels may only be used against Cassandra 2.0+
+        and the :attr:`~Cluster.protocol_version` must be set to 2 or higher.
         """)
 
     @property
@@ -157,15 +207,17 @@ class PreparedStatement(object):
     routing_key_indexes = None
 
     consistency_level = ConsistencyLevel.ONE
+    serial_consistency_level = None
 
     def __init__(self, column_metadata, query_id, routing_key_indexes, query, keyspace,
-                 consistency_level=ConsistencyLevel.ONE):
+                 consistency_level=ConsistencyLevel.ONE, serial_consistency_level=None):
         self.column_metadata = column_metadata
         self.query_id = query_id
         self.routing_key_indexes = routing_key_indexes
         self.query_string = query
         self.keyspace = keyspace
         self.consistency_level = consistency_level
+        self.serial_consistency_level = serial_consistency_level
 
     @classmethod
     def from_message(cls, query_id, column_metadata, cluster_metadata, query, keyspace):
@@ -234,6 +286,7 @@ class BoundStatement(Statement):
         All other ``*args`` and ``**kwargs`` will be passed to :class:`.Statement`.
         """
         self.consistency_level = prepared_statement.consistency_level
+        self.serial_consistency_level = prepared_statement.serial_consistency_level
         self.prepared_statement = prepared_statement
         self.values = []
 

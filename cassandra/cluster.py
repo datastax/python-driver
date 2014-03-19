@@ -1069,10 +1069,12 @@ class Session(object):
             query_string = query.query_string
             if parameters:
                 query_string = bind_params(query.query_string, parameters)
-            message = QueryMessage(query_string, query.consistency_level)
+            message = QueryMessage(
+                query_string, query.consistency_level, query.serial_consistency_level)
         elif isinstance(query, BoundStatement):
             message = ExecuteMessage(
-                query.prepared_statement.query_id, query.values, query.consistency_level)
+                query.prepared_statement.query_id, query.values, query.consistency_level,
+                query.serial_consistency_level)
             prepared_statement = query.prepared_statement
         elif isinstance(query, BatchStatement):
             if self._protocol_version < 2:

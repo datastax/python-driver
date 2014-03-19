@@ -382,15 +382,27 @@ class QueryMessage(_MessageType):
     opcode = 0x07
     name = 'QUERY'
 
-    def __init__(self, query, consistency_level):
+    def __init__(self, query, consistency_level, serial_consistency_level=None):
         self.query = query
         self.consistency_level = consistency_level
+        self.serial_consistency_level = serial_consistency_level
 
     def send_body(self, f, protocol_version):
         write_longstring(f, self.query)
         write_consistency_level(f, self.consistency_level)
         flags = 0x00
+        if self.serial_consistency_level:
+            if protocol_version < 2:
+                raise UnsupportedOperation(
+                    "Serial consistency levels require the use of protocol version "
+                    "2 or higher. Consider setting Cluster.protocol_version to 2 "
+                    "to support serial consistency levels.")
+            else:
+                flags |= _WITH_SERIAL_CONSISTENCY_FLAG
+
         write_byte(f, flags)
+        if self.serial_consistency_level:
+            write_consistency_level(f, self.serial_consistency_level)
 
 
 CUSTOM_TYPE = object()
@@ -536,14 +548,20 @@ class ExecuteMessage(_MessageType):
     opcode = 0x0A
     name = 'EXECUTE'
 
-    def __init__(self, query_id, query_params, consistency_level):
+    def __init__(self, query_id, query_params, consistency_level, serial_consistency_level=None):
         self.query_id = query_id
         self.query_params = query_params
         self.consistency_level = consistency_level
+        self.serial_consistency_level = serial_consistency_level
 
     def send_body(self, f, protocol_version):
         write_string(f, self.query_id)
         if protocol_version == 1:
+            if self.serial_consistency_level:
+                raise UnsupportedOperation(
+                    "Serial consistency levels require the use of protocol version "
+                    "2 or higher. Consider setting Cluster.protocol_version to 2 "
+                    "to support serial consistency levels.")
             write_short(f, len(self.query_params))
             for param in self.query_params:
                 write_value(f, param)
@@ -551,10 +569,14 @@ class ExecuteMessage(_MessageType):
         else:
             write_consistency_level(f, self.consistency_level)
             flags = _VALUES_FLAG
+            if self.serial_consistency_level:
+                flags |= _WITH_SERIAL_CONSISTENCY_FLAG
             write_byte(f, flags)
             write_short(f, len(self.query_params))
             for param in self.query_params:
                 write_value(f, param)
+            if self.serial_consistency_level:
+                write_consistency_level(f, self.serial_consistency_level)
 
 
 class BatchMessage(_MessageType):
