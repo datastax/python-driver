@@ -8,7 +8,8 @@ except ImportError:
     from StringIO import StringIO  # ignore flake8 warning: # NOQA
 
 from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
-                       AlreadyExists, InvalidRequest, Unauthorized)
+                       AlreadyExists, InvalidRequest, Unauthorized,
+                       UnsupportedOperation)
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
                                int8_pack, int8_unpack)
 from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
@@ -335,6 +336,11 @@ class CredentialsMessage(_MessageType):
         self.creds = creds
 
     def send_body(self, f, protocol_version):
+        if protocol_version > 1:
+            raise UnsupportedOperation(
+                "Credentials-based authentication is not supported with "
+                "protocol version 2 or higher.  Use the SASL authentication "
+                "mechanism instead.")
         write_short(f, len(self.creds))
         for credkey, credval in self.creds.items():
             write_string(f, credkey)
