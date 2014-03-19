@@ -360,9 +360,9 @@ class BatchStatement(Statement):
             self._statements_and_parameters.append((False, statement, ()))
         elif isinstance(statement, PreparedStatement):
             query_id = statement.query_id
-            bound_statement = statement.bind(parameters)
+            bound_statement = statement.bind(() if parameters is None else parameters)
             self._statements_and_parameters.append(
-                (True, query_id, () if parameters is None else bound_statement.values))
+                (True, query_id, bound_statement.values))
         elif isinstance(statement, BoundStatement):
             if parameters:
                 raise ValueError(
