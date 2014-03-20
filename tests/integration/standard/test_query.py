@@ -3,10 +3,12 @@ try:
 except ImportError:
     import unittest # noqa
 
+from cassandra import ConsistencyLevel
 from cassandra.query import (PreparedStatement, BoundStatement, ValueSequence,
                              SimpleStatement, BatchStatement, BatchType,
                              dict_factory)
 from cassandra.cluster import Cluster
+from cassandra.policies import HostDistance
 
 from tests.integration import get_server_versions
 
@@ -206,13 +208,115 @@ class BatchStatementTests(unittest.TestCase):
                 "Cassandra 2.0+ is required for BATCH operations, currently testing against %r"
                 % (cass_version,))
 
-    def test_string_statements(self):
-        cluster = Cluster(protocol_version=2)
-        session = cluster.connect()
+        self.cluster = Cluster(protocol_version=2)
+        self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
+        self.session = self.cluster.connect()
 
+    def tearDown(self):
+        self.cluster.shutdown()
+
+    def test_string_statements(self):
         batch = BatchStatement(BatchType.LOGGED)
         for i in range(10):
             batch.add("INSERT INTO test3rf.test (k, v) VALUES (%s, %s)", (i, i))
 
-        session.execute(batch)
-        session.execute_async(batch).result()
+        self.session.execute(batch)
+        self.session.execute_async(batch).result()
+
+    def test_simple_statements(self):
+        batch = BatchStatement(BatchType.LOGGED)
+        for i in range(10):
+            batch.add(SimpleStatement("INSERT INTO test3rf.test (k, v) VALUES (%s, %s)"), (i, i))
+
+        self.session.execute(batch)
+        self.session.execute_async(batch).result()
+
+    def test_prepared_statements(self):
+        prepared = self.session.prepare("INSERT INTO test3rf.test (k, v) VALUES (?, ?)")
+
+        batch = BatchStatement(BatchType.LOGGED)
+        for i in range(10):
+            batch.add(prepared, (i, i))
+
+        self.session.execute(batch)
+        self.session.execute_async(batch).result()
+
+    def test_bound_statements(self):
+        prepared = self.session.prepare("INSERT INTO test3rf.test (k, v) VALUES (?, ?)")
+
+        batch = BatchStatement(BatchType.LOGGED)
+        for i in range(10):
+            batch.add(prepared.bind((i, i)))
+
+        self.session.execute(batch)
+        self.session.execute_async(batch).result()
+
+    def test_no_parameters(self):
+        batch = BatchStatement(BatchType.LOGGED)
+        batch.add("INSERT INTO test3rf.test (k, v) VALUES (0, 0)")
+        batch.add("INSERT INTO test3rf.test (k, v) VALUES (1, 1)", ())
+        batch.add(SimpleStatement("INSERT INTO test3rf.test (k, v) VALUES (2, 2)"))
+        batch.add(SimpleStatement("INSERT INTO test3rf.test (k, v) VALUES (3, 3)"), ())
+
+        prepared = self.session.prepare("INSERT INTO test3rf.test (k, v) VALUES (4, 4)")
+        batch.add(prepared)
+        batch.add(prepared, ())
+        batch.add(prepared.bind([]))
+        batch.add(prepared.bind([]), ())
+
+        self.assertRaises(ValueError, batch.add, prepared.bind([]), (1, 2, 3))
+
+        self.session.execute(batch)
+
+
+class SerialConsistencyTests(unittest.TestCase):
+
+    def setUp(self):
+        cass_version, _ = get_server_versions()
+        if cass_version < (2, 0):
+            raise unittest.SkipTest(
+                "Cassandra 2.0+ is required for BATCH operations, currently testing against %r"
+                % (cass_version,))
+
+        self.cluster = Cluster(protocol_version=2)
+        self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
+        self.session = self.cluster.connect()
+
+    def test_conditional_update(self):
+        self.session.execute("INSERT INTO test3rf.test (k, v) VALUES (0, 0)")
+        statement = SimpleStatement(
+            "UPDATE test3rf.test SET v=1 WHERE k=0 IF v=1",
+            serial_consistency_level=ConsistencyLevel.SERIAL)
+        result = self.session.execute(statement)
+        self.assertEquals(1, len(result))
+        self.assertFalse(result[0].applied)
+
+        statement = SimpleStatement(
+            "UPDATE test3rf.test SET v=1 WHERE k=0 IF v=0",
+            serial_consistency_level=ConsistencyLevel.SERIAL)
+        result = self.session.execute(statement)
+        self.assertEquals(1, len(result))
+        self.assertTrue(result[0].applied)
+
+    def test_conditional_update_with_prepared_statements(self):
+        self.session.execute("INSERT INTO test3rf.test (k, v) VALUES (0, 0)")
+        statement = self.session.prepare(
+            "UPDATE test3rf.test SET v=1 WHERE k=0 IF v=2")
+
+        statement.serial_consistency_level = ConsistencyLevel.SERIAL
+        result = self.session.execute(statement)
+        self.assertEquals(1, len(result))
+        self.assertFalse(result[0].applied)
+
+        statement = self.session.prepare(
+            "UPDATE test3rf.test SET v=1 WHERE k=0 IF v=0")
+        bound = statement.bind(())
+        bound.serial_consistency_level = ConsistencyLevel.SERIAL
+        result = self.session.execute(statement)
+        self.assertEquals(1, len(result))
+        self.assertTrue(result[0].applied)
+
+    def test_bad_consistency_level(self):
+        statement = SimpleStatement("foo")
+        self.assertRaises(ValueError, setattr, statement, 'serial_consistency_level', ConsistencyLevel.ONE)
+        self.assertRaises(ValueError, SimpleStatement, 'foo', serial_consistency_level=ConsistencyLevel.ONE)
