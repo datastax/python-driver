@@ -317,7 +317,7 @@ class Metadata(object):
 
         token_to_host_owner = {}
         ring = []
-        for host, token_strings in token_map.iteritems():
+        for host, token_strings in six.iteritems(token_map):
             for token_string in token_strings:
                 token = token_class(token_string)
                 ring.append(token)
@@ -997,6 +997,9 @@ class Token(object):
 
     def __eq__(self, other):
         return self.value == other.value
+
+    def __lt__(self, other):
+        return self.value < other.value
 
     def __hash__(self):
         return hash(self.value)

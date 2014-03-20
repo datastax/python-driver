@@ -10,7 +10,7 @@ import time
 from threading import Lock, RLock, Thread, Event
 
 import six
-from six.moves import xrange
+from six.moves import range
 from six.moves import queue as Queue
 
 import weakref
@@ -852,7 +852,7 @@ class Cluster(object):
                 # prepare 10 statements at a time
                 ks_statements = list(ks_statements)
                 chunks = []
-                for i in xrange(0, len(ks_statements), 10):
+                for i in range(0, len(ks_statements), 10):
                     chunks.append(ks_statements[i:i + 10])
 
                 for ks_chunk in chunks:
@@ -1802,7 +1802,7 @@ class _Scheduler(object):
             # this can happen on interpreter shutdown
             pass
         self.is_shutdown = True
-        self._scheduled.put_nowait((None, None))
+        self._scheduled.put_nowait((0, None))
 
     def schedule(self, delay, fn, *args, **kwargs):
         if not self.is_shutdown:
