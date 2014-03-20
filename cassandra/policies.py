@@ -2,6 +2,7 @@ from itertools import islice, cycle, groupby, repeat
 import logging
 from random import randint
 from threading import Lock
+import six
 
 from cassandra import ConsistencyLevel
 
@@ -250,7 +251,7 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
         for host in islice(cycle(local_live), pos, pos + len(local_live)):
             yield host
 
-        for dc, current_dc_hosts in self._dc_live_hosts.iteritems():
+        for dc, current_dc_hosts in six.iteritems(self._dc_live_hosts):
             if dc == self.local_dc:
                 continue
 

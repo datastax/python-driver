@@ -8,16 +8,15 @@ import six
 
 from cassandra.util import OrderedDict
 
-# if six.PY3:
-#     unicode = str
-#     long = int
+if six.PY3:
+    long = int
 
 
 def cql_quote(term):
-    if isinstance(term, unicode):
-        return "'%s'" % term.encode('utf8').replace("'", "''")
-    elif isinstance(term, (str, bool)):
+    if isinstance(term, (str, bool)):
         return "'%s'" % str(term).replace("'", "''")
+    elif isinstance(term, six.text_type):
+        return "'%s'" % term.encode('utf8').replace("'", "''")
     else:
         return str(term)
 
@@ -62,11 +61,10 @@ def cql_encode_sequence(val):
 
 
 def cql_encode_map_collection(val):
-    return '{ %s }' % ' , '.join(
-                                 '%s : %s' % (
-                                     cql_encode_all_types(k),
-                                     cql_encode_all_types(v))
-                                 for k, v in val.iteritems())
+    return '{ %s }' % ' , '.join('%s : %s' % (
+        cql_encode_all_types(k),
+        cql_encode_all_types(v)
+    ) for k, v in six.iteritems(val))
 
 
 def cql_encode_list_collection(val):
@@ -82,7 +80,6 @@ def cql_encode_all_types(val):
 
 
 cql_encoders = {
-    six.binary_type: cql_encode_bytes,
     float: cql_encode_object,
     bytearray: cql_encode_bytes,
     str: cql_encode_str,
@@ -101,13 +98,13 @@ cql_encoders = {
 
 if six.PY2:
     cql_encoders.update({
-        buffer: cql_encode_bytes,
         unicode: cql_encode_unicode,
+        buffer: cql_encode_bytes,
         long: cql_encode_object,
         types.NoneType: cql_encode_none,
     })
 else:
     cql_encoders.update({
         memoryview: cql_encode_bytes,
-        None: cql_encode_none,
+        type(None): cql_encode_none,
     })

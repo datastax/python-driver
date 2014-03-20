@@ -408,11 +408,9 @@ class ValueSequence(object):
 
 def bind_params(query, params):
     if isinstance(params, dict):
-        return query % dict((k, cql_encoders.get(type(v), cql_encode_object)(v))
-                    for k, v in params.iteritems())
+        return query % dict((k, cql_encoders.get(type(v), cql_encode_object)(v)) for k, v in six.iteritems(params))
     else:
-        return query % tuple(cql_encoders.get(type(v), cql_encode_object)(v)
-                     for v in params)
+        return query % tuple(cql_encoders.get(type(v), cql_encode_object)(v) for v in params)
 
 
 class TraceUnavailable(Exception):

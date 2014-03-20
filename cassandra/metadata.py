@@ -779,14 +779,18 @@ class TableMetadata(object):
         return list(sorted(ret))
 
 
-def protect_name(name):
-    if isinstance(name, six.text_type):
-        name = name.encode('utf8')
-    return maybe_escape_name(name)
+if six.PY3:
+    def protect_name(name):
+        return maybe_escape_name(name)
+else:
+    def protect_name(name):
+        if isinstance(name, six.text_type):
+            name = name.encode('utf8')
+        return maybe_escape_name(name)
 
 
 def protect_names(names):
-    return map(protect_name, names)
+    return [protect_name(n) for n in names]
 
 
 def protect_value(value):
@@ -998,7 +1002,7 @@ class Token(object):
         return hash(self.value)
 
     def __repr__(self):
-        return "<%s: %r>" % (self.__class__.__name__, self.value)
+        return "<%s: %s>" % (self.__class__.__name__, self.value)
     __str__ = __repr__
 
 MIN_LONG = -(2 ** 63)
@@ -1017,7 +1021,7 @@ class Murmur3Token(Token):
     @classmethod
     def hash_fn(cls, key):
         if murmur3 is not None:
-            h = murmur3(key)
+            h = int(murmur3(key))
             return h if h != MIN_LONG else MAX_LONG
         else:
             raise NoMurmur3()
@@ -1034,6 +1038,8 @@ class MD5Token(Token):
 
     @classmethod
     def hash_fn(cls, key):
+        if isinstance(key, six.text_type):
+            key = key.encode('UTF-8')
         return abs(varint_unpack(md5(key).digest()))
 
     def __init__(self, token):

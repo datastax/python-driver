@@ -35,6 +35,7 @@ apache_cassandra_type_prefix = 'org.apache.cassandra.db.marshal.'
 
 if six.PY3:
     _number_types = frozenset((int, float))
+    long = int
 else:
     _number_types = frozenset((int, long, float))
 
@@ -217,7 +218,7 @@ class _CassandraType(six.with_metaclass(CassandraTypeType, object)):
         more information. This method differs in that if None is passed in,
         the result is the empty string.
         """
-        return six.binary_type() if val is None else cls.serialize(val)
+        return b'' if val is None else cls.serialize(val)
 
     @staticmethod
     def deserialize(byts):
@@ -278,7 +279,8 @@ class _CassandraType(six.with_metaclass(CassandraTypeType, object)):
         if cls.num_subtypes != 'UNKNOWN' and len(subtypes) != cls.num_subtypes:
             raise ValueError("%s types require %d subtypes (%d given)"
                              % (cls.typename, cls.num_subtypes, len(subtypes)))
-        newname = cls.cass_parameterized_type_with(subtypes).encode('utf8')
+        # newname = cls.cass_parameterized_type_with(subtypes).encode('utf8')
+        newname = cls.cass_parameterized_type_with(subtypes)
         return type(newname, (cls,), {'subtypes': subtypes, 'cassname': cls.cassname})
 
     @classmethod
@@ -309,10 +311,16 @@ class _UnrecognizedType(_CassandraType):
     num_subtypes = 'UNKNOWN'
 
 
-def mkUnrecognizedType(casstypename):
-    return CassandraTypeType(casstypename.encode('utf8'),
-                             (_UnrecognizedType,),
-                             {'typename': "'%s'" % casstypename})
+if six.PY3:
+    def mkUnrecognizedType(casstypename):
+        return CassandraTypeType(casstypename,
+                                 (_UnrecognizedType,),
+                                 {'typename': "'%s'" % casstypename})
+else:
+    def mkUnrecognizedType(casstypename):
+        return CassandraTypeType(casstypename.encode('utf8'),
+                                 (_UnrecognizedType,),
+                                 {'typename': "'%s'" % casstypename})
 
 
 class BytesType(_CassandraType):
@@ -321,11 +329,11 @@ class BytesType(_CassandraType):
 
     @staticmethod
     def validate(val):
-        return buffer(val)
+        return bytearray(val)
 
     @staticmethod
     def serialize(val):
-        return str(val)
+        return six.binary_type(val)
 
 
 class DecimalType(_CassandraType):
@@ -386,9 +394,25 @@ class BooleanType(_CassandraType):
         return int8_pack(truth)
 
 
-class AsciiType(_CassandraType):
-    typename = 'ascii'
-    empty_binary_ok = True
+if six.PY2:
+    class AsciiType(_CassandraType):
+        typename = 'ascii'
+        empty_binary_ok = True
+else:
+    class AsciiType(_CassandraType):
+        typename = 'ascii'
+        empty_binary_ok = True
+
+        @staticmethod
+        def deserialize(byts):
+            return byts.decode('ascii')
+
+        @staticmethod
+        def serialize(var):
+            try:
+                return var.encode('ascii')
+            except UnicodeDecodeError:
+                return var
 
 
 class FloatType(_CassandraType):
@@ -683,7 +707,7 @@ class MapType(_ParameterizedType):
         buf = six.BytesIO()
         buf.write(uint16_pack(len(themap)))
         try:
-            items = themap.iteritems()
+            items = six.iteritems(themap)
         except AttributeError:
             raise TypeError("Got a non-map object for a map value")
         for key, val in items:

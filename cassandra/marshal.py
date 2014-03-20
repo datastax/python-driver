@@ -1,3 +1,4 @@
+import six
 import struct
 
 
@@ -29,11 +30,18 @@ header_pack = header_struct.pack
 header_unpack = header_struct.unpack
 
 
-def varint_unpack(term):
-    val = int(term.encode('hex'), 16)
-    if (ord(term[0]) & 128) != 0:
-        val = val - (1 << (len(term) * 8))
-    return val
+if six.PY3:
+    def varint_unpack(term):
+        val = int(''.join("%02x" % i for i in term), 16)
+        if (term[0] & 128) != 0:
+            val -= 1 << (len(term) * 8)
+        return val
+else:
+    def varint_unpack(term):
+        val = int(term.encode('hex'), 16)
+        if (ord(term[0]) & 128) != 0:
+            val = val - (1 << (len(term) * 8))
+        return val
 
 
 def bitlength(n):
@@ -44,19 +52,25 @@ def bitlength(n):
     return bitlen
 
 
+if six.PY3:
+    byte_val = int
+else:
+    byte_val = ord
+
+
 def varint_pack(big):
     pos = True
     if big == 0:
-        return '\x00'
+        return b'\x00'
     if big < 0:
-        bytelength = bitlength(abs(big) - 1) / 8 + 1
+        bytelength = bitlength(abs(big) - 1) // 8 + 1
         big = (1 << bytelength * 8) + big
         pos = False
-    revbytes = []
+    revbytes = bytearray()
     while big > 0:
-        revbytes.append(chr(big & 0xff))
+        revbytes.append(big & 0xff)
         big >>= 8
-    if pos and ord(revbytes[-1]) & 0x80:
-        revbytes.append('\x00')
+    if pos and revbytes[-1] & 0x80:
+        revbytes.append(0)
     revbytes.reverse()
-    return ''.join(revbytes)
+    return six.binary_type(revbytes)

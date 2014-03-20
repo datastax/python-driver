@@ -200,7 +200,7 @@ class TestTokens(unittest.TestCase):
             murmur3_token = Murmur3Token(cassandra.metadata.MIN_LONG - 1)
             self.assertEqual(murmur3_token.hash_fn('123'), -7468325962851647638)
             self.assertEqual(murmur3_token.hash_fn(str(cassandra.metadata.MAX_LONG)), 7162290910810015547)
-            self.assertEqual(str(murmur3_token), '<Murmur3Token: -9223372036854775809L>')
+            self.assertEqual(str(murmur3_token), '<Murmur3Token: -9223372036854775809>')
         except NoMurmur3:
             raise unittest.SkipTest('The murmur3 extension is not available')
 
@@ -208,14 +208,14 @@ class TestTokens(unittest.TestCase):
         md5_token = MD5Token(cassandra.metadata.MIN_LONG - 1)
         self.assertEqual(md5_token.hash_fn('123'), 42767516990368493138776584305024125808)
         self.assertEqual(md5_token.hash_fn(str(cassandra.metadata.MAX_LONG)), 28528976619278518853815276204542453639)
-        self.assertEqual(str(md5_token), '<MD5Token: -9223372036854775809L>')
+        self.assertEqual(str(md5_token), '<MD5Token: %s>' % -9223372036854775809)
 
     def test_bytes_tokens(self):
         bytes_token = BytesToken(str(cassandra.metadata.MIN_LONG - 1))
         self.assertEqual(bytes_token.hash_fn('123'), '123')
         self.assertEqual(bytes_token.hash_fn(123), 123)
         self.assertEqual(bytes_token.hash_fn(str(cassandra.metadata.MAX_LONG)), str(cassandra.metadata.MAX_LONG))
-        self.assertEqual(str(bytes_token), "<BytesToken: '-9223372036854775809'>")
+        self.assertEqual(str(bytes_token), "<BytesToken: -9223372036854775809>")
 
         try:
             bytes_token = BytesToken(cassandra.metadata.MIN_LONG - 1)

@@ -151,8 +151,8 @@ class TypeTests(unittest.TestCase):
         # middle subtype should be a BarType instance with its own subtypes and names
         self.assertIsInstance(ctype.subtypes[1], BarType)
         self.assertEquals([UTF8Type], ctype.subtypes[1].subtypes)
-        self.assertEquals(["address"], ctype.subtypes[1].names)
+        self.assertEquals([b"address"], ctype.subtypes[1].names)
 
         self.assertEquals(UTF8Type, ctype.subtypes[2])
 
-        self.assertEquals(['city', None, 'zip'], ctype.names)
+        self.assertEquals([b'city', None, b'zip'], ctype.names)
