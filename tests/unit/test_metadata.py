@@ -15,6 +15,12 @@ from cassandra.pool import Host
 
 class TestStrategies(unittest.TestCase):
 
+    @classmethod
+    def setUpClass(cls):
+        "Hook method for setting up class fixture before running tests in the class."
+        if not hasattr(cls, 'assertItemsEqual'):
+            cls.assertItemsEqual = cls.assertCountEqual
+
     def test_replication_strategy(self):
         """
         Basic code coverage testing that ensures different ReplicationStrategies
