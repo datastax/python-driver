@@ -8,6 +8,7 @@ CHANGELOG
 * Added support for blind partial updates to queryset (Thanks Danny Cosson github.com/dcosson)
 * Model instance equality check bugfix (Thanks to Michael Hall, github.com/mahall)
 * Fixed bug syncing tables with camel cased names (Thanks to Netanel Cohen-Tzemach, github.com/natict)
+* Fixed bug dealing with eggs (Thanks Kevin Deldycke github.com/kdeldycke)
 
 0.11.0
 
