@@ -137,6 +137,9 @@ class Host(object):
     def __eq__(self, other):
         return self.address == other.address
 
+    def __hash__(self):
+        return hash(self.address)
+
     def __str__(self):
         return self.address
 
