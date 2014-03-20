@@ -1562,7 +1562,9 @@ class ControlConnection(object):
 
             host = self._cluster.metadata.get_host(connection.host)
             if host:
-                host.set_location_info(local_row["data_center"], local_row["rack"])
+                datacenter = local_row.get("data_center")
+                rack = local_row.get("rack")
+                self._update_location_info(host, datacenter, rack)
 
             partitioner = local_row.get("partitioner")
             tokens = local_row.get("tokens")
