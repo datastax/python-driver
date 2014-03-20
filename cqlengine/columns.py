@@ -537,7 +537,7 @@ class BaseContainerColumn(Column):
         Returns a column definition for CQL table definition
         """
         db_type = self.db_type.format(self.value_type.db_type)
-        return '{} {}'.format(self.db_field_name, db_type)
+        return '{} {}'.format(self.cql, db_type)
 
     def get_update_statement(self, val, prev, ctx):
         """
@@ -813,7 +813,7 @@ class Map(BaseContainerColumn):
             self.key_type.db_type,
             self.value_type.db_type
         )
-        return '{} {}'.format(self.db_field_name, db_type)
+        return '{} {}'.format(self.cql, db_type)
 
     def validate(self, value):
         val = super(Map, self).validate(value)
