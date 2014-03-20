@@ -4,7 +4,8 @@ In Progress
 
 Features
 --------
-* Gevent is now supported through monkey-patching the stdlib
+* Gevent is now supported through monkey-patching the stdlib (PYTHON-7,
+  github issue #46)
 * Support static columns in schemas, which are available starting in
   Cassandra 2.1. (github issue #91)
 
