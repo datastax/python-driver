@@ -140,8 +140,11 @@ class Host(object):
     def __hash__(self):
         return hash(self.address)
 
+    def __lt__(self, other):
+        return self.address < other.address
+
     def __str__(self):
-        return self.address
+        return str(self.address)
 
     def __repr__(self):
         dc = (" %s" % (self._datacenter,)) if self._datacenter else ""
