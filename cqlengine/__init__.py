@@ -1,4 +1,3 @@
-import os
 import pkg_resources
 
 from cqlengine.columns import *
