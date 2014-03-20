@@ -15,12 +15,21 @@ Bug Fixes
 * Ignore SSL_ERROR_WANT_READ and SSL_ERROR_WANT_WRITE socket errors.  Previously,
   these resulted in the connection being defuncted, but they can safely be
   ignored by the driver.
+* Don't reconnect the control connection every time Cluster.connect() is
+  called
+* Avoid race condition that could leave ResponseFuture callbacks uncalled
+  if the callback was added outside of the event loop thread (github issue #95)
+* Properly escape keyspace name in Session.set_keyspace().  Previously, the
+  keyspace name was quoted, but any quotes in the string were not escaped.
+* Avoid adding hosts to the load balancing policy before their datacenter
+  and rack information has been set, if possible.
 
 Other
 -----
 * Don't ignore column names when parsing typestrings.  This is needed for
   user-defined type support.  (github issue #90)
 * Better error message when libevwrapper is not found
+* Only try to import scales when metrics are enabled (github issue #92)
 
 1.0.2
 =====

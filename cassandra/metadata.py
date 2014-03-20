@@ -348,11 +348,12 @@ class Metadata(object):
         else:
             return True
 
-    def add_host(self, address):
+    def add_host(self, address, datacenter, rack):
         cluster = self.cluster_ref()
         with self._hosts_lock:
             if address not in self._hosts:
-                new_host = Host(address, cluster.conviction_policy_factory)
+                new_host = Host(
+                    address, cluster.conviction_policy_factory, datacenter, rack)
                 self._hosts[address] = new_host
             else:
                 return None
