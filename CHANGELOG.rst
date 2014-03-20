@@ -1,9 +1,10 @@
-1.0.3
+1.1.0
 =====
 In Progress
 
 Features
 --------
+* Gevent is now supported through monkey-patching the stdlib
 * Support static columns in schemas, which are available starting in
   Cassandra 2.1. (github issue #91)
 
