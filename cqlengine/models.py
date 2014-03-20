@@ -376,7 +376,7 @@ class BaseModel(object):
 
         # check attribute keys
         keys = set(self._columns.keys())
-        other_keys = set(self._columns.keys())
+        other_keys = set(other._columns.keys())
         if keys != other_keys:
             return False
 
