@@ -173,7 +173,7 @@ class _ReconnectionHandler(object):
         # TODO cancel previous reconnection handlers? That's probably the job
         # of whatever created this.
 
-        first_delay = self.schedule.next()
+        first_delay = next(self.schedule)
         self.scheduler.schedule(first_delay, self.run)
 
     def run(self):
