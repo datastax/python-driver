@@ -6,6 +6,8 @@ CHANGELOG
 * Fix race condition in connection manager (Thanks Roey Berman github.com/bergundy)
 * allow access to instance columns as if it is a dict (Thanks Kevin Deldycke github.com/kdeldycke)
 * Added support for blind partial updates to queryset (Thanks Danny Cosson github.com/dcosson)
+* Model instance equality check bugfix (Thanks to Michael Hall, github.com/mahall)
+* Fixed bug syncing tables with camel cased names (Thanks to Netanel Cohen-Tzemach, github.com/natict)
 
 0.11.0
 
