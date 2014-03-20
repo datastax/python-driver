@@ -521,6 +521,10 @@ class ResultMessage(_MessageType):
         flags = read_int(f)
         glob_tblspec = bool(flags & cls._FLAGS_GLOBAL_TABLES_SPEC)
         colcount = read_int(f)
+        if flags & cls._HAS_MORE_PAGES_FLAG:
+            paging_state = read_binary_longstring(f)
+        else:
+            paging_state = None
         if glob_tblspec:
             ksname = read_string(f)
             cfname = read_string(f)
