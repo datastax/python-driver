@@ -11,8 +11,8 @@ import six
 
 murmur3 = None
 try:
-    from murmur3 import murmur3
-except ImportError:
+    from cassandra.murmur3 import murmur3
+except ImportError as e:
     pass
 
 import cassandra.cqltypes as types
