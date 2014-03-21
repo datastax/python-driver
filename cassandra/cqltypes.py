@@ -76,7 +76,7 @@ class CassandraTypeType(type):
     def __new__(metacls, name, bases, dct):
         dct.setdefault('cassname', name)
         cls = type.__new__(metacls, name, bases, dct)
-        if name != 'NewBase' and not name.startswith('_'):
+        if not name.startswith('_'):
             _casstypes[name] = cls
         return cls
 
@@ -165,7 +165,8 @@ class EmptyValue(object):
 EMPTY = EmptyValue()
 
 
-class _CassandraType(six.with_metaclass(CassandraTypeType, object)):
+@six.add_metaclass(CassandraTypeType)
+class _CassandraType(object):
     subtypes = ()
     num_subtypes = 0
     empty_binary_ok = False

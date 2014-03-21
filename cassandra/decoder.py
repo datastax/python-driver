@@ -41,12 +41,13 @@ _message_types_by_opcode = {}
 
 class _RegisterMessageType(type):
     def __init__(cls, name, bases, dct):
-        if name not in ('NewBase', '_MessageType'):
+        if not name.startswith('_'):
             _message_types_by_name[cls.name] = cls
             _message_types_by_opcode[cls.opcode] = cls
 
 
-class _MessageType(six.with_metaclass(_RegisterMessageType, object)):
+@six.add_metaclass(_RegisterMessageType)
+class _MessageType(object):
 
     tracing = False
 
@@ -150,11 +151,12 @@ class ErrorMessage(_MessageType, Exception):
 
 class ErrorMessageSubclass(_RegisterMessageType):
     def __init__(cls, name, bases, dct):
-        if name not in ('NewBase', ) and cls.error_code:
+        if cls.error_code:
             error_classes[cls.error_code] = cls
 
 
-class ErrorMessageSub(six.with_metaclass(ErrorMessageSubclass, ErrorMessage)):
+@six.add_metaclass(ErrorMessageSubclass)
+class ErrorMessageSub(ErrorMessage):
     error_code = None
 
 
