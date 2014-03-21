@@ -27,7 +27,7 @@ try:
     from cassandra.io.libevreactor import LibevConnection
     have_libev = True
     supported_reactors.append(LibevConnection)
-except ImportError, exc:
+except ImportError as exc:
     pass
 
 KEYSPACE = "testkeyspace"

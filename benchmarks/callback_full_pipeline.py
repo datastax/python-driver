@@ -4,7 +4,7 @@ from itertools import count
 from threading import Event
 
 from base import benchmark, BenchmarkThread
-
+from six.moves import range
 
 log = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class Runner(BenchmarkThread):
     def run(self):
         self.start_profile()
 
-        for _ in xrange(min(120, self.num_queries)):
+        for _ in range(min(120, self.num_queries)):
             self.insert_next()
 
         self.event.wait()
