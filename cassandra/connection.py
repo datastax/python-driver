@@ -103,8 +103,6 @@ def defunct_on_error(f):
             return f(self, *args, **kwargs)
         except Exception as exc:
             self.defunct(exc)
-        # return f(self, *args, **kwargs)
-        # TODO: Clean up the above test code.
     return wrapper
 
 
