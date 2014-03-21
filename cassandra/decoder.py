@@ -151,7 +151,7 @@ class ErrorMessage(_MessageType, Exception):
 
 class ErrorMessageSubclass(_RegisterMessageType):
     def __init__(cls, name, bases, dct):
-        if cls.error_code:
+        if cls.error_code is not None:  # Server has an error code of 0.
             error_classes[cls.error_code] = cls
 
 
