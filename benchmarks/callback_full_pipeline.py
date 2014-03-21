@@ -24,10 +24,10 @@ class Runner(BenchmarkThread):
         if previous_result is not sentinel:
             if isinstance(previous_result, BaseException):
                 log.error("Error on insert: %r", previous_result)
-            if self.num_finished.next() >= self.num_queries:
+            if next(self.num_finished) >= self.num_queries:
                 self.event.set()
 
-        if self.num_started.next() <= self.num_queries:
+        if next(self.num_started) <= self.num_queries:
             future = self.session.execute_async(self.query, self.values)
             future.add_callbacks(self.insert_next, self.insert_next)
 
