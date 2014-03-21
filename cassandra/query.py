@@ -214,35 +214,48 @@ class BoundStatement(Statement):
     def bind(self, values):
         """
         Binds a sequence of values for the prepared statement parameters
-        and returns this instance.  Note that `values` *must* be a
-        sequence, even if you are only binding one value.
+        and returns this instance.  Note that `values` *must* be:
+        * a sequence, even if you are only binding one value, or
+        * a dict that relates 1-to-1 between dict keys and columns
         """
         col_meta = self.prepared_statement.column_metadata
 
-        dict_values = []
+        # special case for binding dicts
         if isinstance(values, dict):
             dict_values = values
-            arranged_values = []
+            values = []
+
+            # sort values accordingly
             for col in col_meta:
                 try:
-                    arranged_values.append(values[col[2]])
+                    values.append(dict_values[col[2]])
                 except KeyError:
                     raise KeyError(
                         'Column name `%s` not found in bound dict.' %
                         (col[2]))
-            values = arranged_values
 
-        if len(values) > len(col_meta) or len(dict_values) > len(col_meta):
-            columns = set()
-            for col in col_meta:
-                columns.add(col[2])
-            if dict_values:
-                difference = set(dict_values.keys()).difference(columns)
-                msg = "Too many arguments provided to bind() (got %d, expected %d). " + \
-                      "Unexpected keys %s."
+            # ensure a 1-to-1 dict keys to columns relationship
+            if len(dict_values) != len(col_meta):
+                # find expected columns
+                columns = set()
+                for col in col_meta:
+                    columns.add(col[2])
+
+                # generate error message
+                if len(dict_values) > len(col_meta):
+                    difference = set(dict_values.keys()).difference(columns)
+                    msg = "Too many arguments provided to bind() (got %d, expected %d). " + \
+                          "Unexpected keys %s."
+                else:
+                    difference = set(columns).difference(dict_values.keys())
+                    msg = "Too few arguments provided to bind() (got %d, expected %d). " + \
+                          "Expected keys %s."
+
+                # exit with error message
                 msg = msg % (len(values), len(col_meta), difference)
                 raise ValueError(msg)
 
+        if len(values) > len(col_meta):
             raise ValueError(
                 "Too many arguments provided to bind() (got %d, expected %d)" %
                 (len(values), len(col_meta)))
