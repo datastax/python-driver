@@ -5,7 +5,6 @@ except ImportError:
 
 import cassandra
 from cassandra.query import SimpleStatement, TraceUnavailable
-from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.policies import RoundRobinPolicy, ExponentialReconnectionPolicy, RetryPolicy, SimpleConvictionPolicy, HostDistance
 
 from cassandra.cluster import Cluster, NoHostAvailable
@@ -85,8 +84,7 @@ class ClusterTests(unittest.TestCase):
             load_balancing_policy=RoundRobinPolicy(),
             reconnection_policy=ExponentialReconnectionPolicy(1.0, 600.0),
             default_retry_policy=RetryPolicy(),
-            conviction_policy_factory=SimpleConvictionPolicy,
-            connection_class=AsyncoreConnection
+            conviction_policy_factory=SimpleConvictionPolicy
         )
 
     def test_double_shutdown(self):

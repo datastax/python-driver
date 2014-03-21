@@ -16,6 +16,7 @@ from cassandra.policies import (SimpleConvictionPolicy, RoundRobinPolicy,
 
 PEER_IP = "foobar"
 
+
 class MockMetadata(object):
 
     def __init__(self):
@@ -49,6 +50,7 @@ class MockCluster(object):
     reconnection_policy = ConstantReconnectionPolicy(2)
     down_host = None
     contact_points = []
+    _is_shutdown = False
 
     def __init__(self):
         self.metadata = MockMetadata()
@@ -57,8 +59,8 @@ class MockCluster(object):
         self.scheduler = Mock(spec=_Scheduler)
         self.executor = Mock(spec=ThreadPoolExecutor)
 
-    def add_host(self, address, signal=False):
-        host = Host(address, SimpleConvictionPolicy)
+    def add_host(self, address, datacenter, rack, signal=False):
+        host = Host(address, SimpleConvictionPolicy, datacenter, rack)
         self.added_hosts.append(host)
         return host
 
@@ -210,6 +212,7 @@ class ControlConnectionTest(unittest.TestCase):
         self.connection.peer_results[1].append(
             ["192.168.1.3", "10.0.0.3", "a", "dc1", "rack1", ["3", "103", "203"]]
         )
+        self.cluster.scheduler.schedule = lambda delay, f, *args, **kwargs: f(*args, **kwargs)
         self.control_connection.refresh_node_list_and_token_map()
         self.assertEqual(1, len(self.cluster.added_hosts))
         self.assertEqual(self.cluster.added_hosts[0].address, "192.168.1.3")
@@ -248,7 +251,7 @@ class ControlConnectionTest(unittest.TestCase):
             'address': ('1.2.3.4', 9000)
         }
         self.control_connection._handle_topology_change(event)
-        self.cluster.scheduler.schedule.assert_called_with(ANY, self.cluster.add_host, '1.2.3.4', signal=True)
+        self.cluster.scheduler.schedule.assert_called_with(ANY, self.control_connection.refresh_node_list_and_token_map)
 
         event = {
             'change_type': 'REMOVED_NODE',
@@ -270,7 +273,7 @@ class ControlConnectionTest(unittest.TestCase):
             'address': ('1.2.3.4', 9000)
         }
         self.control_connection._handle_status_change(event)
-        self.cluster.scheduler.schedule.assert_called_with(ANY, self.cluster.add_host, '1.2.3.4', signal=True)
+        self.cluster.scheduler.schedule.assert_called_with(ANY, self.control_connection.refresh_node_list_and_token_map)
 
         # do the same with a known Host
         event = {

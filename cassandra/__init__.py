@@ -9,7 +9,7 @@ class NullHandler(logging.Handler):
 logging.getLogger('cassandra').addHandler(NullHandler())
 
 
-__version_info__ = (1, 0, 1, 'post')
+__version_info__ = (1, 0, 2, 'post')
 __version__ = '.'.join(map(str, __version_info__))
 
 

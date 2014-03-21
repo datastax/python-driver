@@ -1,13 +1,9 @@
 from collections import defaultdict, deque
-from functools import partial
 import logging
 import os
 import socket
 import sys
 from threading import Event, Lock, Thread
-import time
-import traceback
-import Queue
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL, EISCONN, errorcode
 
 import asyncore
@@ -23,9 +19,8 @@ except ImportError:
     ssl = None  # NOQA
 
 from cassandra import OperationTimedOut
-from cassandra.connection import (Connection, ResponseWaiter, ConnectionShutdown,
-                                  ConnectionBusy, ConnectionException, NONBLOCKING,
-                                  MAX_STREAM_PER_CONNECTION)
+from cassandra.connection import (Connection, ConnectionShutdown,
+                                  ConnectionException, NONBLOCKING)
 from cassandra.decoder import RegisterMessage
 from cassandra.marshal import int32_unpack
 
@@ -174,43 +169,10 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
             _starting_conns.discard(self)
 
         if not self.is_defunct:
-            self._error_all_callbacks(
+            self.error_all_callbacks(
                 ConnectionShutdown("Connection to %s was closed" % self.host))
             # don't leave in-progress operations hanging
             self.connected_event.set()
-
-    def defunct(self, exc):
-        with self.lock:
-            if self.is_defunct or self.is_closed:
-                return
-            self.is_defunct = True
-
-        trace = traceback.format_exc(exc)
-        if trace != "None":
-            log.debug("Defuncting connection (%s) to %s: %s\n%s",
-                      id(self), self.host, exc, traceback.format_exc(exc))
-        else:
-            log.debug("Defuncting connection (%s) to %s: %s",
-                      id(self), self.host, exc)
-
-        self.last_error = exc
-        self.close()
-        self._error_all_callbacks(exc)
-        self.connected_event.set()
-        return exc
-
-    def _error_all_callbacks(self, exc):
-        with self.lock:
-            callbacks = self._callbacks
-            self._callbacks = {}
-        new_exc = ConnectionShutdown(str(exc))
-        for cb in callbacks.values():
-            try:
-                cb(new_exc)
-            except Exception:
-                log.warn("Ignoring unhandled exception while erroring callbacks for a "
-                         "failed connection (%s) to host %s:",
-                         id(self), self.host, exc_info=True)
 
     def handle_connect(self):
         with _starting_conns_lock:
@@ -258,7 +220,11 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
                 if len(buf) < self.in_buffer_size:
                     break
         except socket.error as err:
-            if err.args[0] not in NONBLOCKING:
+            if ssl and isinstance(err, ssl.SSLError):
+                if err.args[0] not in (ssl.SSL_ERROR_WANT_READ, ssl.SSL_ERROR_WANT_WRITE):
+                    self.defunct(err)
+                    return
+            elif err.args[0] not in NONBLOCKING:
                 self.defunct(err)
                 return
 
@@ -298,14 +264,6 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
             if not self._callbacks:
                 self._readable = False
 
-    def handle_pushed(self, response):
-        log.debug("Message pushed from server: %r", response)
-        for cb in self._push_watchers.get(response.event_type, []):
-            try:
-                cb(response.event_args)
-            except Exception:
-                log.exception("Pushed event handler errored, ignoring:")
-
     def push(self, data):
         sabs = self.out_buffer_size
         if len(data) > sabs:
@@ -325,61 +283,6 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
 
     def readable(self):
         return self._readable or (self._have_listeners and not (self.is_defunct or self.is_closed))
-
-    def send_msg(self, msg, cb, wait_for_id=False):
-        if self.is_defunct:
-            raise ConnectionShutdown("Connection to %s is defunct" % self.host)
-        elif self.is_closed:
-            raise ConnectionShutdown("Connection to %s is closed" % self.host)
-
-        if not wait_for_id:
-            try:
-                request_id = self._id_queue.get_nowait()
-            except Queue.Empty:
-                raise ConnectionBusy(
-                    "Connection to %s is at the max number of requests" % self.host)
-        else:
-            request_id = self._id_queue.get()
-
-        self._callbacks[request_id] = cb
-        self.push(msg.to_string(request_id, compression=self.compressor))
-        return request_id
-
-    def wait_for_response(self, msg, timeout=None):
-        return self.wait_for_responses(msg, timeout=timeout)[0]
-
-    def wait_for_responses(self, *msgs, **kwargs):
-        timeout = kwargs.get('timeout')
-        waiter = ResponseWaiter(self, len(msgs))
-
-        # busy wait for sufficient space on the connection
-        messages_sent = 0
-        while True:
-            needed = len(msgs) - messages_sent
-            with self.lock:
-                available = min(needed, MAX_STREAM_PER_CONNECTION - self.in_flight)
-                self.in_flight += available
-
-            for i in range(messages_sent, messages_sent + available):
-                self.send_msg(msgs[i], partial(waiter.got_response, index=i), wait_for_id=True)
-            messages_sent += available
-
-            if messages_sent == len(msgs):
-                break
-            else:
-                if timeout is not None:
-                    timeout -= 0.01
-                    if timeout <= 0.0:
-                        raise OperationTimedOut()
-                time.sleep(0.01)
-
-        try:
-            return waiter.deliver(timeout)
-        except OperationTimedOut:
-            raise
-        except Exception, exc:
-            self.defunct(exc)
-            raise
 
     def register_watcher(self, event_type, callback):
         self._push_watchers[event_type].add(callback)

@@ -112,24 +112,29 @@ def parse_casstype_args(typestring):
     tokens, remainder = casstype_scanner.scan(typestring)
     if remainder:
         raise ValueError("weird characters %r at end" % remainder)
-    args = [[]]
+
+    # use a stack of (types, names) lists
+    args = [([], [])]
     for tok in tokens:
         if tok == '(':
-            args.append([])
+            args.append(([], []))
         elif tok == ')':
-            arglist = args.pop()
-            ctype = args[-1].pop()
-            paramized = ctype.apply_parameters(*arglist)
-            args[-1].append(paramized)
+            types, names = args.pop()
+            prev_types, prev_names = args[-1]
+            prev_types[-1] = prev_types[-1].apply_parameters(types, names)
         else:
+            types, names = args[-1]
             if ':' in tok:
-                # ignore those column name hex encoding bit; we have the
-                # proper column name from elsewhere
-                tok = tok.rsplit(':', 1)[-1]
-            ctype = lookup_casstype_simple(tok)
-            args[-1].append(ctype)
+                name, tok = tok.rsplit(':', 1)
+                names.append(name)
+            else:
+                names.append(None)
 
-    return args[0][0]
+            ctype = lookup_casstype_simple(tok)
+            types.append(ctype)
+
+    # return the first (outer) type, which will have all parameters applied
+    return args[0][0][0]
 
 
 def lookup_casstype(casstype):
@@ -264,13 +269,16 @@ class _CassandraType(object):
         return '%s(%s)' % (cname, sublist)
 
     @classmethod
-    def apply_parameters(cls, *subtypes):
+    def apply_parameters(cls, subtypes, names=None):
         """
         Given a set of other CassandraTypes, create a new subtype of this type
         using them as parameters. This is how composite types are constructed.
 
             >>> MapType.apply_parameters(DateType, BooleanType)
             <class 'cassandra.types.MapType(DateType, BooleanType)'>
+
+        `subtypes` will be a sequence of CassandraTypes.  If provided, `names`
+        will be an equally long sequence of column names or Nones.
         """
         if cls.num_subtypes != 'UNKNOWN' and len(subtypes) != cls.num_subtypes:
             raise ValueError("%s types require %d subtypes (%d given)"

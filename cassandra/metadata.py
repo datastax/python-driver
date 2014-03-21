@@ -286,7 +286,8 @@ class Metadata(object):
     def _build_column_metadata(self, table_metadata, row):
         name = row["column_name"]
         data_type = types.lookup_casstype(row["validator"])
-        column_meta = ColumnMetadata(table_metadata, name, data_type)
+        is_static = row.get("type", None) == "static"
+        column_meta = ColumnMetadata(table_metadata, name, data_type, is_static=is_static)
         index_meta = self._build_index_metadata(column_meta, row)
         column_meta.index = index_meta
         return column_meta
@@ -347,11 +348,12 @@ class Metadata(object):
         else:
             return True
 
-    def add_host(self, address):
+    def add_host(self, address, datacenter, rack):
         cluster = self.cluster_ref()
         with self._hosts_lock:
             if address not in self._hosts:
-                new_host = Host(address, cluster.conviction_policy_factory)
+                new_host = Host(
+                    address, cluster.conviction_policy_factory, datacenter, rack)
                 self._hosts[address] = new_host
             else:
                 return None
@@ -630,7 +632,7 @@ class TableMetadata(object):
         "compaction_strategy_class",
         "compaction_strategy_options",
         "min_compaction_threshold",
-        "max_compression_threshold",
+        "max_compaction_threshold",
         "compression_parameters",
         "min_index_interval",
         "max_index_interval",
@@ -642,6 +644,11 @@ class TableMetadata(object):
         "compaction",
         "compression",
         "default_time_to_live")
+
+    compaction_options = {
+        "min_compaction_threshold": "min_threshold",
+        "max_compaction_threshold": "max_threshold",
+        "compaction_strategy_class": "class"}
 
     def __init__(self, keyspace_metadata, name, partition_key=None, clustering_key=None, columns=None, options=None):
         self.keyspace = keyspace_metadata
@@ -687,7 +694,7 @@ class TableMetadata(object):
 
         columns = []
         for col in self.columns.values():
-            columns.append("%s %s" % (protect_name(col.name), col.typestring))
+            columns.append("%s %s%s" % (protect_name(col.name), col.typestring, ' static' if col.is_static else ''))
 
         if len(self.partition_key) == 1 and not self.clustering_key:
             columns[0] += " PRIMARY KEY"
@@ -743,13 +750,36 @@ class TableMetadata(object):
 
     def _make_option_strings(self):
         ret = []
-        for name, value in sorted(self.options.items()):
+        options_copy = dict(self.options.items())
+        if not options_copy.get('compaction'):
+            options_copy.pop('compaction', None)
+
+            actual_options = json.loads(options_copy.pop('compaction_strategy_options', '{}'))
+            for system_table_name, compact_option_name in self.compaction_options.items():
+                value = options_copy.pop(system_table_name, None)
+                if value:
+                    actual_options.setdefault(compact_option_name, value)
+
+            compaction_option_strings = ["'%s': '%s'" % (k, v) for k, v in actual_options.items()]
+            ret.append('compaction = {%s}' % ', '.join(compaction_option_strings))
+
+        for system_table_name in self.compaction_options.keys():
+            options_copy.pop(system_table_name, None)  # delete if present
+        options_copy.pop('compaction_strategy_option', None)
+
+        if not options_copy.get('compression'):
+            params = json.loads(options_copy.pop('compression_parameters', '{}'))
+            if params:
+                param_strings = ["'%s': '%s'" % (k, v) for k, v in params.items()]
+                ret.append('compression = {%s}' % ', '.join(param_strings))
+
+        for name, value in options_copy.items():
             if value is not None:
                 if name == "comment":
                     value = value or ""
                 ret.append("%s = %s" % (name, protect_value(value)))
 
-        return ret
+        return list(sorted(ret))
 
 
 def protect_name(name):
@@ -766,7 +796,7 @@ def protect_value(value):
     if value is None:
         return 'NULL'
     if isinstance(value, (int, float, bool)):
-        return str(value)
+        return str(value).lower()
     return "'%s'" % value.replace("'", "''")
 
 
@@ -810,11 +840,18 @@ class ColumnMetadata(object):
     :class:`.IndexMetadata`, otherwise :const:`None`.
     """
 
-    def __init__(self, table_metadata, column_name, data_type, index_metadata=None):
+    is_static = False
+    """
+    If this column is static (available in Cassandra 2.1+), this will
+    be :const:`True`, otherwise :const:`False`.
+    """
+
+    def __init__(self, table_metadata, column_name, data_type, index_metadata=None, is_static=False):
         self.table = table_metadata
         self.name = column_name
         self.data_type = data_type
         self.index = index_metadata
+        self.is_static = is_static
 
     @property
     def typestring(self):

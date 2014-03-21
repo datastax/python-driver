@@ -1,20 +1,23 @@
 from collections import defaultdict, deque
-from functools import partial, wraps
 import logging
 import os
 import socket
 from threading import Event, Lock, Thread
-import time
-import traceback
-import Queue
 
 from cassandra import OperationTimedOut
-from cassandra.connection import (Connection, ResponseWaiter, ConnectionShutdown,
-                                  ConnectionBusy, NONBLOCKING,
-                                  MAX_STREAM_PER_CONNECTION)
+from cassandra.connection import Connection, ConnectionShutdown, NONBLOCKING
 from cassandra.decoder import RegisterMessage
 from cassandra.marshal import int32_unpack
-import cassandra.io.libevwrapper as libev
+try:
+    import cassandra.io.libevwrapper as libev
+except ImportError:
+    raise ImportError(
+        "The C extension needed to use libev was not found.  This "
+        "probably means that you didn't have the required build dependencies "
+        "when installing the driver.  See "
+        "http://datastax.github.io/python-driver/installation.html#c-extensions "
+        "for instructions on installing build dependencies and building "
+        "the C extension.")
 
 try:
     from cStringIO import StringIO
@@ -70,18 +73,6 @@ def _start_loop():
         t.start()
 
     return should_start
-
-
-def defunct_on_error(f):
-
-    @wraps(f)
-    def wrapper(self, *args, **kwargs):
-        try:
-            return f(self, *args, **kwargs)
-        except Exception as exc:
-            self.defunct(exc)
-
-    return wrapper
 
 
 class LibevConnection(Connection):
@@ -229,40 +220,8 @@ class LibevConnection(Connection):
 
         # don't leave in-progress operations hanging
         if not self.is_defunct:
-            self._error_all_callbacks(
+            self.error_all_callbacks(
                 ConnectionShutdown("Connection to %s was closed" % self.host))
-
-    def defunct(self, exc):
-        with self.lock:
-            if self.is_defunct or self.is_closed:
-                return
-            self.is_defunct = True
-
-        trace = traceback.format_exc(exc)
-        if trace != "None":
-            log.debug("Defuncting connection (%s) to %s: %s\n%s",
-                      id(self), self.host, exc, traceback.format_exc(exc))
-        else:
-            log.debug("Defuncting connection (%s) to %s: %s", id(self), self.host, exc)
-
-        self.last_error = exc
-        self.close()
-        self._error_all_callbacks(exc)
-        self.connected_event.set()
-        return exc
-
-    def _error_all_callbacks(self, exc):
-        with self.lock:
-            callbacks = self._callbacks
-            self._callbacks = {}
-        new_exc = ConnectionShutdown(str(exc))
-        for cb in callbacks.values():
-            try:
-                cb(new_exc)
-            except Exception:
-                log.warn("Ignoring unhandled exception while erroring callbacks for a "
-                         "failed connection (%s) to host %s:",
-                         id(self), self.host, exc_info=True)
 
     def handle_write(self, watcher, revents, errno=None):
         if revents & libev.EV_ERROR:
@@ -311,7 +270,11 @@ class LibevConnection(Connection):
                 if len(buf) < self.in_buffer_size:
                     break
         except socket.error as err:
-            if err.args[0] not in NONBLOCKING:
+            if ssl and isinstance(err, ssl.SSLError):
+                if err.args[0] not in (ssl.SSL_ERROR_WANT_READ, ssl.SSL_ERROR_WANT_WRITE):
+                    self.defunct(err)
+                    return
+            elif err.args[0] not in NONBLOCKING:
                 self.defunct(err)
                 return
 
@@ -351,14 +314,6 @@ class LibevConnection(Connection):
             log.debug("Connection %s closed by server", self)
             self.close()
 
-    def handle_pushed(self, response):
-        log.debug("Message pushed from server: %r", response)
-        for cb in self._push_watchers.get(response.event_type, []):
-            try:
-                cb(response.event_args)
-            except Exception:
-                log.exception("Pushed event handler errored, ignoring:")
-
     def push(self, data):
         sabs = self.out_buffer_size
         if len(data) > sabs:
@@ -371,61 +326,6 @@ class LibevConnection(Connection):
         with self._deque_lock:
             self.deque.extend(chunks)
             _loop_notifier.send()
-
-    def send_msg(self, msg, cb, wait_for_id=False):
-        if self.is_defunct:
-            raise ConnectionShutdown("Connection to %s is defunct" % self.host)
-        elif self.is_closed:
-            raise ConnectionShutdown("Connection to %s is closed" % self.host)
-
-        if not wait_for_id:
-            try:
-                request_id = self._id_queue.get_nowait()
-            except Queue.Empty:
-                raise ConnectionBusy(
-                    "Connection to %s is at the max number of requests" % self.host)
-        else:
-            request_id = self._id_queue.get()
-
-        self._callbacks[request_id] = cb
-        self.push(msg.to_string(request_id, compression=self.compressor))
-        return request_id
-
-    def wait_for_response(self, msg, timeout=None):
-        return self.wait_for_responses(msg, timeout=timeout)[0]
-
-    def wait_for_responses(self, *msgs, **kwargs):
-        timeout = kwargs.get('timeout')
-        waiter = ResponseWaiter(self, len(msgs))
-
-        # busy wait for sufficient space on the connection
-        messages_sent = 0
-        while True:
-            needed = len(msgs) - messages_sent
-            with self.lock:
-                available = min(needed, MAX_STREAM_PER_CONNECTION - self.in_flight)
-                self.in_flight += available
-
-            for i in range(messages_sent, messages_sent + available):
-                self.send_msg(msgs[i], partial(waiter.got_response, index=i), wait_for_id=True)
-            messages_sent += available
-
-            if messages_sent == len(msgs):
-                break
-            else:
-                if timeout is not None:
-                    timeout -= 0.01
-                    if timeout <= 0.0:
-                        raise OperationTimedOut()
-                time.sleep(0.01)
-
-        try:
-            return waiter.deliver(timeout)
-        except OperationTimedOut:
-            raise
-        except Exception, exc:
-            self.defunct(exc)
-            raise
 
     def register_watcher(self, event_type, callback):
         self._push_watchers[event_type].add(callback)

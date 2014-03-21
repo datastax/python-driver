@@ -1,8 +1,14 @@
-import unittest
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
+
+from binascii import unhexlify
 import datetime
 import cassandra
 from cassandra.cqltypes import (BooleanType, lookup_casstype_simple, lookup_casstype,
-                                LongType, DecimalType, SetType, cql_typename)
+                                LongType, DecimalType, SetType, cql_typename,
+                                CassandraType, UTF8Type, parse_casstype_args)
 from cassandra.decoder import named_tuple_factory
 
 
@@ -83,9 +89,11 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(SetType.cass_parameterized_type_with([DecimalType], full=True), 'org.apache.cassandra.db.marshal.SetType(org.apache.cassandra.db.marshal.DecimalType)')
 
         self.assertEqual(LongType.cql_parameterized_type(), 'bigint')
-        self.assertEqual(cassandra.cqltypes.MapType.apply_parameters(
-                         cassandra.cqltypes.UTF8Type, cassandra.cqltypes.UTF8Type).cql_parameterized_type(),
-                         'map<text, text>')
+
+        subtypes = (cassandra.cqltypes.UTF8Type, cassandra.cqltypes.UTF8Type)
+        self.assertEqual(
+                'map<text, text>',
+                cassandra.cqltypes.MapType.apply_parameters(subtypes).cql_parameterized_type())
 
     def test_datetype(self):
         """
@@ -113,3 +121,38 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(result[1], result.applied)
         self.assertEqual(result[2], result.func_func_abc)
         self.assertEqual(result[3], result.foo_bar)
+
+    def test_parse_casstype_args(self):
+        class FooType(CassandraType):
+            typename = 'org.apache.cassandra.db.marshal.FooType'
+
+            def __init__(self, subtypes, names):
+                self.subtypes = subtypes
+                self.names = names
+
+            @classmethod
+            def apply_parameters(cls, subtypes, names):
+                return cls(subtypes, [unhexlify(name) if name is not None else name for name in names])
+
+        class BarType(FooType):
+            typename = 'org.apache.cassandra.db.marshal.BarType'
+
+        ctype = parse_casstype_args(''.join((
+            'org.apache.cassandra.db.marshal.FooType(',
+                '63697479:org.apache.cassandra.db.marshal.UTF8Type,',
+                'BarType(61646472657373:org.apache.cassandra.db.marshal.UTF8Type),',
+                '7a6970:org.apache.cassandra.db.marshal.UTF8Type',
+            ')')))
+
+        self.assertEquals(FooType, ctype.__class__)
+
+        self.assertEquals(UTF8Type, ctype.subtypes[0])
+
+        # middle subtype should be a BarType instance with its own subtypes and names
+        self.assertIsInstance(ctype.subtypes[1], BarType)
+        self.assertEquals([UTF8Type], ctype.subtypes[1].subtypes)
+        self.assertEquals(["address"], ctype.subtypes[1].names)
+
+        self.assertEquals(UTF8Type, ctype.subtypes[2])
+
+        self.assertEquals(['city', None, 'zip'], ctype.names)

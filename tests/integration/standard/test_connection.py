@@ -1,3 +1,5 @@
+import sys
+
 try:
     import unittest2 as unittest
 except ImportError:
@@ -172,12 +174,18 @@ class AsyncoreConnectionTest(ConnectionTest, unittest.TestCase):
 
     klass = AsyncoreConnection
 
+    def setUp(self):
+        if 'gevent.monkey' in sys.modules:
+            raise unittest.SkipTest("Can't test libev with gevent monkey patching")
+
 
 class LibevConnectionTest(ConnectionTest, unittest.TestCase):
 
     klass = LibevConnection
 
     def setUp(self):
+        if 'gevent.monkey' in sys.modules:
+            raise unittest.SkipTest("Can't test libev with gevent monkey patching")
         if LibevConnection is None:
             raise unittest.SkipTest(
                 'libev does not appear to be installed properly')
