@@ -13,8 +13,14 @@ if six.PY3:
 
 
 def cql_quote(term):
+    # The ordering of this method is important for the result of this method to
+    # be a native str type (for both Python 2 and 3)
+
+    # Handle quoting of native str and bool types
     if isinstance(term, (str, bool)):
         return "'%s'" % str(term).replace("'", "''")
+    # This branch of the if statement will only be used by Python 2 to catch
+    # unicode strings, text_type is used to prevent type errors with Python 3.
     elif isinstance(term, six.text_type):
         return "'%s'" % term.encode('utf8').replace("'", "''")
     else:
