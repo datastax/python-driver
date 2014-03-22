@@ -1,3 +1,4 @@
+from __future__ import print_function
 import platform
 import os
 import sys
@@ -62,11 +63,11 @@ class DocCommand(Command):
             except subprocess.CalledProcessError as exc:
                 raise RuntimeError("Documentation step '%s' failed: %s: %s" % (mode, exc, exc.output))
             else:
-                print output
+                print(output)
 
-            print ""
-            print "Documentation step '%s' performed, results here:" % mode
-            print "   %s/" % path
+            print("")
+            print("Documentation step '%s' performed, results here:" % mode)
+            print("   %s/" % path)
 
 
 class BuildFailed(Exception):
@@ -148,7 +149,7 @@ def run_setup(extensions):
         kw['cmdclass']['build_ext'] = build_extensions
         kw['ext_modules'] = extensions
 
-    dependencies = ['futures', 'scales', 'blist']
+    dependencies = ['futures', 'scales', 'blist', 'six >=1.6']
     if platform.python_implementation() != "CPython":
         dependencies.remove('blist')
 
@@ -163,7 +164,7 @@ def run_setup(extensions):
         packages=['cassandra', 'cassandra.io'],
         include_package_data=True,
         install_requires=dependencies,
-        tests_require=['nose', 'mock', 'ccm', 'unittest2', 'PyYAML'],
+        tests_require=['nose', 'mock', 'PyYAML'],
         classifiers=[
             'Development Status :: 5 - Production/Stable',
             'Intended Audience :: Developers',

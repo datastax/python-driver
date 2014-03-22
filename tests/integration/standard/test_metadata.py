@@ -1,3 +1,5 @@
+import six
+
 try:
     import unittest2 as unittest
 except ImportError:
@@ -295,7 +297,7 @@ class TestCodeCoverage(unittest.TestCase):
         cluster = Cluster()
         cluster.connect()
 
-        self.assertIsInstance(cluster.metadata.export_schema_as_string(), basestring)
+        self.assertIsInstance(cluster.metadata.export_schema_as_string(), six.string_types)
 
     def test_export_keyspace_schema(self):
         """
@@ -307,8 +309,8 @@ class TestCodeCoverage(unittest.TestCase):
 
         for keyspace in cluster.metadata.keyspaces:
             keyspace_metadata = cluster.metadata.keyspaces[keyspace]
-            self.assertIsInstance(keyspace_metadata.export_as_string(), basestring)
-            self.assertIsInstance(keyspace_metadata.as_cql_query(), basestring)
+            self.assertIsInstance(keyspace_metadata.export_as_string(), six.string_types)
+            self.assertIsInstance(keyspace_metadata.as_cql_query(), six.string_types)
 
     def test_case_sensitivity(self):
         """

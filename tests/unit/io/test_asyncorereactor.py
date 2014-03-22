@@ -1,3 +1,5 @@
+import six
+
 try:
     import unittest2 as unittest
 except ImportError:
@@ -5,7 +7,9 @@ except ImportError:
 
 import errno
 import os
-from StringIO import StringIO
+
+from six import BytesIO
+
 import socket
 from socket import error as socket_error
 
@@ -16,7 +20,7 @@ from cassandra.connection import (HEADER_DIRECTION_TO_CLIENT,
 
 from cassandra.decoder import (write_stringmultimap, write_int, write_string,
                                SupportedMessage, ReadyMessage, ServerError)
-from cassandra.marshal import uint8_pack, uint32_pack, int32_pack
+from cassandra.marshal import uint8_pack, uint8_unpack, uint32_pack, int32_pack
 
 from cassandra.io.asyncorereactor import AsyncoreConnection
 
@@ -41,7 +45,7 @@ class AsyncoreConnectionTest(unittest.TestCase):
         return c
 
     def make_header_prefix(self, message_class, version=2, stream_id=0):
-        return ''.join(map(uint8_pack, [
+        return six.binary_type().join(map(uint8_pack, [
             0xff & (HEADER_DIRECTION_TO_CLIENT | version),
             0,  # flags (compression)
             stream_id,
@@ -49,7 +53,7 @@ class AsyncoreConnectionTest(unittest.TestCase):
         ]))
 
     def make_options_body(self):
-        options_buf = StringIO()
+        options_buf = BytesIO()
         write_stringmultimap(options_buf, {
             'CQL_VERSION': ['3.0.1'],
             'COMPRESSION': []
@@ -57,12 +61,12 @@ class AsyncoreConnectionTest(unittest.TestCase):
         return options_buf.getvalue()
 
     def make_error_body(self, code, msg):
-        buf = StringIO()
+        buf = BytesIO()
         write_int(buf, code)
         write_string(buf, msg)
         return buf.getvalue()
 
-    def make_msg(self, header, body=""):
+    def make_msg(self, header, body=six.binary_type()):
         return header + uint32_pack(len(body)) + body
 
     def test_successful_connection(self, *args):
@@ -91,12 +95,12 @@ class AsyncoreConnectionTest(unittest.TestCase):
         # get a connection that's already fully started
         c = self.test_successful_connection()
 
-        header = '\x00\x00\x00\x00' + int32_pack(20000)
+        header = six.b('\x00\x00\x00\x00') + int32_pack(20000)
         responses = [
-            header + ('a' * (4096 - len(header))),
-            'a' * 4096,
+            header + (six.b('a') * (4096 - len(header))),
+            six.b('a') * 4096,
             socket_error(errno.EAGAIN),
-            'a' * 100,
+            six.b('a') * 100,
             socket_error(errno.EAGAIN)]
 
         def side_effect(*args):
@@ -223,14 +227,13 @@ class AsyncoreConnectionTest(unittest.TestCase):
         options = self.make_options_body()
         message = self.make_msg(header, options)
 
-        # read in the first byte
-        c.socket.recv.return_value = message[0]
+        c.socket.recv.return_value = message[0:1]
         c.handle_read()
-        self.assertEquals(c._iobuf.getvalue(), message[0])
+        self.assertEquals(c._iobuf.getvalue(), message[0:1])
 
         c.socket.recv.return_value = message[1:]
         c.handle_read()
-        self.assertEquals("", c._iobuf.getvalue())
+        self.assertEquals(six.binary_type(), c._iobuf.getvalue())
 
         # let it write out a StartupMessage
         c.handle_write()
@@ -257,7 +260,7 @@ class AsyncoreConnectionTest(unittest.TestCase):
         # ... then read in the rest
         c.socket.recv.return_value = message[9:]
         c.handle_read()
-        self.assertEquals("", c._iobuf.getvalue())
+        self.assertEquals(six.binary_type(), c._iobuf.getvalue())
 
         # let it write out a StartupMessage
         c.handle_write()

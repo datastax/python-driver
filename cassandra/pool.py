@@ -137,8 +137,14 @@ class Host(object):
     def __eq__(self, other):
         return self.address == other.address
 
+    def __hash__(self):
+        return hash(self.address)
+
+    def __lt__(self, other):
+        return self.address < other.address
+
     def __str__(self):
-        return self.address
+        return str(self.address)
 
     def __repr__(self):
         dc = (" %s" % (self._datacenter,)) if self._datacenter else ""
@@ -167,7 +173,7 @@ class _ReconnectionHandler(object):
         # TODO cancel previous reconnection handlers? That's probably the job
         # of whatever created this.
 
-        first_delay = self.schedule.next()
+        first_delay = next(self.schedule)
         self.scheduler.schedule(first_delay, self.run)
 
     def run(self):
@@ -360,7 +366,7 @@ class HostConnectionPool(object):
     def _create_new_connection(self):
         try:
             self._add_conn_if_under_max()
-        except (ConnectionException, socket.error), exc:
+        except (ConnectionException, socket.error) as exc:
             log.warn("Failed to create new connection to %s: %s", self.host, exc)
         except Exception:
             log.exception("Unexpectedly failed to create new connection")

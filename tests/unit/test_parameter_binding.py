@@ -8,6 +8,8 @@ from cassandra.query import PreparedStatement, BoundStatement
 from cassandra.cqltypes import Int32Type
 from cassandra.util import OrderedDict
 
+from six.moves import xrange
+
 
 class ParamBindingTest(unittest.TestCase):
 

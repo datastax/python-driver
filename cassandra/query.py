@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 import re
 import struct
 import time
+import six
 
 from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.cqltypes import unix_time_from_uuid1
@@ -415,7 +416,7 @@ class BatchStatement(Statement):
         Statement.__init__(self, retry_policy=retry_policy, consistency_level=consistency_level)
 
     def add(self, statement, parameters=None):
-        if isinstance(statement, basestring):
+        if isinstance(statement, six.string_types):
             if parameters:
                 statement = bind_params(statement, parameters)
             self._statements_and_parameters.append((False, statement, ()))
@@ -474,11 +475,9 @@ class ValueSequence(object):
 
 def bind_params(query, params):
     if isinstance(params, dict):
-        return query % dict((k, cql_encoders.get(type(v), cql_encode_object)(v))
-                    for k, v in params.iteritems())
+        return query % dict((k, cql_encoders.get(type(v), cql_encode_object)(v)) for k, v in six.iteritems(params))
     else:
-        return query % tuple(cql_encoders.get(type(v), cql_encode_object)(v)
-                     for v in params)
+        return query % tuple(cql_encoders.get(type(v), cql_encode_object)(v) for v in params)
 
 
 class TraceUnavailable(Exception):

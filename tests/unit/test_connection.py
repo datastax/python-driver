@@ -1,9 +1,11 @@
+import six
+
 try:
     import unittest2 as unittest
 except ImportError:
     import unittest # noqa
 
-from StringIO import StringIO
+from six import BytesIO
 
 from mock import Mock, ANY
 
@@ -25,7 +27,7 @@ class ConnectionTest(unittest.TestCase):
         return c
 
     def make_header_prefix(self, message_class, version=2, stream_id=0):
-        return ''.join(map(uint8_pack, [
+        return six.binary_type().join(map(uint8_pack, [
             0xff & (HEADER_DIRECTION_TO_CLIENT | version),
             0,  # flags (compression)
             stream_id,
@@ -33,7 +35,7 @@ class ConnectionTest(unittest.TestCase):
         ]))
 
     def make_options_body(self):
-        options_buf = StringIO()
+        options_buf = BytesIO()
         write_stringmultimap(options_buf, {
             'CQL_VERSION': ['3.0.1'],
             'COMPRESSION': []
@@ -41,7 +43,7 @@ class ConnectionTest(unittest.TestCase):
         return options_buf.getvalue()
 
     def make_error_body(self, code, msg):
-        buf = StringIO()
+        buf = BytesIO()
         write_int(buf, code)
         write_string(buf, msg)
         return buf.getvalue()
@@ -73,12 +75,12 @@ class ConnectionTest(unittest.TestCase):
         c.defunct = Mock()
 
         # read in a SupportedMessage response
-        header = ''.join(map(uint8_pack, [
+        header = six.binary_type().join(uint8_pack(i) for i in (
             0xff & (HEADER_DIRECTION_FROM_CLIENT | self.protocol_version),
             0,  # flags (compression)
             0,
             SupportedMessage.opcode  # opcode
-        ]))
+        ))
         options = self.make_options_body()
         message = self.make_msg(header, options)
         c.process_msg(message, len(message) - 8)
@@ -115,7 +117,7 @@ class ConnectionTest(unittest.TestCase):
         # read in a SupportedMessage response
         header = self.make_header_prefix(SupportedMessage)
 
-        options_buf = StringIO()
+        options_buf = BytesIO()
         write_stringmultimap(options_buf, {
             'CQL_VERSION': ['7.8.9'],
             'COMPRESSION': []

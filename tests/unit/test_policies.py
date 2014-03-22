@@ -22,6 +22,8 @@ from cassandra.policies import (RoundRobinPolicy, DCAwareRoundRobinPolicy,
 from cassandra.pool import Host
 from cassandra.query import Statement
 
+from six.moves import xrange
+
 
 class TestLoadBalancingPolicy(unittest.TestCase):
     def test_non_implemented(self):

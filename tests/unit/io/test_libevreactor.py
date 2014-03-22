@@ -5,7 +5,9 @@ except ImportError:
 
 import errno
 import os
-from StringIO import StringIO
+
+from six.moves import StringIO
+
 from socket import error as socket_error
 
 from mock import patch, Mock

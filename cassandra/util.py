@@ -1,7 +1,5 @@
 from __future__ import with_statement
 
-from UserDict import DictMixin
-
 try:
     from collections import OrderedDict
 except ImportError:
@@ -28,6 +26,7 @@ except ImportError:
     #     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
     #     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
     #     OTHER DEALINGS IN THE SOFTWARE.
+    from UserDict import DictMixin
 
     class OrderedDict(dict, DictMixin):  # noqa
         """ A dictionary which maintains the insertion order of keys. """

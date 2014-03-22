@@ -2,14 +2,16 @@ import errno
 from functools import wraps, partial
 import logging
 from threading import Event, RLock
-from Queue import Queue
+
+from six.moves.queue import Queue
 
 from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut
-from cassandra.marshal import int8_unpack, int32_pack
+from cassandra.marshal import int8_unpack, int32_pack, header_unpack
 from cassandra.decoder import (ReadyMessage, AuthenticateMessage, OptionsMessage,
                                StartupMessage, ErrorMessage, CredentialsMessage,
                                QueryMessage, ResultMessage, decode_response,
                                InvalidRequestException, SupportedMessage)
+import six
 
 
 log = logging.getLogger(__name__)
@@ -101,7 +103,6 @@ def defunct_on_error(f):
             return f(self, *args, **kwargs)
         except Exception as exc:
             self.defunct(exc)
-
     return wrapper
 
 
@@ -169,7 +170,7 @@ class Connection(object):
 
     @defunct_on_error
     def process_msg(self, msg, body_len):
-        version, flags, stream_id, opcode = map(int8_unpack, msg[:4])
+        version, flags, stream_id, opcode = header_unpack(msg[:4])
         if stream_id < 0:
             callback = None
         else:
@@ -194,7 +195,7 @@ class Connection(object):
             if body_len > 0:
                 body = msg[8:]
             elif body_len == 0:
-                body = ""
+                body = six.binary_type()
             else:
                 raise ProtocolError("Got negative body length: %r" % body_len)
 

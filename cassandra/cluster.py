@@ -2,14 +2,17 @@
 This module houses the main classes you will interact with,
 :class:`.Cluster` and :class:`.Session`.
 """
-
 from concurrent.futures import ThreadPoolExecutor
 import logging
 import socket
 import sys
 import time
 from threading import Lock, RLock, Thread, Event
-import Queue
+
+import six
+from six.moves import range
+from six.moves import queue as Queue
+
 import weakref
 from weakref import WeakValueDictionary
 try:
@@ -35,7 +38,7 @@ from cassandra.decoder import (QueryMessage, ResultMessage,
                                RESULT_KIND_SET_KEYSPACE, RESULT_KIND_ROWS,
                                RESULT_KIND_SCHEMA_CHANGE)
 from cassandra.metadata import Metadata
-from cassandra.metrics import Metrics
+# from cassandra.metrics import Metrics
 from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy)
@@ -373,6 +376,7 @@ class Cluster(object):
         self._lock = RLock()
 
         if self.metrics_enabled:
+            from cassandra.metrics import Metrics
             self.metrics = Metrics(weakref.proxy(self))
 
         self.control_connection = ControlConnection(
@@ -848,7 +852,7 @@ class Cluster(object):
                 # prepare 10 statements at a time
                 ks_statements = list(ks_statements)
                 chunks = []
-                for i in xrange(0, len(ks_statements), 10):
+                for i in range(0, len(ks_statements), 10):
                     chunks.append(ks_statements[i:i + 10])
 
                 for ks_chunk in chunks:
@@ -1069,7 +1073,7 @@ class Session(object):
 
         prepared_statement = None
 
-        if isinstance(query, basestring):
+        if isinstance(query, six.string_types):
             query = SimpleStatement(query)
         elif isinstance(query, PreparedStatement):
             query = query.bind(parameters)
@@ -1798,7 +1802,7 @@ class _Scheduler(object):
             # this can happen on interpreter shutdown
             pass
         self.is_shutdown = True
-        self._scheduled.put_nowait((None, None))
+        self._scheduled.put_nowait((0, None))
 
     def schedule(self, delay, fn, *args, **kwargs):
         if not self.is_shutdown:

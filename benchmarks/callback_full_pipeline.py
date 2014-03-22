@@ -4,7 +4,7 @@ from itertools import count
 from threading import Event
 
 from base import benchmark, BenchmarkThread
-
+from six.moves import range
 
 log = logging.getLogger(__name__)
 
@@ -24,17 +24,17 @@ class Runner(BenchmarkThread):
         if previous_result is not sentinel:
             if isinstance(previous_result, BaseException):
                 log.error("Error on insert: %r", previous_result)
-            if self.num_finished.next() >= self.num_queries:
+            if next(self.num_finished) >= self.num_queries:
                 self.event.set()
 
-        if self.num_started.next() <= self.num_queries:
+        if next(self.num_started) <= self.num_queries:
             future = self.session.execute_async(self.query, self.values)
             future.add_callbacks(self.insert_next, self.insert_next)
 
     def run(self):
         self.start_profile()
 
-        for _ in xrange(min(120, self.num_queries)):
+        for _ in range(min(120, self.num_queries)):
             self.insert_next()
 
         self.event.wait()
