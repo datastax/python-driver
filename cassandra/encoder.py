@@ -106,5 +106,6 @@ if six.PY2:
 else:
     cql_encoders.update({
         memoryview: cql_encode_bytes,
+        bytes: cql_encode_bytes,
         type(None): cql_encode_none,
     })
