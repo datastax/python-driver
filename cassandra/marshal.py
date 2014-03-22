@@ -52,12 +52,6 @@ def bitlength(n):
     return bitlen
 
 
-if six.PY3:
-    byte_val = int
-else:
-    byte_val = ord
-
-
 def varint_pack(big):
     pos = True
     if big == 0:
