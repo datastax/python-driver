@@ -68,6 +68,7 @@ def get_node(node_id):
 
 def setup_package():
     version = os.getenv("CASSANDRA_VERSION", DEFAULT_CASSANDRA_VERSION)
+    print 'Using Cassandra version: %s' % version
     try:
         try:
             cluster = CCMCluster.load(path, CLUSTER_NAME)
