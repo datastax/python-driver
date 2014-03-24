@@ -4,7 +4,7 @@ import unittest
 
 from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster
-from cassandra.decoder import dict_factory
+from cassandra.query import dict_factory
 from cassandra.query import SimpleStatement
 from tests.integration.long.utils import create_schema
 
