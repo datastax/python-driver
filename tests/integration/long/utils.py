@@ -3,7 +3,7 @@ import time
 
 from collections import defaultdict
 
-from cassandra.decoder import named_tuple_factory
+from cassandra.query import named_tuple_factory
 
 from tests.integration import get_node
 
