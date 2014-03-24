@@ -175,7 +175,7 @@ def run_setup(extensions):
         packages=['cassandra', 'cassandra.io'],
         include_package_data=True,
         install_requires=dependencies,
-        tests_require=['nose', 'mock', 'ccm', 'unittest2', 'PyYAML'],
+        tests_require=['nose', 'mock', 'ccm', 'unittest2', 'PyYAML', 'pytz'],
         classifiers=[
             'Development Status :: 5 - Production/Stable',
             'Intended Audience :: Developers',
