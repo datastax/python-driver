@@ -25,6 +25,8 @@ Bug Fixes
   keyspace name was quoted, but any quotes in the string were not escaped.
 * Avoid adding hosts to the load balancing policy before their datacenter
   and rack information has been set, if possible.
+* Avoid KeyError when updating metadata after droping a table (github issues
+  #97, #98)
 
 Other
 -----
