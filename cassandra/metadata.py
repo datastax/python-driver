@@ -159,7 +159,8 @@ class Metadata(object):
 
         if not cf_results:
             # the table was removed
-            del keyspace_meta.tables[table]
+            if table in keyspace_meta.tables: 
+                del keyspace_meta.tables[table]
         else:
             assert len(cf_results) == 1
             keyspace_meta.tables[table] = self._build_table_metadata(
