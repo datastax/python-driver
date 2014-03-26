@@ -110,17 +110,17 @@ class LibevConnectionTest(unittest.TestCase):
 
         c._socket.recv.side_effect = side_effect
         c.handle_read(None, 0)
-        self.assertEquals(c._total_reqd_bytes, 20000 + len(header))
+        self.assertEqual(c._total_reqd_bytes, 20000 + len(header))
         # the EAGAIN prevents it from reading the last 100 bytes
         c._iobuf.seek(0, os.SEEK_END)
         pos = c._iobuf.tell()
-        self.assertEquals(pos, 4096 + 4096)
+        self.assertEqual(pos, 4096 + 4096)
 
         # now tell it to read the last 100 bytes
         c.handle_read(None, 0)
         c._iobuf.seek(0, os.SEEK_END)
         pos = c._iobuf.tell()
-        self.assertEquals(pos, 4096 + 4096 + 100)
+        self.assertEqual(pos, 4096 + 4096 + 100)
 
     def test_protocol_error(self, *args):
         c = self.make_connection()
@@ -228,11 +228,11 @@ class LibevConnectionTest(unittest.TestCase):
         # read in the first byte
         c._socket.recv.return_value = message[0]
         c.handle_read(None, 0)
-        self.assertEquals(c._iobuf.getvalue(), message[0])
+        self.assertEqual(c._iobuf.getvalue(), message[0])
 
         c._socket.recv.return_value = message[1:]
         c.handle_read(None, 0)
-        self.assertEquals("", c._iobuf.getvalue())
+        self.assertEqual("", c._iobuf.getvalue())
 
         # let it write out a StartupMessage
         c.handle_write(None, 0)
@@ -254,12 +254,12 @@ class LibevConnectionTest(unittest.TestCase):
         # read in the first nine bytes
         c._socket.recv.return_value = message[:9]
         c.handle_read(None, 0)
-        self.assertEquals(c._iobuf.getvalue(), message[:9])
+        self.assertEqual(c._iobuf.getvalue(), message[:9])
 
         # ... then read in the rest
         c._socket.recv.return_value = message[9:]
         c.handle_read(None, 0)
-        self.assertEquals("", c._iobuf.getvalue())
+        self.assertEqual("", c._iobuf.getvalue())
 
         # let it write out a StartupMessage
         c.handle_write(None, 0)

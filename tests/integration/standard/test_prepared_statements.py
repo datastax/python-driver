@@ -7,6 +7,7 @@ from cassandra import InvalidRequest
 from cassandra.cluster import Cluster
 from cassandra.query import PreparedStatement
 
+
 class PreparedStatementTests(unittest.TestCase):
 
     def test_basic(self):
@@ -51,7 +52,7 @@ class PreparedStatementTests(unittest.TestCase):
 
         bound = prepared.bind(('a'))
         results = session.execute(bound)
-        self.assertEquals(results, [('a', 'b', 'c')])
+        self.assertEqual(results, [('a', 'b', 'c')])
 
     def test_missing_primary_key(self):
         """
@@ -85,7 +86,7 @@ class PreparedStatementTests(unittest.TestCase):
             """)
 
         self.assertIsInstance(prepared, PreparedStatement)
-        self.assertRaises(ValueError, prepared.bind, (1,2))
+        self.assertRaises(ValueError, prepared.bind, (1, 2))
 
     def test_none_values(self):
         """
@@ -112,7 +113,7 @@ class PreparedStatementTests(unittest.TestCase):
 
         bound = prepared.bind((1,))
         results = session.execute(bound)
-        self.assertEquals(results[0].v, None)
+        self.assertEqual(results[0].v, None)
 
     def test_async_binding(self):
         """
@@ -139,4 +140,4 @@ class PreparedStatementTests(unittest.TestCase):
 
         future = session.execute_async(prepared, (873,))
         results = future.result()
-        self.assertEquals(results[0].v, None)
+        self.assertEqual(results[0].v, None)

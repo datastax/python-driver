@@ -66,7 +66,7 @@ class TypeTests(unittest.TestCase):
         results = s.execute("SELECT * FROM mytable")
 
         for expected, actual in zip(expected_vals, results[0]):
-            self.assertEquals(expected, actual)
+            self.assertEqual(expected, actual)
 
     def test_blob_type_as_bytearray(self):
         c = Cluster()
@@ -101,7 +101,7 @@ class TypeTests(unittest.TestCase):
         results = s.execute("SELECT * FROM mytable")
 
         for expected, actual in zip(expected_vals, results[0]):
-            self.assertEquals(expected, actual)
+            self.assertEqual(expected, actual)
 
     create_type_table = """
         CREATE TABLE mytable (
@@ -194,7 +194,7 @@ class TypeTests(unittest.TestCase):
         results = s.execute("SELECT * FROM mytable")
 
         for expected, actual in zip(expected_vals, results[0]):
-            self.assertEquals(expected, actual)
+            self.assertEqual(expected, actual)
 
         # try the same thing with a prepared statement
         prepared = s.prepare("""
@@ -207,7 +207,7 @@ class TypeTests(unittest.TestCase):
         results = s.execute("SELECT * FROM mytable")
 
         for expected, actual in zip(expected_vals, results[0]):
-            self.assertEquals(expected, actual)
+            self.assertEqual(expected, actual)
 
         # query with prepared statement
         prepared = s.prepare("""
@@ -216,14 +216,14 @@ class TypeTests(unittest.TestCase):
         results = s.execute(prepared.bind(()))
 
         for expected, actual in zip(expected_vals, results[0]):
-            self.assertEquals(expected, actual)
+            self.assertEqual(expected, actual)
 
         # query with prepared statement, no explicit columns
         prepared = s.prepare("""SELECT * FROM mytable""")
         results = s.execute(prepared.bind(()))
 
         for expected, actual in zip(expected_vals, results[0]):
-            self.assertEquals(expected, actual)
+            self.assertEqual(expected, actual)
 
     def test_empty_strings_and_nones(self):
         c = Cluster()
@@ -251,11 +251,11 @@ class TypeTests(unittest.TestCase):
         # insert empty strings for string-like fields and fetch them
         s.execute("INSERT INTO mytable (a, b, c, o, s, l, n) VALUES ('a', 'b', %s, %s, %s, %s, %s)",
                   ('', '', '', [''], {'': 3}))
-        self.assertEquals(
+        self.assertEqual(
             {'c': '', 'o': '', 's': '', 'l': ('', ), 'n': OrderedDict({'': 3})},
             s.execute("SELECT c, o, s, l, n FROM mytable WHERE a='a' AND b='b'")[0])
 
-        self.assertEquals(
+        self.assertEqual(
             {'c': '', 'o': '', 's': '', 'l': ('', ), 'n': OrderedDict({'': 3})},
             s.execute(s.prepare("SELECT c, o, s, l, n FROM mytable WHERE a='a' AND b='b'"), [])[0])
 
@@ -367,10 +367,10 @@ class TypeTests(unittest.TestCase):
         # test non-prepared statement
         s.execute("INSERT INTO mytable (a, b) VALUES ('key1', %s)", parameters=(dt,))
         result = s.execute("SELECT b FROM mytable WHERE a='key1'")[0].b
-        self.assertEquals(dt.utctimetuple(), result.utctimetuple())
+        self.assertEqual(dt.utctimetuple(), result.utctimetuple())
 
         # test prepared statement
         prepared = s.prepare("INSERT INTO mytable (a, b) VALUES ('key2', ?)")
         s.execute(prepared, parameters=(dt,))
         result = s.execute("SELECT b FROM mytable WHERE a='key2'")[0].b
-        self.assertEquals(dt.utctimetuple(), result.utctimetuple())
+        self.assertEqual(dt.utctimetuple(), result.utctimetuple())

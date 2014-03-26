@@ -25,7 +25,7 @@ class ClusterTests(unittest.TestCase):
             CREATE KEYSPACE clustertests
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
             """)
-        self.assertEquals(None, result)
+        self.assertEqual(None, result)
 
         result = session.execute(
             """
@@ -36,16 +36,16 @@ class ClusterTests(unittest.TestCase):
                 PRIMARY KEY (a, b)
             )
             """)
-        self.assertEquals(None, result)
+        self.assertEqual(None, result)
 
         result = session.execute(
             """
             INSERT INTO clustertests.cf0 (a, b, c) VALUES ('a', 'b', 'c')
             """)
-        self.assertEquals(None, result)
+        self.assertEqual(None, result)
 
         result = session.execute("SELECT * FROM clustertests.cf0")
-        self.assertEquals([('a', 'b', 'c')], result)
+        self.assertEqual([('a', 'b', 'c')], result)
 
         cluster.shutdown()
 
@@ -60,15 +60,15 @@ class ClusterTests(unittest.TestCase):
             """
             INSERT INTO test3rf.test (k, v) VALUES (8889, 8889)
             """)
-        self.assertEquals(None, result)
+        self.assertEqual(None, result)
 
         result = session.execute("SELECT * FROM test3rf.test")
-        self.assertEquals([(8889, 8889)], result)
+        self.assertEqual([(8889, 8889)], result)
 
         # test_connect_on_keyspace
         session2 = cluster.connect('test3rf')
         result2 = session2.execute("SELECT * FROM test")
-        self.assertEquals(result, result2)
+        self.assertEqual(result, result2)
 
     def test_set_keyspace_twice(self):
         cluster = Cluster()

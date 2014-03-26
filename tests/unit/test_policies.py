@@ -319,14 +319,14 @@ class TokenAwarePolicyTest(unittest.TestCase):
 
             replicas = get_replicas(None, struct.pack('>i', i))
             other = set(h for h in hosts if h not in replicas)
-            self.assertEquals(replicas, qplan[:2])
-            self.assertEquals(other, set(qplan[2:]))
+            self.assertEqual(replicas, qplan[:2])
+            self.assertEqual(other, set(qplan[2:]))
 
         # Should use the secondary policy
         for i in range(4):
             qplan = list(policy.make_query_plan())
 
-            self.assertEquals(set(qplan), set(hosts))
+            self.assertEqual(set(qplan), set(hosts))
 
     def test_wrap_dc_aware(self):
         cluster = Mock(spec=Cluster)
@@ -359,16 +359,16 @@ class TokenAwarePolicyTest(unittest.TestCase):
 
             # first should be the only local replica
             self.assertIn(qplan[0], replicas)
-            self.assertEquals(qplan[0].datacenter, "dc1")
+            self.assertEqual(qplan[0].datacenter, "dc1")
 
             # then the local non-replica
             self.assertNotIn(qplan[1], replicas)
-            self.assertEquals(qplan[1].datacenter, "dc1")
+            self.assertEqual(qplan[1].datacenter, "dc1")
 
             # then one of the remotes (used_hosts_per_remote_dc is 1, so we
             # shouldn't see two remotes)
-            self.assertEquals(qplan[2].datacenter, "dc2")
-            self.assertEquals(3, len(qplan))
+            self.assertEqual(qplan[2].datacenter, "dc2")
+            self.assertEqual(3, len(qplan))
 
     class FakeCluster:
         def __init__(self):

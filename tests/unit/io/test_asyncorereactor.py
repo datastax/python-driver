@@ -20,7 +20,7 @@ from cassandra.connection import (HEADER_DIRECTION_TO_CLIENT,
 
 from cassandra.decoder import (write_stringmultimap, write_int, write_string,
                                SupportedMessage, ReadyMessage, ServerError)
-from cassandra.marshal import uint8_pack, uint8_unpack, uint32_pack, int32_pack
+from cassandra.marshal import uint8_pack, uint32_pack, int32_pack
 
 from cassandra.io.asyncorereactor import AsyncoreConnection
 
@@ -112,17 +112,17 @@ class AsyncoreConnectionTest(unittest.TestCase):
 
         c.socket.recv.side_effect = side_effect
         c.handle_read()
-        self.assertEquals(c._total_reqd_bytes, 20000 + len(header))
+        self.assertEqual(c._total_reqd_bytes, 20000 + len(header))
         # the EAGAIN prevents it from reading the last 100 bytes
         c._iobuf.seek(0, os.SEEK_END)
         pos = c._iobuf.tell()
-        self.assertEquals(pos, 4096 + 4096)
+        self.assertEqual(pos, 4096 + 4096)
 
         # now tell it to read the last 100 bytes
         c.handle_read()
         c._iobuf.seek(0, os.SEEK_END)
         pos = c._iobuf.tell()
-        self.assertEquals(pos, 4096 + 4096 + 100)
+        self.assertEqual(pos, 4096 + 4096 + 100)
 
     def test_protocol_error(self, *args):
         c = self.make_connection()
@@ -229,11 +229,11 @@ class AsyncoreConnectionTest(unittest.TestCase):
 
         c.socket.recv.return_value = message[0:1]
         c.handle_read()
-        self.assertEquals(c._iobuf.getvalue(), message[0:1])
+        self.assertEqual(c._iobuf.getvalue(), message[0:1])
 
         c.socket.recv.return_value = message[1:]
         c.handle_read()
-        self.assertEquals(six.binary_type(), c._iobuf.getvalue())
+        self.assertEqual(six.binary_type(), c._iobuf.getvalue())
 
         # let it write out a StartupMessage
         c.handle_write()
@@ -255,12 +255,12 @@ class AsyncoreConnectionTest(unittest.TestCase):
         # read in the first nine bytes
         c.socket.recv.return_value = message[:9]
         c.handle_read()
-        self.assertEquals(c._iobuf.getvalue(), message[:9])
+        self.assertEqual(c._iobuf.getvalue(), message[:9])
 
         # ... then read in the rest
         c.socket.recv.return_value = message[9:]
         c.handle_read()
-        self.assertEquals(six.binary_type(), c._iobuf.getvalue())
+        self.assertEqual(six.binary_type(), c._iobuf.getvalue())
 
         # let it write out a StartupMessage
         c.handle_write()

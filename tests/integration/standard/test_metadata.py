@@ -101,7 +101,7 @@ class SchemaMetadataTest(unittest.TestCase):
 
     def check_create_statement(self, tablemeta, original):
         recreate = tablemeta.as_cql_query(formatted=False)
-        self.assertEquals(original, recreate[:len(original)])
+        self.assertEqual(original, recreate[:len(original)])
         self.session.execute("DROP TABLE %s.%s" % (self.ksname, self.cfname))
         self.session.execute(recreate)
 

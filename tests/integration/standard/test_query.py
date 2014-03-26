@@ -288,14 +288,14 @@ class SerialConsistencyTests(unittest.TestCase):
             "UPDATE test3rf.test SET v=1 WHERE k=0 IF v=1",
             serial_consistency_level=ConsistencyLevel.SERIAL)
         result = self.session.execute(statement)
-        self.assertEquals(1, len(result))
+        self.assertEqual(1, len(result))
         self.assertFalse(result[0].applied)
 
         statement = SimpleStatement(
             "UPDATE test3rf.test SET v=1 WHERE k=0 IF v=0",
             serial_consistency_level=ConsistencyLevel.SERIAL)
         result = self.session.execute(statement)
-        self.assertEquals(1, len(result))
+        self.assertEqual(1, len(result))
         self.assertTrue(result[0].applied)
 
     def test_conditional_update_with_prepared_statements(self):
@@ -305,7 +305,7 @@ class SerialConsistencyTests(unittest.TestCase):
 
         statement.serial_consistency_level = ConsistencyLevel.SERIAL
         result = self.session.execute(statement)
-        self.assertEquals(1, len(result))
+        self.assertEqual(1, len(result))
         self.assertFalse(result[0].applied)
 
         statement = self.session.prepare(
@@ -313,7 +313,7 @@ class SerialConsistencyTests(unittest.TestCase):
         bound = statement.bind(())
         bound.serial_consistency_level = ConsistencyLevel.SERIAL
         result = self.session.execute(statement)
-        self.assertEquals(1, len(result))
+        self.assertEqual(1, len(result))
         self.assertTrue(result[0].applied)
 
     def test_bad_consistency_level(self):
