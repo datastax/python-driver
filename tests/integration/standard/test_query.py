@@ -10,13 +10,13 @@ from cassandra.query import (PreparedStatement, BoundStatement, ValueSequence,
 from cassandra.cluster import Cluster
 from cassandra.policies import HostDistance
 
-from tests.integration import get_server_versions
+from tests.integration import get_server_versions, PROTOCOL_VERSION
 
 
 class QueryTest(unittest.TestCase):
 
     def test_query(self):
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         prepared = session.prepare(
@@ -44,7 +44,7 @@ class QueryTest(unittest.TestCase):
         Code coverage to ensure trace prints to string without error
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         query = "SELECT * FROM system.local"
@@ -57,7 +57,7 @@ class QueryTest(unittest.TestCase):
             str(event)
 
     def test_trace_ignores_row_factory(self):
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
         session.row_factory = dict_factory
 
@@ -78,7 +78,7 @@ class PreparedStatementTests(unittest.TestCase):
         Simple code coverage to ensure routing_keys can be accessed
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         prepared = session.prepare(
@@ -96,7 +96,7 @@ class PreparedStatementTests(unittest.TestCase):
         the routing key should be None
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         prepared = session.prepare(
@@ -115,7 +115,7 @@ class PreparedStatementTests(unittest.TestCase):
         overrides the current routing key
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         prepared = session.prepare(
@@ -133,7 +133,7 @@ class PreparedStatementTests(unittest.TestCase):
         Basic test that uses a fake routing_key_index
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         prepared = session.prepare(
@@ -151,7 +151,7 @@ class PreparedStatementTests(unittest.TestCase):
         Ensure that bound.keyspace works as expected
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         prepared = session.prepare(
@@ -186,7 +186,7 @@ class PrintStatementTests(unittest.TestCase):
         Highlight the difference between Prepared and Bound statements
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         prepared = session.prepare('INSERT INTO test3rf.test (k, v) VALUES (?, ?)')
@@ -208,7 +208,7 @@ class BatchStatementTests(unittest.TestCase):
                 "Cassandra 2.0+ is required for BATCH operations, currently testing against %r"
                 % (cass_version,))
 
-        self.cluster = Cluster(protocol_version=2)
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         self.session = self.cluster.connect()
 
@@ -278,7 +278,7 @@ class SerialConsistencyTests(unittest.TestCase):
                 "Cassandra 2.0+ is required for BATCH operations, currently testing against %r"
                 % (cass_version,))
 
-        self.cluster = Cluster(protocol_version=2)
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         self.session = self.cluster.connect()
 

@@ -1,3 +1,5 @@
+from tests.integration import PROTOCOL_VERSION
+
 try:
     import unittest2 as unittest
 except ImportError:
@@ -24,7 +26,7 @@ class ConnectionTest(object):
         """
         Test a single connection with sequential requests.
         """
-        conn = self.klass.factory()
+        conn = self.klass.factory(protocol_version=PROTOCOL_VERSION)
         query = "SELECT keyspace_name FROM system.schema_keyspaces LIMIT 1"
         event = Event()
 
@@ -47,7 +49,7 @@ class ConnectionTest(object):
         """
         Test a single connection with pipelined requests.
         """
-        conn = self.klass.factory()
+        conn = self.klass.factory(protocol_version=PROTOCOL_VERSION)
         query = "SELECT keyspace_name FROM system.schema_keyspaces LIMIT 1"
         responses = [False] * 100
         event = Event()
@@ -69,7 +71,7 @@ class ConnectionTest(object):
         """
         Test multiple connections with pipelined requests.
         """
-        conns = [self.klass.factory() for i in range(5)]
+        conns = [self.klass.factory(protocol_version=PROTOCOL_VERSION) for i in range(5)]
         events = [Event() for i in range(5)]
         query = "SELECT keyspace_name FROM system.schema_keyspaces LIMIT 1"
 
@@ -100,7 +102,7 @@ class ConnectionTest(object):
         num_threads = 5
         event = Event()
 
-        conn = self.klass.factory()
+        conn = self.klass.factory(protocol_version=PROTOCOL_VERSION)
         query = "SELECT keyspace_name FROM system.schema_keyspaces LIMIT 1"
 
         def cb(all_responses, thread_responses, request_num, *args, **kwargs):
@@ -157,7 +159,7 @@ class ConnectionTest(object):
 
         threads = []
         for i in range(num_conns):
-            conn = self.klass.factory()
+            conn = self.klass.factory(protocol_version=PROTOCOL_VERSION)
             t = Thread(target=send_msgs, args=(conn, events[i]))
             threads.append(t)
 
