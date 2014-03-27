@@ -20,10 +20,13 @@ CLUSTER_NAME = 'test_cluster'
 CCM_CLUSTER = None
 
 CASSANDRA_VERSION = os.getenv('CASSANDRA_VERSION', '2.0.6')
+
 if CASSANDRA_VERSION.startswith('1'):
-    PROTOCOL_VERSION = 1
+    DEFAULT_PROTOCOL_VERSION = 1
 else:
-    PROTOCOL_VERSION = 2
+    DEFAULT_PROTOCOL_VERSION = 2
+PROTOCOL_VERSION = os.getenv('PROTOCOL_VERSION', DEFAULT_PROTOCOL_VERSION)
+
 
 path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ccm')
 if not os.path.exists(path):
