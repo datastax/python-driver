@@ -192,10 +192,17 @@ class ClusterTests(unittest.TestCase):
 
         self.assertRaises(TypeError, session.execute, "SELECT * FROM system.local", trace=True)
 
+        def check_trace(trace):
+            self.assertIsNot(None, trace.request_type)
+            self.assertIsNot(None, trace.duration)
+            self.assertIsNot(None, trace.started_at)
+            self.assertIsNot(None, trace.coordinator)
+            self.assertIsNot(None, trace.events)
+
         query = "SELECT * FROM system.local"
         statement = SimpleStatement(query)
         session.execute(statement, trace=True)
-        self.assertEqual(query, statement.trace.parameters['query'])
+        check_trace(statement.trace)
 
         query = "SELECT * FROM system.local"
         statement = SimpleStatement(query)
@@ -205,12 +212,17 @@ class ClusterTests(unittest.TestCase):
         statement2 = SimpleStatement(query)
         future = session.execute_async(statement2, trace=True)
         future.result()
-        self.assertEqual(query, future.get_query_trace().parameters['query'])
+        check_trace(future.get_query_trace())
 
         statement2 = SimpleStatement(query)
         future = session.execute_async(statement2)
         future.result()
         self.assertEqual(None, future.get_query_trace())
+
+        prepared = session.prepare("SELECT * FROM system.local")
+        future = session.execute_async(prepared, parameters=(), trace=True)
+        future.result()
+        check_trace(future.get_query_trace())
 
     def test_trace_timeout(self):
         cluster = Cluster()
