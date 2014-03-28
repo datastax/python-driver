@@ -1,3 +1,5 @@
+from tests.integration import PROTOCOL_VERSION
+
 try:
     import unittest2 as unittest
 except ImportError:
@@ -14,7 +16,7 @@ class PreparedStatementTests(unittest.TestCase):
         Test basic PreparedStatement usage
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
         session.execute(
             """
@@ -59,7 +61,7 @@ class PreparedStatementTests(unittest.TestCase):
         when prepared statements are missing the primary key
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         prepared = session.prepare(
@@ -76,7 +78,7 @@ class PreparedStatementTests(unittest.TestCase):
         Ensure a ValueError is thrown when attempting to bind too many variables
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         prepared = session.prepare(
@@ -92,7 +94,7 @@ class PreparedStatementTests(unittest.TestCase):
         Ensure binding None is handled correctly
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         prepared = session.prepare(
@@ -119,7 +121,7 @@ class PreparedStatementTests(unittest.TestCase):
         Ensure None binding over async queries
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         prepared = session.prepare(

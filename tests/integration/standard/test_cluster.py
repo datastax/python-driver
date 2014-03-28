@@ -1,3 +1,5 @@
+from tests.integration import PROTOCOL_VERSION
+
 try:
     import unittest2 as unittest
 except ImportError:
@@ -18,7 +20,7 @@ class ClusterTests(unittest.TestCase):
         Test basic connection and usage
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
         result = session.execute(
             """
@@ -54,7 +56,7 @@ class ClusterTests(unittest.TestCase):
         Ensure clusters that connect on a keyspace, do
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
         result = session.execute(
             """
@@ -71,7 +73,7 @@ class ClusterTests(unittest.TestCase):
         self.assertEquals(result, result2)
 
     def test_set_keyspace_twice(self):
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
         session.execute("USE system")
         session.execute("USE system")
@@ -86,7 +88,8 @@ class ClusterTests(unittest.TestCase):
             reconnection_policy=ExponentialReconnectionPolicy(1.0, 600.0),
             default_retry_policy=RetryPolicy(),
             conviction_policy_factory=SimpleConvictionPolicy,
-            connection_class=AsyncoreConnection
+            connection_class=AsyncoreConnection,
+            protocol_version=PROTOCOL_VERSION
         )
 
     def test_double_shutdown(self):
@@ -94,7 +97,7 @@ class ClusterTests(unittest.TestCase):
         Ensure that a cluster can be shutdown twice, without error
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         cluster.shutdown()
 
         try:
@@ -108,7 +111,7 @@ class ClusterTests(unittest.TestCase):
         Ensure you cannot connect to a cluster that's been shutdown
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         cluster.shutdown()
         self.assertRaises(Exception, cluster.connect)
 
@@ -132,7 +135,8 @@ class ClusterTests(unittest.TestCase):
         when a cluster cannot connect to given hosts
         """
 
-        cluster = Cluster(['127.1.2.9', '127.1.2.10'])
+        cluster = Cluster(['127.1.2.9', '127.1.2.10'],
+                          protocol_version=PROTOCOL_VERSION)
         self.assertRaises(NoHostAvailable, cluster.connect)
 
     def test_cluster_settings(self):
@@ -140,7 +144,7 @@ class ClusterTests(unittest.TestCase):
         Test connection setting getters and setters
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
 
         min_requests_per_connection = cluster.get_min_requests_per_connection(HostDistance.LOCAL)
         self.assertEqual(cassandra.cluster.DEFAULT_MIN_REQUESTS, min_requests_per_connection)
@@ -167,11 +171,11 @@ class ClusterTests(unittest.TestCase):
         Ensure new new schema is refreshed after submit_schema_refresh()
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         cluster.connect()
         self.assertNotIn("newkeyspace", cluster.metadata.keyspaces)
 
-        other_cluster = Cluster()
+        other_cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = other_cluster.connect()
         session.execute(
             """
@@ -189,7 +193,7 @@ class ClusterTests(unittest.TestCase):
         Ensure trace can be requested for async and non-async queries
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         self.assertRaises(TypeError, session.execute, "SELECT * FROM system.local", trace=True)
@@ -215,7 +219,7 @@ class ClusterTests(unittest.TestCase):
         self.assertEqual(None, future.get_query_trace())
 
     def test_trace_timeout(self):
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         query = "SELECT * FROM system.local"
@@ -229,7 +233,7 @@ class ClusterTests(unittest.TestCase):
         Ensure str(future) returns without error
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         query = "SELECT * FROM system.local"
