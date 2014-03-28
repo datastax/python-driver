@@ -202,11 +202,10 @@ class PrintStatementTests(unittest.TestCase):
 class BatchStatementTests(unittest.TestCase):
 
     def setUp(self):
-        cass_version, _ = get_server_versions()
-        if cass_version < (2, 0):
+        if PROTOCOL_VERSION < 2:
             raise unittest.SkipTest(
-                "Cassandra 2.0+ is required for BATCH operations, currently testing against %r"
-                % (cass_version,))
+                "Protocol 2.0+ is required for BATCH operations, currently testing against %r"
+                % (PROTOCOL_VERSION,))
 
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
@@ -272,11 +271,10 @@ class BatchStatementTests(unittest.TestCase):
 class SerialConsistencyTests(unittest.TestCase):
 
     def setUp(self):
-        cass_version, _ = get_server_versions()
-        if cass_version < (2, 0):
+        if PROTOCOL_VERSION < 2:
             raise unittest.SkipTest(
-                "Cassandra 2.0+ is required for BATCH operations, currently testing against %r"
-                % (cass_version,))
+                "Protocol 2.0+ is required for BATCH operations, currently testing against %r"
+                % (PROTOCOL_VERSION,))
 
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
