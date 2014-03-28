@@ -25,7 +25,7 @@ if CASSANDRA_VERSION.startswith('1'):
     DEFAULT_PROTOCOL_VERSION = 1
 else:
     DEFAULT_PROTOCOL_VERSION = 2
-PROTOCOL_VERSION = os.getenv('PROTOCOL_VERSION', DEFAULT_PROTOCOL_VERSION)
+PROTOCOL_VERSION = int(os.getenv('PROTOCOL_VERSION', DEFAULT_PROTOCOL_VERSION))
 
 
 path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ccm')
