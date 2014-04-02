@@ -1,16 +1,11 @@
-import platform
-import os
 import sys
-import warnings
-
-try:
-    import subprocess
-    has_subprocess = True
-except ImportError:
-    has_subprocess = False
 
 import ez_setup
 ez_setup.use_setuptools()
+
+if __name__ == '__main__' and sys.argv[1] == "gevent_nosetests":
+    from gevent.monkey import patch_all
+    patch_all()
 
 from setuptools import setup
 from distutils.command.build_ext import build_ext
@@ -19,11 +14,28 @@ from distutils.errors import (CCompilerError, DistutilsPlatformError,
                               DistutilsExecError)
 from distutils.cmd import Command
 
+
+import platform
+import os
+import warnings
+
+try:
+    import subprocess
+    has_subprocess = True
+except ImportError:
+    has_subprocess = False
+
+from nose.commands import nosetests
+
 from cassandra import __version__
 
 long_description = ""
 with open("README.rst") as f:
     long_description = f.read()
+
+
+class gevent_nosetests(nosetests):
+    description = "run nosetests with gevent monkey patching"
 
 
 class DocCommand(Command):
@@ -143,7 +155,7 @@ On OSX, via homebrew:
 
 
 def run_setup(extensions):
-    kw = {'cmdclass': {'doc': DocCommand}}
+    kw = {'cmdclass': {'doc': DocCommand, 'gevent_nosetests': gevent_nosetests}}
     if extensions:
         kw['cmdclass']['build_ext'] = build_extensions
         kw['ext_modules'] = extensions

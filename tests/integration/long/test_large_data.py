@@ -39,9 +39,10 @@ class LargeDataTests(unittest.TestCase):
         return session
 
     def batch_futures(self, session, statement_generator):
-        futures = Queue.Queue(maxsize=121)
+        concurrency = 50
+        futures = Queue.Queue(maxsize=concurrency)
         for i, statement in enumerate(statement_generator):
-            if i > 0 and i % 120 == 0:
+            if i > 0 and i % (concurrency - 1) == 0:
                 # clear the existing queue
                 while True:
                     try:
@@ -68,7 +69,7 @@ class LargeDataTests(unittest.TestCase):
             session,
             (SimpleStatement('INSERT INTO %s (k, i) VALUES (0, %s)' % (table, i),
                             consistency_level=ConsistencyLevel.QUORUM)
-             for i in range(1000000)))
+             for i in range(100000)))
 
         # Read
         results = session.execute('SELECT i FROM %s WHERE k=%s' % (table, 0))
@@ -110,7 +111,7 @@ class LargeDataTests(unittest.TestCase):
             session,
             (SimpleStatement('INSERT INTO %s (k, i, v) VALUES (0, %s, %s)' % (table, i, str(bb)),
                             consistency_level=ConsistencyLevel.QUORUM)
-             for i in range(1000000)))
+             for i in range(100000)))
 
         # Read
         results = session.execute('SELECT i, v FROM %s WHERE k=%s' % (table, 0))

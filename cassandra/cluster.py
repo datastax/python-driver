@@ -34,8 +34,7 @@ from cassandra.decoder import (QueryMessage, ResultMessage,
                                BatchMessage, RESULT_KIND_PREPARED,
                                RESULT_KIND_SET_KEYSPACE, RESULT_KIND_ROWS,
                                RESULT_KIND_SCHEMA_CHANGE)
-from cassandra.metadata import Metadata
-from cassandra.metrics import Metrics
+from cassandra.metadata import Metadata, protect_name
 from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy)
@@ -45,11 +44,15 @@ from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              BatchStatement, bind_params, QueryTrace, Statement,
                              named_tuple_factory, dict_factory)
 
-# libev is all around faster, so we want to try and default to using that when we can
-try:
-    from cassandra.io.libevreactor import LibevConnection as DefaultConnection
-except ImportError:
-    from cassandra.io.asyncorereactor import AsyncoreConnection as DefaultConnection  # NOQA
+# default to gevent when we are monkey patched, otherwise if libev is available, use that as the
+# default because it's faster than asyncore
+if 'gevent.monkey' in sys.modules:
+    from cassandra.io.geventreactor import GeventConnection as DefaultConnection
+else:
+    try:
+        from cassandra.io.libevreactor import LibevConnection as DefaultConnection  # NOQA
+    except ImportError:
+        from cassandra.io.asyncorereactor import AsyncoreConnection as DefaultConnection  # NOQA
 
 # Forces load of utf8 encoding module to avoid deadlock that occurs
 # if code that is being imported tries to import the module in a seperate
@@ -284,13 +287,6 @@ class Cluster(object):
         Any of the mutable Cluster attributes may be set as keyword arguments
         to the constructor.
         """
-        if 'gevent.monkey' in sys.modules:
-            raise Exception(
-                "gevent monkey-patching detected. This driver does not currently "
-                "support gevent, and monkey patching will break the driver "
-                "completely. You can track progress towards adding gevent "
-                "support here: https://datastax-oss.atlassian.net/browse/PYTHON-7.")
-
         self.contact_points = contact_points
         self.port = port
         self.compression = compression
@@ -373,6 +369,7 @@ class Cluster(object):
         self._lock = RLock()
 
         if self.metrics_enabled:
+            from cassandra.metrics import Metrics
             self.metrics = Metrics(weakref.proxy(self))
 
         self.control_connection = ControlConnection(
@@ -474,19 +471,20 @@ class Cluster(object):
 
                 self.load_balancing_policy.populate(
                     weakref.proxy(self), self.metadata.all_hosts())
+
+                if self.control_connection:
+                    try:
+                        self.control_connection.connect()
+                        log.debug("Control connection created")
+                    except Exception:
+                        log.exception("Control connection failed to connect, "
+                                      "shutting down Cluster:")
+                        self.shutdown()
+                        raise
+
+                self.load_balancing_policy.check_supported()
+
                 self._is_setup = True
-
-            if self.control_connection:
-                try:
-                    self.control_connection.connect()
-                    log.debug("Control connection created")
-                except Exception:
-                    log.exception("Control connection failed to connect, "
-                                  "shutting down Cluster:")
-                    self.shutdown()
-                    raise
-
-            self.load_balancing_policy.check_supported()
 
         session = self._new_session()
         if keyspace:
@@ -768,13 +766,13 @@ class Cluster(object):
             self.on_down(host, is_host_addition, force_if_down=True)
         return is_down
 
-    def add_host(self, address, signal):
+    def add_host(self, address, datacenter=None, rack=None, signal=True):
         """
         Called when adding initial contact points and when the control
         connection subsequently discovers a new node.  Intended for internal
         use only.
         """
-        new_host = self.metadata.add_host(address)
+        new_host = self.metadata.add_host(address, datacenter, rack)
         if new_host and signal:
             log.info("New Cassandra host %s added", address)
             self.on_add(new_host)
@@ -1289,7 +1287,7 @@ class Session(object):
         Set the default keyspace for all queries made through this Session.
         This operation blocks until complete.
         """
-        self.execute('USE "%s"' % (keyspace,))
+        self.execute('USE %s' % (protect_name(keyspace),))
 
     def _set_keyspace_for_all_pools(self, keyspace, callback):
         """
@@ -1598,7 +1596,9 @@ class ControlConnection(object):
 
             host = self._cluster.metadata.get_host(connection.host)
             if host:
-                host.set_location_info(local_row["data_center"], local_row["rack"])
+                datacenter = local_row.get("data_center")
+                rack = local_row.get("rack")
+                self._update_location_info(host, datacenter, rack)
 
             partitioner = local_row.get("partitioner")
             tokens = local_row.get("tokens")
@@ -1616,10 +1616,13 @@ class ControlConnection(object):
             found_hosts.add(addr)
 
             host = self._cluster.metadata.get_host(addr)
+            datacenter = row.get("data_center")
+            rack = row.get("rack")
             if host is None:
                 log.debug("[control connection] Found new host to connect to: %s", addr)
-                host = self._cluster.add_host(addr, signal=True)
-            host.set_location_info(row.get("data_center"), row.get("rack"))
+                host = self._cluster.add_host(addr, datacenter, rack, signal=True)
+            else:
+                self._update_location_info(host, datacenter, rack)
 
             tokens = row.get("tokens")
             if partitioner and tokens:
@@ -1636,11 +1639,22 @@ class ControlConnection(object):
             log.debug("[control connection] Fetched ring info, rebuilding metadata")
             self._cluster.metadata.rebuild_token_map(partitioner, token_map)
 
+    def _update_location_info(self, host, datacenter, rack):
+        if host.datacenter == datacenter and host.rack == rack:
+            return
+
+        # If the dc/rack information changes, we need to update the load balancing policy.
+        # For that, we remove and re-add the node against the policy. Not the most elegant, and assumes
+        # that the policy will update correctly, but in practice this should work.
+        self._cluster.load_balancing_policy.on_down(host)
+        host.set_location_info(datacenter, rack)
+        self._cluster.load_balancing_policy.on_up(host)
+
     def _handle_topology_change(self, event):
         change_type = event["change_type"]
         addr, port = event["address"]
         if change_type == "NEW_NODE":
-            self._cluster.scheduler.schedule(10, self._cluster.add_host, addr, signal=True)
+            self._cluster.scheduler.schedule(10, self.refresh_node_list_and_token_map)
         elif change_type == "REMOVED_NODE":
             host = self._cluster.metadata.get_host(addr)
             self._cluster.scheduler.schedule(0, self._cluster.remove_host, host)
@@ -1654,7 +1668,7 @@ class ControlConnection(object):
         if change_type == "UP":
             if host is None:
                 # this is the first time we've seen the node
-                self._cluster.scheduler.schedule(1, self._cluster.add_host, addr, signal=True)
+                self._cluster.scheduler.schedule(1, self.refresh_node_list_and_token_map)
             else:
                 # this will be run by the scheduler
                 self._cluster.scheduler.schedule(1, self._cluster.on_up, host)
@@ -1893,6 +1907,7 @@ class ResponseFuture(object):
         self.default_timeout = default_timeout
         self._metrics = metrics
         self.prepared_statement = prepared_statement
+        self._callback_lock = Lock()
         if metrics is not None:
             self._start_time = time.time()
 
@@ -1947,6 +1962,8 @@ class ResponseFuture(object):
         except Exception as exc:
             log.debug("Error querying host %s", host, exc_info=True)
             self._errors[host] = exc
+            if self._metrics is not None:
+                self._metrics.on_connection_error()
             if connection:
                 pool.return_connection(connection)
             return None
@@ -2164,7 +2181,8 @@ class ResponseFuture(object):
                 del self.session  # clear reference cycles
             except AttributeError:
                 pass
-        self._final_result = response
+        with self._callback_lock:
+            self._final_result = response
         self._event.set()
         if self._callback:
             fn, args, kwargs = self._callback
@@ -2177,7 +2195,8 @@ class ResponseFuture(object):
             del self.session  # clear reference cycles
         except AttributeError:
             pass
-        self._final_exception = response
+        with self._callback_lock:
+            self._final_exception = response
         self._event.set()
         if self._errback:
             fn, args, kwargs = self._errback
@@ -2297,10 +2316,14 @@ class ResponseFuture(object):
             >>> future.add_callback(handle_results, time.time(), should_log=True)
 
         """
-        if self._final_result is not _NOT_SET:
+        run_now = False
+        with self._callback_lock:
+            if self._final_result is not _NOT_SET:
+                run_now = True
+            else:
+                self._callback = (fn, args, kwargs)
+        if run_now:
             fn(self._final_result, *args, **kwargs)
-        else:
-            self._callback = (fn, args, kwargs)
         return self
 
     def add_errback(self, fn, *args, **kwargs):
@@ -2309,10 +2332,14 @@ class ResponseFuture(object):
         An Exception instance will be passed as the first positional argument
         to `fn`.
         """
-        if self._final_exception:
+        run_now = False
+        with self._callback_lock:
+            if self._final_exception:
+                run_now = True
+            else:
+                self._errback = (fn, args, kwargs)
+        if run_now:
             fn(self._final_exception, *args, **kwargs)
-        else:
-            self._errback = (fn, args, kwargs)
         return self
 
     def add_callbacks(self, callback, errback,

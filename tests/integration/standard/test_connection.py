@@ -6,6 +6,7 @@ except ImportError:
     import unittest # noqa
 
 from functools import partial
+import sys
 from threading import Thread, Event
 
 from cassandra import ConsistencyLevel
@@ -174,12 +175,18 @@ class AsyncoreConnectionTest(ConnectionTest, unittest.TestCase):
 
     klass = AsyncoreConnection
 
+    def setUp(self):
+        if 'gevent.monkey' in sys.modules:
+            raise unittest.SkipTest("Can't test libev with gevent monkey patching")
+
 
 class LibevConnectionTest(ConnectionTest, unittest.TestCase):
 
     klass = LibevConnection
 
     def setUp(self):
+        if 'gevent.monkey' in sys.modules:
+            raise unittest.SkipTest("Can't test libev with gevent monkey patching")
         if LibevConnection is None:
             raise unittest.SkipTest(
                 'libev does not appear to be installed properly')

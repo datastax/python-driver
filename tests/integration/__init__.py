@@ -27,7 +27,6 @@ else:
     DEFAULT_PROTOCOL_VERSION = 2
 PROTOCOL_VERSION = int(os.getenv('PROTOCOL_VERSION', DEFAULT_PROTOCOL_VERSION))
 
-
 path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ccm')
 if not os.path.exists(path):
     os.mkdir(path)
