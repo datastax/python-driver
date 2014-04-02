@@ -1910,13 +1910,7 @@ class ResponseFuture(object):
         self._callback_lock = Lock()
         if metrics is not None:
             self._start_time = time.time()
-
-        # convert the list/generator/etc to an iterator so that subsequent
-        # calls to send_request (which retries may do) will resume where
-        # they last left off
-        self.query_plan = iter(session._load_balancer.make_query_plan(
-            session.keyspace, query))
-
+        self._make_query_plan()
         self._event = Event()
         self._errors = {}
 
@@ -1925,6 +1919,13 @@ class ResponseFuture(object):
             del self.session
         except AttributeError:
             pass
+
+    def _make_query_plan(self):
+        # convert the list/generator/etc to an iterator so that subsequent
+        # calls to send_request (which retries may do) will resume where
+        # they last left off
+        self.query_plan = iter(self.session._load_balancer.make_query_plan(
+            self.session.keyspace, self.query))
 
     def send_request(self):
         """ Internal """
@@ -1972,6 +1973,21 @@ class ResponseFuture(object):
         self._current_pool = pool
         self._connection = connection
         return request_id
+
+    @property
+    def has_more_pages(self):
+        return self._paging_state is not None
+
+    def request_next_page(self):
+        if not self._paging_state:
+            raise QueryExhausted()
+
+        self._make_query_plan()
+        self.message.paging_state = self._paging_state
+        self._event.clear()
+        self._final_result = _NOT_SET
+        self._final_exception = None
+        self.send_request()
 
     def _reprepare(self, prepare_message):
         cb = partial(self.session.submit, self._execute_after_prepare)
@@ -2176,13 +2192,19 @@ class ResponseFuture(object):
     def _set_final_result(self, response):
         if self._metrics is not None:
             self._metrics.request_timer.addValue(time.time() - self._start_time)
-        if hasattr(self, 'session'):
-            try:
-                del self.session  # clear reference cycles
-            except AttributeError:
-                pass
-        with self._callback_lock:
-            self._final_result = response
+
+        if self._paging_state is None:
+            if hasattr(self, 'session'):
+                try:
+                    del self.session  # clear reference cycles
+                except AttributeError:
+                    pass
+            with self._callback_lock:
+                self._final_result = response
+        else:
+            with self._callback_lock:
+                self._final_result = PagedResult(self, response)
+
         self._event.set()
         if self._callback:
             fn, args, kwargs = self._callback
@@ -2375,3 +2397,35 @@ class ResponseFuture(object):
         return "<ResponseFuture: query='%s' request_id=%s result=%s exception=%s host=%s>" \
                % (self.query, self._req_id, result, self._final_exception, self._current_host)
     __repr__ = __str__
+
+
+class QueryExhausted(Exception):
+    pass
+
+
+class PagedResult(object):
+
+    def __init__(self, response_future, initial_response):
+        self.response_future = response_future
+        self.current_response = iter(initial_response)
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        try:
+            return next(self.current_response)
+        except StopIteration:
+            if self.response_future._paging_state is None:
+                raise
+
+        self.response_future.request_next_page()
+        result = self.response_future.result()
+        if self.response_future.has_more_pages:
+            self.current_response = result.current_response
+        else:
+            self.current_response = iter(result)
+
+        return next(self.current_response)
+
+    __next__ = next
