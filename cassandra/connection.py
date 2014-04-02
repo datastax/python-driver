@@ -7,9 +7,9 @@ import time
 import traceback
 
 if 'gevent.monkey' in sys.modules:
-    from gevent.queue import Queue
+    from gevent.queue import Queue, Empty
 else:
-    from Queue import Queue  # noqa
+    from Queue import Queue, Empty  # noqa
 
 from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut
 from cassandra.marshal import int8_unpack, int32_pack
@@ -204,7 +204,7 @@ class Connection(object):
         if not wait_for_id:
             try:
                 request_id = self._id_queue.get_nowait()
-            except Queue.Empty:
+            except Empty:
                 raise ConnectionBusy(
                     "Connection to %s is at the max number of requests" % self.host)
         else:
