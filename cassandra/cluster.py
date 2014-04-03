@@ -1914,12 +1914,6 @@ class ResponseFuture(object):
         self._event = Event()
         self._errors = {}
 
-    def __del__(self):
-        try:
-            del self.session
-        except AttributeError:
-            pass
-
     def _make_query_plan(self):
         # convert the list/generator/etc to an iterator so that subsequent
         # calls to send_request (which retries may do) will resume where
@@ -1978,7 +1972,7 @@ class ResponseFuture(object):
     def has_more_pages(self):
         return self._paging_state is not None
 
-    def request_next_page(self):
+    def start_fetching_next_page(self):
         if not self._paging_state:
             raise QueryExhausted()
 
@@ -2193,17 +2187,8 @@ class ResponseFuture(object):
         if self._metrics is not None:
             self._metrics.request_timer.addValue(time.time() - self._start_time)
 
-        if self._paging_state is None:
-            if hasattr(self, 'session'):
-                try:
-                    del self.session  # clear reference cycles
-                except AttributeError:
-                    pass
-            with self._callback_lock:
-                self._final_result = response
-        else:
-            with self._callback_lock:
-                self._final_result = PagedResult(self, response)
+        with self._callback_lock:
+            self._final_result = response
 
         self._event.set()
         if self._callback:
@@ -2213,10 +2198,7 @@ class ResponseFuture(object):
     def _set_final_exception(self, response):
         if self._metrics is not None:
             self._metrics.request_timer.addValue(time.time() - self._start_time)
-        try:
-            del self.session  # clear reference cycles
-        except AttributeError:
-            pass
+
         with self._callback_lock:
             self._final_exception = response
         self._event.set()
@@ -2279,13 +2261,19 @@ class ResponseFuture(object):
             timeout = self.default_timeout
 
         if self._final_result is not _NOT_SET:
-            return self._final_result
+            if self._paging_state is None:
+                return self._final_result
+            else:
+                return PagedResult(self, self._final_result)
         elif self._final_exception:
             raise self._final_exception
         else:
             self._event.wait(timeout=timeout)
             if self._final_result is not _NOT_SET:
-                return self._final_result
+                if self._paging_state is None:
+                    return self._final_result
+                else:
+                    return PagedResult(self, self._final_result)
             elif self._final_exception:
                 raise self._final_exception
             else:
@@ -2419,7 +2407,7 @@ class PagedResult(object):
             if self.response_future._paging_state is None:
                 raise
 
-        self.response_future.request_next_page()
+        self.response_future.start_fetching_next_page()
         result = self.response_future.result()
         if self.response_future.has_more_pages:
             self.current_response = result.current_response
