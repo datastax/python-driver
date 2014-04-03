@@ -2,6 +2,7 @@
 This module houses the main classes you will interact with,
 :class:`.Cluster` and :class:`.Session`.
 """
+from __future__ import absolute_import
 
 from concurrent.futures import ThreadPoolExecutor
 import logging
@@ -147,8 +148,15 @@ class Cluster(object):
     server will be automatically used.
     """
 
-    # TODO: docs
     protocol_version = 2
+    """
+    The version of the native protocol to use.  The protocol version 2
+    add support for lightweight transactions, batch operations, and
+    automatic query paging, but is only supported by Cassandra 2.0+.  When
+    working with Cassandra 1.2, this must be set to 1.  You can also set
+    this to 1 when working with Cassandra 2.0+, but features that require
+    the version 2 protocol will not be enabled.
+    """
 
     compression = True
     """
@@ -941,10 +949,10 @@ class Session(object):
     default_fetch_size = 5000
     """
     By default, this many rows will be fetched at a time.  This can be
-    specified per-query through :attr:`~Statement.fetch_size`.
+    specified per-query through :attr:`.Statement.fetch_size`.
 
     This only takes effect when protocol version 2 or higher is used.
-    See :attr:`~Cluster.protocol_version` for details.
+    See :attr:`.Cluster.protocol_version` for details.
     """
 
     _lock = None
@@ -1970,9 +1978,21 @@ class ResponseFuture(object):
 
     @property
     def has_more_pages(self):
+        """
+        Returns :const:`True` if there are more pages left in the
+        query results, :const:`False` otherwise.  This should only
+        be checked after the first page has been returned.
+        """
         return self._paging_state is not None
 
     def start_fetching_next_page(self):
+        """
+        If there are more pages left in the query result, this asynchronously
+        starts fetching the next page.  If there are no pages left, :exc:`.QueryExhausted`
+        is raised.  Also see :attr:`.has_more_pages`.
+
+        This should only be called after the first page has been returned.
+        """
         if not self._paging_state:
             raise QueryExhausted()
 
@@ -2388,10 +2408,33 @@ class ResponseFuture(object):
 
 
 class QueryExhausted(Exception):
+    """
+    Raised when :meth:`.ResultSet.start_fetching_next_page()` is called and
+    there are no more pages.  You can check :attr:`.ResultSet.has_more_pages`
+    before calling to avoid this.
+    """
     pass
 
 
 class PagedResult(object):
+    """
+    An iterator over the rows from a paged query result.  Whenever the number
+    of result rows for a query exceed the :attr:`~.query.Statement.fetch_size`
+    (or :attr:`~.Session.default_fetch_size`, if not set) an instance of this
+    class will be returned.
+
+    You can treat this as a normal iterator over rows::
+
+        >>> from cassandra.query import SimpleStatement
+        >>> statement = SimpleStatement("SELECT * FROM users", fetch_size=10)
+        >>> for user_row in session.execute(statement):
+        ...     process_user(user_row)
+
+    Whenever there are no more rows in the current page, the next page will
+    be fetched transparently.  However, note that it _is_ possible for
+    an :class:`Exception` to be raised while fetching the next page, just
+    like you might see on a normal call to ``session.execute()``.
+    """
 
     def __init__(self, response_future, initial_response):
         self.response_future = response_future

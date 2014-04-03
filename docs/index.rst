@@ -8,6 +8,7 @@ Python Cassandra Driver
    installation
    getting_started
    performance
+   query_paging
 
 Indices and Tables
 ==================

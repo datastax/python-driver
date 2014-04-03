@@ -72,6 +72,13 @@ class Statement(object):
     """
 
     fetch_size = None
+    """
+    How many rows will be fetched at a time.  This overrides the default
+    of :attr:`.Session.default_fetch_size`
+
+    This only takes effect when protocol version 2 or higher is used.
+    See :attr:`.Cluster.protocol_version` for details.
+    """
 
     _serial_consistency_level = None
     _routing_key = None
