@@ -67,35 +67,27 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 2, 4)
         self.coordinator_stats.assert_query_count_equals(self, 3, 4)
 
-        try:
-            force_stop(3)
-            wait_for_down(cluster, 3)
+        force_stop(3)
+        wait_for_down(cluster, 3)
 
-            self.coordinator_stats.reset_counts()
-            self._query(session, keyspace)
+        self.coordinator_stats.reset_counts()
+        self._query(session, keyspace)
 
-            self.coordinator_stats.assert_query_count_equals(self, 1, 6)
-            self.coordinator_stats.assert_query_count_equals(self, 2, 6)
-            self.coordinator_stats.assert_query_count_equals(self, 3, 0)
+        self.coordinator_stats.assert_query_count_equals(self, 1, 6)
+        self.coordinator_stats.assert_query_count_equals(self, 2, 6)
+        self.coordinator_stats.assert_query_count_equals(self, 3, 0)
 
-            decommission(1)
-            start(3)
-            wait_for_down(cluster, 1)
-            wait_for_up(cluster, 3)
+        decommission(1)
+        start(3)
+        wait_for_down(cluster, 1)
+        wait_for_up(cluster, 3)
 
-            self.coordinator_stats.reset_counts()
-            self._query(session, keyspace)
+        self.coordinator_stats.reset_counts()
+        self._query(session, keyspace)
 
-            self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-            self.coordinator_stats.assert_query_count_equals(self, 2, 6)
-            self.coordinator_stats.assert_query_count_equals(self, 3, 6)
-        finally:
-            try: start(1)
-            except: pass
-            try: start(3)
-            except: pass
-
-            wait_for_up(cluster, 3)
+        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
+        self.coordinator_stats.assert_query_count_equals(self, 2, 6)
+        self.coordinator_stats.assert_query_count_equals(self, 3, 6)
 
     def test_roundrobin_two_dcs(self):
         use_multidc([2,2])
