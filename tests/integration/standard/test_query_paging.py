@@ -28,6 +28,7 @@ class QueryPagingTests(unittest.TestCase):
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         self.session = self.cluster.connect()
+        self.session.execute("TRUNCATE test3rf.test")
 
     def test_paging(self):
         statements_and_params = zip(cycle(["INSERT INTO test3rf.test (k, v) VALUES (%s, 0)"]),
