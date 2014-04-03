@@ -8,6 +8,9 @@ Features
   github issue #46)
 * Support static columns in schemas, which are available starting in
   Cassandra 2.1. (github issue #91)
+* Add debian packaging (github issue #101)
+* Add utility methods for easy concurrent execution of statements. See
+  the new cassandra.concurrent module. (github issue #7)
 
 Bug Fixes
 ---------
