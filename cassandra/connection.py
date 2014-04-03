@@ -4,7 +4,6 @@ import logging
 import sys
 from threading import Event, RLock
 import time
-import traceback
 
 if 'gevent.monkey' in sys.modules:
     from gevent.queue import Queue, Empty
@@ -164,12 +163,8 @@ class Connection(object):
                 return
             self.is_defunct = True
 
-        trace = traceback.format_exc(exc)
-        if trace != "None":
-            log.debug("Defuncting connection (%s) to %s: %s\n%s",
-                      id(self), self.host, exc, traceback.format_exc(exc))
-        else:
-            log.debug("Defuncting connection (%s) to %s: %s", id(self), self.host, exc)
+        log.debug("Defuncting connection (%s) to %s:",
+                  id(self), self.host, exc_info=exc)
 
         self.last_error = exc
         self.close()
