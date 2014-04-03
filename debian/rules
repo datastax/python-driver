@@ -1,0 +1,16 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@ --with python2,sphinxdoc
+
+override_dh_auto_build:
+	dh_auto_build
+	python setup.py doc
+
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+override_dh_auto_test:
+	python setup.py gevent_nosetests
+endif
+
+override_dh_strip:
+	dh_strip --dbg-package=python-cassandra-driver-dbg
