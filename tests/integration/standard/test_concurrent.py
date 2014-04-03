@@ -1,5 +1,3 @@
-from tests.integration import PROTOCOL_VERSION
-
 try:
     import unittest2 as unittest
 except ImportError:
@@ -12,13 +10,13 @@ from cassandra.cluster import Cluster
 from cassandra.concurrent import (execute_concurrent,
                                   execute_concurrent_with_args)
 from cassandra.policies import HostDistance
-from cassandra.query import tuple_factory
+from cassandra.decoder import tuple_factory
 
 
 class ClusterTests(unittest.TestCase):
 
     def setUp(self):
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.cluster = Cluster()
         self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         self.session = self.cluster.connect()
         self.session.row_factory = tuple_factory
