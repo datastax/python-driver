@@ -181,9 +181,9 @@ class Connection(object):
             try:
                 cb(new_exc)
             except Exception:
-                log.warn("Ignoring unhandled exception while erroring callbacks for a "
-                         "failed connection (%s) to host %s:",
-                         id(self), self.host, exc_info=True)
+                log.warning("Ignoring unhandled exception while erroring callbacks for a "
+                            "failed connection (%s) to host %s:",
+                            id(self), self.host, exc_info=True)
 
     def handle_pushed(self, response):
         log.debug("Message pushed from server: %r", response)

@@ -100,7 +100,7 @@ def decode_response(stream_id, flags, opcode, body, decompressor=None):
         trace_id = None
 
     if flags:
-        log.warn("Unknown protocol flags set: %02x. May cause problems.", flags)
+        log.warning("Unknown protocol flags set: %02x. May cause problems.", flags)
 
     msg_class = _message_types_by_opcode[opcode]
     msg = msg_class.recv_body(body)
