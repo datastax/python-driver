@@ -118,7 +118,9 @@ def wait_for_up(cluster, node, wait=True):
         if host and host.is_up:
             # BUG: shouldn't have to, but we do
             if wait:
+                log.debug("Sleeping 5s until host is up")
                 time.sleep(20)
+            log.debug("Done waiting for node %s to be up", node)
             return
 
 
@@ -130,7 +132,7 @@ def wait_for_down(cluster, node, wait=True):
         if not host or not host.is_up:
             # BUG: shouldn't have to, but we do
             if wait:
-                log.debug("Sleeping 5s until host is up")
-                time.sleep(5)
+                log.debug("Sleeping 5s until host is down")
+                time.sleep(10)
             log.debug("Done waiting for node %s to be down", node)
             return
