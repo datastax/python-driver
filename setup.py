@@ -26,8 +26,6 @@ try:
 except ImportError:
     has_subprocess = False
 
-from nose.commands import nosetests
-
 from cassandra import __version__
 
 long_description = ""
@@ -35,8 +33,13 @@ with open("README.rst") as f:
     long_description = f.read()
 
 
-class gevent_nosetests(nosetests):
-    description = "run nosetests with gevent monkey patching"
+try:
+    from nose.commands import nosetests
+except ImportError:
+    gevent_nosetests = None
+else:
+    class gevent_nosetests(nosetests):
+        description = "run nosetests with gevent monkey patching"
 
 
 class DocCommand(Command):
