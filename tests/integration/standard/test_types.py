@@ -18,7 +18,7 @@ from cassandra.cqltypes import Int32Type, EMPTY
 from cassandra.query import dict_factory
 from cassandra.util import OrderedDict
 
-from tests.integration import get_server_versions
+from tests.integration import get_server_versions, PROTOCOL_VERSION
 
 
 class TypeTests(unittest.TestCase):
@@ -27,7 +27,7 @@ class TypeTests(unittest.TestCase):
         self._cass_version, self._cql_version = get_server_versions()
 
     def test_blob_type_as_string(self):
-        c = Cluster()
+        c = Cluster(protocol_version=PROTOCOL_VERSION)
         s = c.connect()
 
         s.execute("""
@@ -69,7 +69,7 @@ class TypeTests(unittest.TestCase):
             self.assertEqual(expected, actual)
 
     def test_blob_type_as_bytearray(self):
-        c = Cluster()
+        c = Cluster(protocol_version=PROTOCOL_VERSION)
         s = c.connect()
 
         s.execute("""
@@ -129,7 +129,7 @@ class TypeTests(unittest.TestCase):
         """
 
     def test_basic_types(self):
-        c = Cluster()
+        c = Cluster(protocol_version=PROTOCOL_VERSION)
         s = c.connect()
         s.execute("""
             CREATE KEYSPACE typetests
@@ -226,7 +226,7 @@ class TypeTests(unittest.TestCase):
             self.assertEqual(expected, actual)
 
     def test_empty_strings_and_nones(self):
-        c = Cluster()
+        c = Cluster(protocol_version=PROTOCOL_VERSION)
         s = c.connect()
         s.execute("""
             CREATE KEYSPACE test_empty_strings_and_nones
@@ -329,7 +329,7 @@ class TypeTests(unittest.TestCase):
         self.assertEqual([], [(name, val) for (name, val) in results[0].items() if val is not None])
 
     def test_empty_values(self):
-        c = Cluster()
+        c = Cluster(protocol_version=PROTOCOL_VERSION)
         s = c.connect()
         s.execute("""
             CREATE KEYSPACE test_empty_values
@@ -356,7 +356,7 @@ class TypeTests(unittest.TestCase):
         eastern_tz = pytz.timezone('US/Eastern')
         eastern_tz.localize(dt)
 
-        c = Cluster()
+        c = Cluster(protocol_version=PROTOCOL_VERSION)
         s = c.connect()
 
         s.execute("""CREATE KEYSPACE tz_aware_test

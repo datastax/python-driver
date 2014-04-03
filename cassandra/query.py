@@ -73,6 +73,13 @@ class Statement(object):
     """
 
     fetch_size = None
+    """
+    How many rows will be fetched at a time.  This overrides the default
+    of :attr:`.Session.default_fetch_size`
+
+    This only takes effect when protocol version 2 or higher is used.
+    See :attr:`.Cluster.protocol_version` for details.
+    """
 
     _serial_consistency_level = None
     _routing_key = None
@@ -561,6 +568,7 @@ class QueryTrace(object):
             if max_wait is not None and time_spent >= max_wait:
                 raise TraceUnavailable("Trace information was not available within %f seconds" % (max_wait,))
 
+            log.debug("Attempting to fetch trace info for trace ID: %s", self.trace_id)
             session_results = self._execute(
                 self._SELECT_SESSIONS_FORMAT, (self.trace_id,), time_spent, max_wait)
 
@@ -568,6 +576,7 @@ class QueryTrace(object):
                 time.sleep(self._BASE_RETRY_SLEEP * (2 ** attempt))
                 attempt += 1
                 continue
+            log.debug("Fetched trace info for trace ID: %s", self.trace_id)
 
             session_row = session_results[0]
             self.request_type = session_row.request
@@ -576,9 +585,11 @@ class QueryTrace(object):
             self.coordinator = session_row.coordinator
             self.parameters = session_row.parameters
 
+            log.debug("Attempting to fetch trace events for trace ID: %s", self.trace_id)
             time_spent = time.time() - start
             event_results = self._execute(
                 self._SELECT_EVENTS_FORMAT, (self.trace_id,), time_spent, max_wait)
+            log.debug("Fetched trace events for trace ID: %s", self.trace_id)
             self.events = tuple(TraceEvent(r.activity, r.event_id, r.source, r.source_elapsed, r.thread)
                                 for r in event_results)
             break

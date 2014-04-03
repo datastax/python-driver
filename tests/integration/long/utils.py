@@ -4,7 +4,7 @@ import time
 
 from collections import defaultdict
 
-from cassandra.decoder import named_tuple_factory
+from cassandra.query import named_tuple_factory
 
 from tests.integration import get_node
 
@@ -74,7 +74,9 @@ def stop(node):
 
 
 def force_stop(node):
+    log.debug("Forcing stop of node %s", node)
     get_node(node).stop(wait=False, gently=False)
+    log.debug("Node %s was stopped", node)
 
 
 def ring(node):
@@ -85,6 +87,7 @@ def ring(node):
 def wait_for_up(cluster, node, wait=True):
     while True:
         host = cluster.metadata.get_host('127.0.0.%s' % node)
+        time.sleep(0.1)
         if host and host.is_up:
             # BUG: shouldn't have to, but we do
             if wait:
@@ -93,10 +96,14 @@ def wait_for_up(cluster, node, wait=True):
 
 
 def wait_for_down(cluster, node, wait=True):
+    log.debug("Waiting for node %s to be down", node)
     while True:
         host = cluster.metadata.get_host('127.0.0.%s' % node)
+        time.sleep(0.1)
         if not host or not host.is_up:
             # BUG: shouldn't have to, but we do
             if wait:
+                log.debug("Sleeping 5s until host is up")
                 time.sleep(5)
+            log.debug("Done waiting for node %s to be down", node)
             return

@@ -137,6 +137,7 @@ class RoundRobinPolicy(LoadBalancingPolicy):
 
     This load balancing policy is used by default.
     """
+    _live_hosts = frozenset(())
 
     def populate(self, cluster, hosts):
         self._live_hosts = frozenset(hosts)

@@ -3,6 +3,7 @@ import logging
 from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster
 from cassandra.query import SimpleStatement
+from tests.integration import PROTOCOL_VERSION
 
 try:
     import unittest2 as unittest
@@ -15,7 +16,7 @@ log = logging.getLogger(__name__)
 class SchemaTests(unittest.TestCase):
 
     def test_recreates(self):
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
         replication_factor = 3
 

@@ -1,3 +1,5 @@
+from tests.integration import PROTOCOL_VERSION
+
 try:
     import unittest2 as unittest
 except ImportError:
@@ -36,7 +38,7 @@ class TestFactories(unittest.TestCase):
     '''
 
     def test_tuple_factory(self):
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
         session.row_factory = tuple_factory
 
@@ -58,7 +60,7 @@ class TestFactories(unittest.TestCase):
         self.assertEqual(result[1][0], 2)
 
     def test_named_tuple_factoryy(self):
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
         session.row_factory = named_tuple_factory
 
@@ -79,7 +81,7 @@ class TestFactories(unittest.TestCase):
         self.assertEqual(result[1].k, 2)
 
     def test_dict_factory(self):
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
         session.row_factory = dict_factory
 
@@ -101,7 +103,7 @@ class TestFactories(unittest.TestCase):
         self.assertEqual(result[1]['k'], 2)
 
     def test_ordered_dict_factory(self):
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
         session.row_factory = ordered_dict_factory
 

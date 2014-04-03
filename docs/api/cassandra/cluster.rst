@@ -7,6 +7,8 @@
 
    .. autoattribute:: cql_version
 
+   .. autoattribute:: protocol_version
+
    .. autoattribute:: port
 
    .. autoattribute:: compression
@@ -59,6 +61,8 @@
 
    .. autoattribute:: row_factory
 
+   .. autoattribute:: default_fetch_size
+
    .. automethod:: execute(statement[, parameters][, timeout][, trace])
 
    .. automethod:: execute_async(statement[, parameters][, trace])
@@ -77,11 +81,20 @@
 
    .. automethod:: get_query_trace()
 
+   .. autoattribute:: has_more_pages
+
+   .. automethod:: start_fetching_next_page()
+
    .. automethod:: add_callback(fn, *args, **kwargs)
 
    .. automethod:: add_errback(fn, *args, **kwargs)
 
    .. automethod:: add_callbacks(callback, errback, callback_args=(), callback_kwargs=None, errback_args=(), errback_args=None)
+
+.. autoclass:: PagedResult ()
+   :members:
+
+.. autoexception:: QueryExhausted ()
 
 .. autoexception:: NoHostAvailable ()
    :members:

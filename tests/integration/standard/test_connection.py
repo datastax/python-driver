@@ -1,9 +1,12 @@
+from tests.integration import PROTOCOL_VERSION
+
 try:
     import unittest2 as unittest
 except ImportError:
     import unittest # noqa
 
 from functools import partial
+import sys
 from threading import Thread, Event
 
 from cassandra import ConsistencyLevel
@@ -24,7 +27,7 @@ class ConnectionTest(object):
         """
         Test a single connection with sequential requests.
         """
-        conn = self.klass.factory()
+        conn = self.klass.factory(protocol_version=PROTOCOL_VERSION)
         query = "SELECT keyspace_name FROM system.schema_keyspaces LIMIT 1"
         event = Event()
 
@@ -47,7 +50,7 @@ class ConnectionTest(object):
         """
         Test a single connection with pipelined requests.
         """
-        conn = self.klass.factory()
+        conn = self.klass.factory(protocol_version=PROTOCOL_VERSION)
         query = "SELECT keyspace_name FROM system.schema_keyspaces LIMIT 1"
         responses = [False] * 100
         event = Event()
@@ -69,7 +72,7 @@ class ConnectionTest(object):
         """
         Test multiple connections with pipelined requests.
         """
-        conns = [self.klass.factory() for i in range(5)]
+        conns = [self.klass.factory(protocol_version=PROTOCOL_VERSION) for i in range(5)]
         events = [Event() for i in range(5)]
         query = "SELECT keyspace_name FROM system.schema_keyspaces LIMIT 1"
 
@@ -100,7 +103,7 @@ class ConnectionTest(object):
         num_threads = 5
         event = Event()
 
-        conn = self.klass.factory()
+        conn = self.klass.factory(protocol_version=PROTOCOL_VERSION)
         query = "SELECT keyspace_name FROM system.schema_keyspaces LIMIT 1"
 
         def cb(all_responses, thread_responses, request_num, *args, **kwargs):
@@ -157,7 +160,7 @@ class ConnectionTest(object):
 
         threads = []
         for i in range(num_conns):
-            conn = self.klass.factory()
+            conn = self.klass.factory(protocol_version=PROTOCOL_VERSION)
             t = Thread(target=send_msgs, args=(conn, events[i]))
             threads.append(t)
 
@@ -172,12 +175,18 @@ class AsyncoreConnectionTest(ConnectionTest, unittest.TestCase):
 
     klass = AsyncoreConnection
 
+    def setUp(self):
+        if 'gevent.monkey' in sys.modules:
+            raise unittest.SkipTest("Can't test libev with gevent monkey patching")
+
 
 class LibevConnectionTest(ConnectionTest, unittest.TestCase):
 
     klass = LibevConnection
 
     def setUp(self):
+        if 'gevent.monkey' in sys.modules:
+            raise unittest.SkipTest("Can't test libev with gevent monkey patching")
         if LibevConnection is None:
             raise unittest.SkipTest(
                 'libev does not appear to be installed properly')

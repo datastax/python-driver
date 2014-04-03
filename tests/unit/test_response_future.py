@@ -35,6 +35,9 @@ class ResponseFutureTests(unittest.TestCase):
         message = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
         return ResponseFuture(session, message, query)
 
+    def make_mock_response(self, results):
+        return Mock(spec=ResultMessage, kind=RESULT_KIND_ROWS, results=results, paging_state=None)
+
     def test_result_message(self):
         session = self.make_basic_session()
         session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
@@ -49,9 +52,7 @@ class ResponseFutureTests(unittest.TestCase):
         connection = pool.borrow_connection.return_value
         connection.send_msg.assert_called_once_with(rf.message, cb=ANY)
 
-        response = Mock(spec=ResultMessage, kind=RESULT_KIND_ROWS, results=[{'col': 'val'}])
-        rf._set_result(response)
-
+        rf._set_result(self.make_mock_response([{'col': 'val'}]))
         result = rf.result()
         self.assertEqual(result, [{'col': 'val'}])
 
@@ -259,8 +260,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf = self.make_response_future(session)
         rf.send_request()
 
-        response = Mock(spec=ResultMessage, kind=RESULT_KIND_ROWS, results=[{'col': 'val'}])
-        rf._set_result(response)
+        rf._set_result(self.make_mock_response([{'col': 'val'}]))
 
         result = rf.result()
         self.assertEqual(result, [{'col': 'val'}])
@@ -280,8 +280,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf = self.make_response_future(session)
         rf.send_request()
 
-        response = Mock(spec=ResultMessage, kind=RESULT_KIND_ROWS, results=[{'col': 'val'}])
-        rf._set_result(response)
+        rf._set_result(self.make_mock_response([{'col': 'val'}]))
         self.assertEqual(rf.result(), [{'col': 'val'}])
 
         # make sure the exception is recorded correctly
@@ -294,8 +293,7 @@ class ResponseFutureTests(unittest.TestCase):
 
         rf.add_callback(self.assertEqual, [{'col': 'val'}])
 
-        response = Mock(spec=ResultMessage, kind=RESULT_KIND_ROWS, results=[{'col': 'val'}])
-        rf._set_result(response)
+        rf._set_result(self.make_mock_response([{'col': 'val'}]))
 
         result = rf.result()
         self.assertEqual(result, [{'col': 'val'}])
@@ -349,8 +347,7 @@ class ResponseFutureTests(unittest.TestCase):
             callback=self.assertEqual, callback_args=([{'col': 'val'}],),
             errback=self.assertIsInstance, errback_args=(Exception,))
 
-        response = Mock(spec=ResultMessage, kind=RESULT_KIND_ROWS, results=[{'col': 'val'}])
-        rf._set_result(response)
+        rf._set_result(self.make_mock_response([{'col': 'val'}]))
         self.assertEqual(rf.result(), [{'col': 'val'}])
 
     def test_prepared_query_not_found(self):

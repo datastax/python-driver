@@ -157,7 +157,7 @@ class Metadata(object):
 
         if not cf_results:
             # the table was removed
-            del keyspace_meta.tables[table]
+            keyspace_meta.tables.pop(table, None)
         else:
             assert len(cf_results) == 1
             keyspace_meta.tables[table] = self._build_table_metadata(
@@ -346,11 +346,12 @@ class Metadata(object):
         else:
             return True
 
-    def add_host(self, address):
+    def add_host(self, address, datacenter, rack):
         cluster = self.cluster_ref()
         with self._hosts_lock:
             if address not in self._hosts:
-                new_host = Host(address, cluster.conviction_policy_factory)
+                new_host = Host(
+                    address, cluster.conviction_policy_factory, datacenter, rack)
                 self._hosts[address] = new_host
             else:
                 return None

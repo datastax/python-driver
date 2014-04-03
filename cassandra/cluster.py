@@ -2,6 +2,8 @@
 This module houses the main classes you will interact with,
 :class:`.Cluster` and :class:`.Session`.
 """
+from __future__ import absolute_import
+
 from concurrent.futures import ThreadPoolExecutor
 import logging
 import socket
@@ -37,8 +39,7 @@ from cassandra.decoder import (QueryMessage, ResultMessage,
                                BatchMessage, RESULT_KIND_PREPARED,
                                RESULT_KIND_SET_KEYSPACE, RESULT_KIND_ROWS,
                                RESULT_KIND_SCHEMA_CHANGE)
-from cassandra.metadata import Metadata
-# from cassandra.metrics import Metrics
+from cassandra.metadata import Metadata, protect_name
 from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy)
@@ -48,11 +49,15 @@ from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              BatchStatement, bind_params, QueryTrace, Statement,
                              named_tuple_factory, dict_factory)
 
-# libev is all around faster, so we want to try and default to using that when we can
-try:
-    from cassandra.io.libevreactor import LibevConnection as DefaultConnection
-except ImportError:
-    from cassandra.io.asyncorereactor import AsyncoreConnection as DefaultConnection  # NOQA
+# default to gevent when we are monkey patched, otherwise if libev is available, use that as the
+# default because it's faster than asyncore
+if 'gevent.monkey' in sys.modules:
+    from cassandra.io.geventreactor import GeventConnection as DefaultConnection
+else:
+    try:
+        from cassandra.io.libevreactor import LibevConnection as DefaultConnection  # NOQA
+    except ImportError:
+        from cassandra.io.asyncorereactor import AsyncoreConnection as DefaultConnection  # NOQA
 
 # Forces load of utf8 encoding module to avoid deadlock that occurs
 # if code that is being imported tries to import the module in a seperate
@@ -147,8 +152,15 @@ class Cluster(object):
     server will be automatically used.
     """
 
-    # TODO: docs
     protocol_version = 2
+    """
+    The version of the native protocol to use.  The protocol version 2
+    add support for lightweight transactions, batch operations, and
+    automatic query paging, but is only supported by Cassandra 2.0+.  When
+    working with Cassandra 1.2, this must be set to 1.  You can also set
+    this to 1 when working with Cassandra 2.0+, but features that require
+    the version 2 protocol will not be enabled.
+    """
 
     compression = True
     """
@@ -287,13 +299,6 @@ class Cluster(object):
         Any of the mutable Cluster attributes may be set as keyword arguments
         to the constructor.
         """
-        if 'gevent.monkey' in sys.modules:
-            raise Exception(
-                "gevent monkey-patching detected. This driver does not currently "
-                "support gevent, and monkey patching will break the driver "
-                "completely. You can track progress towards adding gevent "
-                "support here: https://datastax-oss.atlassian.net/browse/PYTHON-7.")
-
         self.contact_points = contact_points
         self.port = port
         self.compression = compression
@@ -478,19 +483,20 @@ class Cluster(object):
 
                 self.load_balancing_policy.populate(
                     weakref.proxy(self), self.metadata.all_hosts())
+
+                if self.control_connection:
+                    try:
+                        self.control_connection.connect()
+                        log.debug("Control connection created")
+                    except Exception:
+                        log.exception("Control connection failed to connect, "
+                                      "shutting down Cluster:")
+                        self.shutdown()
+                        raise
+
+                self.load_balancing_policy.check_supported()
+
                 self._is_setup = True
-
-            if self.control_connection:
-                try:
-                    self.control_connection.connect()
-                    log.debug("Control connection created")
-                except Exception:
-                    log.exception("Control connection failed to connect, "
-                                  "shutting down Cluster:")
-                    self.shutdown()
-                    raise
-
-            self.load_balancing_policy.check_supported()
 
         session = self._new_session()
         if keyspace:
@@ -772,13 +778,13 @@ class Cluster(object):
             self.on_down(host, is_host_addition, force_if_down=True)
         return is_down
 
-    def add_host(self, address, signal):
+    def add_host(self, address, datacenter=None, rack=None, signal=True):
         """
         Called when adding initial contact points and when the control
         connection subsequently discovers a new node.  Intended for internal
         use only.
         """
-        new_host = self.metadata.add_host(address)
+        new_host = self.metadata.add_host(address, datacenter, rack)
         if new_host and signal:
             log.info("New Cassandra host %s added", address)
             self.on_add(new_host)
@@ -947,10 +953,10 @@ class Session(object):
     default_fetch_size = 5000
     """
     By default, this many rows will be fetched at a time.  This can be
-    specified per-query through :attr:`~Statement.fetch_size`.
+    specified per-query through :attr:`.Statement.fetch_size`.
 
     This only takes effect when protocol version 2 or higher is used.
-    See :attr:`~Cluster.protocol_version` for details.
+    See :attr:`.Cluster.protocol_version` for details.
     """
 
     _lock = None
@@ -1293,7 +1299,7 @@ class Session(object):
         Set the default keyspace for all queries made through this Session.
         This operation blocks until complete.
         """
-        self.execute('USE "%s"' % (keyspace,))
+        self.execute('USE %s' % (protect_name(keyspace),))
 
     def _set_keyspace_for_all_pools(self, keyspace, callback):
         """
@@ -1602,7 +1608,9 @@ class ControlConnection(object):
 
             host = self._cluster.metadata.get_host(connection.host)
             if host:
-                host.set_location_info(local_row["data_center"], local_row["rack"])
+                datacenter = local_row.get("data_center")
+                rack = local_row.get("rack")
+                self._update_location_info(host, datacenter, rack)
 
             partitioner = local_row.get("partitioner")
             tokens = local_row.get("tokens")
@@ -1620,10 +1628,13 @@ class ControlConnection(object):
             found_hosts.add(addr)
 
             host = self._cluster.metadata.get_host(addr)
+            datacenter = row.get("data_center")
+            rack = row.get("rack")
             if host is None:
                 log.debug("[control connection] Found new host to connect to: %s", addr)
-                host = self._cluster.add_host(addr, signal=True)
-            host.set_location_info(row.get("data_center"), row.get("rack"))
+                host = self._cluster.add_host(addr, datacenter, rack, signal=True)
+            else:
+                self._update_location_info(host, datacenter, rack)
 
             tokens = row.get("tokens")
             if partitioner and tokens:
@@ -1640,11 +1651,22 @@ class ControlConnection(object):
             log.debug("[control connection] Fetched ring info, rebuilding metadata")
             self._cluster.metadata.rebuild_token_map(partitioner, token_map)
 
+    def _update_location_info(self, host, datacenter, rack):
+        if host.datacenter == datacenter and host.rack == rack:
+            return
+
+        # If the dc/rack information changes, we need to update the load balancing policy.
+        # For that, we remove and re-add the node against the policy. Not the most elegant, and assumes
+        # that the policy will update correctly, but in practice this should work.
+        self._cluster.load_balancing_policy.on_down(host)
+        host.set_location_info(datacenter, rack)
+        self._cluster.load_balancing_policy.on_up(host)
+
     def _handle_topology_change(self, event):
         change_type = event["change_type"]
         addr, port = event["address"]
         if change_type == "NEW_NODE":
-            self._cluster.scheduler.schedule(10, self._cluster.add_host, addr, signal=True)
+            self._cluster.scheduler.schedule(10, self.refresh_node_list_and_token_map)
         elif change_type == "REMOVED_NODE":
             host = self._cluster.metadata.get_host(addr)
             self._cluster.scheduler.schedule(0, self._cluster.remove_host, host)
@@ -1658,7 +1680,7 @@ class ControlConnection(object):
         if change_type == "UP":
             if host is None:
                 # this is the first time we've seen the node
-                self._cluster.scheduler.schedule(1, self._cluster.add_host, addr, signal=True)
+                self._cluster.scheduler.schedule(1, self.refresh_node_list_and_token_map)
             else:
                 # this will be run by the scheduler
                 self._cluster.scheduler.schedule(1, self._cluster.on_up, host)
@@ -1897,23 +1919,19 @@ class ResponseFuture(object):
         self.default_timeout = default_timeout
         self._metrics = metrics
         self.prepared_statement = prepared_statement
+        self._callback_lock = Lock()
         if metrics is not None:
             self._start_time = time.time()
-
-        # convert the list/generator/etc to an iterator so that subsequent
-        # calls to send_request (which retries may do) will resume where
-        # they last left off
-        self.query_plan = iter(session._load_balancer.make_query_plan(
-            session.keyspace, query))
-
+        self._make_query_plan()
         self._event = Event()
         self._errors = {}
 
-    def __del__(self):
-        try:
-            del self.session
-        except AttributeError:
-            pass
+    def _make_query_plan(self):
+        # convert the list/generator/etc to an iterator so that subsequent
+        # calls to send_request (which retries may do) will resume where
+        # they last left off
+        self.query_plan = iter(self.session._load_balancer.make_query_plan(
+            self.session.keyspace, self.query))
 
     def send_request(self):
         """ Internal """
@@ -1951,6 +1969,8 @@ class ResponseFuture(object):
         except Exception as exc:
             log.debug("Error querying host %s", host, exc_info=True)
             self._errors[host] = exc
+            if self._metrics is not None:
+                self._metrics.on_connection_error()
             if connection:
                 pool.return_connection(connection)
             return None
@@ -1959,6 +1979,33 @@ class ResponseFuture(object):
         self._current_pool = pool
         self._connection = connection
         return request_id
+
+    @property
+    def has_more_pages(self):
+        """
+        Returns :const:`True` if there are more pages left in the
+        query results, :const:`False` otherwise.  This should only
+        be checked after the first page has been returned.
+        """
+        return self._paging_state is not None
+
+    def start_fetching_next_page(self):
+        """
+        If there are more pages left in the query result, this asynchronously
+        starts fetching the next page.  If there are no pages left, :exc:`.QueryExhausted`
+        is raised.  Also see :attr:`.has_more_pages`.
+
+        This should only be called after the first page has been returned.
+        """
+        if not self._paging_state:
+            raise QueryExhausted()
+
+        self._make_query_plan()
+        self.message.paging_state = self._paging_state
+        self._event.clear()
+        self._final_result = _NOT_SET
+        self._final_exception = None
+        self.send_request()
 
     def _reprepare(self, prepare_message):
         cb = partial(self.session.submit, self._execute_after_prepare)
@@ -2163,12 +2210,10 @@ class ResponseFuture(object):
     def _set_final_result(self, response):
         if self._metrics is not None:
             self._metrics.request_timer.addValue(time.time() - self._start_time)
-        if hasattr(self, 'session'):
-            try:
-                del self.session  # clear reference cycles
-            except AttributeError:
-                pass
-        self._final_result = response
+
+        with self._callback_lock:
+            self._final_result = response
+
         self._event.set()
         if self._callback:
             fn, args, kwargs = self._callback
@@ -2177,11 +2222,9 @@ class ResponseFuture(object):
     def _set_final_exception(self, response):
         if self._metrics is not None:
             self._metrics.request_timer.addValue(time.time() - self._start_time)
-        try:
-            del self.session  # clear reference cycles
-        except AttributeError:
-            pass
-        self._final_exception = response
+
+        with self._callback_lock:
+            self._final_exception = response
         self._event.set()
         if self._errback:
             fn, args, kwargs = self._errback
@@ -2242,13 +2285,19 @@ class ResponseFuture(object):
             timeout = self.default_timeout
 
         if self._final_result is not _NOT_SET:
-            return self._final_result
+            if self._paging_state is None:
+                return self._final_result
+            else:
+                return PagedResult(self, self._final_result)
         elif self._final_exception:
             raise self._final_exception
         else:
             self._event.wait(timeout=timeout)
             if self._final_result is not _NOT_SET:
-                return self._final_result
+                if self._paging_state is None:
+                    return self._final_result
+                else:
+                    return PagedResult(self, self._final_result)
             elif self._final_exception:
                 raise self._final_exception
             else:
@@ -2301,10 +2350,14 @@ class ResponseFuture(object):
             >>> future.add_callback(handle_results, time.time(), should_log=True)
 
         """
-        if self._final_result is not _NOT_SET:
+        run_now = False
+        with self._callback_lock:
+            if self._final_result is not _NOT_SET:
+                run_now = True
+            else:
+                self._callback = (fn, args, kwargs)
+        if run_now:
             fn(self._final_result, *args, **kwargs)
-        else:
-            self._callback = (fn, args, kwargs)
         return self
 
     def add_errback(self, fn, *args, **kwargs):
@@ -2313,10 +2366,14 @@ class ResponseFuture(object):
         An Exception instance will be passed as the first positional argument
         to `fn`.
         """
-        if self._final_exception:
+        run_now = False
+        with self._callback_lock:
+            if self._final_exception:
+                run_now = True
+            else:
+                self._errback = (fn, args, kwargs)
+        if run_now:
             fn(self._final_exception, *args, **kwargs)
-        else:
-            self._errback = (fn, args, kwargs)
         return self
 
     def add_callbacks(self, callback, errback,
@@ -2352,3 +2409,58 @@ class ResponseFuture(object):
         return "<ResponseFuture: query='%s' request_id=%s result=%s exception=%s host=%s>" \
                % (self.query, self._req_id, result, self._final_exception, self._current_host)
     __repr__ = __str__
+
+
+class QueryExhausted(Exception):
+    """
+    Raised when :meth:`.ResultSet.start_fetching_next_page()` is called and
+    there are no more pages.  You can check :attr:`.ResultSet.has_more_pages`
+    before calling to avoid this.
+    """
+    pass
+
+
+class PagedResult(object):
+    """
+    An iterator over the rows from a paged query result.  Whenever the number
+    of result rows for a query exceed the :attr:`~.query.Statement.fetch_size`
+    (or :attr:`~.Session.default_fetch_size`, if not set) an instance of this
+    class will be returned.
+
+    You can treat this as a normal iterator over rows::
+
+        >>> from cassandra.query import SimpleStatement
+        >>> statement = SimpleStatement("SELECT * FROM users", fetch_size=10)
+        >>> for user_row in session.execute(statement):
+        ...     process_user(user_row)
+
+    Whenever there are no more rows in the current page, the next page will
+    be fetched transparently.  However, note that it _is_ possible for
+    an :class:`Exception` to be raised while fetching the next page, just
+    like you might see on a normal call to ``session.execute()``.
+    """
+
+    def __init__(self, response_future, initial_response):
+        self.response_future = response_future
+        self.current_response = iter(initial_response)
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        try:
+            return next(self.current_response)
+        except StopIteration:
+            if self.response_future._paging_state is None:
+                raise
+
+        self.response_future.start_fetching_next_page()
+        result = self.response_future.result()
+        if self.response_future.has_more_pages:
+            self.current_response = result.current_response
+        else:
+            self.current_response = iter(result)
+
+        return next(self.current_response)
+
+    __next__ = next
