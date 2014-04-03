@@ -1,0 +1,5 @@
+python-cassandra-driver (1.1.0~prerelease-1) unstable; urgency=low
+
+  * Initial packaging
+
+ -- paul cannon <pik@debian.org>  Thu, 03 Apr 2014 10:30:11 -0600
