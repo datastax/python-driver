@@ -6,6 +6,7 @@ except ImportError:
 from itertools import islice, cycle
 from mock import Mock
 from random import randint
+import six
 import sys
 import struct
 from threading import Thread
@@ -122,13 +123,23 @@ class TestRoundRobinPolicy(unittest.TestCase):
 
         # make the GIL switch after every instruction, maximizing
         # the chace of race conditions
-        original_interval = sys.getcheckinterval()
+        if six.PY2:
+            original_interval = sys.getcheckinterval()
+        else:
+            original_interval = sys.getswitchinterval()
+
         try:
-            sys.setcheckinterval(0)
+            if six.PY2:
+                sys.setcheckinterval(0)
+            else:
+                sys.setswitchinterval(0.0001)
             map(lambda t: t.start(), threads)
             map(lambda t: t.join(), threads)
         finally:
-            sys.setcheckinterval(original_interval)
+            if six.PY2:
+                sys.setcheckinterval(original_interval)
+            else:
+                sys.setswitchinterval(original_interval)
 
         if errors:
             self.fail("Saw errors: %s" % (errors,))
