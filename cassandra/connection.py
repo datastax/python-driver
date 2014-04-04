@@ -355,7 +355,7 @@ class Connection(object):
                           locally_supported_compressions.keys(),
                           remote_supported_compressions)
             else:
-                compression_type = iter(overlap).next()  # choose any
+                compression_type = next(iter(overlap))  # choose any
                 # set the decompressor here, but set the compressor only after
                 # a successful Ready message
                 self._compressor, self.decompressor = \

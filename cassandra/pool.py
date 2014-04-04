@@ -185,7 +185,7 @@ class _ReconnectionHandler(object):
         try:
             conn = self.try_reconnect()
         except Exception as exc:
-            next_delay = self.schedule.next()
+            next_delay = next(self.schedule)
             if self.on_exception(exc, next_delay):
                 self.scheduler.schedule(next_delay, self.run)
         else:
