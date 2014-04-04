@@ -100,8 +100,8 @@ class Statement(object):
 
     def _set_routing_key(self, key):
         if isinstance(key, (list, tuple)):
-            self._routing_key = "".join(struct.pack("HsB", len(component), component, 0)
-                                        for component in key)
+            self._routing_key = b"".join(struct.pack("HsB", len(component), component, 0)
+                                         for component in key)
         else:
             self._routing_key = key
 
@@ -358,7 +358,7 @@ class BoundStatement(Statement):
                 val = self.values[statement_index]
                 components.append(struct.pack("HsB", len(val), val, 0))
 
-            self._routing_key = "".join(components)
+            self._routing_key = b"".join(components)
 
         return self._routing_key
 
