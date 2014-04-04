@@ -24,6 +24,8 @@ def create_column_name(i):
         if not i:
             break
 
+    if column_name == "if":
+        column_name = "ifffff"
     return column_name
 
 
