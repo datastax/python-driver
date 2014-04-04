@@ -57,7 +57,7 @@ def trim_if_startswith(s, prefix):
 
 
 def unix_time_from_uuid1(u):
-    return (u.get_time() - 0x01B21DD213814000) / 10000000.0
+    return (u.time - 0x01B21DD213814000) / 10000000.0
 
 _casstypes = {}
 
@@ -318,7 +318,7 @@ if six.PY3:
                                  (_UnrecognizedType,),
                                  {'typename': "'%s'" % casstypename})
 else:
-    def mkUnrecognizedType(casstypename):
+    def mkUnrecognizedType(casstypename):  # noqa
         return CassandraTypeType(casstypename.encode('utf8'),
                                  (_UnrecognizedType,),
                                  {'typename': "'%s'" % casstypename})

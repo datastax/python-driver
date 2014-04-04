@@ -10,7 +10,7 @@ from cassandra.query import (PreparedStatement, BoundStatement, ValueSequence,
 from cassandra.cluster import Cluster
 from cassandra.policies import HostDistance
 
-from tests.integration import get_server_versions, PROTOCOL_VERSION
+from tests.integration import PROTOCOL_VERSION
 
 
 class QueryTest(unittest.TestCase):
@@ -29,7 +29,7 @@ class QueryTest(unittest.TestCase):
         self.assertIsInstance(bound, BoundStatement)
         self.assertEqual(2, len(bound.values))
         session.execute(bound)
-        self.assertEqual(bound.routing_key, '\x00\x00\x00\x01')
+        self.assertEqual(bound.routing_key, b'\x00\x00\x00\x01')
 
     def test_value_sequence(self):
         """
@@ -88,7 +88,7 @@ class PreparedStatementTests(unittest.TestCase):
 
         self.assertIsInstance(prepared, PreparedStatement)
         bound = prepared.bind((1, None))
-        self.assertEqual(bound.routing_key, '\x00\x00\x00\x01')
+        self.assertEqual(bound.routing_key, b'\x00\x00\x00\x01')
 
     def test_empty_routing_key_indexes(self):
         """
@@ -144,7 +144,7 @@ class PreparedStatementTests(unittest.TestCase):
 
         self.assertIsInstance(prepared, PreparedStatement)
         bound = prepared.bind((1, 2))
-        self.assertEqual(bound.routing_key, '\x04\x00\x00\x00\x04\x00\x00\x00')
+        self.assertEqual(bound.routing_key, b'\x04\x00\x00\x00\x04\x00\x00\x00')
 
     def test_bound_keyspace(self):
         """

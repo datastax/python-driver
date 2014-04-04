@@ -3,6 +3,7 @@ try:
 except ImportError:
     import unittest # noqa
 
+import binascii
 from decimal import Decimal
 from datetime import datetime
 from uuid import uuid1, uuid4
@@ -44,8 +45,8 @@ class TypeTests(unittest.TestCase):
         """)
 
         params = [
-            'key1',
-            'blobyblob'.encode('hex')
+            b'key1',
+            binascii.hexlify(b'blobyblob')
         ]
 
         query = 'INSERT INTO mytable (a, b) VALUES (%s, %s)'
