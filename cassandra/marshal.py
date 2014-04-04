@@ -25,7 +25,7 @@ float_pack, float_unpack = _make_packer('>f')
 double_pack, double_unpack = _make_packer('>d')
 
 # Special case for cassandra header
-header_struct = struct.Struct('>BBBB')
+header_struct = struct.Struct('>BBbB')
 header_pack = header_struct.pack
 header_unpack = header_struct.unpack
 
@@ -37,7 +37,7 @@ if six.PY3:
             val -= 1 << (len(term) * 8)
         return val
 else:
-    def varint_unpack(term):
+    def varint_unpack(term):  # noqa
         val = int(term.encode('hex'), 16)
         if (ord(term[0]) & 128) != 0:
             val = val - (1 << (len(term) * 8))
