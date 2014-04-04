@@ -20,7 +20,7 @@ def create_column_name(i):
     column_name = ''
     while True:
         column_name += letters[i % 10]
-        i /= 10
+        i = i // 10
         if not i:
             break
 
