@@ -99,7 +99,7 @@ def wait_for_down(cluster, node, wait=True):
     log.debug("Waiting for node %s to be down", node)
     while True:
         host = cluster.metadata.get_host('127.0.0.%s' % node)
-        time.sleep(0.1)
+        time.sleep(0.5)
         if not host or not host.is_up:
             # BUG: shouldn't have to, but we do
             if wait:
@@ -107,3 +107,5 @@ def wait_for_down(cluster, node, wait=True):
                 time.sleep(5)
             log.debug("Done waiting for node %s to be down", node)
             return
+        else:
+            log.debug("Host is still marked up, waiting")
