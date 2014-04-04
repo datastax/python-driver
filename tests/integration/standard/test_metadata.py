@@ -277,7 +277,7 @@ class SchemaMetadataTest(unittest.TestCase):
         tablemeta = self.get_table_metadata()
         statements = tablemeta.export_as_string().strip()
         statements = [s.strip() for s in statements.split(';')]
-        statements = filter(bool, statements)
+        statements = list(filter(bool, statements))
         self.assertEqual(3, len(statements))
         self.assertEqual(d_index, statements[1])
         self.assertEqual(e_index, statements[2])
