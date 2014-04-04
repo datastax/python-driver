@@ -3,9 +3,12 @@ try:
 except ImportError:
     import unittest # noqa
 
-import binascii
+import logging
+log = logging.getLogger(__name__)
+
 from decimal import Decimal
 from datetime import datetime
+import six
 from uuid import uuid1, uuid4
 
 try:
@@ -45,13 +48,17 @@ class TypeTests(unittest.TestCase):
         """)
 
         params = [
-            b'key1',
-            binascii.hexlify(b'blobyblob')
+            'key1',
+            b'blobyblob'
         ]
 
         query = 'INSERT INTO mytable (a, b) VALUES (%s, %s)'
 
-        if self._cql_version >= (3, 1, 0):
+        # In python 3, the 'bytes' type is treated as a blob, so we can
+        # correctly encode it with hex notation.
+        # In python2, we don't treat the 'str' type as a blob, so we'll encode it
+        # as a string literal and have the following failure.
+        if six.PY2 and self._cql_version >= (3, 1, 0):
             # Blob values can't be specified using string notation in CQL 3.1.0 and
             # above which is used by default in Cassandra 2.0.
             msg = r'.*Invalid STRING constant \(.*?\) for b of type blob.*'
@@ -61,7 +68,7 @@ class TypeTests(unittest.TestCase):
         s.execute(query, params)
         expected_vals = [
            'key1',
-           'blobyblob'
+           bytearray(b'blobyblob')
         ]
 
         results = s.execute("SELECT * FROM mytable")
@@ -88,7 +95,7 @@ class TypeTests(unittest.TestCase):
 
         params = [
             'key1',
-            bytearray('blob1', 'hex')
+            bytearray(b'blob1')
         ]
 
         query = 'INSERT INTO mytable (a, b) VALUES (%s, %s);'
@@ -96,7 +103,7 @@ class TypeTests(unittest.TestCase):
 
         expected_vals = [
             'key1',
-            bytearray('blob1', 'hex')
+            bytearray(b'blob1')
         ]
 
         results = s.execute("SELECT * FROM mytable")

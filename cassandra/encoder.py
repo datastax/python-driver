@@ -1,3 +1,6 @@
+import logging
+log = logging.getLogger(__name__)
+
 from binascii import hexlify
 import calendar
 import datetime
@@ -39,13 +42,16 @@ def cql_encode_str(val):
     return cql_quote(val)
 
 
-if sys.version_info >= (2, 7):
+if six.PY3:
     def cql_encode_bytes(val):
-        return '0x' + hexlify(val)
+        return (b'0x' + hexlify(val)).decode('utf-8')
+elif sys.version_info >= (2, 7):
+    def cql_encode_bytes(val):  # noqa
+        return b'0x' + hexlify(val)
 else:
     # python 2.6 requires string or read-only buffer for hexlify
     def cql_encode_bytes(val):  # noqa
-        return '0x' + hexlify(buffer(val))
+        return b'0x' + hexlify(buffer(val))
 
 
 def cql_encode_object(val):
