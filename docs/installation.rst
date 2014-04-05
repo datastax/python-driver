@@ -79,6 +79,18 @@ through `Homebrew <http://brew.sh/>`_. For example, on Mac OS X::
 
     $ brew install libev
 
+In addition on Mac OS X, be sure to include libev in the lib and include paths or
+libev support will NOT be included. For example::
+
+    $ brew list libev
+    /usr/local/Cellar/libev/4.15/include/ (2 files)
+    /usr/local/Cellar/libev/4.15/lib/libev.4.dylib
+    /usr/local/Cellar/libev/4.15/lib/ (2 other files)
+    /usr/local/Cellar/libev/4.15/share/man/man3/ev.3
+
+    $ export CPPFLAGS=-I/usr/local/Cellar/libev/4.15/include
+    $ export LDFLAGS=-L/usr/local/Cellar/libev/4.15/lib
+
 If successful, you should be able to build and install the extension
 (just using ``setup.py build`` or ``setup.py install``) and then use
 the libev event loop by doing the following:

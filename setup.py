@@ -133,6 +133,18 @@ On OSX, via homebrew:
 
     $ brew install libev
 
+    In addition on OSX, you'll need to add libev's lib and include paths to your
+    build variables or libev support will NOT be compiled. For example:
+
+    $ brew list libev
+    /usr/local/Cellar/libev/4.15/include/ (2 files)
+    /usr/local/Cellar/libev/4.15/lib/libev.4.dylib
+    /usr/local/Cellar/libev/4.15/lib/ (2 other files)
+    /usr/local/Cellar/libev/4.15/share/man/man3/ev.3
+
+    $ export CPPFLAGS=-I/usr/local/Cellar/libev/4.15/include
+    $ export LDFLAGS=-L/usr/local/Cellar/libev/4.15/lib
+
 ===============================================================================
     """
 
