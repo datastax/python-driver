@@ -37,6 +37,9 @@ Other
   user-defined type support.  (github issue #90)
 * Better error message when libevwrapper is not found
 * Only try to import scales when metrics are enabled (github issue #92)
+* Cut down on the number of queries executing when a new Cluster
+  connects and when the control connection has to reconnect (github issue #104,
+  PYTHON-59)
 
 1.0.2
 =====
