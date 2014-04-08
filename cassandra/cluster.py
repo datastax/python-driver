@@ -4,6 +4,7 @@ This module houses the main classes you will interact with,
 """
 from __future__ import absolute_import
 
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 import logging
 import socket
@@ -1682,7 +1683,8 @@ class ControlConnection(object):
 
                 peers_result = preloaded_results[0]
                 local_result = preloaded_results[1]
-                if self._do_schemas_match(peers_result, local_result):
+                schema_mismatches = self._get_schema_mismatches(peers_result, local_result, connection.host)
+                if schema_mismatches is None:
                     return True
 
             log.debug("[control connection] Waiting for schema agreement")
@@ -1690,6 +1692,7 @@ class ControlConnection(object):
             elapsed = 0
             cl = ConsistencyLevel.ONE
             total_timeout = self._cluster.max_schema_agreement_wait
+            schema_mismatches = None
             while elapsed < total_timeout:
                 peers_query = QueryMessage(query=self._SELECT_SCHEMA_PEERS, consistency_level=cl)
                 local_query = QueryMessage(query=self._SELECT_SCHEMA_LOCAL, consistency_level=cl)
@@ -1703,23 +1706,26 @@ class ControlConnection(object):
                     elapsed = self._time.time() - start
                     continue
 
-                if self._do_schemas_match(peers_result, local_result):
+                schema_mismatches = self._get_schema_mismatches(peers_result, local_result, connection.host)
+                if schema_mismatches is None:
                     return True
 
                 log.debug("[control connection] Schemas mismatched, trying again")
                 self._time.sleep(0.2)
                 elapsed = self._time.time() - start
 
+            log.warn("Node %s is reporting a schema disagreement: %s",
+                     connection.host, schema_mismatches)
             return False
 
-    def _do_schemas_match(self, peers_result, local_result):
+    def _get_schema_mismatches(self, peers_result, local_result, local_address):
         peers_result = dict_factory(*peers_result.results)
 
-        versions = set()
+        versions = defaultdict(set)
         if local_result.results:
             local_row = dict_factory(*local_result.results)[0]
             if local_row.get("schema_version"):
-                versions.add(local_row.get("schema_version"))
+                versions[local_row.get("schema_version")].add(local_address)
 
         for row in peers_result:
             if not row.get("rpc_address") or not row.get("schema_version"):
@@ -1731,14 +1737,13 @@ class ControlConnection(object):
 
             peer = self._cluster.metadata.get_host(rpc)
             if peer and peer.is_up:
-                versions.add(row.get("schema_version"))
+                versions[row.get("schema_version")].add(rpc)
 
         if len(versions) == 1:
             log.debug("[control connection] Schemas match")
-            return True
+            return None
 
-        return False
-
+        return dict((version, list(nodes)) for version, nodes in versions.iteritems())
 
     def _signal_error(self):
         # try just signaling the cluster, as this will trigger a reconnect

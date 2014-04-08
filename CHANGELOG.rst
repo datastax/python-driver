@@ -40,6 +40,7 @@ Other
 * Cut down on the number of queries executing when a new Cluster
   connects and when the control connection has to reconnect (github issue #104,
   PYTHON-59)
+* Issue warning log when schema versions do not match
 
 1.0.2
 =====
