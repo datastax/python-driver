@@ -124,7 +124,7 @@ def use_singledc():
 def setup_test_keyspace():
     # wait for nodes to startup
     time.sleep(10)
-    
+
     cluster = Cluster(protocol_version=PROTOCOL_VERSION)
     session = cluster.connect()
 

@@ -19,6 +19,7 @@ class CoordinatorStats():
         self.coordinator_counts = defaultdict(int)
 
     def add_coordinator(self, future):
+        future.result()
         coordinator = future._current_host.address
         self.coordinator_counts[coordinator] += 1
 
