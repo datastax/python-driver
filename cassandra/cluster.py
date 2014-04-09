@@ -4,6 +4,7 @@ This module houses the main classes you will interact with,
 """
 from __future__ import absolute_import
 
+import atexit
 from concurrent.futures import ThreadPoolExecutor
 import logging
 import socket
@@ -1799,6 +1800,16 @@ class ControlConnection(object):
         self.refresh_node_list_and_token_map()
 
 
+def _stop_scheduler(scheduler, thread):
+    try:
+        if not scheduler.is_shutdown:
+            scheduler.shutdown()
+    except ReferenceError:
+        pass
+
+    thread.join()
+
+
 class _Scheduler(object):
 
     _scheduled = None
@@ -1812,6 +1823,10 @@ class _Scheduler(object):
         t = Thread(target=self.run, name="Task Scheduler")
         t.daemon = True
         t.start()
+
+        # although this runs on a daemonized thread, we prefer to stop
+        # it gracefully to avoid random errors during interpreter shutdown
+        atexit.register(partial(_stop_scheduler, weakref.proxy(self), t))
 
     def shutdown(self):
         try:
