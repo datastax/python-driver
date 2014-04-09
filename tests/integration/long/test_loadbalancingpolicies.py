@@ -1,6 +1,7 @@
 import struct
 from cassandra import ConsistencyLevel, Unavailable
 from cassandra.cluster import Cluster
+from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.policies import RoundRobinPolicy, DCAwareRoundRobinPolicy, \
     TokenAwarePolicy, WhiteListRoundRobinPolicy
 from cassandra.query import SimpleStatement
@@ -29,7 +30,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         for i in range(count):
             ss = SimpleStatement('INSERT INTO cf(k, i) VALUES (0, 0)',
                                  consistency_level=consistency_level)
-            session.execute(ss)
+            execute_concurrent_with_args(session, ss, [None] * count)
 
     def _query(self, session, keyspace, count=12,
                consistency_level=ConsistencyLevel.ONE, use_prepared=False):
