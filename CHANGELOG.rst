@@ -30,6 +30,8 @@ Bug Fixes
   and rack information has been set, if possible.
 * Avoid KeyError when updating metadata after droping a table (github issues
   #97, #98)
+* Use tuples instead of sets for DCAwareLoadBalancingPolicy to ensure equal
+  distribution of requests
 
 Other
 -----
