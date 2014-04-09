@@ -1,3 +1,4 @@
+import atexit
 from collections import defaultdict, deque
 import logging
 import os
@@ -5,6 +6,10 @@ import socket
 import sys
 from threading import Event, Lock, Thread
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL, EISCONN, errorcode
+try:
+    from weakref import WeakSet
+except ImportError:
+    from cassandra.util import WeakSet  # noqa
 
 import asyncore
 
@@ -31,6 +36,8 @@ _loop_lock = Lock()
 
 _starting_conns = set()
 _starting_conns_lock = Lock()
+_shutdown = False
+_conns = WeakSet()
 
 
 def _run_loop():
@@ -39,14 +46,13 @@ def _run_loop():
     with _loop_lock:
         while True:
             try:
-                asyncore.loop(timeout=0.001, use_poll=True, count=None)
+                asyncore.loop(timeout=0.001, use_poll=True, count=1000)
             except Exception:
                 log.debug("Asyncore event loop stopped unexepectedly", exc_info=True)
                 break
 
-            with _starting_conns_lock:
-                if not _starting_conns:
-                    break
+            if _shutdown or len(_conns) == 0:
+                break
 
         _loop_started = False
         if log:
@@ -71,6 +77,15 @@ def _start_loop():
         t = Thread(target=_run_loop, name="event_loop")
         t.daemon = True
         t.start()
+
+        def cleanup():
+            global _shutdown
+            _shutdown = True
+            log.debug("Waiting for event loop thread to join...")
+            t.join()
+            log.debug("Event loop thread was joined")
+
+        atexit.register(cleanup)
 
 
 class AsyncoreConnection(Connection, asyncore.dispatcher):
@@ -122,6 +137,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         self._readable = True
 
         # start the global event loop if needed
+        _conns.add(self)
         _start_loop()
 
     def create_socket(self, family, type):
