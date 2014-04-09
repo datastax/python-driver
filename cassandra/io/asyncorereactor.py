@@ -1,5 +1,5 @@
 import atexit
-from collections import defaultdict, deque
+from collections import deque
 import logging
 import os
 import socket
@@ -119,7 +119,6 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         self._iobuf = StringIO()
 
         self._callbacks = {}
-        self._push_watchers = defaultdict(set)
         self.deque = deque()
         self.deque_lock = Lock()
 

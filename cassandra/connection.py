@@ -1,3 +1,4 @@
+from collections import defaultdict
 import errno
 from functools import wraps, partial
 import logging
@@ -149,6 +150,7 @@ class Connection(object):
         self.cql_version = cql_version
         self.protocol_version = protocol_version
         self.is_control_connection = is_control_connection
+        self._push_watchers = defaultdict(set)
 
         self._id_queue = Queue(MAX_STREAM_PER_CONNECTION)
         for i in range(MAX_STREAM_PER_CONNECTION):
@@ -261,6 +263,10 @@ class Connection(object):
 
     def register_watchers(self, type_callback_dict):
         raise NotImplementedError()
+
+    def control_conn_disposed(self):
+        self.is_control_connection = False
+        self._push_watchers = {}
 
     @defunct_on_error
     def process_msg(self, msg, body_len):

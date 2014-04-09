@@ -1,4 +1,4 @@
-from collections import defaultdict, deque
+from collections import deque
 import logging
 import os
 import socket
@@ -178,7 +178,6 @@ class LibevConnection(Connection):
         self._iobuf = StringIO()
 
         self._callbacks = {}
-        self._push_watchers = defaultdict(set)
         self.deque = deque()
         self._deque_lock = Lock()
 

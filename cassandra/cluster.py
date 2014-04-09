@@ -1338,6 +1338,28 @@ class _ControlReconnectionHandler(_ReconnectionHandler):
             return True
 
 
+def _watch_callback(obj_weakref, method_name, *args, **kwargs):
+    """
+    A callback handler for the ControlConnection that tolerates
+    weak references.
+    """
+    obj = obj_weakref()
+    if obj is None:
+        return
+    getattr(obj, method_name)(*args, **kwargs)
+
+
+def _clear_watcher(conn, expiring_weakref):
+    """
+    Called when the ControlConnection object is about to be finalized.
+    This clears watchers on the underlying Connection object.
+    """
+    try:
+        conn.control_conn_disposed()
+    except ReferenceError:
+        pass
+
+
 class ControlConnection(object):
     """
     Internal
@@ -1419,17 +1441,23 @@ class ControlConnection(object):
         node/token and schema metadata.
         """
         log.debug("[control connection] Opening new connection to %s", host)
-        connection = self._cluster.connection_factory(host.address)
+        connection = self._cluster.connection_factory(host.address, is_control_connection=True)
 
         log.debug("[control connection] Established new connection %r, "
                   "registering watchers and refreshing schema and topology",
                   connection)
+
+        # use weak references in both directions
+        # _clear_watcher will be called when this ControlConnection is about to be finalized
+        # _watch_callback will get the actual callback from the Connection and relay it to
+        # this object (after a dereferencing a weakref)
+        self_weakref = weakref.ref(self, callback=partial(_clear_watcher, weakref.proxy(connection)))
         try:
             connection.register_watchers({
-                "TOPOLOGY_CHANGE": self._handle_topology_change,
-                "STATUS_CHANGE": self._handle_status_change,
-                "SCHEMA_CHANGE": self._handle_schema_change
-            })
+                "TOPOLOGY_CHANGE": partial(_watch_callback, self_weakref, '_handle_topology_change'),
+                "STATUS_CHANGE": partial(_watch_callback, self_weakref, '_handle_status_change'),
+                "SCHEMA_CHANGE": partial(_watch_callback, self_weakref, '_handle_schema_change')
+            }, register_timeout=self._timeout)
 
             self._refresh_node_list_and_token_map(connection)
             self._refresh_schema(connection)
@@ -1497,12 +1525,14 @@ class ControlConnection(object):
             else:
                 self._is_shutdown = True
 
+        log.debug("Shutting down control connection")
         # stop trying to reconnect (if we are)
         if self._reconnection_handler:
             self._reconnection_handler.cancel()
 
         if self._connection:
             self._connection.close()
+            del self._connection
 
     def refresh_schema(self, keyspace=None, table=None):
         try:
