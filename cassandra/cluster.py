@@ -38,7 +38,7 @@ from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy)
 from cassandra.pool import (_ReconnectionHandler, _HostReconnectionHandler,
-                            HostConnectionPool)
+                            HostConnectionPool, NoConnectionsAvailable)
 from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              bind_params, QueryTrace, Statement)
 
@@ -1953,6 +1953,10 @@ class ResponseFuture(object):
             # TODO get connectTimeout from cluster settings
             connection = pool.borrow_connection(timeout=2.0)
             request_id = connection.send_msg(message, cb=cb)
+        except NoConnectionsAvailable as exc:
+            log.debug("All connections for host %s are at capacity, moving to the next host", host)
+            self._errors[host] = exc
+            return None
         except Exception as exc:
             log.debug("Error querying host %s", host, exc_info=True)
             self._errors[host] = exc
