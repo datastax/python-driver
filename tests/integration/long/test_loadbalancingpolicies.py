@@ -403,10 +403,11 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         # ----------------------------------------------------------------------
         # Traceback (most recent call last):
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/test_loadbalancingpolicies.py", line 328, in test_token_aware
-        #     self.token_aware()
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/test_loadbalancingpolicies.py", line 387, in token_aware
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/utils.py", line 35, in assert_query_count_equals
+        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/test_loadbalancingpolicies.py", line 346, in test_token_aware
+        #     self.token_aware(keyspace)
+        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/test_loadbalancingpolicies.py", line 414, in token_aware
+        #     self.coordinator_stats.assert_query_count_equals(self, 1, 12)
+        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/utils.py", line 36, in assert_query_count_equals
         #     expected, ip, self.coordinator_counts[ip], dict(self.coordinator_counts)))
         # AssertionError: Expected 12 queries to 127.0.0.1, but got 6. Query counts: {'127.0.0.3': 6, '127.0.0.1': 6}
         # -------------------- >> begin captured logging << --------------------

@@ -97,7 +97,7 @@ def use_multidc(dc_list):
             cluster.clear()
         except Exception:
             log.debug("Creating new ccm test multi-dc cluster")
-            cluster = CCMCluster(path, MULTIDC_CLUSTER_NAME, cassandra_version=CASSANDRA_VERSION)
+            cluster = CCMCluster(path, MULTIDC_CLUSTER_NAME, cassandra_version=DEFAULT_CASSANDRA_VERSION)
             cluster.set_configuration_options({'start_native_transport': True})
             common.switch_cluster(path, MULTIDC_CLUSTER_NAME)
             cluster.populate(dc_list)
@@ -125,7 +125,7 @@ def setup_test_keyspace():
     # wait for nodes to startup
     time.sleep(10)
 
-    cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+    cluster = Cluster()
     session = cluster.connect()
 
     try:
