@@ -527,19 +527,6 @@ class Cluster(object):
         if self.executor:
             self.executor.shutdown()
 
-    def __del__(self):
-        # we don't use shutdown() because we want to avoid shutting down
-        # Sessions while they are still being used (in case there are no
-        # longer any references to this Cluster object, but there are
-        # still references to the Session object)
-        if not self.is_shutdown:
-            if self.scheduler:
-                self.scheduler.shutdown()
-            if self.control_connection:
-                self.control_connection.shutdown()
-            if self.executor:
-                self.executor.shutdown(wait=False)
-
     def _new_session(self):
         session = Session(self, self.metadata.all_hosts())
         self.sessions.add(session)
@@ -1206,13 +1193,6 @@ class Session(object):
 
         for pool in self._pools.values():
             pool.shutdown()
-
-    def __del__(self):
-        try:
-            self.shutdown()
-            del self.cluster
-        except TypeError:
-            pass
 
     def add_or_renew_pool(self, host, is_host_addition):
         """
