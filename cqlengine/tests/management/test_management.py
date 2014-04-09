@@ -2,7 +2,7 @@ from mock import MagicMock, patch
 
 from cqlengine import ONE
 from cqlengine.exceptions import CQLEngineException
-from cqlengine.management import create_table, delete_table, get_fields
+from cqlengine.management import create_table, delete_table, get_fields, sync_table
 from cqlengine.tests.base import BaseCassEngTestCase
 from cqlengine.connection import ConnectionPool, Host
 from cqlengine import management
@@ -77,6 +77,11 @@ class CapitalizedKeyModel(Model):
     secondKey = columns.Integer(primary_key=True)
     someData = columns.Text()
 
+class PrimaryKeysOnlyModel(Model):
+    first_ey = columns.Integer(primary_key=True)
+    second_key = columns.Integer(primary_key=True)
+
+
 class CapitalizedKeyTest(BaseCassEngTestCase):
 
     def test_table_definition(self):
@@ -142,3 +147,17 @@ class AddColumnTest(BaseCassEngTestCase):
         self.assertEqual(len(fields), 4)
 
 
+class SyncTableTests(BaseCassEngTestCase):
+
+    def setUp(self):
+        delete_table(PrimaryKeysOnlyModel)
+
+    def test_sync_table_works_with_primary_keys_only_tables(self):
+        sync_table(PrimaryKeysOnlyModel)
+
+        # primary-keys-only tables do not create entries in system.schema_columns
+        # table. Only non-primary keys are added to that table.
+        # Our code must deal with that eventuality properly (not crash)
+        # on subsequent runs of sync_table (which runs get_fields internally)
+        get_fields(PrimaryKeysOnlyModel)
+        sync_table(PrimaryKeysOnlyModel)

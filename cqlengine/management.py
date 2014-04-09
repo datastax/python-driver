@@ -65,6 +65,16 @@ def create_table(model, create_missing_keyspace=True):
     sync_table(model, create_missing_keyspace)
 
 def sync_table(model, create_missing_keyspace=True):
+    """
+    Inspects the model and creates / updates the corresponding table and columns.
+
+    Note that the attributes removed from the model are not deleted on the database.
+    They become effectively ignored by (will not show up on) the model.
+
+    :param create_missing_keyspace: (Defaults to True) Flags to us that we need to create missing keyspace
+        mentioned in the model automatically.
+    :type create_missing_keyspace: bool
+    """
 
     if model.__abstract__:
         raise CQLEngineException("cannot create table from abstract model")
@@ -238,12 +248,19 @@ def get_fields(model):
 
         tmp = con.execute(query, {'ks_name': ks_name, 'col_family': col_family}, ONE)
 
-    column_indices = [tmp.columns.index('column_name'), tmp.columns.index('validator')]
+    # Tables containing only primary keys do not appear to create
+    # any entries in system.schema_columns, as only non-primary-key attributes
+    # appear to be inserted into the schema_columns table
+    if not tmp.results:
+        return []
+
+    column_name_positon = tmp.columns.index('column_name')
+    validator_positon = tmp.columns.index('validator')
     try:
-        type_index = tmp.columns.index('type')
-        return [Field(x[column_indices[0]], x[column_indices[1]]) for x in tmp.results if x[type_index] == 'regular']
+        type_position = tmp.columns.index('type')
+        return [Field(x[column_name_positon], x[validator_positon]) for x in tmp.results if x[type_position] == 'regular']
     except ValueError:
-        return [Field(x[column_indices[0]], x[column_indices[1]]) for x in tmp.results]
+        return [Field(x[column_name_positon], x[validator_positon]) for x in tmp.results]
     # convert to Field named tuples
 
 
