@@ -274,6 +274,9 @@ Batch Queries
 
     cqlengine now supports batch queries using the BatchQuery class. Batch queries can be started and stopped manually, or within a context manager. To add queries to the batch object, you just need to precede the create/save/delete call with a call to batch, and pass in the batch object.
 
+Batch Query General Use Pattern
+-------------------------------
+
     You can only create, update, and delete rows with a batch query, attempting to read rows out of the database with a batch query will fail.
 
     .. code-block:: python
@@ -323,6 +326,96 @@ Batch Queries
             LogEntry.batch(b).create(k=1, v=2) # this code is never reached due to the exception, but anything leading up to here will execute in the batch.
 
     If an exception is thrown somewhere in the block, any statements that have been added to the batch will still be executed.  This is useful for some logging situations.
+
+Batch Query Execution Callbacks
+-------------------------------
+
+    In order to allow secondary tasks to be chained to the end of batch, BatchQuery instances allow callbacks to be
+    registered with the batch, to be executed immediately after the batch executes.
+
+    Let's say an iterative action over a group of records needs to be followed up by a "maintenance" task like "Update
+    count of children on parent model."
+    If your were to kick off that task following manipulation on each child, while the batch is not executed, the reads
+    the maintenance task would do would operate on old data since the batch is not yet commited.
+    (You also risk kicking off too many of the same tasks, while only one is needed at the end of the batch.)
+
+    The callbacks attached to a given batch instance are executed only if the batch executes. If the batch is used as a
+    context manager and an exception bubbles up, the queued up callbacks will not be run.
+
+    The callback should be a callable object that accepts at least one (positional) argument - instance of the batch object.
+
+    .. code-block:: python
+
+        def example_callback_handler(batch, *args, **kwargs):
+            pass
+
+    Multiple callbacks can be attached to same BatchQuery instance both, at the point of instantiation and later
+    directly to the batch object instance.
+
+    The callbacks collection is implemented as a ``set``, which naturally deduplicates the callback handlers:
+
+    .. code-block:: python
+
+        # let's add a few of the same callbacks at init
+        batch = BatchQuery(callbacks=([
+            example_callback_handler,
+            example_callback_handler
+        ])
+
+        # and one more time same callback now using the collection API on the batch instance
+        batch.callbacks.add(example_callback_handler)
+
+        assert len(batch.callbacks) == 1
+        assert batch.callbacks == {example_callback_handler}
+
+        # this, of course, also means that if you remove a callback,
+        # you negate "all additions" of that callback
+        batch.callbacks.remove(example_callback_handler)
+
+        assert len(batch.callbacks) == 0
+
+    In order to benefit from the natural deduplication of the callback handlers it is allowed to pass in tuples of
+    callback and its positional arguments.
+    This allows one to pre-package additional call arguments for the callable without the need to wrap the callable and
+    args into a closure or ``functools.partial``.
+
+    .. code-block:: python
+
+        batch = BatchQuery(callbacks=([
+            (example_callback_handler, 'some', 'args'),
+            (example_callback_handler, 'some', 'args'),
+            (example_callback_handler, 'some other', 'args'),
+        ])
+
+        batch.callbacks.add((example_callback_handler, 'some other', 'args'))
+
+        assert len(batch.callbacks) == 2
+        assert batch.callbacks == {
+            (example_callback_handler, 'some', 'args'),
+            (example_callback_handler, 'some other', 'args')
+        }
+
+    Note that the tuple callback object format prevents the possibily of essentially same callback firing multiple times,
+    which might happen if you package same callback and arguments several times with ``functools.partial``, which returns a new callable with each call.
+
+    Arguments packaged into callbacks communicated as tuples are passed to callback handler **after** the ``batch`` argument.
+
+    .. code-block:: python
+
+        call_args = []
+
+        def callback_handler(batch, *args, **kwargs):
+            call_args.append([batch] + list(args))
+
+        batch = BatchQuery(callbacks=([(callback_handler, 'some', 'args')])
+
+        batch.execute()
+
+        assert call_args == [[batch, 'some', 'args']]
+
+
+    Failure in any of the callbacks does not affect the batch's execution, as the callbacks are started after the execution
+    of the batch is complete and no effort to "roll it back" is made.
 
 
 

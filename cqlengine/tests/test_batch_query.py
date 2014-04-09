@@ -17,6 +17,7 @@ class TestMultiKeyModel(Model):
     count       = columns.Integer(required=False)
     text        = columns.Text(required=False)
 
+
 class BatchQueryTests(BaseCassEngTestCase):
 
     @classmethod
@@ -41,23 +42,12 @@ class BatchQueryTests(BaseCassEngTestCase):
         b = BatchQuery()
         inst = TestMultiKeyModel.batch(b).create(partition=self.pkey, cluster=2, count=3, text='4')
 
-
         with self.assertRaises(TestMultiKeyModel.DoesNotExist):
             TestMultiKeyModel.get(partition=self.pkey, cluster=2)
 
         b.execute()
-
 
         TestMultiKeyModel.get(partition=self.pkey, cluster=2)
-
-    def test_batch_is_executed(self):
-        b = BatchQuery()
-        inst = TestMultiKeyModel.batch(b).create(partition=self.pkey, cluster=2, count=3, text='4')
-
-        with self.assertRaises(TestMultiKeyModel.DoesNotExist):
-            TestMultiKeyModel.get(partition=self.pkey, cluster=2)
-
-        b.execute()
 
     def test_update_success_case(self):
 
@@ -125,3 +115,104 @@ class BatchQueryTests(BaseCassEngTestCase):
 
         with BatchQuery() as b:
             pass
+
+class BatchQueryCallbacksTests(BaseCassEngTestCase):
+
+    def test_API_managing_callbacks(self):
+
+        # Callbacks can be added at init and after
+
+        def my_callback(batch, *args, **kwargs):
+            pass
+
+        # adding on init:
+        b = BatchQuery(callbacks=[
+            my_callback,
+            my_callback, # will be filtered out automatically
+            (my_callback, 'more', 'args'),
+            (my_callback, 'more', 'args'), # will be filtered out too
+        ])
+        assert b.callbacks == {
+            my_callback,
+            (my_callback, 'more', 'args')
+        }
+
+        # adding using set API post-init:
+
+        b.callbacks.add(my_callback)
+        b.callbacks.add((my_callback, 'more', 'args'))
+        b.callbacks.add((my_callback, 'yet more', 'args'))
+        assert b.callbacks == {
+            my_callback,
+            (my_callback, 'more', 'args'),
+            (my_callback, 'yet more', 'args')
+        }
+
+        b.callbacks.remove(my_callback)
+        assert b.callbacks == {
+            (my_callback, 'more', 'args'),
+            (my_callback, 'yet more', 'args')
+        }
+
+        b.callbacks.remove((my_callback, 'more', 'args'))
+        assert b.callbacks == {
+            (my_callback, 'yet more', 'args')
+        }
+
+
+        # insure that we disallow setting the callback colleciton on instance:
+        # (thus forcing use of init and set-like api tested above)
+        with self.assertRaises(AttributeError):
+            b.callbacks = set()
+
+    def test_callbacks_properly_execute_callables_and_tuples(self):
+
+        call_history = []
+        def my_callback(*args, **kwargs):
+            call_history.append(args)
+
+        # adding on init:
+        b = BatchQuery(callbacks=[
+            my_callback,
+            (my_callback, 'more', 'args')
+        ])
+
+        b.execute()
+
+        assert len(call_history) == 2
+        assert {(b,), (b, 'more', 'args')} == set(call_history)
+
+    def test_callbacks_tied_to_execute(self):
+        """Batch callbacks should NOT fire if batch is not executed in context manager mode"""
+
+        call_history = []
+        def my_callback(*args, **kwargs):
+            call_history.append(args)
+
+        with BatchQuery(callbacks=[my_callback]) as b:
+            pass
+
+        assert len(call_history) == 1
+
+        class SomeError(Exception):
+            pass
+
+        with self.assertRaises(SomeError):
+            with BatchQuery(callbacks=[my_callback]) as b:
+                # this error bubbling up through context manager
+                # should prevent callback runs (along with b.execute())
+                raise SomeError
+
+        # still same call history
+        assert len(call_history) == 1
+
+        # but if execute run, even with an error bubbling through
+        # the callbacks also whoudl have fired
+        with self.assertRaises(SomeError):
+            with BatchQuery(execute_on_exception=True, callbacks=[my_callback]) as b:
+                # this error bubbling up through context manager
+                # should prevent callback runs (along with b.execute())
+                raise SomeError
+
+        # still same call history
+        assert len(call_history) == 2
