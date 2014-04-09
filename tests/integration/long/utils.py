@@ -25,7 +25,6 @@ class CoordinatorStats():
 
         if future._errors:
             log.error('future._errors: %s', future._errors)
-        future.result()
 
     def reset_counts(self):
         self.coordinator_counts = defaultdict(int)
