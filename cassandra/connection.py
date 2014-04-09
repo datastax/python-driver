@@ -135,9 +135,11 @@ class Connection(object):
     is_closed = False
     lock = None
 
+    is_control_connection = False
+
     def __init__(self, host='127.0.0.1', port=9042, credentials=None,
                  ssl_options=None, sockopts=None, compression=True,
-                 cql_version=None, protocol_version=2):
+                 cql_version=None, protocol_version=2, is_control_connection=False):
         self.host = host
         self.port = port
         self.credentials = credentials
@@ -146,6 +148,7 @@ class Connection(object):
         self.compression = compression
         self.cql_version = cql_version
         self.protocol_version = protocol_version
+        self.is_control_connection = is_control_connection
 
         self._id_queue = Queue(MAX_STREAM_PER_CONNECTION)
         for i in range(MAX_STREAM_PER_CONNECTION):
@@ -219,6 +222,8 @@ class Connection(object):
         return self.wait_for_responses(msg, timeout=timeout)[0]
 
     def wait_for_responses(self, *msgs, **kwargs):
+        if self.is_closed or self.is_defunct:
+            raise ConnectionShutdown("Connection %s is already closed" % (self, ))
         timeout = kwargs.get('timeout')
         waiter = ResponseWaiter(self, len(msgs))
 

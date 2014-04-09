@@ -82,7 +82,6 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
     _total_reqd_bytes = 0
     _writable = False
     _readable = False
-    _have_listeners = False
 
     @classmethod
     def factory(cls, *args, **kwargs):
@@ -261,7 +260,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
                         self._total_reqd_bytes = body_len + 8
                         break
 
-            if not self._callbacks:
+            if not self._callbacks and not self.is_control_connection:
                 self._readable = False
 
     def push(self, data):
@@ -282,18 +281,15 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         return self._writable
 
     def readable(self):
-        return self._readable or (self._have_listeners and not (self.is_defunct or self.is_closed))
+        return self._readable or (self.is_control_connection and not (self.is_defunct or self.is_closed))
 
     def register_watcher(self, event_type, callback, register_timeout=None):
         self._push_watchers[event_type].add(callback)
-        self._have_listeners = True
-        self._readable = True
         self.wait_for_response(
             RegisterMessage(event_list=[event_type]), timeout=register_timeout)
 
     def register_watchers(self, type_callback_dict, register_timeout=None):
         for event_type, callback in type_callback_dict.items():
             self._push_watchers[event_type].add(callback)
-        self._have_listeners = True
         self.wait_for_response(
             RegisterMessage(event_list=type_callback_dict.keys()), timeout=register_timeout)
