@@ -2,13 +2,14 @@ import struct
 from cassandra import ConsistencyLevel, Unavailable
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.concurrent import execute_concurrent_with_args
-from cassandra.policies import RoundRobinPolicy, DCAwareRoundRobinPolicy, \
-    TokenAwarePolicy, WhiteListRoundRobinPolicy
+from cassandra.policies import (RoundRobinPolicy, DCAwareRoundRobinPolicy,
+                                TokenAwarePolicy, WhiteListRoundRobinPolicy)
 from cassandra.query import SimpleStatement
 from tests.integration import use_multidc, use_singledc
-from tests.integration.long.utils import wait_for_up, create_schema, \
-    CoordinatorStats, force_stop, wait_for_down, decommission, start, ring, \
-    bootstrap, stop, IP_FORMAT
+from tests.integration.long.utils import (wait_for_up, create_schema,
+                                          CoordinatorStats, force_stop,
+                                          wait_for_down, decommission, start,
+                                          bootstrap, stop, IP_FORMAT)
 
 try:
     import unittest2 as unittest
@@ -47,7 +48,6 @@ class LoadBalancingPolicyTests(unittest.TestCase):
                                      consistency_level=consistency_level,
                                      routing_key=routing_key)
                 self.coordinator_stats.add_coordinator(session.execute_async(ss))
-
 
     def test_roundrobin(self):
         use_singledc()
@@ -90,7 +90,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 3, 6)
 
     def test_roundrobin_two_dcs(self):
-        use_multidc([2,2])
+        use_multidc([2, 2])
         keyspace = 'test_roundrobin_two_dcs'
         cluster = Cluster(
             load_balancing_policy=RoundRobinPolicy())
@@ -100,7 +100,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         wait_for_up(cluster, 3, wait=False)
         wait_for_up(cluster, 4)
 
-        create_schema(session, keyspace, replication_strategy=[2,2])
+        create_schema(session, keyspace, replication_strategy=[2, 2])
         self._insert(session, keyspace)
         self._query(session, keyspace)
 
@@ -127,7 +127,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 5, 3)
 
     def test_roundrobin_two_dcs_2(self):
-        use_multidc([2,2])
+        use_multidc([2, 2])
         keyspace = 'test_roundrobin_two_dcs_2'
         cluster = Cluster(
             load_balancing_policy=RoundRobinPolicy())
@@ -137,7 +137,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         wait_for_up(cluster, 3, wait=False)
         wait_for_up(cluster, 4)
 
-        create_schema(session, keyspace, replication_strategy=[2,2])
+        create_schema(session, keyspace, replication_strategy=[2, 2])
         self._insert(session, keyspace)
         self._query(session, keyspace)
 
@@ -164,7 +164,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 5, 3)
 
     def test_dc_aware_roundrobin_two_dcs(self):
-        use_multidc([3,2])
+        use_multidc([3, 2])
         keyspace = 'test_dc_aware_roundrobin_two_dcs'
         cluster = Cluster(
             load_balancing_policy=DCAwareRoundRobinPolicy('dc1'))
@@ -186,7 +186,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 5, 0)
 
     def test_dc_aware_roundrobin_two_dcs_2(self):
-        use_multidc([3,2])
+        use_multidc([3, 2])
         keyspace = 'test_dc_aware_roundrobin_two_dcs_2'
         cluster = Cluster(
             load_balancing_policy=DCAwareRoundRobinPolicy('dc2'))
@@ -208,7 +208,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 5, 6)
 
     def test_dc_aware_roundrobin_one_remote_host(self):
-        use_multidc([2,2])
+        use_multidc([2, 2])
         keyspace = 'test_dc_aware_roundrobin_one_remote_host'
         cluster = Cluster(
             load_balancing_policy=DCAwareRoundRobinPolicy('dc2', used_hosts_per_remote_dc=1))
@@ -250,9 +250,9 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 3, 0)
         self.coordinator_stats.assert_query_count_equals(self, 4, 0)
         responses = set()
-        for node in [1,2,5]:
+        for node in [1, 2, 5]:
             responses.add(self.coordinator_stats.get_query_count(node))
-        self.assertEqual(set([0,0,12]), responses)
+        self.assertEqual(set([0, 0, 12]), responses)
 
         self.coordinator_stats.reset_counts()
         decommission(5)
@@ -264,9 +264,9 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 4, 0)
         self.coordinator_stats.assert_query_count_equals(self, 5, 0)
         responses = set()
-        for node in [1,2]:
+        for node in [1, 2]:
             responses.add(self.coordinator_stats.get_query_count(node))
-        self.assertEqual(set([0,12]), responses)
+        self.assertEqual(set([0, 12]), responses)
 
         self.coordinator_stats.reset_counts()
         decommission(1)

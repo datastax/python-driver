@@ -97,7 +97,7 @@ def bootstrap(node, data_center=None, token=None):
                          storage_interface=(IP_FORMAT % node, 7000),
                          jmx_port=str(7000 + 100 * node),
                          remote_debug_port=0,
-                         initial_token=token if token else node*10)
+                         initial_token=token if token else node * 10)
     get_cluster().add(node_instance, is_seed=False, data_center=data_center)
 
     try:

@@ -1,4 +1,3 @@
-from ccmlib.common import current_cluster_name
 import time
 
 try:
