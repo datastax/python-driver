@@ -400,7 +400,7 @@ class TestCodeCoverage(unittest.TestCase):
         get_replicas = cluster.metadata.token_map.get_replicas
 
         for ksname in ('test1rf', 'test2rf', 'test3rf'):
-            self.assertNotEqual(list(get_replicas('test3rf', ring[0])), [])
+            self.assertNotEqual(list(get_replicas(ksname, ring[0])), [])
 
         for i, token in enumerate(ring):
             self.assertEqual(set(get_replicas('test3rf', token)), set(owners))
