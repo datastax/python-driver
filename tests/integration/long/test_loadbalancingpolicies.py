@@ -27,10 +27,9 @@ class LoadBalancingPolicyTests(unittest.TestCase):
     def _insert(self, session, keyspace, count=12,
                 consistency_level=ConsistencyLevel.ONE):
         session.execute('USE %s' % keyspace)
-        for i in range(count):
-            ss = SimpleStatement('INSERT INTO cf(k, i) VALUES (0, 0)',
-                                 consistency_level=consistency_level)
-            session.execute(ss)
+        ss = SimpleStatement('INSERT INTO cf(k, i) VALUES (0, 0)',
+                             consistency_level=consistency_level)
+        execute_concurrent_with_args(session, ss, [None] * count)
 
     def _query(self, session, keyspace, count=12,
                consistency_level=ConsistencyLevel.ONE, use_prepared=False):
