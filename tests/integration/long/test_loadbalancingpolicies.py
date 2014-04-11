@@ -1,6 +1,6 @@
 import struct
 from cassandra import ConsistencyLevel, Unavailable
-from cassandra.cluster import Cluster
+from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.policies import RoundRobinPolicy, DCAwareRoundRobinPolicy, \
     TokenAwarePolicy, WhiteListRoundRobinPolicy
@@ -30,7 +30,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         for i in range(count):
             ss = SimpleStatement('INSERT INTO cf(k, i) VALUES (0, 0)',
                                  consistency_level=consistency_level)
-            execute_concurrent_with_args(session, ss, [None] * count)
+            session.execute(ss)
 
     def _query(self, session, keyspace, count=12,
                consistency_level=ConsistencyLevel.ONE, use_prepared=False):
@@ -177,22 +177,14 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         wait_for_up(cluster, 5)
 
         create_schema(session, keyspace, replication_strategy=[2, 2])
-        self._insert(session, keyspace, count=12000)
-        self._query(session, keyspace, count=12000)
+        self._insert(session, keyspace)
+        self._query(session, keyspace)
 
-        # ----------------------------------------------------------------------
-        # Traceback (most recent call last):
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/test_loadbalancingpolicies.py", line 181, in test_dc_aware_roundrobin_two_dcs
-        #     self.coordinator_stats.assert_query_count_equals(self, 1, 4000)
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/utils.py", line 35, in assert_query_count_equals
-        #     expected, ip, self.coordinator_counts[ip], dict(self.coordinator_counts)))
-        # AssertionError: Expected 4000 queries to 127.0.0.1, but got 2400. Query counts: {'127.0.0.3': 7200, '127.0.0.2': 2400, '127.0.0.1': 2400}
-        # -------------------- >> begin captured logging << --------------------
-        # self.coordinator_stats.assert_query_count_equals(self, 1, 4000)
-        # self.coordinator_stats.assert_query_count_equals(self, 2, 4000)
-        # self.coordinator_stats.assert_query_count_equals(self, 3, 4000)
-        # self.coordinator_stats.assert_query_count_equals(self, 4, 0)
-        # self.coordinator_stats.assert_query_count_equals(self, 5, 0)
+        self.coordinator_stats.assert_query_count_equals(self, 1, 4)
+        self.coordinator_stats.assert_query_count_equals(self, 2, 4)
+        self.coordinator_stats.assert_query_count_equals(self, 3, 4)
+        self.coordinator_stats.assert_query_count_equals(self, 4, 0)
+        self.coordinator_stats.assert_query_count_equals(self, 5, 0)
 
     def test_dc_aware_roundrobin_two_dcs_2(self):
         use_multidc([3,2])
@@ -207,26 +199,18 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         wait_for_up(cluster, 5)
 
         create_schema(session, keyspace, replication_strategy=[2, 2])
-        self._insert(session, keyspace, count=12000)
-        self._query(session, keyspace, count=12000)
+        self._insert(session, keyspace)
+        self._query(session, keyspace)
 
-        # ----------------------------------------------------------------------
-        # Traceback (most recent call last):
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/test_loadbalancingpolicies.py", line 214, in test_dc_aware_roundrobin_two_dcs_2
-        #     self.coordinator_stats.assert_query_count_equals(self, 4, 6000)
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/utils.py", line 35, in assert_query_count_equals
-        #     expected, ip, self.coordinator_counts[ip], dict(self.coordinator_counts)))
-        # AssertionError: Expected 6000 queries to 127.0.0.4, but got 2400. Query counts: {'127.0.0.5': 9600, '127.0.0.4': 2400, '127.0.0.3': 0, '127.0.0.2': 0, '127.0.0.1': 0}
-        # -------------------- >> begin captured logging << --------------------
-        # self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-        # self.coordinator_stats.assert_query_count_equals(self, 2, 0)
-        # self.coordinator_stats.assert_query_count_equals(self, 3, 0)
-        # self.coordinator_stats.assert_query_count_equals(self, 4, 6000)
-        # self.coordinator_stats.assert_query_count_equals(self, 5, 6000)
+        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
+        self.coordinator_stats.assert_query_count_equals(self, 2, 0)
+        self.coordinator_stats.assert_query_count_equals(self, 3, 0)
+        self.coordinator_stats.assert_query_count_equals(self, 4, 6)
+        self.coordinator_stats.assert_query_count_equals(self, 5, 6)
 
     def test_dc_aware_roundrobin_one_remote_host(self):
         use_multidc([2,2])
-        keyspace = 'test_dc_aware_roundrobin_one_remote_host_2'
+        keyspace = 'test_dc_aware_roundrobin_one_remote_host'
         cluster = Cluster(
             load_balancing_policy=DCAwareRoundRobinPolicy('dc2', used_hosts_per_remote_dc=1))
         session = cluster.connect()
@@ -236,14 +220,13 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         wait_for_up(cluster, 4)
 
         create_schema(session, keyspace, replication_strategy=[2, 2])
-        self._insert(session, keyspace, count=12000)
-        self._query(session, keyspace, count=12000)
+        self._insert(session, keyspace)
+        self._query(session, keyspace)
 
-        # Differing distributions
-        # self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-        # self.coordinator_stats.assert_query_count_equals(self, 2, 0)
-        # self.coordinator_stats.assert_query_count_equals(self, 3, 6000)
-        # self.coordinator_stats.assert_query_count_equals(self, 4, 6000)
+        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
+        self.coordinator_stats.assert_query_count_equals(self, 2, 0)
+        self.coordinator_stats.assert_query_count_equals(self, 3, 6)
+        self.coordinator_stats.assert_query_count_equals(self, 4, 6)
 
         self.coordinator_stats.reset_counts()
         bootstrap(5, 'dc1')
@@ -251,12 +234,11 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         self._query(session, keyspace)
 
-        # Differing distributions
-        # self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-        # self.coordinator_stats.assert_query_count_equals(self, 2, 0)
-        # self.coordinator_stats.assert_query_count_equals(self, 3, 6)
-        # self.coordinator_stats.assert_query_count_equals(self, 4, 6)
-        # self.coordinator_stats.assert_query_count_equals(self, 5, 0)
+        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
+        self.coordinator_stats.assert_query_count_equals(self, 2, 0)
+        self.coordinator_stats.assert_query_count_equals(self, 3, 6)
+        self.coordinator_stats.assert_query_count_equals(self, 4, 6)
+        self.coordinator_stats.assert_query_count_equals(self, 5, 0)
 
         self.coordinator_stats.reset_counts()
         decommission(3)
@@ -264,83 +246,49 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         wait_for_down(cluster, 3, wait=True)
         wait_for_down(cluster, 4, wait=True)
 
-        # ----------------------------------------------------------------------
-        # Traceback (most recent call last):
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/test_loadbalancingpolicies.py", line 242, in test_dc_aware_roundrobin_one_remote_host
-        #     self._query(session, keyspace)
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/test_loadbalancingpolicies.py", line 36, in _query
-        #     self.coordinator_stats.add_coordinator(session.execute_async(ss))
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/utils.py", line 21, in add_coordinator
-        #     coordinator = future._current_host.address
-        # AttributeError: 'NoneType' object has no attribute 'address'
-        # -------------------- >> begin captured logging << --------------------
-        # self._query(session, keyspace)
+        self._query(session, keyspace)
 
-        # self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-        # self.coordinator_stats.assert_query_count_equals(self, 2, 0)
-        # self.coordinator_stats.assert_query_count_equals(self, 3, 0)
-        # self.coordinator_stats.assert_query_count_equals(self, 4, 0)
-        # self.coordinator_stats.assert_query_count_equals(self, 5, 12)
+        self.coordinator_stats.assert_query_count_equals(self, 3, 0)
+        self.coordinator_stats.assert_query_count_equals(self, 4, 0)
+        responses = set()
+        for node in [1,2,5]:
+            responses.add(self.coordinator_stats.get_query_count(node))
+        self.assertEqual(set([0,0,12]), responses)
 
         self.coordinator_stats.reset_counts()
         decommission(5)
         wait_for_down(cluster, 5, wait=True)
 
-        # ----------------------------------------------------------------------
-        # Traceback (most recent call last):
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/test_loadbalancingpolicies.py", line 266, in test_dc_aware_roundrobin_one_remote_host
-        #     self._query(session, keyspace)
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/test_loadbalancingpolicies.py", line 36, in _query
-        #     self.coordinator_stats.add_coordinator(session.execute_async(ss))
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/utils.py", line 21, in add_coordinator
-        #     coordinator = future._current_host.address
-        # AttributeError: 'NoneType' object has no attribute 'address'
-        # -------------------- >> begin captured logging << --------------------
-        # self._query(session, keyspace)
-        #
-        # self.coordinator_stats.assert_query_count_equals(self, 1, 12)
-        # self.coordinator_stats.assert_query_count_equals(self, 2, 0)
-        # self.coordinator_stats.assert_query_count_equals(self, 3, 0)
-        # self.coordinator_stats.assert_query_count_equals(self, 4, 0)
-        # self.coordinator_stats.assert_query_count_equals(self, 5, 0)
+        self._query(session, keyspace)
+
+        self.coordinator_stats.assert_query_count_equals(self, 3, 0)
+        self.coordinator_stats.assert_query_count_equals(self, 4, 0)
+        self.coordinator_stats.assert_query_count_equals(self, 5, 0)
+        responses = set()
+        for node in [1,2]:
+            responses.add(self.coordinator_stats.get_query_count(node))
+        self.assertEqual(set([0,12]), responses)
 
         self.coordinator_stats.reset_counts()
         decommission(1)
         wait_for_down(cluster, 1, wait=True)
 
-        # ----------------------------------------------------------------------
-        # Traceback (most recent call last):
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/test_loadbalancingpolicies.py", line 288, in test_dc_aware_roundrobin_one_remote_host
-        #     self._query(session, keyspace)
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/test_loadbalancingpolicies.py", line 36, in _query
-        #     self.coordinator_stats.add_coordinator(session.execute_async(ss))
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/utils.py", line 21, in add_coordinator
-        #     coordinator = future._current_host.address
-        # AttributeError: 'NoneType' object has no attribute 'address'
-        # -------------------- >> begin captured logging << --------------------
-        # self._query(session, keyspace)
-        #
-        # self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-        # self.coordinator_stats.assert_query_count_equals(self, 2, 12)
-        # self.coordinator_stats.assert_query_count_equals(self, 3, 0)
-        # self.coordinator_stats.assert_query_count_equals(self, 4, 0)
-        # self.coordinator_stats.assert_query_count_equals(self, 5, 0)
+        self._query(session, keyspace)
+
+        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
+        self.coordinator_stats.assert_query_count_equals(self, 2, 12)
+        self.coordinator_stats.assert_query_count_equals(self, 3, 0)
+        self.coordinator_stats.assert_query_count_equals(self, 4, 0)
+        self.coordinator_stats.assert_query_count_equals(self, 5, 0)
 
         self.coordinator_stats.reset_counts()
         force_stop(2)
 
-        # ----------------------------------------------------------------------
-        # Traceback (most recent call last):
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/test_loadbalancingpolicies.py", line 309, in test_dc_aware_roundrobin_one_remote_host
-        #     self._query(session, keyspace)
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/test_loadbalancingpolicies.py", line 36, in _query
-        #     self.coordinator_stats.add_coordinator(session.execute_async(ss))
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/utils.py", line 21, in add_coordinator
-        #     coordinator = future._current_host.address
-        # AttributeError: 'NoneType' object has no attribute 'address'
-        # -------------------- >> begin captured logging << --------------------
-        # should throw an error about not being able to connect
-        # self._query(session, keyspace)
+        try:
+            self._query(session, keyspace)
+            self.fail()
+        except NoHostAvailable:
+            pass
 
     def test_token_aware(self):
         keyspace = 'test_token_aware'
@@ -402,20 +350,9 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         self._query(session, keyspace, use_prepared=use_prepared)
 
-        # ----------------------------------------------------------------------
-        # Traceback (most recent call last):
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/test_loadbalancingpolicies.py", line 346, in test_token_aware
-        #     self.token_aware(keyspace)
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/test_loadbalancingpolicies.py", line 414, in token_aware
-        #     self.coordinator_stats.assert_query_count_equals(self, 1, 12)
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/utils.py", line 36, in assert_query_count_equals
-        #     expected, ip, self.coordinator_counts[ip], dict(self.coordinator_counts)))
-        # AssertionError: Expected 12 queries to 127.0.0.1, but got 6. Query counts: {'127.0.0.3': 6, '127.0.0.1': 6}
-        # -------------------- >> begin captured logging << --------------------
-        # This is different than the java-driver, but I just wanted to make sure it's intended
-        # self.coordinator_stats.assert_query_count_equals(self, 1, 12)
-        # self.coordinator_stats.assert_query_count_equals(self, 2, 0)
-        # self.coordinator_stats.assert_query_count_equals(self, 3, 0)
+        self.coordinator_stats.assert_query_count_equals(self, 1, 6)
+        self.coordinator_stats.assert_query_count_equals(self, 2, 0)
+        self.coordinator_stats.assert_query_count_equals(self, 3, 6)
 
     def test_token_aware_composite_key(self):
         use_singledc()
@@ -477,8 +414,6 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         use_singledc()
         keyspace = 'test_white_list'
 
-        # BUG? Can only connect to the cluster via nodes in the whitelist?
-        # Perhaps we should be more lenient here?
         cluster = Cluster(('127.0.0.2',),
             load_balancing_policy=WhiteListRoundRobinPolicy((IP_FORMAT % 2,)))
         session = cluster.connect()
@@ -498,15 +433,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         decommission(2)
         wait_for_down(cluster, 2, wait=True)
 
-        # I was expecting another type of error since only IP_FORMAT % 2 is whitelisted
-        # ----------------------------------------------------------------------
-        # Traceback (most recent call last):
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/test_loadbalancingpolicies.py", line 506, in test_white_list
-        #     self._query(session, keyspace)
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/test_loadbalancingpolicies.py", line 49, in _query
-        #     self.coordinator_stats.add_coordinator(session.execute_async(ss))
-        #   File "/Users/joaquin/repos/python-driver/tests/integration/long/utils.py", line 22, in add_coordinator
-        #     coordinator = future._current_host.address
-        # AttributeError: 'NoneType' object has no attribute 'address'
-        # -------------------- >> begin captured logging << --------------------
-        # self._query(session, keyspace)
+        try:
+            self._query(session, keyspace)
+            self.fail()
+        except NoHostAvailable:
+            pass

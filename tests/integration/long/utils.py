@@ -29,9 +29,13 @@ class CoordinatorStats():
     def reset_counts(self):
         self.coordinator_counts = defaultdict(int)
 
+    def get_query_count(self, node):
+        ip = '127.0.0.%d' % node
+        return self.coordinator_counts[ip]
+
     def assert_query_count_equals(self, testcase, node, expected):
         ip = '127.0.0.%d' % node
-        if self.coordinator_counts[ip] != expected:
+        if self.get_query_count(node) != expected:
             testcase.fail('Expected %d queries to %s, but got %d. Query counts: %s' % (
                 expected, ip, self.coordinator_counts[ip], dict(self.coordinator_counts)))
 
@@ -118,7 +122,7 @@ def wait_for_up(cluster, node, wait=True):
         if host and host.is_up:
             # BUG: shouldn't have to, but we do
             if wait:
-                log.debug("Sleeping 5s until host is up")
+                log.debug("Sleeping 20s until host is up")
                 time.sleep(20)
             log.debug("Done waiting for node %s to be up", node)
             return
@@ -132,7 +136,7 @@ def wait_for_down(cluster, node, wait=True):
         if not host or not host.is_up:
             # BUG: shouldn't have to, but we do
             if wait:
-                log.debug("Sleeping 5s until host is down")
+                log.debug("Sleeping 10s until host is down")
                 time.sleep(10)
             log.debug("Done waiting for node %s to be down", node)
             return
