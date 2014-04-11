@@ -427,7 +427,8 @@ class QueryTrace(object):
         while True:
             time_spent = time.time() - start
             if max_wait is not None and time_spent >= max_wait:
-                raise TraceUnavailable("Trace information was not available within %f seconds" % (max_wait,))
+                raise TraceUnavailable(
+                    "Trace information was not available within %f seconds. Consider raising Session.max_trace_wait." % (max_wait,))
 
             log.debug("Attempting to fetch trace info for trace ID: %s", self.trace_id)
             session_results = self._execute(
