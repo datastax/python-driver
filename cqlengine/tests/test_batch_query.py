@@ -180,7 +180,7 @@ class BatchQueryCallbacksTests(BaseCassEngTestCase):
         b.execute()
 
         assert len(call_history) == 2
-        assert {(b,), (b, 'more', 'args')} == set(call_history)
+        assert {tuple(), ('more', 'args')} == set(call_history)
 
     def test_callbacks_tied_to_execute(self):
         """Batch callbacks should NOT fire if batch is not executed in context manager mode"""

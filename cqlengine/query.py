@@ -104,7 +104,6 @@ class BatchQuery(object):
         :param callbacks: A list of functions to be executed after the batch executes. Note, that if the batch
             does not execute, the callbacks are not executed. This, thus, effectively is a list of "on success"
             callback handlers. If defined, must be a collection of callables.
-            At this time only one argument is passed into the callback - the batch instance.
         :type callbacks: list or set or tuple
         """
         self.queries = []
@@ -131,7 +130,7 @@ class BatchQuery(object):
             else:
                 stored_args = callback[1:]
                 callback = callback[0]
-            callback(self, *stored_args)
+            callback(*stored_args)
 
         # trying to clear up the ref counts for objects mentioned in the set
         del self._callbacks

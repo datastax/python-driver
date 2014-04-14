@@ -342,14 +342,16 @@ Batch Query Execution Callbacks
     The callbacks attached to a given batch instance are executed only if the batch executes. If the batch is used as a
     context manager and an exception bubbles up, the queued up callbacks will not be run.
 
-    The callback should be a callable object that accepts at least one (positional) argument - instance of the batch object.
+    The callback arguments signature is not prescribed. However, while it's possible to trap arguments you want to be
+    passed into the callback in a "callback" tuple you add to the batch, only passing of positional arguments is
+    supported at this time. This means there is no elegant way to communicate named arguments to the callback.
 
     .. code-block:: python
 
-        def example_callback_handler(batch, *args, **kwargs):
+        def example_callback_handler(*args):
             pass
 
-    Multiple callbacks can be attached to same BatchQuery instance both, at the point of instantiation and later
+    Multiple callbacks can be attached to same BatchQuery instance both, at the point of batch instantiation and later,
     directly to the batch object instance.
 
     The callbacks collection is implemented as a ``set``, which naturally deduplicates the callback handlers:
@@ -396,22 +398,21 @@ Batch Query Execution Callbacks
         }
 
     Note that the tuple callback object format prevents the possibily of essentially same callback firing multiple times,
-    which might happen if you package same callback and arguments several times with ``functools.partial``, which returns a new callable with each call.
-
-    Arguments packaged into callbacks communicated as tuples are passed to callback handler **after** the ``batch`` argument.
+    which might happen if you package same callback and arguments several times with ``functools.partial``, which returns
+    a new callable with each call.
 
     .. code-block:: python
 
         call_args = []
 
-        def callback_handler(batch, *args, **kwargs):
-            call_args.append([batch] + list(args))
+        def callback_handler(*args, **kwargs):
+            call_args.append(list(args))
 
         batch = BatchQuery(callbacks=([(callback_handler, 'some', 'args')])
 
         batch.execute()
 
-        assert call_args == [[batch, 'some', 'args']]
+        assert call_args[0] == ['some', 'args']
 
 
     Failure in any of the callbacks does not affect the batch's execution, as the callbacks are started after the execution
