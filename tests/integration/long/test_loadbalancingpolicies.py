@@ -22,7 +22,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats = CoordinatorStats()
         self.prepared = None
 
-    def teardown(self):
+    @classmethod
+    def tearDownClass(cls):
         use_singledc()
 
     def _insert(self, session, keyspace, count=12,
