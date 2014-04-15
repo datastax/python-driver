@@ -1,4 +1,5 @@
 import time
+import traceback
 
 try:
     import unittest2 as unittest
@@ -154,6 +155,9 @@ def setup_test_keyspace():
                 k int PRIMARY KEY,
                 v int )'''
         session.execute(ddl)
+    except Exception:
+        traceback.print_exc()
+        raise
     finally:
         cluster.shutdown()
 
