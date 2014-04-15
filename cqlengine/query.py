@@ -78,16 +78,7 @@ class BatchQuery(object):
     """
     _consistency = None
 
-    @property
-    def callbacks(self):
-        """
-        Returns the set object that contains all of the callbacks presently attached to this batch.
-
-        :rtype: set
-        """
-        return self._callbacks
-
-    def __init__(self, batch_type=None, timestamp=None, consistency=None, execute_on_exception=False, callbacks=None):
+    def __init__(self, batch_type=None, timestamp=None, consistency=None, execute_on_exception=False):
         """
         :param batch_type: (optional) One of batch type values available through BatchType enum
         :type batch_type: str or None
@@ -113,7 +104,7 @@ class BatchQuery(object):
         self.timestamp = timestamp
         self._consistency = consistency
         self._execute_on_exception = execute_on_exception
-        self._callbacks = set(callbacks or [])
+        self._callbacks = []
 
     def add_query(self, query):
         if not isinstance(query, BaseCQLStatement):
@@ -124,16 +115,28 @@ class BatchQuery(object):
         self._consistency = consistency
 
     def _execute_callbacks(self):
-        for callback in self._callbacks:
-            if callable(callback):
-                stored_args = []
-            else:
-                stored_args = callback[1:]
-                callback = callback[0]
-            callback(*stored_args)
+        for callback, args, kwargs in self._callbacks:
+            callback(*args, **kwargs)
 
         # trying to clear up the ref counts for objects mentioned in the set
         del self._callbacks
+
+    def add_callback(self, fn, *args, **kwargs):
+        """Add a function and arguments to be passed to it to be executed after the batch executes.
+
+        A batch can support multiple callbacks.
+
+        Note, that if the batch does not execute, the callbacks are not executed.
+        A callback, thus, is an "on batch success" handler.
+
+        :param fn: Callable object
+        :type fn: callable
+        :param *args: Positional arguments to be passed to the callback at the time of execution
+        :param **kwargs: Named arguments to be passed to the callback at the time of execution
+        """
+        if not callable(fn):
+            raise ValueError("Value for argument 'fn' is {} and is not a callable object.".format(type(fn)))
+        self._callbacks.append((fn, args, kwargs))
 
     def execute(self):
         if len(self.queries) == 0:
