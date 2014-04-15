@@ -2,11 +2,13 @@ import logging
 import time
 
 from collections import defaultdict
+from ccmlib.node import Node
 
 from cassandra.query import named_tuple_factory
 
-from tests.integration import get_node
+from tests.integration import get_node, get_cluster
 
+IP_FORMAT = '127.0.0.%s'
 
 log = logging.getLogger(__name__)
 
@@ -17,19 +19,23 @@ class CoordinatorStats():
         self.coordinator_counts = defaultdict(int)
 
     def add_coordinator(self, future):
+        future.result()
         coordinator = future._current_host.address
         self.coordinator_counts[coordinator] += 1
 
         if future._errors:
             log.error('future._errors: %s', future._errors)
-        future.result()
 
     def reset_counts(self):
         self.coordinator_counts = defaultdict(int)
 
+    def get_query_count(self, node):
+        ip = '127.0.0.%d' % node
+        return self.coordinator_counts[ip]
+
     def assert_query_count_equals(self, testcase, node, expected):
         ip = '127.0.0.%d' % node
-        if self.coordinator_counts[ip] != expected:
+        if self.get_query_count(node) != expected:
             testcase.fail('Expected %d queries to %s, but got %d. Query counts: %s' % (
                 expected, ip, self.coordinator_counts[ip], dict(self.coordinator_counts)))
 
@@ -78,6 +84,32 @@ def force_stop(node):
     log.debug("Node %s was stopped", node)
 
 
+def decommission(node):
+    get_node(node).decommission()
+    get_node(node).stop()
+
+
+def bootstrap(node, data_center=None, token=None):
+    node_instance = Node('node%s' % node,
+                         get_cluster(),
+                         auto_bootstrap=False,
+                         thrift_interface=(IP_FORMAT % node, 9160),
+                         storage_interface=(IP_FORMAT % node, 7000),
+                         jmx_port=str(7000 + 100 * node),
+                         remote_debug_port=0,
+                         initial_token=token if token else node * 10)
+    get_cluster().add(node_instance, is_seed=False, data_center=data_center)
+
+    try:
+        start(node)
+    except:
+        # Try only twice
+        try:
+            start(node)
+        except:
+            log.error('Added node failed to start twice.')
+
+
 def ring(node):
     print 'From node%s:' % node
     get_node(node).nodetool('ring')
@@ -85,24 +117,26 @@ def ring(node):
 
 def wait_for_up(cluster, node, wait=True):
     while True:
-        host = cluster.metadata.get_host('127.0.0.%s' % node)
+        host = cluster.metadata.get_host(IP_FORMAT % node)
         time.sleep(0.1)
         if host and host.is_up:
             # BUG: shouldn't have to, but we do
             if wait:
-                time.sleep(5)
+                log.debug("Sleeping 20s until host is up")
+                time.sleep(20)
+            log.debug("Done waiting for node %s to be up", node)
             return
 
 
 def wait_for_down(cluster, node, wait=True):
     log.debug("Waiting for node %s to be down", node)
     while True:
-        host = cluster.metadata.get_host('127.0.0.%s' % node)
+        host = cluster.metadata.get_host(IP_FORMAT % node)
         time.sleep(0.1)
         if not host or not host.is_up:
             # BUG: shouldn't have to, but we do
             if wait:
-                log.debug("Sleeping 5s until host is up")
-                time.sleep(5)
+                log.debug("Sleeping 10s until host is down")
+                time.sleep(10)
             log.debug("Done waiting for node %s to be down", node)
             return

@@ -21,6 +21,9 @@ def create_column_name(i):
         if not i:
             break
 
+    if column_name == 'if':
+        column_name = 'special_case'
+
     return column_name
 
 
@@ -143,17 +146,18 @@ class LargeDataTests(unittest.TestCase):
 
     def test_wide_table(self):
         table = 'wide_table'
+        table_width = 330
         session = self.make_session_and_keyspace()
         table_declaration = 'CREATE TABLE %s (key INT PRIMARY KEY, '
-        table_declaration += ' INT, '.join(create_column_name(i) for i in range(330))
+        table_declaration += ' INT, '.join(create_column_name(i) for i in range(table_width))
         table_declaration += ' INT)'
         session.execute(table_declaration % table)
 
         # Write
         insert_statement = 'INSERT INTO %s (key, '
-        insert_statement += ', '.join(create_column_name(i) for i in range(330))
+        insert_statement += ', '.join(create_column_name(i) for i in range(table_width))
         insert_statement += ') VALUES (%s, '
-        insert_statement += ', '.join(str(i) for i in range(330))
+        insert_statement += ', '.join(str(i) for i in range(table_width))
         insert_statement += ')'
         insert_statement = insert_statement % (table, 0)
 
@@ -164,5 +168,5 @@ class LargeDataTests(unittest.TestCase):
 
         # Verify
         for row in result:
-            for i in range(330):
+            for i in range(table_width):
                 self.assertEqual(row[create_column_name(i)], i)

@@ -1,3 +1,5 @@
+import time
+
 try:
     import unittest2 as unittest
 except ImportError:
@@ -122,6 +124,7 @@ class MetricsTests(unittest.TestCase):
 
         # Force kill ccm node
         get_node(1).stop(wait=True, gently=True)
+        time.sleep(5)
 
         try:
             # Test write

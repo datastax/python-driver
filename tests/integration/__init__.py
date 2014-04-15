@@ -1,3 +1,5 @@
+import time
+
 try:
     import unittest2 as unittest
 except ImportError:
@@ -17,6 +19,7 @@ except ImportError as e:
     raise unittest.SkipTest('ccm is a dependency for integration tests:', e)
 
 CLUSTER_NAME = 'test_cluster'
+MULTIDC_CLUSTER_NAME = 'multidc_test_cluster'
 CCM_CLUSTER = None
 
 CASSANDRA_VERSION = os.getenv('CASSANDRA_VERSION', '2.0.6')
@@ -99,7 +102,43 @@ def setup_package():
     setup_test_keyspace()
 
 
+def use_multidc(dc_list):
+    teardown_package()
+    try:
+        try:
+            cluster = CCMCluster.load(path, MULTIDC_CLUSTER_NAME)
+            log.debug("Found existing ccm test multi-dc cluster, clearing")
+            cluster.clear()
+        except Exception:
+            log.debug("Creating new ccm test multi-dc cluster")
+            cluster = CCMCluster(path, MULTIDC_CLUSTER_NAME, cassandra_version=CASSANDRA_VERSION)
+            cluster.set_configuration_options({'start_native_transport': True})
+            common.switch_cluster(path, MULTIDC_CLUSTER_NAME)
+            cluster.populate(dc_list)
+
+        log.debug("Starting ccm test cluster")
+        cluster.start(wait_for_binary_proto=True)
+    except Exception:
+        log.exception("Failed to start ccm cluster:")
+        raise
+
+    global CCM_CLUSTER
+    CCM_CLUSTER = cluster
+    setup_test_keyspace()
+    log.debug("Switched to multidc cluster")
+
+
+def use_singledc():
+    teardown_package()
+
+    setup_package()
+    log.debug("Switched to singledc cluster")
+
+
 def setup_test_keyspace():
+    # wait for nodes to startup
+    time.sleep(10)
+
     cluster = Cluster(protocol_version=PROTOCOL_VERSION)
     session = cluster.connect()
 
@@ -135,11 +174,19 @@ def setup_test_keyspace():
 
 
 def teardown_package():
-    if CCM_CLUSTER:
+    for cluster_name in [CLUSTER_NAME, MULTIDC_CLUSTER_NAME]:
         try:
-            CCM_CLUSTER.clear()
+            cluster = CCMCluster.load(path, cluster_name)
+
+            try:
+                cluster.clear()
+                cluster.remove()
+                log.info('Cleared cluster: %s' % cluster_name)
+            except Exception:
+                log.exception('Failed to clear cluster: %s' % cluster_name)
+
         except Exception:
-            log.exception("Failed to clear cluster")
+            log.warn('Did not find cluster: %s' % cluster_name)
 
 
 class UpDownWaiter(object):
