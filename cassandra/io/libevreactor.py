@@ -40,6 +40,7 @@ _loop.unref()
 
 _loop_started = None
 _loop_lock = Lock()
+_shutdown = False
 
 
 def _run_loop():
@@ -47,7 +48,7 @@ def _run_loop():
         end_condition = _loop.start()
         # there are still active watchers, no deadlock
         with _loop_lock:
-            if end_condition:
+            if not _shutdown and end_condition:
                 log.debug("Restarting event loop")
                 continue
             else:
@@ -73,6 +74,14 @@ def _start_loop():
         t.start()
 
     return should_start
+
+
+def _cleanup(thread):
+    global _shutdown
+    _shutdown = True
+    log.debug("Waiting for event loop thread to join...")
+    thread.join()
+    log.debug("Event loop thread was joined")
 
 
 class LibevConnection(Connection):
