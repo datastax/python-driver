@@ -322,12 +322,49 @@ class BoundStatement(Statement):
     def bind(self, values):
         """
         Binds a sequence of values for the prepared statement parameters
-        and returns this instance.  Note that `values` *must* be a
-        sequence, even if you are only binding one value.
+        and returns this instance.  Note that `values` *must* be:
+        * a sequence, even if you are only binding one value, or
+        * a dict that relates 1-to-1 between dict keys and columns
         """
         if values is None:
             values = ()
         col_meta = self.prepared_statement.column_metadata
+
+        # special case for binding dicts
+        if isinstance(values, dict):
+            dict_values = values
+            values = []
+
+            # sort values accordingly
+            for col in col_meta:
+                try:
+                    values.append(dict_values[col[2]])
+                except KeyError:
+                    raise KeyError(
+                        'Column name `%s` not found in bound dict.' %
+                        (col[2]))
+
+            # ensure a 1-to-1 dict keys to columns relationship
+            if len(dict_values) != len(col_meta):
+                # find expected columns
+                columns = set()
+                for col in col_meta:
+                    columns.add(col[2])
+
+                # generate error message
+                if len(dict_values) > len(col_meta):
+                    difference = set(dict_values.keys()).difference(columns)
+                    msg = "Too many arguments provided to bind() (got %d, expected %d). " + \
+                          "Unexpected keys %s."
+                else:
+                    difference = set(columns).difference(dict_values.keys())
+                    msg = "Too few arguments provided to bind() (got %d, expected %d). " + \
+                          "Expected keys %s."
+
+                # exit with error message
+                msg = msg % (len(values), len(col_meta), difference)
+                raise ValueError(msg)
+
         if len(values) > len(col_meta):
             raise ValueError(
                 "Too many arguments provided to bind() (got %d, expected %d)" %
@@ -581,7 +618,8 @@ class QueryTrace(object):
         while True:
             time_spent = time.time() - start
             if max_wait is not None and time_spent >= max_wait:
-                raise TraceUnavailable("Trace information was not available within %f seconds" % (max_wait,))
+                raise TraceUnavailable(
+                    "Trace information was not available within %f seconds. Consider raising Session.max_trace_wait." % (max_wait,))
 
             log.debug("Attempting to fetch trace info for trace ID: %s", self.trace_id)
             session_results = self._execute(

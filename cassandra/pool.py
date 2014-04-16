@@ -264,7 +264,7 @@ class _HostReconnectionHandler(_ReconnectionHandler):
         if isinstance(exc, AuthenticationFailed):
             return False
         else:
-            log.warn("Error attempting to reconnect to %s, scheduling retry in %f seconds: %s",
+            log.warn("Error attempting to reconnect to %s, scheduling retry in %s seconds: %s",
                      self.host, next_delay, exc)
             log.debug("Reconnection error details", exc_info=True)
             return True

@@ -19,6 +19,7 @@ from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.policies import (RoundRobinPolicy, DCAwareRoundRobinPolicy,
                                 TokenAwarePolicy, WhiteListRoundRobinPolicy)
 from cassandra.query import SimpleStatement
+
 from tests.integration import use_multidc, use_singledc, PROTOCOL_VERSION
 from tests.integration.long.utils import (wait_for_up, create_schema,
                                           CoordinatorStats, force_stop,

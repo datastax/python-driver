@@ -65,9 +65,16 @@ def execute_concurrent(session, statements_and_parameters, concurrency=100, rais
     if not statements_and_parameters:
         return []
 
+    # TODO handle iterators and generators naturally without converting the
+    # whole thing to a list.  This would requires not building a result
+    # list of Nones up front (we don't know how many results there will be),
+    # so a dict keyed by index should be used instead.  The tricky part is
+    # knowing when you're the final statement to finish.
+    statements_and_parameters = list(statements_and_parameters)
+
     event = Event()
     first_error = [] if raise_on_first_error else None
-    to_execute = len(statements_and_parameters)  # TODO handle iterators/generators
+    to_execute = len(statements_and_parameters)
     results = [None] * to_execute
     num_finished = count(start=1)
     statements = enumerate(iter(statements_and_parameters))
@@ -76,7 +83,12 @@ def execute_concurrent(session, statements_and_parameters, concurrency=100, rais
 
     event.wait()
     if first_error:
-        raise first_error[0]
+        exc = first_error[0]
+        if isinstance(exc, tuple):
+            (exc_type, value, traceback) = exc
+            raise exc_type, value, traceback
+        else:
+            raise exc
     else:
         return results
 

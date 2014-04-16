@@ -2,6 +2,7 @@
 *.swp
 *.swo
 *.so
+*.egg
 *.egg-info
 .tox
 .idea/

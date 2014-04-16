@@ -18,6 +18,7 @@ This module houses the main classes you will interact with,
 """
 from __future__ import absolute_import
 
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 import logging
 import socket
@@ -54,7 +55,7 @@ from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy)
 from cassandra.pool import (_ReconnectionHandler, _HostReconnectionHandler,
-                            HostConnectionPool)
+                            HostConnectionPool, NoConnectionsAvailable)
 from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              BatchStatement, bind_params, QueryTrace, Statement,
                              named_tuple_factory, dict_factory)
@@ -1380,8 +1381,8 @@ class ControlConnection(object):
     _SELECT_COLUMN_FAMILIES = "SELECT * FROM system.schema_columnfamilies"
     _SELECT_COLUMNS = "SELECT * FROM system.schema_columns"
 
-    _SELECT_PEERS = "SELECT peer, data_center, rack, tokens, rpc_address FROM system.peers"
-    _SELECT_LOCAL = "SELECT cluster_name, data_center, rack, tokens, partitioner FROM system.local WHERE key='local'"
+    _SELECT_PEERS = "SELECT peer, data_center, rack, tokens, rpc_address, schema_version FROM system.peers"
+    _SELECT_LOCAL = "SELECT cluster_name, data_center, rack, tokens, partitioner, schema_version FROM system.local WHERE key='local'"
 
     _SELECT_SCHEMA_PEERS = "SELECT rpc_address, schema_version FROM system.peers"
     _SELECT_SCHEMA_LOCAL = "SELECT schema_version FROM system.local WHERE key='local'"
@@ -1464,8 +1465,13 @@ class ControlConnection(object):
                 "SCHEMA_CHANGE": self._handle_schema_change
             })
 
-            self._refresh_node_list_and_token_map(connection)
-            self._refresh_schema(connection)
+            peers_query = QueryMessage(query=self._SELECT_PEERS, consistency_level=ConsistencyLevel.ONE)
+            local_query = QueryMessage(query=self._SELECT_LOCAL, consistency_level=ConsistencyLevel.ONE)
+            shared_results = connection.wait_for_responses(
+                peers_query, local_query, timeout=self._timeout)
+
+            self._refresh_node_list_and_token_map(connection, preloaded_results=shared_results)
+            self._refresh_schema(connection, preloaded_results=shared_results)
         except Exception:
             connection.close()
             raise
@@ -1547,11 +1553,11 @@ class ControlConnection(object):
             log.debug("[control connection] Error refreshing schema", exc_info=True)
             self._signal_error()
 
-    def _refresh_schema(self, connection, keyspace=None, table=None):
+    def _refresh_schema(self, connection, keyspace=None, table=None, preloaded_results=None):
         if self._cluster.is_shutdown:
             return
 
-        self.wait_for_schema_agreement(connection)
+        self.wait_for_schema_agreement(connection, preloaded_results=preloaded_results)
 
         where_clause = ""
         if keyspace:
@@ -1598,13 +1604,19 @@ class ControlConnection(object):
             log.debug("[control connection] Error refreshing node list and token map", exc_info=True)
             self._signal_error()
 
-    def _refresh_node_list_and_token_map(self, connection):
-        log.debug("[control connection] Refreshing node list and token map")
-        cl = ConsistencyLevel.ONE
-        peers_query = QueryMessage(query=self._SELECT_PEERS, consistency_level=cl)
-        local_query = QueryMessage(query=self._SELECT_LOCAL, consistency_level=cl)
-        peers_result, local_result = connection.wait_for_responses(
-            peers_query, local_query, timeout=self._timeout)
+    def _refresh_node_list_and_token_map(self, connection, preloaded_results=None):
+        if preloaded_results:
+            log.debug("[control connection] Refreshing node list and token map using preloaded results")
+            peers_result = preloaded_results[0]
+            local_result = preloaded_results[1]
+        else:
+            log.debug("[control connection] Refreshing node list and token map")
+            cl = ConsistencyLevel.ONE
+            peers_query = QueryMessage(query=self._SELECT_PEERS, consistency_level=cl)
+            local_query = QueryMessage(query=self._SELECT_LOCAL, consistency_level=cl)
+            peers_result, local_result = connection.wait_for_responses(
+                peers_query, local_query, timeout=self._timeout)
+
         peers_result = dict_factory(*peers_result.results)
 
         partitioner = None
@@ -1712,7 +1724,7 @@ class ControlConnection(object):
         elif event['change_type'] == "UPDATED":
             self._submit(self.refresh_schema, keyspace, table)
 
-    def wait_for_schema_agreement(self, connection=None):
+    def wait_for_schema_agreement(self, connection=None, preloaded_results=None):
         # Each schema change typically generates two schema refreshes, one
         # from the response type and one from the pushed notification. Holding
         # a lock is just a simple way to cut down on the number of schema queries
@@ -1721,14 +1733,24 @@ class ControlConnection(object):
             if self._is_shutdown:
                 return
 
-            log.debug("[control connection] Waiting for schema agreement")
             if not connection:
                 connection = self._connection
 
+            if preloaded_results:
+                log.debug("[control connection] Attempting to use preloaded results for schema agreement")
+
+                peers_result = preloaded_results[0]
+                local_result = preloaded_results[1]
+                schema_mismatches = self._get_schema_mismatches(peers_result, local_result, connection.host)
+                if schema_mismatches is None:
+                    return True
+
+            log.debug("[control connection] Waiting for schema agreement")
             start = self._time.time()
             elapsed = 0
             cl = ConsistencyLevel.ONE
             total_timeout = self._cluster.max_schema_agreement_wait
+            schema_mismatches = None
             while elapsed < total_timeout:
                 peers_query = QueryMessage(query=self._SELECT_SCHEMA_PEERS, consistency_level=cl)
                 local_query = QueryMessage(query=self._SELECT_SCHEMA_LOCAL, consistency_level=cl)
@@ -1742,35 +1764,44 @@ class ControlConnection(object):
                     elapsed = self._time.time() - start
                     continue
 
-                peers_result = dict_factory(*peers_result.results)
-
-                versions = set()
-                if local_result.results:
-                    local_row = dict_factory(*local_result.results)[0]
-                    if local_row.get("schema_version"):
-                        versions.add(local_row.get("schema_version"))
-
-                for row in peers_result:
-                    if not row.get("rpc_address") or not row.get("schema_version"):
-                        continue
-
-                    rpc = row.get("rpc_address")
-                    if rpc == "0.0.0.0":  # TODO ipv6 check
-                        rpc = row.get("peer")
-
-                    peer = self._cluster.metadata.get_host(rpc)
-                    if peer and peer.is_up:
-                        versions.add(row.get("schema_version"))
-
-                if len(versions) == 1:
-                    log.debug("[control connection] Schemas match")
+                schema_mismatches = self._get_schema_mismatches(peers_result, local_result, connection.host)
+                if schema_mismatches is None:
                     return True
 
                 log.debug("[control connection] Schemas mismatched, trying again")
                 self._time.sleep(0.2)
                 elapsed = self._time.time() - start
 
+            log.warn("Node %s is reporting a schema disagreement: %s",
+                     connection.host, schema_mismatches)
             return False
+
+    def _get_schema_mismatches(self, peers_result, local_result, local_address):
+        peers_result = dict_factory(*peers_result.results)
+
+        versions = defaultdict(set)
+        if local_result.results:
+            local_row = dict_factory(*local_result.results)[0]
+            if local_row.get("schema_version"):
+                versions[local_row.get("schema_version")].add(local_address)
+
+        for row in peers_result:
+            if not row.get("rpc_address") or not row.get("schema_version"):
+                continue
+
+            rpc = row.get("rpc_address")
+            if rpc == "0.0.0.0":  # TODO ipv6 check
+                rpc = row.get("peer")
+
+            peer = self._cluster.metadata.get_host(rpc)
+            if peer and peer.is_up:
+                versions[row.get("schema_version")].add(rpc)
+
+        if len(versions) == 1:
+            log.debug("[control connection] Schemas match")
+            return None
+
+        return dict((version, list(nodes)) for version, nodes in versions.iteritems())
 
     def _signal_error(self):
         # try just signaling the cluster, as this will trigger a reconnect
@@ -1976,6 +2007,10 @@ class ResponseFuture(object):
             # TODO get connectTimeout from cluster settings
             connection = pool.borrow_connection(timeout=2.0)
             request_id = connection.send_msg(message, cb=cb)
+        except NoConnectionsAvailable as exc:
+            log.debug("All connections for host %s are at capacity, moving to the next host", host)
+            self._errors[host] = exc
+            return None
         except Exception as exc:
             log.debug("Error querying host %s", host, exc_info=True)
             self._errors[host] = exc
