@@ -46,7 +46,7 @@ class QueryPagingTests(unittest.TestCase):
 
             self.assertEqual(100, len(list(self.session.execute(prepared))))
 
-    def test_paging_verify(self):
+    def test_paging_verify_writes(self):
         statements_and_params = zip(cycle(["INSERT INTO test3rf.test (k, v) VALUES (%s, 0)"]),
                                     [(i, ) for i in range(100)])
         execute_concurrent(self.session, statements_and_params)
@@ -86,7 +86,7 @@ class QueryPagingTests(unittest.TestCase):
             self.assertEqual(set(range(100)), result_array)
             self.assertEqual(set([0]), result_set)
 
-    def test_paging_verify_2(self):
+    def test_paging_verify_with_composite_keys(self):
         ddl = '''
             CREATE TABLE test3rf.test_paging_verify_2 (
                 k1 int,
@@ -152,7 +152,7 @@ class QueryPagingTests(unittest.TestCase):
 
             self.assertEqual(100, len(list(self.session.execute_async(prepared).result())))
 
-    def test_async_paging_verify(self):
+    def test_async_paging_verify_writes(self):
         ddl = '''
             CREATE TABLE test3rf.test_async_paging_verify (
                 k1 int,
