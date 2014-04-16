@@ -225,8 +225,22 @@ class BatchStatementTests(unittest.TestCase):
         self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         self.session = self.cluster.connect()
 
+        self.session.execute("TRUNCATE test3rf.test")
+
     def tearDown(self):
+        self.confirm_results()
         self.cluster.shutdown()
+
+    def confirm_results(self):
+        keys = set()
+        values = set()
+        results = self.session.execute("SELECT * FROM test3rf.test")
+        for result in results:
+            keys.add(result.k)
+            values.add(result.v)
+
+        self.assertEqual(set(range(10)), keys)
+        self.assertEqual(set(range(10)), values)
 
     def test_string_statements(self):
         batch = BatchStatement(BatchType.LOGGED)
@@ -277,6 +291,14 @@ class BatchStatementTests(unittest.TestCase):
         batch.add(prepared.bind([]))
         batch.add(prepared.bind([]), ())
 
+        batch.add("INSERT INTO test3rf.test (k, v) VALUES (5, 5)", ())
+        batch.add("INSERT INTO test3rf.test (k, v) VALUES (6, 6)", ())
+        batch.add("INSERT INTO test3rf.test (k, v) VALUES (7, 7)", ())
+        batch.add("INSERT INTO test3rf.test (k, v) VALUES (8, 8)", ())
+        batch.add("INSERT INTO test3rf.test (k, v) VALUES (9, 9)", ())
+
+        self.assertRaises(ValueError, batch.add, prepared.bind([]), (1))
+        self.assertRaises(ValueError, batch.add, prepared.bind([]), (1, 2))
         self.assertRaises(ValueError, batch.add, prepared.bind([]), (1, 2, 3))
 
         self.session.execute(batch)
