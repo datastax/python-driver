@@ -1568,7 +1568,10 @@ class ControlConnection(object):
         if self._cluster.is_shutdown:
             return
 
-        self.wait_for_schema_agreement(connection, preloaded_results=preloaded_results)
+        agreed = self.wait_for_schema_agreement(connection, preloaded_results=preloaded_results)
+        if not agreed:
+            log.debug("Skipping schema refresh due to lack of schema agreement")
+            return
 
         where_clause = ""
         if keyspace:
@@ -1774,6 +1777,12 @@ class ControlConnection(object):
                               "response during schema agreement check: %s", timeout)
                     elapsed = self._time.time() - start
                     continue
+                except ConnectionShutdown:
+                    if self._is_shutdown:
+                        log.debug("[control connection] Aborting wait for schema match due to shutdown")
+                        return None
+                    else:
+                        raise
 
                 schema_mismatches = self._get_schema_mismatches(peers_result, local_result, connection.host)
                 if schema_mismatches is None:
