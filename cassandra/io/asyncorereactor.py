@@ -1,5 +1,6 @@
 import atexit
 from collections import deque
+from functools import partial
 import logging
 import os
 import socket
@@ -31,61 +32,69 @@ from cassandra.marshal import int32_unpack
 
 log = logging.getLogger(__name__)
 
-_loop_started = False
-_loop_lock = Lock()
 
-_starting_conns = set()
-_starting_conns_lock = Lock()
-_shutdown = False
-_conns = WeakSet()
+class AsyncoreLoop(object):
 
+    def __init__(self):
+        self._loop_lock = Lock()
+        self._started = False
+        self._shutdown = False
 
-def _run_loop():
-    global _loop_started
-    log.debug("Starting asyncore event loop")
-    with _loop_lock:
-        while True:
-            try:
-                asyncore.loop(timeout=0.001, use_poll=True, count=1000)
-            except Exception:
-                log.debug("Asyncore event loop stopped unexepectedly", exc_info=True)
-                break
+        self._conns_lock = Lock()
+        self._conns = WeakSet()
 
-            if _shutdown or len(_conns) == 0:
-                break
+    def maybe_start(self):
+        should_start = False
+        did_acquire = False
+        try:
+            did_acquire = self._loop_lock.acquire(False)
+            if did_acquire and not self._started:
+                self._started = True
+                should_start = True
+        finally:
+            if did_acquire:
+                self._loop_lock.release()
 
-        _loop_started = False
-        if log:
-            # this can happen during interpreter shutdown
-            log.debug("Asyncore event loop ended")
+        if should_start:
+            thread = Thread(target=self._run_loop, name="cassandra_driver_event_loop")
+            thread.daemon = True
+            thread.start()
+            atexit.register(partial(self._cleanup, thread))
 
+    def _run_loop(self):
+        log.debug("Starting asyncore event loop")
+        with self._loop_lock:
+            while True:
+                try:
+                    asyncore.loop(timeout=0.001, use_poll=True, count=1000)
+                except Exception:
+                    log.debug("Asyncore event loop stopped unexepectedly", exc_info=True)
+                    break
 
-def _start_loop():
-    global _loop_started
-    should_start = False
-    did_acquire = False
-    try:
-        did_acquire = _loop_lock.acquire(False)
-        if did_acquire and not _loop_started:
-            _loop_started = True
-            should_start = True
-    finally:
-        if did_acquire:
-            _loop_lock.release()
+                if self._shutdown:
+                    break
 
-    if should_start:
-        t = Thread(target=_run_loop, name="event_loop")
-        t.daemon = True
-        t.start()
+                with self._conns_lock:
+                    if len(self._conns) == 0:
+                        break
 
-        def cleanup():
-            global _shutdown
-            _shutdown = True
-            log.debug("Waiting for event loop thread to join...")
-            t.join()
-            log.debug("Event loop thread was joined")
+            self._started = False
 
-        atexit.register(cleanup)
+        log.debug("Asyncore event loop ended")
+
+    def _cleanup(self, thread):
+        self._shutdown = True
+        log.debug("Waiting for event loop thread to join...")
+        thread.join()
+        log.debug("Event loop thread was joined")
+
+    def connection_created(self, connection):
+        with self._conns_lock:
+            self._conns.add(connection)
+
+    def connection_destroyed(self, connection):
+        with self._conns_lock:
+            self._conns.discard(connection)
 
 
 class AsyncoreConnection(Connection, asyncore.dispatcher):
@@ -93,6 +102,8 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
     An implementation of :class:`.Connection` that uses the ``asyncore``
     module in the Python standard library for its event loop.
     """
+
+    _loop = AsyncoreLoop()
 
     _total_reqd_bytes = 0
     _writable = False
@@ -122,8 +133,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         self.deque = deque()
         self.deque_lock = Lock()
 
-        with _starting_conns_lock:
-            _starting_conns.add(self)
+        self._loop.connection_created(self)
 
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect((self.host, self.port))
@@ -135,9 +145,8 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         self._writable = True
         self._readable = True
 
-        # start the global event loop if needed
-        _conns.add(self)
-        _start_loop()
+        # start the event loop if needed
+        self._loop.maybe_start()
 
     def create_socket(self, family, type):
         # copied from asyncore, but with the line to set the socket in
@@ -179,8 +188,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         asyncore.dispatcher.close(self)
         log.debug("Closed socket to %s", self.host)
 
-        with _starting_conns_lock:
-            _starting_conns.discard(self)
+        self._loop.connection_destroyed(self)
 
         if not self.is_defunct:
             self.error_all_callbacks(
@@ -189,8 +197,6 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
             self.connected_event.set()
 
     def handle_connect(self):
-        with _starting_conns_lock:
-            _starting_conns.discard(self)
         self._send_options_message()
 
     def handle_error(self):
