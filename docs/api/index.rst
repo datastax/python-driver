@@ -10,6 +10,7 @@ API Documentation
    cassandra/metadata
    cassandra/query
    cassandra/pool
+   cassandra/concurrent
    cassandra/connection
    cassandra/io/asyncorereactor
    cassandra/io/libevreactor

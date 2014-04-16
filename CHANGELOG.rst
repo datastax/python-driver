@@ -8,6 +8,9 @@ Features
   github issue #46)
 * Support static columns in schemas, which are available starting in
   Cassandra 2.1. (github issue #91)
+* Add debian packaging (github issue #101)
+* Add utility methods for easy concurrent execution of statements. See
+  the new cassandra.concurrent module. (github issue #7)
 
 Bug Fixes
 ---------
@@ -27,6 +30,8 @@ Bug Fixes
   and rack information has been set, if possible.
 * Avoid KeyError when updating metadata after droping a table (github issues
   #97, #98)
+* Use tuples instead of sets for DCAwareLoadBalancingPolicy to ensure equal
+  distribution of requests
 
 Other
 -----
@@ -34,6 +39,10 @@ Other
   user-defined type support.  (github issue #90)
 * Better error message when libevwrapper is not found
 * Only try to import scales when metrics are enabled (github issue #92)
+* Cut down on the number of queries executing when a new Cluster
+  connects and when the control connection has to reconnect (github issue #104,
+  PYTHON-59)
+* Issue warning log when schema versions do not match
 
 1.0.2
 =====

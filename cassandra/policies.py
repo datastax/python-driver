@@ -1,3 +1,17 @@
+# Copyright 2013-2014 DataStax, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from itertools import islice, cycle, groupby, repeat
 import logging
 from random import randint
@@ -210,7 +224,7 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
 
     def populate(self, cluster, hosts):
         for dc, dc_hosts in groupby(hosts, lambda h: self._dc(h)):
-            self._dc_live_hosts[dc] = frozenset(dc_hosts)
+            self._dc_live_hosts[dc] = tuple(set(dc_hosts))
 
         # position is currently only used for local hosts
         local_live = self._dc_live_hosts.get(self.local_dc)
@@ -244,7 +258,7 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
         pos = self._position
         self._position += 1
 
-        local_live = list(self._dc_live_hosts.get(self.local_dc, ()))
+        local_live = self._dc_live_hosts.get(self.local_dc, ())
         pos = (pos % len(local_live)) if local_live else 0
         for host in islice(cycle(local_live), pos, pos + len(local_live)):
             yield host
@@ -253,32 +267,36 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
             if dc == self.local_dc:
                 continue
 
-            for host in list(current_dc_hosts)[:self.used_hosts_per_remote_dc]:
+            for host in current_dc_hosts[:self.used_hosts_per_remote_dc]:
                 yield host
 
     def on_up(self, host):
         dc = self._dc(host)
         with self._hosts_lock:
-            current_hosts = self._dc_live_hosts.setdefault(dc, frozenset())
-            self._dc_live_hosts[dc] = current_hosts.union((host, ))
+            current_hosts = self._dc_live_hosts.setdefault(dc, ())
+            if host not in current_hosts:
+                self._dc_live_hosts[dc] = current_hosts + (host, )
 
     def on_down(self, host):
         dc = self._dc(host)
         with self._hosts_lock:
-            current_hosts = self._dc_live_hosts.setdefault(dc, frozenset())
-            self._dc_live_hosts[dc] = current_hosts.difference((host, ))
+            current_hosts = self._dc_live_hosts.setdefault(dc, ())
+            if host in current_hosts:
+                self._dc_live_hosts[dc] = tuple(h for h in current_hosts if h != host)
 
     def on_add(self, host):
         dc = self._dc(host)
         with self._hosts_lock:
-            current_hosts = self._dc_live_hosts.setdefault(dc, frozenset())
-            self._dc_live_hosts[dc] = current_hosts.union((host, ))
+            current_hosts = self._dc_live_hosts.setdefault(dc, ())
+            if host not in current_hosts:
+                self._dc_live_hosts[dc] = current_hosts + (host, )
 
     def on_remove(self, host):
         dc = self._dc(host)
         with self._hosts_lock:
-            current_hosts = self._dc_live_hosts.setdefault(dc, frozenset())
-            self._dc_live_hosts[dc] = current_hosts.difference((host, ))
+            current_hosts = self._dc_live_hosts.setdefault(dc, ())
+            if host in current_hosts:
+                self._dc_live_hosts[dc] = tuple(h for h in current_hosts if h != host)
 
 
 class TokenAwarePolicy(LoadBalancingPolicy):

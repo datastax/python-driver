@@ -1,3 +1,17 @@
+# Copyright 2013-2014 DataStax, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 try:
     import unittest2 as unittest
 except ImportError:
@@ -402,7 +416,7 @@ class TestCodeCoverage(unittest.TestCase):
         get_replicas = cluster.metadata.token_map.get_replicas
 
         for ksname in ('test1rf', 'test2rf', 'test3rf'):
-            self.assertNotEqual(list(get_replicas('test3rf', ring[0])), [])
+            self.assertNotEqual(list(get_replicas(ksname, ring[0])), [])
 
         for i, token in enumerate(ring):
             self.assertEqual(set(get_replicas('test3rf', token)), set(owners))
