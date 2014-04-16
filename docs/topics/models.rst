@@ -260,6 +260,63 @@ Extending Model Validation
     if validation fails
 
 
+Table Properties
+================
+
+    Each table can have its own set of configuration options.
+    These can be specified on a model with the following attributes:
+
+    .. attribute:: Model.__bloom_filter_fp_chance
+
+    .. attribute:: Model.__caching__
+
+    .. attribute:: Model.__comment__
+
+    .. attribute:: Model.__dclocal_read_repair_chance__
+
+    .. attribute:: Model.__default_time_to_live__
+
+    .. attribute:: Model.__gc_grace_seconds__
+
+    .. attribute:: Model.__index_interval__
+
+    .. attribute:: Model.__memtable_flush_period_in_ms__
+
+    .. attribute:: Model.__populate_io_cache_on_flush__
+
+    .. attribute:: Model.__read_repair_chance__
+
+    .. attribute:: Model.__replicate_on_write__
+
+    Example:
+
+    .. code-block:: python
+
+        from cqlengine import ROWS_ONLY, columns
+        from cqlengine.models import Model
+
+        class User(Model):
+            __caching__ = ROWS_ONLY  # cache only rows instead of keys only by default
+            __gc_grace_seconds__ = 86400  # 1 day instead of the default 10 days
+
+            user_id = columns.UUID(primary_key=True)
+            name = columns.Text()
+
+    Will produce the following CQL statement:
+
+    .. code-block:: sql
+
+        CREATE TABLE cqlengine.user (
+            user_id uuid,
+            name text,
+            PRIMARY KEY (user_id)
+        ) WITH caching = 'rows_only'
+           AND gc_grace_seconds = 86400;
+
+    See the `list of supported table properties for more information
+    <http://www.datastax.com/documentation/cql/3.1/cql/cql_reference/tabProp.html>`_.
+
+
 Compaction Options
 ==================
 
@@ -310,6 +367,7 @@ Compaction Options
             __compaction_tombstone_compaction_interval__ = 86400
 
     Tables may use `LeveledCompactionStrategy` or `SizeTieredCompactionStrategy`.  Both options are available in the top level cqlengine module.  To reiterate, you will need to set your `__compaction__` option explicitly in order for cqlengine to handle any of your settings.
+
 
 Manipulating model instances as dictionaries
 ============================================

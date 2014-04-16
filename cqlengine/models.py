@@ -255,8 +255,18 @@ class BaseModel(object):
     #__ttl__ = None # this doesn't seem to be used
     __consistency__ = None # can be set per query
 
-    __read_repair_chance__ = 0.1
-
+    # Additional table properties
+    __bloom_filter_fp_chance__ = None
+    __caching__ = None
+    __comment__ = None
+    __dclocal_read_repair_chance__ = None
+    __default_time_to_live__ = None
+    __gc_grace_seconds__ = None
+    __index_interval__ = None
+    __memtable_flush_period_in_ms__ = None
+    __populate_io_cache_on_flush__ = None
+    __read_repair_chance__ = None
+    __replicate_on_write__ = None
 
     _timestamp = None # optional timestamp to include with the operation (USING TIMESTAMP)
 
