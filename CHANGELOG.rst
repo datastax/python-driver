@@ -1,6 +1,6 @@
 1.1.0
 =====
-In Progress
+April 16, 2014
 
 Features
 --------
