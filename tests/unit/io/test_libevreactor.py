@@ -27,7 +27,7 @@ except ImportError:
 @patch('cassandra.io.libevwrapper.IO')
 @patch('cassandra.io.libevwrapper.Prepare')
 @patch('cassandra.io.libevwrapper.Async')
-@patch('cassandra.io.libevreactor._start_loop')
+@patch('cassandra.io.libevreactor.LibevConnection._maybe_start_loop')
 class LibevConnectionTest(unittest.TestCase):
 
     def setUp(self):
