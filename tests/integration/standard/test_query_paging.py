@@ -56,37 +56,34 @@ class QueryPagingTests(unittest.TestCase):
         for fetch_size in (2, 3, 7, 10, 99, 100, 101, 10000):
             self.session.default_fetch_size = fetch_size
             results = self.session.execute("SELECT * FROM test3rf.test")
-            result_array = []
+            result_array = set()
             result_set = set()
             for result in results:
-                result_array.append(result.k)
+                result_array.add(result.k)
                 result_set.add(result.v)
-            result_array.sort()
 
-            self.assertEqual(range(100), result_array)
+            self.assertEqual(set(range(100)), result_array)
             self.assertEqual(set([0]), result_set)
 
             statement = SimpleStatement("SELECT * FROM test3rf.test")
             results = self.session.execute(statement)
-            result_array = []
+            result_array = set()
             result_set = set()
             for result in results:
-                result_array.append(result.k)
+                result_array.add(result.k)
                 result_set.add(result.v)
-            result_array.sort()
 
-            self.assertEqual(range(100), result_array)
+            self.assertEqual(set(range(100)), result_array)
             self.assertEqual(set([0]), result_set)
 
             results = self.session.execute(prepared)
-            result_array = []
+            result_array = set()
             result_set = set()
             for result in results:
-                result_array.append(result.k)
+                result_array.add(result.k)
                 result_set.add(result.v)
-            result_array.sort()
 
-            self.assertEqual(range(100), result_array)
+            self.assertEqual(set(range(100)), result_array)
             self.assertEqual(set([0]), result_set)
 
     def test_paging_verify_2(self):
