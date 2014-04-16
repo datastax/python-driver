@@ -46,6 +46,99 @@ class QueryPagingTests(unittest.TestCase):
 
             self.assertEqual(100, len(list(self.session.execute(prepared))))
 
+    def test_paging_verify(self):
+        statements_and_params = zip(cycle(["INSERT INTO test3rf.test (k, v) VALUES (%s, 0)"]),
+                                    [(i, ) for i in range(100)])
+        execute_concurrent(self.session, statements_and_params)
+
+        prepared = self.session.prepare("SELECT * FROM test3rf.test")
+
+        for fetch_size in (2, 3, 7, 10, 99, 100, 101, 10000):
+            self.session.default_fetch_size = fetch_size
+            results = self.session.execute("SELECT * FROM test3rf.test")
+            result_array = []
+            result_set = set()
+            for result in results:
+                result_array.append(result.k)
+                result_set.add(result.v)
+            result_array.sort()
+
+            self.assertEqual(range(100), result_array)
+            self.assertEqual(set([0]), result_set)
+
+            statement = SimpleStatement("SELECT * FROM test3rf.test")
+            results = self.session.execute(statement)
+            result_array = []
+            result_set = set()
+            for result in results:
+                result_array.append(result.k)
+                result_set.add(result.v)
+            result_array.sort()
+
+            self.assertEqual(range(100), result_array)
+            self.assertEqual(set([0]), result_set)
+
+            results = self.session.execute(prepared)
+            result_array = []
+            result_set = set()
+            for result in results:
+                result_array.append(result.k)
+                result_set.add(result.v)
+            result_array.sort()
+
+            self.assertEqual(range(100), result_array)
+            self.assertEqual(set([0]), result_set)
+
+    def test_paging_verify_2(self):
+        ddl = '''
+            CREATE TABLE test3rf.test_paging_verify_2 (
+                k1 int,
+                k2 int,
+                v int,
+                PRIMARY KEY(k1, k2)
+            )'''
+        self.session.execute(ddl)
+
+        statements_and_params = zip(cycle(["INSERT INTO test3rf.test_paging_verify_2 "
+                                           "(k1, k2, v) VALUES (0, %s, %s)"]),
+                                    [(i, i + 1) for i in range(100)])
+        execute_concurrent(self.session, statements_and_params)
+
+        prepared = self.session.prepare("SELECT * FROM test3rf.test_paging_verify_2")
+
+        for fetch_size in (2, 3, 7, 10, 99, 100, 101, 10000):
+            self.session.default_fetch_size = fetch_size
+            results = self.session.execute("SELECT * FROM test3rf.test_paging_verify_2")
+            result_array = []
+            value_array = []
+            for result in results:
+                result_array.append(result.k2)
+                value_array.append(result.v)
+
+            self.assertEqual(range(100), result_array)
+            self.assertEqual(range(1, 101), value_array)
+
+            statement = SimpleStatement("SELECT * FROM test3rf.test_paging_verify_2")
+            results = self.session.execute(statement)
+            result_array = []
+            value_array = []
+            for result in results:
+                result_array.append(result.k2)
+                value_array.append(result.v)
+
+            self.assertEqual(range(100), result_array)
+            self.assertEqual(range(1, 101), value_array)
+
+            results = self.session.execute(prepared)
+            result_array = []
+            value_array = []
+            for result in results:
+                result_array.append(result.k2)
+                value_array.append(result.v)
+
+            self.assertEqual(range(100), result_array)
+            self.assertEqual(range(1, 101), value_array)
+
     def test_async_paging(self):
         statements_and_params = zip(cycle(["INSERT INTO test3rf.test (k, v) VALUES (%s, 0)"]),
                                     [(i, ) for i in range(100)])
@@ -61,6 +154,56 @@ class QueryPagingTests(unittest.TestCase):
             self.assertEqual(100, len(list(self.session.execute_async(statement).result())))
 
             self.assertEqual(100, len(list(self.session.execute_async(prepared).result())))
+
+    def test_async_paging_verify(self):
+        ddl = '''
+            CREATE TABLE test3rf.test_async_paging_verify (
+                k1 int,
+                k2 int,
+                v int,
+                PRIMARY KEY(k1, k2)
+            )'''
+        self.session.execute(ddl)
+
+        statements_and_params = zip(cycle(["INSERT INTO test3rf.test_async_paging_verify "
+                                           "(k1, k2, v) VALUES (0, %s, %s)"]),
+                                    [(i, i + 1) for i in range(100)])
+        execute_concurrent(self.session, statements_and_params)
+
+        prepared = self.session.prepare("SELECT * FROM test3rf.test_async_paging_verify")
+
+        for fetch_size in (2, 3, 7, 10, 99, 100, 101, 10000):
+            self.session.default_fetch_size = fetch_size
+            results = self.session.execute_async("SELECT * FROM test3rf.test_async_paging_verify").result()
+            result_array = []
+            value_array = []
+            for result in results:
+                result_array.append(result.k2)
+                value_array.append(result.v)
+
+            self.assertEqual(range(100), result_array)
+            self.assertEqual(range(1, 101), value_array)
+
+            statement = SimpleStatement("SELECT * FROM test3rf.test_async_paging_verify")
+            results = self.session.execute_async(statement).result()
+            result_array = []
+            value_array = []
+            for result in results:
+                result_array.append(result.k2)
+                value_array.append(result.v)
+
+            self.assertEqual(range(100), result_array)
+            self.assertEqual(range(1, 101), value_array)
+
+            results = self.session.execute_async(prepared).result()
+            result_array = []
+            value_array = []
+            for result in results:
+                result_array.append(result.k2)
+                value_array.append(result.v)
+
+            self.assertEqual(range(100), result_array)
+            self.assertEqual(range(1, 101), value_array)
 
     def test_paging_callbacks(self):
         statements_and_params = zip(cycle(["INSERT INTO test3rf.test (k, v) VALUES (%s, 0)"]),
