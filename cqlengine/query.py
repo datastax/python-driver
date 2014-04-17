@@ -78,8 +78,25 @@ class BatchQuery(object):
     """
     _consistency = None
 
-
     def __init__(self, batch_type=None, timestamp=None, consistency=None, execute_on_exception=False):
+        """
+        :param batch_type: (optional) One of batch type values available through BatchType enum
+        :type batch_type: str or None
+        :param timestamp: (optional) A datetime or timedelta object with desired timestamp to be applied
+            to the batch transaction.
+        :type timestamp: datetime or timedelta or None
+        :param consistency: (optional) One of consistency values ("ANY", "ONE", "QUORUM" etc)
+        :type consistency: str or None
+        :param execute_on_exception: (Defaults to False) Indicates that when the BatchQuery instance is used
+            as a context manager the queries accumulated within the context must be executed despite
+            encountering an error within the context. By default, any exception raised from within
+            the context scope will cause the batched queries not to be executed.
+        :type execute_on_exception: bool
+        :param callbacks: A list of functions to be executed after the batch executes. Note, that if the batch
+            does not execute, the callbacks are not executed. This, thus, effectively is a list of "on success"
+            callback handlers. If defined, must be a collection of callables.
+        :type callbacks: list or set or tuple
+        """
         self.queries = []
         self.batch_type = batch_type
         if timestamp is not None and not isinstance(timestamp, (datetime, timedelta)):
@@ -87,6 +104,7 @@ class BatchQuery(object):
         self.timestamp = timestamp
         self._consistency = consistency
         self._execute_on_exception = execute_on_exception
+        self._callbacks = []
 
     def add_query(self, query):
         if not isinstance(query, BaseCQLStatement):
@@ -96,9 +114,35 @@ class BatchQuery(object):
     def consistency(self, consistency):
         self._consistency = consistency
 
+    def _execute_callbacks(self):
+        for callback, args, kwargs in self._callbacks:
+            callback(*args, **kwargs)
+
+        # trying to clear up the ref counts for objects mentioned in the set
+        del self._callbacks
+
+    def add_callback(self, fn, *args, **kwargs):
+        """Add a function and arguments to be passed to it to be executed after the batch executes.
+
+        A batch can support multiple callbacks.
+
+        Note, that if the batch does not execute, the callbacks are not executed.
+        A callback, thus, is an "on batch success" handler.
+
+        :param fn: Callable object
+        :type fn: callable
+        :param *args: Positional arguments to be passed to the callback at the time of execution
+        :param **kwargs: Named arguments to be passed to the callback at the time of execution
+        """
+        if not callable(fn):
+            raise ValueError("Value for argument 'fn' is {} and is not a callable object.".format(type(fn)))
+        self._callbacks.append((fn, args, kwargs))
+
     def execute(self):
         if len(self.queries) == 0:
             # Empty batch is a no-op
+            # except for callbacks
+            self._execute_callbacks()
             return
 
         opener = 'BEGIN ' + (self.batch_type + ' ' if self.batch_type else '') + ' BATCH'
@@ -130,6 +174,7 @@ class BatchQuery(object):
         execute('\n'.join(query_list), parameters, self._consistency)
 
         self.queries = []
+        self._execute_callbacks()
 
     def __enter__(self):
         return self
