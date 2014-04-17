@@ -1,3 +1,11 @@
+1.1.1
+=====
+April 16, 2014
+
+Bug Fixes
+---------
+* Fix unconditional import of nose in setup.py (github #111)
+
 1.1.0
 =====
 April 16, 2014
