@@ -228,7 +228,6 @@ class BatchStatementTests(unittest.TestCase):
         self.session.execute("TRUNCATE test3rf.test")
 
     def tearDown(self):
-        self.confirm_results()
         self.cluster.shutdown()
 
     def confirm_results(self):
@@ -249,6 +248,7 @@ class BatchStatementTests(unittest.TestCase):
 
         self.session.execute(batch)
         self.session.execute_async(batch).result()
+        self.confirm_results()
 
     def test_simple_statements(self):
         batch = BatchStatement(BatchType.LOGGED)
@@ -257,6 +257,7 @@ class BatchStatementTests(unittest.TestCase):
 
         self.session.execute(batch)
         self.session.execute_async(batch).result()
+        self.confirm_results()
 
     def test_prepared_statements(self):
         prepared = self.session.prepare("INSERT INTO test3rf.test (k, v) VALUES (?, ?)")
@@ -267,6 +268,7 @@ class BatchStatementTests(unittest.TestCase):
 
         self.session.execute(batch)
         self.session.execute_async(batch).result()
+        self.confirm_results()
 
     def test_bound_statements(self):
         prepared = self.session.prepare("INSERT INTO test3rf.test (k, v) VALUES (?, ?)")
@@ -277,6 +279,7 @@ class BatchStatementTests(unittest.TestCase):
 
         self.session.execute(batch)
         self.session.execute_async(batch).result()
+        self.confirm_results()
 
     def test_no_parameters(self):
         batch = BatchStatement(BatchType.LOGGED)
@@ -302,6 +305,7 @@ class BatchStatementTests(unittest.TestCase):
         self.assertRaises(ValueError, batch.add, prepared.bind([]), (1, 2, 3))
 
         self.session.execute(batch)
+        self.confirm_results()
 
 
 class SerialConsistencyTests(unittest.TestCase):
