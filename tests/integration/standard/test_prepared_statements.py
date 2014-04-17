@@ -122,7 +122,7 @@ class PreparedStatementTests(unittest.TestCase):
         with dict bindings
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         prepared = session.prepare(
@@ -156,7 +156,7 @@ class PreparedStatementTests(unittest.TestCase):
         with dict bindings
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         prepared = session.prepare(
@@ -203,7 +203,7 @@ class PreparedStatementTests(unittest.TestCase):
         Ensure binding None is handled correctly with dict bindings
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
 
@@ -260,7 +260,7 @@ class PreparedStatementTests(unittest.TestCase):
         Ensure None binding over async queries with dict bindings
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         prepared = session.prepare(
