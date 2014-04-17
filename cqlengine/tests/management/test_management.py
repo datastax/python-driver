@@ -8,8 +8,7 @@ from cqlengine.connection import ConnectionPool, Host
 from cqlengine import management
 from cqlengine.tests.query.test_queryset import TestModel
 from cqlengine.models import Model
-from cqlengine import columns
-
+from cqlengine import columns, SizeTieredCompactionStrategy, LeveledCompactionStrategy
 
 class ConnectionPoolFailoverTestCase(BaseCassEngTestCase):
     """Test cassandra connection pooling."""
@@ -78,6 +77,8 @@ class CapitalizedKeyModel(Model):
     someData = columns.Text()
 
 class PrimaryKeysOnlyModel(Model):
+    __compaction__ = LeveledCompactionStrategy
+
     first_ey = columns.Integer(primary_key=True)
     second_key = columns.Integer(primary_key=True)
 
@@ -153,7 +154,24 @@ class SyncTableTests(BaseCassEngTestCase):
         delete_table(PrimaryKeysOnlyModel)
 
     def test_sync_table_works_with_primary_keys_only_tables(self):
+
+        # This is "create table":
+
         sync_table(PrimaryKeysOnlyModel)
+
+        # let's make sure settings persisted correctly:
+
+        assert PrimaryKeysOnlyModel.__compaction__ == LeveledCompactionStrategy
+        # blows up with DoesNotExist if table does not exist
+        table_settings = management.get_table_settings(PrimaryKeysOnlyModel)
+        # let make sure the flag we care about
+        assert LeveledCompactionStrategy in table_settings['compaction_strategy_class']
+
+
+        # Now we are "updating" the table:
+
+        # setting up something to change
+        PrimaryKeysOnlyModel.__compaction__ = SizeTieredCompactionStrategy
 
         # primary-keys-only tables do not create entries in system.schema_columns
         # table. Only non-primary keys are added to that table.
@@ -161,3 +179,6 @@ class SyncTableTests(BaseCassEngTestCase):
         # on subsequent runs of sync_table (which runs get_fields internally)
         get_fields(PrimaryKeysOnlyModel)
         sync_table(PrimaryKeysOnlyModel)
+
+        table_settings = management.get_table_settings(PrimaryKeysOnlyModel)
+        assert SizeTieredCompactionStrategy in table_settings['compaction_strategy_class']
