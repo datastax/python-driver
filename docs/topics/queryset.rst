@@ -333,23 +333,11 @@ Batch Query Execution Callbacks
     In order to allow secondary tasks to be chained to the end of batch, BatchQuery instances allow callbacks to be
     registered with the batch, to be executed immediately after the batch executes.
 
-    Let's say an iterative action over a group of records needs to be followed up by a "maintenance" task like "Update
-    count of children on parent model."
-    If your were to kick off that task following manipulation on each child, while the batch is not executed, the reads
-    the maintenance task would do would operate on old data since the batch is not yet commited.
-    (You also risk kicking off too many of the same tasks, while only one is needed at the end of the batch.)
-
-    Multiple callbacks can be attached to same BatchQuery instance
+    Multiple callbacks can be attached to same BatchQuery instance, they are executed in the same order that they
+    are added to the batch.
 
     The callbacks attached to a given batch instance are executed only if the batch executes. If the batch is used as a
-    context manager and an exception bubbles up, the queued up callbacks will not be run.
-
-    The callback arguments signature is not prescribed. Moreover, the callback API allows trapping the arguments you want to be
-    passed into the callback. If you need to inspect the batch itself within the callback, simply trap the batch instance
-    as part of the arguments stored with the callback.
-
-    Internally the callbacks collection is implemented as an ordered collection, which means the execution order follows
-    the order in which the callbacks are added to the batch.
+    context manager and an exception is raised, the queued up callbacks will not be run.
 
     .. code-block:: python
 
@@ -374,7 +362,7 @@ Batch Query Execution Callbacks
         my_callback(cqlengine_batch=batch)
 
     Failure in any of the callbacks does not affect the batch's execution, as the callbacks are started after the execution
-    of the batch is complete and no effort to "roll it back" is made.
+    of the batch is complete.
 
 
 
