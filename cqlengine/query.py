@@ -1,4 +1,5 @@
 import copy
+import time
 from datetime import datetime, timedelta
 from cqlengine import BaseContainerColumn, Map, columns
 from cqlengine.columns import Counter, List, Set
@@ -150,10 +151,11 @@ class BatchQuery(object):
 
             if isinstance(self.timestamp, (int, long)):
                 ts = self.timestamp
-            elif isinstance(self.timestamp, timedelta):
-                ts = long((datetime.now() + self.timestamp - datetime.fromtimestamp(0)).total_seconds() * 1000000)
-            elif isinstance(self.timestamp, datetime):
-                ts = long((self.timestamp - datetime.fromtimestamp(0)).total_seconds() * 1000000)
+            elif isinstance(self.timestamp, (datetime, timedelta)):
+                ts = self.timestamp
+                if isinstance(self.timestamp, timedelta):
+                    ts += datetime.now()  # Apply timedelta
+                long(time.mktime(ts.timetuple()) * 1e+6 + ts.microsecond)
             else:
                 raise ValueError("Batch expects a long, a timedelta, or a datetime")
 

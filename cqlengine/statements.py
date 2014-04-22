@@ -1,3 +1,4 @@
+import time
 from datetime import datetime, timedelta
 from cqlengine.functions import QueryValue
 from cqlengine.operators import BaseWhereOperator, InOperator
@@ -496,7 +497,7 @@ class BaseCQLStatement(object):
         else:
             tmp = self.timestamp
 
-        return long(((tmp - datetime.fromtimestamp(0)).total_seconds()) * 1000000)
+        return long(time.mktime(tmp.timetuple()) * 1e+6 + tmp.microsecond)
 
     def __unicode__(self):
         raise NotImplementedError
