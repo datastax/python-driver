@@ -599,7 +599,7 @@ class Cluster(object):
         host._handle_node_up_condition.acquire()
         while host._currently_handling_node_up:
             host._handle_node_up_condition.wait()
-        host.handling_up_down = True
+        host._currently_handling_node_up = True
         host._handle_node_up_condition.release()
 
         if host.is_up:

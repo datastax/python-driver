@@ -8,6 +8,8 @@ Bug Fixes
   from the ring
 * Fix file handle leak with gevent reactor due to blocking Greenlet kills when
   closing excess connections
+* Avoid handling a node coming up multiple times due to a reconnection attempt
+  succeeding close to the same time that an UP notification is pushed
 
 1.1.1
 =====
