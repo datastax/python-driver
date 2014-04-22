@@ -359,17 +359,29 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 3, 0)
 
         self.coordinator_stats.reset_counts()
+        stop(2)
+        wait_for_down(cluster, 2, wait=True)
+
+        try:
+            self._query(session, keyspace, use_prepared=use_prepared)
+            self.fail()
+        except Unavailable:
+            pass
+
+        self.coordinator_stats.reset_counts()
+        start(2)
+        wait_for_up(cluster, 2, wait=True)
         decommission(2)
         wait_for_down(cluster, 2, wait=True)
 
         self._query(session, keyspace, use_prepared=use_prepared)
 
-        # TODO: this depends on the token order of the cluster; either set up
-        # the tokens deliberately or confirm that only one node is used and
-        # it's the correct replica
-        self.coordinator_stats.assert_query_count_equals(self, 1, 12)
+        results = {
+            self.coordinator_stats.get_query_count(1),
+            self.coordinator_stats.get_query_count(3)
+        }
+        self.assertEqual(results, {0, 12})
         self.coordinator_stats.assert_query_count_equals(self, 2, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 0)
 
     def test_token_aware_composite_key(self):
         use_singledc()
