@@ -100,7 +100,7 @@ def benchmark(thread_class):
         time.sleep(2.0)
 
         query = session.prepare("""
-            INSERT INTO {table} (thekey, col1, col2) VALUES (?, ?, ?))
+            INSERT INTO {table} (thekey, col1, col2) VALUES (?, ?, ?)
             """.format(table=TABLE))
         values = ('key', 'a', 'b')
 

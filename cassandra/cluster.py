@@ -604,7 +604,7 @@ class Cluster(object):
         host._handle_node_up_condition.acquire()
         while host._currently_handling_node_up:
             host._handle_node_up_condition.wait()
-        host.handling_up_down = True
+        host._currently_handling_node_up = True
         host._handle_node_up_condition.release()
 
         if host.is_up:
@@ -770,6 +770,7 @@ class Cluster(object):
             session.on_remove(host)
         for listener in self.listeners:
             listener.on_remove(host)
+        self.control_connection.on_remove(host)
 
     def signal_connection_failure(self, host, connection_exc, is_host_addition):
         is_down = host.signal_connection_failure(connection_exc)
@@ -1716,10 +1717,10 @@ class ControlConnection(object):
         if change_type == "UP":
             if host is None:
                 # this is the first time we've seen the node
-                self._cluster.scheduler.schedule(1, self.refresh_node_list_and_token_map)
+                self._cluster.scheduler.schedule(2, self.refresh_node_list_and_token_map)
             else:
                 # this will be run by the scheduler
-                self._cluster.scheduler.schedule(1, self._cluster.on_up, host)
+                self._cluster.scheduler.schedule(2, self._cluster.on_up, host)
         elif change_type == "DOWN":
             # Note that there is a slight risk we can receive the event late and thus
             # mark the host down even though we already had reconnected successfully.

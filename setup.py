@@ -17,9 +17,11 @@ import sys
 import ez_setup
 ez_setup.use_setuptools()
 
+run_gevent_nosetests = False
 if __name__ == '__main__' and sys.argv[1] == "gevent_nosetests":
     from gevent.monkey import patch_all
     patch_all()
+    run_gevent_nosetests = True
 
 from setuptools import setup
 from distutils.command.build_ext import build_ext
@@ -39,8 +41,6 @@ try:
 except ImportError:
     has_subprocess = False
 
-from nose.commands import nosetests
-
 from cassandra import __version__
 
 long_description = ""
@@ -48,8 +48,12 @@ with open("README.rst") as f:
     long_description = f.read()
 
 
-class gevent_nosetests(nosetests):
-    description = "run nosetests with gevent monkey patching"
+gevent_nosetests = None
+if run_gevent_nosetests:
+    from nose.commands import nosetests
+
+    class gevent_nosetests(nosetests):
+        description = "run nosetests with gevent monkey patching"
 
 
 class DocCommand(Command):
@@ -169,7 +173,10 @@ On OSX, via homebrew:
 
 
 def run_setup(extensions):
-    kw = {'cmdclass': {'doc': DocCommand, 'gevent_nosetests': gevent_nosetests}}
+    kw = {'cmdclass': {'doc': DocCommand}}
+    if gevent_nosetests is not None:
+        kw['cmdclass']['gevent_nosetests'] = gevent_nosetests
+
     if extensions:
         kw['cmdclass']['build_ext'] = build_extensions
         kw['ext_modules'] = extensions

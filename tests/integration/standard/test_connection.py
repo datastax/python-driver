@@ -23,7 +23,8 @@ from functools import partial
 import sys
 from threading import Thread, Event
 
-from cassandra import ConsistencyLevel
+from cassandra import ConsistencyLevel, OperationTimedOut
+from cassandra.cluster import NoHostAvailable
 from cassandra.decoder import QueryMessage
 from cassandra.io.asyncorereactor import AsyncoreConnection
 
@@ -37,11 +38,33 @@ class ConnectionTest(object):
 
     klass = None
 
+    def get_connection(self):
+        """
+        Helper method to solve automated testing issues within Jenkins.
+        Officially patched under the 2.0 branch through
+        17998ef72a2fe2e67d27dd602b6ced33a58ad8ef, but left as is for the
+        1.0 branch due to possible regressions for fixing an
+        automated testing edge-case.
+        """
+        conn = None
+        e = None
+        for i in xrange(5):
+            try:
+                conn = self.klass.factory(protocol_version=PROTOCOL_VERSION)
+                break
+            except (OperationTimedOut, NoHostAvailable) as e:
+                continue
+
+        if conn:
+            return conn
+        else:
+            raise e
+
     def test_single_connection(self):
         """
         Test a single connection with sequential requests.
         """
-        conn = self.klass.factory(protocol_version=PROTOCOL_VERSION)
+        conn = self.get_connection()
         query = "SELECT keyspace_name FROM system.schema_keyspaces LIMIT 1"
         event = Event()
 
@@ -64,7 +87,7 @@ class ConnectionTest(object):
         """
         Test a single connection with pipelined requests.
         """
-        conn = self.klass.factory(protocol_version=PROTOCOL_VERSION)
+        conn = self.get_connection()
         query = "SELECT keyspace_name FROM system.schema_keyspaces LIMIT 1"
         responses = [False] * 100
         event = Event()
@@ -86,7 +109,7 @@ class ConnectionTest(object):
         """
         Test multiple connections with pipelined requests.
         """
-        conns = [self.klass.factory(protocol_version=PROTOCOL_VERSION) for i in range(5)]
+        conns = [self.get_connection() for i in range(5)]
         events = [Event() for i in range(5)]
         query = "SELECT keyspace_name FROM system.schema_keyspaces LIMIT 1"
 
@@ -117,7 +140,7 @@ class ConnectionTest(object):
         num_threads = 5
         event = Event()
 
-        conn = self.klass.factory(protocol_version=PROTOCOL_VERSION)
+        conn = self.get_connection()
         query = "SELECT keyspace_name FROM system.schema_keyspaces LIMIT 1"
 
         def cb(all_responses, thread_responses, request_num, *args, **kwargs):
@@ -174,7 +197,7 @@ class ConnectionTest(object):
 
         threads = []
         for i in range(num_conns):
-            conn = self.klass.factory(protocol_version=PROTOCOL_VERSION)
+            conn = self.get_connection()
             t = Thread(target=send_msgs, args=(conn, events[i]))
             threads.append(t)
 

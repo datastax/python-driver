@@ -1,6 +1,27 @@
-1.1.0
+1.1.2
 =====
 In Progress
+
+Bug Fixes
+---------
+* Update token metadata (for TokenAware calculations) when a node is removed
+  from the ring
+* Fix file handle leak with gevent reactor due to blocking Greenlet kills when
+  closing excess connections
+* Avoid handling a node coming up multiple times due to a reconnection attempt
+  succeeding close to the same time that an UP notification is pushed
+
+1.1.1
+=====
+April 16, 2014
+
+Bug Fixes
+---------
+* Fix unconditional import of nose in setup.py (github #111)
+
+1.1.0
+=====
+April 16, 2014
 
 Features
 --------

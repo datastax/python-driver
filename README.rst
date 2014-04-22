@@ -49,7 +49,7 @@ you can use `freenode's web-based client <http://webchat.freenode.net/?channels=
 Features to be Added
 --------------------
 * C extension for encoding/decoding messages
-* Twisted, gevent support
+* Twisted support
 * Python 3 support
 * IPv6 Support
 
