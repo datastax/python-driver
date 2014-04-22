@@ -6,6 +6,8 @@ Bug Fixes
 ---------
 * Update token metadata (for TokenAware calculations) when a node is removed
   from the ring
+* Fix file handle leak with gevent reactor due to blocking Greenlet kills when
+  closing excess connections
 
 1.1.1
 =====

@@ -98,9 +98,9 @@ class GeventConnection(Connection):
 
         log.debug("Closing connection (%s) to %s" % (id(self), self.host))
         if self._read_watcher:
-            self._read_watcher.kill()
+            self._read_watcher.kill(block=False)
         if self._write_watcher:
-            self._write_watcher.kill()
+            self._write_watcher.kill(block=False)
         if self._socket:
             self._socket.close()
         log.debug("Closed socket to %s" % (self.host,))
@@ -122,8 +122,9 @@ class GeventConnection(Connection):
                 next_msg = self._write_queue.get()
                 run_select()
             except Exception as exc:
-                log.debug("Exception during write select() for %s: %s", self, exc)
-                self.defunct(exc)
+                if not self.is_closed:
+                    log.debug("Exception during write select() for %s: %s", self, exc)
+                    self.defunct(exc)
                 return
 
             try:
@@ -139,8 +140,9 @@ class GeventConnection(Connection):
             try:
                 run_select()
             except Exception as exc:
-                log.debug("Exception during read select() for %s: %s", self, exc)
-                self.defunct(exc)
+                if not self.is_closed:
+                    log.debug("Exception during read select() for %s: %s", self, exc)
+                    self.defunct(exc)
                 return
 
             try:
