@@ -376,11 +376,11 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         self._query(session, keyspace, use_prepared=use_prepared)
 
-        results = {
+        results = set([
             self.coordinator_stats.get_query_count(1),
             self.coordinator_stats.get_query_count(3)
-        }
-        self.assertEqual(results, {0, 12})
+        ])
+        self.assertEqual(results, set([0, 12]))
         self.coordinator_stats.assert_query_count_equals(self, 2, 0)
 
     def test_token_aware_composite_key(self):
