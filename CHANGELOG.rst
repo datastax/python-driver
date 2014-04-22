@@ -1,3 +1,12 @@
+1.1.2
+=====
+In Progress
+
+Bug Fixes
+---------
+* Update token metadata (for TokenAware calculations) when a node is removed
+  from the ring
+
 1.1.1
 =====
 April 16, 2014

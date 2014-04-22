@@ -765,6 +765,7 @@ class Cluster(object):
             session.on_remove(host)
         for listener in self.listeners:
             listener.on_remove(host)
+        self.control_connection.on_remove(host)
 
     def signal_connection_failure(self, host, connection_exc, is_host_addition):
         is_down = host.signal_connection_failure(connection_exc)
