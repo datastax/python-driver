@@ -1659,10 +1659,10 @@ class ControlConnection(object):
         if change_type == "UP":
             if host is None:
                 # this is the first time we've seen the node
-                self._cluster.scheduler.schedule(1, self.refresh_node_list_and_token_map)
+                self._cluster.scheduler.schedule(2, self.refresh_node_list_and_token_map)
             else:
                 # this will be run by the scheduler
-                self._cluster.scheduler.schedule(1, self._cluster.on_up, host)
+                self._cluster.scheduler.schedule(2, self._cluster.on_up, host)
         elif change_type == "DOWN":
             # Note that there is a slight risk we can receive the event late and thus
             # mark the host down even though we already had reconnected successfully.
