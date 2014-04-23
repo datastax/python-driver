@@ -89,6 +89,13 @@ class TestTextIO(BaseColumnIOTest):
     pkey_val = 'bacon'
     data_val = 'monkey'
 
+
+class TestNonBinaryTextIO(BaseColumnIOTest):
+
+    column = columns.Text
+    pkey_val = 'bacon'
+    data_val = '0xmonkey'
+
 class TestInteger(BaseColumnIOTest):
 
     column = columns.Integer
