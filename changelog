@@ -1,5 +1,12 @@
 CHANGELOG
 
+0.13.0
+* adding support for post batch callbacks (thanks Daniel Dotsenko github.com/dvdotsenko)
+* fixing sync table for tables with multiple keys (thanks Daniel Dotsenko github.com/dvdotsenko)
+* fixing bug in Bytes column (thanks Netanel Cohen-Tzemach github.com/natict)
+* fixing bug with timestamps and DST (thanks Netanel Cohen-Tzemach github.com/natict)
+* performance improvements (thanks Jon Haddad)
+
 0.12.0
 
 * Normalize and unquote boolean values. (Thanks Kevin Deldycke github.com/kdeldycke)
