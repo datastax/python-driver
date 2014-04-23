@@ -155,7 +155,7 @@ class BatchQuery(object):
                 ts = self.timestamp
                 if isinstance(self.timestamp, timedelta):
                     ts += datetime.now()  # Apply timedelta
-                long(time.mktime(ts.timetuple()) * 1e+6 + ts.microsecond)
+                ts = long(time.mktime(ts.timetuple()) * 1e+6 + ts.microsecond)
             else:
                 raise ValueError("Batch expects a long, a timedelta, or a datetime")
 
