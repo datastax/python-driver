@@ -302,7 +302,7 @@ class Connection(object):
             response = decode_response(stream_id, flags, opcode, body, self.decompressor)
         except Exception as exc:
             log.exception("Error decoding response from Cassandra. "
-                          "opcode: %04x; message contents: %r", opcode, body)
+                          "opcode: %04x; message contents: %r", opcode, msg)
             if callback is not None:
                 callback(exc)
             self.defunct(exc)
