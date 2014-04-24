@@ -772,7 +772,7 @@ class DowngradingConsistencyRetryPolicy(RetryPolicy):
                         received_responses, data_retrieved, retry_num):
         if retry_num != 0:
             return (self.RETHROW, None)
-        elif received_responses < required_responses:
+        elif received_responses <= required_responses:
             return self._pick_consistency(received_responses)
         elif not data_retrieved:
             return (self.RETRY, consistency)

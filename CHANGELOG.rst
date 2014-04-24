@@ -10,6 +10,8 @@ Bug Fixes
   closing excess connections
 * Avoid handling a node coming up multiple times due to a reconnection attempt
   succeeding close to the same time that an UP notification is pushed
+* Correctly retry when received_responses == required_responses in
+  DowngradingConsistencyRetryPolicy.on_read_timeout() (PYTHON-55)
 
 1.1.1
 =====
