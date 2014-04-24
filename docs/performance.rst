@@ -169,7 +169,7 @@ be consumed by the list of Futures:
     ~/python-driver $ python benchmarks/future_full_throttle.py -n 100000 --hosts=127.0.0.1,127.0.0.2,127.0.0.3 --libev-only --threads=8
     Average throughput: 2165.29/sec
 
-Callback Chaining (`callbacks_full_pipeline.py <https://github.com/datastax/python-driver/blob/master/benchmarks/callbacks_full_pipeline.py>`_)
+Callback Chaining (`callback_full_pipeline.py <https://github.com/datastax/python-driver/blob/master/benchmarks/callback_full_pipeline.py>`_)
 -----------------------------------------------------------------------------------------------------------------------------------------------
 This pattern is very different from the previous patterns.  Here we're taking
 advantage of the :meth:`.ResponseFuture.add_callback()` function to start
