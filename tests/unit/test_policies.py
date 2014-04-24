@@ -55,6 +55,13 @@ class TestLoadBalancingPolicy(unittest.TestCase):
         self.assertRaises(NotImplementedError, policy.on_add, host)
         self.assertRaises(NotImplementedError, policy.on_remove, host)
 
+    def test_instance_check(self):
+        try:
+            Cluster(load_balancing_policy=RoundRobinPolicy)
+            self.fail()
+        except TypeError:
+            pass
+
 
 class TestRoundRobinPolicy(unittest.TestCase):
 
