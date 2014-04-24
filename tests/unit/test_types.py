@@ -25,7 +25,7 @@ from cassandra.cqltypes import (BooleanType, lookup_casstype_simple, lookup_cass
                                 LongType, DecimalType, SetType, cql_typename,
                                 CassandraType, UTF8Type, parse_casstype_args,
                                 EmptyValue, _CassandraType, DateType)
-from cassandra.decoder import named_tuple_factory, write_string, read_longstring, write_stringmap, read_stringmap, read_inet, write_inet, cql_quote
+from cassandra.decoder import named_tuple_factory, write_string, read_longstring, write_stringmap, read_stringmap, read_inet, write_inet, cql_quote, read_string, write_longstring
 
 
 class TypeTests(unittest.TestCase):
@@ -186,24 +186,19 @@ class TypeTests(unittest.TestCase):
         now = datetime.datetime.now()
         date_type = DateType(now)
         self.assertEqual(date_type.my_timestamp(), now)
-        try:
-            date_type.interpret_datestring('fakestring')
-            self.fail()
-        except ValueError:
-            pass
+        self.assertRaises(ValueError, date_type.interpret_datestring, 'fakestring')
 
     def test_write_read_string(self):
-        # BUG?
-        # Traceback (most recent call last):
-        #   File "/Users/joaquin/repos/python-driver/tests/unit/test_types.py", line 199, in test_write_read_string
-        #     self.assertEqual(read_longstring(f), u'test')
-        # AssertionError: u'st' != u'test'
-        # - st
-        # + test
-        # ? ++
         with tempfile.TemporaryFile() as f:
             value = u'test'
             write_string(f, value)
+            f.seek(0)
+            self.assertEqual(read_string(f), value)
+
+    def test_write_read_longstring(self):
+        with tempfile.TemporaryFile() as f:
+            value = u'test'
+            write_longstring(f, value)
             f.seek(0)
             self.assertEqual(read_longstring(f), value)
 
@@ -215,19 +210,6 @@ class TypeTests(unittest.TestCase):
             self.assertEqual(read_stringmap(f), value)
 
     def test_write_read_inet(self):
-        # BUG? I didn't think it mattered, but just wanted to confirm
-        # Traceback (most recent call last):
-        #   File "/Users/joaquin/repos/python-driver/tests/unit/test_types.py", line 228, in test_write_read_inet
-        #     self.assertEqual(read_inet(f), value)
-        # AssertionError: Tuples differ: ('2001:db8:0:f101::1', 9042) != ('2001:0db8:0:f101::1', 9042)
-        #
-        # First differing element 0:
-        # 2001:db8:0:f101::1
-        # 2001:0db8:0:f101::1
-        #
-        # - ('2001:db8:0:f101::1', 9042)
-        # + ('2001:0db8:0:f101::1', 9042)
-        # ?        +
         with tempfile.TemporaryFile() as f:
             value = ('192.168.1.1', 9042)
             write_inet(f, value)
@@ -235,7 +217,7 @@ class TypeTests(unittest.TestCase):
             self.assertEqual(read_inet(f), value)
 
         with tempfile.TemporaryFile() as f:
-            value = ('2001:0db8:0:f101::1', 9042)
+            value = ('2001:db8:0:f101::1', 9042)
             write_inet(f, value)
             f.seek(0)
             self.assertEqual(read_inet(f), value)
