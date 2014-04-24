@@ -92,6 +92,14 @@ class TestSetColumn(BaseCassEngTestCase):
         with self.assertRaises(ValidationError):
             TestSetModel.create(int_set={'string', True}, text_set={1, 3.0})
 
+    def test_element_count_validation(self):
+        """
+        Tests that big collections are detected and raise an exception.
+        """
+        TestSetModel.create(text_set={str(uuid4()) for i in range(65535)})
+        with self.assertRaises(ValidationError):
+            TestSetModel.create(text_set={str(uuid4()) for i in range(65536)})
+
     def test_partial_updates(self):
         """ Tests that partial udpates work as expected """
         m1 = TestSetModel.create(int_set={1, 2, 3, 4})
@@ -231,6 +239,14 @@ class TestListColumn(BaseCassEngTestCase):
         """
         with self.assertRaises(ValidationError):
             TestListModel.create(int_list=['string', True], text_list=[1, 3.0])
+
+    def test_element_count_validation(self):
+        """
+        Tests that big collections are detected and raise an exception.
+        """
+        TestListModel.create(text_list=[str(uuid4()) for i in range(65535)])
+        with self.assertRaises(ValidationError):
+            TestListModel.create(text_list=[str(uuid4()) for i in range(65536)])
 
     def test_partial_updates(self):
         """ Tests that partial udpates work as expected """
@@ -422,6 +438,14 @@ class TestMapColumn(BaseCassEngTestCase):
         """
         with self.assertRaises(ValidationError):
             TestMapModel.create(int_map={'key': 2, uuid4(): 'val'}, text_map={2: 5})
+
+    def test_element_count_validation(self):
+        """
+        Tests that big collections are detected and raise an exception.
+        """
+        TestMapModel.create(text_map={str(uuid4()): i for i in range(65535)})
+        with self.assertRaises(ValidationError):
+            TestMapModel.create(text_map={str(uuid4()): i for i in range(65536)})
 
     def test_partial_updates(self):
         """ Tests that partial udpates work as expected """
