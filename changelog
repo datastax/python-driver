@@ -1,5 +1,9 @@
 CHANGELOG
 
+0.14.0-dev
+
+* Check number of elements in collections.
+
 0.13.0
 * adding support for post batch callbacks (thanks Daniel Dotsenko github.com/dvdotsenko)
 * fixing sync table for tables with multiple keys (thanks Daniel Dotsenko github.com/dvdotsenko)

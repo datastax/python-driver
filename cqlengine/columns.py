@@ -513,7 +513,9 @@ class Decimal(Column):
 
 class BaseContainerColumn(Column):
     """
-    Base Container type
+    Base Container type for collection-like columns.
+
+    https://cassandra.apache.org/doc/cql3/CQL.html#collections
     """
 
     def __init__(self, value_type, **kwargs):
@@ -536,6 +538,14 @@ class BaseContainerColumn(Column):
             self.value_type = self.value_col.__class__
 
         super(BaseContainerColumn, self).__init__(**kwargs)
+
+    def validate(self, value):
+        value = super(BaseContainerColumn, self).validate(value)
+        # It is dangerous to let collections have more than 65535.
+        # See: https://issues.apache.org/jira/browse/CASSANDRA-5428
+        if value is not None and len(value) > 65535:
+            raise ValidationError("Collection can't have more than 65535 elements.")
+        return value
 
     def get_column_def(self):
         """
