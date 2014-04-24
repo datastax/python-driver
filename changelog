@@ -3,6 +3,7 @@ CHANGELOG
 0.14.0-dev
 
 * Check number of elements in collections.
+* Add support for table properties.
 
 0.13.0
 * adding support for post batch callbacks (thanks Daniel Dotsenko github.com/dvdotsenko)
