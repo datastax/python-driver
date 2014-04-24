@@ -11,6 +11,11 @@ Bug Fixes
 * Avoid handling a node coming up multiple times due to a reconnection attempt
   succeeding close to the same time that an UP notification is pushed
 
+Other
+-----
+* Don't log at ERROR when a connection is closed during the startup
+  communications
+
 1.1.1
 =====
 April 16, 2014
