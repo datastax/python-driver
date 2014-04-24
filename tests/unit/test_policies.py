@@ -553,6 +553,7 @@ class ExponentialReconnectionPolicyTest(unittest.TestCase):
             else:
                 self.assertEqual(delay, 100)
 
+ONE = ConsistencyLevel.ONE
 
 class RetryPolicyTest(unittest.TestCase):
 
@@ -561,55 +562,55 @@ class RetryPolicyTest(unittest.TestCase):
 
         # if this is the second or greater attempt, rethrow
         retry, consistency = policy.on_read_timeout(
-            query=None, consistency="ONE", required_responses=1, received_responses=2,
+            query=None, consistency=ONE, required_responses=1, received_responses=2,
             data_retrieved=True, retry_num=1)
         self.assertEqual(retry, RetryPolicy.RETHROW)
         self.assertEqual(consistency, None)
 
         # if we didn't get enough responses, rethrow
         retry, consistency = policy.on_read_timeout(
-            query=None, consistency="ONE", required_responses=2, received_responses=1,
+            query=None, consistency=ONE, required_responses=2, received_responses=1,
             data_retrieved=True, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETHROW)
         self.assertEqual(consistency, None)
 
         # if we got enough responses, but also got a data response, rethrow
         retry, consistency = policy.on_read_timeout(
-            query=None, consistency="ONE", required_responses=2, received_responses=2,
+            query=None, consistency=ONE, required_responses=2, received_responses=2,
             data_retrieved=True, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETHROW)
         self.assertEqual(consistency, None)
 
         # we got enough responses but no data response, so retry
         retry, consistency = policy.on_read_timeout(
-            query=None, consistency="ONE", required_responses=2, received_responses=2,
+            query=None, consistency=ONE, required_responses=2, received_responses=2,
             data_retrieved=False, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETRY)
-        self.assertEqual(consistency, 'ONE')
+        self.assertEqual(consistency, ONE)
 
     def test_write_timeout(self):
         policy = RetryPolicy()
 
         # if this is the second or greater attempt, rethrow
         retry, consistency = policy.on_write_timeout(
-            query=None, consistency="ONE", write_type=WriteType.SIMPLE,
+            query=None, consistency=ONE, write_type=WriteType.SIMPLE,
             required_responses=1, received_responses=2, retry_num=1)
         self.assertEqual(retry, RetryPolicy.RETHROW)
         self.assertEqual(consistency, None)
 
         # if it's not a BATCH_LOG write, don't retry it
         retry, consistency = policy.on_write_timeout(
-            query=None, consistency="ONE", write_type=WriteType.SIMPLE,
+            query=None, consistency=ONE, write_type=WriteType.SIMPLE,
             required_responses=1, received_responses=2, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETHROW)
         self.assertEqual(consistency, None)
 
         # retry BATCH_LOG writes regardless of received responses
         retry, consistency = policy.on_write_timeout(
-            query=None, consistency="ONE", write_type=WriteType.BATCH_LOG,
+            query=None, consistency=ONE, write_type=WriteType.BATCH_LOG,
             required_responses=10000, received_responses=1, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETRY)
-        self.assertEqual(consistency, 'ONE')
+        self.assertEqual(consistency, ONE)
 
     def test_unavailable(self):
         """
@@ -618,19 +619,19 @@ class RetryPolicyTest(unittest.TestCase):
         policy = RetryPolicy()
 
         retry, consistency = policy.on_unavailable(
-            query=None, consistency="ONE",
+            query=None, consistency=ONE,
             required_replicas=1, alive_replicas=2, retry_num=1)
         self.assertEqual(retry, RetryPolicy.RETHROW)
         self.assertEqual(consistency, None)
 
         retry, consistency = policy.on_unavailable(
-            query=None, consistency="ONE",
+            query=None, consistency=ONE,
             required_replicas=1, alive_replicas=2, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETHROW)
         self.assertEqual(consistency, None)
 
         retry, consistency = policy.on_unavailable(
-            query=None, consistency="ONE",
+            query=None, consistency=ONE,
             required_replicas=10000, alive_replicas=1, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETHROW)
         self.assertEqual(consistency, None)
@@ -646,25 +647,25 @@ class FallthroughRetryPolicyTest(unittest.TestCase):
         policy = FallthroughRetryPolicy()
 
         retry, consistency = policy.on_read_timeout(
-            query=None, consistency="ONE", required_responses=1, received_responses=2,
+            query=None, consistency=ONE, required_responses=1, received_responses=2,
             data_retrieved=True, retry_num=1)
         self.assertEqual(retry, RetryPolicy.RETHROW)
         self.assertEqual(consistency, None)
 
         retry, consistency = policy.on_read_timeout(
-            query=None, consistency="ONE", required_responses=2, received_responses=1,
+            query=None, consistency=ONE, required_responses=2, received_responses=1,
             data_retrieved=True, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETHROW)
         self.assertEqual(consistency, None)
 
         retry, consistency = policy.on_read_timeout(
-            query=None, consistency="ONE", required_responses=2, received_responses=2,
+            query=None, consistency=ONE, required_responses=2, received_responses=2,
             data_retrieved=True, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETHROW)
         self.assertEqual(consistency, None)
 
         retry, consistency = policy.on_read_timeout(
-            query=None, consistency="ONE", required_responses=2, received_responses=2,
+            query=None, consistency=ONE, required_responses=2, received_responses=2,
             data_retrieved=False, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETHROW)
         self.assertEqual(consistency, None)
@@ -673,19 +674,19 @@ class FallthroughRetryPolicyTest(unittest.TestCase):
         policy = FallthroughRetryPolicy()
 
         retry, consistency = policy.on_write_timeout(
-            query=None, consistency="ONE", write_type=WriteType.SIMPLE,
+            query=None, consistency=ONE, write_type=WriteType.SIMPLE,
             required_responses=1, received_responses=2, retry_num=1)
         self.assertEqual(retry, RetryPolicy.RETHROW)
         self.assertEqual(consistency, None)
 
         retry, consistency = policy.on_write_timeout(
-            query=None, consistency="ONE", write_type=WriteType.SIMPLE,
+            query=None, consistency=ONE, write_type=WriteType.SIMPLE,
             required_responses=1, received_responses=2, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETHROW)
         self.assertEqual(consistency, None)
 
         retry, consistency = policy.on_write_timeout(
-            query=None, consistency="ONE", write_type=WriteType.BATCH_LOG,
+            query=None, consistency=ONE, write_type=WriteType.BATCH_LOG,
             required_responses=10000, received_responses=1, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETHROW)
         self.assertEqual(consistency, None)
@@ -694,19 +695,19 @@ class FallthroughRetryPolicyTest(unittest.TestCase):
         policy = FallthroughRetryPolicy()
 
         retry, consistency = policy.on_unavailable(
-            query=None, consistency="ONE",
+            query=None, consistency=ONE,
             required_replicas=1, alive_replicas=2, retry_num=1)
         self.assertEqual(retry, RetryPolicy.RETHROW)
         self.assertEqual(consistency, None)
 
         retry, consistency = policy.on_unavailable(
-            query=None, consistency="ONE",
+            query=None, consistency=ONE,
             required_replicas=1, alive_replicas=2, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETHROW)
         self.assertEqual(consistency, None)
 
         retry, consistency = policy.on_unavailable(
-            query=None, consistency="ONE",
+            query=None, consistency=ONE,
             required_replicas=10000, alive_replicas=1, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETHROW)
         self.assertEqual(consistency, None)
@@ -719,49 +720,49 @@ class DowngradingConsistencyRetryPolicyTest(unittest.TestCase):
 
         # if this is the second or greater attempt, rethrow
         retry, consistency = policy.on_read_timeout(
-            query=None, consistency="ONE", required_responses=1, received_responses=2,
+            query=None, consistency=ONE, required_responses=1, received_responses=2,
             data_retrieved=True, retry_num=1)
         self.assertEqual(retry, RetryPolicy.RETHROW)
         self.assertEqual(consistency, None)
 
         # if we didn't get enough responses, retry at a lower consistency
         retry, consistency = policy.on_read_timeout(
-            query=None, consistency="ONE", required_responses=4, received_responses=3,
+            query=None, consistency=ONE, required_responses=4, received_responses=3,
             data_retrieved=True, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETRY)
         self.assertEqual(consistency, ConsistencyLevel.THREE)
 
         # if we didn't get enough responses, retry at a lower consistency
         retry, consistency = policy.on_read_timeout(
-            query=None, consistency="ONE", required_responses=3, received_responses=2,
+            query=None, consistency=ONE, required_responses=3, received_responses=2,
             data_retrieved=True, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETRY)
         self.assertEqual(consistency, ConsistencyLevel.TWO)
 
         # retry consistency level goes down based on the # of recv'd responses
         retry, consistency = policy.on_read_timeout(
-            query=None, consistency="ONE", required_responses=3, received_responses=1,
+            query=None, consistency=ONE, required_responses=3, received_responses=1,
             data_retrieved=True, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETRY)
         self.assertEqual(consistency, ConsistencyLevel.ONE)
 
         # if we got no responses, rethrow
         retry, consistency = policy.on_read_timeout(
-            query=None, consistency="ONE", required_responses=3, received_responses=0,
+            query=None, consistency=ONE, required_responses=3, received_responses=0,
             data_retrieved=True, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETHROW)
         self.assertEqual(consistency, None)
 
         # if we got enough response but no data, retry
         retry, consistency = policy.on_read_timeout(
-            query=None, consistency="ONE", required_responses=3, received_responses=3,
+            query=None, consistency=ONE, required_responses=3, received_responses=3,
             data_retrieved=False, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETRY)
-        self.assertEqual(consistency, 'ONE')
+        self.assertEqual(consistency, ONE)
 
         # if we got enough responses, but also got a data response, rethrow
         retry, consistency = policy.on_read_timeout(
-            query=None, consistency="ONE", required_responses=2, received_responses=2,
+            query=None, consistency=ONE, required_responses=2, received_responses=2,
             data_retrieved=True, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETHROW)
         self.assertEqual(consistency, None)
@@ -771,7 +772,7 @@ class DowngradingConsistencyRetryPolicyTest(unittest.TestCase):
 
         # if this is the second or greater attempt, rethrow
         retry, consistency = policy.on_write_timeout(
-            query=None, consistency="ONE", write_type=WriteType.SIMPLE,
+            query=None, consistency=ONE, write_type=WriteType.SIMPLE,
             required_responses=1, received_responses=2, retry_num=1)
         self.assertEqual(retry, RetryPolicy.RETHROW)
         self.assertEqual(consistency, None)
@@ -779,27 +780,27 @@ class DowngradingConsistencyRetryPolicyTest(unittest.TestCase):
         # ignore failures on these types of writes
         for write_type in (WriteType.SIMPLE, WriteType.BATCH, WriteType.COUNTER):
             retry, consistency = policy.on_write_timeout(
-                query=None, consistency="ONE", write_type=write_type,
+                query=None, consistency=ONE, write_type=write_type,
                 required_responses=1, received_responses=2, retry_num=0)
             self.assertEqual(retry, RetryPolicy.IGNORE)
 
         # downgrade consistency level on unlogged batch writes
         retry, consistency = policy.on_write_timeout(
-            query=None, consistency="ONE", write_type=WriteType.UNLOGGED_BATCH,
+            query=None, consistency=ONE, write_type=WriteType.UNLOGGED_BATCH,
             required_responses=3, received_responses=1, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETRY)
         self.assertEqual(consistency, ConsistencyLevel.ONE)
 
         # retry batch log writes at the same consistency level
         retry, consistency = policy.on_write_timeout(
-            query=None, consistency="ONE", write_type=WriteType.BATCH_LOG,
+            query=None, consistency=ONE, write_type=WriteType.BATCH_LOG,
             required_responses=3, received_responses=1, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETRY)
-        self.assertEqual(consistency, "ONE")
+        self.assertEqual(consistency, ONE)
 
         # timeout on an unknown write_type
         retry, consistency = policy.on_write_timeout(
-            query=None, consistency="ONE", write_type=None,
+            query=None, consistency=ONE, write_type=None,
             required_responses=1, received_responses=2, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETHROW)
         self.assertEqual(consistency, None)
@@ -809,12 +810,12 @@ class DowngradingConsistencyRetryPolicyTest(unittest.TestCase):
 
         # if this is the second or greater attempt, rethrow
         retry, consistency = policy.on_unavailable(
-            query=None, consistency="ONE", required_replicas=3, alive_replicas=1, retry_num=1)
+            query=None, consistency=ONE, required_replicas=3, alive_replicas=1, retry_num=1)
         self.assertEqual(retry, RetryPolicy.RETHROW)
         self.assertEqual(consistency, None)
 
         # downgrade consistency on unavailable exceptions
         retry, consistency = policy.on_unavailable(
-            query=None, consistency="ONE", required_replicas=3, alive_replicas=1, retry_num=0)
+            query=None, consistency=ONE, required_replicas=3, alive_replicas=1, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETRY)
         self.assertEqual(consistency, ConsistencyLevel.ONE)
