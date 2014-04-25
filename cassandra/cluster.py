@@ -665,7 +665,7 @@ class Cluster(object):
             log.debug("Old host reconnector found for %s, cancelling", host)
             old_reconnector.cancel()
 
-        log.debug("Staring reconnector for host %s", host)
+        log.debug("Starting reconnector for host %s", host)
         reconnector.start()
 
     @run_in_executor
