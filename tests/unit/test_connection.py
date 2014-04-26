@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from cassandra.cluster import Cluster
 
 try:
     import unittest2 as unittest
@@ -152,3 +153,18 @@ class ConnectionTest(unittest.TestCase):
         self.assertRaises(NotImplementedError, c.close)
         self.assertRaises(NotImplementedError, c.register_watcher, None, None)
         self.assertRaises(NotImplementedError, c.register_watchers, None)
+
+    def test_set_keyspace_blocking(self):
+        c = self.make_connection()
+
+        self.assertEqual(c.keyspace, None)
+        c.set_keyspace_blocking(None)
+        self.assertEqual(c.keyspace, None)
+
+        c.keyspace = 'ks'
+        c.set_keyspace_blocking('ks')
+        self.assertEqual(c.keyspace, 'ks')
+
+    def test_set_connection_class(self):
+        cluster = Cluster(connection_class='test')
+        self.assertEqual('test', cluster.connection_class)

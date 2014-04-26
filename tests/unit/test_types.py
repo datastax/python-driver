@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import tempfile
 
 try:
     import unittest2 as unittest
@@ -22,8 +23,9 @@ import datetime
 import cassandra
 from cassandra.cqltypes import (BooleanType, lookup_casstype_simple, lookup_casstype,
                                 LongType, DecimalType, SetType, cql_typename,
-                                CassandraType, UTF8Type, parse_casstype_args)
-from cassandra.decoder import named_tuple_factory
+                                CassandraType, UTF8Type, parse_casstype_args,
+                                EmptyValue, _CassandraType, DateType)
+from cassandra.decoder import named_tuple_factory, write_string, read_longstring, write_stringmap, read_stringmap, read_inet, write_inet, cql_quote, read_string, write_longstring
 
 
 class TypeTests(unittest.TestCase):
@@ -170,3 +172,57 @@ class TypeTests(unittest.TestCase):
         self.assertEquals(UTF8Type, ctype.subtypes[2])
 
         self.assertEquals(['city', None, 'zip'], ctype.names)
+
+    def test_empty_value(self):
+        self.assertEqual(str(EmptyValue()), 'EMPTY')
+
+    def test_CassandraType(self):
+        cassandra_type = _CassandraType('randomvaluetocheck')
+        self.assertEqual(cassandra_type.val, 'randomvaluetocheck')
+        self.assertEqual(cassandra_type.validate('randomvaluetocheck2'), 'randomvaluetocheck2')
+        self.assertEqual(cassandra_type.val, 'randomvaluetocheck')
+
+    def test_DateType(self):
+        now = datetime.datetime.now()
+        date_type = DateType(now)
+        self.assertEqual(date_type.my_timestamp(), now)
+        self.assertRaises(ValueError, date_type.interpret_datestring, 'fakestring')
+
+    def test_write_read_string(self):
+        with tempfile.TemporaryFile() as f:
+            value = u'test'
+            write_string(f, value)
+            f.seek(0)
+            self.assertEqual(read_string(f), value)
+
+    def test_write_read_longstring(self):
+        with tempfile.TemporaryFile() as f:
+            value = u'test'
+            write_longstring(f, value)
+            f.seek(0)
+            self.assertEqual(read_longstring(f), value)
+
+    def test_write_read_stringmap(self):
+        with tempfile.TemporaryFile() as f:
+            value = {'key': 'value'}
+            write_stringmap(f, value)
+            f.seek(0)
+            self.assertEqual(read_stringmap(f), value)
+
+    def test_write_read_inet(self):
+        with tempfile.TemporaryFile() as f:
+            value = ('192.168.1.1', 9042)
+            write_inet(f, value)
+            f.seek(0)
+            self.assertEqual(read_inet(f), value)
+
+        with tempfile.TemporaryFile() as f:
+            value = ('2001:db8:0:f101::1', 9042)
+            write_inet(f, value)
+            f.seek(0)
+            self.assertEqual(read_inet(f), value)
+
+    def test_cql_quote(self):
+        self.assertEqual(cql_quote(u'test'), "'test'")
+        self.assertEqual(cql_quote('test'), "'test'")
+        self.assertEqual(cql_quote(0), '0')
