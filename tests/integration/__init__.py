@@ -36,7 +36,7 @@ except ImportError as e:
 CLUSTER_NAME = 'test_cluster'
 MULTIDC_CLUSTER_NAME = 'multidc_test_cluster'
 CCM_CLUSTER = None
-DEFAULT_CASSANDRA_VERSION = '1.2.15'
+DEFAULT_CASSANDRA_VERSION = '1.2.16'
 
 path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ccm')
 if not os.path.exists(path):
