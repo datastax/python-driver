@@ -607,7 +607,7 @@ class Cluster(object):
 
         futures = set()
         try:
-            log.info("Host %s has been marked up", host)
+            log.info("Host %s may be up; will prepare queries and open connection pool", host)
 
             reconnector = host.get_and_set_reconnection_handler(None)
             if reconnector:
