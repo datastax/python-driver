@@ -155,10 +155,8 @@ class _ReconnectionHandler(object):
 
     def start(self):
         if self._cancelled:
+            log.debug("Reconnection handler was cancelled before starting")
             return
-
-        # TODO cancel previous reconnection handlers? That's probably the job
-        # of whatever created this.
 
         first_delay = self.schedule.next()
         self.scheduler.schedule(first_delay, self.run)
