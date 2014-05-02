@@ -1839,7 +1839,7 @@ class ControlConnection(object):
             log.debug("[control connection] Schemas match")
             return None
 
-        return dict((version, list(nodes)) for version, nodes in versions.iteritems())
+        return dict((version, list(nodes)) for version, nodes in six.iteritems(versions))
 
     def _signal_error(self):
         # try just signaling the cluster, as this will trigger a reconnect
