@@ -20,6 +20,7 @@ except ImportError:
     import unittest # noqa
 
 from functools import partial
+from six.moves import range
 import sys
 from threading import Thread, Event
 
@@ -48,7 +49,7 @@ class ConnectionTest(object):
         """
         conn = None
         e = None
-        for i in xrange(5):
+        for i in range(5):
             try:
                 conn = self.klass.factory(protocol_version=PROTOCOL_VERSION)
                 break
