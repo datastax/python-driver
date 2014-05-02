@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import six
 import sys
 
 from itertools import count, cycle
@@ -135,7 +136,10 @@ def _handle_error(error, result_index, event, session, statements, results, num_
             errback=_handle_error, errback_args=args)
     except Exception as exc:
         if first_error is not None:
-            first_error.append(sys.exc_info())
+            if six.PY2:
+                first_error.append(sys.exc_info())
+            else:
+                first_error.append(exc)
             event.set()
             return
         else:
@@ -165,7 +169,10 @@ def _execute_next(result, result_index, event, session, statements, results, num
             errback=_handle_error, errback_args=args)
     except Exception as exc:
         if first_error is not None:
-            first_error.append(sys.exc_info())
+            if six.PY2:
+                first_error.append(sys.exc_info())
+            else:
+                first_error.append(exc)
             event.set()
             return
         else:
