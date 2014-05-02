@@ -86,9 +86,9 @@ def execute_concurrent(session, statements_and_parameters, concurrency=100, rais
     event.wait()
     if first_error:
         exc = first_error[0]
-        if isinstance(exc, tuple):
+        if six.PY2 and isinstance(exc, tuple):
             (exc_type, value, traceback) = exc
-            raise exc_type, value, traceback
+            six.reraise(exc_type, value, traceback)
         else:
             raise exc
     else:
