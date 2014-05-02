@@ -10,6 +10,14 @@ Bug Fixes
   closing excess connections
 * Avoid handling a node coming up multiple times due to a reconnection attempt
   succeeding close to the same time that an UP notification is pushed
+* Fix duplicate node-up handling, which could result in multiple reconnectors
+  being started as well as the executor threads becoming deadlocked, preventing
+  future node up or node down handling from being executed.
+
+Other
+-----
+* Don't log at ERROR when a connection is closed during the startup
+  communications
 
 1.1.1
 =====

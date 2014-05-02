@@ -147,6 +147,9 @@ class TestStrategies(unittest.TestCase):
         self.assertItemsEqual(rf3_replicas[MD5Token(200)], [host3, host1, host2])
 
 
+    def test_ss_equals(self):
+        self.assertNotEqual(SimpleStrategy(1), NetworkTopologyStrategy(2))
+
 class TestNameEscaping(unittest.TestCase):
 
     def test_protect_name(self):

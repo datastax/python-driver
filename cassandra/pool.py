@@ -83,7 +83,6 @@ class Host(object):
     lock = None
 
     _currently_handling_node_up = False
-    _handle_node_up_condition = None
 
     def __init__(self, inet_address, conviction_policy_factory, datacenter=None, rack=None):
         if inet_address is None:
@@ -95,7 +94,6 @@ class Host(object):
         self.conviction_policy = conviction_policy_factory(self)
         self.set_location_info(datacenter, rack)
         self.lock = RLock()
-        self._handle_node_up_condition = Condition()
 
     @property
     def datacenter(self):
@@ -177,10 +175,8 @@ class _ReconnectionHandler(object):
 
     def start(self):
         if self._cancelled:
+            log.debug("Reconnection handler was cancelled before starting")
             return
-
-        # TODO cancel previous reconnection handlers? That's probably the job
-        # of whatever created this.
 
         first_delay = self.schedule.next()
         self.scheduler.schedule(first_delay, self.run)

@@ -316,7 +316,7 @@ class Connection(object):
             response = decode_response(stream_id, flags, opcode, body, self.decompressor)
         except Exception as exc:
             log.exception("Error decoding response from Cassandra. "
-                          "opcode: %04x; message contents: %r", opcode, body)
+                          "opcode: %04x; message contents: %r", opcode, msg)
             if callback is not None:
                 callback(exc)
             self.defunct(exc)
@@ -429,6 +429,9 @@ class Connection(object):
                 raise ConnectionException(
                     "Failed to initialize new connection to %s: %s"
                     % (self.host, startup_response.summary_msg()))
+        elif isinstance(startup_response, ConnectionShutdown):
+            log.debug("Connection to %s was closed during the startup handshake", (self.host))
+            raise startup_response
         else:
             msg = "Unexpected response during Connection setup: %r"
             log.error(msg, startup_response)

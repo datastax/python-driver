@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from cassandra.marshal import bitlength
 
 try:
     import unittest2 as unittest
@@ -126,3 +127,8 @@ class TestUnmarshal(unittest.TestCase):
             self.assertEqual(type(whatwegot), type(serializedval),
                              msg='Marshaller for %s (%s) gave wrong type (%s instead of %s)'
                                  % (valtype, marshaller, type(whatwegot), type(serializedval)))
+
+    def test_bitlength(self):
+        self.assertEqual(bitlength(9), 4)
+        self.assertEqual(bitlength(-10), 0)
+        self.assertEqual(bitlength(0), 0)
