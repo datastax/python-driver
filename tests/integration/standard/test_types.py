@@ -17,8 +17,12 @@ try:
 except ImportError:
     import unittest # noqa
 
+import logging
+log = logging.getLogger(__name__)
+
 from decimal import Decimal
 from datetime import datetime
+import six
 from uuid import uuid1, uuid4
 
 try:
@@ -59,12 +63,16 @@ class TypeTests(unittest.TestCase):
 
         params = [
             'key1',
-            'blobyblob'.encode('hex')
+            b'blobyblob'
         ]
 
         query = 'INSERT INTO mytable (a, b) VALUES (%s, %s)'
 
-        if self._cql_version >= (3, 1, 0):
+        # In python 3, the 'bytes' type is treated as a blob, so we can
+        # correctly encode it with hex notation.
+        # In python2, we don't treat the 'str' type as a blob, so we'll encode it
+        # as a string literal and have the following failure.
+        if six.PY2 and self._cql_version >= (3, 1, 0):
             # Blob values can't be specified using string notation in CQL 3.1.0 and
             # above which is used by default in Cassandra 2.0.
             msg = r'.*Invalid STRING constant \(.*?\) for b of type blob.*'
@@ -74,13 +82,13 @@ class TypeTests(unittest.TestCase):
         s.execute(query, params)
         expected_vals = [
            'key1',
-           'blobyblob'
+           bytearray(b'blobyblob')
         ]
 
         results = s.execute("SELECT * FROM mytable")
 
         for expected, actual in zip(expected_vals, results[0]):
-            self.assertEquals(expected, actual)
+            self.assertEqual(expected, actual)
 
     def test_blob_type_as_bytearray(self):
         c = Cluster(protocol_version=PROTOCOL_VERSION)
@@ -101,7 +109,7 @@ class TypeTests(unittest.TestCase):
 
         params = [
             'key1',
-            bytearray('blob1', 'hex')
+            bytearray(b'blob1')
         ]
 
         query = 'INSERT INTO mytable (a, b) VALUES (%s, %s);'
@@ -109,13 +117,13 @@ class TypeTests(unittest.TestCase):
 
         expected_vals = [
             'key1',
-            bytearray('blob1', 'hex')
+            bytearray(b'blob1')
         ]
 
         results = s.execute("SELECT * FROM mytable")
 
         for expected, actual in zip(expected_vals, results[0]):
-            self.assertEquals(expected, actual)
+            self.assertEqual(expected, actual)
 
     create_type_table = """
         CREATE TABLE mytable (
@@ -208,7 +216,7 @@ class TypeTests(unittest.TestCase):
         results = s.execute("SELECT * FROM mytable")
 
         for expected, actual in zip(expected_vals, results[0]):
-            self.assertEquals(expected, actual)
+            self.assertEqual(expected, actual)
 
         # try the same thing with a prepared statement
         prepared = s.prepare("""
@@ -221,7 +229,7 @@ class TypeTests(unittest.TestCase):
         results = s.execute("SELECT * FROM mytable")
 
         for expected, actual in zip(expected_vals, results[0]):
-            self.assertEquals(expected, actual)
+            self.assertEqual(expected, actual)
 
         # query with prepared statement
         prepared = s.prepare("""
@@ -230,14 +238,14 @@ class TypeTests(unittest.TestCase):
         results = s.execute(prepared.bind(()))
 
         for expected, actual in zip(expected_vals, results[0]):
-            self.assertEquals(expected, actual)
+            self.assertEqual(expected, actual)
 
         # query with prepared statement, no explicit columns
         prepared = s.prepare("""SELECT * FROM mytable""")
         results = s.execute(prepared.bind(()))
 
         for expected, actual in zip(expected_vals, results[0]):
-            self.assertEquals(expected, actual)
+            self.assertEqual(expected, actual)
 
     def test_empty_strings_and_nones(self):
         c = Cluster(protocol_version=PROTOCOL_VERSION)
@@ -265,11 +273,11 @@ class TypeTests(unittest.TestCase):
         # insert empty strings for string-like fields and fetch them
         s.execute("INSERT INTO mytable (a, b, c, o, s, l, n) VALUES ('a', 'b', %s, %s, %s, %s, %s)",
                   ('', '', '', [''], {'': 3}))
-        self.assertEquals(
+        self.assertEqual(
             {'c': '', 'o': '', 's': '', 'l': ('', ), 'n': OrderedDict({'': 3})},
             s.execute("SELECT c, o, s, l, n FROM mytable WHERE a='a' AND b='b'")[0])
 
-        self.assertEquals(
+        self.assertEqual(
             {'c': '', 'o': '', 's': '', 'l': ('', ), 'n': OrderedDict({'': 3})},
             s.execute(s.prepare("SELECT c, o, s, l, n FROM mytable WHERE a='a' AND b='b'"), [])[0])
 
@@ -363,7 +371,7 @@ class TypeTests(unittest.TestCase):
         """ Ensure timezone-aware datetimes are converted to timestamps correctly """
         try:
             import pytz
-        except ImportError, exc:
+        except ImportError as exc:
             raise unittest.SkipTest('pytz is not available: %r' % (exc,))
 
         dt = datetime(1997, 8, 29, 11, 14)
@@ -381,10 +389,10 @@ class TypeTests(unittest.TestCase):
         # test non-prepared statement
         s.execute("INSERT INTO mytable (a, b) VALUES ('key1', %s)", parameters=(dt,))
         result = s.execute("SELECT b FROM mytable WHERE a='key1'")[0].b
-        self.assertEquals(dt.utctimetuple(), result.utctimetuple())
+        self.assertEqual(dt.utctimetuple(), result.utctimetuple())
 
         # test prepared statement
         prepared = s.prepare("INSERT INTO mytable (a, b) VALUES ('key2', ?)")
         s.execute(prepared, parameters=(dt,))
         result = s.execute("SELECT b FROM mytable WHERE a='key2'")[0].b
-        self.assertEquals(dt.utctimetuple(), result.utctimetuple())
+        self.assertEqual(dt.utctimetuple(), result.utctimetuple())

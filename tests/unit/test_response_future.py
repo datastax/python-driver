@@ -346,7 +346,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf.send_request()
 
         rf.add_callbacks(
-            callback=self.assertEquals, callback_args=([{'col': 'val'}],),
+            callback=self.assertEqual, callback_args=([{'col': 'val'}],),
             errback=self.assertIsInstance, errback_args=(Exception,))
 
         result = Mock(spec=UnavailableErrorMessage, info={})
@@ -358,7 +358,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf.send_request()
 
         rf.add_callbacks(
-            callback=self.assertEquals, callback_args=([{'col': 'val'}],),
+            callback=self.assertEqual, callback_args=([{'col': 'val'}],),
             errback=self.assertIsInstance, errback_args=(Exception,))
 
         rf._set_result(self.make_mock_response([{'col': 'val'}]))
@@ -380,9 +380,9 @@ class ResponseFutureTests(unittest.TestCase):
 
         session.submit.assert_called_once()
         args, kwargs = session.submit.call_args
-        self.assertEquals(rf._reprepare, args[-2])
+        self.assertEqual(rf._reprepare, args[-2])
         self.assertIsInstance(args[-1], PrepareMessage)
-        self.assertEquals(args[-1].query, "SELECT * FROM foobar")
+        self.assertEqual(args[-1].query, "SELECT * FROM foobar")
 
     def test_prepared_query_not_found_bad_keyspace(self):
         session = self.make_session()

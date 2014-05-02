@@ -16,16 +16,14 @@ import logging
 import socket
 from uuid import UUID
 
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO  # ignore flake8 warning: # NOQA
+import six
+from six.moves import range
 
 from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
                        AlreadyExists, InvalidRequest, Unauthorized,
                        UnsupportedOperation)
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
-                               int8_pack, int8_unpack)
+                               int8_pack, int8_unpack, header_pack)
 from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 CounterColumnType, DateType, DecimalType,
                                 DoubleType, FloatType, Int32Type,
@@ -48,66 +46,75 @@ HEADER_DIRECTION_FROM_CLIENT = 0x00
 HEADER_DIRECTION_TO_CLIENT = 0x80
 HEADER_DIRECTION_MASK = 0x80
 
+COMPRESSED_FLAG = 0x01
+TRACING_FLAG = 0x02
 
 _message_types_by_name = {}
 _message_types_by_opcode = {}
 
 
-class _register_msg_type(type):
+class _RegisterMessageType(type):
     def __init__(cls, name, bases, dct):
         if not name.startswith('_'):
             _message_types_by_name[cls.name] = cls
             _message_types_by_opcode[cls.opcode] = cls
 
 
+@six.add_metaclass(_RegisterMessageType)
 class _MessageType(object):
-    __metaclass__ = _register_msg_type
 
     tracing = False
 
-    def to_string(self, stream_id, protocol_version, compression=None):
-        body = StringIO()
+    def to_binary(self, stream_id, protocol_version, compression=None):
+        body = six.BytesIO()
         self.send_body(body, protocol_version)
         body = body.getvalue()
-        version = protocol_version | HEADER_DIRECTION_FROM_CLIENT
-        flags = 0
-        if compression is not None and len(body) > 0:
-            body = compression(body)
-            flags |= 0x01
-        if self.tracing:
-            flags |= 0x02
-        msglen = int32_pack(len(body))
-        msg_parts = map(int8_pack, (version, flags, stream_id, self.opcode)) + [msglen, body]
-        return ''.join(msg_parts)
 
-    def __str__(self):
-        paramstrs = ['%s=%r' % (pname, getattr(self, pname)) for pname in _get_params(self)]
-        return '<%s(%s)>' % (self.__class__.__name__, ', '.join(paramstrs))
-    __repr__ = __str__
+        flags = 0
+        if compression and len(body) > 0:
+            body = compression(body)
+            flags |= COMPRESSED_FLAG
+        if self.tracing:
+            flags |= TRACING_FLAG
+
+        msg = six.BytesIO()
+        write_header(
+            msg,
+            protocol_version | HEADER_DIRECTION_FROM_CLIENT,
+            flags, stream_id, self.opcode, len(body)
+        )
+        msg.write(body)
+
+        return msg.getvalue()
+
+    def __repr__(self):
+        return '<%s(%s)>' % (self.__class__.__name__, ', '.join('%s=%r' % i for i in _get_params(self)))
 
 
 def _get_params(message_obj):
     base_attrs = dir(_MessageType)
-    return [a for a in dir(message_obj)
-            if a not in base_attrs and not a.startswith('_') and not callable(getattr(message_obj, a))]
+    return (
+        (n, a) for n, a in message_obj.__dict__.items()
+        if n not in base_attrs and not n.startswith('_') and not callable(a)
+    )
 
 
 def decode_response(stream_id, flags, opcode, body, decompressor=None):
-    if flags & 0x01:
+    if flags & COMPRESSED_FLAG:
         if decompressor is None:
-            raise Exception("No decompressor available for compressed frame!")
+            raise Exception("No de-compressor available for compressed frame!")
         body = decompressor(body)
-        flags ^= 0x01
+        flags ^= COMPRESSED_FLAG
 
-    body = StringIO(body)
-    if flags & 0x02:
+    body = six.BytesIO(body)
+    if flags & TRACING_FLAG:
         trace_id = UUID(bytes=body.read(16))
-        flags ^= 0x02
+        flags ^= TRACING_FLAG
     else:
         trace_id = None
 
     if flags:
-        log.warn("Unknown protocol flags set: %02x. May cause problems.", flags)
+        log.warning("Unknown protocol flags set: %02x. May cause problems.", flags)
 
     msg_class = _message_types_by_opcode[opcode]
     msg = msg_class.recv_body(body)
@@ -156,14 +163,14 @@ class ErrorMessage(_MessageType, Exception):
         return self
 
 
-class ErrorMessageSubclass(_register_msg_type):
+class ErrorMessageSubclass(_RegisterMessageType):
     def __init__(cls, name, bases, dct):
-        if cls.error_code is not None:
+        if cls.error_code is not None:  # Server has an error code of 0.
             error_classes[cls.error_code] = cls
 
 
+@six.add_metaclass(ErrorMessageSubclass)
 class ErrorMessageSub(ErrorMessage):
-    __metaclass__ = ErrorMessageSubclass
     error_code = None
 
 
@@ -511,7 +518,7 @@ class ResultMessage(_MessageType):
     def recv_results_rows(cls, f):
         paging_state, column_metadata = cls.recv_results_metadata(f)
         rowcount = read_int(f)
-        rows = [cls.recv_row(f, len(column_metadata)) for x in xrange(rowcount)]
+        rows = [cls.recv_row(f, len(column_metadata)) for _ in range(rowcount)]
         colnames = [c[2] for c in column_metadata]
         coltypes = [c[3] for c in column_metadata]
         return (
@@ -538,7 +545,7 @@ class ResultMessage(_MessageType):
             ksname = read_string(f)
             cfname = read_string(f)
         column_metadata = []
-        for x in xrange(colcount):
+        for _ in range(colcount):
             if glob_tblspec:
                 colksname = ksname
                 colcfname = cfname
@@ -580,7 +587,7 @@ class ResultMessage(_MessageType):
 
     @staticmethod
     def recv_row(f, colcount):
-        return [read_value(f) for x in xrange(colcount)]
+        return [read_value(f) for _ in range(colcount)]
 
 
 class PrepareMessage(_MessageType):
@@ -729,6 +736,14 @@ class EventMessage(_MessageType):
         return dict(change_type=change_type, keyspace=keyspace, table=table)
 
 
+def write_header(f, version, flags, stream_id, opcode, length):
+    """
+    Write a CQL protocol frame header.
+    """
+    f.write(header_pack(version, flags, stream_id, opcode))
+    write_int(f, length)
+
+
 def read_byte(f):
     return int8_unpack(f.read(1))
 
@@ -774,7 +789,7 @@ def read_binary_string(f):
 
 
 def write_string(f, s):
-    if isinstance(s, unicode):
+    if isinstance(s, six.text_type):
         s = s.encode('utf8')
     write_short(f, len(s))
     f.write(s)
@@ -791,7 +806,7 @@ def read_longstring(f):
 
 
 def write_longstring(f, s):
-    if isinstance(s, unicode):
+    if isinstance(s, six.text_type):
         s = s.encode('utf8')
     write_int(f, len(s))
     f.write(s)
@@ -799,7 +814,7 @@ def write_longstring(f, s):
 
 def read_stringlist(f):
     numstrs = read_short(f)
-    return [read_string(f) for x in xrange(numstrs)]
+    return [read_string(f) for _ in range(numstrs)]
 
 
 def write_stringlist(f, stringlist):
@@ -811,7 +826,7 @@ def write_stringlist(f, stringlist):
 def read_stringmap(f):
     numpairs = read_short(f)
     strmap = {}
-    for x in xrange(numpairs):
+    for _ in range(numpairs):
         k = read_string(f)
         strmap[k] = read_string(f)
     return strmap
@@ -827,7 +842,7 @@ def write_stringmap(f, strmap):
 def read_stringmultimap(f):
     numkeys = read_short(f)
     strmmap = {}
-    for x in xrange(numkeys):
+    for _ in range(numkeys):
         k = read_string(f)
         strmmap[k] = read_stringlist(f)
     return strmmap

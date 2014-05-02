@@ -20,6 +20,10 @@ import os
 import socket
 import sys
 from threading import Event, Lock, Thread
+
+from six import BytesIO
+from six.moves import range
+
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL, EISCONN, errorcode
 try:
     from weakref import WeakSet
@@ -27,11 +31,6 @@ except ImportError:
     from cassandra.util import WeakSet  # noqa
 
 import asyncore
-
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO  # ignore flake8 warning: # NOQA
 
 try:
     import ssl
@@ -141,7 +140,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         asyncore.dispatcher.__init__(self)
 
         self.connected_event = Event()
-        self._iobuf = StringIO()
+        self._iobuf = BytesIO()
 
         self._callbacks = {}
         self.deque = deque()
@@ -286,7 +285,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
 
                         # leave leftover in current buffer
                         leftover = self._iobuf.read()
-                        self._iobuf = StringIO()
+                        self._iobuf = BytesIO()
                         self._iobuf.write(leftover)
 
                         self._total_reqd_bytes = 0
@@ -302,7 +301,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         sabs = self.out_buffer_size
         if len(data) > sabs:
             chunks = []
-            for i in xrange(0, len(data), sabs):
+            for i in range(0, len(data), sabs):
                 chunks.append(data[i:i + sabs])
         else:
             chunks = [data]

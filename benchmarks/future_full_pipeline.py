@@ -13,16 +13,16 @@
 # limitations under the License.
 
 import logging
-import Queue
-
 from base import benchmark, BenchmarkThread
+from six.moves import queue
 
 log = logging.getLogger(__name__)
+
 
 class Runner(BenchmarkThread):
 
     def run(self):
-        futures = Queue.Queue(maxsize=121)
+        futures = queue.Queue(maxsize=121)
 
         self.start_profile()
 
@@ -37,7 +37,7 @@ class Runner(BenchmarkThread):
         while True:
             try:
                 futures.get_nowait().result()
-            except Queue.Empty:
+            except queue.Empty:
                 break
 
         self.finish_profile

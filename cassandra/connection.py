@@ -19,19 +19,21 @@ import logging
 import sys
 from threading import Event, RLock
 import time
-import traceback
 
 if 'gevent.monkey' in sys.modules:
     from gevent.queue import Queue, Empty
 else:
-    from Queue import Queue, Empty  # noqa
+    from six.moves.queue import Queue, Empty  # noqa
+
+from six.moves import range
 
 from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut
-from cassandra.marshal import int8_unpack, int32_pack
+from cassandra.marshal import int32_pack, header_unpack
 from cassandra.decoder import (ReadyMessage, AuthenticateMessage, OptionsMessage,
                                StartupMessage, ErrorMessage, CredentialsMessage,
                                QueryMessage, ResultMessage, decode_response,
                                InvalidRequestException, SupportedMessage)
+import six
 
 
 log = logging.getLogger(__name__)
@@ -123,7 +125,6 @@ def defunct_on_error(f):
             return f(self, *args, **kwargs)
         except Exception as exc:
             self.defunct(exc)
-
     return wrapper
 
 
@@ -181,12 +182,8 @@ class Connection(object):
                 return
             self.is_defunct = True
 
-        trace = traceback.format_exc(exc)
-        if trace != "None":
-            log.debug("Defuncting connection (%s) to %s: %s\n%s",
-                      id(self), self.host, exc, traceback.format_exc(exc))
-        else:
-            log.debug("Defuncting connection (%s) to %s: %s", id(self), self.host, exc)
+        log.debug("Defuncting connection (%s) to %s:",
+                  id(self), self.host, exc_info=exc)
 
         self.last_error = exc
         self.close()
@@ -203,9 +200,9 @@ class Connection(object):
             try:
                 cb(new_exc)
             except Exception:
-                log.warn("Ignoring unhandled exception while erroring callbacks for a "
-                         "failed connection (%s) to host %s:",
-                         id(self), self.host, exc_info=True)
+                log.warning("Ignoring unhandled exception while erroring callbacks for a "
+                            "failed connection (%s) to host %s:",
+                            id(self), self.host, exc_info=True)
 
     def handle_pushed(self, response):
         log.debug("Message pushed from server: %r", response)
@@ -231,7 +228,7 @@ class Connection(object):
             request_id = self._id_queue.get()
 
         self._callbacks[request_id] = cb
-        self.push(msg.to_string(request_id, self.protocol_version, compression=self.compressor))
+        self.push(msg.to_binary(request_id, self.protocol_version, compression=self.compressor))
         return request_id
 
     def wait_for_response(self, msg, timeout=None):
@@ -268,7 +265,7 @@ class Connection(object):
             return waiter.deliver(timeout)
         except OperationTimedOut:
             raise
-        except Exception, exc:
+        except Exception as exc:
             self.defunct(exc)
             raise
 
@@ -284,7 +281,7 @@ class Connection(object):
 
     @defunct_on_error
     def process_msg(self, msg, body_len):
-        version, flags, stream_id, opcode = map(int8_unpack, msg[:4])
+        version, flags, stream_id, opcode = header_unpack(msg[:4])
         if stream_id < 0:
             callback = None
         else:
@@ -309,7 +306,7 @@ class Connection(object):
             if body_len > 0:
                 body = msg[8:]
             elif body_len == 0:
-                body = ""
+                body = six.binary_type()
             else:
                 raise ProtocolError("Got negative body length: %r" % body_len)
 
@@ -383,7 +380,7 @@ class Connection(object):
                           locally_supported_compressions.keys(),
                           remote_supported_compressions)
             else:
-                compression_type = iter(overlap).next()  # choose any
+                compression_type = next(iter(overlap))  # choose any
                 # set the decompressor here, but set the compressor only after
                 # a successful Ready message
                 self._compressor, self.decompressor = \

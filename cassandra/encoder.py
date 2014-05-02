@@ -12,21 +12,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+log = logging.getLogger(__name__)
+
 from binascii import hexlify
 import calendar
 import datetime
 import sys
 import types
 from uuid import UUID
+import six
 
 from cassandra.util import OrderedDict
 
+if six.PY3:
+    long = int
+
 
 def cql_quote(term):
-    if isinstance(term, unicode):
-        return "'%s'" % term.encode('utf8').replace("'", "''")
-    elif isinstance(term, (str, bool)):
+    # The ordering of this method is important for the result of this method to
+    # be a native str type (for both Python 2 and 3)
+
+    # Handle quoting of native str and bool types
+    if isinstance(term, (str, bool)):
         return "'%s'" % str(term).replace("'", "''")
+    # This branch of the if statement will only be used by Python 2 to catch
+    # unicode strings, text_type is used to prevent type errors with Python 3.
+    elif isinstance(term, six.text_type):
+        return "'%s'" % term.encode('utf8').replace("'", "''")
     else:
         return str(term)
 
@@ -43,13 +56,16 @@ def cql_encode_str(val):
     return cql_quote(val)
 
 
-if sys.version_info >= (2, 7):
+if six.PY3:
     def cql_encode_bytes(val):
-        return '0x' + hexlify(val)
+        return (b'0x' + hexlify(val)).decode('utf-8')
+elif sys.version_info >= (2, 7):
+    def cql_encode_bytes(val):  # noqa
+        return b'0x' + hexlify(val)
 else:
     # python 2.6 requires string or read-only buffer for hexlify
     def cql_encode_bytes(val):  # noqa
-        return '0x' + hexlify(buffer(val))
+        return b'0x' + hexlify(buffer(val))
 
 
 def cql_encode_object(val):
@@ -71,11 +87,10 @@ def cql_encode_sequence(val):
 
 
 def cql_encode_map_collection(val):
-    return '{ %s }' % ' , '.join(
-                                 '%s : %s' % (
-                                     cql_encode_all_types(k),
-                                     cql_encode_all_types(v))
-                                 for k, v in val.iteritems())
+    return '{ %s }' % ' , '.join('%s : %s' % (
+        cql_encode_all_types(k),
+        cql_encode_all_types(v)
+    ) for k, v in six.iteritems(val))
 
 
 def cql_encode_list_collection(val):
@@ -92,13 +107,9 @@ def cql_encode_all_types(val):
 
 cql_encoders = {
     float: cql_encode_object,
-    buffer: cql_encode_bytes,
     bytearray: cql_encode_bytes,
     str: cql_encode_str,
-    unicode: cql_encode_unicode,
-    types.NoneType: cql_encode_none,
     int: cql_encode_object,
-    long: cql_encode_object,
     UUID: cql_encode_object,
     datetime.datetime: cql_encode_datetime,
     datetime.date: cql_encode_date,
@@ -110,3 +121,17 @@ cql_encoders = {
     frozenset: cql_encode_set_collection,
     types.GeneratorType: cql_encode_list_collection
 }
+
+if six.PY2:
+    cql_encoders.update({
+        unicode: cql_encode_unicode,
+        buffer: cql_encode_bytes,
+        long: cql_encode_object,
+        types.NoneType: cql_encode_none,
+    })
+else:
+    cql_encoders.update({
+        memoryview: cql_encode_bytes,
+        bytes: cql_encode_bytes,
+        type(None): cql_encode_none,
+    })

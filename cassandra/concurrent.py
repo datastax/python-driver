@@ -15,6 +15,7 @@
 import sys
 
 from itertools import count, cycle
+from six.moves import xrange
 from threading import Event
 
 
@@ -105,7 +106,7 @@ def execute_concurrent_with_args(session, statement, parameters, *args, **kwargs
         parameters = [(x,) for x in range(1000)]
         execute_concurrent_with_args(session, statement, parameters)
     """
-    return execute_concurrent(session, zip(cycle((statement,)), parameters), *args, **kwargs)
+    return execute_concurrent(session, list(zip(cycle((statement,)), parameters)), *args, **kwargs)
 
 
 _sentinel = object()
@@ -118,12 +119,12 @@ def _handle_error(error, result_index, event, session, statements, results, num_
         return
     else:
         results[result_index] = (False, error)
-        if num_finished.next() >= to_execute:
+        if next(num_finished) >= to_execute:
             event.set()
             return
 
     try:
-        (next_index, (statement, params)) = statements.next()
+        (next_index, (statement, params)) = next(statements)
     except StopIteration:
         return
 
@@ -139,7 +140,7 @@ def _handle_error(error, result_index, event, session, statements, results, num_
             return
         else:
             results[next_index] = (False, exc)
-            if num_finished.next() >= to_execute:
+            if next(num_finished) >= to_execute:
                 event.set()
                 return
 
@@ -147,13 +148,13 @@ def _handle_error(error, result_index, event, session, statements, results, num_
 def _execute_next(result, result_index, event, session, statements, results, num_finished, to_execute, first_error):
     if result is not _sentinel:
         results[result_index] = (True, result)
-        finished = num_finished.next()
+        finished = next(num_finished)
         if finished >= to_execute:
             event.set()
             return
 
     try:
-        (next_index, (statement, params)) = statements.next()
+        (next_index, (statement, params)) = next(statements)
     except StopIteration:
         return
 
@@ -169,6 +170,6 @@ def _execute_next(result, result_index, event, session, statements, results, num
             return
         else:
             results[next_index] = (False, exc)
-            if num_finished.next() >= to_execute:
+            if next(num_finished) >= to_execute:
                 event.set()
                 return

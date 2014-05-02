@@ -41,7 +41,7 @@ try:
     from cassandra.io.libevreactor import LibevConnection
     have_libev = True
     supported_reactors.append(LibevConnection)
-except ImportError, exc:
+except ImportError as exc:
     pass
 
 KEYSPACE = "testkeyspace"
@@ -104,7 +104,7 @@ def benchmark(thread_class):
             """.format(table=TABLE))
         values = ('key', 'a', 'b')
 
-        per_thread = options.num_ops / options.threads
+        per_thread = options.num_ops // options.threads
         threads = []
 
         log.debug("Beginning inserts...")

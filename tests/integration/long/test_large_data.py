@@ -12,7 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import Queue
+try:
+    from Queue import Queue, Empty
+except ImportError:
+    from queue import Queue, Empty  # noqa
+
 from struct import pack
 import unittest
 
@@ -31,13 +35,12 @@ def create_column_name(i):
     column_name = ''
     while True:
         column_name += letters[i % 10]
-        i /= 10
+        i = i // 10
         if not i:
             break
 
     if column_name == 'if':
         column_name = 'special_case'
-
     return column_name
 
 
@@ -56,15 +59,15 @@ class LargeDataTests(unittest.TestCase):
         return session
 
     def batch_futures(self, session, statement_generator):
-        concurrency = 50
-        futures = Queue.Queue(maxsize=concurrency)
+        concurrency = 10
+        futures = Queue(maxsize=concurrency)
         for i, statement in enumerate(statement_generator):
             if i > 0 and i % (concurrency - 1) == 0:
                 # clear the existing queue
                 while True:
                     try:
                         futures.get_nowait().result()
-                    except Queue.Empty:
+                    except Empty:
                         break
 
             future = session.execute_async(statement)
@@ -73,7 +76,7 @@ class LargeDataTests(unittest.TestCase):
         while True:
             try:
                 futures.get_nowait().result()
-            except Queue.Empty:
+            except Empty:
                 break
 
     def test_wide_rows(self):
@@ -81,15 +84,13 @@ class LargeDataTests(unittest.TestCase):
         session = self.make_session_and_keyspace()
         session.execute('CREATE TABLE %s (k INT, i INT, PRIMARY KEY(k, i))' % table)
 
+        prepared = session.prepare('INSERT INTO %s (k, i) VALUES (0, ?)' % (table, ))
+
         # Write via async futures
-        self.batch_futures(
-            session,
-            (SimpleStatement('INSERT INTO %s (k, i) VALUES (0, %s)' % (table, i),
-                            consistency_level=ConsistencyLevel.QUORUM)
-             for i in range(100000)))
+        self.batch_futures(session, (prepared.bind((i, )) for i in range(100000)))
 
         # Read
-        results = session.execute('SELECT i FROM %s WHERE k=%s' % (table, 0))
+        results = session.execute('SELECT i FROM %s WHERE k=0' % (table, ))
 
         # Verify
         for i, row in enumerate(results):
@@ -120,18 +121,13 @@ class LargeDataTests(unittest.TestCase):
         session = self.make_session_and_keyspace()
         session.execute('CREATE TABLE %s (k INT, i INT, v BLOB, PRIMARY KEY(k, i))' % table)
 
-        # Build small ByteBuffer sample
-        bb = '0xCAFE'
+        prepared = session.prepare('INSERT INTO %s (k, i, v) VALUES (0, ?, 0xCAFE)' % (table, ))
 
         # Write
-        self.batch_futures(
-            session,
-            (SimpleStatement('INSERT INTO %s (k, i, v) VALUES (0, %s, %s)' % (table, i, str(bb)),
-                            consistency_level=ConsistencyLevel.QUORUM)
-             for i in range(100000)))
+        self.batch_futures(session, (prepared.bind((i, )) for i in range(100000)))
 
         # Read
-        results = session.execute('SELECT i, v FROM %s WHERE k=%s' % (table, 0))
+        results = session.execute('SELECT i, v FROM %s WHERE k=0' % (table, ))
 
         # Verify
         bb = pack('>H', 0xCAFE)

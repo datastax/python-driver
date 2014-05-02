@@ -23,6 +23,7 @@ except ImportError:
     import unittest # noqa
 
 from itertools import cycle, count
+from six.moves import range
 from threading import Event
 
 from cassandra.cluster import Cluster
@@ -47,7 +48,7 @@ class QueryPagingTests(unittest.TestCase):
     def test_paging(self):
         statements_and_params = zip(cycle(["INSERT INTO test3rf.test (k, v) VALUES (%s, 0)"]),
                                     [(i, ) for i in range(100)])
-        execute_concurrent(self.session, statements_and_params)
+        execute_concurrent(self.session, list(statements_and_params))
 
         prepared = self.session.prepare("SELECT * FROM test3rf.test")
 
@@ -153,7 +154,7 @@ class QueryPagingTests(unittest.TestCase):
     def test_async_paging(self):
         statements_and_params = zip(cycle(["INSERT INTO test3rf.test (k, v) VALUES (%s, 0)"]),
                                     [(i, ) for i in range(100)])
-        execute_concurrent(self.session, statements_and_params)
+        execute_concurrent(self.session, list(statements_and_params))
 
         prepared = self.session.prepare("SELECT * FROM test3rf.test")
 
@@ -219,7 +220,7 @@ class QueryPagingTests(unittest.TestCase):
     def test_paging_callbacks(self):
         statements_and_params = zip(cycle(["INSERT INTO test3rf.test (k, v) VALUES (%s, 0)"]),
                                     [(i, ) for i in range(100)])
-        execute_concurrent(self.session, statements_and_params)
+        execute_concurrent(self.session, list(statements_and_params))
 
         prepared = self.session.prepare("SELECT * FROM test3rf.test")
 
@@ -232,7 +233,7 @@ class QueryPagingTests(unittest.TestCase):
 
             def handle_page(rows, future, counter):
                 for row in rows:
-                    counter.next()
+                    next(counter)
 
                 if future.has_more_pages:
                     future.start_fetching_next_page()
@@ -245,7 +246,7 @@ class QueryPagingTests(unittest.TestCase):
 
             future.add_callbacks(callback=handle_page, callback_args=(future, counter), errback=handle_error)
             event.wait()
-            self.assertEquals(counter.next(), 100)
+            self.assertEquals(next(counter), 100)
 
             # simple statement
             future = self.session.execute_async(SimpleStatement("SELECT * FROM test3rf.test"))
@@ -254,7 +255,7 @@ class QueryPagingTests(unittest.TestCase):
 
             future.add_callbacks(callback=handle_page, callback_args=(future, counter), errback=handle_error)
             event.wait()
-            self.assertEquals(counter.next(), 100)
+            self.assertEquals(next(counter), 100)
 
             # prepared statement
             future = self.session.execute_async(prepared)
@@ -263,4 +264,4 @@ class QueryPagingTests(unittest.TestCase):
 
             future.add_callbacks(callback=handle_page, callback_args=(future, counter), errback=handle_error)
             event.wait()
-            self.assertEquals(counter.next(), 100)
+            self.assertEquals(next(counter), 100)

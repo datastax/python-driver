@@ -26,7 +26,11 @@ import socket
 import sys
 import time
 from threading import Lock, RLock, Thread, Event
-import Queue
+
+import six
+from six.moves import range
+from six.moves import queue as Queue
+
 import weakref
 from weakref import WeakValueDictionary
 try:
@@ -696,7 +700,7 @@ class Cluster(object):
 
             host.set_down()
 
-        log.warn("Host %s has been marked down", host)
+        log.warning("Host %s has been marked down", host)
 
         self.load_balancing_policy.on_down(host)
         self.control_connection.on_down(host)
@@ -742,7 +746,7 @@ class Cluster(object):
                 return
 
             if not all(futures_results):
-                log.warn("Connection pool could not be created, not marking node %s up", host)
+                log.warning("Connection pool could not be created, not marking node %s up", host)
                 return
 
             self._finalize_add(host)
@@ -867,7 +871,7 @@ class Cluster(object):
                 # prepare 10 statements at a time
                 ks_statements = list(ks_statements)
                 chunks = []
-                for i in xrange(0, len(ks_statements), 10):
+                for i in range(0, len(ks_statements), 10):
                     chunks.append(ks_statements[i:i + 10])
 
                 for ks_chunk in chunks:
@@ -882,9 +886,9 @@ class Cluster(object):
 
             log.debug("Done preparing all known prepared statements against host %s", host)
         except OperationTimedOut as timeout:
-            log.warn("Timed out trying to prepare all statements on host %s: %s", host, timeout)
+            log.warning("Timed out trying to prepare all statements on host %s: %s", host, timeout)
         except (ConnectionException, socket.error) as exc:
-            log.warn("Error trying to prepare all statements on host %s: %r", host, exc)
+            log.warning("Error trying to prepare all statements on host %s: %r", host, exc)
         except Exception:
             log.exception("Error trying to prepare all statements on host %s", host)
         finally:
@@ -1088,7 +1092,7 @@ class Session(object):
 
         prepared_statement = None
 
-        if isinstance(query, basestring):
+        if isinstance(query, six.string_types):
             query = SimpleStatement(query)
         elif isinstance(query, PreparedStatement):
             query = query.bind(parameters)
@@ -1235,8 +1239,8 @@ class Session(object):
                 self.cluster.signal_connection_failure(host, conn_exc, is_host_addition)
                 return False
             except Exception as conn_exc:
-                log.warn("Failed to create connection pool for new host %s: %s",
-                         host, conn_exc)
+                log.warning("Failed to create connection pool for new host %s: %s",
+                            host, conn_exc)
                 # the host itself will still be marked down, so we need to pass
                 # a special flag to make sure the reconnector is created
                 self.cluster.signal_connection_failure(
@@ -1456,11 +1460,11 @@ class ControlConnection(object):
                 return self._try_connect(host)
             except ConnectionException as exc:
                 errors[host.address] = exc
-                log.warn("[control connection] Error connecting to %s:", host, exc_info=True)
+                log.warning("[control connection] Error connecting to %s:", host, exc_info=True)
                 self._cluster.signal_connection_failure(host, exc, is_host_addition=False)
             except Exception as exc:
                 errors[host.address] = exc
-                log.warn("[control connection] Error connecting to %s:", host, exc_info=True)
+                log.warning("[control connection] Error connecting to %s:", host, exc_info=True)
 
         raise NoHostAvailable("Unable to connect to any servers", errors)
 
@@ -1948,7 +1952,7 @@ class _Scheduler(object):
     def _log_if_failed(self, future):
         exc = future.exception()
         if exc:
-            log.warn(
+            log.warning(
                 "An internally scheduled tasked failed with an unhandled exception:",
                 exc_info=exc)
 
@@ -2170,8 +2174,8 @@ class ResponseFuture(object):
                     if self._metrics is not None:
                         self._metrics.on_other_error()
                     # need to retry against a different host here
-                    log.warn("Host %s is overloaded, retrying against a different "
-                             "host", self._current_host)
+                    log.warning("Host %s is overloaded, retrying against a different "
+                                "host", self._current_host)
                     self._retry(reuse_connection=False, consistency_level=None)
                     return
                 elif isinstance(response, IsBootstrappingErrorMessage):

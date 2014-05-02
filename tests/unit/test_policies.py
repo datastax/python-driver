@@ -20,6 +20,7 @@ except ImportError:
 from itertools import islice, cycle
 from mock import Mock
 from random import randint
+import six
 import sys
 import struct
 from threading import Thread
@@ -35,6 +36,8 @@ from cassandra.policies import (RoundRobinPolicy, DCAwareRoundRobinPolicy,
                                 LoadBalancingPolicy, ConvictionPolicy, ReconnectionPolicy, FallthroughRetryPolicy)
 from cassandra.pool import Host
 from cassandra.query import Statement
+
+from six.moves import xrange
 
 
 class TestLoadBalancingPolicy(unittest.TestCase):
@@ -137,13 +140,23 @@ class TestRoundRobinPolicy(unittest.TestCase):
 
         # make the GIL switch after every instruction, maximizing
         # the chace of race conditions
-        original_interval = sys.getcheckinterval()
+        if six.PY2:
+            original_interval = sys.getcheckinterval()
+        else:
+            original_interval = sys.getswitchinterval()
+
         try:
-            sys.setcheckinterval(0)
+            if six.PY2:
+                sys.setcheckinterval(0)
+            else:
+                sys.setswitchinterval(0.0001)
             map(lambda t: t.start(), threads)
             map(lambda t: t.join(), threads)
         finally:
-            sys.setcheckinterval(original_interval)
+            if six.PY2:
+                sys.setcheckinterval(original_interval)
+            else:
+                sys.setswitchinterval(original_interval)
 
         if errors:
             self.fail("Saw errors: %s" % (errors,))
@@ -334,14 +347,14 @@ class TokenAwarePolicyTest(unittest.TestCase):
 
             replicas = get_replicas(None, struct.pack('>i', i))
             other = set(h for h in hosts if h not in replicas)
-            self.assertEquals(replicas, qplan[:2])
-            self.assertEquals(other, set(qplan[2:]))
+            self.assertEqual(replicas, qplan[:2])
+            self.assertEqual(other, set(qplan[2:]))
 
         # Should use the secondary policy
         for i in range(4):
             qplan = list(policy.make_query_plan())
 
-            self.assertEquals(set(qplan), set(hosts))
+            self.assertEqual(set(qplan), set(hosts))
 
     def test_wrap_dc_aware(self):
         cluster = Mock(spec=Cluster)
@@ -374,16 +387,16 @@ class TokenAwarePolicyTest(unittest.TestCase):
 
             # first should be the only local replica
             self.assertIn(qplan[0], replicas)
-            self.assertEquals(qplan[0].datacenter, "dc1")
+            self.assertEqual(qplan[0].datacenter, "dc1")
 
             # then the local non-replica
             self.assertNotIn(qplan[1], replicas)
-            self.assertEquals(qplan[1].datacenter, "dc1")
+            self.assertEqual(qplan[1].datacenter, "dc1")
 
             # then one of the remotes (used_hosts_per_remote_dc is 1, so we
             # shouldn't see two remotes)
-            self.assertEquals(qplan[2].datacenter, "dc2")
-            self.assertEquals(3, len(qplan))
+            self.assertEqual(qplan[2].datacenter, "dc2")
+            self.assertEqual(3, len(qplan))
 
     class FakeCluster:
         def __init__(self):

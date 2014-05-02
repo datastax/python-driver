@@ -1,3 +1,4 @@
 blist
 futures
 scales
+six >=1.6

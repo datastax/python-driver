@@ -20,6 +20,8 @@ import os
 import socket
 from threading import Event, Lock, Thread
 
+from six import BytesIO
+
 from cassandra import OperationTimedOut
 from cassandra.connection import Connection, ConnectionShutdown, NONBLOCKING
 from cassandra.decoder import RegisterMessage
@@ -35,10 +37,6 @@ except ImportError:
         "for instructions on installing build dependencies and building "
         "the C extension.")
 
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO  # ignore flake8 warning: # NOQA
 
 try:
     import ssl
@@ -197,7 +195,7 @@ class LibevConnection(Connection):
         Connection.__init__(self, *args, **kwargs)
 
         self.connected_event = Event()
-        self._iobuf = StringIO()
+        self._iobuf = BytesIO()
 
         self._callbacks = {}
         self.deque = deque()
@@ -323,7 +321,7 @@ class LibevConnection(Connection):
 
                         # leave leftover in current buffer
                         leftover = self._iobuf.read()
-                        self._iobuf = StringIO()
+                        self._iobuf = BytesIO()
                         self._iobuf.write(leftover)
 
                         self._total_reqd_bytes = 0

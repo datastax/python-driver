@@ -163,18 +163,17 @@ class TypeTests(unittest.TestCase):
                 '7a6970:org.apache.cassandra.db.marshal.UTF8Type',
             ')')))
 
-        self.assertEquals(FooType, ctype.__class__)
+        self.assertEqual(FooType, ctype.__class__)
 
-        self.assertEquals(UTF8Type, ctype.subtypes[0])
+        self.assertEqual(UTF8Type, ctype.subtypes[0])
 
         # middle subtype should be a BarType instance with its own subtypes and names
         self.assertIsInstance(ctype.subtypes[1], BarType)
-        self.assertEquals([UTF8Type], ctype.subtypes[1].subtypes)
-        self.assertEquals(["address"], ctype.subtypes[1].names)
+        self.assertEqual([UTF8Type], ctype.subtypes[1].subtypes)
+        self.assertEqual([b"address"], ctype.subtypes[1].names)
 
-        self.assertEquals(UTF8Type, ctype.subtypes[2])
-
-        self.assertEquals(['city', None, 'zip'], ctype.names)
+        self.assertEqual(UTF8Type, ctype.subtypes[2])
+        self.assertEqual([b'city', None, b'zip'], ctype.names)
 
     def test_empty_value(self):
         self.assertEqual(str(EmptyValue()), 'EMPTY')

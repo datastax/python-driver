@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import six
 
 try:
     import unittest2 as unittest
@@ -115,7 +116,7 @@ class SchemaMetadataTest(unittest.TestCase):
 
     def check_create_statement(self, tablemeta, original):
         recreate = tablemeta.as_cql_query(formatted=False)
-        self.assertEquals(original, recreate[:len(original)])
+        self.assertEqual(original, recreate[:len(original)])
         self.session.execute("DROP TABLE %s.%s" % (self.ksname, self.cfname))
         self.session.execute(recreate)
 
@@ -289,7 +290,7 @@ class SchemaMetadataTest(unittest.TestCase):
         tablemeta = self.get_table_metadata()
         statements = tablemeta.export_as_string().strip()
         statements = [s.strip() for s in statements.split(';')]
-        statements = filter(bool, statements)
+        statements = list(filter(bool, statements))
         self.assertEqual(3, len(statements))
         self.assertEqual(d_index, statements[1])
         self.assertEqual(e_index, statements[2])
@@ -311,7 +312,7 @@ class TestCodeCoverage(unittest.TestCase):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         cluster.connect()
 
-        self.assertIsInstance(cluster.metadata.export_schema_as_string(), basestring)
+        self.assertIsInstance(cluster.metadata.export_schema_as_string(), six.string_types)
 
     def test_export_keyspace_schema(self):
         """
@@ -323,8 +324,8 @@ class TestCodeCoverage(unittest.TestCase):
 
         for keyspace in cluster.metadata.keyspaces:
             keyspace_metadata = cluster.metadata.keyspaces[keyspace]
-            self.assertIsInstance(keyspace_metadata.export_as_string(), basestring)
-            self.assertIsInstance(keyspace_metadata.as_cql_query(), basestring)
+            self.assertIsInstance(keyspace_metadata.export_as_string(), six.string_types)
+            self.assertIsInstance(keyspace_metadata.as_cql_query(), six.string_types)
 
     def test_case_sensitivity(self):
         """

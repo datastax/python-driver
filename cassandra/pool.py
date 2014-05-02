@@ -150,8 +150,14 @@ class Host(object):
     def __eq__(self, other):
         return self.address == other.address
 
+    def __hash__(self):
+        return hash(self.address)
+
+    def __lt__(self, other):
+        return self.address < other.address
+
     def __str__(self):
-        return self.address
+        return str(self.address)
 
     def __repr__(self):
         dc = (" %s" % (self._datacenter,)) if self._datacenter else ""
@@ -178,7 +184,7 @@ class _ReconnectionHandler(object):
             log.debug("Reconnection handler was cancelled before starting")
             return
 
-        first_delay = self.schedule.next()
+        first_delay = next(self.schedule)
         self.scheduler.schedule(first_delay, self.run)
 
     def run(self):
@@ -189,7 +195,7 @@ class _ReconnectionHandler(object):
         try:
             conn = self.try_reconnect()
         except Exception as exc:
-            next_delay = self.schedule.next()
+            next_delay = next(self.schedule)
             if self.on_exception(exc, next_delay):
                 self.scheduler.schedule(next_delay, self.run)
         else:
@@ -260,8 +266,8 @@ class _HostReconnectionHandler(_ReconnectionHandler):
         if isinstance(exc, AuthenticationFailed):
             return False
         else:
-            log.warn("Error attempting to reconnect to %s, scheduling retry in %s seconds: %s",
-                     self.host, next_delay, exc)
+            log.warning("Error attempting to reconnect to %s, scheduling retry in %s seconds: %s",
+                        self.host, next_delay, exc)
             log.debug("Reconnection error details", exc_info=True)
             return True
 
@@ -371,8 +377,8 @@ class HostConnectionPool(object):
     def _create_new_connection(self):
         try:
             self._add_conn_if_under_max()
-        except (ConnectionException, socket.error), exc:
-            log.warn("Failed to create new connection to %s: %s", self.host, exc)
+        except (ConnectionException, socket.error) as exc:
+            log.warning("Failed to create new connection to %s: %s", self.host, exc)
         except Exception:
             log.exception("Unexpectedly failed to create new connection")
         finally:
@@ -404,7 +410,7 @@ class HostConnectionPool(object):
             self._signal_available_conn()
             return True
         except (ConnectionException, socket.error) as exc:
-            log.warn("Failed to add new connection to pool for host %s: %s", self.host, exc)
+            log.warning("Failed to add new connection to pool for host %s: %s", self.host, exc)
             with self._lock:
                 self.open_count -= 1
             if self._session.cluster.signal_connection_failure(self.host, exc, is_host_addition=False):

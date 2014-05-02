@@ -23,6 +23,7 @@ from datetime import datetime, timedelta
 import re
 import struct
 import time
+import six
 
 from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.cqltypes import unix_time_from_uuid1
@@ -113,8 +114,8 @@ class Statement(object):
 
     def _set_routing_key(self, key):
         if isinstance(key, (list, tuple)):
-            self._routing_key = "".join(struct.pack("HsB", len(component), component, 0)
-                                        for component in key)
+            self._routing_key = b"".join(struct.pack("HsB", len(component), component, 0)
+                                         for component in key)
         else:
             self._routing_key = key
 
@@ -408,7 +409,7 @@ class BoundStatement(Statement):
                 val = self.values[statement_index]
                 components.append(struct.pack("HsB", len(val), val, 0))
 
-            self._routing_key = "".join(components)
+            self._routing_key = b"".join(components)
 
         return self._routing_key
 
@@ -473,7 +474,7 @@ class BatchStatement(Statement):
         Statement.__init__(self, retry_policy=retry_policy, consistency_level=consistency_level)
 
     def add(self, statement, parameters=None):
-        if isinstance(statement, basestring):
+        if isinstance(statement, six.string_types):
             if parameters:
                 statement = bind_params(statement, parameters)
             self._statements_and_parameters.append((False, statement, ()))
@@ -532,11 +533,9 @@ class ValueSequence(object):
 
 def bind_params(query, params):
     if isinstance(params, dict):
-        return query % dict((k, cql_encoders.get(type(v), cql_encode_object)(v))
-                    for k, v in params.iteritems())
+        return query % dict((k, cql_encoders.get(type(v), cql_encode_object)(v)) for k, v in six.iteritems(params))
     else:
-        return query % tuple(cql_encoders.get(type(v), cql_encode_object)(v)
-                     for v in params)
+        return query % tuple(cql_encoders.get(type(v), cql_encode_object)(v) for v in params)
 
 
 class TraceUnavailable(Exception):

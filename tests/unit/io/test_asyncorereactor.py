@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import six
 
 try:
     import unittest2 as unittest
@@ -19,7 +20,9 @@ except ImportError:
 
 import errno
 import os
-from StringIO import StringIO
+
+from six import BytesIO
+
 import socket
 from socket import error as socket_error
 
@@ -55,7 +58,7 @@ class AsyncoreConnectionTest(unittest.TestCase):
         return c
 
     def make_header_prefix(self, message_class, version=2, stream_id=0):
-        return ''.join(map(uint8_pack, [
+        return six.binary_type().join(map(uint8_pack, [
             0xff & (HEADER_DIRECTION_TO_CLIENT | version),
             0,  # flags (compression)
             stream_id,
@@ -63,7 +66,7 @@ class AsyncoreConnectionTest(unittest.TestCase):
         ]))
 
     def make_options_body(self):
-        options_buf = StringIO()
+        options_buf = BytesIO()
         write_stringmultimap(options_buf, {
             'CQL_VERSION': ['3.0.1'],
             'COMPRESSION': []
@@ -71,12 +74,12 @@ class AsyncoreConnectionTest(unittest.TestCase):
         return options_buf.getvalue()
 
     def make_error_body(self, code, msg):
-        buf = StringIO()
+        buf = BytesIO()
         write_int(buf, code)
         write_string(buf, msg)
         return buf.getvalue()
 
-    def make_msg(self, header, body=""):
+    def make_msg(self, header, body=six.binary_type()):
         return header + uint32_pack(len(body)) + body
 
     def test_successful_connection(self, *args):
@@ -105,12 +108,12 @@ class AsyncoreConnectionTest(unittest.TestCase):
         # get a connection that's already fully started
         c = self.test_successful_connection()
 
-        header = '\x00\x00\x00\x00' + int32_pack(20000)
+        header = six.b('\x00\x00\x00\x00') + int32_pack(20000)
         responses = [
-            header + ('a' * (4096 - len(header))),
-            'a' * 4096,
+            header + (six.b('a') * (4096 - len(header))),
+            six.b('a') * 4096,
             socket_error(errno.EAGAIN),
-            'a' * 100,
+            six.b('a') * 100,
             socket_error(errno.EAGAIN)]
 
         def side_effect(*args):
@@ -122,17 +125,17 @@ class AsyncoreConnectionTest(unittest.TestCase):
 
         c.socket.recv.side_effect = side_effect
         c.handle_read()
-        self.assertEquals(c._total_reqd_bytes, 20000 + len(header))
+        self.assertEqual(c._total_reqd_bytes, 20000 + len(header))
         # the EAGAIN prevents it from reading the last 100 bytes
         c._iobuf.seek(0, os.SEEK_END)
         pos = c._iobuf.tell()
-        self.assertEquals(pos, 4096 + 4096)
+        self.assertEqual(pos, 4096 + 4096)
 
         # now tell it to read the last 100 bytes
         c.handle_read()
         c._iobuf.seek(0, os.SEEK_END)
         pos = c._iobuf.tell()
-        self.assertEquals(pos, 4096 + 4096 + 100)
+        self.assertEqual(pos, 4096 + 4096 + 100)
 
     def test_protocol_error(self, *args):
         c = self.make_connection()
@@ -237,14 +240,13 @@ class AsyncoreConnectionTest(unittest.TestCase):
         options = self.make_options_body()
         message = self.make_msg(header, options)
 
-        # read in the first byte
-        c.socket.recv.return_value = message[0]
+        c.socket.recv.return_value = message[0:1]
         c.handle_read()
-        self.assertEquals(c._iobuf.getvalue(), message[0])
+        self.assertEqual(c._iobuf.getvalue(), message[0:1])
 
         c.socket.recv.return_value = message[1:]
         c.handle_read()
-        self.assertEquals("", c._iobuf.getvalue())
+        self.assertEqual(six.binary_type(), c._iobuf.getvalue())
 
         # let it write out a StartupMessage
         c.handle_write()
@@ -266,12 +268,12 @@ class AsyncoreConnectionTest(unittest.TestCase):
         # read in the first nine bytes
         c.socket.recv.return_value = message[:9]
         c.handle_read()
-        self.assertEquals(c._iobuf.getvalue(), message[:9])
+        self.assertEqual(c._iobuf.getvalue(), message[:9])
 
         # ... then read in the rest
         c.socket.recv.return_value = message[9:]
         c.handle_read()
-        self.assertEquals("", c._iobuf.getvalue())
+        self.assertEqual(six.binary_type(), c._iobuf.getvalue())
 
         # let it write out a StartupMessage
         c.handle_write()
