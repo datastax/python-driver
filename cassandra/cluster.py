@@ -139,6 +139,11 @@ def run_in_executor(f):
     return new_f
 
 
+def _shutdown_cluster(cluster):
+    if cluster and not cluster.is_shutdown:
+        cluster.shutdown()
+
+
 class Cluster(object):
     """
     The main class to use when interacting with a Cassandra cluster.
@@ -490,6 +495,7 @@ class Cluster(object):
                 raise Exception("Cluster is already shut down")
 
             if not self._is_setup:
+                atexit.register(partial(_shutdown_cluster, self))
                 for address in self.contact_points:
                     host = self.add_host(address, signal=False)
                     if host:
