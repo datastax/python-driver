@@ -27,7 +27,8 @@ from cassandra.cqltypes import (BooleanType, lookup_casstype_simple, lookup_cass
                                 EmptyValue, _CassandraType, DateType)
 from cassandra.query import named_tuple_factory
 from cassandra.decoder import (write_string, read_longstring, write_stringmap, read_stringmap, read_inet,
-                               write_inet, cql_quote, read_string, write_longstring)
+                               write_inet, read_string, write_longstring)
+from cassandra.encoder import cql_quote
 
 
 class TypeTests(unittest.TestCase):

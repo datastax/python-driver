@@ -787,7 +787,7 @@ def read_binary_longstring(f):
 
 
 def read_longstring(f):
-    return read_binary_longstring().decode('utf8')
+    return read_binary_longstring(f).decode('utf8')
 
 
 def write_longstring(f, s):
