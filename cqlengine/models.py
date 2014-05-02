@@ -179,10 +179,9 @@ class ColumnDescriptor(object):
         :param instance: the model instance
         :type instance: Model
         """
-
-        if instance:
+        try:
             return instance._values[self.column.column_name].getval()
-        else:
+        except AttributeError as e:
             return self.query_evaluator
 
     def __set__(self, instance, value):
@@ -221,6 +220,8 @@ class BaseModel(object):
 
     # custom timestamps, see USING TIMESTAMP X
     timestamp = TimestampDescriptor()
+
+    # _len is lazily created by __len__
 
     # table names will be generated automatically from it's model
     # however, you can also define them manually here
@@ -446,7 +447,11 @@ class BaseModel(object):
 
     def __len__(self):
         """ Returns the number of columns defined on that model. """
-        return len(self._columns.keys())
+        try:
+            return self._len
+        except:
+            self._len = len(self._columns.keys())
+            return self._len
 
     def keys(self):
         """ Returns list of column's IDs. """

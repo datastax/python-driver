@@ -1,5 +1,5 @@
 #column field types
-from copy import deepcopy
+from copy import deepcopy, copy
 from datetime import datetime
 from datetime import date
 import re
@@ -33,7 +33,7 @@ class BaseValueManager(object):
         return self.value != self.previous_value
 
     def reset_previous_value(self):
-        self.previous_value = deepcopy(self.value)
+        self.previous_value = copy(self.value)
 
     def getval(self):
         return self.value
@@ -394,7 +394,7 @@ class UUID(Column):
         from uuid import UUID as _UUID
         if isinstance(val, _UUID): return val
         if isinstance(val, basestring) and self.re_uuid.match(val):
-                return _UUID(val)
+            return _UUID(val)
         raise ValidationError("{} is not a valid uuid".format(value))
 
     def to_python(self, value):

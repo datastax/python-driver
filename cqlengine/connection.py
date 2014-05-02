@@ -157,10 +157,10 @@ class ConnectionPool(object):
         :type conn: connection
         """
 
-        if self._queue.full():
+        try:
+            self._queue.put(conn, block=False)
+        except queue.Full:
             conn.close()
-        else:
-            self._queue.put(conn)
 
     def _create_transport(self, host):
         """

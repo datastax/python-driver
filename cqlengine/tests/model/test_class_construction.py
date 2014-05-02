@@ -330,6 +330,17 @@ class TestCustomQuerySet(BaseCassEngTestCase):
             CDQModel().save()
 
 
+class TestCachedLengthIsNotCarriedToSubclasses(BaseCassEngTestCase):
+    def test_subclassing(self):
+
+        length = len(ConcreteModelWithCol())
+
+        class AlreadyLoadedTest(ConcreteModelWithCol):
+            new_field = columns.Integer()
+
+        self.assertGreater(len(AlreadyLoadedTest()), length)
+
+
 
 
 
