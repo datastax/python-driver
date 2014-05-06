@@ -1,6 +1,6 @@
 2.0.0b1
 =======
-In progress
+May 6, 2014
 
 Upgrading from 1.x
 ------------------

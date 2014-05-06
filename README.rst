@@ -6,7 +6,7 @@ DataStax Python Driver for Apache Cassandra
 
 A Python client driver for Apache Cassandra.  This driver works exclusively
 with the Cassandra Query Language v3 (CQL3) and Cassandra's native
-protocol.  As such, only Cassandra 1.2+ is supported.
+protocol.
 
 Installation
 ------------
@@ -50,12 +50,11 @@ Features to be Added
 --------------------
 * C extension for encoding/decoding messages
 * Twisted support
-* Python 3 support
 * IPv6 Support
 
 License
 -------
-Copyright 2013, DataStax
+Copyright 2013, 2014 DataStax
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
