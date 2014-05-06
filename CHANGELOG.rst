@@ -2,6 +2,14 @@
 =======
 In progress
 
+Upgrading from 1.x
+------------------
+Cluster.shutdown() should always be called when you are done with a
+Cluster instance.  If it is not called, there are no guarantees that the
+driver will not hang.  However, if you *do* have a reproduceable case
+where Cluster.shutdown() is not called and the driver hangs, please
+report it so that we can attempt to fix it.
+
 Features
 --------
 * Support v2 of Cassandra's native protocol, which includes the following
@@ -16,6 +24,16 @@ Bug Fixes
 ---------
 * Avoid errors during interpreter shutdown (the driver attempts to cleanup
   daemonized worker threads before interpreter shutdown)
+
+Deprecations
+------------
+The following functions have moved from cassandra.decoder to cassandra.query.
+The original functions have been left in place with a DeprecationWarning for
+now:
+* cassandra.decoder.tuple_factory has moved to cassandra.query.tuple_factory
+* cassandra.decoder.named_tuple_factory has moved to cassandra.query.named_tuple_factory
+* cassandra.decoder.dict_factory has moved to cassandra.query.dict_factory
+* cassandra.decoder.ordered_dict_factory has moved to cassandra.query.ordered_dict_factory
 
 1.1.2
 =====
