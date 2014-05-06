@@ -221,11 +221,11 @@ class ConnectionPool(object):
                 con = self.get()
                 if not con:
                     raise CQLEngineException("Error calling execute without calling setup.")
+                LOG.debug('{} {}'.format(query, repr(params)))
                 cur = con.cursor()
                 cur.execute(query, params, consistency_level=consistency_level)
                 columns = [i[0] for i in cur.description or []]
                 results = [RowResult(r) for r in cur.fetchall()]
-                LOG.debug('{} {}'.format(query, repr(params)))
                 self.put(con)
                 return QueryResult(columns, results)
             except CQLConnectionError as ex:
