@@ -1,3 +1,22 @@
+2.0.0b1
+=======
+In progress
+
+Features
+--------
+* Support v2 of Cassandra's native protocol, which includes the following
+  new features:
+  * Automatic query paging support
+  * Protocol-level batch statements
+  * Lightweight transactions
+* Support for Python 3.3 and 3.4
+* Allow a default query timeout to be set per-Session
+
+Bug Fixes
+---------
+* Avoid errors during interpreter shutdown (the driver attempts to cleanup
+  daemonized worker threads before interpreter shutdown)
+
 1.1.2
 =====
 In Progress
