@@ -167,9 +167,20 @@ class _ReconnectionHandler(object):
         try:
             conn = self.try_reconnect()
         except Exception as exc:
-            next_delay = self.schedule.next()
+            try:
+                next_delay = self.schedule.next()
+            except StopIteration:
+                # the schedule has been exhausted
+                next_delay = None
+
+            # call on_exception for logging purposes even if next_delay is None
             if self.on_exception(exc, next_delay):
-                self.scheduler.schedule(next_delay, self.run)
+                if next_delay is None:
+                    log.warn(
+                        "Will not continue to retry reconnection attempts "
+                        "due to an exhausted retry schedule")
+                else:
+                    self.scheduler.schedule(next_delay, self.run)
         else:
             if not self._cancelled:
                 self.on_reconnection(conn)

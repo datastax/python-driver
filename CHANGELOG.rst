@@ -13,6 +13,7 @@ Bug Fixes
 * Fix duplicate node-up handling, which could result in multiple reconnectors
   being started as well as the executor threads becoming deadlocked, preventing
   future node up or node down handling from being executed.
+* Handle exhausted ReconnectionPolicy schedule correctly
 
 Other
 -----
