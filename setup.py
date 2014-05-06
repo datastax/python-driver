@@ -225,6 +225,11 @@ elif "--no-libev" in sys.argv:
     sys.argv = [a for a in sys.argv if a != "--no-libev"]
     extensions.remove(libev_ext)
 
+# For now, don't try to compile the libev extension for Python 3.
+# Once the extension has been updated, this can be removed.
+if sys.version_info >= (3, 0) and libev_ext in extensions:
+    extensions.remove(libev_ext)
+
 platform_unsupported_msg = \
 """
 ===============================================================================
