@@ -22,7 +22,7 @@ from mock import Mock, ANY
 from concurrent.futures import ThreadPoolExecutor
 
 from cassandra import OperationTimedOut
-from cassandra.decoder import ResultMessage, RESULT_KIND_ROWS
+from cassandra.protocol import ResultMessage, RESULT_KIND_ROWS
 from cassandra.cluster import ControlConnection, Cluster, _Scheduler
 from cassandra.pool import Host
 from cassandra.policies import (SimpleConvictionPolicy, RoundRobinPolicy,

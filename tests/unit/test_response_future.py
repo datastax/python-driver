@@ -22,12 +22,12 @@ from mock import Mock, MagicMock, ANY
 from cassandra import ConsistencyLevel
 from cassandra.cluster import Session, ResponseFuture, NoHostAvailable
 from cassandra.connection import ConnectionException
-from cassandra.decoder import (ReadTimeoutErrorMessage, WriteTimeoutErrorMessage,
-                               UnavailableErrorMessage, ResultMessage, QueryMessage,
-                               OverloadedErrorMessage, IsBootstrappingErrorMessage,
-                               PreparedQueryNotFound, PrepareMessage,
-                               RESULT_KIND_ROWS, RESULT_KIND_SET_KEYSPACE,
-                               RESULT_KIND_SCHEMA_CHANGE)
+from cassandra.protocol import (ReadTimeoutErrorMessage, WriteTimeoutErrorMessage,
+                                UnavailableErrorMessage, ResultMessage, QueryMessage,
+                                OverloadedErrorMessage, IsBootstrappingErrorMessage,
+                                PreparedQueryNotFound, PrepareMessage,
+                                RESULT_KIND_ROWS, RESULT_KIND_SET_KEYSPACE,
+                                RESULT_KIND_SCHEMA_CHANGE)
 from cassandra.policies import RetryPolicy
 from cassandra.pool import NoConnectionsAvailable
 from cassandra.query import SimpleStatement

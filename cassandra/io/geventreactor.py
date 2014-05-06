@@ -31,7 +31,7 @@ from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL
 
 from cassandra import OperationTimedOut
 from cassandra.connection import Connection, ConnectionShutdown
-from cassandra.decoder import RegisterMessage
+from cassandra.protocol import RegisterMessage
 from cassandra.marshal import int32_unpack
 
 

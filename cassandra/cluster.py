@@ -44,17 +44,17 @@ from itertools import groupby
 from cassandra import (ConsistencyLevel, AuthenticationFailed,
                        OperationTimedOut, UnsupportedOperation)
 from cassandra.connection import ConnectionException, ConnectionShutdown
-from cassandra.decoder import (QueryMessage, ResultMessage,
-                               ErrorMessage, ReadTimeoutErrorMessage,
-                               WriteTimeoutErrorMessage,
-                               UnavailableErrorMessage,
-                               OverloadedErrorMessage,
-                               PrepareMessage, ExecuteMessage,
-                               PreparedQueryNotFound,
-                               IsBootstrappingErrorMessage,
-                               BatchMessage, RESULT_KIND_PREPARED,
-                               RESULT_KIND_SET_KEYSPACE, RESULT_KIND_ROWS,
-                               RESULT_KIND_SCHEMA_CHANGE)
+from cassandra.protocol import (QueryMessage, ResultMessage,
+                                ErrorMessage, ReadTimeoutErrorMessage,
+                                WriteTimeoutErrorMessage,
+                                UnavailableErrorMessage,
+                                OverloadedErrorMessage,
+                                PrepareMessage, ExecuteMessage,
+                                PreparedQueryNotFound,
+                                IsBootstrappingErrorMessage,
+                                BatchMessage, RESULT_KIND_PREPARED,
+                                RESULT_KIND_SET_KEYSPACE, RESULT_KIND_ROWS,
+                                RESULT_KIND_SCHEMA_CHANGE)
 from cassandra.metadata import Metadata, protect_name
 from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,

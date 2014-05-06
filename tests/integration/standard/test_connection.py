@@ -26,7 +26,7 @@ from threading import Thread, Event
 
 from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.cluster import NoHostAvailable
-from cassandra.decoder import QueryMessage
+from cassandra.protocol import QueryMessage
 from cassandra.io.asyncorereactor import AsyncoreConnection
 
 try:

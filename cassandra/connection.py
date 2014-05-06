@@ -29,10 +29,10 @@ from six.moves import range
 
 from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut
 from cassandra.marshal import int32_pack, header_unpack
-from cassandra.decoder import (ReadyMessage, AuthenticateMessage, OptionsMessage,
-                               StartupMessage, ErrorMessage, CredentialsMessage,
-                               QueryMessage, ResultMessage, decode_response,
-                               InvalidRequestException, SupportedMessage)
+from cassandra.protocol import (ReadyMessage, AuthenticateMessage, OptionsMessage,
+                                StartupMessage, ErrorMessage, CredentialsMessage,
+                                QueryMessage, ResultMessage, decode_response,
+                                InvalidRequestException, SupportedMessage)
 import six
 
 

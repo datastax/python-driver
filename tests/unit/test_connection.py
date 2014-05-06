@@ -25,8 +25,8 @@ from mock import Mock, ANY
 from cassandra.cluster import Cluster
 from cassandra.connection import (Connection, HEADER_DIRECTION_TO_CLIENT,
                                   HEADER_DIRECTION_FROM_CLIENT, ProtocolError)
-from cassandra.decoder import (write_stringmultimap, write_int, write_string,
-                               SupportedMessage)
+from cassandra.protocol import (write_stringmultimap, write_int, write_string,
+                                SupportedMessage)
 from cassandra.marshal import uint8_pack, uint32_pack
 
 

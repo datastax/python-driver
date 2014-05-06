@@ -31,8 +31,8 @@ from mock import patch, Mock
 from cassandra.connection import (HEADER_DIRECTION_TO_CLIENT,
                                   ConnectionException)
 
-from cassandra.decoder import (write_stringmultimap, write_int, write_string,
-                               SupportedMessage, ReadyMessage, ServerError)
+from cassandra.protocol import (write_stringmultimap, write_int, write_string,
+                                SupportedMessage, ReadyMessage, ServerError)
 from cassandra.marshal import uint8_pack, uint32_pack, int32_pack
 
 from cassandra.io.asyncorereactor import AsyncoreConnection
