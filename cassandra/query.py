@@ -44,19 +44,73 @@ def _clean_column_name(name):
 
 
 def tuple_factory(colnames, rows):
+    """
+    Returns each row as a tuple
+
+    Example::
+
+        >>> from cassandra.query import named_tuple_factory
+        >>> session = cluster.connect('mykeyspace')
+        >>> session.row_factory = tuple_factory
+        >>> rows = session.execute("SELECT name, age FROM users LIMIT 1")
+        >>> print rows[0]
+        ('Bob', 42)
+    """
     return rows
 
 
 def named_tuple_factory(colnames, rows):
+    """
+    Returns each row as a `namedtuple <https://docs.python.org/2/library/collections.html#collections.namedtuple>`_.
+    This is the default row factory.
+
+    Example::
+
+        >>> from cassandra.query import named_tuple_factory
+        >>> session = cluster.connect('mykeyspace')
+        >>> session.row_factory = named_tuple_factory
+        >>> rows = session.execute("SELECT name, age FROM users LIMIT 1")
+        >>> user = rows[0]
+
+        >>> # you can access field by their name:
+        >>> print "name: %s, age: %d" % (user.name, user.age)
+        name: Bob, age: 42
+
+        >>> # or you can access fields by their position (like a tuple)
+        >>> name, age = user
+        >>> print "name: %s, age: %d" % (name, age)
+        name: Bob, age: 42
+        >>> name = user[0]
+        >>> age = user[1]
+        >>> print "name: %s, age: %d" % (name, age)
+        name: Bob, age: 42
+    """
     Row = namedtuple('Row', map(_clean_column_name, colnames))
     return [Row(*row) for row in rows]
 
 
 def dict_factory(colnames, rows):
+    """
+    Returns each row as a dict.
+
+    Example::
+
+        >>> from cassandra.query import named_tuple_factory
+        >>> session = cluster.connect('mykeyspace')
+        >>> session.row_factory = dict_factory
+        >>> rows = session.execute("SELECT name, age FROM users LIMIT 1")
+        >>> print rows[0]
+        {'age': 42, 'name': 'Bob'}
+
+    """
     return [dict(zip(colnames, row)) for row in rows]
 
 
 def ordered_dict_factory(colnames, rows):
+    """
+    Like :meth:`~cassandra.query.dict_factory`, but returns each row as an OrderedDict,
+    so the order of the columns is preserved.
+    """
     return [OrderedDict(zip(colnames, row)) for row in rows]
 
 
