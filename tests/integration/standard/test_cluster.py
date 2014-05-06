@@ -104,20 +104,6 @@ class ClusterTests(unittest.TestCase):
             protocol_version=PROTOCOL_VERSION
         )
 
-    def test_double_shutdown(self):
-        """
-        Ensure that a cluster can be shutdown twice, without error
-        """
-
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        cluster.shutdown()
-
-        try:
-            cluster.shutdown()
-            self.fail('A double cluster.shutdown() should throw an error.')
-        except Exception as e:
-            self.assertIn('The Cluster was already shutdown', str(e))
-
     def test_connect_to_already_shutdown_cluster(self):
         """
         Ensure you cannot connect to a cluster that's been shutdown
