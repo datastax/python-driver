@@ -33,6 +33,7 @@ Deprecations
 The following functions have moved from cassandra.decoder to cassandra.query.
 The original functions have been left in place with a DeprecationWarning for
 now:
+
 * cassandra.decoder.tuple_factory has moved to cassandra.query.tuple_factory
 * cassandra.decoder.named_tuple_factory has moved to cassandra.query.named_tuple_factory
 * cassandra.decoder.dict_factory has moved to cassandra.query.dict_factory
