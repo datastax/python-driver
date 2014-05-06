@@ -78,6 +78,8 @@ class TypeTests(unittest.TestCase):
             msg = r'.*Invalid STRING constant \(.*?\) for b of type blob.*'
             self.assertRaisesRegexp(InvalidRequest, msg, s.execute, query, params)
             return
+        elif six.PY2:
+            params[1] = params[1].encode('hex')
 
         s.execute(query, params)
         expected_vals = [
