@@ -8,6 +8,8 @@ A Python client driver for Apache Cassandra.  This driver works exclusively
 with the Cassandra Query Language v3 (CQL3) and Cassandra's native
 protocol.
 
+The driver supports Python 2.6, 2.7, 3.3, and 3.4.
+
 Installation
 ------------
 Installation through pip is recommended::

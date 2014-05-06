@@ -10,13 +10,16 @@ driver will not hang.  However, if you *do* have a reproduceable case
 where Cluster.shutdown() is not called and the driver hangs, please
 report it so that we can attempt to fix it.
 
+If you're using the 2.0 driver against Cassandra 1.2, you will need
+to set your protocol version to 1.  For example:
+
+    cluster = Cluster(..., protocol_version=1)
+
 Features
 --------
 * Support v2 of Cassandra's native protocol, which includes the following
-  new features:
-  * Automatic query paging support
-  * Protocol-level batch statements
-  * Lightweight transactions
+  new features: automatic query paging support, protocol-level batch statements,
+  and lightweight transactions
 * Support for Python 3.3 and 3.4
 * Allow a default query timeout to be set per-Session
 
