@@ -19,6 +19,7 @@ Other
 -----
 * Don't log at ERROR when a connection is closed during the startup
   communications
+* Mke scales, blist optional dependencies
 
 1.1.1
 =====
