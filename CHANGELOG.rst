@@ -2,6 +2,11 @@
 =====
 In Progress
 
+Features
+--------
+* Allow a specific compression type to be requested for communications with
+  Cassandra and prefer lz4 if available
+
 Bug Fixes
 ---------
 * Update token metadata (for TokenAware calculations) when a node is removed

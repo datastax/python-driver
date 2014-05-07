@@ -31,23 +31,12 @@ from cassandra.decoder import (ReadyMessage, AuthenticateMessage, OptionsMessage
                                StartupMessage, ErrorMessage, CredentialsMessage,
                                QueryMessage, ResultMessage, decode_response,
                                InvalidRequestException, SupportedMessage)
+from cassandra.util import OrderedDict
 
 
 log = logging.getLogger(__name__)
 
-locally_supported_compressions = {}
-
-try:
-    import snappy
-except ImportError:
-    pass
-else:
-    # work around apparently buggy snappy decompress
-    def decompress(byts):
-        if byts == '\x00':
-            return ''
-        return snappy.decompress(byts)
-    locally_supported_compressions['snappy'] = (snappy.compress, decompress)
+locally_supported_compressions = OrderedDict()
 
 try:
     import lz4
@@ -68,6 +57,18 @@ else:
         return lz4.decompress(byts[3::-1] + byts[4:])
 
     locally_supported_compressions['lz4'] = (lz4_compress, lz4_decompress)
+
+try:
+    import snappy
+except ImportError:
+    pass
+else:
+    # work around apparently buggy snappy decompress
+    def decompress(byts):
+        if byts == '\x00':
+            return ''
+        return snappy.decompress(byts)
+    locally_supported_compressions['snappy'] = (snappy.compress, decompress)
 
 
 MAX_STREAM_PER_CONNECTION = 127
@@ -369,7 +370,22 @@ class Connection(object):
                           locally_supported_compressions.keys(),
                           remote_supported_compressions)
             else:
-                compression_type = iter(overlap).next()  # choose any
+                compression_type = None
+                if isinstance(self.compression, basestring):
+                    # the user picked a specific compression type ('snappy' or 'lz4')
+                    if self.compression not in remote_supported_compressions:
+                        raise ProtocolError(
+                            "The requested compression type (%s) is not supported by the Cassandra server at %s"
+                            % (self.compression, self.host))
+                    compression_type = self.compression
+                else:
+                    # our locally supported compressions are ordered to prefer
+                    # lz4, if available
+                    for k in locally_supported_compressions.keys():
+                        if k in overlap:
+                            compression_type = k
+                            break
+
                 # set the decompressor here, but set the compressor only after
                 # a successful Ready message
                 self._compressor, self.decompressor = \

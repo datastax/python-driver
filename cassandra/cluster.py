@@ -161,8 +161,15 @@ class Cluster(object):
 
     compression = True
     """
-    Whether or not compression should be enabled when possible. Defaults to
-    :const:`True` and attempts to use snappy compression.
+    Controls compression for communications between the driver and Cassandra.
+    If left as the default of :const:`True`, either lz4 or snappy compression
+    may be used, depending on what is supported by both the driver
+    and Cassandra.  If both are fully supported, lz4 will be preferred.
+
+    You may also set this to 'snappy' or 'lz4' to request that specific
+    compression type.
+
+    Setting this to :const:`False` disables compression.
     """
 
     auth_provider = None
