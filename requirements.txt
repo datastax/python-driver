@@ -1,4 +1,1 @@
-blist
 futures
-scales >=1.0.6
-six >=1.6

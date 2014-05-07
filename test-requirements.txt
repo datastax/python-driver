@@ -1,3 +1,5 @@
+blist
+scales
 nose
 mock
 ccm

@@ -15,7 +15,12 @@
 from itertools import chain
 import logging
 
-from greplin import scales
+try:
+    from greplin import scales
+except ImportError:
+    raise ImportError(
+        "The scales library is required for metrics support: "
+        "https://pypi.python.org/pypi/scales")
 
 log = logging.getLogger(__name__)
 

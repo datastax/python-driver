@@ -30,7 +30,6 @@ from distutils.errors import (CCompilerError, DistutilsPlatformError,
 from distutils.cmd import Command
 
 
-import platform
 import os
 import warnings
 
@@ -181,9 +180,7 @@ def run_setup(extensions):
         kw['cmdclass']['build_ext'] = build_extensions
         kw['ext_modules'] = extensions
 
-    dependencies = ['futures', 'scales >=1.0.6', 'blist', 'six >=1.6']
-    if platform.python_implementation() != "CPython":
-        dependencies.remove('blist')
+    dependencies = ['futures', 'six >=1.6']
 
     setup(
         name='cassandra-driver',

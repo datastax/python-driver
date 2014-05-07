@@ -24,10 +24,11 @@ from mock import Mock, ANY
 
 from cassandra.cluster import Cluster
 from cassandra.connection import (Connection, HEADER_DIRECTION_TO_CLIENT,
-                                  HEADER_DIRECTION_FROM_CLIENT, ProtocolError)
+                                  HEADER_DIRECTION_FROM_CLIENT, ProtocolError,
+                                  locally_supported_compressions)
+from cassandra.marshal import uint8_pack, uint32_pack
 from cassandra.protocol import (write_stringmultimap, write_int, write_string,
                                 SupportedMessage)
-from cassandra.marshal import uint8_pack, uint32_pack
 
 
 class ConnectionTest(unittest.TestCase):
@@ -145,6 +146,123 @@ class ConnectionTest(unittest.TestCase):
         c.defunct.assert_called_once_with(ANY)
         args, kwargs = c.defunct.call_args
         self.assertIsInstance(args[0], ProtocolError)
+
+    def test_prefer_lz4_compression(self, *args):
+        c = self.make_connection()
+        c._id_queue.get_nowait()
+        c._callbacks = {0: c._handle_options_response}
+        c.defunct = Mock()
+        c.cql_version = "3.0.3"
+
+        locally_supported_compressions.pop('lz4', None)
+        locally_supported_compressions.pop('snappy', None)
+        locally_supported_compressions['lz4'] = ('lz4compress', 'lz4decompress')
+        locally_supported_compressions['snappy'] = ('snappycompress', 'snappydecompress')
+
+        # read in a SupportedMessage response
+        header = self.make_header_prefix(SupportedMessage)
+
+        options_buf = BytesIO()
+        write_stringmultimap(options_buf, {
+            'CQL_VERSION': ['3.0.3'],
+            'COMPRESSION': ['snappy', 'lz4']
+        })
+        options = options_buf.getvalue()
+
+        message = self.make_msg(header, options)
+        c.process_msg(message, len(message) - 8)
+
+        self.assertEqual(c.decompressor, locally_supported_compressions['lz4'][1])
+
+    def test_requested_compression_not_available(self, *args):
+        c = self.make_connection()
+        c._id_queue.get_nowait()
+        c._callbacks = {0: c._handle_options_response}
+        c.defunct = Mock()
+        # request lz4 compression
+        c.compression = "lz4"
+
+        locally_supported_compressions.pop('lz4', None)
+        locally_supported_compressions.pop('snappy', None)
+        locally_supported_compressions['lz4'] = ('lz4compress', 'lz4decompress')
+        locally_supported_compressions['snappy'] = ('snappycompress', 'snappydecompress')
+
+        # read in a SupportedMessage response
+        header = self.make_header_prefix(SupportedMessage)
+
+        # the server only supports snappy
+        options_buf = BytesIO()
+        write_stringmultimap(options_buf, {
+            'CQL_VERSION': ['3.0.3'],
+            'COMPRESSION': ['snappy']
+        })
+        options = options_buf.getvalue()
+
+        message = self.make_msg(header, options)
+        c.process_msg(message, len(message) - 8)
+
+        # make sure it errored correctly
+        c.defunct.assert_called_once_with(ANY)
+        args, kwargs = c.defunct.call_args
+        self.assertIsInstance(args[0], ProtocolError)
+
+    def test_use_requested_compression(self, *args):
+        c = self.make_connection()
+        c._id_queue.get_nowait()
+        c._callbacks = {0: c._handle_options_response}
+        c.defunct = Mock()
+        # request snappy compression
+        c.compression = "snappy"
+
+        locally_supported_compressions.pop('lz4', None)
+        locally_supported_compressions.pop('snappy', None)
+        locally_supported_compressions['lz4'] = ('lz4compress', 'lz4decompress')
+        locally_supported_compressions['snappy'] = ('snappycompress', 'snappydecompress')
+
+        # read in a SupportedMessage response
+        header = self.make_header_prefix(SupportedMessage)
+
+        # the server only supports snappy
+        options_buf = BytesIO()
+        write_stringmultimap(options_buf, {
+            'CQL_VERSION': ['3.0.3'],
+            'COMPRESSION': ['snappy', 'lz4']
+        })
+        options = options_buf.getvalue()
+
+        message = self.make_msg(header, options)
+        c.process_msg(message, len(message) - 8)
+
+        self.assertEqual(c.decompressor, locally_supported_compressions['snappy'][1])
+
+    def test_disable_compression(self, *args):
+        c = self.make_connection()
+        c._id_queue.get_nowait()
+        c._callbacks = {0: c._handle_options_response}
+        c.defunct = Mock()
+        # disable compression
+        c.compression = False
+
+        locally_supported_compressions.pop('lz4', None)
+        locally_supported_compressions.pop('snappy', None)
+        locally_supported_compressions['lz4'] = ('lz4compress', 'lz4decompress')
+        locally_supported_compressions['snappy'] = ('snappycompress', 'snappydecompress')
+
+        # read in a SupportedMessage response
+        header = self.make_header_prefix(SupportedMessage)
+
+        # the server only supports snappy
+        options_buf = BytesIO()
+        write_stringmultimap(options_buf, {
+            'CQL_VERSION': ['3.0.3'],
+            'COMPRESSION': ['snappy', 'lz4']
+        })
+        options = options_buf.getvalue()
+
+        message = self.make_msg(header, options)
+        c.process_msg(message, len(message) - 8)
+
+        self.assertEqual(c.decompressor, None)
 
     def test_not_implemented(self):
         """
