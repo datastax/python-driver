@@ -36,6 +36,9 @@ from cassandra.util import OrderedDict
 
 log = logging.getLogger(__name__)
 
+# We use an ordered dictionary and specifically add lz4 before
+# snappy so that lz4 will be preferred. Changing the order of this
+# will change the compression preferences for the driver.
 locally_supported_compressions = OrderedDict()
 
 try:
