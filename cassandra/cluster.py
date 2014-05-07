@@ -2516,8 +2516,8 @@ class ResponseFuture(object):
 
 class QueryExhausted(Exception):
     """
-    Raised when :meth:`.ResultSet.start_fetching_next_page()` is called and
-    there are no more pages.  You can check :attr:`.ResultSet.has_more_pages`
+    Raised when :meth:`.ResponseFuture.start_fetching_next_page()` is called and
+    there are no more pages.  You can check :attr:`.ResponseFuture.has_more_pages`
     before calling to avoid this.
     """
     pass
@@ -2538,7 +2538,7 @@ class PagedResult(object):
         ...     process_user(user_row)
 
     Whenever there are no more rows in the current page, the next page will
-    be fetched transparently.  However, note that it _is_ possible for
+    be fetched transparently.  However, note that it *is* possible for
     an :class:`Exception` to be raised while fetching the next page, just
     like you might see on a normal call to ``session.execute()``.
     """
