@@ -385,7 +385,7 @@ class Connection(object):
                           remote_supported_compressions)
             else:
                 compression_type = None
-                if isinstance(self.compression, basestring):
+                if isinstance(self.compression, six.string_types):
                     # the user picked a specific compression type ('snappy' or 'lz4')
                     if self.compression not in remote_supported_compressions:
                         raise ProtocolError(
