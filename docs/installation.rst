@@ -38,6 +38,25 @@ To check if the installation was successful, you can run::
 
 It should print something like "2.0.0".
 
+(*Optional*) Compression Support
+--------------------------------
+Compression can optionally be used for communication between the driver and
+Cassandra.  There are currently two supported compression algorithms:
+snappy (in Cassandra 1.2+) and LZ4 (only in Cassandra 2.0+).  If either is
+available for the driver and Cassandra also supports it, it will
+be used automatically.
+
+For lz4 support::
+
+    pip install lz4
+
+For snappy support::
+
+    pip install python-snappy
+
+(If using a Debian Linux derivative such as Ubuntu, it may be easier to
+just run ``apt-get install python-snappy``.)
+
 (*Optional*) Metrics Support
 ----------------------------
 The driver has built-in support for capturing :attr:`.Cluster.metrics` about
@@ -116,26 +135,7 @@ the libev event loop by doing the following:
     >>> cluster.connection_class = LibevConnection
     >>> session = cluster.connect()
 
-Compression Support
-^^^^^^^^^^^^^^^^^^^
-Compression can optionally be used for communication between the driver and
-Cassandra.  There are currently two supported compression algorithms:
-snappy (in Cassandra 1.2+) and LZ4 (only in Cassandra 2.0+).  If either is
-available for the driver and Cassandra also supports it, it will
-be used automatically.
-
-For lz4 support::
-
-    $ pip install lz4
-
-For snappy support::
-
-    $ pip install python-snappy
-
-(If using a Debian Linux derivative such as Ubuntu, it may be easier to
-just run ``apt-get install python-snappy``.)
-
-Setting SSL
------------
+(*Optional*) Configuring SSL
+-----------------------------
 Andrew Mussey has published a thorough guide on
 `Using SSL with the DataStax Python driver <http://blog.amussey.com/post/64036730812/cassandra-2-0-client-server-ssl-with-datastax-python>`_.
