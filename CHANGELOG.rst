@@ -1,6 +1,6 @@
 1.1.2
 =====
-In Progress
+May 8, 2014
 
 Features
 --------
