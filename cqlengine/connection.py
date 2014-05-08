@@ -94,9 +94,9 @@ def setup(
             try:
                 port = int(host[1])
             except ValueError:
-                raise CQLConnectionError("Can't parse {}".format(''.join(host)))
+                raise CQLConnectionError("Can't parse port as int {}".format(':'.join(host)))
         else:
-            raise CQLConnectionError("Can't parse {}".format(''.join(host)))
+            raise CQLConnectionError("Can't parse host string {}".format(':'.join(host)))
 
         _hosts.append(Host(host[0], port))
 
