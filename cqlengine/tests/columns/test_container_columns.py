@@ -67,6 +67,16 @@ class TestSetColumn(BaseCassEngTestCase):
         m = TestSetModel.get(partition=m.partition)
         self.assertNotIn(5, m.int_set)
 
+    def test_blind_deleting_last_item_should_succeed(self):
+        m = TestSetModel.create()
+        m.int_set.add(5)
+        m.save()
+
+        TestSetModel.objects(partition=m.partition).update(int_set=set())
+
+        m = TestSetModel.get(partition=m.partition)
+        self.assertNotIn(5, m.int_set)
+
     def test_empty_set_retrieval(self):
         m = TestSetModel.create()
         m2 = TestSetModel.get(partition=m.partition)
