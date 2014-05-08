@@ -511,7 +511,7 @@ class BatchType(object):
         return self.name
 
     def __repr__(self):
-        return "BatchType<%s>" % (self.name, )
+        return "BatchType.%s" % (self.name, )
 
 
 BatchType.LOGGED = BatchType("LOGGED", 0)
