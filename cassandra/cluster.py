@@ -964,6 +964,8 @@ class Session(object):
     on a :class:`~.ResponseFuture` through :meth:`.ResponseFuture.add_callback` or
     :meth:`.ResponseFuture.add_errback`; even if a query exceeds this default
     timeout, neither the registered callback or errback will be called.
+
+    .. versionadded:: 2.0.0b1
     """
 
     max_trace_wait = 2.0
@@ -983,6 +985,8 @@ class Session(object):
 
     This only takes effect when protocol version 2 or higher is used.
     See :attr:`.Cluster.protocol_version` for details.
+
+    .. versionadded:: 2.0.0b1
     """
 
     _lock = None
@@ -2548,6 +2552,8 @@ class PagedResult(object):
     be fetched transparently.  However, note that it *is* possible for
     an :class:`Exception` to be raised while fetching the next page, just
     like you might see on a normal call to ``session.execute()``.
+
+    .. versionadded: 2.0.0b1
     """
 
     def __init__(self, response_future, initial_response):

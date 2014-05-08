@@ -116,9 +116,9 @@ def ordered_dict_factory(colnames, rows):
 
 class Statement(object):
     """
-    An abstract class representing a single query. There are two subclasses:
-    :class:`.SimpleStatement` and :class:`.BoundStatement`.  These can
-    be passed to :meth:`.Session.execute()`.
+    An abstract class representing a single query. There are three subclasses:
+    :class:`.SimpleStatement`, :class:`.BoundStatement`, and :class:`.BatchStatement`.
+    These can be passed to :meth:`.Session.execute()`.
     """
 
     retry_policy = None
@@ -483,6 +483,10 @@ class BoundStatement(Statement):
 
 
 class BatchType(object):
+    """
+    A BatchType is used with :class:`.BatchStatement` instances to control
+    the atomicity of the batch operation.
+    """
 
     LOGGED = None
     """
@@ -516,18 +520,66 @@ BatchType.COUNTER = BatchType("COUNTER", 2)
 
 
 class BatchStatement(Statement):
+    """
+    A protocol-level batch of operations which are applied atomically
+    by default.
+    """
 
     batch_type = None
+    """
+    The :class:`.BatchType` for the batch operation.  Defaults to
+    :attr:`.BatchType.LOGGED`.
+    """
 
     _statements_and_parameters = None
 
     def __init__(self, batch_type=BatchType.LOGGED, retry_policy=None,
                  consistency_level=None):
+        """
+        `batch_type` specifies The :class:`.BatchType` for the batch operation.
+        Defaults to :attr:`.BatchType.LOGGED`.
+
+        `retry_policy` should be a :class:`~.RetryPolicy` instance for
+        controlling retries on the operation.
+
+        `consistency_level` should be a :class:`~.ConsistencyLevel` value
+        to be used for all operations in the batch.
+
+        Example usage:
+
+        .. code-block:: python
+
+            insert_user = session.prepare("INSERT INTO users (name, age) VALUES (?, ?)")
+            batch = BatchStatement(consistency_level=ConsistencyLevel.QUORUM)
+
+            for (name, age) in users_to_insert:
+                batch.add(insert_user, (name, age))
+
+            session.execute(batch)
+
+        You can also mix different types of operations within a batch:
+
+        .. code-block:: python
+
+            batch = BatchStatement()
+            batch.add(SimpleStatement("INSERT INTO users (name, age) VALUES (%s, %s)", (name, age))
+            batch.add(SimpleStatement("DELETE FROM pending_users WHERE name=%s", (name,))
+            session.execute(batch)
+
+        .. versionadded:: 2.0.0b1
+        """
         self.batch_type = batch_type
         self._statements_and_parameters = []
         Statement.__init__(self, retry_policy=retry_policy, consistency_level=consistency_level)
 
     def add(self, statement, parameters=None):
+        """
+        Adds a :class:`.Statement` and optional sequence of parameters
+        to be used with the statement to the batch.
+
+        Like with other statements, parameters must be a sequence, even
+        if there is only one item.
+        """
         if isinstance(statement, six.string_types):
             if parameters:
                 statement = bind_params(statement, parameters)
@@ -553,6 +605,11 @@ class BatchStatement(Statement):
         return self
 
     def add_all(self, statements, parameters):
+        """
+        Adds a sequence of :class:`.Statement` objects and a matching sequence
+        of parameters to the batch.  :const:`None` can be used in place of
+        parameters when no parameters are needed.
+        """
         for statement, value in zip(statements, parameters):
             self.add(statement, parameters)
 

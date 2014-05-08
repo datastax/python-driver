@@ -23,6 +23,17 @@
 .. autoclass:: BoundStatement
    :members:
 
+.. autoclass:: BatchStatement (batch_type=BatchType.LOGGED, retry_policy=None, consistency_level=None)
+   :members:
+
+.. autoclass:: BatchType ()
+
+    .. autoattribute:: LOGGED
+
+    .. autoattribute:: UNLOGGED
+
+    .. autoattribute:: COUNTER
+
 .. autoclass:: ValueSequence
    :members:
 
