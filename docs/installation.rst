@@ -3,13 +3,11 @@ Installation
 
 Supported Platforms
 -------------------
-Python 2.6 and 2.7 are supported.  Both CPython (the standard Python
+Python 2.6, 2.7, 3.3, and 3.4 are supported.  Both CPython (the standard Python
 implementation) and `PyPy <http://pypy.org>`_ are supported and tested
 against.
 
 Linux, OSX, and Windows are supported.
-
-Support for Python 3 is planned.
 
 Installation through pip
 ------------------------
@@ -34,11 +32,29 @@ Once the dependencies are installed, simply run::
 
 Verifying your Installation
 ---------------------------
-To check if the installation was successful, you can run:
+To check if the installation was successful, you can run::
 
     python -c 'import cassandra; print cassandra.__version__'
 
 It should print something like "2.0.0".
+
+(*Optional*) Metrics Support
+----------------------------
+The driver has built-in support for capturing :attr:`.Cluster.metrics` about
+the queries you run.  However, the ``scales`` library is required to
+support this::
+
+    pip install scales
+
+(*Optional*) Sorted Sets
+------------------------
+Cassandra can store entire collections within a column.  One of those
+collection types is a set.  Cassandra's sets are actually ordered
+sets.  By default, the driver will use unordered sets to represent
+these collections.  If you would like to maintain the ordering,
+install the ``blist`` library::
+
+    pip install blist
 
 (*Optional*) Non-python Dependencies
 ------------------------------------
