@@ -32,8 +32,16 @@ Once the dependencies are installed, simply run::
 
     python setup.py install
 
-(Optional) Non-python Dependencies
-----------------------------------
+Verifying your Installation
+---------------------------
+To check if the installation was successful, you can run:
+
+    python -c 'import cassandra; print cassandra.__version__'
+
+It should print something like "2.0.0".
+
+(*Optional*) Non-python Dependencies
+------------------------------------
 The driver has several **optional** features that have non-Python dependencies.
 
 C Extensions
@@ -113,4 +121,5 @@ just run ``apt-get install python-snappy``.)
 
 Setting SSL
 -----------
-Andrew Mussey has published a thorough guide on `Using SSL with the DataStax Python driver <http://blog.amussey.com/post/64036730812/cassandra-2-0-client-server-ssl-with-datastax-python>`_.
+Andrew Mussey has published a thorough guide on
+`Using SSL with the DataStax Python driver <http://blog.amussey.com/post/64036730812/cassandra-2-0-client-server-ssl-with-datastax-python>`_.

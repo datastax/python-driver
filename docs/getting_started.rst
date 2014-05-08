@@ -16,7 +16,17 @@ The simplest way to create a :class:`~.Cluster` is like this:
 
     from cassandra.cluster import Cluster
 
-    cluster = Cluster(['10.1.1.3', '10.1.1.4', '10.1.1.5'])
+    cluster = Cluster()
+
+This will attempt to connection to a Cassandra instance on your
+local machine (127.0.0.1).  You can also specify a list of IP
+addresses for nodes in your cluster:
+
+.. code-block:: python
+
+    from cassandra.cluster import Cluster
+
+    cluster = Cluster(['192.168.0.1', '192.168.0.2'])
 
 The set of IP addresses we pass to the :class:`~.Cluster` is simply
 an initial set of contact points.  After the driver connects to one
@@ -33,7 +43,7 @@ behavior in some other way, this is the place to do it:
     from cassandra.polices import DCAwareRoundRobinPolicy
 
     cluster = Cluster(
-        contact_points=['10.1.1.3', '10.1.1.4', '10.1.1.5'],
+        ['10.1.1.3', '10.1.1.4', '10.1.1.5'],
         load_balancing_policy=DCAwareRoundRobinPolicy(local_dc='US_EAST'),
         port=9042)
 
@@ -42,15 +52,19 @@ You can find a more complete list of options in the :class:`~.Cluster` documenta
 
 Instantiating a :class:`~.Cluster` does not actually connect us to any nodes.
 To establish connections and begin executing queries we need a
-:class:`~.Session`, which is created by calling :meth:`.Cluster.connect()`.
+:class:`~.Session`, which is created by calling :meth:`.Cluster.connect()`:
+
+.. code-block:: python
+
+    cluster = Cluster()
+    session = cluster.connect()
+
 The :meth:`~.Cluster.connect()` method takes an optional ``keyspace`` argument
 which sets the default keyspace for all queries made through that :class:`~.Session`:
 
 .. code-block:: python
 
-    from cassandra.cluster import Cluster
-
-    cluster = Cluster(['10.1.1.3', '10.1.1.4', '10.1.1.5'])
+    cluster = Cluster()
     session = cluster.connect('mykeyspace')
 
 
@@ -82,7 +96,14 @@ By default, each row in the result set will be a
 `namedtuple <http://docs.python.org/2/library/collections.html#collections.namedtuple>`_.
 Each row will have a matching attribute for each column defined in the schema,
 such as ``name``, ``age``, and so on.  You can also treat them as normal tuples
-by unpacking them or accessing fields by position:
+by unpacking them or accessing fields by position.  The following three
+examples are equivalent:
+
+.. code-block:: python
+
+    rows = session.execute('SELECT name, age, email FROM users')
+    for row in rows:
+        print row.name, row.age, row.email
 
 .. code-block:: python
 
@@ -93,9 +114,8 @@ by unpacking them or accessing fields by position:
 .. code-block:: python
 
     rows = session.execute('SELECT name, age, email FROM users')
-    names = [row[0] for row in rows]
-    ages = [row[1] for row in rows]
-    emails = [row[2] for row in rows]
+    for row in row:
+        print row[0], row[1], row[2]
 
 If you prefer another result format, such as a ``dict`` per row, you
 can change the :attr:`~.Session.row_factory` attribute.
