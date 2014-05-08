@@ -19,12 +19,13 @@ except ImportError:
 
 from itertools import cycle
 
-from cassandra import InvalidRequest
+from cassandra import InvalidRequest, ConsistencyLevel
 from cassandra.cluster import Cluster
 from cassandra.concurrent import (execute_concurrent,
                                   execute_concurrent_with_args)
 from cassandra.policies import HostDistance
 from cassandra.decoder import tuple_factory
+from cassandra.query import SimpleStatement
 
 
 class ClusterTests(unittest.TestCase):
@@ -38,7 +39,10 @@ class ClusterTests(unittest.TestCase):
     def test_execute_concurrent(self):
         for num_statements in (0, 1, 2, 7, 10, 99, 100, 101, 199, 200, 201):
             # write
-            statements = cycle(("INSERT INTO test3rf.test (k, v) VALUES (%s, %s)", ))
+            statement = SimpleStatement(
+                "INSERT INTO test3rf.test (k, v) VALUES (%s, %s)",
+                consistency_level=ConsistencyLevel.QUORUM)
+            statements = cycle((statement, ))
             parameters = [(i, i) for i in range(num_statements)]
 
             results = execute_concurrent(self.session, zip(statements, parameters))
@@ -46,7 +50,10 @@ class ClusterTests(unittest.TestCase):
             self.assertEqual([(True, None)] * num_statements, results)
 
             # read
-            statements = cycle(("SELECT v FROM test3rf.test WHERE k=%s", ))
+            statement = SimpleStatement(
+                "SELECT v FROM test3rf.test WHERE k=%s",
+                consistency_level=ConsistencyLevel.QUORUM)
+            statements = cycle((statement, ))
             parameters = [(i, ) for i in range(num_statements)]
 
             results = execute_concurrent(self.session, zip(statements, parameters))
@@ -55,7 +62,9 @@ class ClusterTests(unittest.TestCase):
 
     def test_execute_concurrent_with_args(self):
         for num_statements in (0, 1, 2, 7, 10, 99, 100, 101, 199, 200, 201):
-            statement = "INSERT INTO test3rf.test (k, v) VALUES (%s, %s)"
+            statement = SimpleStatement(
+                "INSERT INTO test3rf.test (k, v) VALUES (%s, %s)",
+                consistency_level=ConsistencyLevel.QUORUM)
             parameters = [(i, i) for i in range(num_statements)]
 
             results = execute_concurrent_with_args(self.session, statement, parameters)
@@ -63,7 +72,9 @@ class ClusterTests(unittest.TestCase):
             self.assertEqual([(True, None)] * num_statements, results)
 
             # read
-            statement = "SELECT v FROM test3rf.test WHERE k=%s"
+            statement = SimpleStatement(
+                "SELECT v FROM test3rf.test WHERE k=%s",
+                consistency_level=ConsistencyLevel.QUORUM)
             parameters = [(i, ) for i in range(num_statements)]
 
             results = execute_concurrent_with_args(self.session, statement, parameters)
@@ -82,7 +93,10 @@ class ClusterTests(unittest.TestCase):
             execute_concurrent, self.session, zip(statements, parameters), raise_on_first_error=True)
 
     def test_first_failure_client_side(self):
-        statements = cycle(("INSERT INTO test3rf.test (k, v) VALUES (%s, %s)", ))
+        statement = SimpleStatement(
+            "INSERT INTO test3rf.test (k, v) VALUES (%s, %s)",
+            consistency_level=ConsistencyLevel.QUORUM)
+        statements = cycle((statement, ))
         parameters = [(i, i) for i in range(100)]
 
         # the driver will raise an error when binding the params
@@ -93,7 +107,10 @@ class ClusterTests(unittest.TestCase):
             execute_concurrent, self.session, zip(statements, parameters), raise_on_first_error=True)
 
     def test_no_raise_on_first_failure(self):
-        statements = cycle(("INSERT INTO test3rf.test (k, v) VALUES (%s, %s)", ))
+        statement = SimpleStatement(
+            "INSERT INTO test3rf.test (k, v) VALUES (%s, %s)",
+            consistency_level=ConsistencyLevel.QUORUM)
+        statements = cycle((statement, ))
         parameters = [(i, i) for i in range(100)]
 
         # we'll get an error back from the server
@@ -109,7 +126,10 @@ class ClusterTests(unittest.TestCase):
                 self.assertEqual(None, result)
 
     def test_no_raise_on_first_failure_client_side(self):
-        statements = cycle(("INSERT INTO test3rf.test (k, v) VALUES (%s, %s)", ))
+        statement = SimpleStatement(
+            "INSERT INTO test3rf.test (k, v) VALUES (%s, %s)",
+            consistency_level=ConsistencyLevel.QUORUM)
+        statements = cycle((statement, ))
         parameters = [(i, i) for i in range(100)]
 
         # the driver will raise an error when binding the params
