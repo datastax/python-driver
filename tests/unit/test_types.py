@@ -134,13 +134,14 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(cql_typename('org.apache.cassandra.db.marshal.ListType(IntegerType)'), 'list<varint>')
 
     def test_named_tuple_colname_substitution(self):
-        colnames = ("func(abc)", "[applied]", "func(func(abc))", "foo_bar")
-        rows = [(1, 2, 3, 4)]
+        colnames = ("func(abc)", "[applied]", "func(func(abc))", "foo_bar", "foo_bar_")
+        rows = [(1, 2, 3, 4, 5)]
         result = named_tuple_factory(colnames, rows)[0]
         self.assertEqual(result[0], result.func_abc)
         self.assertEqual(result[1], result.applied)
         self.assertEqual(result[2], result.func_func_abc)
         self.assertEqual(result[3], result.foo_bar)
+        self.assertEqual(result[4], result.foo_bar_)
 
     def test_parse_casstype_args(self):
         class FooType(CassandraType):
