@@ -1,3 +1,12 @@
+1.1.3
+=====
+In Progress
+
+Bug Fixes
+---------
+* Don't strip trailing underscores from column names when using the
+  named_tuple_factory (PYTHON-56)
+
 1.1.2
 =====
 May 8, 2014

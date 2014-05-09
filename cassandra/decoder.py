@@ -63,12 +63,20 @@ HEADER_DIRECTION_TO_CLIENT = 0x80
 HEADER_DIRECTION_MASK = 0x80
 
 
-NON_ALPHA_REGEX = re.compile('\W')
-END_UNDERSCORE_REGEX = re.compile('^_*(\w*[a-zA-Z0-9])_*$')
+NON_ALPHA_REGEX = re.compile('[^a-zA-Z0-9]')
+START_BADCHAR_REGEX = re.compile('^[^a-zA-Z0-9]*')
+END_BADCHAR_REGEX = re.compile('[^a-zA-Z0-9_]*$')
+
+_clean_name_cache = {}
 
 
 def _clean_column_name(name):
-    return END_UNDERSCORE_REGEX.sub("\g<1>", NON_ALPHA_REGEX.sub("_", name))
+    try:
+        return _clean_name_cache[name]
+    except KeyError:
+        clean = NON_ALPHA_REGEX.sub("_", START_BADCHAR_REGEX.sub("", END_BADCHAR_REGEX.sub("", name)))
+        _clean_name_cache[name] = clean
+        return clean
 
 
 def tuple_factory(colnames, rows):
