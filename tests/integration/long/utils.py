@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import print_function
 import logging
 import time
 
 from collections import defaultdict
 from ccmlib.node import Node
 
-from cassandra.decoder import named_tuple_factory
+from cassandra.query import named_tuple_factory
 
 from tests.integration import get_node, get_cluster
 
@@ -125,7 +126,7 @@ def bootstrap(node, data_center=None, token=None):
 
 
 def ring(node):
-    print 'From node%s:' % node
+    print('From node%s:' % node)
     get_node(node).nodetool('ring')
 
 
@@ -154,3 +155,5 @@ def wait_for_down(cluster, node, wait=True):
                 time.sleep(10)
             log.debug("Done waiting for node %s to be down", node)
             return
+        else:
+            log.debug("Host is still marked up, waiting")

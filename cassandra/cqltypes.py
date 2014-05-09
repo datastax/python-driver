@@ -36,19 +36,22 @@ from datetime import datetime
 from uuid import UUID
 import warnings
 
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO  # NOQA
+import six
+from six.moves import range
 
 from cassandra.marshal import (int8_pack, int8_unpack, uint16_pack, uint16_unpack,
                                int32_pack, int32_unpack, int64_pack, int64_unpack,
                                float_pack, float_unpack, double_pack, double_unpack,
                                varint_pack, varint_unpack)
+from cassandra.util import OrderedDict
 
 apache_cassandra_type_prefix = 'org.apache.cassandra.db.marshal.'
 
-_number_types = frozenset((int, long, float))
+if six.PY3:
+    _number_types = frozenset((int, float))
+    long = int
+else:
+    _number_types = frozenset((int, long, float))
 
 try:
     from blist import sortedset
@@ -60,11 +63,6 @@ except ImportError:
 
     sortedset = set
 
-try:
-    from collections import OrderedDict
-except ImportError:  # Python <2.7
-    from cassandra.util import OrderedDict # NOQA
-
 
 def trim_if_startswith(s, prefix):
     if s.startswith(prefix):
@@ -73,7 +71,7 @@ def trim_if_startswith(s, prefix):
 
 
 def unix_time_from_uuid1(u):
-    return (u.get_time() - 0x01B21DD213814000) / 10000000.0
+    return (u.time - 0x01B21DD213814000) / 10000000.0
 
 _casstypes = {}
 
@@ -181,8 +179,8 @@ class EmptyValue(object):
 EMPTY = EmptyValue()
 
 
+@six.add_metaclass(CassandraTypeType)
 class _CassandraType(object):
-    __metaclass__ = CassandraTypeType
     subtypes = ()
     num_subtypes = 0
     empty_binary_ok = False
@@ -203,9 +201,8 @@ class _CassandraType(object):
     def __init__(self, val):
         self.val = self.validate(val)
 
-    def __str__(self):
+    def __repr__(self):
         return '<%s( %r )>' % (self.cql_parameterized_type(), self.val)
-    __repr__ = __str__
 
     @staticmethod
     def validate(val):
@@ -225,7 +222,7 @@ class _CassandraType(object):
         """
         if byts is None:
             return None
-        elif byts == '' and not cls.empty_binary_ok:
+        elif len(byts) == 0 and not cls.empty_binary_ok:
             return EMPTY if cls.support_empty_values else None
         return cls.deserialize(byts)
 
@@ -236,7 +233,7 @@ class _CassandraType(object):
         more information. This method differs in that if None is passed in,
         the result is the empty string.
         """
-        return '' if val is None else cls.serialize(val)
+        return b'' if val is None else cls.serialize(val)
 
     @staticmethod
     def deserialize(byts):
@@ -297,7 +294,8 @@ class _CassandraType(object):
         if cls.num_subtypes != 'UNKNOWN' and len(subtypes) != cls.num_subtypes:
             raise ValueError("%s types require %d subtypes (%d given)"
                              % (cls.typename, cls.num_subtypes, len(subtypes)))
-        newname = cls.cass_parameterized_type_with(subtypes).encode('utf8')
+        # newname = cls.cass_parameterized_type_with(subtypes).encode('utf8')
+        newname = cls.cass_parameterized_type_with(subtypes)
         return type(newname, (cls,), {'subtypes': subtypes, 'cassname': cls.cassname})
 
     @classmethod
@@ -328,10 +326,16 @@ class _UnrecognizedType(_CassandraType):
     num_subtypes = 'UNKNOWN'
 
 
-def mkUnrecognizedType(casstypename):
-    return CassandraTypeType(casstypename.encode('utf8'),
-                             (_UnrecognizedType,),
-                             {'typename': "'%s'" % casstypename})
+if six.PY3:
+    def mkUnrecognizedType(casstypename):
+        return CassandraTypeType(casstypename,
+                                 (_UnrecognizedType,),
+                                 {'typename': "'%s'" % casstypename})
+else:
+    def mkUnrecognizedType(casstypename):  # noqa
+        return CassandraTypeType(casstypename.encode('utf8'),
+                                 (_UnrecognizedType,),
+                                 {'typename': "'%s'" % casstypename})
 
 
 class BytesType(_CassandraType):
@@ -340,11 +344,11 @@ class BytesType(_CassandraType):
 
     @staticmethod
     def validate(val):
-        return buffer(val)
+        return bytearray(val)
 
     @staticmethod
     def serialize(val):
-        return str(val)
+        return six.binary_type(val)
 
 
 class DecimalType(_CassandraType):
@@ -405,9 +409,25 @@ class BooleanType(_CassandraType):
         return int8_pack(truth)
 
 
-class AsciiType(_CassandraType):
-    typename = 'ascii'
-    empty_binary_ok = True
+if six.PY2:
+    class AsciiType(_CassandraType):
+        typename = 'ascii'
+        empty_binary_ok = True
+else:
+    class AsciiType(_CassandraType):
+        typename = 'ascii'
+        empty_binary_ok = True
+
+        @staticmethod
+        def deserialize(byts):
+            return byts.decode('ascii')
+
+        @staticmethod
+        def serialize(var):
+            try:
+                return var.encode('ascii')
+            except UnicodeDecodeError:
+                return var
 
 
 class FloatType(_CassandraType):
@@ -500,7 +520,7 @@ class DateType(_CassandraType):
 
     @classmethod
     def validate(cls, date):
-        if isinstance(date, basestring):
+        if isinstance(date, six.string_types):
             date = cls.interpret_datestring(date)
         return date
 
@@ -632,7 +652,7 @@ class _SimpleParameterizedType(_ParameterizedType):
         numelements = uint16_unpack(byts[:2])
         p = 2
         result = []
-        for n in xrange(numelements):
+        for _ in range(numelements):
             itemlen = uint16_unpack(byts[p:p + 2])
             p += 2
             item = byts[p:p + itemlen]
@@ -642,11 +662,11 @@ class _SimpleParameterizedType(_ParameterizedType):
 
     @classmethod
     def serialize_safe(cls, items):
-        if isinstance(items, basestring):
+        if isinstance(items, six.string_types):
             raise TypeError("Received a string for a type that expects a sequence")
 
         subtype, = cls.subtypes
-        buf = StringIO()
+        buf = six.BytesIO()
         buf.write(uint16_pack(len(items)))
         for item in items:
             itembytes = subtype.to_binary(item)
@@ -674,7 +694,7 @@ class MapType(_ParameterizedType):
     @classmethod
     def validate(cls, val):
         subkeytype, subvaltype = cls.subtypes
-        return dict((subkeytype.validate(k), subvaltype.validate(v)) for (k, v) in val.iteritems())
+        return dict((subkeytype.validate(k), subvaltype.validate(v)) for (k, v) in six.iteritems(val))
 
     @classmethod
     def deserialize_safe(cls, byts):
@@ -682,7 +702,7 @@ class MapType(_ParameterizedType):
         numelements = uint16_unpack(byts[:2])
         p = 2
         themap = OrderedDict()
-        for n in xrange(numelements):
+        for _ in range(numelements):
             key_len = uint16_unpack(byts[p:p + 2])
             p += 2
             keybytes = byts[p:p + key_len]
@@ -699,10 +719,10 @@ class MapType(_ParameterizedType):
     @classmethod
     def serialize_safe(cls, themap):
         subkeytype, subvaltype = cls.subtypes
-        buf = StringIO()
+        buf = six.BytesIO()
         buf.write(uint16_pack(len(themap)))
         try:
-            items = themap.iteritems()
+            items = six.iteritems(themap)
         except AttributeError:
             raise TypeError("Got a non-map object for a map value")
         for key, val in items:
@@ -751,7 +771,7 @@ class ReversedType(_ParameterizedType):
 
 
 def is_counter_type(t):
-    if isinstance(t, basestring):
+    if isinstance(t, six.string_types):
         t = lookup_casstype(t)
     return issubclass(t, CounterColumnType)
 

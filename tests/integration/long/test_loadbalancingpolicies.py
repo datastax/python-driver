@@ -19,7 +19,8 @@ from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.policies import (RoundRobinPolicy, DCAwareRoundRobinPolicy,
                                 TokenAwarePolicy, WhiteListRoundRobinPolicy)
 from cassandra.query import SimpleStatement
-from tests.integration import use_multidc, use_singledc
+
+from tests.integration import use_multidc, use_singledc, PROTOCOL_VERSION
 from tests.integration.long.utils import (wait_for_up, create_schema,
                                           CoordinatorStats, force_stop,
                                           wait_for_down, decommission, start,
@@ -68,7 +69,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         use_singledc()
         keyspace = 'test_roundrobin'
         cluster = Cluster(
-            load_balancing_policy=RoundRobinPolicy())
+            load_balancing_policy=RoundRobinPolicy(),
+            protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
         wait_for_up(cluster, 1, wait=False)
         wait_for_up(cluster, 2, wait=False)
@@ -108,7 +110,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         use_multidc([2, 2])
         keyspace = 'test_roundrobin_two_dcs'
         cluster = Cluster(
-            load_balancing_policy=RoundRobinPolicy())
+            load_balancing_policy=RoundRobinPolicy(),
+            protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
         wait_for_up(cluster, 1, wait=False)
         wait_for_up(cluster, 2, wait=False)
@@ -145,7 +148,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         use_multidc([2, 2])
         keyspace = 'test_roundrobin_two_dcs_2'
         cluster = Cluster(
-            load_balancing_policy=RoundRobinPolicy())
+            load_balancing_policy=RoundRobinPolicy(),
+            protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
         wait_for_up(cluster, 1, wait=False)
         wait_for_up(cluster, 2, wait=False)
@@ -182,7 +186,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         use_multidc([3, 2])
         keyspace = 'test_dc_aware_roundrobin_two_dcs'
         cluster = Cluster(
-            load_balancing_policy=DCAwareRoundRobinPolicy('dc1'))
+            load_balancing_policy=DCAwareRoundRobinPolicy('dc1'),
+            protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
         wait_for_up(cluster, 1, wait=False)
         wait_for_up(cluster, 2, wait=False)
@@ -204,7 +209,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         use_multidc([3, 2])
         keyspace = 'test_dc_aware_roundrobin_two_dcs_2'
         cluster = Cluster(
-            load_balancing_policy=DCAwareRoundRobinPolicy('dc2'))
+            load_balancing_policy=DCAwareRoundRobinPolicy('dc2'),
+            protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
         wait_for_up(cluster, 1, wait=False)
         wait_for_up(cluster, 2, wait=False)
@@ -226,7 +232,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         use_multidc([2, 2])
         keyspace = 'test_dc_aware_roundrobin_one_remote_host'
         cluster = Cluster(
-            load_balancing_policy=DCAwareRoundRobinPolicy('dc2', used_hosts_per_remote_dc=1))
+            load_balancing_policy=DCAwareRoundRobinPolicy('dc2', used_hosts_per_remote_dc=1),
+            protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
         wait_for_up(cluster, 1, wait=False)
         wait_for_up(cluster, 2, wait=False)
@@ -315,7 +322,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
     def token_aware(self, keyspace, use_prepared=False):
         use_singledc()
         cluster = Cluster(
-            load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()))
+            load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
+            protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
         wait_for_up(cluster, 1, wait=False)
         wait_for_up(cluster, 2, wait=False)
@@ -388,7 +396,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         keyspace = 'test_token_aware_composite_key'
         table = 'composite'
         cluster = Cluster(
-            load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()))
+            load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
+            protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
         wait_for_up(cluster, 1, wait=False)
         wait_for_up(cluster, 2, wait=False)
@@ -415,7 +424,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         use_singledc()
         keyspace = 'test_token_aware_with_rf_2'
         cluster = Cluster(
-            load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()))
+            load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
+            protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
         wait_for_up(cluster, 1, wait=False)
         wait_for_up(cluster, 2, wait=False)
@@ -444,7 +454,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         keyspace = 'test_white_list'
 
         cluster = Cluster(('127.0.0.2',),
-            load_balancing_policy=WhiteListRoundRobinPolicy((IP_FORMAT % 2,)))
+            load_balancing_policy=WhiteListRoundRobinPolicy((IP_FORMAT % 2,)),
+            protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
         wait_for_up(cluster, 1, wait=False)
         wait_for_up(cluster, 2, wait=False)

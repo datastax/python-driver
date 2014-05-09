@@ -12,25 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections import defaultdict
 import errno
 from functools import wraps, partial
 import logging
 import sys
 from threading import Event, RLock
 import time
-import traceback
 
 if 'gevent.monkey' in sys.modules:
     from gevent.queue import Queue, Empty
 else:
-    from Queue import Queue, Empty  # noqa
+    from six.moves.queue import Queue, Empty  # noqa
+
+import six
+from six.moves import range
 
 from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut
-from cassandra.marshal import int8_unpack, int32_pack
-from cassandra.decoder import (ReadyMessage, AuthenticateMessage, OptionsMessage,
-                               StartupMessage, ErrorMessage, CredentialsMessage,
-                               QueryMessage, ResultMessage, decode_response,
-                               InvalidRequestException, SupportedMessage)
+from cassandra.marshal import int32_pack, header_unpack
+from cassandra.protocol import (ReadyMessage, AuthenticateMessage, OptionsMessage,
+                                StartupMessage, ErrorMessage, CredentialsMessage,
+                                QueryMessage, ResultMessage, decode_response,
+                                InvalidRequestException, SupportedMessage)
 from cassandra.util import OrderedDict
 
 
@@ -76,7 +79,6 @@ else:
 
 MAX_STREAM_PER_CONNECTION = 127
 
-PROTOCOL_VERSION = 0x01
 PROTOCOL_VERSION_MASK = 0x7f
 
 HEADER_DIRECTION_FROM_CLIENT = 0x00
@@ -127,7 +129,6 @@ def defunct_on_error(f):
             return f(self, *args, **kwargs)
         except Exception as exc:
             self.defunct(exc)
-
     return wrapper
 
 
@@ -140,6 +141,7 @@ class Connection(object):
     out_buffer_size = 4096
 
     cql_version = None
+    protocol_version = 2
 
     keyspace = None
     compression = True
@@ -153,9 +155,11 @@ class Connection(object):
     is_closed = False
     lock = None
 
+    is_control_connection = False
+
     def __init__(self, host='127.0.0.1', port=9042, credentials=None,
                  ssl_options=None, sockopts=None, compression=True,
-                 cql_version=None):
+                 cql_version=None, protocol_version=2, is_control_connection=False):
         self.host = host
         self.port = port
         self.credentials = credentials
@@ -163,6 +167,9 @@ class Connection(object):
         self.sockopts = sockopts
         self.compression = compression
         self.cql_version = cql_version
+        self.protocol_version = protocol_version
+        self.is_control_connection = is_control_connection
+        self._push_watchers = defaultdict(set)
 
         self._id_queue = Queue(MAX_STREAM_PER_CONNECTION)
         for i in range(MAX_STREAM_PER_CONNECTION):
@@ -179,12 +186,8 @@ class Connection(object):
                 return
             self.is_defunct = True
 
-        trace = traceback.format_exc(exc)
-        if trace != "None":
-            log.debug("Defuncting connection (%s) to %s: %s\n%s",
-                      id(self), self.host, exc, traceback.format_exc(exc))
-        else:
-            log.debug("Defuncting connection (%s) to %s: %s", id(self), self.host, exc)
+        log.debug("Defuncting connection (%s) to %s:",
+                  id(self), self.host, exc_info=exc)
 
         self.last_error = exc
         self.close()
@@ -201,9 +204,9 @@ class Connection(object):
             try:
                 cb(new_exc)
             except Exception:
-                log.warn("Ignoring unhandled exception while erroring callbacks for a "
-                         "failed connection (%s) to host %s:",
-                         id(self), self.host, exc_info=True)
+                log.warning("Ignoring unhandled exception while erroring callbacks for a "
+                            "failed connection (%s) to host %s:",
+                            id(self), self.host, exc_info=True)
 
     def handle_pushed(self, response):
         log.debug("Message pushed from server: %r", response)
@@ -229,13 +232,15 @@ class Connection(object):
             request_id = self._id_queue.get()
 
         self._callbacks[request_id] = cb
-        self.push(msg.to_string(request_id, compression=self.compressor))
+        self.push(msg.to_binary(request_id, self.protocol_version, compression=self.compressor))
         return request_id
 
     def wait_for_response(self, msg, timeout=None):
         return self.wait_for_responses(msg, timeout=timeout)[0]
 
     def wait_for_responses(self, *msgs, **kwargs):
+        if self.is_closed or self.is_defunct:
+            raise ConnectionShutdown("Connection %s is already closed" % (self, ))
         timeout = kwargs.get('timeout')
         waiter = ResponseWaiter(self, len(msgs))
 
@@ -264,7 +269,7 @@ class Connection(object):
             return waiter.deliver(timeout)
         except OperationTimedOut:
             raise
-        except Exception, exc:
+        except Exception as exc:
             self.defunct(exc)
             raise
 
@@ -274,9 +279,13 @@ class Connection(object):
     def register_watchers(self, type_callback_dict):
         raise NotImplementedError()
 
+    def control_conn_disposed(self):
+        self.is_control_connection = False
+        self._push_watchers = {}
+
     @defunct_on_error
     def process_msg(self, msg, body_len):
-        version, flags, stream_id, opcode = map(int8_unpack, msg[:4])
+        version, flags, stream_id, opcode = header_unpack(msg[:4])
         if stream_id < 0:
             callback = None
         else:
@@ -287,8 +296,10 @@ class Connection(object):
         try:
             # check that the protocol version is supported
             given_version = version & PROTOCOL_VERSION_MASK
-            if given_version != PROTOCOL_VERSION:
-                raise ProtocolError("Unsupported CQL protocol version: %d" % given_version)
+            if given_version != self.protocol_version:
+                msg = "Server protocol version (%d) does not match the specified driver protocol version (%d). " +\
+                      "Consider setting Cluster.protocol_version to %d."
+                raise ProtocolError(msg % (given_version, self.protocol_version, given_version))
 
             # check that the header direction is correct
             if version & HEADER_DIRECTION_MASK != HEADER_DIRECTION_TO_CLIENT:
@@ -299,7 +310,7 @@ class Connection(object):
             if body_len > 0:
                 body = msg[8:]
             elif body_len == 0:
-                body = ""
+                body = six.binary_type()
             else:
                 raise ProtocolError("Got negative body length: %r" % body_len)
 
@@ -374,7 +385,7 @@ class Connection(object):
                           remote_supported_compressions)
             else:
                 compression_type = None
-                if isinstance(self.compression, basestring):
+                if isinstance(self.compression, six.string_types):
                     # the user picked a specific compression type ('snappy' or 'lz4')
                     if self.compression not in remote_supported_compressions:
                         raise ProtocolError(

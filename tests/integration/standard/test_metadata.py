@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import six
 
 try:
     import unittest2 as unittest
@@ -27,7 +28,7 @@ from cassandra.metadata import (Metadata, KeyspaceMetadata, TableMetadata,
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
-from tests.integration import get_cluster
+from tests.integration import get_cluster, PROTOCOL_VERSION
 
 
 class SchemaMetadataTest(unittest.TestCase):
@@ -40,7 +41,7 @@ class SchemaMetadataTest(unittest.TestCase):
 
     @classmethod
     def setup_class(cls):
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
         try:
             results = session.execute("SELECT keyspace_name FROM system.schema_keyspaces")
@@ -58,7 +59,8 @@ class SchemaMetadataTest(unittest.TestCase):
 
     @classmethod
     def teardown_class(cls):
-        cluster = Cluster(['127.0.0.1'])
+        cluster = Cluster(['127.0.0.1'],
+                          protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
         try:
             session.execute("DROP KEYSPACE %s" % cls.ksname)
@@ -66,7 +68,8 @@ class SchemaMetadataTest(unittest.TestCase):
             cluster.shutdown()
 
     def setUp(self):
-        self.cluster = Cluster(['127.0.0.1'])
+        self.cluster = Cluster(['127.0.0.1'],
+                               protocol_version=PROTOCOL_VERSION)
         self.session = self.cluster.connect()
 
     def tearDown(self):
@@ -113,7 +116,7 @@ class SchemaMetadataTest(unittest.TestCase):
 
     def check_create_statement(self, tablemeta, original):
         recreate = tablemeta.as_cql_query(formatted=False)
-        self.assertEquals(original, recreate[:len(original)])
+        self.assertEqual(original, recreate[:len(original)])
         self.session.execute("DROP TABLE %s.%s" % (self.ksname, self.cfname))
         self.session.execute(recreate)
 
@@ -287,7 +290,7 @@ class SchemaMetadataTest(unittest.TestCase):
         tablemeta = self.get_table_metadata()
         statements = tablemeta.export_as_string().strip()
         statements = [s.strip() for s in statements.split(';')]
-        statements = filter(bool, statements)
+        statements = list(filter(bool, statements))
         self.assertEqual(3, len(statements))
         self.assertEqual(d_index, statements[1])
         self.assertEqual(e_index, statements[2])
@@ -306,30 +309,30 @@ class TestCodeCoverage(unittest.TestCase):
         Test export schema functionality
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         cluster.connect()
 
-        self.assertIsInstance(cluster.metadata.export_schema_as_string(), basestring)
+        self.assertIsInstance(cluster.metadata.export_schema_as_string(), six.string_types)
 
     def test_export_keyspace_schema(self):
         """
         Test export keyspace schema functionality
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         cluster.connect()
 
         for keyspace in cluster.metadata.keyspaces:
             keyspace_metadata = cluster.metadata.keyspaces[keyspace]
-            self.assertIsInstance(keyspace_metadata.export_as_string(), basestring)
-            self.assertIsInstance(keyspace_metadata.as_cql_query(), basestring)
+            self.assertIsInstance(keyspace_metadata.export_as_string(), six.string_types)
+            self.assertIsInstance(keyspace_metadata.as_cql_query(), six.string_types)
 
     def test_case_sensitivity(self):
         """
         Test that names that need to be escaped in CREATE statements are
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         ksname = 'AnInterestingKeyspace'
@@ -368,7 +371,7 @@ class TestCodeCoverage(unittest.TestCase):
         Ensure AlreadyExists exception is thrown when hit
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         ksname = 'test3rf'
@@ -392,7 +395,7 @@ class TestCodeCoverage(unittest.TestCase):
         if murmur3 is None:
             raise unittest.SkipTest('the murmur3 extension is not available')
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         self.assertEqual(cluster.metadata.get_replicas('test3rf', 'key'), [])
 
         cluster.connect('test3rf')
@@ -407,7 +410,7 @@ class TestCodeCoverage(unittest.TestCase):
         Test token mappings
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         cluster.connect('test3rf')
         ring = cluster.metadata.token_map.ring
         owners = list(cluster.metadata.token_map.token_to_host_owner[token] for token in ring)
@@ -430,7 +433,7 @@ class TokenMetadataTest(unittest.TestCase):
     def test_token(self):
         expected_node_count = len(get_cluster().nodes)
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         cluster.connect()
         tmap = cluster.metadata.token_map
         self.assertTrue(issubclass(tmap.token_class, Token))

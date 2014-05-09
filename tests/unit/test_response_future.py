@@ -22,13 +22,16 @@ from mock import Mock, MagicMock, ANY
 from cassandra import ConsistencyLevel
 from cassandra.cluster import Session, ResponseFuture, NoHostAvailable
 from cassandra.connection import ConnectionException
-from cassandra.decoder import (ReadTimeoutErrorMessage, WriteTimeoutErrorMessage,
-                               UnavailableErrorMessage, ResultMessage, QueryMessage,
-                               OverloadedErrorMessage, IsBootstrappingErrorMessage,
-                               PreparedQueryNotFound, PrepareMessage)
+from cassandra.protocol import (ReadTimeoutErrorMessage, WriteTimeoutErrorMessage,
+                                UnavailableErrorMessage, ResultMessage, QueryMessage,
+                                OverloadedErrorMessage, IsBootstrappingErrorMessage,
+                                PreparedQueryNotFound, PrepareMessage,
+                                RESULT_KIND_ROWS, RESULT_KIND_SET_KEYSPACE,
+                                RESULT_KIND_SCHEMA_CHANGE)
 from cassandra.policies import RetryPolicy
 from cassandra.pool import NoConnectionsAvailable
 from cassandra.query import SimpleStatement
+
 
 class ResponseFutureTests(unittest.TestCase):
 
@@ -46,6 +49,9 @@ class ResponseFutureTests(unittest.TestCase):
         message = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
         return ResponseFuture(session, message, query)
 
+    def make_mock_response(self, results):
+        return Mock(spec=ResultMessage, kind=RESULT_KIND_ROWS, results=results, paging_state=None)
+
     def test_result_message(self):
         session = self.make_basic_session()
         session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
@@ -60,9 +66,7 @@ class ResponseFutureTests(unittest.TestCase):
         connection = pool.borrow_connection.return_value
         connection.send_msg.assert_called_once_with(rf.message, cb=ANY)
 
-        response = Mock(spec=ResultMessage, kind=ResultMessage.KIND_ROWS, results=[{'col': 'val'}])
-        rf._set_result(response)
-
+        rf._set_result(self.make_mock_response([{'col': 'val'}]))
         result = rf.result()
         self.assertEqual(result, [{'col': 'val'}])
 
@@ -79,7 +83,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf.send_request()
 
         result = Mock(spec=ResultMessage,
-                      kind=ResultMessage.KIND_SET_KEYSPACE,
+                      kind=RESULT_KIND_SET_KEYSPACE,
                       results="keyspace1")
         rf._set_result(result)
         rf._set_keyspace_completed({})
@@ -91,7 +95,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf.send_request()
 
         result = Mock(spec=ResultMessage,
-                      kind=ResultMessage.KIND_SCHEMA_CHANGE,
+                      kind=RESULT_KIND_SCHEMA_CHANGE,
                       results={'keyspace': "keyspace1", "table": "table1"})
         rf._set_result(result)
         session.submit.assert_called_once_with(ANY, 'keyspace1', 'table1', ANY, rf)
@@ -270,8 +274,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf = self.make_response_future(session)
         rf.send_request()
 
-        response = Mock(spec=ResultMessage, kind=ResultMessage.KIND_ROWS, results=[{'col': 'val'}])
-        rf._set_result(response)
+        rf._set_result(self.make_mock_response([{'col': 'val'}]))
 
         result = rf.result()
         self.assertEqual(result, [{'col': 'val'}])
@@ -291,8 +294,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf = self.make_response_future(session)
         rf.send_request()
 
-        response = Mock(spec=ResultMessage, kind=ResultMessage.KIND_ROWS, results=[{'col': 'val'}])
-        rf._set_result(response)
+        rf._set_result(self.make_mock_response([{'col': 'val'}]))
         self.assertEqual(rf.result(), [{'col': 'val'}])
 
         # make sure the exception is recorded correctly
@@ -305,8 +307,7 @@ class ResponseFutureTests(unittest.TestCase):
 
         rf.add_callback(self.assertEqual, [{'col': 'val'}])
 
-        response = Mock(spec=ResultMessage, kind=ResultMessage.KIND_ROWS, results=[{'col': 'val'}])
-        rf._set_result(response)
+        rf._set_result(self.make_mock_response([{'col': 'val'}]))
 
         result = rf.result()
         self.assertEqual(result, [{'col': 'val'}])
@@ -345,7 +346,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf.send_request()
 
         rf.add_callbacks(
-            callback=self.assertEquals, callback_args=([{'col': 'val'}],),
+            callback=self.assertEqual, callback_args=([{'col': 'val'}],),
             errback=self.assertIsInstance, errback_args=(Exception,))
 
         result = Mock(spec=UnavailableErrorMessage, info={})
@@ -357,11 +358,10 @@ class ResponseFutureTests(unittest.TestCase):
         rf.send_request()
 
         rf.add_callbacks(
-            callback=self.assertEquals, callback_args=([{'col': 'val'}],),
+            callback=self.assertEqual, callback_args=([{'col': 'val'}],),
             errback=self.assertIsInstance, errback_args=(Exception,))
 
-        response = Mock(spec=ResultMessage, kind=ResultMessage.KIND_ROWS, results=[{'col': 'val'}])
-        rf._set_result(response)
+        rf._set_result(self.make_mock_response([{'col': 'val'}]))
         self.assertEqual(rf.result(), [{'col': 'val'}])
 
     def test_prepared_query_not_found(self):
@@ -380,9 +380,9 @@ class ResponseFutureTests(unittest.TestCase):
 
         session.submit.assert_called_once()
         args, kwargs = session.submit.call_args
-        self.assertEquals(rf._reprepare, args[-2])
+        self.assertEqual(rf._reprepare, args[-2])
         self.assertIsInstance(args[-1], PrepareMessage)
-        self.assertEquals(args[-1].query, "SELECT * FROM foobar")
+        self.assertEqual(args[-1].query, "SELECT * FROM foobar")
 
     def test_prepared_query_not_found_bad_keyspace(self):
         session = self.make_session()

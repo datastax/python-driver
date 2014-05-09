@@ -25,7 +25,11 @@ from cassandra.cqltypes import (BooleanType, lookup_casstype_simple, lookup_cass
                                 LongType, DecimalType, SetType, cql_typename,
                                 CassandraType, UTF8Type, parse_casstype_args,
                                 EmptyValue, _CassandraType, DateType)
-from cassandra.decoder import named_tuple_factory, write_string, read_longstring, write_stringmap, read_stringmap, read_inet, write_inet, cql_quote, read_string, write_longstring
+from cassandra.query import named_tuple_factory
+from cassandra.protocol import (write_string, read_longstring, write_stringmap,
+                                read_stringmap, read_inet, write_inet,
+                                read_string, write_longstring)
+from cassandra.encoder import cql_quote
 
 
 class TypeTests(unittest.TestCase):
@@ -160,18 +164,17 @@ class TypeTests(unittest.TestCase):
                 '7a6970:org.apache.cassandra.db.marshal.UTF8Type',
             ')')))
 
-        self.assertEquals(FooType, ctype.__class__)
+        self.assertEqual(FooType, ctype.__class__)
 
-        self.assertEquals(UTF8Type, ctype.subtypes[0])
+        self.assertEqual(UTF8Type, ctype.subtypes[0])
 
         # middle subtype should be a BarType instance with its own subtypes and names
         self.assertIsInstance(ctype.subtypes[1], BarType)
-        self.assertEquals([UTF8Type], ctype.subtypes[1].subtypes)
-        self.assertEquals(["address"], ctype.subtypes[1].names)
+        self.assertEqual([UTF8Type], ctype.subtypes[1].subtypes)
+        self.assertEqual([b"address"], ctype.subtypes[1].names)
 
-        self.assertEquals(UTF8Type, ctype.subtypes[2])
-
-        self.assertEquals(['city', None, 'zip'], ctype.names)
+        self.assertEqual(UTF8Type, ctype.subtypes[2])
+        self.assertEqual([b'city', None, b'zip'], ctype.names)
 
     def test_empty_value(self):
         self.assertEqual(str(EmptyValue()), 'EMPTY')

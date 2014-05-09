@@ -11,26 +11,29 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from cassandra.cluster import Cluster
+import six
 
 try:
     import unittest2 as unittest
 except ImportError:
     import unittest # noqa
 
-from StringIO import StringIO
+from six import BytesIO
 
 from mock import Mock, ANY
 
-from cassandra.connection import (Connection, PROTOCOL_VERSION,
-                                  HEADER_DIRECTION_TO_CLIENT,
-                                  HEADER_DIRECTION_FROM_CLIENT, ProtocolError, locally_supported_compressions)
-from cassandra.decoder import (write_stringmultimap, write_int, write_string,
-                               SupportedMessage)
+from cassandra.cluster import Cluster
+from cassandra.connection import (Connection, HEADER_DIRECTION_TO_CLIENT,
+                                  HEADER_DIRECTION_FROM_CLIENT, ProtocolError,
+                                  locally_supported_compressions)
 from cassandra.marshal import uint8_pack, uint32_pack
+from cassandra.protocol import (write_stringmultimap, write_int, write_string,
+                                SupportedMessage)
 
 
 class ConnectionTest(unittest.TestCase):
+
+    protocol_version = 2
 
     def make_connection(self):
         c = Connection('1.2.3.4')
@@ -38,8 +41,8 @@ class ConnectionTest(unittest.TestCase):
         c._socket.send.side_effect = lambda x: len(x)
         return c
 
-    def make_header_prefix(self, message_class, version=PROTOCOL_VERSION, stream_id=0):
-        return ''.join(map(uint8_pack, [
+    def make_header_prefix(self, message_class, version=2, stream_id=0):
+        return six.binary_type().join(map(uint8_pack, [
             0xff & (HEADER_DIRECTION_TO_CLIENT | version),
             0,  # flags (compression)
             stream_id,
@@ -47,7 +50,7 @@ class ConnectionTest(unittest.TestCase):
         ]))
 
     def make_options_body(self):
-        options_buf = StringIO()
+        options_buf = BytesIO()
         write_stringmultimap(options_buf, {
             'CQL_VERSION': ['3.0.1'],
             'COMPRESSION': []
@@ -55,7 +58,7 @@ class ConnectionTest(unittest.TestCase):
         return options_buf.getvalue()
 
     def make_error_body(self, code, msg):
-        buf = StringIO()
+        buf = BytesIO()
         write_int(buf, code)
         write_string(buf, msg)
         return buf.getvalue()
@@ -87,12 +90,12 @@ class ConnectionTest(unittest.TestCase):
         c.defunct = Mock()
 
         # read in a SupportedMessage response
-        header = ''.join(map(uint8_pack, [
-            0xff & (HEADER_DIRECTION_FROM_CLIENT | PROTOCOL_VERSION),
+        header = six.binary_type().join(uint8_pack(i) for i in (
+            0xff & (HEADER_DIRECTION_FROM_CLIENT | self.protocol_version),
             0,  # flags (compression)
             0,
             SupportedMessage.opcode  # opcode
-        ]))
+        ))
         options = self.make_options_body()
         message = self.make_msg(header, options)
         c.process_msg(message, len(message) - 8)
@@ -129,7 +132,7 @@ class ConnectionTest(unittest.TestCase):
         # read in a SupportedMessage response
         header = self.make_header_prefix(SupportedMessage)
 
-        options_buf = StringIO()
+        options_buf = BytesIO()
         write_stringmultimap(options_buf, {
             'CQL_VERSION': ['7.8.9'],
             'COMPRESSION': []
@@ -159,7 +162,7 @@ class ConnectionTest(unittest.TestCase):
         # read in a SupportedMessage response
         header = self.make_header_prefix(SupportedMessage)
 
-        options_buf = StringIO()
+        options_buf = BytesIO()
         write_stringmultimap(options_buf, {
             'CQL_VERSION': ['3.0.3'],
             'COMPRESSION': ['snappy', 'lz4']
@@ -188,7 +191,7 @@ class ConnectionTest(unittest.TestCase):
         header = self.make_header_prefix(SupportedMessage)
 
         # the server only supports snappy
-        options_buf = StringIO()
+        options_buf = BytesIO()
         write_stringmultimap(options_buf, {
             'CQL_VERSION': ['3.0.3'],
             'COMPRESSION': ['snappy']
@@ -220,7 +223,7 @@ class ConnectionTest(unittest.TestCase):
         header = self.make_header_prefix(SupportedMessage)
 
         # the server only supports snappy
-        options_buf = StringIO()
+        options_buf = BytesIO()
         write_stringmultimap(options_buf, {
             'CQL_VERSION': ['3.0.3'],
             'COMPRESSION': ['snappy', 'lz4']
@@ -249,7 +252,7 @@ class ConnectionTest(unittest.TestCase):
         header = self.make_header_prefix(SupportedMessage)
 
         # the server only supports snappy
-        options_buf = StringIO()
+        options_buf = BytesIO()
         write_stringmultimap(options_buf, {
             'CQL_VERSION': ['3.0.3'],
             'COMPRESSION': ['snappy', 'lz4']

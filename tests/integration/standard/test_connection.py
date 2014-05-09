@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
+from tests.integration import PROTOCOL_VERSION
 
 try:
     import unittest2 as unittest
@@ -20,11 +20,13 @@ except ImportError:
     import unittest # noqa
 
 from functools import partial
+from six.moves import range
+import sys
 from threading import Thread, Event
 
 from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.cluster import NoHostAvailable
-from cassandra.decoder import QueryMessage
+from cassandra.protocol import QueryMessage
 from cassandra.io.asyncorereactor import AsyncoreConnection
 
 try:
@@ -47,9 +49,9 @@ class ConnectionTest(object):
         """
         conn = None
         e = None
-        for i in xrange(5):
+        for i in range(5):
             try:
-                conn = self.klass.factory()
+                conn = self.klass.factory(protocol_version=PROTOCOL_VERSION)
                 break
             except (OperationTimedOut, NoHostAvailable) as e:
                 continue

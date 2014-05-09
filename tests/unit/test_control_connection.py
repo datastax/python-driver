@@ -22,7 +22,7 @@ from mock import Mock, ANY
 from concurrent.futures import ThreadPoolExecutor
 
 from cassandra import OperationTimedOut
-from cassandra.decoder import ResultMessage
+from cassandra.protocol import ResultMessage, RESULT_KIND_ROWS
 from cassandra.cluster import ControlConnection, Cluster, _Scheduler
 from cassandra.pool import Host
 from cassandra.policies import (SimpleConvictionPolicy, RoundRobinPolicy,
@@ -64,7 +64,7 @@ class MockCluster(object):
     reconnection_policy = ConstantReconnectionPolicy(2)
     down_host = None
     contact_points = []
-    _is_shutdown = False
+    is_shutdown = False
 
     def __init__(self):
         self.metadata = MockMetadata()
@@ -105,9 +105,9 @@ class MockConnection(object):
              ["192.168.1.2", "10.0.0.2", "a", "dc1", "rack1", ["2", "102", "202"]]]
         ]
         local_response = ResultMessage(
-            kind=ResultMessage.KIND_ROWS, results=self.local_results)
+            kind=RESULT_KIND_ROWS, results=self.local_results)
         peer_response = ResultMessage(
-            kind=ResultMessage.KIND_ROWS, results=self.peer_results)
+            kind=RESULT_KIND_ROWS, results=self.peer_results)
 
         self.wait_for_responses = Mock(return_value=(peer_response, local_response))
 
@@ -140,14 +140,14 @@ class ControlConnectionTest(unittest.TestCase):
             ["schema_version", "cluster_name", "data_center", "rack", "partitioner", "tokens"],
             [["a", "foocluster", "dc1", "rack1", "Murmur3Partitioner", ["0", "100", "200"]]]
         ]
-        local_response = ResultMessage(kind=ResultMessage.KIND_ROWS, results=local_results)
+        local_response = ResultMessage(kind=RESULT_KIND_ROWS, results=local_results)
 
         peer_results = [
             ["rpc_address", "peer", "schema_version", "data_center", "rack", "tokens"],
             [["192.168.1.1", "10.0.0.1", "a", "dc1", "rack1", ["1", "101", "201"]],
              ["192.168.1.2", "10.0.0.2", "a", "dc1", "rack1", ["2", "102", "202"]]]
         ]
-        peer_response = ResultMessage(kind=ResultMessage.KIND_ROWS, results=peer_results)
+        peer_response = ResultMessage(kind=RESULT_KIND_ROWS, results=peer_results)
 
         return (peer_response, local_response)
 
@@ -156,14 +156,14 @@ class ControlConnectionTest(unittest.TestCase):
             ["schema_version", "cluster_name", "data_center", "rack", "partitioner", "tokens"],
             [["a", "foocluster", "dc1", "rack1", "Murmur3Partitioner", ["0", "100", "200"]]]
         ]
-        local_response = ResultMessage(kind=ResultMessage.KIND_ROWS, results=local_results)
+        local_response = ResultMessage(kind=RESULT_KIND_ROWS, results=local_results)
 
         peer_results = [
             ["rpc_address", "peer", "schema_version", "data_center", "rack", "tokens"],
             [["192.168.1.1", "10.0.0.1", "a", "dc1", "rack1", ["1", "101", "201"]],
              ["192.168.1.2", "10.0.0.2", "b", "dc1", "rack1", ["2", "102", "202"]]]
         ]
-        peer_response = ResultMessage(kind=ResultMessage.KIND_ROWS, results=peer_results)
+        peer_response = ResultMessage(kind=RESULT_KIND_ROWS, results=peer_results)
 
         return (peer_response, local_response)
 

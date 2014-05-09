@@ -13,13 +13,15 @@
 # limitations under the License.
 
 from base import benchmark, BenchmarkThread
+from six.moves import range
+
 
 class Runner(BenchmarkThread):
 
     def run(self):
         self.start_profile()
 
-        for i in xrange(self.num_queries):
+        for _ in range(self.num_queries):
             self.session.execute(self.query, self.values)
 
         self.finish_profile()

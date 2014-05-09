@@ -31,7 +31,7 @@ from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL
 
 from cassandra import OperationTimedOut
 from cassandra.connection import Connection, ConnectionShutdown
-from cassandra.decoder import RegisterMessage
+from cassandra.protocol import RegisterMessage
 from cassandra.marshal import int32_unpack
 
 
@@ -196,11 +196,15 @@ class GeventConnection(Connection):
         for i in xrange(0, len(data), chunk_size):
             self._write_queue.put(data[i:i + chunk_size])
 
-    def register_watcher(self, event_type, callback):
+    def register_watcher(self, event_type, callback, register_timeout=None):
         self._push_watchers[event_type].add(callback)
-        self.wait_for_response(RegisterMessage(event_list=[event_type]))
+        self.wait_for_response(
+            RegisterMessage(event_list=[event_type]),
+            timeout=register_timeout)
 
-    def register_watchers(self, type_callback_dict):
+    def register_watchers(self, type_callback_dict, register_timeout=None):
         for event_type, callback in type_callback_dict.items():
             self._push_watchers[event_type].add(callback)
-        self.wait_for_response(RegisterMessage(event_list=type_callback_dict.keys()))
+        self.wait_for_response(
+            RegisterMessage(event_list=type_callback_dict.keys()),
+            timeout=register_timeout)

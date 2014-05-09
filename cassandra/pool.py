@@ -17,6 +17,7 @@ Connection pooling and host management.
 """
 
 import logging
+import re
 import socket
 import time
 from threading import RLock, Condition
@@ -40,6 +41,13 @@ class NoConnectionsAvailable(Exception):
     pass
 
 
+# example matches:
+# 1.0.0
+# 1.0.0-beta1
+# 2.0-SNAPSHOT
+version_re = re.compile(r"(?P<major>\d+)\.(?P<minor>\d+)(?:\.(?P<patch>\d+))?(?:-(?P<label>\w+))?")
+
+
 class Host(object):
     """
     Represents a single Cassandra node.
@@ -61,6 +69,12 @@ class Host(object):
     :const:`True` if the node is considered up, :const:`False` if it is
     considered down, and :const:`None` if it is not known if the node is
     up or down.
+    """
+
+    version = None
+    """
+    A tuple representing the Cassandra version for this host.  This will
+    remain as :const:`None` if the version is unknown.
     """
 
     _datacenter = None
@@ -100,6 +114,14 @@ class Host(object):
         self._datacenter = datacenter
         self._rack = rack
 
+    def set_version(self, version_string):
+        match = version_re.match(version_string)
+        if match is not None:
+            version = [int(match.group('major')), int(match.group('minor')), int(match.group('patch') or 0)]
+            if match.group('label'):
+                version.append(match.group('label'))
+            self.version = tuple(version)
+
     def set_up(self):
         if not self.is_up:
             log.debug("Host %s is now marked up", self.address)
@@ -128,8 +150,14 @@ class Host(object):
     def __eq__(self, other):
         return self.address == other.address
 
+    def __hash__(self):
+        return hash(self.address)
+
+    def __lt__(self, other):
+        return self.address < other.address
+
     def __str__(self):
-        return self.address
+        return str(self.address)
 
     def __repr__(self):
         dc = (" %s" % (self._datacenter,)) if self._datacenter else ""
@@ -156,7 +184,7 @@ class _ReconnectionHandler(object):
             log.debug("Reconnection handler was cancelled before starting")
             return
 
-        first_delay = self.schedule.next()
+        first_delay = next(self.schedule)
         self.scheduler.schedule(first_delay, self.run)
 
     def run(self):
@@ -168,7 +196,7 @@ class _ReconnectionHandler(object):
             conn = self.try_reconnect()
         except Exception as exc:
             try:
-                next_delay = self.schedule.next()
+                next_delay = next(self.schedule)
             except StopIteration:
                 # the schedule has been exhausted
                 next_delay = None
@@ -249,8 +277,8 @@ class _HostReconnectionHandler(_ReconnectionHandler):
         if isinstance(exc, AuthenticationFailed):
             return False
         else:
-            log.warn("Error attempting to reconnect to %s, scheduling retry in %s seconds: %s",
-                     self.host, next_delay, exc)
+            log.warning("Error attempting to reconnect to %s, scheduling retry in %s seconds: %s",
+                        self.host, next_delay, exc)
             log.debug("Reconnection error details", exc_info=True)
             return True
 
@@ -360,8 +388,8 @@ class HostConnectionPool(object):
     def _create_new_connection(self):
         try:
             self._add_conn_if_under_max()
-        except (ConnectionException, socket.error), exc:
-            log.warn("Failed to create new connection to %s: %s", self.host, exc)
+        except (ConnectionException, socket.error) as exc:
+            log.warning("Failed to create new connection to %s: %s", self.host, exc)
         except Exception:
             log.exception("Unexpectedly failed to create new connection")
         finally:
@@ -393,7 +421,7 @@ class HostConnectionPool(object):
             self._signal_available_conn()
             return True
         except (ConnectionException, socket.error) as exc:
-            log.warn("Failed to add new connection to pool for host %s: %s", self.host, exc)
+            log.warning("Failed to add new connection to pool for host %s: %s", self.host, exc)
             with self._lock:
                 self.open_count -= 1
             if self._session.cluster.signal_connection_failure(self.host, exc, is_host_addition=False):

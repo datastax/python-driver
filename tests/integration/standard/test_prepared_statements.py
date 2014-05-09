@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+from tests.integration import PROTOCOL_VERSION
+
 try:
     import unittest2 as unittest
 except ImportError:
@@ -21,6 +24,7 @@ from cassandra import InvalidRequest
 from cassandra.cluster import Cluster
 from cassandra.query import PreparedStatement
 
+
 class PreparedStatementTests(unittest.TestCase):
 
     def test_basic(self):
@@ -28,7 +32,7 @@ class PreparedStatementTests(unittest.TestCase):
         Test basic PreparedStatement usage
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
         session.execute(
             """
@@ -65,7 +69,7 @@ class PreparedStatementTests(unittest.TestCase):
 
         bound = prepared.bind(('a'))
         results = session.execute(bound)
-        self.assertEquals(results, [('a', 'b', 'c')])
+        self.assertEqual(results, [('a', 'b', 'c')])
 
         # test with new dict binding
         prepared = session.prepare(
@@ -91,7 +95,7 @@ class PreparedStatementTests(unittest.TestCase):
 
         bound = prepared.bind({'a': 'x'})
         results = session.execute(bound)
-        self.assertEquals(results, [('x', 'y', 'z')])
+        self.assertEqual(results, [('x', 'y', 'z')])
 
     def test_missing_primary_key(self):
         """
@@ -99,7 +103,7 @@ class PreparedStatementTests(unittest.TestCase):
         when prepared statements are missing the primary key
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         prepared = session.prepare(
@@ -118,7 +122,7 @@ class PreparedStatementTests(unittest.TestCase):
         with dict bindings
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         prepared = session.prepare(
@@ -135,7 +139,7 @@ class PreparedStatementTests(unittest.TestCase):
         Ensure a ValueError is thrown when attempting to bind too many variables
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         prepared = session.prepare(
@@ -144,7 +148,7 @@ class PreparedStatementTests(unittest.TestCase):
             """)
 
         self.assertIsInstance(prepared, PreparedStatement)
-        self.assertRaises(ValueError, prepared.bind, (1,2))
+        self.assertRaises(ValueError, prepared.bind, (1, 2))
 
     def test_too_many_bind_values_dicts(self):
         """
@@ -152,7 +156,7 @@ class PreparedStatementTests(unittest.TestCase):
         with dict bindings
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         prepared = session.prepare(
@@ -172,7 +176,7 @@ class PreparedStatementTests(unittest.TestCase):
         Ensure binding None is handled correctly
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         prepared = session.prepare(
@@ -192,16 +196,15 @@ class PreparedStatementTests(unittest.TestCase):
 
         bound = prepared.bind((1,))
         results = session.execute(bound)
-        self.assertEquals(results[0].v, None)
+        self.assertEqual(results[0].v, None)
 
     def test_none_values_dicts(self):
         """
         Ensure binding None is handled correctly with dict bindings
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
-
 
         # test with new dict binding
         prepared = session.prepare(
@@ -221,14 +224,14 @@ class PreparedStatementTests(unittest.TestCase):
 
         bound = prepared.bind({'k': 1})
         results = session.execute(bound)
-        self.assertEquals(results[0].v, None)
+        self.assertEqual(results[0].v, None)
 
     def test_async_binding(self):
         """
         Ensure None binding over async queries
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         prepared = session.prepare(
@@ -248,15 +251,14 @@ class PreparedStatementTests(unittest.TestCase):
 
         future = session.execute_async(prepared, (873,))
         results = future.result()
-        self.assertEquals(results[0].v, None)
-
+        self.assertEqual(results[0].v, None)
 
     def test_async_binding_dicts(self):
         """
         Ensure None binding over async queries with dict bindings
         """
 
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         prepared = session.prepare(
@@ -276,4 +278,4 @@ class PreparedStatementTests(unittest.TestCase):
 
         future = session.execute_async(prepared, {'k': 873})
         results = future.result()
-        self.assertEquals(results[0].v, None)
+        self.assertEqual(results[0].v, None)

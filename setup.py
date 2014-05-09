@@ -12,16 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import print_function
 import sys
 
 import ez_setup
 ez_setup.use_setuptools()
 
-run_gevent_nosetests = False
 if __name__ == '__main__' and sys.argv[1] == "gevent_nosetests":
     from gevent.monkey import patch_all
     patch_all()
-    run_gevent_nosetests = True
 
 from setuptools import setup
 from distutils.command.build_ext import build_ext
@@ -47,10 +46,11 @@ with open("README.rst") as f:
     long_description = f.read()
 
 
-gevent_nosetests = None
-if run_gevent_nosetests:
+try:
     from nose.commands import nosetests
-
+except ImportError:
+    gevent_nosetests = None
+else:
     class gevent_nosetests(nosetests):
         description = "run nosetests with gevent monkey patching"
 
@@ -91,11 +91,11 @@ class DocCommand(Command):
             except subprocess.CalledProcessError as exc:
                 raise RuntimeError("Documentation step '%s' failed: %s: %s" % (mode, exc, exc.output))
             else:
-                print output
+                print(output)
 
-            print ""
-            print "Documentation step '%s' performed, results here:" % mode
-            print "   %s/" % path
+            print("")
+            print("Documentation step '%s' performed, results here:" % mode)
+            print("   %s/" % path)
 
 
 class BuildFailed(Exception):
@@ -180,7 +180,7 @@ def run_setup(extensions):
         kw['cmdclass']['build_ext'] = build_extensions
         kw['ext_modules'] = extensions
 
-    dependencies = ['futures']
+    dependencies = ['futures', 'six >=1.6']
 
     setup(
         name='cassandra-driver',
@@ -193,7 +193,7 @@ def run_setup(extensions):
         packages=['cassandra', 'cassandra.io'],
         include_package_data=True,
         install_requires=dependencies,
-        tests_require=['nose', 'mock', 'ccm', 'unittest2', 'PyYAML', 'pytz'],
+        tests_require=['nose', 'mock', 'PyYAML', 'pytz'],
         classifiers=[
             'Development Status :: 5 - Production/Stable',
             'Intended Audience :: Developers',
@@ -201,9 +201,12 @@ def run_setup(extensions):
             'Natural Language :: English',
             'Operating System :: OS Independent',
             'Programming Language :: Python',
-            'Programming Language :: Python :: 2',
             'Programming Language :: Python :: 2.6',
             'Programming Language :: Python :: 2.7',
+            'Programming Language :: Python :: 3.3',
+            'Programming Language :: Python :: 3.4',
+            'Programming Language :: Python :: Implementation :: CPython',
+            'Programming Language :: Python :: Implementation :: PyPy',
             'Topic :: Software Development :: Libraries :: Python Modules'
         ],
         **kw)
@@ -217,6 +220,11 @@ elif "--no-murmur3" in sys.argv:
     extensions.remove(murmur3_ext)
 elif "--no-libev" in sys.argv:
     sys.argv = [a for a in sys.argv if a != "--no-libev"]
+    extensions.remove(libev_ext)
+
+# For now, don't try to compile the libev extension for Python 3.
+# Once the extension has been updated, this can be removed.
+if sys.version_info >= (3, 0) and libev_ext in extensions:
     extensions.remove(libev_ext)
 
 platform_unsupported_msg = \

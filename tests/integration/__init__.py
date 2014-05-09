@@ -22,7 +22,9 @@ except ImportError:
 
 import logging
 log = logging.getLogger(__name__)
+
 import os
+from six import print_
 from threading import Event
 
 from cassandra.cluster import Cluster
@@ -36,11 +38,21 @@ except ImportError as e:
 CLUSTER_NAME = 'test_cluster'
 MULTIDC_CLUSTER_NAME = 'multidc_test_cluster'
 CCM_CLUSTER = None
-DEFAULT_CASSANDRA_VERSION = '1.2.16'
+
+CASSANDRA_VERSION = os.getenv('CASSANDRA_VERSION', '2.0.6')
+
+if CASSANDRA_VERSION.startswith('1'):
+    DEFAULT_PROTOCOL_VERSION = 1
+else:
+    DEFAULT_PROTOCOL_VERSION = 2
+PROTOCOL_VERSION = int(os.getenv('PROTOCOL_VERSION', DEFAULT_PROTOCOL_VERSION))
 
 path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ccm')
 if not os.path.exists(path):
     os.mkdir(path)
+
+cass_version = None
+cql_version = None
 
 
 def get_server_versions():
@@ -48,7 +60,12 @@ def get_server_versions():
     Probe system.local table to determine Cassandra and CQL version.
     Returns a tuple of (cassandra_version, cql_version).
     """
-    c = Cluster()
+    global cass_version, cql_version
+
+    if cass_version is not None:
+        return (cass_version, cql_version)
+
+    c = Cluster(protocol_version=PROTOCOL_VERSION)
     s = c.connect()
     s.set_keyspace('system')
     row = s.execute('SELECT cql_version, release_version FROM local')[0]
@@ -77,16 +94,16 @@ def get_node(node_id):
 
 
 def setup_package():
-    version = os.getenv("CASSANDRA_VERSION", DEFAULT_CASSANDRA_VERSION)
+    print_('Using Cassandra version: %s' % CASSANDRA_VERSION)
     try:
         try:
             cluster = CCMCluster.load(path, CLUSTER_NAME)
             log.debug("Found existing ccm test cluster, clearing")
             cluster.clear()
-            cluster.set_cassandra_dir(cassandra_version=version)
+            cluster.set_cassandra_dir(cassandra_version=CASSANDRA_VERSION)
         except Exception:
-            log.debug("Creating new ccm test cluster with version %s", version)
-            cluster = CCMCluster(path, CLUSTER_NAME, cassandra_version=version)
+            log.debug("Creating new ccm test cluster with version %s", CASSANDRA_VERSION)
+            cluster = CCMCluster(path, CLUSTER_NAME, cassandra_version=CASSANDRA_VERSION)
             cluster.set_configuration_options({'start_native_transport': True})
             common.switch_cluster(path, CLUSTER_NAME)
             cluster.populate(3)
@@ -111,7 +128,7 @@ def use_multidc(dc_list):
             cluster.clear()
         except Exception:
             log.debug("Creating new ccm test multi-dc cluster")
-            cluster = CCMCluster(path, MULTIDC_CLUSTER_NAME, cassandra_version=DEFAULT_CASSANDRA_VERSION)
+            cluster = CCMCluster(path, MULTIDC_CLUSTER_NAME, cassandra_version=CASSANDRA_VERSION)
             cluster.set_configuration_options({'start_native_transport': True})
             common.switch_cluster(path, MULTIDC_CLUSTER_NAME)
             cluster.populate(dc_list)
@@ -139,7 +156,7 @@ def setup_test_keyspace():
     # wait for nodes to startup
     time.sleep(10)
 
-    cluster = Cluster()
+    cluster = Cluster(protocol_version=PROTOCOL_VERSION)
     session = cluster.connect()
 
     try:

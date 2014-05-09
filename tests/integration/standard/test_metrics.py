@@ -23,7 +23,7 @@ from cassandra.query import SimpleStatement
 from cassandra import ConsistencyLevel, WriteTimeout, Unavailable, ReadTimeout
 
 from cassandra.cluster import Cluster, NoHostAvailable
-from tests.integration import get_node, get_cluster
+from tests.integration import get_node, get_cluster, PROTOCOL_VERSION
 
 
 class MetricsTests(unittest.TestCase):
@@ -33,7 +33,8 @@ class MetricsTests(unittest.TestCase):
         Trigger and ensure connection_errors are counted
         """
 
-        cluster = Cluster(metrics_enabled=True)
+        cluster = Cluster(metrics_enabled=True,
+                          protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
         session.execute("USE test3rf")
 
@@ -61,7 +62,8 @@ class MetricsTests(unittest.TestCase):
         Attempt a write at cl.ALL and receive a WriteTimeout.
         """
 
-        cluster = Cluster(metrics_enabled=True)
+        cluster = Cluster(metrics_enabled=True,
+                          protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         # Test write
@@ -91,7 +93,8 @@ class MetricsTests(unittest.TestCase):
         Attempt a read at cl.ALL and receive a ReadTimeout.
         """
 
-        cluster = Cluster(metrics_enabled=True)
+        cluster = Cluster(metrics_enabled=True,
+                          protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         # Test write
@@ -121,7 +124,8 @@ class MetricsTests(unittest.TestCase):
         Attempt an insert/read at cl.ALL and receive a Unavailable Exception.
         """
 
-        cluster = Cluster(metrics_enabled=True)
+        cluster = Cluster(metrics_enabled=True,
+                          protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         # Test write

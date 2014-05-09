@@ -25,7 +25,7 @@ class Runner(BenchmarkThread):
 
         self.start_profile()
 
-        for i in range(self.num_queries):
+        for _ in range(self.num_queries):
             future = self.session.execute_async(self.query, self.values)
             futures.append(future)
 

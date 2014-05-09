@@ -17,6 +17,7 @@ import logging
 from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.cluster import Cluster
 from cassandra.query import SimpleStatement
+from tests.integration import PROTOCOL_VERSION
 
 try:
     import unittest2 as unittest
@@ -29,7 +30,7 @@ log = logging.getLogger(__name__)
 class SchemaTests(unittest.TestCase):
 
     def test_recreates(self):
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
         replication_factor = 3
 
@@ -65,7 +66,7 @@ class SchemaTests(unittest.TestCase):
                 session.execute(ss)
 
     def test_for_schema_disagreements_different_keyspaces(self):
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         for i in xrange(30):
@@ -92,7 +93,7 @@ class SchemaTests(unittest.TestCase):
             except OperationTimedOut: pass
 
     def test_for_schema_disagreements_same_keyspace(self):
-        cluster = Cluster()
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         for i in xrange(30):

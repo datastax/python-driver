@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import six
 import sys
 
 from itertools import count, cycle
+from six.moves import xrange
 from threading import Event
 
 
@@ -84,9 +86,9 @@ def execute_concurrent(session, statements_and_parameters, concurrency=100, rais
     event.wait()
     if first_error:
         exc = first_error[0]
-        if isinstance(exc, tuple):
+        if six.PY2 and isinstance(exc, tuple):
             (exc_type, value, traceback) = exc
-            raise exc_type, value, traceback
+            six.reraise(exc_type, value, traceback)
         else:
             raise exc
     else:
@@ -105,7 +107,7 @@ def execute_concurrent_with_args(session, statement, parameters, *args, **kwargs
         parameters = [(x,) for x in range(1000)]
         execute_concurrent_with_args(session, statement, parameters)
     """
-    return execute_concurrent(session, zip(cycle((statement,)), parameters), *args, **kwargs)
+    return execute_concurrent(session, list(zip(cycle((statement,)), parameters)), *args, **kwargs)
 
 
 _sentinel = object()
@@ -118,12 +120,12 @@ def _handle_error(error, result_index, event, session, statements, results, num_
         return
     else:
         results[result_index] = (False, error)
-        if num_finished.next() >= to_execute:
+        if next(num_finished) >= to_execute:
             event.set()
             return
 
     try:
-        (next_index, (statement, params)) = statements.next()
+        (next_index, (statement, params)) = next(statements)
     except StopIteration:
         return
 
@@ -134,12 +136,15 @@ def _handle_error(error, result_index, event, session, statements, results, num_
             errback=_handle_error, errback_args=args)
     except Exception as exc:
         if first_error is not None:
-            first_error.append(sys.exc_info())
+            if six.PY2:
+                first_error.append(sys.exc_info())
+            else:
+                first_error.append(exc)
             event.set()
             return
         else:
             results[next_index] = (False, exc)
-            if num_finished.next() >= to_execute:
+            if next(num_finished) >= to_execute:
                 event.set()
                 return
 
@@ -147,13 +152,13 @@ def _handle_error(error, result_index, event, session, statements, results, num_
 def _execute_next(result, result_index, event, session, statements, results, num_finished, to_execute, first_error):
     if result is not _sentinel:
         results[result_index] = (True, result)
-        finished = num_finished.next()
+        finished = next(num_finished)
         if finished >= to_execute:
             event.set()
             return
 
     try:
-        (next_index, (statement, params)) = statements.next()
+        (next_index, (statement, params)) = next(statements)
     except StopIteration:
         return
 
@@ -164,11 +169,14 @@ def _execute_next(result, result_index, event, session, statements, results, num
             errback=_handle_error, errback_args=args)
     except Exception as exc:
         if first_error is not None:
-            first_error.append(sys.exc_info())
+            if six.PY2:
+                first_error.append(sys.exc_info())
+            else:
+                first_error.append(exc)
             event.set()
             return
         else:
             results[next_index] = (False, exc)
-            if num_finished.next() >= to_execute:
+            if next(num_finished) >= to_execute:
                 event.set()
                 return
