@@ -951,6 +951,15 @@ class Session(object):
     timeout, neither the registered callback or errback will be called.
     """
 
+    default_consistency_level = ConsistencyLevel.ONE
+    """
+    The default :class:`~ConsistencyLevel` for operations executed through
+    this session.  This default may be overridden by setting the
+    :attr:`~.Statement.consistency_level` on individual statements.
+
+    .. versionadded:: 1.2.0
+    """
+
     max_trace_wait = 2.0
     """
     The maximum amount of time (in seconds) the driver will wait for trace
@@ -1082,17 +1091,18 @@ class Session(object):
         elif isinstance(query, PreparedStatement):
             query = query.bind(parameters)
 
+        cl = query.consistency_level if query.consistency_level is not None else self.default_consistency_level
         if isinstance(query, BoundStatement):
             message = ExecuteMessage(
                 query_id=query.prepared_statement.query_id,
                 query_params=query.values,
-                consistency_level=query.consistency_level)
+                consistency_level=cl)
             prepared_statement = query.prepared_statement
         else:
             query_string = query.query_string
             if parameters:
                 query_string = bind_params(query.query_string, parameters)
-            message = QueryMessage(query=query_string, consistency_level=query.consistency_level)
+            message = QueryMessage(query=query_string, consistency_level=cl)
 
         if trace:
             message.tracing = True

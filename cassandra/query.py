@@ -51,10 +51,11 @@ class Statement(object):
     this will be set to a :class:`.QueryTrace` instance.
     """
 
-    consistency_level = ConsistencyLevel.ONE
+    consistency_level = None
     """
     The :class:`.ConsistencyLevel` to be used for this operation.  Defaults
-    to :attr:`.ConsistencyLevel.ONE`.
+    to :const:`None`, which means that the default consistency level for
+    the Session this is executed in will be used.
     """
 
     _routing_key = None
@@ -119,7 +120,7 @@ class SimpleStatement(Statement):
         return self._query_string
 
     def __str__(self):
-        consistency = ConsistencyLevel.value_to_name[self.consistency_level]
+        consistency = ConsistencyLevel.value_to_name.get(self.consistency_level, 'Not Set')
         return (u'<SimpleStatement query="%s", consistency=%s>' %
                 (self.query_string, consistency))
     __repr__ = __str__
@@ -142,10 +143,10 @@ class PreparedStatement(object):
 
     routing_key_indexes = None
 
-    consistency_level = ConsistencyLevel.ONE
+    consistency_level = None
 
     def __init__(self, column_metadata, query_id, routing_key_indexes, query, keyspace,
-                 consistency_level=ConsistencyLevel.ONE):
+                 consistency_level=None):
         self.column_metadata = column_metadata
         self.query_id = query_id
         self.routing_key_indexes = routing_key_indexes

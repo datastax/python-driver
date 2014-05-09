@@ -17,6 +17,7 @@ try:
 except ImportError:
     import unittest # noqa
 
+from cassandra import ConsistencyLevel
 from cassandra.query import PreparedStatement, BoundStatement, ValueSequence, SimpleStatement
 from cassandra.cluster import Cluster
 from cassandra.decoder import dict_factory
@@ -185,7 +186,7 @@ class PrintStatementTests(unittest.TestCase):
         Highlight the format of printing SimpleStatements
         """
 
-        ss = SimpleStatement('SELECT * FROM test3rf.test')
+        ss = SimpleStatement('SELECT * FROM test3rf.test', consistency_level=ConsistencyLevel.ONE)
         self.assertEqual(str(ss),
                          '<SimpleStatement query="SELECT * FROM test3rf.test", consistency=ONE>')
 
@@ -198,6 +199,7 @@ class PrintStatementTests(unittest.TestCase):
         session = cluster.connect()
 
         prepared = session.prepare('INSERT INTO test3rf.test (k, v) VALUES (?, ?)')
+        prepared.consistency_level = ConsistencyLevel.ONE
 
         self.assertEqual(str(prepared),
                          '<PreparedStatement query="INSERT INTO test3rf.test (k, v) VALUES (?, ?)", consistency=ONE>')

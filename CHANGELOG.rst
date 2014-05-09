@@ -1,6 +1,10 @@
-1.1.3
+1.2.0
 =====
 In Progress
+
+Features
+--------
+* Add Session.default_consistency_level (PYTHON-14)
 
 Bug Fixes
 ---------
