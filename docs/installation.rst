@@ -21,11 +21,11 @@ You can use ``pip install --pre cassandra-driver`` if you need to install a beta
 
 OSX Installation Error
 ^^^^^^^^^^^^^^^^^^^^^^
-If you're installing on OSX and have XCode 5.1 installed, you may see an error like this:
+If you're installing on OSX and have XCode 5.1 installed, you may see an error like this::
 
     clang: error: unknown argument: '-mno-fused-madd' [-Wunused-command-line-argument-hard-error-in-future]
 
-To fix this, re-run the installation with an extra compilation flag:
+To fix this, re-run the installation with an extra compilation flag::
 
     ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future pip install cassandra-driver
 
