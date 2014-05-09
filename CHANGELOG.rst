@@ -5,6 +5,10 @@ In Progress
 Merged From 1.x
 ---------------
 
+Features
+--------
+* Add Session.default_consistency_level (PYTHON-14)
+
 Bug Fixes
 ^^^^^^^^^
 * Don't strip trailing underscores from column names when using the

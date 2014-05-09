@@ -968,6 +968,15 @@ class Session(object):
     .. versionadded:: 2.0.0b1
     """
 
+    default_consistency_level = ConsistencyLevel.ONE
+    """
+    The default :class:`~ConsistencyLevel` for operations executed through
+    this session.  This default may be overridden by setting the
+    :attr:`~.Statement.consistency_level` on individual statements.
+
+    .. versionadded:: 1.2.0
+    """
+
     max_trace_wait = 2.0
     """
     The maximum amount of time (in seconds) the driver will wait for trace
@@ -1114,6 +1123,7 @@ class Session(object):
         elif isinstance(query, PreparedStatement):
             query = query.bind(parameters)
 
+        cl = query.consistency_level if query.consistency_level is not None else self.default_consistency_level
         fetch_size = query.fetch_size
         if not fetch_size and self._protocol_version >= 2:
             fetch_size = self.default_fetch_size
@@ -1123,11 +1133,11 @@ class Session(object):
             if parameters:
                 query_string = bind_params(query.query_string, parameters)
             message = QueryMessage(
-                query_string, query.consistency_level, query.serial_consistency_level,
+                query_string, cl, query.serial_consistency_level,
                 fetch_size=fetch_size)
         elif isinstance(query, BoundStatement):
             message = ExecuteMessage(
-                query.prepared_statement.query_id, query.values, query.consistency_level,
+                query.prepared_statement.query_id, query.values, cl,
                 query.serial_consistency_level, fetch_size=fetch_size)
             prepared_statement = query.prepared_statement
         elif isinstance(query, BatchStatement):
@@ -1137,8 +1147,7 @@ class Session(object):
                     "2 or higher (supported in Cassandra 2.0 and higher).  Consider "
                     "setting Cluster.protocol_version to 2 to support this operation.")
             message = BatchMessage(
-                query.batch_type, query._statements_and_parameters,
-                query.consistency_level)
+                query.batch_type, query._statements_and_parameters, cl)
 
         if trace:
             message.tracing = True
