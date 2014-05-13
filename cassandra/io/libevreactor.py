@@ -97,7 +97,12 @@ class LibevConnection(Connection):
     def _cleanup(cls, thread):
         cls._loop_shutdown = True
         log.debug("Waiting for event loop thread to join...")
-        thread.join()
+        thread.join(timeout=1.0)
+        if thread.is_alive():
+            log.warning(
+                "Event loop thread could not be joined, so shutdown may not be clean. "
+                "Please call Cluster.shutdown() to avoid this.")
+
         log.debug("Event loop thread was joined")
 
     # class-level set of all connections; only replaced with a new copy

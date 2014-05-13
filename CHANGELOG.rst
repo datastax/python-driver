@@ -14,6 +14,12 @@ Bug Fixes
 * Don't strip trailing underscores from column names when using the
   named_tuple_factory (PYTHON-56)
 
+Other
+-----
+* Add 1 second timeout to join() call on event loop thread during
+  interpreter shutdown.  This can help to prevent the process from
+  hanging during shutdown.
+
 2.0.0b1
 =======
 May 6, 2014
