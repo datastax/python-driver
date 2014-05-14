@@ -18,6 +18,9 @@ Load Balancing
 .. autoclass:: DCAwareRoundRobinPolicy
    :members:
 
+.. autoclass:: WhiteListRoundRobinPolicy
+   :members:
+
 .. autoclass:: TokenAwarePolicy
    :members:
 

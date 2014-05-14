@@ -394,7 +394,8 @@ class WhiteListRoundRobinPolicy(RoundRobinPolicy):
     """
     def __init__(self, hosts):
         """
-        :param hosts: List of hosts
+        The `hosts` parameter should be a sequence of hosts to permit
+        connections to.
         """
         self._allowed_hosts = hosts
         RoundRobinPolicy.__init__(self)
