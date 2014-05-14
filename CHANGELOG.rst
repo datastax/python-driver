@@ -13,6 +13,8 @@ Bug Fixes
 ^^^^^^^^^
 * Don't strip trailing underscores from column names when using the
   named_tuple_factory (PYTHON-56)
+* Ensure replication factors are ints for NetworkTopologyStrategy
+  to avoid TypeErrors (github #120)
 
 Other
 -----

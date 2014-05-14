@@ -460,7 +460,8 @@ class NetworkTopologyStrategy(ReplicationStrategy):
     """
 
     def __init__(self, dc_replication_factors):
-        self.dc_replication_factors = dc_replication_factors
+        self.dc_replication_factors = dict(
+                (str(k), int(v)) for k, v in dc_replication_factors.items())
 
     def make_token_replica_map(self, token_to_host_owner, ring):
         # note: this does not account for hosts having different racks
@@ -798,7 +799,7 @@ if six.PY3:
     def protect_name(name):
         return maybe_escape_name(name)
 else:
-    def protect_name(name):
+    def protect_name(name):  # NOQA
         if isinstance(name, six.text_type):
             name = name.encode('utf8')
         return maybe_escape_name(name)
