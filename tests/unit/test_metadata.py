@@ -46,7 +46,7 @@ class TestStrategies(unittest.TestCase):
         self.assertEqual(rs.create('OldNetworkTopologyStrategy', None), None)
         self.assertEqual(rs.create('xxxxxxOldNetworkTopologyStrategy', None), None)
 
-        fake_options_map = {'options': 'map'}
+        fake_options_map = {'dc1': '3'}
         self.assertIsInstance(rs.create('NetworkTopologyStrategy', fake_options_map), NetworkTopologyStrategy)
         self.assertEqual(rs.create('NetworkTopologyStrategy', fake_options_map).dc_replication_factors,
                          NetworkTopologyStrategy(fake_options_map).dc_replication_factors)
@@ -152,9 +152,9 @@ class TestStrategies(unittest.TestCase):
         self.assertItemsEqual(rf3_replicas[MD5Token(100)], [host2, host3, host1])
         self.assertItemsEqual(rf3_replicas[MD5Token(200)], [host3, host1, host2])
 
-
     def test_ss_equals(self):
-        self.assertNotEqual(SimpleStrategy(1), NetworkTopologyStrategy(2))
+        self.assertNotEqual(SimpleStrategy(1), NetworkTopologyStrategy({'dc1': 2}))
+
 
 class TestNameEscaping(unittest.TestCase):
 
