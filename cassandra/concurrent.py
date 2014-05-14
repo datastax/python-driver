@@ -48,8 +48,8 @@ def execute_concurrent(session, statements_and_parameters, concurrency=100, rais
 
         statements_and_params = []
         for user_id in user_ids:
-            statatements_and_params.append(
-                (select_statement, user_id))
+            params = (user_id, )
+            statatements_and_params.append((select_statement, params))
 
         results = execute_concurrent(
             session, statements_and_params, raise_on_first_error=False)
@@ -97,9 +97,9 @@ def execute_concurrent(session, statements_and_parameters, concurrency=100, rais
 
 def execute_concurrent_with_args(session, statement, parameters, *args, **kwargs):
     """
-    Like :meth:`~.execute_concurrent`, but takes a single statement and a
-    sequence of parameters.  Each item in ``parameters`` should be a sequence
-    or :const:`None`.
+    Like :meth:`~cassandra.concurrent.execute_concurrent()`, but takes a single
+    statement and a sequence of parameters.  Each item in ``parameters``
+    should be a sequence or :const:`None`.
 
     Example usage::
 
