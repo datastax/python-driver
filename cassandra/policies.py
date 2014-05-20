@@ -568,6 +568,14 @@ class WriteType(object):
     internally before a BATCH write.
     """
 
+WriteType.name_to_value = {
+    'SIMPLE': WriteType.SIMPLE,
+    'BATCH': WriteType.BATCH,
+    'UNLOGGED_BATCH': WriteType.UNLOGGED_BATCH,
+    'COUNTER': WriteType.COUNTER,
+    'BATCH_LOG': WriteType.BATCH_LOG,
+}
+
 
 class RetryPolicy(object):
     """

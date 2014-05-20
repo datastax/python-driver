@@ -10,6 +10,9 @@ Bug Fixes
 ---------
 * Don't strip trailing underscores from column names when using the
   named_tuple_factory (PYTHON-56)
+* Pass WriteType instance to RetryPolicy.on_write_timeout() instead
+  of the string name of the write type. This caused write timeout
+  errors to always be rethrown instead of retrying. (github #123)
 
 1.1.2
 =====

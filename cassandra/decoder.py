@@ -43,6 +43,7 @@ from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 InetAddressType, IntegerType, ListType,
                                 LongType, MapType, SetType, TimeUUIDType,
                                 UTF8Type, UUIDType, lookup_casstype)
+from cassandra.policies import WriteType
 
 log = logging.getLogger(__name__)
 
@@ -291,7 +292,7 @@ class WriteTimeoutErrorMessage(RequestExecutionException):
             'consistency': read_consistency_level(f),
             'received_responses': read_int(f),
             'required_responses': read_int(f),
-            'write_type': read_string(f),
+            'write_type': WriteType.name_to_value[read_string(f)],
         }
 
     def to_exception(self):
