@@ -15,6 +15,9 @@ Bug Fixes
   named_tuple_factory (PYTHON-56)
 * Ensure replication factors are ints for NetworkTopologyStrategy
   to avoid TypeErrors (github #120)
+* Pass WriteType instance to RetryPolicy.on_write_timeout() instead
+  of the string name of the write type. This caused write timeout
+  errors to always be rethrown instead of retrying. (github #123)
 
 Other
 -----
