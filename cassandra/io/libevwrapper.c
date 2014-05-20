@@ -161,7 +161,8 @@ IO_init(libevwrapper_IO *self, PyObject *args, PyObject *kwds) {
         Py_XDECREF(loop);
         return -1;
     }
-    ev_io_init(&self->io, io_callback, fd, io_flags);
+    struct ev_io *io = &(self->io);
+    ev_io_init(io, io_callback, fd, io_flags);
     self->io.data = self;
     return 0;
 }
@@ -180,12 +181,14 @@ IO_stop(libevwrapper_IO *self, PyObject *args) {
 
 static PyObject*
 IO_is_active(libevwrapper_IO *self, PyObject *args) {
-    return PyBool_FromLong(ev_is_active(&self->io));
+    struct ev_io *io = &(self->io);
+    return PyBool_FromLong(ev_is_active(io));
 }
 
 static PyObject*
 IO_is_pending(libevwrapper_IO *self, PyObject *args) {
-    return PyBool_FromLong(ev_is_pending(&self->io));
+    struct ev_io *io = &(self->io);
+    return PyBool_FromLong(ev_is_pending(io));
 }
 
 static PyMethodDef IO_methods[] = {
@@ -264,7 +267,8 @@ Async_init(libevwrapper_Async *self, PyObject *args, PyObject *kwds) {
     } else {
         return -1;
     }
-    ev_async_init(&self->async, async_callback);
+    struct ev_async *async = &(self->async);
+    ev_async_init(async, async_callback);
     return 0;
 };
 
@@ -379,7 +383,8 @@ Prepare_init(libevwrapper_Prepare *self, PyObject *args, PyObject *kwds) {
         Py_INCREF(callback);
         self->callback = callback;
     }
-    ev_prepare_init(&self->prepare, prepare_callback);
+    struct ev_prepare *prepare = &(self->prepare);
+    ev_prepare_init(prepare, prepare_callback);
     self->prepare.data = self;
     return 0;
 }

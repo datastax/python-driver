@@ -220,8 +220,8 @@ class LibevConnection(Connection):
                 self._socket.setsockopt(*args)
 
         with self._loop_lock:
-            self._read_watcher = libev.IO(self._socket._sock, libev.EV_READ, self._loop, self.handle_read)
-            self._write_watcher = libev.IO(self._socket._sock, libev.EV_WRITE, self._loop, self.handle_write)
+            self._read_watcher = libev.IO(self._socket.fileno(), libev.EV_READ, self._loop, self.handle_read)
+            self._write_watcher = libev.IO(self._socket.fileno(), libev.EV_WRITE, self._loop, self.handle_write)
 
         self._send_options_message()
 
