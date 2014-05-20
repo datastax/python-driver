@@ -2,11 +2,15 @@
 =======
 In Progress
 
+Features
+--------
+* Make libev C extension Python3-compatible (PYTHON-70)
+
 Merged From 1.x
 ---------------
 
 Features
---------
+^^^^^^^^
 * Add Session.default_consistency_level (PYTHON-14)
 
 Bug Fixes
@@ -17,7 +21,7 @@ Bug Fixes
   to avoid TypeErrors (github #120)
 
 Other
------
+^^^^^
 * Add 1 second timeout to join() call on event loop thread during
   interpreter shutdown.  This can help to prevent the process from
   hanging during shutdown.
