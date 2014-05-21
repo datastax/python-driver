@@ -22,6 +22,9 @@ Bug Fixes
 * Pass WriteType instance to RetryPolicy.on_write_timeout() instead
   of the string name of the write type. This caused write timeout
   errors to always be rethrown instead of retrying. (github #123)
+* Avoid submitting tasks to the ThreadPoolExecutor after shutdown. With
+  retries enabled, this could cause Cluster.shutdown() to hang under
+  some circumstances.
 
 Other
 ^^^^^

@@ -130,6 +130,8 @@ def run_in_executor(f):
     @wraps(f)
     def new_f(self, *args, **kwargs):
 
+        if self.is_shutdown:
+            return
         try:
             future = self.executor.submit(f, self, *args, **kwargs)
             future.add_done_callback(_future_completed)
@@ -1366,7 +1368,8 @@ class Session(object):
 
     def submit(self, fn, *args, **kwargs):
         """ Internal """
-        return self.cluster.executor.submit(fn, *args, **kwargs)
+        if not self.is_shutdown:
+            return self.cluster.executor.submit(fn, *args, **kwargs)
 
     def get_pool_state(self):
         return dict((host, pool.get_state()) for host, pool in self._pools.items())
