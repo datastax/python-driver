@@ -179,7 +179,10 @@ def get_create_table(model):
     for prop_name in table_properties:
         prop_value = getattr(model, '__{}__'.format(prop_name), None)
         if prop_value is not None:
-            with_qs.append('{} = {}'.format(prop_name, prop_value))
+            # Strings needs to be single quoted
+            if isinstance(prop_value, basestring):
+                prop_value = "'{}'".format(prop_value)
+            with_qs.append("{} = {}".format(prop_name, prop_value))
 
     _order = ['"{}" {}'.format(c.db_field_name, c.clustering_order or 'ASC') for c in model._clustering_keys.values()]
     if _order:
