@@ -629,12 +629,18 @@ class _SimpleParameterizedType(_ParameterizedType):
     @classmethod
     def deserialize_safe(cls, byts):
         subtype, = cls.subtypes
-        numelements = uint16_unpack(byts[:2])
-        p = 2
+        unpack = uint16_unpack
+        length = 2
+        numelements = unpack(byts[:length])
+        if numelements == 0 and len(byts) > 2 :
+            unpack = int32_unpack
+            length = 4
+            numelements = unpack(byts[:length])
+        p = length
         result = []
         for n in xrange(numelements):
-            itemlen = uint16_unpack(byts[p:p + 2])
-            p += 2
+            itemlen = unpack(byts[p:p + length])
+            p += length
             item = byts[p:p + itemlen]
             p += itemlen
             result.append(subtype.from_binary(item))
@@ -679,16 +685,23 @@ class MapType(_ParameterizedType):
     @classmethod
     def deserialize_safe(cls, byts):
         subkeytype, subvaltype = cls.subtypes
-        numelements = uint16_unpack(byts[:2])
-        p = 2
+        unpack = uint16_unpack
+        length = 2
+        numelements = unpack(byts[:length])
+        if numelements == 0 and len(byts) > 2:
+            unpack = int32_unpack
+            length = 4
+            numelements = unpack(byts[:length])
+
+        p = length
         themap = OrderedDict()
         for n in xrange(numelements):
-            key_len = uint16_unpack(byts[p:p + 2])
-            p += 2
+            key_len = unpack(byts[p:p + length])
+            p += length
             keybytes = byts[p:p + key_len]
             p += key_len
-            val_len = uint16_unpack(byts[p:p + 2])
-            p += 2
+            val_len = unpack(byts[p:p + length])
+            p += length
             valbytes = byts[p:p + val_len]
             p += val_len
             key = subkeytype.from_binary(keybytes)
