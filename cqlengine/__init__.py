@@ -15,10 +15,10 @@ SizeTieredCompactionStrategy = "SizeTieredCompactionStrategy"
 LeveledCompactionStrategy = "LeveledCompactionStrategy"
 
 # Caching constants.
-ALL = "all"
-KEYS_ONLY = "keys_only"
-ROWS_ONLY = "rows_only"
-NONE = "none"
+ALL = "ALL"
+KEYS_ONLY = "KEYS_ONLY"
+ROWS_ONLY = "ROWS_ONLY"
+NONE = "NONE"
 
 ANY = "ANY"
 ONE = "ONE"
