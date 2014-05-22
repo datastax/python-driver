@@ -6,6 +6,10 @@ Features
 --------
 * Make libev C extension Python3-compatible (PYTHON-70)
 
+Bug Fixes
+---------
+* Fix murmur3 C extension compilation under Python3.4 (github #124)
+
 Merged From 1.x
 ---------------
 
