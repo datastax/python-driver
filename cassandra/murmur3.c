@@ -100,11 +100,14 @@ uint64_t MurmurHash3_x64_128 (const void * key, const int len,
 
   uint64_t c1 = BIG_CONSTANT(0x87c37b91114253d5);
   uint64_t c2 = BIG_CONSTANT(0x4cf5ad432745937f);
+  uint64_t k1 = 0;
+  uint64_t k2 = 0;
+
+  const uint64_t * blocks = (const uint64_t *)(data);
+  const uint8_t * tail = (const uint8_t*)(data + nblocks*16);
 
   //----------
   // body
-
-  const uint64_t * blocks = (const uint64_t *)(data);
 
   int i;
   for(i = 0; i < nblocks; i++)
@@ -124,11 +127,6 @@ uint64_t MurmurHash3_x64_128 (const void * key, const int len,
 
   //----------
   // tail
-
-  const uint8_t * tail = (const uint8_t*)(data + nblocks*16);
-
-  uint64_t k1 = 0;
-  uint64_t k2 = 0;
 
   switch(len & 15)
   {
@@ -187,13 +185,15 @@ murmur3(PyObject *self, PyObject *args)
     const char *key;
     Py_ssize_t len;
     uint32_t seed = 0;
+    uint64_t result = 0;
+
 
     if (!PyArg_ParseTuple(args, "s#|I", &key, &len, &seed)) {
         return NULL;
     }
 
     // TODO handle x86 version?
-    uint64_t result = MurmurHash3_x64_128((void *)key, len, seed);
+    result = MurmurHash3_x64_128((void *)key, len, seed);
     return (PyObject *) PyLong_FromLong((long int)result);
 }
 
@@ -243,10 +243,11 @@ initmurmur3(void)
 #else
     PyObject *module = Py_InitModule("murmur3", murmur3_methods);
 #endif
+    struct module_state *st = NULL;
 
     if (module == NULL)
         INITERROR;
-    struct module_state *st = GETSTATE(module);
+    st = GETSTATE(module);
 
     st->error = PyErr_NewException("murmur3.Error", NULL, NULL);
     if (st->error == NULL) {
