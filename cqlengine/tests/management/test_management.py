@@ -1,6 +1,9 @@
+import random
+import string
+
 from mock import MagicMock, patch
 
-from cqlengine import ONE
+from cqlengine import ONE, ALL, KEYS_ONLY, ROWS_ONLY, NONE
 from cqlengine.exceptions import CQLEngineException
 from cqlengine.management import create_table, delete_table, get_fields, sync_table
 from cqlengine.tests.base import BaseCassEngTestCase
@@ -9,6 +12,7 @@ from cqlengine import management
 from cqlengine.tests.query.test_queryset import TestModel
 from cqlengine.models import Model
 from cqlengine import columns, SizeTieredCompactionStrategy, LeveledCompactionStrategy
+
 
 class ConnectionPoolFailoverTestCase(BaseCassEngTestCase):
     """Test cassandra connection pooling."""
@@ -146,6 +150,36 @@ class AddColumnTest(BaseCassEngTestCase):
         create_table(FourthModel)
         fields = get_fields(FirstModel)
         self.assertEqual(len(fields), 4)
+
+
+class TablePropertiesTests(BaseCassEngTestCase):
+
+    table_properties = {
+        'bloom_filter_fp_chance': random.randint(0, 99999) / 100000.0,
+        'caching': random.choice([ALL, KEYS_ONLY, ROWS_ONLY, NONE]),
+        'comment': ''.join(random.choice(string.ascii_letters)
+                           for i in range(random.randint(4, 99))),
+        'dclocal_read_repair_chance': random.randint(0, 99999) / 100000.0,
+        'default_time_to_live': random.randint(0, 99999),
+        'gc_grace_seconds': random.randint(0, 99999),
+        'index_interval': random.randint(0, 99999),
+        'memtable_flush_period_in_ms': random.randint(0, 99999),
+        'populate_io_cache_on_flush': random.choice([True, False]),
+        'read_repair_chance': random.randint(0, 99999) / 100000.0,
+        'replicate_on_write': random.choice([True, False]),
+    }
+
+    def setUp(self):
+        delete_table(FirstModel)
+
+    def test_set_table_properties(self):
+        for property_name, property_value in self.table_properties.items():
+            property_id = '__{}__'.format(property_name)
+            setattr(FirstModel, property_id, property_value)
+        sync_table(FirstModel)
+        table_settings = management.get_table_settings(FirstModel)
+        for property_name, property_value in self.table_properties.items():
+            assert table_settings[property_name] == property_value
 
 
 class SyncTableTests(BaseCassEngTestCase):
