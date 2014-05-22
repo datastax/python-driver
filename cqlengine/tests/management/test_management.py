@@ -179,6 +179,11 @@ class TablePropertiesTests(BaseCassEngTestCase):
         sync_table(FirstModel)
         table_settings = management.get_table_settings(FirstModel)
         for property_name, property_value in self.table_properties.items():
+            if property_name == 'dclocal_read_repair_chance':
+                # For some reason 'dclocal_read_repair_chance' in CQL is called
+                # just 'local_read_repair_chance' in the schema table.
+                # Source: https://issues.apache.org/jira/browse/CASSANDRA-6717
+                property_name = 'local_read_repair_chance'
             assert table_settings[property_name] == property_value
 
 
