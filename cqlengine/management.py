@@ -173,8 +173,9 @@ def get_create_table(model):
     with_qs = []
 
     table_properties = ['bloom_filter_fp_chance', 'caching', 'comment',
-        'dclocal_read_repair_chance', 'gc_grace_seconds', 'read_repair_chance',
-        'replicate_on_write']
+        'dclocal_read_repair_chance', 'default_time_to_live', 'gc_grace_seconds',
+        'index_interval', 'memtable_flush_period_in_ms', 'populate_io_cache_on_flush',
+        'read_repair_chance', 'replicate_on_write']
     for prop_name in table_properties:
         prop_value = getattr(model, '__{}__'.format(prop_name), None)
         if prop_value is not None:
