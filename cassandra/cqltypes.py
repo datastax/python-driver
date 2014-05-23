@@ -28,6 +28,7 @@ the corresponding CQL or Cassandra type strings.
 # .from_cql_literal() and .as_cql_literal() classmethods (or whatever).
 
 import calendar
+from collections import namedtuple
 from decimal import Decimal
 import re
 import socket
@@ -733,6 +734,45 @@ class MapType(_ParameterizedType):
             buf.write(uint16_pack(len(valbytes)))
             buf.write(valbytes)
         return buf.getvalue()
+
+
+class UserDefinedType(_ParameterizedType):
+    typename = "'org.apache.cassandra.db.marshal.UserType'"
+
+    FIELD_LENGTH = 4
+
+    @classmethod
+    def apply_parameters(cls, subtypes, names):
+        newname = subtypes[1].cassname.decode("hex")
+        field_names = [encoded_name.decode("hex") for encoded_name in names[2:]]
+        return type(newname, (cls,), {'subtypes': subtypes[2:],
+                                      'cassname': cls.cassname,
+                                      'typename': newname,
+                                      'fieldnames': field_names})
+
+    @classmethod
+    def cql_parameterized_type(cls):
+        return cls.typename
+
+    @classmethod
+    def deserialize_safe(cls, byts):
+        p = 0
+        Result = namedtuple(cls.typename, cls.fieldnames)
+        result = []
+        for col_type in cls.subtypes:
+            if p == len(byts):
+                break
+            itemlen = int32_unpack(byts[p:p + cls.FIELD_LENGTH])
+            p += cls.FIELD_LENGTH
+            item = byts[p:p + itemlen]
+            p += itemlen
+            result.append(col_type.from_binary(item))
+
+        if len(result) < len(cls.subtypes):
+            nones = [None] * (len(cls.subtypes) - len(result))
+            result = result + nones
+
+        return Result(*result)
 
 
 class CompositeType(_ParameterizedType):
