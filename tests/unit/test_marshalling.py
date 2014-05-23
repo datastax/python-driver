@@ -109,7 +109,7 @@ class TestUnmarshal(unittest.TestCase):
     def test_unmarshalling(self):
         for serializedval, valtype, nativeval in marshalled_value_pairs:
             unmarshaller = lookup_casstype(valtype)
-            whatwegot = unmarshaller.from_binary(serializedval)
+            whatwegot = unmarshaller.from_binary(serializedval, 1)
             self.assertEqual(whatwegot, nativeval,
                              msg='Unmarshaller for %s (%s) failed: unmarshal(%r) got %r instead of %r'
                                  % (valtype, unmarshaller, serializedval, whatwegot, nativeval))
@@ -120,7 +120,7 @@ class TestUnmarshal(unittest.TestCase):
     def test_marshalling(self):
         for serializedval, valtype, nativeval in marshalled_value_pairs:
             marshaller = lookup_casstype(valtype)
-            whatwegot = marshaller.to_binary(nativeval)
+            whatwegot = marshaller.to_binary(nativeval, 1)
             self.assertEqual(whatwegot, serializedval,
                              msg='Marshaller for %s (%s) failed: marshal(%r) got %r instead of %r'
                                  % (valtype, marshaller, nativeval, whatwegot, serializedval))

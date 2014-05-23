@@ -89,7 +89,7 @@ class BoundStatementTestCase(unittest.TestCase):
         values = ['nonint', 1]
 
         try:
-            bound_statement.bind(values)
+            bound_statement.bind(values, protocol_version=1)
         except TypeError as e:
             self.assertIn('foo1', str(e))
             self.assertIn('Int32Type', str(e))
@@ -100,7 +100,7 @@ class BoundStatementTestCase(unittest.TestCase):
         values = [1, ['1', '2']]
 
         try:
-            bound_statement.bind(values)
+            bound_statement.bind(values, protocol_version=1)
         except TypeError as e:
             self.assertIn('foo2', str(e))
             self.assertIn('Int32Type', str(e))

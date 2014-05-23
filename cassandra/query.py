@@ -337,13 +337,13 @@ class PreparedStatement(object):
 
         return PreparedStatement(column_metadata, query_id, routing_key_indexes, query, keyspace)
 
-    def bind(self, values):
+    def bind(self, values, protocol_version):
         """
         Creates and returns a :class:`BoundStatement` instance using `values`.
         The `values` parameter **must** be a sequence, such as a tuple or list,
         even if there is only one value to bind.
         """
-        return BoundStatement(self).bind(values)
+        return BoundStatement(self).bind(values, protocol_version)
 
     def __str__(self):
         consistency = ConsistencyLevel.value_to_name.get(self.consistency_level, 'Not Set')

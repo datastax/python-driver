@@ -680,7 +680,7 @@ class _SimpleParameterizedType(_ParameterizedType):
             p += 2
             item = byts[p:p + itemlen]
             p += itemlen
-            result.append(subtype.from_binary(item))
+            result.append(subtype.from_binary(item, protocol_version))
         return cls.adapter(result)
 
     @classmethod
@@ -734,8 +734,8 @@ class MapType(_ParameterizedType):
             p += 2
             valbytes = byts[p:p + val_len]
             p += val_len
-            key = subkeytype.from_binary(keybytes)
-            val = subvaltype.from_binary(valbytes)
+            key = subkeytype.from_binary(keybytes, protocol_version)
+            val = subvaltype.from_binary(valbytes, protocol_version)
             themap[key] = val
         return themap
 
