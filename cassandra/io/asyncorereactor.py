@@ -155,6 +155,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
 
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect((self.host, self.port))
+        self.add_channel()
 
         if self.sockopts:
             for args in self.sockopts:
@@ -165,6 +166,13 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
 
         # start the event loop if needed
         self._loop.maybe_start()
+
+    def set_socket(self, sock):
+        # Overrides the same method in asyncore. We deliberately
+        # do not call add_channel() in this method so that we can call
+        # it later, after connect() has completed.
+        self.socket = sock
+        self._fileno = sock.fileno()
 
     def create_socket(self, family, type):
         # copied from asyncore, but with the line to set the socket in
