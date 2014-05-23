@@ -382,7 +382,7 @@ class BoundStatement(Statement):
 
         Statement.__init__(self, *args, **kwargs)
 
-    def bind(self, values):
+    def bind(self, values, protocol_version):
         """
         Binds a sequence of values for the prepared statement parameters
         and returns this instance.  Note that `values` *must* be:
@@ -442,7 +442,7 @@ class BoundStatement(Statement):
                 col_type = col_spec[-1]
 
                 try:
-                    self.values.append(col_type.serialize(value))
+                    self.values.append(col_type.serialize(value, protocol_version))
                 except (TypeError, struct.error):
                     col_name = col_spec[2]
                     expected_type = col_type

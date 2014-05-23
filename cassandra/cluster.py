@@ -1134,7 +1134,7 @@ class Session(object):
         if isinstance(query, six.string_types):
             query = SimpleStatement(query)
         elif isinstance(query, PreparedStatement):
-            query = query.bind(parameters)
+            query = query.bind(parameters, self._protocol_version)
 
         cl = query.consistency_level if query.consistency_level is not None else self.default_consistency_level
         fetch_size = query.fetch_size

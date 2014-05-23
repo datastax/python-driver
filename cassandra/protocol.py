@@ -101,7 +101,7 @@ def _get_params(message_obj):
     )
 
 
-def decode_response(stream_id, flags, opcode, body, decompressor=None):
+def decode_response(protocol_version, stream_id, flags, opcode, body, decompressor=None):
     if flags & COMPRESSED_FLAG:
         if decompressor is None:
             raise Exception("No de-compressor available for compressed frame!")
@@ -119,7 +119,7 @@ def decode_response(stream_id, flags, opcode, body, decompressor=None):
         log.warning("Unknown protocol flags set: %02x. May cause problems.", flags)
 
     msg_class = _message_types_by_opcode[opcode]
-    msg = msg_class.recv_body(body)
+    msg = msg_class.recv_body(body, protocol_version)
     msg.stream_id = stream_id
     msg.trace_id = trace_id
     return msg
@@ -139,7 +139,7 @@ class ErrorMessage(_MessageType, Exception):
         self.info = info
 
     @classmethod
-    def recv_body(cls, f):
+    def recv_body(cls, f, protocol_version):
         code = read_int(f)
         msg = read_string(f)
         subcls = error_classes.get(code, cls)
@@ -339,7 +339,7 @@ class ReadyMessage(_MessageType):
     name = 'READY'
 
     @classmethod
-    def recv_body(cls, f):
+    def recv_body(cls, f, protocol_version):
         return cls()
 
 
@@ -351,7 +351,7 @@ class AuthenticateMessage(_MessageType):
         self.authenticator = authenticator
 
     @classmethod
-    def recv_body(cls, f):
+    def recv_body(cls, f, protocol_version):
         authname = read_string(f)
         return cls(authenticator=authname)
 
@@ -383,7 +383,7 @@ class AuthChallengeMessage(_MessageType):
         self.challenge = challenge
 
     @classmethod
-    def recv_body(cls, f):
+    def recv_body(cls, f, protocol_version):
         return cls(read_longstring(f))
 
 
@@ -406,7 +406,7 @@ class AuthSuccessMessage(_MessageType):
         self.token = token
 
     @classmethod
-    def recv_body(cls, f):
+    def recv_body(cls, f, protocol_version):
         return cls(read_longstring(f))
 
 
@@ -427,7 +427,7 @@ class SupportedMessage(_MessageType):
         self.options = options
 
     @classmethod
-    def recv_body(cls, f):
+    def recv_body(cls, f, protocol_version):
         options = read_stringmultimap(f)
         cql_versions = options.pop('CQL_VERSION')
         return cls(cql_versions=cql_versions, options=options)
@@ -541,13 +541,13 @@ class ResultMessage(_MessageType):
         self.paging_state = paging_state
 
     @classmethod
-    def recv_body(cls, f):
+    def recv_body(cls, f, protocol_version):
         kind = read_int(f)
         paging_state = None
         if kind == RESULT_KIND_VOID:
             results = None
         elif kind == RESULT_KIND_ROWS:
-            paging_state, results = cls.recv_results_rows(f)
+            paging_state, results = cls.recv_results_rows(f, protocol_version)
         elif kind == RESULT_KIND_SET_KEYSPACE:
             ksname = read_string(f)
             results = ksname
@@ -558,7 +558,7 @@ class ResultMessage(_MessageType):
         return cls(kind, results, paging_state)
 
     @classmethod
-    def recv_results_rows(cls, f):
+    def recv_results_rows(cls, f, protocol_version):
         paging_state, column_metadata = cls.recv_results_metadata(f)
         rowcount = read_int(f)
         rows = [cls.recv_row(f, len(column_metadata)) for _ in range(rowcount)]
@@ -566,7 +566,7 @@ class ResultMessage(_MessageType):
         coltypes = [c[3] for c in column_metadata]
         return (
             paging_state,
-            (colnames, [tuple(ctype.from_binary(val) for ctype, val in zip(coltypes, row))
+            (colnames, [tuple(ctype.from_binary(val, protocol_version) for ctype, val in zip(coltypes, row))
                         for row in rows]))
 
     @classmethod
@@ -749,7 +749,7 @@ class EventMessage(_MessageType):
         self.event_args = event_args
 
     @classmethod
-    def recv_body(cls, f):
+    def recv_body(cls, f, protocol_version):
         event_type = read_string(f).upper()
         if event_type in known_event_types:
             read_method = getattr(cls, 'recv_' + event_type.lower())
