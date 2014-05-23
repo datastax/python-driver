@@ -200,8 +200,15 @@ class Cluster(object):
 
     auth_provider = None
     """
-    An optional function that accepts one argument, the IP address of a node,
+    When :attr:`~.Cluster.protocol_version` is 2 or higher, this should
+    be an instance of a subclass of :class:`~cassandra.auth.AuthProvider`,
+    such ass :class:`~.PlainTextAuthProvider`.
+
+    When :attr:`~.Cluster.protocol_version` is 1, this should be
+    a function that accepts one argument, the IP address of a node,
     and returns a dict of credentials for that node.
+
+    When not using authentication, this should be left as :const:`None`.
     """
 
     load_balancing_policy = None
@@ -334,9 +341,13 @@ class Cluster(object):
         self.compression = compression
 
         if auth_provider is not None:
-            if not callable(auth_provider):
-                raise ValueError("auth_provider must be callable")
-            self.auth_provider = auth_provider
+            if not hasattr(auth_provider, 'new_authenticator'):
+                if protocol_version > 1:
+                    raise TypeError("auth_provider must implement the cassandra.auth.AuthProvider "
+                                    "interface when protocol_version >= 2")
+                self.auth_provider = auth_provider
+            else:
+                self.auth_provider = auth_provider.new_authenticator
 
         if load_balancing_policy is not None:
             if isinstance(load_balancing_policy, type):
@@ -482,7 +493,7 @@ class Cluster(object):
 
     def _make_connection_kwargs(self, address, kwargs_dict):
         if self.auth_provider:
-            kwargs_dict['credentials'] = self.auth_provider(address)
+            kwargs_dict['authenticator'] = self.auth_provider(address)
 
         kwargs_dict['port'] = self.port
         kwargs_dict['compression'] = self.compression

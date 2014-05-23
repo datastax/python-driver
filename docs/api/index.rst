@@ -7,6 +7,7 @@ API Documentation
    cassandra
    cassandra/cluster
    cassandra/policies
+   cassandra/auth
    cassandra/metadata
    cassandra/query
    cassandra/pool

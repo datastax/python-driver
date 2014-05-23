@@ -33,7 +33,9 @@ from cassandra.marshal import int32_pack, header_unpack
 from cassandra.protocol import (ReadyMessage, AuthenticateMessage, OptionsMessage,
                                 StartupMessage, ErrorMessage, CredentialsMessage,
                                 QueryMessage, ResultMessage, decode_response,
-                                InvalidRequestException, SupportedMessage)
+                                InvalidRequestException, SupportedMessage,
+                                AuthResponseMessage, AuthChallengeMessage,
+                                AuthSuccessMessage)
 from cassandra.util import OrderedDict
 
 
@@ -157,12 +159,12 @@ class Connection(object):
 
     is_control_connection = False
 
-    def __init__(self, host='127.0.0.1', port=9042, credentials=None,
+    def __init__(self, host='127.0.0.1', port=9042, authenticator=None,
                  ssl_options=None, sockopts=None, compression=True,
                  cql_version=None, protocol_version=2, is_control_connection=False):
         self.host = host
         self.port = port
-        self.credentials = credentials
+        self.authenticator = authenticator
         self.ssl_options = ssl_options
         self.sockopts = sockopts
         self.compression = compression
@@ -425,15 +427,24 @@ class Connection(object):
                 self.compressor = self._compressor
             self.connected_event.set()
         elif isinstance(startup_response, AuthenticateMessage):
-            log.debug("Got AuthenticateMessage on new connection (%s) from %s", id(self), self.host)
+            log.debug("Got AuthenticateMessage on new connection (%s) from %s: %s",
+                      id(self), self.host, startup_response.authenticator)
 
-            if self.credentials is None:
+            if self.authenticator is None:
                 raise AuthenticationFailed('Remote end requires authentication.')
 
-            self.authenticator = startup_response.authenticator
-            cm = CredentialsMessage(creds=self.credentials)
-            callback = partial(self._handle_startup_response, did_authenticate=True)
-            self.send_msg(cm, cb=callback)
+            self.authenticator_class = startup_response.authenticator
+
+            if isinstance(self.authenticator, dict):
+                log.debug("Sending credentials-based auth response on %s", self)
+                cm = CredentialsMessage(creds=self.authenticator)
+                callback = partial(self._handle_startup_response, did_authenticate=True)
+                self.send_msg(cm, cb=callback)
+            else:
+                log.debug("Sending SASL-based auth response on %s", self)
+                initial_response = self.authenticator.initial_response()
+                initial_response = "" if initial_response is None else initial_response.encode('utf-8')
+                self.send_msg(AuthResponseMessage(initial_response), self._handle_auth_response)
         elif isinstance(startup_response, ErrorMessage):
             log.debug("Received ErrorMessage on new connection (%s) from %s: %s",
                       id(self), self.host, startup_response.summary_msg())
@@ -452,6 +463,35 @@ class Connection(object):
             msg = "Unexpected response during Connection setup: %r"
             log.error(msg, startup_response)
             raise ProtocolError(msg % (startup_response,))
+
+    @defunct_on_error
+    def _handle_auth_response(self, auth_response):
+        if self.is_defunct:
+            return
+
+        if isinstance(auth_response, AuthSuccessMessage):
+            log.debug("Connection %s successfully authenticated", self)
+            self.authenticator.on_authentication_success(auth_response.token)
+            if self._compressor:
+                self.compressor = self._compressor
+            self.connected_event.set()
+        elif isinstance(auth_response, AuthChallengeMessage):
+            response = self.authenticator.evaluate_challenge(auth_response.challenge)
+            msg = AuthResponseMessage("" if response is None else response)
+            self.send_msg(msg, self._handle_auth_response)
+        elif isinstance(auth_response, ErrorMessage):
+            log.debug("Received ErrorMessage on new connection (%s) from %s: %s",
+                      id(self), self.host, auth_response.summary_msg())
+            raise AuthenticationFailed(
+                "Failed to authenticate to %s: %s" %
+                (self.host, auth_response.summary_msg()))
+        elif isinstance(auth_response, ConnectionShutdown):
+            log.debug("Connection to %s was closed during the authentication process", self.host)
+            raise auth_response
+        else:
+            msg = "Unexpected response during Connection authentication to %s: %r"
+            log.error(msg, self.host, auth_response)
+            raise ProtocolError(msg % (self.host, auth_response))
 
     def set_keyspace_blocking(self, keyspace):
         if not keyspace or keyspace == self.keyspace:

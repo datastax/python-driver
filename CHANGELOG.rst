@@ -5,6 +5,7 @@ In Progress
 Features
 --------
 * Make libev C extension Python3-compatible (PYTHON-70)
+* Support v2 protocol authentication (PYTHON-73, github #125)
 
 Bug Fixes
 ---------

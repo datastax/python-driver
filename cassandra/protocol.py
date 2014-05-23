@@ -193,6 +193,11 @@ class ProtocolException(ErrorMessageSub):
     error_code = 0x000A
 
 
+class BadCredentials(ErrorMessageSub):
+    summary = 'Bad credentials'
+    error_code = 0x0100
+
+
 class UnavailableErrorMessage(RequestExecutionException):
     summary = 'Unavailable exception'
     error_code = 0x1000
@@ -367,6 +372,41 @@ class CredentialsMessage(_MessageType):
         for credkey, credval in self.creds.items():
             write_string(f, credkey)
             write_string(f, credval)
+
+
+class AuthChallengeMessage(_MessageType):
+    opcode = 0x0E
+    name = 'AUTH_CHALLENGE'
+
+    def __init__(self, challenge):
+        self.challenge = challenge
+
+    @classmethod
+    def recv_body(cls, f):
+        return cls(read_longstring(f))
+
+
+class AuthResponseMessage(_MessageType):
+    opcode = 0x0F
+    name = 'AUTH_RESPONSE'
+
+    def __init__(self, response):
+        self.response = response
+
+    def send_body(self, f, protocol_version):
+        write_longstring(f, self.response)
+
+
+class AuthSuccessMessage(_MessageType):
+    opcode = 0x10
+    name = 'AUTH_SUCCESS'
+
+    def __init__(self, token):
+        self.token = token
+
+    @classmethod
+    def recv_body(cls, f):
+        return cls(read_longstring(f))
 
 
 class OptionsMessage(_MessageType):
