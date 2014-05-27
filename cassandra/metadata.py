@@ -181,11 +181,11 @@ class Metadata(object):
 
     def _keyspace_added(self, ksname):
         if self.token_map:
-            self.token_map.rebuild_keyspace(ksname)
+            self.token_map.rebuild_keyspace(ksname, build_if_absent=False)
 
     def _keyspace_updated(self, ksname):
         if self.token_map:
-            self.token_map.rebuild_keyspace(ksname)
+            self.token_map.rebuild_keyspace(ksname, build_if_absent=False)
 
     def _keyspace_removed(self, ksname):
         if self.token_map:
@@ -950,10 +950,14 @@ class TokenMap(object):
 
         self.tokens_to_hosts_by_ks = {}
         self._metadata = metadata
+        self._rebuild_lock = RLock()
 
-    def rebuild_keyspace(self, keyspace):
-        self.tokens_to_hosts_by_ks[keyspace] = \
-            self.replica_map_for_keyspace(self._metadata.keyspaces[keyspace])
+    def rebuild_keyspace(self, keyspace, build_if_absent=False):
+        with self._rebuild_lock:
+            current = self.tokens_to_hosts_by_ks.get(keyspace, None)
+            if (build_if_absent and current is None) or (not build_if_absent and current is not None):
+                replica_map = self.replica_map_for_keyspace(self._metadata.keyspaces[keyspace])
+                self.tokens_to_hosts_by_ks[keyspace] = replica_map
 
     def replica_map_for_keyspace(self, ks_metadata):
         strategy = ks_metadata.replication_strategy
@@ -972,7 +976,7 @@ class TokenMap(object):
         """
         tokens_to_hosts = self.tokens_to_hosts_by_ks.get(keyspace, None)
         if tokens_to_hosts is None:
-            self.rebuild_keyspace(keyspace)
+            self.rebuild_keyspace(keyspace, build_if_absent=True)
             tokens_to_hosts = self.tokens_to_hosts_by_ks.get(keyspace, None)
             if tokens_to_hosts is None:
                 return []
