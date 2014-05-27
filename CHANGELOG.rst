@@ -36,7 +36,7 @@ Bug Fixes
 * Avoid rebuilding token metadata when cluster topology has not
   actually changed
 * Avoid preparing queries for hosts that should be ignored (such as
-  remote hosts when using the DCAwareRoundRobinPolicy)
+  remote hosts when using the DCAwareRoundRobinPolicy) (PYTHON-75)
 
 Other
 ^^^^^
