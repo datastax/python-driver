@@ -30,6 +30,9 @@ Bug Fixes
 * Avoid submitting tasks to the ThreadPoolExecutor after shutdown. With
   retries enabled, this could cause Cluster.shutdown() to hang under
   some circumstances.
+* Fix unintended rebuild of token replica map when keyspaces are
+  discovered (on startup), added, or updated and TokenAwarePolicy is not
+  in use.
 
 Other
 ^^^^^

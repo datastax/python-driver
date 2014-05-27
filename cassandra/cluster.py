@@ -130,7 +130,7 @@ def run_in_executor(f):
     @wraps(f)
     def new_f(self, *args, **kwargs):
 
-        if self.is_shutdown:
+        if self._is_shutdown:
             return
         try:
             future = self.executor.submit(f, self, *args, **kwargs)
@@ -825,7 +825,7 @@ class Cluster(object):
         """
         new_host = self.metadata.add_host(address, datacenter, rack)
         if new_host and signal:
-            log.info("New Cassandra host %s added", address)
+            log.info("New Cassandra host %r discovered", new_host)
             self.on_add(new_host)
 
         return new_host
