@@ -135,3 +135,12 @@ else:
         bytes: cql_encode_bytes,
         type(None): cql_encode_none,
     })
+
+# sortedset is optional
+try:
+    from blist import sortedset
+    cql_encoders.update({
+        sortedset: cql_encode_set_collection
+    })
+except ImportError:
+    pass
