@@ -21,6 +21,8 @@ Bug Fixes
   in use.
 * Avoid rebuilding token metadata when cluster topology has not
   actually changed
+* Avoid preparing queries for hosts that should be ignored (such as
+  remote hosts when using the DCAwareRoundRobinPolicy)
 
 1.1.2
 =====

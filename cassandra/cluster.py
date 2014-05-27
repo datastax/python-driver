@@ -716,12 +716,21 @@ class Cluster(object):
         if self._is_shutdown:
             return
 
-        log.debug("Adding or renewing pools for new host %s and notifying listeners", host)
-        self._prepare_all_queries(host)
-        log.debug("Done preparing queries for new host %s", host)
+        log.debug("Handling new host %r and notifying listeners", host)
+
+        distance = self.load_balancing_policy.distance(host)
+        if distance != HostDistance.IGNORED:
+            self._prepare_all_queries(host)
+            log.debug("Done preparing queries for new host %r", host)
 
         self.load_balancing_policy.on_add(host)
         self.control_connection.on_add(host)
+
+        if distance == HostDistance.IGNORED:
+            log.debug("Not adding connection pool for new host %r because the "
+                      "load balancing policy has marked it as IGNORED", host)
+            self._finalize_add(host)
+            return
 
         futures_lock = Lock()
         futures_results = []
