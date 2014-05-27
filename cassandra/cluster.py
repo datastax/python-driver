@@ -742,12 +742,21 @@ class Cluster(object):
         if self.is_shutdown:
             return
 
-        log.debug("Adding or renewing pools for new host %s and notifying listeners", host)
-        self._prepare_all_queries(host)
-        log.debug("Done preparing queries for new host %s", host)
+        log.debug("Handling new host %r and notifying listeners", host)
+
+        distance = self.load_balancing_policy.distance(host)
+        if distance != HostDistance.IGNORED:
+            self._prepare_all_queries(host)
+            log.debug("Done preparing queries for new host %r", host)
 
         self.load_balancing_policy.on_add(host)
         self.control_connection.on_add(host)
+
+        if distance == HostDistance.IGNORED:
+            log.debug("Not adding connection pool for new host %r because the "
+                      "load balancing policy has marked it as IGNORED", host)
+            self._finalize_add(host)
+            return
 
         futures_lock = Lock()
         futures_results = []
@@ -1711,6 +1720,7 @@ class ControlConnection(object):
             if partitioner and tokens:
                 token_map[host] = tokens
 
+        should_rebuild_token_map = False
         found_hosts = set()
         for row in peers_result:
             addr = row.get("rpc_address")
@@ -1727,8 +1737,9 @@ class ControlConnection(object):
             if host is None:
                 log.debug("[control connection] Found new host to connect to: %s", addr)
                 host = self._cluster.add_host(addr, datacenter, rack, signal=True)
+                should_rebuild_token_map = True
             else:
-                self._update_location_info(host, datacenter, rack)
+                should_rebuild_token_map |= self._update_location_info(host, datacenter, rack)
 
             tokens = row.get("tokens")
             if partitioner and tokens:
@@ -1739,15 +1750,17 @@ class ControlConnection(object):
                     old_host.address not in found_hosts and \
                     old_host.address not in self._cluster.contact_points:
                 log.debug("[control connection] Found host that has been removed: %r", old_host)
+                should_rebuild_token_map = True
                 self._cluster.remove_host(old_host)
 
-        if partitioner:
-            log.debug("[control connection] Fetched ring info, rebuilding metadata")
+        log.debug("[control connection] Finished fetching ring info")
+        if partitioner and should_rebuild_token_map:
+            log.debug("[control connection] Rebuilding token map due to topology changes")
             self._cluster.metadata.rebuild_token_map(partitioner, token_map)
 
     def _update_location_info(self, host, datacenter, rack):
         if host.datacenter == datacenter and host.rack == rack:
-            return
+            return False
 
         # If the dc/rack information changes, we need to update the load balancing policy.
         # For that, we remove and re-add the node against the policy. Not the most elegant, and assumes
@@ -1755,6 +1768,7 @@ class ControlConnection(object):
         self._cluster.load_balancing_policy.on_down(host)
         host.set_location_info(datacenter, rack)
         self._cluster.load_balancing_policy.on_up(host)
+        return True
 
     def _handle_topology_change(self, event):
         change_type = event["change_type"]

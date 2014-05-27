@@ -33,6 +33,10 @@ Bug Fixes
 * Fix unintended rebuild of token replica map when keyspaces are
   discovered (on startup), added, or updated and TokenAwarePolicy is not
   in use.
+* Avoid rebuilding token metadata when cluster topology has not
+  actually changed
+* Avoid preparing queries for hosts that should be ignored (such as
+  remote hosts when using the DCAwareRoundRobinPolicy)
 
 Other
 ^^^^^
