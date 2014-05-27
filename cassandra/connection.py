@@ -478,6 +478,7 @@ class Connection(object):
         elif isinstance(auth_response, AuthChallengeMessage):
             response = self.authenticator.evaluate_challenge(auth_response.challenge)
             msg = AuthResponseMessage("" if response is None else response)
+            log.debug("Responding to auth challenge on %s", self)
             self.send_msg(msg, self._handle_auth_response)
         elif isinstance(auth_response, ErrorMessage):
             log.debug("Received ErrorMessage on new connection (%s) from %s: %s",
