@@ -12,7 +12,16 @@ in 2.1 are not yet supported.
 Using the v2 Native Protocol
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 By default, the driver will attempt to use version 2 of Cassandra's
-native protocol.  When working with Cassandra 1.2, you will need to
+native protocol. You can explicitly set the protocol version to
+2, though:
+
+.. code-block:: python
+
+    from cassandra.cluster import Cluster
+
+    cluster = Cluster(protocol_version=2)
+
+When working with Cassandra 1.2, you will need to
 explicitly set the :attr:`~.Cluster.protocol_version` to 1:
 
 .. code-block:: python
@@ -48,6 +57,13 @@ Lightweight Transactions
 `Lightweight transactions <http://www.datastax.com/dev/blog/lightweight-transactions-in-cassandra-2-0>`_ are another new feature.  To use lightweight transactions, add ``IF`` clauses
 to your CQL queries and set the :attr:`~.Statement.serial_consistency_level`
 on your statements.
+
+Calling Cluster.shutdown()
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+In order to fix some issues around garbage collection and unclean interpreter
+shutdowns, version 2.0 of the driver requires you to call :meth:`.Cluster.shutdown()`
+on your :class:`~.Cluster` objects when you are through with them.
+This helps to guarantee a clean shutdown.
 
 Deprecations
 ^^^^^^^^^^^^
