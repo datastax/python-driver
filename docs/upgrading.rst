@@ -58,7 +58,7 @@ now:
 * :attr:`cassandra.decoder.tuple_factory` has moved to
   :attr:`cassandra.query.tuple_factory`
 * :attr:`cassandra.decoder.named_tuple_factory` has moved to
-  :attr:`cassandra.query.named_tuple_factory
+  :attr:`cassandra.query.named_tuple_factory`
 * :attr:`cassandra.decoder.dict_factory` has moved to
   :attr:`cassandra.query.dict_factory`
 * :attr:`cassandra.decoder.ordered_dict_factory` has moved to

@@ -1002,7 +1002,7 @@ class Session(object):
     :meth:`.ResponseFuture.add_errback`; even if a query exceeds this default
     timeout, neither the registered callback or errback will be called.
 
-    .. versionadded:: 2.0.0b1
+    .. versionadded:: 2.0.0
     """
 
     default_consistency_level = ConsistencyLevel.ONE
@@ -1032,7 +1032,7 @@ class Session(object):
     This only takes effect when protocol version 2 or higher is used.
     See :attr:`.Cluster.protocol_version` for details.
 
-    .. versionadded:: 2.0.0b1
+    .. versionadded:: 2.0.0
     """
 
     _lock = None
@@ -2152,6 +2152,8 @@ class ResponseFuture(object):
         Returns :const:`True` if there are more pages left in the
         query results, :const:`False` otherwise.  This should only
         be checked after the first page has been returned.
+
+        .. versionadded:: 2.0.0
         """
         return self._paging_state is not None
 
@@ -2162,6 +2164,8 @@ class ResponseFuture(object):
         is raised.  Also see :attr:`.has_more_pages`.
 
         This should only be called after the first page has been returned.
+
+        .. versionadded:: 2.0.0
         """
         if not self._paging_state:
             raise QueryExhausted()
@@ -2582,6 +2586,8 @@ class QueryExhausted(Exception):
     Raised when :meth:`.ResponseFuture.start_fetching_next_page()` is called and
     there are no more pages.  You can check :attr:`.ResponseFuture.has_more_pages`
     before calling to avoid this.
+
+    .. versionadded:: 2.0.0
     """
     pass
 
@@ -2605,7 +2611,7 @@ class PagedResult(object):
     an :class:`Exception` to be raised while fetching the next page, just
     like you might see on a normal call to ``session.execute()``.
 
-    .. versionadded: 2.0.0b1
+    .. versionadded: 2.0.0
     """
 
     def __init__(self, response_future, initial_response):

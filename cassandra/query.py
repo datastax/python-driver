@@ -63,6 +63,9 @@ def tuple_factory(colnames, rows):
         >>> rows = session.execute("SELECT name, age FROM users LIMIT 1")
         >>> print rows[0]
         ('Bob', 42)
+
+    .. versionchanged:: 2.0.0
+        moved from ``cassandra.decoder`` to ``cassandra.query``
     """
     return rows
 
@@ -92,6 +95,9 @@ def named_tuple_factory(colnames, rows):
         >>> age = user[1]
         >>> print "name: %s, age: %d" % (name, age)
         name: Bob, age: 42
+
+    .. versionchanged:: 2.0.0
+        moved from ``cassandra.decoder`` to ``cassandra.query``
     """
     Row = namedtuple('Row', map(_clean_column_name, colnames))
     return [Row(*row) for row in rows]
@@ -110,6 +116,8 @@ def dict_factory(colnames, rows):
         >>> print rows[0]
         {'age': 42, 'name': 'Bob'}
 
+    .. versionchanged:: 2.0.0
+        moved from ``cassandra.decoder`` to ``cassandra.query``
     """
     return [dict(zip(colnames, row)) for row in rows]
 
@@ -118,6 +126,9 @@ def ordered_dict_factory(colnames, rows):
     """
     Like :meth:`~cassandra.query.dict_factory`, but returns each row as an OrderedDict,
     so the order of the columns is preserved.
+
+    .. versionchanged:: 2.0.0
+        moved from ``cassandra.decoder`` to ``cassandra.query``
     """
     return [OrderedDict(zip(colnames, row)) for row in rows]
 
@@ -156,6 +167,8 @@ class Statement(object):
 
     This only takes effect when protocol version 2 or higher is used.
     See :attr:`.Cluster.protocol_version` for details.
+
+    .. versionadded:: 2.0.0
     """
 
     _serial_consistency_level = None
@@ -242,6 +255,8 @@ class Statement(object):
 
         Serial consistency levels may only be used against Cassandra 2.0+
         and the :attr:`~.Cluster.protocol_version` must be set to 2 or higher.
+
+        .. versionadded:: 2.0.0
         """)
 
     @property
@@ -494,6 +509,8 @@ class BatchType(object):
     """
     A BatchType is used with :class:`.BatchStatement` instances to control
     the atomicity of the batch operation.
+
+    .. versionadded:: 2.0.0
     """
 
     LOGGED = None
@@ -531,6 +548,8 @@ class BatchStatement(Statement):
     """
     A protocol-level batch of operations which are applied atomically
     by default.
+
+    .. versionadded:: 2.0.0
     """
 
     batch_type = None
@@ -574,7 +593,7 @@ class BatchStatement(Statement):
             batch.add(SimpleStatement("DELETE FROM pending_users WHERE name=%s", (name,))
             session.execute(batch)
 
-        .. versionadded:: 2.0.0b1
+        .. versionadded:: 2.0.0
         """
         self.batch_type = batch_type
         self._statements_and_parameters = []
