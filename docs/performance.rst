@@ -244,6 +244,11 @@ dramatically:
 
 Until this is improved, you should limit the number of callback chains you run.
 
+For many use cases, you don't need to implement this pattern yourself.  You can
+simply use :meth:`cassandra.concurrent.execute_concurrent` and
+:meth:`cassandra.concurrent.execute_concurrent_with_args`, which implement
+this pattern for you with a synchronous API.
+
 PyPy
 ----
 Almost all of these patterns become CPU-bound pretty quickly with CPython, the
