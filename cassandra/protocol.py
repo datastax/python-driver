@@ -608,11 +608,21 @@ class ResultMessage(_MessageType):
         return paging_state, column_metadata
 
     @classmethod
-    def recv_results_schema_change(cls, f):
+    def recv_results_schema_change(cls, f, protocol_version):
         change_type = read_string(f)
-        keyspace = read_string(f)
-        table = read_string(f)
-        return dict(change_type=change_type, keyspace=keyspace, table=table)
+        if protocol_version >= 3:
+            target = read_string(f)
+            keyspace = read_string(f)
+            if target != "KEYSPACE":
+                table_or_type = read_string(f)
+                return {'change_type': change_type, 'keyspace': keyspace, target.lower(): table_or_type}
+            else:
+                return {'change_type': change_type, 'keyspace': keyspace}
+
+        else:
+            keyspace = read_string(f)
+            table = read_string(f)
+            return {'change_type': change_type, 'keyspace': keyspace, 'table': table}
 
     @classmethod
     def read_type(cls, f):
