@@ -1,3 +1,5 @@
+.. _query-paging:
+
 Paging Large Queries
 ====================
 Cassandra 2.0+ offers support for automatic query paging.  Starting with

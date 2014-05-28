@@ -41,6 +41,8 @@ For example::
     python setup.py doc
     cp -R docs/_build/1.0.0-beta1/* ~/python-driver-docs/
     cd ~/python-driver-docs
+    git add --all
+    git commit -m 'Update docs'
     git push origin gh-pages
 
 Running the Tests

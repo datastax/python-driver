@@ -26,6 +26,9 @@ log = logging.getLogger(__name__)
 
 
 class Metrics(object):
+    """
+    A collection of timers and counters for various performance metrics.
+    """
 
     request_timer = None
     """

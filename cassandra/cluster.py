@@ -130,7 +130,7 @@ def run_in_executor(f):
     @wraps(f)
     def new_f(self, *args, **kwargs):
 
-        if self.is_shutdown:
+        if self._is_shutdown:
             return
         try:
             future = self.executor.submit(f, self, *args, **kwargs)
@@ -198,18 +198,41 @@ class Cluster(object):
     Setting this to :const:`False` disables compression.
     """
 
-    auth_provider = None
-    """
-    When :attr:`~.Cluster.protocol_version` is 2 or higher, this should
-    be an instance of a subclass of :class:`~cassandra.auth.AuthProvider`,
-    such ass :class:`~.PlainTextAuthProvider`.
+    _auth_provider = None
+    _auth_provider_callable = None
 
-    When :attr:`~.Cluster.protocol_version` is 1, this should be
-    a function that accepts one argument, the IP address of a node,
-    and returns a dict of credentials for that node.
+    @property
+    def auth_provider(self):
+        """
+        When :attr:`~.Cluster.protocol_version` is 2 or higher, this should
+        be an instance of a subclass of :class:`~cassandra.auth.AuthProvider`,
+        such as :class:`~.PlainTextAuthProvider`.
 
-    When not using authentication, this should be left as :const:`None`.
-    """
+        When :attr:`~.Cluster.protocol_version` is 1, this should be
+        a function that accepts one argument, the IP address of a node,
+        and returns a dict of credentials for that node.
+
+        When not using authentication, this should be left as :const:`None`.
+        """
+        return self._auth_provider
+
+    @auth_provider.setter  # noqa
+    def auth_provider(self, value):
+        if not value:
+            self._auth_provider = value
+            return
+
+        try:
+            self._auth_provider_callable = value.new_authenticator
+        except AttributeError:
+            if self.protocol_version > 1:
+                raise TypeError("auth_provider must implement the cassandra.auth.AuthProvider "
+                                "interface when protocol_version >= 2")
+            elif not callable(value):
+                raise TypeError("auth_provider must be callable when protocol_version == 1")
+            self._auth_provider_callable = value
+
+        self._auth_provider = value
 
     load_balancing_policy = None
     """
@@ -241,12 +264,12 @@ class Cluster(object):
     metrics_enabled = False
     """
     Whether or not metric collection is enabled.  If enabled, :attr:`.metrics`
-    will be an instance of :class:`.metrics.Metrics`.
+    will be an instance of :class:`~cassandra.metrics.Metrics`.
     """
 
     metrics = None
     """
-    An instance of :class:`.metrics.Metrics` if :attr:`.metrics_enabled` is
+    An instance of :class:`cassandra.metrics.Metrics` if :attr:`.metrics_enabled` is
     :const:`True`, else :const:`None`.
     """
 
@@ -339,15 +362,8 @@ class Cluster(object):
         self.contact_points = contact_points
         self.port = port
         self.compression = compression
-
-        if auth_provider is not None:
-            if not hasattr(auth_provider, 'new_authenticator'):
-                if protocol_version > 1:
-                    raise TypeError("auth_provider must implement the cassandra.auth.AuthProvider "
-                                    "interface when protocol_version >= 2")
-                self.auth_provider = auth_provider
-            else:
-                self.auth_provider = auth_provider.new_authenticator
+        self.protocol_version = protocol_version
+        self.auth_provider = auth_provider
 
         if load_balancing_policy is not None:
             if isinstance(load_balancing_policy, type):
@@ -381,7 +397,6 @@ class Cluster(object):
         self.ssl_options = ssl_options
         self.sockopts = sockopts
         self.cql_version = cql_version
-        self.protocol_version = protocol_version
         self.max_schema_agreement_wait = max_schema_agreement_wait
         self.control_connection_timeout = control_connection_timeout
 
@@ -492,8 +507,8 @@ class Cluster(object):
         return partial(self.connection_class.factory, host.address, *args, **kwargs)
 
     def _make_connection_kwargs(self, address, kwargs_dict):
-        if self.auth_provider:
-            kwargs_dict['authenticator'] = self.auth_provider(address)
+        if self._auth_provider_callable:
+            kwargs_dict['authenticator'] = self._auth_provider_callable(address)
 
         kwargs_dict['port'] = self.port
         kwargs_dict['compression'] = self.compression
@@ -742,12 +757,21 @@ class Cluster(object):
         if self.is_shutdown:
             return
 
-        log.debug("Adding or renewing pools for new host %s and notifying listeners", host)
-        self._prepare_all_queries(host)
-        log.debug("Done preparing queries for new host %s", host)
+        log.debug("Handling new host %r and notifying listeners", host)
+
+        distance = self.load_balancing_policy.distance(host)
+        if distance != HostDistance.IGNORED:
+            self._prepare_all_queries(host)
+            log.debug("Done preparing queries for new host %r", host)
 
         self.load_balancing_policy.on_add(host)
         self.control_connection.on_add(host)
+
+        if distance == HostDistance.IGNORED:
+            log.debug("Not adding connection pool for new host %r because the "
+                      "load balancing policy has marked it as IGNORED", host)
+            self._finalize_add(host)
+            return
 
         futures_lock = Lock()
         futures_results = []
@@ -825,7 +849,7 @@ class Cluster(object):
         """
         new_host = self.metadata.add_host(address, datacenter, rack)
         if new_host and signal:
-            log.info("New Cassandra host %s added", address)
+            log.info("New Cassandra host %r discovered", new_host)
             self.on_add(new_host)
 
         return new_host
@@ -978,7 +1002,7 @@ class Session(object):
     :meth:`.ResponseFuture.add_errback`; even if a query exceeds this default
     timeout, neither the registered callback or errback will be called.
 
-    .. versionadded:: 2.0.0b1
+    .. versionadded:: 2.0.0
     """
 
     default_consistency_level = ConsistencyLevel.ONE
@@ -1008,7 +1032,7 @@ class Session(object):
     This only takes effect when protocol version 2 or higher is used.
     See :attr:`.Cluster.protocol_version` for details.
 
-    .. versionadded:: 2.0.0b1
+    .. versionadded:: 2.0.0
     """
 
     _lock = None
@@ -1711,6 +1735,7 @@ class ControlConnection(object):
             if partitioner and tokens:
                 token_map[host] = tokens
 
+        should_rebuild_token_map = False
         found_hosts = set()
         for row in peers_result:
             addr = row.get("rpc_address")
@@ -1727,8 +1752,9 @@ class ControlConnection(object):
             if host is None:
                 log.debug("[control connection] Found new host to connect to: %s", addr)
                 host = self._cluster.add_host(addr, datacenter, rack, signal=True)
+                should_rebuild_token_map = True
             else:
-                self._update_location_info(host, datacenter, rack)
+                should_rebuild_token_map |= self._update_location_info(host, datacenter, rack)
 
             tokens = row.get("tokens")
             if partitioner and tokens:
@@ -1739,15 +1765,17 @@ class ControlConnection(object):
                     old_host.address not in found_hosts and \
                     old_host.address not in self._cluster.contact_points:
                 log.debug("[control connection] Found host that has been removed: %r", old_host)
+                should_rebuild_token_map = True
                 self._cluster.remove_host(old_host)
 
-        if partitioner:
-            log.debug("[control connection] Fetched ring info, rebuilding metadata")
+        log.debug("[control connection] Finished fetching ring info")
+        if partitioner and should_rebuild_token_map:
+            log.debug("[control connection] Rebuilding token map due to topology changes")
             self._cluster.metadata.rebuild_token_map(partitioner, token_map)
 
     def _update_location_info(self, host, datacenter, rack):
         if host.datacenter == datacenter and host.rack == rack:
-            return
+            return False
 
         # If the dc/rack information changes, we need to update the load balancing policy.
         # For that, we remove and re-add the node against the policy. Not the most elegant, and assumes
@@ -1755,6 +1783,7 @@ class ControlConnection(object):
         self._cluster.load_balancing_policy.on_down(host)
         host.set_location_info(datacenter, rack)
         self._cluster.load_balancing_policy.on_up(host)
+        return True
 
     def _handle_topology_change(self, event):
         change_type = event["change_type"]
@@ -2123,6 +2152,8 @@ class ResponseFuture(object):
         Returns :const:`True` if there are more pages left in the
         query results, :const:`False` otherwise.  This should only
         be checked after the first page has been returned.
+
+        .. versionadded:: 2.0.0
         """
         return self._paging_state is not None
 
@@ -2133,6 +2164,8 @@ class ResponseFuture(object):
         is raised.  Also see :attr:`.has_more_pages`.
 
         This should only be called after the first page has been returned.
+
+        .. versionadded:: 2.0.0
         """
         if not self._paging_state:
             raise QueryExhausted()
@@ -2553,6 +2586,8 @@ class QueryExhausted(Exception):
     Raised when :meth:`.ResponseFuture.start_fetching_next_page()` is called and
     there are no more pages.  You can check :attr:`.ResponseFuture.has_more_pages`
     before calling to avoid this.
+
+    .. versionadded:: 2.0.0
     """
     pass
 
@@ -2576,7 +2611,7 @@ class PagedResult(object):
     an :class:`Exception` to be raised while fetching the next page, just
     like you might see on a normal call to ``session.execute()``.
 
-    .. versionadded: 2.0.0b1
+    .. versionadded: 2.0.0
     """
 
     def __init__(self, response_future, initial_response):
