@@ -1035,6 +1035,16 @@ class Session(object):
     .. versionadded:: 2.0.0
     """
 
+    use_client_timestamp = True
+    """
+    When using protocol version 3 or higher, write timestamps may be supplied
+    client-side at the protocol level.  (Normally they are generated
+    server-side by the coordinator node.)  Note that timestamps specified
+    within a CQL query will override this timestamp.
+
+    .. versionadded:: 2.1.0
+    """
+
     _lock = None
     _pools = None
     _load_balancer = None
@@ -1165,17 +1175,23 @@ class Session(object):
         if not fetch_size and self._protocol_version >= 2:
             fetch_size = self.default_fetch_size
 
+        if self._protocol_version >= 3 and self.use_client_timestamp:
+            timestamp = int(time.time() * 1e6)
+        else:
+            timestamp = None
+
         if isinstance(query, SimpleStatement):
             query_string = query.query_string
             if parameters:
                 query_string = bind_params(query.query_string, parameters)
             message = QueryMessage(
                 query_string, cl, query.serial_consistency_level,
-                fetch_size=fetch_size)
+                fetch_size, timestamp=timestamp)
         elif isinstance(query, BoundStatement):
             message = ExecuteMessage(
                 query.prepared_statement.query_id, query.values, cl,
-                query.serial_consistency_level, fetch_size=fetch_size)
+                query.serial_consistency_level, fetch_size,
+                timestamp=timestamp)
             prepared_statement = query.prepared_statement
         elif isinstance(query, BatchStatement):
             if self._protocol_version < 2:
@@ -1184,7 +1200,8 @@ class Session(object):
                     "2 or higher (supported in Cassandra 2.0 and higher).  Consider "
                     "setting Cluster.protocol_version to 2 to support this operation.")
             message = BatchMessage(
-                query.batch_type, query._statements_and_parameters, cl, query.serial_consistency_level)
+                query.batch_type, query._statements_and_parameters, cl,
+                query.serial_consistency_level, timestamp)
 
         if trace:
             message.tracing = True

@@ -23,7 +23,7 @@ from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
                        AlreadyExists, InvalidRequest, Unauthorized,
                        UnsupportedOperation)
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
-                               int8_pack, int8_unpack, header_pack)
+                               int8_pack, int8_unpack, uint64_pack, header_pack)
 from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 CounterColumnType, DateType, DecimalType,
                                 DoubleType, FloatType, Int32Type,
@@ -439,6 +439,7 @@ _SKIP_METADATA_FLAG = 0x01
 _PAGE_SIZE_FLAG = 0x04
 _WITH_PAGING_STATE_FLAG = 0x08
 _WITH_SERIAL_CONSISTENCY_FLAG = 0x10
+_PROTOCOL_TIMESTAMP = 0x20
 
 
 class QueryMessage(_MessageType):
@@ -446,12 +447,13 @@ class QueryMessage(_MessageType):
     name = 'QUERY'
 
     def __init__(self, query, consistency_level, serial_consistency_level=None,
-                 fetch_size=None, paging_state=None):
+                 fetch_size=None, paging_state=None, timestamp=None):
         self.query = query
         self.consistency_level = consistency_level
         self.serial_consistency_level = serial_consistency_level
         self.fetch_size = fetch_size
         self.paging_state = paging_state
+        self.timestamp = timestamp
 
     def send_body(self, f, protocol_version):
         write_longstring(f, self.query)
@@ -482,6 +484,9 @@ class QueryMessage(_MessageType):
                     "Automatic query paging may only be used with protocol version "
                     "2 or higher. Consider setting Cluster.protocol_version to 2.")
 
+        if self.timestamp is not None:
+            flags |= _PROTOCOL_TIMESTAMP
+
         write_byte(f, flags)
         if self.fetch_size:
             write_int(f, self.fetch_size)
@@ -489,6 +494,8 @@ class QueryMessage(_MessageType):
             write_longstring(f, self.paging_state)
         if self.serial_consistency_level:
             write_consistency_level(f, self.serial_consistency_level)
+        if self.timestamp is not None:
+            write_long(f, self.timestamp)
 
 CUSTOM_TYPE = object()
 
@@ -650,13 +657,14 @@ class ExecuteMessage(_MessageType):
 
     def __init__(self, query_id, query_params, consistency_level,
                  serial_consistency_level=None, fetch_size=None,
-                 paging_state=None):
+                 paging_state=None, timestamp=None):
         self.query_id = query_id
         self.query_params = query_params
         self.consistency_level = consistency_level
         self.serial_consistency_level = serial_consistency_level
         self.fetch_size = fetch_size
         self.paging_state = paging_state
+        self.timestamp = timestamp
 
     def send_body(self, f, protocol_version):
         write_string(f, self.query_id)
@@ -683,6 +691,13 @@ class ExecuteMessage(_MessageType):
                 flags |= _PAGE_SIZE_FLAG
             if self.paging_state:
                 flags |= _WITH_PAGING_STATE_FLAG
+            if self.timestamp is not None:
+                if protocol_version >= 3:
+                    flags |= _PROTOCOL_TIMESTAMP
+                else:
+                    raise UnsupportedOperation(
+                        "Protocol-level timestamps may only be used with protocol version "
+                        "3 or higher. Consider setting Cluster.protocol_version to 3.")
             write_byte(f, flags)
             write_short(f, len(self.query_params))
             for param in self.query_params:
@@ -693,17 +708,21 @@ class ExecuteMessage(_MessageType):
                 write_longstring(f, self.paging_state)
             if self.serial_consistency_level:
                 write_consistency_level(f, self.serial_consistency_level)
+            if self.timestamp is not None:
+                write_long(f, self.timestamp)
 
 
 class BatchMessage(_MessageType):
     opcode = 0x0D
     name = 'BATCH'
 
-    def __init__(self, batch_type, queries, consistency_level, serial_consistency_level=None):
+    def __init__(self, batch_type, queries, consistency_level,
+                 serial_consistency_level=None, timestamp=None):
         self.batch_type = batch_type
         self.queries = queries
         self.consistency_level = consistency_level
         self.serial_consistency_level = serial_consistency_level
+        self.timestamp = timestamp
 
     def send_body(self, f, protocol_version):
         write_byte(f, self.batch_type.value)
@@ -711,6 +730,8 @@ class BatchMessage(_MessageType):
             flags = 0
             if self.serial_consistency_level:
                 flags |= _WITH_SERIAL_CONSISTENCY_FLAG
+            if self.timestamp is not None:
+                flags |= _PROTOCOL_TIMESTAMP
             write_byte(f, flags)
         write_short(f, len(self.queries))
         for prepared, string_or_query_id, params in self.queries:
@@ -728,6 +749,8 @@ class BatchMessage(_MessageType):
         write_consistency_level(f, self.consistency_level)
         if protocol_version >= 3 and self.serial_consistency_level:
             write_consistency_level(f, self.serial_consistency_level)
+        if self.timestamp is not None:
+            write_long(f, self.timestamp)
 
 
 known_event_types = frozenset((
@@ -809,6 +832,10 @@ def read_int(f):
 
 def write_int(f, i):
     f.write(int32_pack(i))
+
+
+def write_long(f, i):
+    f.write(uint64_pack(i))
 
 
 def read_short(f):
