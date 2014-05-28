@@ -1,5 +1,5 @@
-2.0.0b2
-=======
+2.0.0
+=====
 In Progress
 
 Features
