@@ -1,3 +1,12 @@
+2.0.1
+=====
+May 28, 2014
+
+Bug Fixes
+---------
+* Fix check for Cluster.is_shutdown in in @run_in_executor
+  decorator
+
 2.0.0
 =====
 May 28, 2014

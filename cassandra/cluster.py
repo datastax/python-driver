@@ -130,7 +130,7 @@ def run_in_executor(f):
     @wraps(f)
     def new_f(self, *args, **kwargs):
 
-        if self._is_shutdown:
+        if self.is_shutdown:
             return
         try:
             future = self.executor.submit(f, self, *args, **kwargs)
