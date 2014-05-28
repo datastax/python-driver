@@ -1,6 +1,6 @@
 2.0.0
 =====
-In Progress
+May 28, 2014
 
 Features
 --------
