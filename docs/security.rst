@@ -1,3 +1,5 @@
+.. _security:
+
 Security
 ========
 The two main security components you will use with the

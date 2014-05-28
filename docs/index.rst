@@ -7,6 +7,7 @@ Python Cassandra Driver
    api/index
    installation
    getting_started
+   upgrading
    performance
    query_paging
    security
