@@ -9,6 +9,7 @@ Python Cassandra Driver
    getting_started
    performance
    query_paging
+   security
 
 Indices and Tables
 ==================
