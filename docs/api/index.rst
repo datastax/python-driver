@@ -9,6 +9,7 @@ API Documentation
    cassandra/policies
    cassandra/auth
    cassandra/metadata
+   cassandra/metrics
    cassandra/query
    cassandra/pool
    cassandra/decoder

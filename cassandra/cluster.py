@@ -206,7 +206,7 @@ class Cluster(object):
         """
         When :attr:`~.Cluster.protocol_version` is 2 or higher, this should
         be an instance of a subclass of :class:`~cassandra.auth.AuthProvider`,
-        such ass :class:`~.PlainTextAuthProvider`.
+        such as :class:`~.PlainTextAuthProvider`.
 
         When :attr:`~.Cluster.protocol_version` is 1, this should be
         a function that accepts one argument, the IP address of a node,
@@ -264,12 +264,12 @@ class Cluster(object):
     metrics_enabled = False
     """
     Whether or not metric collection is enabled.  If enabled, :attr:`.metrics`
-    will be an instance of :class:`.metrics.Metrics`.
+    will be an instance of :class:`~cassandra.metrics.Metrics`.
     """
 
     metrics = None
     """
-    An instance of :class:`.metrics.Metrics` if :attr:`.metrics_enabled` is
+    An instance of :class:`cassandra.metrics.Metrics` if :attr:`.metrics_enabled` is
     :const:`True`, else :const:`None`.
     """
 

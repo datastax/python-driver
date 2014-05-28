@@ -227,12 +227,12 @@ class Statement(object):
         :attr:`~.ConsistencyLevel.QUORUM` read is guaranteed to see that write.
         But if the regular :attr:`~.consistency_level` of that write is
         :attr:`~.ConsistencyLevel.ANY`, then only a read with a
-        :attr`~.consistency_level` of :attr:`~.ConsistencyLevel.SERIAL` is
+        :attr:`~.consistency_level` of :attr:`~.ConsistencyLevel.SERIAL` is
         guaranteed to see it (even a read with consistency
         :attr:`~.ConsistencyLevel.ALL` is not guaranteed to be enough).
 
-        The serial consistency can only be one of :attr:`~ConsistencyLevel.SERIAL`
-        or :attr:`~ConsistencyLevel.LOCAL_SERIAL`. While ``SERIAL`` guarantees full
+        The serial consistency can only be one of :attr:`~.ConsistencyLevel.SERIAL`
+        or :attr:`~.ConsistencyLevel.LOCAL_SERIAL`. While ``SERIAL`` guarantees full
         linearizability (with other ``SERIAL`` updates), ``LOCAL_SERIAL`` only
         guarantees it in the local data center.
 
@@ -241,7 +241,7 @@ class Statement(object):
         :attr:`consistency_level`.
 
         Serial consistency levels may only be used against Cassandra 2.0+
-        and the :attr:`~Cluster.protocol_version` must be set to 2 or higher.
+        and the :attr:`~.Cluster.protocol_version` must be set to 2 or higher.
         """)
 
     @property
