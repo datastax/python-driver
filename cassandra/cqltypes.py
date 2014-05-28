@@ -800,7 +800,9 @@ class UserDefinedType(_ParameterizedType):
             p += cls.FIELD_LENGTH
             item = byts[p:p + itemlen]
             p += itemlen
-            result.append(col_type.from_binary(item, protocol_version))
+            # collections inside UDTs are always encoded with at least the
+            # version 3 format
+            result.append(col_type.from_binary(item, max(3, protocol_version)))
 
         if len(result) < len(cls.subtypes):
             nones = [None] * (len(cls.subtypes) - len(result))
