@@ -672,12 +672,18 @@ class _SimpleParameterizedType(_ParameterizedType):
     @classmethod
     def deserialize_safe(cls, byts, protocol_version):
         subtype, = cls.subtypes
-        numelements = uint16_unpack(byts[:2])
-        p = 2
+        if protocol_version >= 3:
+            unpack = int32_unpack
+            length = 4
+        else:
+            unpack = uint16_unpack
+            length = 2
+        numelements = unpack(byts[:length])
+        p = length
         result = []
         for _ in range(numelements):
-            itemlen = uint16_unpack(byts[p:p + 2])
-            p += 2
+            itemlen = unpack(byts[p:p + length])
+            p += length
             item = byts[p:p + itemlen]
             p += itemlen
             result.append(subtype.from_binary(item, protocol_version))
@@ -722,16 +728,22 @@ class MapType(_ParameterizedType):
     @classmethod
     def deserialize_safe(cls, byts, protocol_version):
         subkeytype, subvaltype = cls.subtypes
-        numelements = uint16_unpack(byts[:2])
-        p = 2
+        if protocol_version >= 3:
+            unpack = int32_unpack
+            length = 4
+        else:
+            unpack = uint16_unpack
+            length = 2
+        numelements = unpack(byts[:length])
+        p = length
         themap = OrderedDict()
         for _ in range(numelements):
-            key_len = uint16_unpack(byts[p:p + 2])
-            p += 2
+            key_len = unpack(byts[p:p + length])
+            p += length
             keybytes = byts[p:p + key_len]
             p += key_len
-            val_len = uint16_unpack(byts[p:p + 2])
-            p += 2
+            val_len = unpack(byts[p:p + length])
+            p += length
             valbytes = byts[p:p + val_len]
             p += val_len
             key = subkeytype.from_binary(keybytes, protocol_version)
@@ -788,7 +800,7 @@ class UserDefinedType(_ParameterizedType):
             p += cls.FIELD_LENGTH
             item = byts[p:p + itemlen]
             p += itemlen
-            result.append(col_type.from_binary(item))
+            result.append(col_type.from_binary(item, protocol_version))
 
         if len(result) < len(cls.subtypes):
             nones = [None] * (len(cls.subtypes) - len(result))
