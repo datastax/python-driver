@@ -699,13 +699,19 @@ class BatchMessage(_MessageType):
     opcode = 0x0D
     name = 'BATCH'
 
-    def __init__(self, batch_type, queries, consistency_level):
+    def __init__(self, batch_type, queries, consistency_level, serial_consistency_level=None):
         self.batch_type = batch_type
         self.queries = queries
         self.consistency_level = consistency_level
+        self.serial_consistency_level = serial_consistency_level
 
     def send_body(self, f, protocol_version):
         write_byte(f, self.batch_type.value)
+        if protocol_version >= 3:
+            flags = 0
+            if self.serial_consistency_level:
+                flags |= _WITH_SERIAL_CONSISTENCY_FLAG
+            write_byte(f, flags)
         write_short(f, len(self.queries))
         for prepared, string_or_query_id, params in self.queries:
             if not prepared:
@@ -720,6 +726,8 @@ class BatchMessage(_MessageType):
                 write_value(f, param)
 
         write_consistency_level(f, self.consistency_level)
+        if protocol_version >= 3 and self.serial_consistency_level:
+            write_consistency_level(f, self.serial_consistency_level)
 
 
 known_event_types = frozenset((

@@ -1184,7 +1184,7 @@ class Session(object):
                     "2 or higher (supported in Cassandra 2.0 and higher).  Consider "
                     "setting Cluster.protocol_version to 2 to support this operation.")
             message = BatchMessage(
-                query.batch_type, query._statements_and_parameters, cl)
+                query.batch_type, query._statements_and_parameters, cl, query.serial_consistency_level)
 
         if trace:
             message.tracing = True
