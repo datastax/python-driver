@@ -318,45 +318,47 @@ class MapUpdateClause(ContainerUpdateClause):
     def __init__(self, field, value, operation=None, previous=None, column=None):
         super(MapUpdateClause, self).__init__(field, value, operation, previous, column=column)
         self._updates = None
-        self.previous = self.previous or {}
+        self.previous = self.previous
 
     def _analyze(self):
         if self._operation == "update":
             self._updates = self.value.keys()
         else:
-            if self.value.items():
-                self._updates = sorted([k for k, v in self.value.items() if v != self.previous.get(k)]) or None
+            if self.previous is None:
+                self._updates = sorted([k for k, v in self.value.items()])
             else:
-                self._updates = []
+                self._updates = sorted([k for k, v in self.value.items() if v != self.previous.get(k)]) or None
         self._analyzed = True
 
     def get_context_size(self):
         if not self._analyzed: self._analyze()
+        if self.previous is None:
+            return 1
         return len(self._updates or []) * 2
 
     def update_context(self, ctx):
         if not self._analyzed: self._analyze()
         ctx_id = self.context_id
-        if self._updates is None or self._updates:
+        if self.previous is None and not self._updates:
+            ctx[str(ctx_id)] = {}
+        else:
             for key in self._updates or []:
                 val = self.value.get(key)
                 ctx[str(ctx_id)] = self._column.key_col.to_database(key) if self._column else key
                 ctx[str(ctx_id + 1)] = self._column.value_col.to_database(val) if self._column else val
                 ctx_id += 2
-        else:
-            ctx[str(ctx_id)] = {}
 
     def __unicode__(self):
         if not self._analyzed: self._analyze()
         qs = []
 
         ctx_id = self.context_id
-        if self._updates is None or self._updates:
+        if self.previous is None and not self._updates:
+            qs += ['"int_map" = :1']
+        else:
             for _ in self._updates or []:
                 qs += ['"{}"[:{}] = :{}'.format(self.field, ctx_id, ctx_id + 1)]
                 ctx_id += 2
-        else:
-            qs += ['"int_map" = :1']
 
         return ', '.join(qs)
 
