@@ -6,6 +6,8 @@ Bug Fixes
 * Add six to requirements.txt
 * Avoid KeyError during schema refresh when a keyspace is dropped
   and TokenAwarePolicy is not in use
+* Avoid registering multiple atexit() cleanup functions will the
+  asyncore event loop is restarted multiple times
 
 2.0.1
 =====

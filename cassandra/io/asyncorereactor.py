@@ -20,6 +20,7 @@ import os
 import socket
 import sys
 from threading import Event, Lock, Thread
+import weakref
 
 from six import BytesIO
 from six.moves import range
@@ -46,6 +47,15 @@ from cassandra.marshal import int32_unpack
 log = logging.getLogger(__name__)
 
 
+def _cleanup(loop_weakref):
+    try:
+        loop = loop_weakref()
+    except ReferenceError:
+        return
+
+    loop._cleanup()
+
+
 class AsyncoreLoop(object):
 
     def __init__(self):
@@ -55,6 +65,8 @@ class AsyncoreLoop(object):
 
         self._conns_lock = Lock()
         self._conns = WeakSet()
+        self._thread = None
+        atexit.register(partial(_cleanup, weakref.ref(self)))
 
     def maybe_start(self):
         should_start = False
@@ -69,10 +81,9 @@ class AsyncoreLoop(object):
                 self._loop_lock.release()
 
         if should_start:
-            thread = Thread(target=self._run_loop, name="cassandra_driver_event_loop")
-            thread.daemon = True
-            thread.start()
-            atexit.register(partial(self._cleanup, thread))
+            self._thread = Thread(target=self._run_loop, name="cassandra_driver_event_loop")
+            self._thread.daemon = True
+            self._thread.start()
 
     def _run_loop(self):
         log.debug("Starting asyncore event loop")
@@ -95,11 +106,14 @@ class AsyncoreLoop(object):
 
         log.debug("Asyncore event loop ended")
 
-    def _cleanup(self, thread):
+    def _cleanup(self):
         self._shutdown = True
+        if not self._thread:
+            return
+
         log.debug("Waiting for event loop thread to join...")
-        thread.join(timeout=1.0)
-        if thread.is_alive():
+        self._thread.join(timeout=1.0)
+        if self._thread.is_alive():
             log.warning(
                 "Event loop thread could not be joined, so shutdown may not be clean. "
                 "Please call Cluster.shutdown() to avoid this.")
