@@ -1,3 +1,12 @@
+2.0.2
+=====
+
+Bug Fixes
+---------
+* Add six to requirements.txt
+* Avoid KeyError during schema refresh when a keyspace is dropped
+  and TokenAwarePolicy is not in use
+
 2.0.1
 =====
 May 28, 2014
