@@ -235,7 +235,7 @@ class ListUpdateClauseTests(TestCase):
 class MapUpdateTests(TestCase):
 
     def test_update(self):
-        c = MapUpdateClause('s', {3: 0, 5: 6}, {5: 0, 3: 4})
+        c = MapUpdateClause('s', {3: 0, 5: 6}, previous={5: 0, 3: 4})
         c._analyze()
         c.set_context_id(0)
 

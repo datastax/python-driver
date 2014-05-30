@@ -334,7 +334,7 @@ class MapUpdateClause(ContainerUpdateClause):
 
     def get_context_size(self):
         if not self._analyzed: self._analyze()
-        if self.previous is None:
+        if self.previous is None and not self._updates:
             return 1
         return len(self._updates or []) * 2
 
