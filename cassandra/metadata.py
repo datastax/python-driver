@@ -970,7 +970,7 @@ class TokenMap(object):
             return None
 
     def remove_keyspace(self, keyspace):
-        del self.tokens_to_hosts_by_ks[keyspace]
+        self.tokens_to_hosts_by_ks.pop(keyspace, None)
 
     def get_replicas(self, keyspace, token):
         """
