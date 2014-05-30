@@ -200,6 +200,8 @@ class SetUpdateClause(ContainerUpdateClause):
 
     def get_context_size(self):
         if not self._analyzed: self._analyze()
+        if self.previous is None and not (self._assignments or self._additions or self._removals):
+            return 1
         return int(bool(self._assignments)) + int(bool(self._additions)) + int(bool(self._removals))
 
     def update_context(self, ctx):
