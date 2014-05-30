@@ -799,6 +799,9 @@ class Map(BaseContainerColumn):
         def keys(self):
             return self.value.keys()
 
+        def items(self):
+            return self.value.items()
+
     def __init__(self, key_type, value_type, default=dict, **kwargs):
         """
         :param key_type: a column class indicating the types of the key

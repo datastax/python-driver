@@ -320,7 +320,10 @@ class MapUpdateClause(ContainerUpdateClause):
         if self._operation == "update":
             self._updates = self.value.keys()
         else:
-            self._updates = sorted([k for k, v in self.value.items() if v != self.previous.get(k)]) or None
+            if self.value.items():
+                self._updates = sorted([k for k, v in self.value.items() if v != self.previous.get(k)]) or None
+            else:
+                self._updates = []
         self._analyzed = True
 
     def get_context_size(self):
@@ -330,20 +333,26 @@ class MapUpdateClause(ContainerUpdateClause):
     def update_context(self, ctx):
         if not self._analyzed: self._analyze()
         ctx_id = self.context_id
-        for key in self._updates or []:
-            val = self.value.get(key)
-            ctx[str(ctx_id)] = self._column.key_col.to_database(key) if self._column else key
-            ctx[str(ctx_id + 1)] = self._column.value_col.to_database(val) if self._column else val
-            ctx_id += 2
+        if self._updates is None or self._updates:
+            for key in self._updates or []:
+                val = self.value.get(key)
+                ctx[str(ctx_id)] = self._column.key_col.to_database(key) if self._column else key
+                ctx[str(ctx_id + 1)] = self._column.value_col.to_database(val) if self._column else val
+                ctx_id += 2
+        else:
+            ctx[str(ctx_id)] = {}
 
     def __unicode__(self):
         if not self._analyzed: self._analyze()
         qs = []
 
         ctx_id = self.context_id
-        for _ in self._updates or []:
-            qs += ['"{}"[:{}] = :{}'.format(self.field, ctx_id, ctx_id + 1)]
-            ctx_id += 2
+        if self._updates is None or self._updates:
+            for _ in self._updates or []:
+                qs += ['"{}"[:{}] = :{}'.format(self.field, ctx_id, ctx_id + 1)]
+                ctx_id += 2
+        else:
+            qs += ['"int_map" = :1']
 
         return ', '.join(qs)
 
