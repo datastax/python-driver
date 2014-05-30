@@ -169,6 +169,8 @@ class SetUpdateClause(ContainerUpdateClause):
     def __unicode__(self):
         qs = []
         ctx_id = self.context_id
+        if self.previous is None and not (self._assignments or self._additions or self._removals):
+            qs += ['"{}" = :{}'.format(self.field, ctx_id)]
         if self._assignments:
             qs += ['"{}" = :{}'.format(self.field, ctx_id)]
             ctx_id += 1
@@ -203,6 +205,8 @@ class SetUpdateClause(ContainerUpdateClause):
     def update_context(self, ctx):
         if not self._analyzed: self._analyze()
         ctx_id = self.context_id
+        if self.previous is None and not (self._assignments or self._additions or self._removals):
+            ctx[str(ctx_id)] = self._to_database({})
         if self._assignments:
             ctx[str(ctx_id)] = self._to_database(self._assignments)
             ctx_id += 1
