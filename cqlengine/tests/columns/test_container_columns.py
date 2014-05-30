@@ -370,6 +370,20 @@ class TestListColumn(BaseCassEngTestCase):
         with self.assertRaises(ValidationError):
             TestListModel.create(partition=pkey, int_list=[None])
 
+    def test_blind_list_updates_from_none(self):
+        """ Tests that updates from None work as expected """
+        m = TestListModel.create(int_list=None)
+        expected = [1, 2]
+        m.int_list = expected
+        m.save()
+
+        m2 = TestListModel.get(partition=m.partition)
+        assert m2.int_list == expected
+
+        TestListModel.objects(partition=m.partition).update(int_list=[])
+
+        m3 = TestListModel.get(partition=m.partition)
+        assert m3.int_list == []
 
 class TestMapModel(Model):
 
