@@ -229,7 +229,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         self.defunct(sys.exc_info()[1])
 
     def handle_close(self):
-        log.debug("connection (%s) to %s closed by server", id(self), self.host)
+        log.debug("Connection %s closed by server", self)
         self.close()
 
     def handle_write(self):
@@ -277,24 +277,24 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         if self._iobuf.tell():
             while True:
                 pos = self._iobuf.tell()
-                if pos < 8 or (self._total_reqd_bytes > 0 and pos < self._total_reqd_bytes):
+                if pos < self._full_header_length or (self._total_reqd_bytes > 0 and pos < self._total_reqd_bytes):
                     # we don't have a complete header yet or we
                     # already saw a header, but we don't have a
                     # complete message yet
                     break
                 else:
                     # have enough for header, read body len from header
-                    self._iobuf.seek(4)
+                    self._iobuf.seek(self._header_length)
                     body_len = int32_unpack(self._iobuf.read(4))
 
                     # seek to end to get length of current buffer
                     self._iobuf.seek(0, os.SEEK_END)
                     pos = self._iobuf.tell()
 
-                    if pos >= body_len + 8:
+                    if pos >= body_len + self._full_header_length:
                         # read message header and body
                         self._iobuf.seek(0)
-                        msg = self._iobuf.read(8 + body_len)
+                        msg = self._iobuf.read(self._full_header_length + body_len)
 
                         # leave leftover in current buffer
                         leftover = self._iobuf.read()
@@ -304,7 +304,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
                         self._total_reqd_bytes = 0
                         self.process_msg(msg, body_len)
                     else:
-                        self._total_reqd_bytes = body_len + 8
+                        self._total_reqd_bytes = body_len + self._full_header_length
                         break
 
             if not self._callbacks and not self.is_control_connection:

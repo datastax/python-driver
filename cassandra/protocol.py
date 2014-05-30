@@ -23,7 +23,8 @@ from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
                        AlreadyExists, InvalidRequest, Unauthorized,
                        UnsupportedOperation)
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
-                               int8_pack, int8_unpack, uint64_pack, header_pack)
+                               int8_pack, int8_unpack, uint64_pack, header_pack,
+                               v3_header_pack)
 from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 CounterColumnType, DateType, DecimalType,
                                 DoubleType, FloatType, Int32Type,
@@ -80,11 +81,7 @@ class _MessageType(object):
             flags |= TRACING_FLAG
 
         msg = six.BytesIO()
-        write_header(
-            msg,
-            protocol_version | HEADER_DIRECTION_FROM_CLIENT,
-            flags, stream_id, self.opcode, len(body)
-        )
+        write_header(msg, protocol_version, flags, stream_id, self.opcode, len(body))
         msg.write(body)
 
         return msg.getvalue()
@@ -824,7 +821,8 @@ def write_header(f, version, flags, stream_id, opcode, length):
     """
     Write a CQL protocol frame header.
     """
-    f.write(header_pack(version, flags, stream_id, opcode))
+    pack = v3_header_pack if version >= 3 else header_pack
+    f.write(pack(version | HEADER_DIRECTION_FROM_CLIENT, flags, stream_id, opcode))
     write_int(f, length)
 
 

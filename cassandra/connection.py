@@ -29,7 +29,7 @@ import six
 from six.moves import range
 
 from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut
-from cassandra.marshal import int32_pack, header_unpack
+from cassandra.marshal import int32_pack, header_unpack, v3_header_unpack
 from cassandra.protocol import (ReadyMessage, AuthenticateMessage, OptionsMessage,
                                 StartupMessage, ErrorMessage, CredentialsMessage,
                                 QueryMessage, ResultMessage, decode_response,
@@ -78,8 +78,6 @@ else:
         return snappy.decompress(byts)
     locally_supported_compressions['snappy'] = (snappy.compress, decompress)
 
-
-MAX_STREAM_PER_CONNECTION = 127
 
 PROTOCOL_VERSION_MASK = 0x7f
 
@@ -153,6 +151,7 @@ class Connection(object):
     ssl_options = None
     last_error = None
     in_flight = 0
+    current_request_id = 0
     is_defunct = False
     is_closed = False
     lock = None
@@ -172,10 +171,27 @@ class Connection(object):
         self.protocol_version = protocol_version
         self.is_control_connection = is_control_connection
         self._push_watchers = defaultdict(set)
+        if protocol_version >= 3:
+            self._header_unpack = v3_header_unpack
+            self._header_length = 5
+            self.max_request_id = (2 ** 15) - 1
+        else:
+            self._header_unpack = header_unpack
+            self._header_length = 4
+            self.max_request_id = (2 ** 7) - 1
 
-        self._id_queue = Queue(MAX_STREAM_PER_CONNECTION)
-        for i in range(MAX_STREAM_PER_CONNECTION):
-            self._id_queue.put_nowait(i)
+        # 0         8        16        24        32         40
+        # +---------+---------+---------+---------+---------+
+        # | version |  flags  |      stream       | opcode  |
+        # +---------+---------+---------+---------+---------+
+        # |                length                 |
+        # +---------+---------+---------+---------+
+        # |                                       |
+        # .            ...  body ...              .
+        # .                                       .
+        # .                                       .
+        # +----------------------------------------
+        self._full_header_length = self._header_length + 4
 
         self.lock = RLock()
 
@@ -210,6 +226,11 @@ class Connection(object):
                             "failed connection (%s) to host %s:",
                             id(self), self.host, exc_info=True)
 
+    def get_request_id(self):
+        current = self.current_request_id
+        self.current_request_id = (current + 1) % self.max_request_id
+        return current
+
     def handle_pushed(self, response):
         log.debug("Message pushed from server: %r", response)
         for cb in self._push_watchers.get(response.event_type, []):
@@ -218,20 +239,11 @@ class Connection(object):
             except Exception:
                 log.exception("Pushed event handler errored, ignoring:")
 
-    def send_msg(self, msg, cb, wait_for_id=False):
+    def send_msg(self, msg, request_id, cb):
         if self.is_defunct:
             raise ConnectionShutdown("Connection to %s is defunct" % self.host)
         elif self.is_closed:
             raise ConnectionShutdown("Connection to %s is closed" % self.host)
-
-        if not wait_for_id:
-            try:
-                request_id = self._id_queue.get_nowait()
-            except Empty:
-                raise ConnectionBusy(
-                    "Connection to %s is at the max number of requests" % self.host)
-        else:
-            request_id = self._id_queue.get()
 
         self._callbacks[request_id] = cb
         self.push(msg.to_binary(request_id, self.protocol_version, compression=self.compressor))
@@ -251,11 +263,15 @@ class Connection(object):
         while True:
             needed = len(msgs) - messages_sent
             with self.lock:
-                available = min(needed, MAX_STREAM_PER_CONNECTION - self.in_flight)
+                available = min(needed, self.max_request_id - self.in_flight)
+                start_request_id = self.current_request_id
+                self.current_request_id = (self.current_request_id + available) % self.max_request_id
                 self.in_flight += available
 
-            for i in range(messages_sent, messages_sent + available):
-                self.send_msg(msgs[i], partial(waiter.got_response, index=i), wait_for_id=True)
+            for i in range(available):
+                self.send_msg(msgs[messages_sent + i],
+                              (start_request_id + i) % self.max_request_id,
+                              partial(waiter.got_response, index=messages_sent + i))
             messages_sent += available
 
             if messages_sent == len(msgs):
@@ -287,12 +303,11 @@ class Connection(object):
 
     @defunct_on_error
     def process_msg(self, msg, body_len):
-        version, flags, stream_id, opcode = header_unpack(msg[:4])
+        version, flags, stream_id, opcode = self._header_unpack(msg[:self._header_length])
         if stream_id < 0:
             callback = None
         else:
             callback = self._callbacks.pop(stream_id, None)
-            self._id_queue.put_nowait(stream_id)
 
         body = None
         try:
@@ -344,7 +359,7 @@ class Connection(object):
             self._send_startup_message()
         else:
             log.debug("Sending initial options message for new connection (%s) to %s", id(self), self.host)
-            self.send_msg(OptionsMessage(), self._handle_options_response)
+            self.send_msg(OptionsMessage(), 0, self._handle_options_response)
 
     @defunct_on_error
     def _handle_options_response(self, options_response):
@@ -411,11 +426,13 @@ class Connection(object):
 
     @defunct_on_error
     def _send_startup_message(self, compression=None):
+        log.debug("Sending StartupMessage on %s", self)
         opts = {}
         if compression:
             opts['COMPRESSION'] = compression
         sm = StartupMessage(cqlversion=self.cql_version, options=opts)
-        self.send_msg(sm, cb=self._handle_startup_response)
+        self.send_msg(sm, 0, cb=self._handle_startup_response)
+        log.debug("Sent StartupMessage on %s", self)
 
     @defunct_on_error
     def _handle_startup_response(self, startup_response, did_authenticate=False):
@@ -439,12 +456,12 @@ class Connection(object):
                 log.debug("Sending credentials-based auth response on %s", self)
                 cm = CredentialsMessage(creds=self.authenticator)
                 callback = partial(self._handle_startup_response, did_authenticate=True)
-                self.send_msg(cm, cb=callback)
+                self.send_msg(cm, 0, cb=callback)
             else:
                 log.debug("Sending SASL-based auth response on %s", self)
                 initial_response = self.authenticator.initial_response()
                 initial_response = "" if initial_response is None else initial_response.encode('utf-8')
-                self.send_msg(AuthResponseMessage(initial_response), self._handle_auth_response)
+                self.send_msg(AuthResponseMessage(initial_response), 0, self._handle_auth_response)
         elif isinstance(startup_response, ErrorMessage):
             log.debug("Received ErrorMessage on new connection (%s) from %s: %s",
                       id(self), self.host, startup_response.summary_msg())
@@ -479,7 +496,7 @@ class Connection(object):
             response = self.authenticator.evaluate_challenge(auth_response.challenge)
             msg = AuthResponseMessage("" if response is None else response)
             log.debug("Responding to auth challenge on %s", self)
-            self.send_msg(msg, self._handle_auth_response)
+            self.send_msg(msg, 0, self._handle_auth_response)
         elif isinstance(auth_response, ErrorMessage):
             log.debug("Received ErrorMessage on new connection (%s) from %s: %s",
                       id(self), self.host, auth_response.summary_msg())
@@ -543,7 +560,21 @@ class Connection(object):
                 callback(self, self.defunct(ConnectionException(
                     "Problem while setting keyspace: %r" % (result,), self.host)))
 
-        self.send_msg(query, process_result, wait_for_id=True)
+        request_id = None
+        # we use a busy wait on the lock here because:
+        # - we'll only spin if the connection is at max capacity, which is very
+        #   unlikely for a set_keyspace call
+        # - it allows us to avoid signaling a condition every time a request completes
+        while True:
+            with self.lock:
+                if self.in_flight < self.max_request_id:
+                    request_id = self.get_request_id()
+                    self.in_flight += 1
+                    break
+
+            time.sleep(0.001)
+
+        self.send_msg(query, request_id, process_result)
 
     def __str__(self):
         status = ""

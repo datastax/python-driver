@@ -2143,8 +2143,8 @@ class ResponseFuture(object):
         connection = None
         try:
             # TODO get connectTimeout from cluster settings
-            connection = pool.borrow_connection(timeout=2.0)
-            request_id = connection.send_msg(message, cb=cb)
+            connection, request_id = pool.borrow_connection(timeout=2.0)
+            connection.send_msg(message, request_id, cb=cb)
         except NoConnectionsAvailable as exc:
             log.debug("All connections for host %s are at capacity, moving to the next host", host)
             self._errors[host] = exc

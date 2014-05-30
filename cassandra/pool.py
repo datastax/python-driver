@@ -28,7 +28,7 @@ except ImportError:
     from cassandra.util import WeakSet  # NOQA
 
 from cassandra import AuthenticationFailed
-from cassandra.connection import MAX_STREAM_PER_CONNECTION, ConnectionException
+from cassandra.connection import ConnectionException
 
 log = logging.getLogger(__name__)
 
@@ -349,6 +349,7 @@ class HostConnectionPool(object):
             max_conns = self._session.cluster.get_max_connections_per_host(self.host_distance)
 
             least_busy = min(conns, key=lambda c: c.in_flight)
+            request_id = None
             # to avoid another thread closing this connection while
             # trashing it (through the return_connection process), hold
             # the connection lock from this point until we've incremented
@@ -356,15 +357,16 @@ class HostConnectionPool(object):
             need_to_wait = False
             with least_busy.lock:
 
-                if least_busy.in_flight >= MAX_STREAM_PER_CONNECTION:
+                if least_busy.in_flight >= least_busy.max_request_id:
                     # once we release the lock, wait for another connection
                     need_to_wait = True
                 else:
                     least_busy.in_flight += 1
+                    request_id = least_busy.get_request_id()
 
             if need_to_wait:
                 # wait_for_conn will increment in_flight on the conn
-                least_busy = self._wait_for_conn(timeout)
+                least_busy, request_id = self._wait_for_conn(timeout)
 
             # if we have too many requests on this connection but we still
             # have space to open a new connection against this host, go ahead
@@ -372,7 +374,7 @@ class HostConnectionPool(object):
             if least_busy.in_flight >= max_reqs and len(self._connections) < max_conns:
                 self._maybe_spawn_new_connection()
 
-            return least_busy
+            return least_busy, request_id
 
     def _maybe_spawn_new_connection(self):
         with self._lock:
@@ -461,9 +463,9 @@ class HostConnectionPool(object):
             if conns:
                 least_busy = min(conns, key=lambda c: c.in_flight)
                 with least_busy.lock:
-                    if least_busy.in_flight < MAX_STREAM_PER_CONNECTION:
+                    if least_busy.in_flight < least_busy.max_request_id:
                         least_busy.in_flight += 1
-                        return least_busy
+                        return least_busy, least_busy.get_request_id()
 
             remaining = timeout - (time.time() - start)
 

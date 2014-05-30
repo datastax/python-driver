@@ -46,6 +46,9 @@ class AsyncoreConnectionTest(unittest.TestCase):
         cls.mock_socket = cls.socket_patcher.start()
         cls.mock_socket().connect_ex.return_value = 0
         cls.mock_socket().getsockopt.return_value = 0
+        cls.mock_socket().fileno.return_value = 100
+
+        AsyncoreConnection.add_channel = lambda *args, **kwargs: None
 
     @classmethod
     def tearDownClass(cls):
@@ -97,7 +100,7 @@ class AsyncoreConnectionTest(unittest.TestCase):
         # let it write out a StartupMessage
         c.handle_write()
 
-        header = self.make_header_prefix(ReadyMessage, stream_id=1)
+        header = self.make_header_prefix(ReadyMessage, stream_id=0)
         c.socket.recv.return_value = self.make_msg(header)
         c.handle_read()
 
@@ -169,7 +172,7 @@ class AsyncoreConnectionTest(unittest.TestCase):
         # let it write out a StartupMessage
         c.handle_write()
 
-        header = self.make_header_prefix(ServerError, stream_id=1)
+        header = self.make_header_prefix(ServerError, stream_id=0)
         body = self.make_error_body(ServerError.error_code, ServerError.summary)
         c.socket.recv.return_value = self.make_msg(header, body)
         c.handle_read()
@@ -251,7 +254,7 @@ class AsyncoreConnectionTest(unittest.TestCase):
         # let it write out a StartupMessage
         c.handle_write()
 
-        header = self.make_header_prefix(ReadyMessage, stream_id=1)
+        header = self.make_header_prefix(ReadyMessage, stream_id=0)
         c.socket.recv.return_value = self.make_msg(header)
         c.handle_read()
 
@@ -278,7 +281,7 @@ class AsyncoreConnectionTest(unittest.TestCase):
         # let it write out a StartupMessage
         c.handle_write()
 
-        header = self.make_header_prefix(ReadyMessage, stream_id=1)
+        header = self.make_header_prefix(ReadyMessage, stream_id=0)
         c.socket.recv.return_value = self.make_msg(header)
         c.handle_read()
 

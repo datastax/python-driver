@@ -68,7 +68,6 @@ class ConnectionTest(unittest.TestCase):
 
     def test_bad_protocol_version(self, *args):
         c = self.make_connection()
-        c._id_queue.get_nowait()
         c._callbacks = Mock()
         c.defunct = Mock()
 
@@ -85,7 +84,6 @@ class ConnectionTest(unittest.TestCase):
 
     def test_bad_header_direction(self, *args):
         c = self.make_connection()
-        c._id_queue.get_nowait()
         c._callbacks = Mock()
         c.defunct = Mock()
 
@@ -107,7 +105,6 @@ class ConnectionTest(unittest.TestCase):
 
     def test_negative_body_length(self, *args):
         c = self.make_connection()
-        c._id_queue.get_nowait()
         c._callbacks = Mock()
         c.defunct = Mock()
 
@@ -124,7 +121,6 @@ class ConnectionTest(unittest.TestCase):
 
     def test_unsupported_cql_version(self, *args):
         c = self.make_connection()
-        c._id_queue.get_nowait()
         c._callbacks = {0: c._handle_options_response}
         c.defunct = Mock()
         c.cql_version = "3.0.3"
@@ -149,7 +145,6 @@ class ConnectionTest(unittest.TestCase):
 
     def test_prefer_lz4_compression(self, *args):
         c = self.make_connection()
-        c._id_queue.get_nowait()
         c._callbacks = {0: c._handle_options_response}
         c.defunct = Mock()
         c.cql_version = "3.0.3"
@@ -176,7 +171,6 @@ class ConnectionTest(unittest.TestCase):
 
     def test_requested_compression_not_available(self, *args):
         c = self.make_connection()
-        c._id_queue.get_nowait()
         c._callbacks = {0: c._handle_options_response}
         c.defunct = Mock()
         # request lz4 compression
@@ -208,7 +202,6 @@ class ConnectionTest(unittest.TestCase):
 
     def test_use_requested_compression(self, *args):
         c = self.make_connection()
-        c._id_queue.get_nowait()
         c._callbacks = {0: c._handle_options_response}
         c.defunct = Mock()
         # request snappy compression
@@ -237,7 +230,6 @@ class ConnectionTest(unittest.TestCase):
 
     def test_disable_compression(self, *args):
         c = self.make_connection()
-        c._id_queue.get_nowait()
         c._callbacks = {0: c._handle_options_response}
         c.defunct = Mock()
         # disable compression

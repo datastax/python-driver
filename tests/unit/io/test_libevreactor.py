@@ -97,7 +97,7 @@ class LibevConnectionTest(unittest.TestCase):
         # let it write out a StartupMessage
         c.handle_write(None, 0)
 
-        header = self.make_header_prefix(ReadyMessage, stream_id=1)
+        header = self.make_header_prefix(ReadyMessage, stream_id=0)
         c._socket.recv.return_value = self.make_msg(header)
         c.handle_read(None, 0)
 
@@ -169,7 +169,7 @@ class LibevConnectionTest(unittest.TestCase):
         # let it write out a StartupMessage
         c.handle_write(None, 0)
 
-        header = self.make_header_prefix(ServerError, stream_id=1)
+        header = self.make_header_prefix(ServerError, stream_id=0)
         body = self.make_error_body(ServerError.error_code, ServerError.summary)
         c._socket.recv.return_value = self.make_msg(header, body)
         c.handle_read(None, 0)
@@ -252,7 +252,7 @@ class LibevConnectionTest(unittest.TestCase):
         # let it write out a StartupMessage
         c.handle_write(None, 0)
 
-        header = self.make_header_prefix(ReadyMessage, stream_id=1)
+        header = self.make_header_prefix(ReadyMessage, stream_id=0)
         c._socket.recv.return_value = self.make_msg(header)
         c.handle_read(None, 0)
 
@@ -279,7 +279,7 @@ class LibevConnectionTest(unittest.TestCase):
         # let it write out a StartupMessage
         c.handle_write(None, 0)
 
-        header = self.make_header_prefix(ReadyMessage, stream_id=1)
+        header = self.make_header_prefix(ReadyMessage, stream_id=0)
         c._socket.recv.return_value = self.make_msg(header)
         c.handle_read(None, 0)
 
