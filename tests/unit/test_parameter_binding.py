@@ -83,13 +83,14 @@ class BoundStatementTestCase(unittest.TestCase):
                                                query_id=None,
                                                routing_key_indexes=[],
                                                query=None,
-                                               keyspace=keyspace)
+                                               keyspace=keyspace,
+                                               protocol_version=2)
         bound_statement = BoundStatement(prepared_statement=prepared_statement)
 
         values = ['nonint', 1]
 
         try:
-            bound_statement.bind(values, protocol_version=1)
+            bound_statement.bind(values)
         except TypeError as e:
             self.assertIn('foo1', str(e))
             self.assertIn('Int32Type', str(e))
@@ -100,7 +101,7 @@ class BoundStatementTestCase(unittest.TestCase):
         values = [1, ['1', '2']]
 
         try:
-            bound_statement.bind(values, protocol_version=1)
+            bound_statement.bind(values)
         except TypeError as e:
             self.assertIn('foo2', str(e))
             self.assertIn('Int32Type', str(e))

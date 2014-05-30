@@ -313,21 +313,25 @@ class PreparedStatement(object):
     consistency_level = None
     serial_consistency_level = None
 
+    _protocol_version = None
+
     def __init__(self, column_metadata, query_id, routing_key_indexes, query, keyspace,
-                 consistency_level=None, serial_consistency_level=None, fetch_size=None):
+                 protocol_version, consistency_level=None, serial_consistency_level=None,
+                 fetch_size=None):
         self.column_metadata = column_metadata
         self.query_id = query_id
         self.routing_key_indexes = routing_key_indexes
         self.query_string = query
         self.keyspace = keyspace
+        self._protocol_version = protocol_version
         self.consistency_level = consistency_level
         self.serial_consistency_level = serial_consistency_level
         self.fetch_size = fetch_size
 
     @classmethod
-    def from_message(cls, query_id, column_metadata, cluster_metadata, query, keyspace):
+    def from_message(cls, query_id, column_metadata, cluster_metadata, query, keyspace, protocol_version):
         if not column_metadata:
-            return PreparedStatement(column_metadata, query_id, None, query, keyspace)
+            return PreparedStatement(column_metadata, query_id, None, query, keyspace, protocol_version)
 
         partition_key_columns = None
         routing_key_indexes = None
@@ -350,15 +354,16 @@ class PreparedStatement(object):
                     pass  # we're missing a partition key component in the prepared
                           # statement; just leave routing_key_indexes as None
 
-        return PreparedStatement(column_metadata, query_id, routing_key_indexes, query, keyspace)
+        return PreparedStatement(column_metadata, query_id, routing_key_indexes,
+                                 query, keyspace, protocol_version)
 
-    def bind(self, values, protocol_version):
+    def bind(self, values):
         """
         Creates and returns a :class:`BoundStatement` instance using `values`.
         The `values` parameter **must** be a sequence, such as a tuple or list,
         even if there is only one value to bind.
         """
-        return BoundStatement(self).bind(values, protocol_version)
+        return BoundStatement(self).bind(values)
 
     def __str__(self):
         consistency = ConsistencyLevel.value_to_name.get(self.consistency_level, 'Not Set')
@@ -397,7 +402,7 @@ class BoundStatement(Statement):
 
         Statement.__init__(self, *args, **kwargs)
 
-    def bind(self, values, protocol_version):
+    def bind(self, values):
         """
         Binds a sequence of values for the prepared statement parameters
         and returns this instance.  Note that `values` *must* be:
@@ -407,6 +412,8 @@ class BoundStatement(Statement):
         if values is None:
             values = ()
         col_meta = self.prepared_statement.column_metadata
+
+        proto_version = self.prepared_statement._protocol_version
 
         # special case for binding dicts
         if isinstance(values, dict):
@@ -457,7 +464,7 @@ class BoundStatement(Statement):
                 col_type = col_spec[-1]
 
                 try:
-                    self.values.append(col_type.serialize(value, protocol_version))
+                    self.values.append(col_type.serialize(value, proto_version))
                 except (TypeError, struct.error):
                     col_name = col_spec[2]
                     expected_type = col_type

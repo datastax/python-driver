@@ -1168,7 +1168,7 @@ class Session(object):
         if isinstance(query, six.string_types):
             query = SimpleStatement(query)
         elif isinstance(query, PreparedStatement):
-            query = query.bind(parameters, self._protocol_version)
+            query = query.bind(parameters)
 
         cl = query.consistency_level if query.consistency_level is not None else self.default_consistency_level
         fetch_size = query.fetch_size
@@ -1246,7 +1246,8 @@ class Session(object):
             raise
 
         prepared_statement = PreparedStatement.from_message(
-            query_id, column_metadata, self.cluster.metadata, query, self.keyspace)
+            query_id, column_metadata, self.cluster.metadata, query, self.keyspace,
+            self._protocol_version)
 
         host = future._current_host
         try:

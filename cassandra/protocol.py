@@ -558,7 +558,7 @@ class ResultMessage(_MessageType):
         elif kind == RESULT_KIND_PREPARED:
             results = cls.recv_results_prepared(f)
         elif kind == RESULT_KIND_SCHEMA_CHANGE:
-            results = cls.recv_results_schema_change(f)
+            results = cls.recv_results_schema_change(f, protocol_version)
         return cls(kind, results, paging_state)
 
     @classmethod
