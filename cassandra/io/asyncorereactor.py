@@ -135,11 +135,16 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
     module in the Python standard library for its event loop.
     """
 
-    _loop = AsyncoreLoop()
+    _loop = None
 
     _total_reqd_bytes = 0
     _writable = False
     _readable = False
+
+    @classmethod
+    def initialize_reactor(cls):
+        if not cls._loop:
+            cls._loop = AsyncoreLoop()
 
     @classmethod
     def factory(cls, *args, **kwargs):

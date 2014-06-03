@@ -530,6 +530,7 @@ class Cluster(object):
                 raise Exception("Cluster is already shut down")
 
             if not self._is_setup:
+                self.connection_class.initialize_reactor()
                 atexit.register(partial(_shutdown_cluster, self))
                 for address in self.contact_points:
                     host = self.add_host(address, signal=False)

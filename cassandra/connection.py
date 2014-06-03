@@ -179,6 +179,14 @@ class Connection(object):
 
         self.lock = RLock()
 
+    @classmethod
+    def initialize_reactor(self):
+        """
+        Called once by Cluster.connect().  This should be used by implementations
+        to set up any resources that will be shared across connections.
+        """
+        pass
+
     def close(self):
         raise NotImplementedError()
 

@@ -50,6 +50,7 @@ class LibevConnectionTest(unittest.TestCase):
     def setUp(self):
         if LibevConnection is None:
             raise unittest.SkipTest('libev does not appear to be installed correctly')
+        LibevConnection.initialize_reactor()
 
     def make_connection(self):
         c = LibevConnection('1.2.3.4', cql_version='3.0.1')

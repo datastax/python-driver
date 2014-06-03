@@ -200,13 +200,17 @@ class LibevConnection(Connection):
     """
     An implementation of :class:`.Connection` that uses libev for its event loop.
     """
-    _libevloop = LibevLoop()
-
+    _libevloop = None
     _write_watcher_is_active = False
     _total_reqd_bytes = 0
     _read_watcher = None
     _write_watcher = None
     _socket = None
+
+    @classmethod
+    def initialize_reactor(cls):
+        if not cls._libevloop:
+            cls._libevloop = LibevLoop()
 
     @classmethod
     def factory(cls, *args, **kwargs):
