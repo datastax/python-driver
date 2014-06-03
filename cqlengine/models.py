@@ -649,9 +649,12 @@ class ModelMetaClass(type):
 
         has_partition_keys = any(v.partition_key for (k, v) in column_definitions)
 
-        #TODO: check that the defined columns don't conflict with any of the Model API's existing attributes/methods
         #transform column definitions
         for k, v in column_definitions:
+            # don't allow a column with the same name as a built-in attribute or method
+            if k in BaseModel.__dict__:
+                raise ModelDefinitionException("column '{}' conflicts with built-in attribute/method".format(k))
+
             # counter column primary keys are not allowed
             if (v.primary_key or v.partition_key) and isinstance(v, (columns.Counter, columns.BaseContainerColumn)):
                 raise ModelDefinitionException('counter columns and container columns cannot be used as primary keys')
@@ -661,7 +664,7 @@ class ModelMetaClass(type):
             if not has_partition_keys and v.primary_key:
                 v.partition_key = True
                 has_partition_keys = True
-            _transform_column(k,v)
+            _transform_column(k, v)
 
         partition_keys = OrderedDict(k for k in primary_keys.items() if k[1].partition_key)
         clustering_keys = OrderedDict(k for k in primary_keys.items() if not k[1].partition_key)
