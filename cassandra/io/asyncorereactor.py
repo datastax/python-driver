@@ -185,8 +185,19 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
 
         self._loop.connection_created(self)
 
-        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.connect((self.host, self.port))
+        sockerr = None
+        for (af, socktype, proto, canonname, sockaddr) in socket.getaddrinfo(self.host, self.port, 0, socket.SOCK_STREAM):
+            try:
+                self.create_socket(af, socktype)
+                self.connect(sockaddr)
+                sockerr = None
+                break
+            except socket.error as err:
+                sockerr = err
+        if sockerr:
+            raise socket.error(sockerr.errno, "Tried connecting to all addresses. Last error was %s" % sockerr.message)
+
+
         self.add_channel()
 
         if self.sockopts:
