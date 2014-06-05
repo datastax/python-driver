@@ -262,13 +262,22 @@ class LibevConnection(Connection):
         self.deque = deque()
         self._deque_lock = Lock()
 
-        self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        addrinfo = socket.getaddrinfo(self.host, self.port, 0, socket.SOCK_STREAM)
+        # Only try connecting to the first address listed. This is not
+        # the proper way to do it, but I'm a bit too lazy to figure
+        # out the event loop callback stuff required to try all
+        # entries.
+        # At least try to warn the user about this limitation.
+        if len(addrinfo) > 1:
+            log.warning("This version of python-driver will only try the first address returned by getaddrinfo")
+        (af, socktype, proto, cannoname, sockaddr) = addrinfo[0]
+        self._socket = socket.socket(af, socktype, proto)
         if self.ssl_options:
             if not ssl:
                 raise Exception("This version of Python was not compiled with SSL support")
             self._socket = ssl.wrap_socket(self._socket, **self.ssl_options)
         self._socket.settimeout(1.0)  # TODO potentially make this value configurable
-        self._socket.connect((self.host, self.port))
+        self._socket.connect(sockaddr)
         self._socket.setblocking(0)
 
         if self.sockopts:
