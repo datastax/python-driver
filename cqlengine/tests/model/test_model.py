@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from cqlengine.models import Model
+from cqlengine.models import Model, ModelDefinitionException
 from cqlengine import columns
 
 
@@ -31,3 +31,21 @@ class TestModel(TestCase):
 
         self.assertEqual(m0, m0)
         self.assertNotEqual(m0, m1)
+
+
+class BuiltInAttributeConflictTest(TestCase):
+    """tests Model definitions that conflict with built-in attributes/methods"""
+
+    def test_model_with_attribute_name_conflict(self):
+        """should raise exception when model defines column that conflicts with built-in attribute"""
+        with self.assertRaises(ModelDefinitionException):
+            class IllegalTimestampColumnModel(Model):
+                my_primary_key = columns.Integer(primary_key=True)
+                timestamp = columns.BigInt()
+
+    def test_model_with_method_name_conflict(self):
+        """should raise exception when model defines column that conflicts with built-in method"""
+        with self.assertRaises(ModelDefinitionException):
+            class IllegalFilterColumnModel(Model):
+                my_primary_key = columns.Integer(primary_key=True)
+                filter = columns.Text()
