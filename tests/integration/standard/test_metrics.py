@@ -51,7 +51,7 @@ class MetricsTests(unittest.TestCase):
             # Ensure the nodes are actually down
             self.assertRaises(NoHostAvailable, session.execute, "USE test3rf")
         finally:
-            get_cluster().start(wait_for_binary_proto=True)
+            get_cluster().start(wait_for_binary_proto=True, wait_other_notice=True)
 
         self.assertGreater(cluster.metrics.stats.connection_errors, 0)
 
