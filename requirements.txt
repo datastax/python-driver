@@ -4,3 +4,4 @@ ipdb==0.7
 Sphinx==1.1.3
 mock==1.0.1
 sure==1.2.5
+cassandra-driver>=2.0.0
