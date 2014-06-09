@@ -67,6 +67,16 @@ class TestSetColumn(BaseCassEngTestCase):
         m = TestSetModel.get(partition=m.partition)
         self.assertNotIn(5, m.int_set)
 
+    def test_blind_deleting_last_item_should_succeed(self):
+        m = TestSetModel.create()
+        m.int_set.add(5)
+        m.save()
+
+        TestSetModel.objects(partition=m.partition).update(int_set=set())
+
+        m = TestSetModel.get(partition=m.partition)
+        self.assertNotIn(5, m.int_set)
+
     def test_empty_set_retrieval(self):
         m = TestSetModel.create()
         m2 = TestSetModel.get(partition=m.partition)
@@ -360,6 +370,20 @@ class TestListColumn(BaseCassEngTestCase):
         with self.assertRaises(ValidationError):
             TestListModel.create(partition=pkey, int_list=[None])
 
+    def test_blind_list_updates_from_none(self):
+        """ Tests that updates from None work as expected """
+        m = TestListModel.create(int_list=None)
+        expected = [1, 2]
+        m.int_list = expected
+        m.save()
+
+        m2 = TestListModel.get(partition=m.partition)
+        assert m2.int_list == expected
+
+        TestListModel.objects(partition=m.partition).update(int_list=[])
+
+        m3 = TestListModel.get(partition=m.partition)
+        assert m3.int_list == []
 
 class TestMapModel(Model):
 
@@ -477,6 +501,21 @@ class TestMapColumn(BaseCassEngTestCase):
 
         m2.int_map = None
         m2.save()
+        m3 = TestMapModel.get(partition=m.partition)
+        assert m3.int_map != expected
+
+    def test_blind_updates_from_none(self):
+        """ Tests that updates from None work as expected """
+        m = TestMapModel.create(int_map=None)
+        expected = {1: uuid4()}
+        m.int_map = expected
+        m.save()
+
+        m2 = TestMapModel.get(partition=m.partition)
+        assert m2.int_map == expected
+
+        TestMapModel.objects(partition=m.partition).update(int_map={})
+
         m3 = TestMapModel.get(partition=m.partition)
         assert m3.int_map != expected
 
