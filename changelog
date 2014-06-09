@@ -1,15 +1,18 @@
 CHANGELOG
 
-0.14.0-dev
+0.14.0
 
-* Check number of elements in collections.
+* fix for setting map to empty (Lifto)
+* report when creating models with attributes that conflict with cqlengine (maedhroz)
+* use stable version of sure package (maedhroz)
+* performance improvements 
+
 
 0.13.0
 * adding support for post batch callbacks (thanks Daniel Dotsenko github.com/dvdotsenko)
 * fixing sync table for tables with multiple keys (thanks Daniel Dotsenko github.com/dvdotsenko)
 * fixing bug in Bytes column (thanks Netanel Cohen-Tzemach github.com/natict)
 * fixing bug with timestamps and DST (thanks Netanel Cohen-Tzemach github.com/natict)
-* performance improvements (thanks Jon Haddad)
 
 0.12.0
 
