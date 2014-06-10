@@ -7,7 +7,7 @@ Bug Fixes
 * Add six to requirements.txt
 * Avoid KeyError during schema refresh when a keyspace is dropped
   and TokenAwarePolicy is not in use
-* Avoid registering multiple atexit() cleanup functions will the
+* Avoid registering multiple atexit cleanup functions when the
   asyncore event loop is restarted multiple times
 * Delay initialization of reactors in order to avoid problems
   with shared state when using multiprocessing (PYTHON-60)
