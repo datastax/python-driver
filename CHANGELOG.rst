@@ -12,6 +12,8 @@ Bug Fixes
   with shared state when using multiprocessing (PYTHON-60)
 * Add python-six to debian dependencies, move python-blist to
   recommends
+* Fix memory leak when libev connections are created and
+  destroyed (github #93)
 
 2.0.1
 =====

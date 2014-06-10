@@ -187,8 +187,12 @@ class LibevLoop(object):
             for conn in to_stop:
                 if conn._write_watcher:
                     conn._write_watcher.stop()
+                    # clear reference cycles from IO callback
+                    del conn._write_watcher
                 if conn._read_watcher:
                     conn._read_watcher.stop()
+                    # clear reference cycles from IO callback
+                    del conn._read_watcher
 
             changed = True
 
