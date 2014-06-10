@@ -14,6 +14,8 @@ Bug Fixes
   recommends
 * Fix memory leak when libev connections are created and
   destroyed (github #93)
+* Ensure token map is rebuilt when hosts are removed from
+  the cluster
 
 2.0.1
 =====
