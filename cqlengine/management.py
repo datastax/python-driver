@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 # system keyspaces
 schema_columnfamilies = NamedTable('system', 'schema_columnfamilies')
 
-
 def create_keyspace(name, strategy_class='SimpleStrategy', replication_factor=3, durable_writes=True, **replication_values):
     """
     creates a keyspace

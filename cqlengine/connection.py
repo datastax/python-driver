@@ -3,6 +3,8 @@
 #http://cassandra.apache.org/doc/cql/CQL.html
 
 from collections import namedtuple
+from cassandra.cluster import Cluster
+
 try:
     import Queue as queue
 except ImportError:
@@ -33,7 +35,8 @@ _max_connections = 10
 
 # global connection pool
 connection_pool = None
-
+cluster = None
+session = None
 
 
 class CQLConnectionError(CQLEngineException): pass
@@ -76,8 +79,11 @@ def setup(
     :type timeout: int or long
 
     """
-    global _max_connections
-    global connection_pool
+    global _max_connections, connection_pool, cluster, session
+
+    cluster = Cluster(hosts)
+    session = cluster.connect()
+
     _max_connections = max_connections
 
     if default_keyspace:

@@ -6,7 +6,7 @@ import os
 if os.environ.get('CASSANDRA_TEST_HOST'):
     CASSANDRA_TEST_HOST = os.environ['CASSANDRA_TEST_HOST']
 else:
-    CASSANDRA_TEST_HOST = 'localhost:9160'
+    CASSANDRA_TEST_HOST = 'localhost'
 
 
 class BaseCassEngTestCase(TestCase):
