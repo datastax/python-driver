@@ -6,6 +6,8 @@ Bug Fixes
 ---------
 * Fix references to xrange that do not go through "six" in
   libevreactor and geventreactor (github #138)
+* Make BoundStatements inherit fetch_size from their parent
+  PreparedStatement (PYTHON-80)
 
 2.0.2
 =====
