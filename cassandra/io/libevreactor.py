@@ -22,6 +22,7 @@ from threading import Event, Lock, Thread
 import weakref
 
 from six import BytesIO
+from six.moves import xrange
 
 from cassandra import OperationTimedOut
 from cassandra.connection import Connection, ConnectionShutdown, NONBLOCKING

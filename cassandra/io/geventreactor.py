@@ -22,6 +22,7 @@ from functools import partial
 import logging
 import os
 
+from six.moves import xrange
 try:
     from cStringIO import StringIO
 except ImportError:

@@ -1,3 +1,12 @@
+2.0.3
+=====
+In Progress
+
+Bug Fixes
+---------
+* Fix references to xrange that do not go through "six" in
+  libevreactor and geventreactor (github #138)
+
 2.0.2
 =====
 June 10, 2014
