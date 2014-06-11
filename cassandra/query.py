@@ -109,7 +109,7 @@ def dict_factory(colnames, rows):
 
     Example::
 
-        >>> from cassandra.query import named_tuple_factory
+        >>> from cassandra.query import dict_factory
         >>> session = cluster.connect('mykeyspace')
         >>> session.row_factory = dict_factory
         >>> rows = session.execute("SELECT name, age FROM users LIMIT 1")
