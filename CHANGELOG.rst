@@ -114,6 +114,9 @@ now:
 * cassandra.decoder.dict_factory has moved to cassandra.query.dict_factory
 * cassandra.decoder.ordered_dict_factory has moved to cassandra.query.ordered_dict_factory
 
+Exceptions that were in cassandra.decoder have been moved to cassandra.protocol. If
+you handle any of these exceptions, you must adjust the code accordingly.
+
 1.1.2
 =====
 May 8, 2014
