@@ -8,6 +8,7 @@ typedef struct libevwrapper_Loop {
 
 static void
 Loop_dealloc(libevwrapper_Loop *self) {
+    ev_loop_destroy(self->loop);
     Py_TYPE(self)->tp_free((PyObject *)self);
 };
 
@@ -17,9 +18,9 @@ Loop_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
 
     self = (libevwrapper_Loop *)type->tp_alloc(type, 0);
     if (self != NULL) {
-        self->loop = ev_default_loop(EVBACKEND_SELECT);
+        self->loop = ev_loop_new(EVBACKEND_SELECT);
         if (!self->loop) {
-            PyErr_SetString(PyExc_Exception, "Error getting default ev loop");
+            PyErr_SetString(PyExc_Exception, "Error getting new ev loop");
             Py_DECREF(self);
             return NULL;
         }
