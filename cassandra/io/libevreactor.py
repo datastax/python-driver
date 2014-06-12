@@ -228,6 +228,12 @@ class LibevConnection(Connection):
             cls._libevloop = LibevLoop()
 
     @classmethod
+    def handle_fork(cls):
+        if cls._libevloop:
+            cls._libevloop._cleanup()
+            cls._libevloop = None
+
+    @classmethod
     def factory(cls, *args, **kwargs):
         timeout = kwargs.pop('timeout', 5.0)
         conn = cls(*args, **kwargs)

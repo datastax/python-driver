@@ -147,6 +147,12 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
             cls._loop = AsyncoreLoop()
 
     @classmethod
+    def handle_fork(cls):
+        if cls._loop:
+            cls._loop._cleanup()
+            cls._loop = None
+
+    @classmethod
     def factory(cls, *args, **kwargs):
         timeout = kwargs.pop('timeout', 5.0)
         conn = cls(*args, **kwargs)

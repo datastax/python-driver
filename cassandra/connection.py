@@ -187,6 +187,14 @@ class Connection(object):
         """
         pass
 
+    @classmethod
+    def handle_fork(self):
+        """
+        Called after a forking.  This should cleanup any remaining reactor state
+        from the parent process.
+        """
+        pass
+
     def close(self):
         raise NotImplementedError()
 
