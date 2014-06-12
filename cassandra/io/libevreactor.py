@@ -126,6 +126,15 @@ class LibevLoop(object):
         if not self._thread:
             return
 
+        for conn in self._live_conns | self._new_conns | self._closed_conns:
+            conn.close()
+            if conn._write_watcher:
+                conn._write_watcher.stop()
+                del conn._write_watcher
+            if conn._read_watcher:
+                conn._read_watcher.stop()
+                del conn._read_watcher
+
         log.debug("Waiting for event loop thread to join...")
         self._thread.join(timeout=1.0)
         if self._thread.is_alive():
@@ -134,6 +143,7 @@ class LibevLoop(object):
                 "Please call Cluster.shutdown() to avoid this.")
 
         log.debug("Event loop thread was joined")
+        self._loop = None
 
     def connection_created(self, conn):
         with self._conn_set_lock:
