@@ -8,6 +8,9 @@ Bug Fixes
   libevreactor and geventreactor (github #138)
 * Make BoundStatements inherit fetch_size from their parent
   PreparedStatement (PYTHON-80)
+* Clear reactor state in child process after forking
+  to prevent errors with multiprocessing when the parent
+  process has connected a Cluster before forking (github #141)
 
 2.0.2
 =====

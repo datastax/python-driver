@@ -59,6 +59,7 @@ def _cleanup(loop_weakref):
 class AsyncoreLoop(object):
 
     def __init__(self):
+        self._pid = os.getpid()
         self._loop_lock = Lock()
         self._started = False
         self._shutdown = False
@@ -145,6 +146,12 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
     def initialize_reactor(cls):
         if not cls._loop:
             cls._loop = AsyncoreLoop()
+        else:
+            current_pid = os.getpid()
+            if cls._loop._pid != current_pid:
+                log.debug("Detected fork, clearing and reinitializing reactor state")
+                cls.handle_fork()
+                cls._loop = AsyncoreLoop()
 
     @classmethod
     def handle_fork(cls):

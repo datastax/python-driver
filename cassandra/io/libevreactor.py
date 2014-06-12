@@ -60,6 +60,7 @@ def _cleanup(loop_weakref):
 class LibevLoop(object):
 
     def __init__(self):
+        self._pid = os.getpid()
         self._loop = libev.Loop()
         self._notifier = libev.Async(self._loop)
         self._notifier.start()
@@ -226,6 +227,11 @@ class LibevConnection(Connection):
     def initialize_reactor(cls):
         if not cls._libevloop:
             cls._libevloop = LibevLoop()
+        else:
+            if cls._libevloop._pid != os.getpid():
+                log.debug("Detected fork, clearing and reinitializing reactor state")
+                cls.handle_fork()
+                cls._libevloop = LibevLoop()
 
     @classmethod
     def handle_fork(cls):
