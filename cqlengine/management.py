@@ -108,7 +108,7 @@ def sync_table(model, create_missing_keyspace=True):
     else:
         # see if we're missing any columns
         fields = get_fields(model)
-        field_names = [x.name for x in fields] # [Field(name=u'name', type=u'org.apache.cassandra.db.marshal.UTF8Type')]
+        field_names = [x.name for x in fields]
         for name, col in model._columns.items():
             if col.primary_key or col.partition_key: continue # we can't mess with the PK
             if col.db_field_name in field_names: continue # skip columns already defined
@@ -238,9 +238,8 @@ def get_fields(model):
     ks_name = model._get_keyspace()
     col_family = model.column_family_name(include_keyspace=False)
 
-    with connection_manager() as con:
-        query = "select * from system.schema_columns where keyspace_name = ? and columnfamily_name = ?"
-        tmp = execute_native(query, [ks_name, col_family])
+    query = "select * from system.schema_columns where keyspace_name = ? and columnfamily_name = ?"
+    tmp = execute_native(query, [ks_name, col_family])
 
     # Tables containing only primary keys do not appear to create
     # any entries in system.schema_columns, as only non-primary-key attributes
