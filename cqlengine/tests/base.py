@@ -8,13 +8,13 @@ if os.environ.get('CASSANDRA_TEST_HOST'):
 else:
     CASSANDRA_TEST_HOST = 'localhost'
 
+connection.setup([CASSANDRA_TEST_HOST], default_keyspace='cqlengine_test')
 
 class BaseCassEngTestCase(TestCase):
 
-    @classmethod
-    def setUpClass(cls):
-        super(BaseCassEngTestCase, cls).setUpClass()
-        connection.setup([CASSANDRA_TEST_HOST], default_keyspace='cqlengine_test')
+    # @classmethod
+    # def setUpClass(cls):
+    #     super(BaseCassEngTestCase, cls).setUpClass()
 
     def assertHasAttr(self, obj, attr):
         self.assertTrue(hasattr(obj, attr),

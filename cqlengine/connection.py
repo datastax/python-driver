@@ -261,3 +261,10 @@ def connection_manager():
     # tmp = connection_pool.get()
     yield connection_pool
     # connection_pool.put(tmp)
+
+
+def execute_native(query, params, consistency_level):
+    # TODO use consistency level
+    prepared = session.prepare(query)
+    result = session.execute(prepared, params)
+    return result

@@ -1,4 +1,5 @@
 0.15 Upgrade to use Datastax Native Driver
 
-
+Calls to execute should no longer use named placeholders.
+We no longer raise cqlengine based OperationalError when connection fails.  Now using the exception thrown in the native driver.
 
