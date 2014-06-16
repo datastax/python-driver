@@ -108,7 +108,7 @@ def sync_table(model, create_missing_keyspace=True):
     else:
         # see if we're missing any columns
         fields = get_fields(model)
-        field_names = [x.name for x in fields]
+        field_names = [x.name for x in fields] # [Field(name=u'name', type=u'org.apache.cassandra.db.marshal.UTF8Type')]
         for name, col in model._columns.items():
             if col.primary_key or col.partition_key: continue # we can't mess with the PK
             if col.db_field_name in field_names: continue # skip columns already defined
@@ -239,28 +239,19 @@ def get_fields(model):
     col_family = model.column_family_name(include_keyspace=False)
 
     with connection_manager() as con:
-        query = "SELECT * FROM system.schema_columns \
-                 WHERE keyspace_name = :ks_name AND columnfamily_name = :col_family"
-
-        logger.debug("get_fields %s %s", ks_name, col_family)
-
-        tmp = con.execute(query, {'ks_name': ks_name, 'col_family': col_family}, ONE)
-
-        #import ipdb; ipdb.set_trace()
+        query = "select * from system.schema_columns where keyspace_name = ? and columnfamily_name = ?"
+        tmp = execute_native(query, [ks_name, col_family])
 
     # Tables containing only primary keys do not appear to create
     # any entries in system.schema_columns, as only non-primary-key attributes
     # appear to be inserted into the schema_columns table
-    if not tmp.results:
+    if not tmp:
         return []
 
-    column_name_positon = tmp.columns.index('column_name')
-    validator_positon = tmp.columns.index('validator')
     try:
-        type_position = tmp.columns.index('type')
-        return [Field(x[column_name_positon], x[validator_positon]) for x in tmp.results if x[type_position] == 'regular']
+        return [Field(x.column_name, x.validator) for x in tmp if x.type == 'regular']
     except ValueError:
-        return [Field(x[column_name_positon], x[validator_positon]) for x in tmp.results]
+        return [Field(x.column_name, x.validator) for x in tmp]
     # convert to Field named tuples
 
 
