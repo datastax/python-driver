@@ -116,7 +116,7 @@ def sync_table(model, create_missing_keyspace=True):
             # add missing column using the column def
             query = "ALTER TABLE {} add {}".format(cf_name, col.get_column_def())
             logger.debug(query)
-            execute(query)
+            execute_native(query)
 
         update_compaction(model)
 
