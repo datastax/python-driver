@@ -266,7 +266,7 @@ def connection_manager():
     # connection_pool.put(tmp)
 
 
-def execute_native(query, params, consistency_level):
+def execute_native(query, params=None, consistency_level=None):
     # TODO use consistency level
     prepared = session.prepare(query)
     result = session.execute(prepared, params)

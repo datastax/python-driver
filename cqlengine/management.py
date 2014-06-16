@@ -99,7 +99,7 @@ def sync_table(model, create_missing_keyspace=True):
         qs = get_create_table(model)
 
         try:
-            execute(qs)
+            execute_native(qs)
         except CQLEngineException as ex:
             # 1.2 doesn't return cf names, so we have to examine the exception
             # and ignore if it says the column family already exists
@@ -245,6 +245,8 @@ def get_fields(model):
         logger.debug("get_fields %s %s", ks_name, col_family)
 
         tmp = con.execute(query, {'ks_name': ks_name, 'col_family': col_family}, ONE)
+
+        #import ipdb; ipdb.set_trace()
 
     # Tables containing only primary keys do not appear to create
     # any entries in system.schema_columns, as only non-primary-key attributes
