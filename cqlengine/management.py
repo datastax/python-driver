@@ -4,7 +4,7 @@ from cqlengine import SizeTieredCompactionStrategy, LeveledCompactionStrategy
 from cqlengine import ONE
 from cqlengine.named import NamedTable
 
-from cqlengine.connection import connection_manager, execute
+from cqlengine.connection import connection_manager, execute, execute_native
 from cqlengine.exceptions import CQLEngineException
 
 import logging
@@ -87,13 +87,12 @@ def sync_table(model, create_missing_keyspace=True):
     if create_missing_keyspace:
         create_keyspace(ks_name)
 
-    with connection_manager() as con:
-        tables = con.execute(
-            "SELECT columnfamily_name from system.schema_columnfamilies WHERE keyspace_name = :ks_name",
-            {'ks_name': ks_name},
-            ONE
-        )
-    tables = [x[0] for x in tables.results]
+    tables = execute_native(
+        "SELECT columnfamily_name from system.schema_columnfamilies WHERE keyspace_name = ?",
+        [ks_name], ONE
+    )
+
+    tables = [x.columnfamily_name for x in tables]
 
     #check for an existing column family
     if raw_cf_name not in tables:

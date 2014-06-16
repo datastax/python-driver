@@ -246,6 +246,7 @@ class ConnectionPool(object):
 
 
 def execute(query, params=None, consistency_level=None):
+
     if isinstance(query, BaseCQLStatement):
         params = query.get_context()
         query = str(query)
@@ -253,6 +254,8 @@ def execute(query, params=None, consistency_level=None):
     if consistency_level is None:
         consistency_level = connection_pool._consistency
     return connection_pool.execute(query, params, consistency_level)
+
+    #return execute_native(query, params, consistency_level)
 
 @contextmanager
 def connection_manager():
