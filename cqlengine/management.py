@@ -54,10 +54,9 @@ def create_keyspace(name, strategy_class='SimpleStrategy', replication_factor=3,
 
 
 def delete_keyspace(name):
-    with connection_manager() as con:
-        _, keyspaces = con.execute("""SELECT keyspace_name FROM system.schema_keyspaces""", {}, ONE)
-        if name in [r[0] for r in keyspaces]:
-            execute("DROP KEYSPACE {}".format(name))
+    keyspaces = execute_native("""SELECT keyspace_name FROM system.schema_keyspaces""", {}, ONE)
+    if name in [r.keyspace_name for r in keyspaces]:
+        execute_native("DROP KEYSPACE {}".format(name))
 
 def create_table(model, create_missing_keyspace=True):
     warnings.warn("create_table has been deprecated in favor of sync_table and will be removed in a future release", DeprecationWarning)
