@@ -31,7 +31,7 @@ class DeleteStatementTests(TestCase):
     def test_where_clause_rendering(self):
         ds = DeleteStatement('table', None)
         ds.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
-        self.assertEqual(unicode(ds), 'DELETE FROM table WHERE "a" = :0', unicode(ds))
+        self.assertEqual(unicode(ds), 'DELETE FROM table WHERE "a" = ?', unicode(ds))
 
     def test_context_update(self):
         ds = DeleteStatement('table', None)
@@ -39,7 +39,7 @@ class DeleteStatementTests(TestCase):
         ds.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
 
         ds.update_context_id(7)
-        self.assertEqual(unicode(ds), 'DELETE "d"[:8] FROM table WHERE "a" = :7')
+        self.assertEqual(unicode(ds), 'DELETE "d"[?] FROM table WHERE "a" = ?')
         self.assertEqual(ds.get_context(), {'7': 'b', '8': 3})
 
     def test_context(self):

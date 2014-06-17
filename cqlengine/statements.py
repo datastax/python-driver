@@ -101,7 +101,7 @@ class WhereClause(BaseClause):
 
     def __unicode__(self):
         field = ('"{}"' if self.quote_field else '{}').format(self.field)
-        return u'{} {} {}'.format(field, self.operator, unicode(self.query_value))
+        return u'{} {} ?'.format(field, self.operator)
 
     def __hash__(self):
         return super(WhereClause, self).__hash__() ^ hash(self.operator)
@@ -129,7 +129,7 @@ class AssignmentClause(BaseClause):
     """ a single variable st statement """
 
     def __unicode__(self):
-        return u'"{}" = :{}'.format(self.field, self.context_id)
+        return u'"{}" = ?'.format(self.field)
 
     def insert_tuple(self):
         return self.field, self.context_id
@@ -170,15 +170,15 @@ class SetUpdateClause(ContainerUpdateClause):
         qs = []
         ctx_id = self.context_id
         if self.previous is None and not (self._assignments or self._additions or self._removals):
-            qs += ['"{}" = :{}'.format(self.field, ctx_id)]
+            qs += ['"{}" = ?'.format(self.field)]
         if self._assignments:
-            qs += ['"{}" = :{}'.format(self.field, ctx_id)]
+            qs += ['"{}" = ?'.format(self.field)]
             ctx_id += 1
         if self._additions:
-            qs += ['"{0}" = "{0}" + :{1}'.format(self.field, ctx_id)]
+            qs += ['"{0}" = "{0}" + ?'.format(self.field)]
             ctx_id += 1
         if self._removals:
-            qs += ['"{0}" = "{0}" - :{1}'.format(self.field, ctx_id)]
+            qs += ['"{0}" = "{0}" - ?'.format(self.field)]
 
         return ', '.join(qs)
 
@@ -232,15 +232,15 @@ class ListUpdateClause(ContainerUpdateClause):
         qs = []
         ctx_id = self.context_id
         if self._assignments is not None:
-            qs += ['"{}" = :{}'.format(self.field, ctx_id)]
+            qs += ['"{}" = ?'.format(self.field)]
             ctx_id += 1
 
         if self._prepend:
-            qs += ['"{0}" = :{1} + "{0}"'.format(self.field, ctx_id)]
+            qs += ['"{0}" = ? + "{0}"'.format(self.field)]
             ctx_id += 1
 
         if self._append:
-            qs += ['"{0}" = "{0}" + :{1}'.format(self.field, ctx_id)]
+            qs += ['"{0}" = "{0}" + ?'.format(self.field)]
 
         return ', '.join(qs)
 
@@ -356,10 +356,10 @@ class MapUpdateClause(ContainerUpdateClause):
 
         ctx_id = self.context_id
         if self.previous is None and not self._updates:
-            qs += ['"int_map" = :1']
+            qs += ['"int_map" = ?']
         else:
             for _ in self._updates or []:
-                qs += ['"{}"[:{}] = :{}'.format(self.field, ctx_id, ctx_id + 1)]
+                qs += ['"{}"[?] = ?'.format(self.field)]
                 ctx_id += 2
 
         return ', '.join(qs)
@@ -380,7 +380,7 @@ class CounterUpdateClause(ContainerUpdateClause):
     def __unicode__(self):
         delta = self.value - self.previous
         sign = '-' if delta < 0 else '+'
-        return '"{0}" = "{0}" {1} :{2}'.format(self.field, sign, self.context_id)
+        return '"{0}" = "{0}" {1} ?'.format(self.field, sign)
 
 
 class BaseDeleteClause(BaseClause):
@@ -428,7 +428,7 @@ class MapDeleteClause(BaseDeleteClause):
 
     def __unicode__(self):
         if not self._analyzed: self._analyze()
-        return ', '.join(['"{}"[:{}]'.format(self.field, self.context_id + i) for i in range(len(self._removals))])
+        return ', '.join(['"{}"[?]'.format(self.field) for i in range(len(self._removals))])
 
 
 class BaseCQLStatement(object):
@@ -626,7 +626,7 @@ class InsertStatement(AssignmentStatement):
 
         qs += ["({})".format(', '.join(['"{}"'.format(c) for c in columns]))]
         qs += ['VALUES']
-        qs += ["({})".format(', '.join([':{}'.format(v) for v in values]))]
+        qs += ["({})".format(', '.join(['?' for v in values]))]
 
         if self.ttl:
             qs += ["USING TTL {}".format(self.ttl)]
