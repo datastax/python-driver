@@ -100,7 +100,8 @@ def _get_params(message_obj):
     )
 
 
-def decode_response(protocol_version, stream_id, flags, opcode, body, decompressor=None):
+def decode_response(protocol_version, user_type_map, stream_id, flags, opcode, body,
+                    decompressor=None):
     if flags & COMPRESSED_FLAG:
         if decompressor is None:
             raise Exception("No de-compressor available for compressed frame!")
@@ -118,7 +119,7 @@ def decode_response(protocol_version, stream_id, flags, opcode, body, decompress
         log.warning("Unknown protocol flags set: %02x. May cause problems.", flags)
 
     msg_class = _message_types_by_opcode[opcode]
-    msg = msg_class.recv_body(body, protocol_version)
+    msg = msg_class.recv_body(body, protocol_version, user_type_map)
     msg.stream_id = stream_id
     msg.trace_id = trace_id
     return msg
@@ -138,7 +139,7 @@ class ErrorMessage(_MessageType, Exception):
         self.info = info
 
     @classmethod
-    def recv_body(cls, f, protocol_version):
+    def recv_body(cls, f, protocol_version, user_type_map):
         code = read_int(f)
         msg = read_string(f)
         subcls = error_classes.get(code, cls)
@@ -338,7 +339,7 @@ class ReadyMessage(_MessageType):
     name = 'READY'
 
     @classmethod
-    def recv_body(cls, f, protocol_version):
+    def recv_body(cls, f, protocol_version, user_type_map):
         return cls()
 
 
@@ -350,7 +351,7 @@ class AuthenticateMessage(_MessageType):
         self.authenticator = authenticator
 
     @classmethod
-    def recv_body(cls, f, protocol_version):
+    def recv_body(cls, f, protocol_version, user_type_map):
         authname = read_string(f)
         return cls(authenticator=authname)
 
@@ -382,7 +383,7 @@ class AuthChallengeMessage(_MessageType):
         self.challenge = challenge
 
     @classmethod
-    def recv_body(cls, f, protocol_version):
+    def recv_body(cls, f, protocol_version, user_type_map):
         return cls(read_longstring(f))
 
 
@@ -405,7 +406,7 @@ class AuthSuccessMessage(_MessageType):
         self.token = token
 
     @classmethod
-    def recv_body(cls, f, protocol_version):
+    def recv_body(cls, f, protocol_version, user_type_map):
         return cls(read_longstring(f))
 
 
@@ -426,7 +427,7 @@ class SupportedMessage(_MessageType):
         self.options = options
 
     @classmethod
-    def recv_body(cls, f, protocol_version):
+    def recv_body(cls, f, protocol_version, user_type_map):
         options = read_stringmultimap(f)
         cql_versions = options.pop('CQL_VERSION')
         return cls(cql_versions=cql_versions, options=options)
@@ -547,13 +548,14 @@ class ResultMessage(_MessageType):
         self.paging_state = paging_state
 
     @classmethod
-    def recv_body(cls, f, protocol_version):
+    def recv_body(cls, f, protocol_version, user_type_map):
         kind = read_int(f)
         paging_state = None
         if kind == RESULT_KIND_VOID:
             results = None
         elif kind == RESULT_KIND_ROWS:
-            paging_state, results = cls.recv_results_rows(f, protocol_version)
+            paging_state, results = cls.recv_results_rows(
+                f, protocol_version, user_type_map)
         elif kind == RESULT_KIND_SET_KEYSPACE:
             ksname = read_string(f)
             results = ksname
@@ -564,16 +566,17 @@ class ResultMessage(_MessageType):
         return cls(kind, results, paging_state)
 
     @classmethod
-    def recv_results_rows(cls, f, protocol_version):
+    def recv_results_rows(cls, f, protocol_version, user_type_map):
         paging_state, column_metadata = cls.recv_results_metadata(f)
         rowcount = read_int(f)
         rows = [cls.recv_row(f, len(column_metadata)) for _ in range(rowcount)]
         colnames = [c[2] for c in column_metadata]
         coltypes = [c[3] for c in column_metadata]
-        return (
-            paging_state,
-            (colnames, [tuple(ctype.from_binary(val, protocol_version) for ctype, val in zip(coltypes, row))
-                        for row in rows]))
+        parsed_rows = [
+            tuple(ctype.from_binary(val, protocol_version)
+                  for ctype, val in zip(coltypes, row))
+            for row in rows]
+        return (paging_state, (colnames, parsed_rows))
 
     @classmethod
     def recv_results_prepared(cls, f):
@@ -582,7 +585,7 @@ class ResultMessage(_MessageType):
         return (query_id, column_metadata)
 
     @classmethod
-    def recv_results_metadata(cls, f):
+    def recv_results_metadata(cls, f, user_type_map):
         flags = read_int(f)
         glob_tblspec = bool(flags & cls._FLAGS_GLOBAL_TABLES_SPEC)
         colcount = read_int(f)
@@ -624,7 +627,7 @@ class ResultMessage(_MessageType):
             return {'change_type': change_type, 'keyspace': keyspace, 'table': table}
 
     @classmethod
-    def read_type(cls, f):
+    def read_type(cls, f, user_type_map):
         optid = read_short(f)
         try:
             typeclass = cls._type_codes[optid]
@@ -638,6 +641,14 @@ class ResultMessage(_MessageType):
             keysubtype = cls.read_type(f)
             valsubtype = cls.read_type(f)
             typeclass = typeclass.apply_parameters((keysubtype, valsubtype))
+        elif typeclass == UserDefinedType:
+            ks = cls.read_string(f)
+            udt_name = cls.read_string(f)
+            num_fields = cls.read_short(f)
+            names_and_types = ((cls.read_string(f), cls.read_type(f))
+                               for _ in xrange(num_fields))
+            mapped_class = user_type_map.get(ks, {}).get(udt_name)
+            typeclass = typeclass.apply_parameters(udt_name, names_and_types, mapped_class)
         elif typeclass == CUSTOM_TYPE:
             classname = read_string(f)
             typeclass = lookup_casstype(classname)
@@ -789,7 +800,7 @@ class EventMessage(_MessageType):
         self.event_args = event_args
 
     @classmethod
-    def recv_body(cls, f, protocol_version):
+    def recv_body(cls, f, protocol_version, user_type_map):
         event_type = read_string(f).upper()
         if event_type in known_event_types:
             read_method = getattr(cls, 'recv_' + event_type.lower())

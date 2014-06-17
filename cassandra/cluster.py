@@ -334,6 +334,11 @@ class Cluster(object):
     _prepared_statements = None
     _prepared_statement_lock = None
 
+    _user_types = None
+    """
+    A map of {keyspace: {type_name: UserType}}
+    """
+
     _listeners = None
     _listener_lock = None
 
@@ -412,6 +417,8 @@ class Cluster(object):
         self._prepared_statements = WeakValueDictionary()
         self._prepared_statement_lock = Lock()
 
+        self._user_types = defaultdict(dict)
+
         self._min_requests_per_connection = {
             HostDistance.LOCAL: DEFAULT_MIN_REQUESTS,
             HostDistance.REMOTE: DEFAULT_MIN_REQUESTS
@@ -443,6 +450,9 @@ class Cluster(object):
 
         self.control_connection = ControlConnection(
             self, self.control_connection_timeout)
+
+    def register_type_class(self, keyspace, user_type, klass):
+        self._user_types[keyspace][user_type] = klass
 
     def get_min_requests_per_connection(self, host_distance):
         return self._min_requests_per_connection[host_distance]
@@ -517,6 +527,7 @@ class Cluster(object):
         kwargs_dict['ssl_options'] = self.ssl_options
         kwargs_dict['cql_version'] = self.cql_version
         kwargs_dict['protocol_version'] = self.protocol_version
+        kwargs_dict['user_type_map'] = self._user_types
 
         return kwargs_dict
 

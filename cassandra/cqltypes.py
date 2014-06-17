@@ -778,14 +778,21 @@ class UserDefinedType(_ParameterizedType):
 
     FIELD_LENGTH = 4
 
+    _cache = {}
+
     @classmethod
-    def apply_parameters(cls, subtypes, names):
-        newname = subtypes[1].cassname.decode("hex")
-        field_names = [encoded_name.decode("hex") for encoded_name in names[2:]]
-        return type(newname, (cls,), {'subtypes': subtypes[2:],
-                                      'cassname': cls.cassname,
-                                      'typename': newname,
-                                      'fieldnames': field_names})
+    def apply_parameters(cls, udt_name, names_and_types, mapped_class):
+        try:
+            return cls._cache[udt_name]
+        except KeyError:
+            fieldnames, types = zip(*names_and_types)
+            instance = type(udt_name, (cls,), {'subtypes': types,
+                                               'cassname': cls.cassname,
+                                               'typename': udt_name,
+                                               'fieldnames': fieldnames,
+                                               'mapped_class': mapped_class})
+            cls._cache[udt_name] = instance
+            return instance
 
     @classmethod
     def cql_parameterized_type(cls):
@@ -795,8 +802,7 @@ class UserDefinedType(_ParameterizedType):
     def deserialize_safe(cls, byts, protocol_version):
         proto_version = max(3, protocol_version)
         p = 0
-        Result = namedtuple(cls.typename, cls.fieldnames)
-        result = []
+        values = []
         for col_type in cls.subtypes:
             if p == len(byts):
                 break
@@ -806,13 +812,17 @@ class UserDefinedType(_ParameterizedType):
             p += itemlen
             # collections inside UDTs are always encoded with at least the
             # version 3 format
-            result.append(col_type.from_binary(item, proto_version))
+            values.append(col_type.from_binary(item, proto_version))
 
-        if len(result) < len(cls.subtypes):
-            nones = [None] * (len(cls.subtypes) - len(result))
-            result = result + nones
+        if len(values) < len(cls.subtypes):
+            nones = [None] * (len(cls.subtypes) - len(values))
+            values = values + nones
 
-        return Result(*result)
+        if cls.mapped_class:
+            return cls.mapped_class(**dict(zip(cls.fieldnames, values)))
+        else:
+            Result = namedtuple(cls.typename, cls.fieldnames)
+            return Result(*values)
 
     @classmethod
     def serialize_safe(cls, val, protocol_version):

@@ -155,12 +155,14 @@ class Connection(object):
     is_defunct = False
     is_closed = False
     lock = None
+    user_type_map = None
 
     is_control_connection = False
 
     def __init__(self, host='127.0.0.1', port=9042, authenticator=None,
                  ssl_options=None, sockopts=None, compression=True,
-                 cql_version=None, protocol_version=2, is_control_connection=False):
+                 cql_version=None, protocol_version=2, is_control_connection=False,
+                 user_type_map=None):
         self.host = host
         self.port = port
         self.authenticator = authenticator
@@ -170,6 +172,7 @@ class Connection(object):
         self.cql_version = cql_version
         self.protocol_version = protocol_version
         self.is_control_connection = is_control_connection
+        self.user_type_map = user_type_map
         self._push_watchers = defaultdict(set)
         if protocol_version >= 3:
             self._header_unpack = v3_header_unpack
@@ -347,7 +350,8 @@ class Connection(object):
             else:
                 raise ProtocolError("Got negative body length: %r" % body_len)
 
-            response = decode_response(given_version, stream_id, flags, opcode, body, self.decompressor)
+            response = decode_response(given_version, self.user_type_map, stream_id,
+                                       flags, opcode, body, self.decompressor)
         except Exception as exc:
             log.exception("Error decoding response from Cassandra. "
                           "opcode: %04x; message contents: %r", opcode, msg)
@@ -386,10 +390,10 @@ class Connection(object):
             if isinstance(options_response, ConnectionException):
                 raise options_response
             else:
-                log.error("Did not get expected SupportedMessage response; " \
+                log.error("Did not get expected SupportedMessage response; "
                           "instead, got: %s", options_response)
-                raise ConnectionException("Did not get expected SupportedMessage " \
-                                          "response; instead, got: %s" \
+                raise ConnectionException("Did not get expected SupportedMessage "
+                                          "response; instead, got: %s"
                                           % (options_response,))
 
         log.debug("Received options response on new connection (%s) from %s",
