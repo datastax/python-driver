@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import absolute_import  # to enable import io from stdlib
 import gevent
 from gevent import select, socket
 from gevent.event import Event
@@ -19,14 +20,11 @@ from gevent.queue import Queue
 
 from collections import defaultdict
 from functools import partial
+import io
 import logging
 import os
 
 from six.moves import xrange
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO  # ignore flake8 warning: # NOQA
 
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL
 
@@ -73,7 +71,7 @@ class GeventConnection(Connection):
         Connection.__init__(self, *args, **kwargs)
 
         self.connected_event = Event()
-        self._iobuf = StringIO()
+        self._iobuf = io.BytesIO()
         self._write_queue = Queue()
 
         self._callbacks = {}
@@ -179,7 +177,7 @@ class GeventConnection(Connection):
 
                             # leave leftover in current buffer
                             leftover = self._iobuf.read()
-                            self._iobuf = StringIO()
+                            self._iobuf = io.BytesIO()
                             self._iobuf.write(leftover)
 
                             self._total_reqd_bytes = 0

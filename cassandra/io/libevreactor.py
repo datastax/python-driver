@@ -12,16 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import absolute_import  # to enable import io from stdlib
 import atexit
 from collections import deque
 from functools import partial
+import io
 import logging
 import os
 import socket
 from threading import Event, Lock, Thread
 import weakref
 
-from six import BytesIO
 from six.moves import xrange
 
 from cassandra import OperationTimedOut
@@ -256,7 +257,7 @@ class LibevConnection(Connection):
         Connection.__init__(self, *args, **kwargs)
 
         self.connected_event = Event()
-        self._iobuf = BytesIO()
+        self._iobuf = io.BytesIO()
 
         self._callbacks = {}
         self.deque = deque()
@@ -381,7 +382,7 @@ class LibevConnection(Connection):
 
                         # leave leftover in current buffer
                         leftover = self._iobuf.read()
-                        self._iobuf = BytesIO()
+                        self._iobuf = io.BytesIO()
                         self._iobuf.write(leftover)
 
                         self._total_reqd_bytes = 0

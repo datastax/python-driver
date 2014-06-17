@@ -2,6 +2,10 @@
 =====
 In Progress
 
+Features
+--------
+* Use io.BytesIO for reduced CPU consumption (github #143)
+
 Bug Fixes
 ---------
 * Fix references to xrange that do not go through "six" in
