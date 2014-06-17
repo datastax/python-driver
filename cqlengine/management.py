@@ -27,30 +27,30 @@ def create_keyspace(name, strategy_class='SimpleStrategy', replication_factor=3,
     :param durable_writes: 1.2 only, write log is bypassed if set to False
     :param **replication_values: 1.2 only, additional values to ad to the replication data map
     """
-    with connection_manager() as con:
-        _, keyspaces = con.execute("""SELECT keyspace_name FROM system.schema_keyspaces""", {}, ONE)
-        if name not in [r[0] for r in keyspaces]:
-            #try the 1.2 method
-            replication_map = {
-                'class': strategy_class,
-                'replication_factor':replication_factor
-            }
-            replication_map.update(replication_values)
-            if strategy_class.lower() != 'simplestrategy':
-                # Although the Cassandra documentation states for `replication_factor`
-                # that it is "Required if class is SimpleStrategy; otherwise,
-                # not used." we get an error if it is present.
-                replication_map.pop('replication_factor', None)
+    cluster = get_cluster()
 
-            query = """
-            CREATE KEYSPACE {}
-            WITH REPLICATION = {}
-            """.format(name, json.dumps(replication_map).replace('"', "'"))
+    if name not in cluster.metadata.keyspaces:
+        #try the 1.2 method
+        replication_map = {
+            'class': strategy_class,
+            'replication_factor':replication_factor
+        }
+        replication_map.update(replication_values)
+        if strategy_class.lower() != 'simplestrategy':
+            # Although the Cassandra documentation states for `replication_factor`
+            # that it is "Required if class is SimpleStrategy; otherwise,
+            # not used." we get an error if it is present.
+            replication_map.pop('replication_factor', None)
 
-            if strategy_class != 'SimpleStrategy':
-                query += " AND DURABLE_WRITES = {}".format('true' if durable_writes else 'false')
+        query = """
+        CREATE KEYSPACE {}
+        WITH REPLICATION = {}
+        """.format(name, json.dumps(replication_map).replace('"', "'"))
 
-            execute(query)
+        if strategy_class != 'SimpleStrategy':
+            query += " AND DURABLE_WRITES = {}".format('true' if durable_writes else 'false')
+
+        execute_native(query)
 
 
 def delete_keyspace(name):
