@@ -828,8 +828,8 @@ class UserDefinedType(_ParameterizedType):
     def serialize_safe(cls, val, protocol_version):
         proto_version = max(3, protocol_version)
         buf = io.BytesIO()
-        for subtype, item in zip(cls.subtypes, val):
-            packed_item = subtype.to_binary(item, proto_version)
+        for fieldname, subtype in zip(cls.fieldnames, cls.subtypes):
+            packed_item = subtype.to_binary(getattr(val, fieldname), proto_version)
             buf.write(int32_pack(len(packed_item)))
             buf.write(packed_item)
         return buf.getvalue()
