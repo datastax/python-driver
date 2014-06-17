@@ -12,12 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import absolute_import  # to enable import io from stdlib
 import logging
 import socket
 from uuid import UUID
 
 import six
 from six.moves import range
+import io
 
 from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
                        AlreadyExists, InvalidRequest, Unauthorized,
@@ -67,7 +69,7 @@ class _MessageType(object):
     tracing = False
 
     def to_binary(self, stream_id, protocol_version, compression=None):
-        body = six.BytesIO()
+        body = io.BytesIO()
         self.send_body(body, protocol_version)
         body = body.getvalue()
 
@@ -78,7 +80,7 @@ class _MessageType(object):
         if self.tracing:
             flags |= TRACING_FLAG
 
-        msg = six.BytesIO()
+        msg = io.BytesIO()
         write_header(
             msg,
             protocol_version | HEADER_DIRECTION_FROM_CLIENT,
@@ -107,7 +109,7 @@ def decode_response(stream_id, flags, opcode, body, decompressor=None):
         body = decompressor(body)
         flags ^= COMPRESSED_FLAG
 
-    body = six.BytesIO(body)
+    body = io.BytesIO(body)
     if flags & TRACING_FLAG:
         trace_id = UUID(bytes=body.read(16))
         flags ^= TRACING_FLAG
