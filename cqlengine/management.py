@@ -300,7 +300,7 @@ def update_compaction(model):
         cf_name = model.column_family_name()
         query = "ALTER TABLE {} with compaction = {}".format(cf_name, options)
         logger.debug(query)
-        execute(query)
+        execute_native(query)
         return True
 
     return False
