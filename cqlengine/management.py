@@ -4,7 +4,7 @@ from cqlengine import SizeTieredCompactionStrategy, LeveledCompactionStrategy
 from cqlengine import ONE
 from cqlengine.named import NamedTable
 
-from cqlengine.connection import connection_manager, execute, execute_native
+from cqlengine.connection import connection_manager, execute, execute_native, get_session, get_cluster
 from cqlengine.exceptions import CQLEngineException
 
 import logging
@@ -313,18 +313,16 @@ def delete_table(model):
 def drop_table(model):
 
     # don't try to delete non existant tables
-    ks_name = model._get_keyspace()
-    with connection_manager() as con:
-        _, tables = con.execute(
-            "SELECT columnfamily_name from system.schema_columnfamilies WHERE keyspace_name = :ks_name",
-            {'ks_name': ks_name},
-            ONE
-        )
-    raw_cf_name = model.column_family_name(include_keyspace=False)
-    if raw_cf_name not in [t[0] for t in tables]:
-        return
+    meta = get_cluster().metadata
 
-    cf_name = model.column_family_name()
-    execute_native('drop table {};'.format(cf_name))
+    ks_name = model._get_keyspace()
+    raw_cf_name = model.column_family_name(include_keyspace=False)
+
+    try:
+        table = meta.keyspaces[ks_name].tables[raw_cf_name]
+        execute_native('drop table {};'.format(model.column_family_name(include_keyspace=True)))
+    except KeyError:
+        pass
+
 
 

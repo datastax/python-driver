@@ -271,3 +271,9 @@ def execute_native(query, params=None, consistency_level=None):
     prepared = session.prepare(query)
     result = session.execute(prepared, params)
     return result
+
+def get_session():
+    return session
+
+def get_cluster():
+    return cluster
