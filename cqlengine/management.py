@@ -4,7 +4,7 @@ from cqlengine import SizeTieredCompactionStrategy, LeveledCompactionStrategy
 from cqlengine import ONE
 from cqlengine.named import NamedTable
 
-from cqlengine.connection import connection_manager, execute, execute_native, get_session, get_cluster
+from cqlengine.connection import execute_native, get_cluster
 from cqlengine.exceptions import CQLEngineException
 
 import logging
@@ -240,10 +240,13 @@ def get_fields(model):
 
 
 def get_table_settings(model):
-    return schema_columnfamilies.objects.consistency(ONE).get(
-        keyspace_name=model._get_keyspace(),
-        columnfamily_name=model.column_family_name(include_keyspace=False))
+    # returns the table as provided by the native driver for a given model
+    cluster = get_cluster()
+    ks = model._get_keyspace()
+    table = model.column_family_name(include_keyspace=False)
 
+    table = cluster.metadata.keyspaces[ks].tables[table]
+    return table
 
 def update_compaction(model):
     """Updates the compaction options for the given model if necessary.
@@ -255,21 +258,11 @@ def update_compaction(model):
     :rtype: bool
     """
     logger.debug("Checking %s for compaction differences", model)
-    row = get_table_settings(model)
-    # check compaction_strategy_class
-    if not model.__compaction__:
-        return
-
-    do_update = not row['compaction_strategy_class'].endswith(model.__compaction__)
-
-    existing_options = json.loads(row['compaction_strategy_options'])
-    # The min/max thresholds are stored differently in the system data dictionary
-    existing_options.update({
-        'min_threshold': str(row['min_compaction_threshold']),
-        'max_threshold': str(row['max_compaction_threshold']),
-        })
+    table = get_table_settings(model)
+    existing_options = table.compaction_options.copy()
 
     desired_options = get_compaction_options(model)
+
     desired_options.pop('class', None)
 
     for k, v in desired_options.items():
