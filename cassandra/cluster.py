@@ -332,7 +332,7 @@ class Cluster(object):
     is_shutdown = False
     _is_setup = False
     _prepared_statements = None
-    _prepared_statement_lock = Lock()
+    _prepared_statement_lock = None
 
     _listeners = None
     _listener_lock = None
@@ -410,6 +410,7 @@ class Cluster(object):
         self.metadata = Metadata(self)
         self.control_connection = None
         self._prepared_statements = WeakValueDictionary()
+        self._prepared_statement_lock = Lock()
 
         self._min_requests_per_connection = {
             HostDistance.LOCAL: DEFAULT_MIN_REQUESTS,
@@ -1308,7 +1309,7 @@ class Session(object):
                 # the host itself will still be marked down, so we need to pass
                 # a special flag to make sure the reconnector is created
                 self.cluster.signal_connection_failure(
-                        host, conn_exc, is_host_addition, expect_host_to_be_down=True)
+                    host, conn_exc, is_host_addition, expect_host_to_be_down=True)
                 return False
 
             previous = self._pools.get(host)
@@ -1861,7 +1862,7 @@ class ControlConnection(object):
                     peers_result, local_result = connection.wait_for_responses(
                         peers_query, local_query, timeout=timeout)
                 except OperationTimedOut as timeout:
-                    log.debug("[control connection] Timed out waiting for " \
+                    log.debug("[control connection] Timed out waiting for "
                               "response during schema agreement check: %s", timeout)
                     elapsed = self._time.time() - start
                     continue
