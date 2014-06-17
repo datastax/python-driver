@@ -23,7 +23,7 @@ class NullHandler(logging.Handler):
 logging.getLogger('cassandra').addHandler(NullHandler())
 
 
-__version_info__ = (2, 0, 1, 'post')
+__version_info__ = (2, 0, 2, 'post')
 __version__ = '.'.join(map(str, __version_info__))
 
 
@@ -172,6 +172,11 @@ class Timeout(Exception):
 class ReadTimeout(Timeout):
     """
     A subclass of :exc:`Timeout` for read operations.
+
+    This indicates that the replicas failed to respond to the coordinator
+    node before the configured timeout. This timeout is configured in
+    ``cassandra.yaml`` with the ``read_request_timeout_in_ms``
+    and ``range_request_timeout_in_ms`` options.
     """
 
     data_retrieved = None
@@ -189,6 +194,11 @@ class ReadTimeout(Timeout):
 class WriteTimeout(Timeout):
     """
     A subclass of :exc:`Timeout` for write operations.
+
+    This indicates that the replicas failed to respond to the coordinator
+    node before the configured timeout. This timeout is configured in
+    ``cassandra.yaml`` with the ``write_request_timeout_in_ms``
+    option.
     """
 
     write_type = None

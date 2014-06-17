@@ -8,6 +8,7 @@ typedef struct libevwrapper_Loop {
 
 static void
 Loop_dealloc(libevwrapper_Loop *self) {
+    ev_loop_destroy(self->loop);
     Py_TYPE(self)->tp_free((PyObject *)self);
 };
 
@@ -17,9 +18,9 @@ Loop_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
 
     self = (libevwrapper_Loop *)type->tp_alloc(type, 0);
     if (self != NULL) {
-        self->loop = ev_default_loop(EVBACKEND_SELECT);
+        self->loop = ev_loop_new(EVBACKEND_SELECT);
         if (!self->loop) {
-            PyErr_SetString(PyExc_Exception, "Error getting default ev loop");
+            PyErr_SetString(PyExc_Exception, "Error getting new ev loop");
             Py_DECREF(self);
             return NULL;
         }
@@ -133,7 +134,8 @@ IO_init(libevwrapper_IO *self, PyObject *args, PyObject *kwds) {
     PyObject *socket;
     PyObject *callback;
     PyObject *loop;
-    int io_flags = 0;
+    int io_flags = 0, fd = -1;
+    struct ev_io *io = NULL;
 
     if (!PyArg_ParseTuple(args, "OiOO", &socket, &io_flags, &loop, &callback)) {
         return -1;
@@ -154,14 +156,14 @@ IO_init(libevwrapper_IO *self, PyObject *args, PyObject *kwds) {
         self->callback = callback;
     }
 
-    int fd = PyObject_AsFileDescriptor(socket);
+    fd = PyObject_AsFileDescriptor(socket);
     if (fd == -1) {
         PyErr_SetString(PyExc_TypeError, "unable to get file descriptor from socket");
         Py_XDECREF(callback);
         Py_XDECREF(loop);
         return -1;
     }
-    struct ev_io *io = &(self->io);
+    io = &(self->io);
     ev_io_init(io, io_callback, fd, io_flags);
     self->io.data = self;
     return 0;
@@ -246,6 +248,7 @@ typedef struct libevwrapper_Async {
 
 static void
 Async_dealloc(libevwrapper_Async *self) {
+    Py_XDECREF(self->loop);
     Py_TYPE(self)->tp_free((PyObject *)self);
 };
 
@@ -254,8 +257,9 @@ static void async_callback(EV_P_ ev_async *watcher, int revents) {};
 static int
 Async_init(libevwrapper_Async *self, PyObject *args, PyObject *kwds) {
     PyObject *loop;
-
     static char *kwlist[] = {"loop", NULL};
+    struct ev_async *async = NULL;
+
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "O", kwlist, &loop)) {
         PyErr_SetString(PyExc_TypeError, "unable to get file descriptor from socket");
         return -1;
@@ -267,7 +271,7 @@ Async_init(libevwrapper_Async *self, PyObject *args, PyObject *kwds) {
     } else {
         return -1;
     }
-    struct ev_async *async = &(self->async);
+    async = &(self->async);
     ev_async_init(async, async_callback);
     return 0;
 };
@@ -345,11 +349,11 @@ Prepare_dealloc(libevwrapper_Prepare *self) {
 
 static void prepare_callback(struct ev_loop *loop, ev_prepare *watcher, int revents) {
     libevwrapper_Prepare *self = watcher->data;
-
+    PyObject *result = NULL;
     PyGILState_STATE gstate;
-    gstate = PyGILState_Ensure();
 
-    PyObject *result = PyObject_CallFunction(self->callback, "O", self);
+    gstate = PyGILState_Ensure();
+    result = PyObject_CallFunction(self->callback, "O", self);
     if (!result) {
         PyErr_WriteUnraisable(self->callback);
     }
@@ -362,6 +366,7 @@ static int
 Prepare_init(libevwrapper_Prepare *self, PyObject *args, PyObject *kwds) {
     PyObject *callback;
     PyObject *loop;
+    struct ev_prepare *prepare = NULL;
 
     if (!PyArg_ParseTuple(args, "OO", &loop, &callback)) {
         return -1;
@@ -383,7 +388,7 @@ Prepare_init(libevwrapper_Prepare *self, PyObject *args, PyObject *kwds) {
         Py_INCREF(callback);
         self->callback = callback;
     }
-    struct ev_prepare *prepare = &(self->prepare);
+    prepare = &(self->prepare);
     ev_prepare_init(prepare, prepare_callback);
     self->prepare.data = self;
     return 0;
@@ -478,6 +483,8 @@ void
 initlibevwrapper(void)
 #endif
 {
+    PyObject *module = NULL;
+
     if (PyType_Ready(&libevwrapper_LoopType) < 0)
         INITERROR;
 
@@ -494,9 +501,9 @@ initlibevwrapper(void)
         INITERROR;
 
 # if PY_MAJOR_VERSION >= 3
-    PyObject *module = PyModule_Create(&moduledef);
+    module = PyModule_Create(&moduledef);
 # else
-    PyObject *module = Py_InitModule3("libevwrapper", module_methods, module_doc);
+    module = Py_InitModule3("libevwrapper", module_methods, module_doc);
 # endif
 
     if (module == NULL)

@@ -42,6 +42,7 @@ class AsyncoreConnectionTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        AsyncoreConnection.initialize_reactor()
         cls.socket_patcher = patch('socket.socket', spec=socket.socket)
         cls.mock_socket = cls.socket_patcher.start()
         cls.mock_socket().connect_ex.return_value = 0

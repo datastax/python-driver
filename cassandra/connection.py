@@ -195,6 +195,22 @@ class Connection(object):
 
         self.lock = RLock()
 
+    @classmethod
+    def initialize_reactor(self):
+        """
+        Called once by Cluster.connect().  This should be used by implementations
+        to set up any resources that will be shared across connections.
+        """
+        pass
+
+    @classmethod
+    def handle_fork(self):
+        """
+        Called after a forking.  This should cleanup any remaining reactor state
+        from the parent process.
+        """
+        pass
+
     def close(self):
         raise NotImplementedError()
 

@@ -109,12 +109,12 @@ def dict_factory(colnames, rows):
 
     Example::
 
-        >>> from cassandra.query import named_tuple_factory
+        >>> from cassandra.query import dict_factory
         >>> session = cluster.connect('mykeyspace')
         >>> session.row_factory = dict_factory
         >>> rows = session.execute("SELECT name, age FROM users LIMIT 1")
         >>> print rows[0]
-        {'age': 42, 'name': 'Bob'}
+        {u'age': 42, u'name': u'Bob'}
 
     .. versionchanged:: 2.0.0
         moved from ``cassandra.decoder`` to ``cassandra.query``
@@ -397,6 +397,7 @@ class BoundStatement(Statement):
         """
         self.consistency_level = prepared_statement.consistency_level
         self.serial_consistency_level = prepared_statement.serial_consistency_level
+        self.fetch_size = prepared_statement.fetch_size
         self.prepared_statement = prepared_statement
         self.values = []
 

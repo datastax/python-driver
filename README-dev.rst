@@ -1,6 +1,8 @@
 Releasing
 =========
 * Run the tests and ensure they all pass
+* If dependencies have changed, make sure ``debian/control``
+  is up to date
 * Update CHANGELOG.rst
 * Update the version in ``cassandra/__init__.py``
 * Commit the changelog and version changes

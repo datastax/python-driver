@@ -109,7 +109,7 @@ def setup_package():
             cluster.populate(3)
 
         log.debug("Starting ccm test cluster")
-        cluster.start(wait_for_binary_proto=True)
+        cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
     except Exception:
         log.exception("Failed to start ccm cluster:")
         raise
@@ -134,7 +134,7 @@ def use_multidc(dc_list):
             cluster.populate(dc_list)
 
         log.debug("Starting ccm test cluster")
-        cluster.start(wait_for_binary_proto=True)
+        cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
     except Exception:
         log.exception("Failed to start ccm cluster:")
         raise

@@ -12,16 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import absolute_import  # to enable import io from stdlib
 import atexit
 from collections import deque
 from functools import partial
+import io
 import logging
 import os
 import socket
 import sys
 from threading import Event, Lock, Thread
+import weakref
 
-from six import BytesIO
 from six.moves import range
 
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL, EISCONN, errorcode
@@ -46,15 +48,27 @@ from cassandra.marshal import int32_unpack
 log = logging.getLogger(__name__)
 
 
+def _cleanup(loop_weakref):
+    try:
+        loop = loop_weakref()
+    except ReferenceError:
+        return
+
+    loop._cleanup()
+
+
 class AsyncoreLoop(object):
 
     def __init__(self):
+        self._pid = os.getpid()
         self._loop_lock = Lock()
         self._started = False
         self._shutdown = False
 
         self._conns_lock = Lock()
         self._conns = WeakSet()
+        self._thread = None
+        atexit.register(partial(_cleanup, weakref.ref(self)))
 
     def maybe_start(self):
         should_start = False
@@ -69,10 +83,9 @@ class AsyncoreLoop(object):
                 self._loop_lock.release()
 
         if should_start:
-            thread = Thread(target=self._run_loop, name="cassandra_driver_event_loop")
-            thread.daemon = True
-            thread.start()
-            atexit.register(partial(self._cleanup, thread))
+            self._thread = Thread(target=self._run_loop, name="cassandra_driver_event_loop")
+            self._thread.daemon = True
+            self._thread.start()
 
     def _run_loop(self):
         log.debug("Starting asyncore event loop")
@@ -95,11 +108,14 @@ class AsyncoreLoop(object):
 
         log.debug("Asyncore event loop ended")
 
-    def _cleanup(self, thread):
+    def _cleanup(self):
         self._shutdown = True
+        if not self._thread:
+            return
+
         log.debug("Waiting for event loop thread to join...")
-        thread.join(timeout=1.0)
-        if thread.is_alive():
+        self._thread.join(timeout=1.0)
+        if self._thread.is_alive():
             log.warning(
                 "Event loop thread could not be joined, so shutdown may not be clean. "
                 "Please call Cluster.shutdown() to avoid this.")
@@ -121,11 +137,28 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
     module in the Python standard library for its event loop.
     """
 
-    _loop = AsyncoreLoop()
+    _loop = None
 
     _total_reqd_bytes = 0
     _writable = False
     _readable = False
+
+    @classmethod
+    def initialize_reactor(cls):
+        if not cls._loop:
+            cls._loop = AsyncoreLoop()
+        else:
+            current_pid = os.getpid()
+            if cls._loop._pid != current_pid:
+                log.debug("Detected fork, clearing and reinitializing reactor state")
+                cls.handle_fork()
+                cls._loop = AsyncoreLoop()
+
+    @classmethod
+    def handle_fork(cls):
+        if cls._loop:
+            cls._loop._cleanup()
+            cls._loop = None
 
     @classmethod
     def factory(cls, *args, **kwargs):
@@ -145,7 +178,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         asyncore.dispatcher.__init__(self)
 
         self.connected_event = Event()
-        self._iobuf = BytesIO()
+        self._iobuf = io.BytesIO()
 
         self._callbacks = {}
         self.deque = deque()
@@ -298,7 +331,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
 
                         # leave leftover in current buffer
                         leftover = self._iobuf.read()
-                        self._iobuf = BytesIO()
+                        self._iobuf = io.BytesIO()
                         self._iobuf.write(leftover)
 
                         self._total_reqd_bytes = 0

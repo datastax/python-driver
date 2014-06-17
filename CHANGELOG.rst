@@ -1,11 +1,40 @@
+2.0.3
+=====
+In Progress
+
+Features
+--------
+* Use io.BytesIO for reduced CPU consumption (github #143)
+
+Bug Fixes
+---------
+* Fix references to xrange that do not go through "six" in
+  libevreactor and geventreactor (github #138)
+* Make BoundStatements inherit fetch_size from their parent
+  PreparedStatement (PYTHON-80)
+* Clear reactor state in child process after forking
+  to prevent errors with multiprocessing when the parent
+  process has connected a Cluster before forking (github #141)
+
 2.0.2
 =====
+June 10, 2014
 
 Bug Fixes
 ---------
 * Add six to requirements.txt
 * Avoid KeyError during schema refresh when a keyspace is dropped
   and TokenAwarePolicy is not in use
+* Avoid registering multiple atexit cleanup functions when the
+  asyncore event loop is restarted multiple times
+* Delay initialization of reactors in order to avoid problems
+  with shared state when using multiprocessing (PYTHON-60)
+* Add python-six to debian dependencies, move python-blist to
+  recommends
+* Fix memory leak when libev connections are created and
+  destroyed (github #93)
+* Ensure token map is rebuilt when hosts are removed from
+  the cluster
 
 2.0.1
 =====
@@ -102,6 +131,9 @@ now:
 * cassandra.decoder.named_tuple_factory has moved to cassandra.query.named_tuple_factory
 * cassandra.decoder.dict_factory has moved to cassandra.query.dict_factory
 * cassandra.decoder.ordered_dict_factory has moved to cassandra.query.ordered_dict_factory
+
+Exceptions that were in cassandra.decoder have been moved to cassandra.protocol. If
+you handle any of these exceptions, you must adjust the code accordingly.
 
 1.1.2
 =====

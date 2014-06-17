@@ -44,12 +44,13 @@ except ImportError:
 @patch('cassandra.io.libevwrapper.IO')
 @patch('cassandra.io.libevwrapper.Prepare')
 @patch('cassandra.io.libevwrapper.Async')
-@patch('cassandra.io.libevreactor.LibevConnection._maybe_start_loop')
+@patch('cassandra.io.libevreactor.LibevLoop.maybe_start')
 class LibevConnectionTest(unittest.TestCase):
 
     def setUp(self):
         if LibevConnection is None:
             raise unittest.SkipTest('libev does not appear to be installed correctly')
+        LibevConnection.initialize_reactor()
 
     def make_connection(self):
         c = LibevConnection('1.2.3.4', cql_version='3.0.1')

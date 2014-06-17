@@ -39,6 +39,9 @@ class ConnectionTest(object):
 
     klass = None
 
+    def setUp(self):
+        self.klass.initialize_reactor()
+
     def get_connection(self):
         """
         Helper method to solve automated testing issues within Jenkins.
@@ -225,6 +228,7 @@ class AsyncoreConnectionTest(ConnectionTest, unittest.TestCase):
     def setUp(self):
         if 'gevent.monkey' in sys.modules:
             raise unittest.SkipTest("Can't test libev with gevent monkey patching")
+        ConnectionTest.setUp(self)
 
 
 class LibevConnectionTest(ConnectionTest, unittest.TestCase):
@@ -237,3 +241,4 @@ class LibevConnectionTest(ConnectionTest, unittest.TestCase):
         if LibevConnection is None:
             raise unittest.SkipTest(
                 'libev does not appear to be installed properly')
+        ConnectionTest.setUp(self)
