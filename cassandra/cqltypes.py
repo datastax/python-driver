@@ -698,7 +698,7 @@ class _SimpleParameterizedType(_ParameterizedType):
             raise TypeError("Received a string for a type that expects a sequence")
 
         subtype, = cls.subtypes
-        buf = six.BytesIO()
+        buf = io.BytesIO()
         buf.write(uint16_pack(len(items)))
         for item in items:
             itembytes = subtype.to_binary(item, protocol_version)
@@ -757,7 +757,7 @@ class MapType(_ParameterizedType):
     @classmethod
     def serialize_safe(cls, themap, protocol_version):
         subkeytype, subvaltype = cls.subtypes
-        buf = six.BytesIO()
+        buf = io.BytesIO()
         buf.write(uint16_pack(len(themap)))
         try:
             items = six.iteritems(themap)
