@@ -54,8 +54,8 @@ def create_keyspace(name, strategy_class='SimpleStrategy', replication_factor=3,
 
 
 def delete_keyspace(name):
-    keyspaces = execute_native("""SELECT keyspace_name FROM system.schema_keyspaces""", {}, ONE)
-    if name in [r.keyspace_name for r in keyspaces]:
+    cluster = get_cluster()
+    if name in cluster.metadata.keyspaces:
         execute_native("DROP KEYSPACE {}".format(name))
 
 def create_table(model, create_missing_keyspace=True):
@@ -86,12 +86,9 @@ def sync_table(model, create_missing_keyspace=True):
     if create_missing_keyspace:
         create_keyspace(ks_name)
 
-    tables = execute_native(
-        "SELECT columnfamily_name from system.schema_columnfamilies WHERE keyspace_name = ?",
-        [ks_name], ONE
-    )
+    cluster = get_cluster()
 
-    tables = [x.columnfamily_name for x in tables]
+    tables = cluster.metadata.keyspaces[ks_name].tables
 
     #check for an existing column family
     if raw_cf_name not in tables:
