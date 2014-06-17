@@ -27,9 +27,11 @@ the corresponding CQL or Cassandra type strings.
 # for example), these classes would be a good place to tack on
 # .from_cql_literal() and .as_cql_literal() classmethods (or whatever).
 
+from __future__ import absolute_import  # to enable import io from stdlib
 import calendar
 from collections import namedtuple
 from decimal import Decimal
+import io
 import re
 import socket
 import time
@@ -583,7 +585,8 @@ class DateType(_CassandraType):
 
             if not _have_warned_about_timestamps:
                 _have_warned_about_timestamps = True
-                warnings.warn("timestamp columns in Cassandra hold a number of "
+                warnings.warn(
+                    "timestamp columns in Cassandra hold a number of "
                     "milliseconds since the unix epoch.  Currently, when executing "
                     "prepared statements, this driver multiplies timestamp "
                     "values by 1000 so that the result of time.time() "
@@ -790,6 +793,7 @@ class UserDefinedType(_ParameterizedType):
 
     @classmethod
     def deserialize_safe(cls, byts, protocol_version):
+        proto_version = max(3, protocol_version)
         p = 0
         Result = namedtuple(cls.typename, cls.fieldnames)
         result = []
@@ -802,13 +806,23 @@ class UserDefinedType(_ParameterizedType):
             p += itemlen
             # collections inside UDTs are always encoded with at least the
             # version 3 format
-            result.append(col_type.from_binary(item, max(3, protocol_version)))
+            result.append(col_type.from_binary(item, proto_version))
 
         if len(result) < len(cls.subtypes):
             nones = [None] * (len(cls.subtypes) - len(result))
             result = result + nones
 
         return Result(*result)
+
+    @classmethod
+    def serialize_safe(cls, val, protocol_version):
+        proto_version = max(3, protocol_version)
+        buf = io.BytesIO()
+        for subtype, item in zip(cls.subtypes, val):
+            packed_item = subtype.to_binary(item, proto_version)
+            buf.write(int32_pack(len(packed_item)))
+            buf.write(packed_item)
+        return buf.getvalue()
 
 
 class CompositeType(_ParameterizedType):
