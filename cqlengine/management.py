@@ -325,6 +325,6 @@ def drop_table(model):
         return
 
     cf_name = model.column_family_name()
-    execute('drop table {};'.format(cf_name))
+    execute_native('drop table {};'.format(cf_name))
 
 
