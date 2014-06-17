@@ -15,6 +15,8 @@ Bug Fixes
 * Clear reactor state in child process after forking
   to prevent errors with multiprocessing when the parent
   process has connected a Cluster before forking (github #141)
+* Don't share prepared statement lock across Cluster
+  instances
 
 2.0.2
 =====

@@ -332,7 +332,7 @@ class Cluster(object):
     is_shutdown = False
     _is_setup = False
     _prepared_statements = None
-    _prepared_statement_lock = Lock()
+    _prepared_statement_lock = None
 
     _listeners = None
     _listener_lock = None
@@ -410,6 +410,7 @@ class Cluster(object):
         self.metadata = Metadata(self)
         self.control_connection = None
         self._prepared_statements = WeakValueDictionary()
+        self._prepared_statement_lock = Lock()
 
         self._min_requests_per_connection = {
             HostDistance.LOCAL: DEFAULT_MIN_REQUESTS,
