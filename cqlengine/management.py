@@ -88,7 +88,8 @@ def sync_table(model, create_missing_keyspace=True):
 
     cluster = get_cluster()
 
-    tables = cluster.metadata.keyspaces[ks_name].tables
+    keyspace = cluster.metadata.keyspaces[ks_name]
+    tables = keyspace.tables
 
     #check for an existing column family
     if raw_cf_name not in tables:
@@ -117,31 +118,19 @@ def sync_table(model, create_missing_keyspace=True):
         update_compaction(model)
 
 
-    #get existing index names, skip ones that already exist
-    with connection_manager() as con:
-        _, idx_names = con.execute(
-            "SELECT index_name from system.\"IndexInfo\" WHERE table_name=:table_name",
-            {'table_name': raw_cf_name},
-            ONE
-        )
-
-    idx_names = [i[0] for i in idx_names]
-    idx_names = filter(None, idx_names)
+    table = cluster.metadata.keyspaces[ks_name].tables[raw_cf_name]
 
     indexes = [c for n,c in model._columns.items() if c.index]
-    if indexes:
-        for column in indexes:
-            if column.db_index_name in idx_names: continue
-            qs = ['CREATE INDEX index_{}_{}'.format(raw_cf_name, column.db_field_name)]
-            qs += ['ON {}'.format(cf_name)]
-            qs += ['("{}")'.format(column.db_field_name)]
-            qs = ' '.join(qs)
 
-            try:
-                execute(qs)
-            except CQLEngineException:
-                # index already exists
-                pass
+    for column in indexes:
+        if table.columns[column.db_field_name].index:
+            continue
+
+        qs = ['CREATE INDEX index_{}_{}'.format(raw_cf_name, column.db_field_name)]
+        qs += ['ON {}'.format(cf_name)]
+        qs += ['("{}")'.format(column.db_field_name)]
+        qs = ' '.join(qs)
+        execute_native(qs)
 
 def get_create_table(model):
     cf_name = model.column_family_name()
