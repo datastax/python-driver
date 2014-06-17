@@ -1326,7 +1326,7 @@ class Session(object):
                 # the host itself will still be marked down, so we need to pass
                 # a special flag to make sure the reconnector is created
                 self.cluster.signal_connection_failure(
-                        host, conn_exc, is_host_addition, expect_host_to_be_down=True)
+                    host, conn_exc, is_host_addition, expect_host_to_be_down=True)
                 return False
 
             previous = self._pools.get(host)
@@ -1484,6 +1484,7 @@ class ControlConnection(object):
     _SELECT_KEYSPACES = "SELECT * FROM system.schema_keyspaces"
     _SELECT_COLUMN_FAMILIES = "SELECT * FROM system.schema_columnfamilies"
     _SELECT_COLUMNS = "SELECT * FROM system.schema_columns"
+    _SELECT_TYPES = "SELECT * FROM system.schema_types"
 
     _SELECT_PEERS = "SELECT peer, data_center, rack, tokens, rpc_address, schema_version FROM system.peers"
     _SELECT_LOCAL = "SELECT cluster_name, data_center, rack, tokens, partitioner, schema_version FROM system.local WHERE key='local'"
@@ -1493,6 +1494,7 @@ class ControlConnection(object):
 
     _is_shutdown = False
     _timeout = None
+    _protocol_version = None
 
     # for testing purposes
     _time = time
@@ -1514,6 +1516,7 @@ class ControlConnection(object):
         if self._is_shutdown:
             return
 
+        self._protocol_version = self._cluster.protocol_version
         self._set_new_connection(self._reconnect_internal())
 
     def _set_new_connection(self, conn):
@@ -1655,59 +1658,77 @@ class ControlConnection(object):
             self._connection.close()
             del self._connection
 
-    def refresh_schema(self, keyspace=None, table=None):
+    def refresh_schema(self, keyspace=None, table=None, usertype=None):
         try:
             if self._connection:
-                self._refresh_schema(self._connection, keyspace, table)
+                self._refresh_schema(self._connection, keyspace, table, usertype)
         except ReferenceError:
             pass  # our weak reference to the Cluster is no good
         except Exception:
             log.debug("[control connection] Error refreshing schema", exc_info=True)
             self._signal_error()
 
-    def _refresh_schema(self, connection, keyspace=None, table=None, preloaded_results=None):
+    def _refresh_schema(self, connection, keyspace=None, table=None, usertype=None, preloaded_results=None):
         if self._cluster.is_shutdown:
             return
+
+        assert table is None or usertype is None
 
         agreed = self.wait_for_schema_agreement(connection, preloaded_results=preloaded_results)
         if not agreed:
             log.debug("Skipping schema refresh due to lack of schema agreement")
             return
 
-        where_clause = ""
-        if keyspace:
-            where_clause = " WHERE keyspace_name = '%s'" % (keyspace,)
-            if table:
-                where_clause += " AND columnfamily_name = '%s'" % (table,)
-
         cl = ConsistencyLevel.ONE
         if table:
-            ks_query = None
-        else:
-            ks_query = QueryMessage(query=self._SELECT_KEYSPACES + where_clause, consistency_level=cl)
-        cf_query = QueryMessage(query=self._SELECT_COLUMN_FAMILIES + where_clause, consistency_level=cl)
-        col_query = QueryMessage(query=self._SELECT_COLUMNS + where_clause, consistency_level=cl)
-
-        if ks_query:
-            ks_result, cf_result, col_result = connection.wait_for_responses(
-                ks_query, cf_query, col_query, timeout=self._timeout)
-            ks_result = dict_factory(*ks_result.results)
-            cf_result = dict_factory(*cf_result.results)
-            col_result = dict_factory(*col_result.results)
-        else:
-            ks_result = None
+            # a particular table changed
+            where_clause = " WHERE keyspace_name = '%s' AND columnfamily_name = '%s'" % (keyspace, table)
+            cf_query = QueryMessage(query=self._SELECT_COLUMN_FAMILIES + where_clause, consistency_level=cl)
+            col_query = QueryMessage(query=self._SELECT_COLUMNS + where_clause, consistency_level=cl)
             cf_result, col_result = connection.wait_for_responses(
-                cf_query, col_query, timeout=self._timeout)
+                cf_query, col_query)
+
+            log.debug("[control connection] Fetched table info for %s.%s, rebuilding metadata", (keyspace, table))
+            cf_result = dict_factory(*cf_result.results)
+            col_result = dict_factory(*col_result.results)
+            self._cluster.metadata.table_changed(keyspace, table, cf_result, col_result)
+        elif usertype:
+            # user defined types within this keyspace changed
+            where_clause = " WHERE keyspace_name = '%s' AND type_name = '%s'" % (keyspace, usertype)
+            types_query = QueryMessage(query=self._SELECT_USERTYPES + where_clause, consistency_level=cl)
+            types_result = connection.wait_for_response(types_query)
+            log.debug("[control connection] Fetched user type info for %s.%s, rebuilding metadata", (keyspace, usertype))
+            types_result = dict_factory(*types_result)
+            self._cluster.metadata.usertype_changed(keyspace, usertype, types_result)
+        elif keyspace:
+            # only the keyspace itself changed (such as replication settings)
+            where_clause = " WHERE keyspace_name = '%s'" % (keyspace,)
+            ks_query = QueryMessage(query=self._SELECT_KEYSPACES + where_clause, consistency_level=cl)
+            ks_result = connection.wait_for_response(ks_query)
+            log.debug("[control connection] Fetched keyspace info for %s, rebuilding metadata", (keyspace,))
+            ks_result = dict_factory(*types_result)
+            self._cluster.metadata.keyspace_changed(keyspace, ks_result)
+        else:
+            # build everything from scratch
+            queries = [
+                QueryMessage(query=self._SELECT_KEYSPACES, consistency_level=cl),
+                QueryMessage(query=self._SELECT_COLUMN_FAMILIES, consistency_level=cl),
+                QueryMessage(query=self._SELECT_COLUMNS, consistency_level=cl)
+            ]
+            if self._protocol_version >= 3:
+                queries.append(QueryMessage(query=self._SELECT_USERTYPES, consistency_level=cl))
+                ks_result, cf_result, col_result, types_result = connection.wait_for_responses(*queries)
+                types_result = dict_factory(*types_result)
+            else:
+                ks_result, cf_result, col_result = connection.wait_for_responses(*queries)
+                types_result = {}
+
+            ks_result = dict_factory(*types_result)
             cf_result = dict_factory(*cf_result.results)
             col_result = dict_factory(*col_result.results)
 
-        log.debug("[control connection] Fetched schema, rebuilding metadata")
-        if table:
-            self._cluster.metadata.table_changed(keyspace, table, cf_result, col_result)
-        elif keyspace:
-            self._cluster.metadata.keyspace_changed(keyspace, ks_result, cf_result, col_result)
-        else:
-            self._cluster.metadata.rebuild_schema(ks_result, cf_result, col_result)
+            log.debug("[control connection] Fetched schema, rebuilding metadata")
+            self._cluster.metadata.rebuild_schema(ks_result, types_result, cf_result, col_result)
 
     def refresh_node_list_and_token_map(self, force_token_rebuild=False):
         try:
@@ -1837,12 +1858,9 @@ class ControlConnection(object):
 
     def _handle_schema_change(self, event):
         keyspace = event['keyspace'] or None
-        table = event['table'] or None
-        if event['change_type'] in ("CREATED", "DROPPED"):
-            keyspace = keyspace if table else None
-            self._submit(self.refresh_schema, keyspace)
-        elif event['change_type'] == "UPDATED":
-            self._submit(self.refresh_schema, keyspace, table)
+        table = event.get('table') or None
+        usertype = event.get('type')
+        self._submit(self.refresh_schema, keyspace, table, usertype)
 
     def wait_for_schema_agreement(self, connection=None, preloaded_results=None):
         # Each schema change typically generates two schema refreshes, one
@@ -1879,7 +1897,7 @@ class ControlConnection(object):
                     peers_result, local_result = connection.wait_for_responses(
                         peers_query, local_query, timeout=timeout)
                 except OperationTimedOut as timeout:
-                    log.debug("[control connection] Timed out waiting for " \
+                    log.debug("[control connection] Timed out waiting for "
                               "response during schema agreement check: %s", timeout)
                     elapsed = self._time.time() - start
                     continue
@@ -2045,12 +2063,13 @@ class _Scheduler(object):
                 exc_info=exc)
 
 
-def refresh_schema_and_set_result(keyspace, table, control_conn, response_future):
+def refresh_schema_and_set_result(keyspace, table, usertype, control_conn, response_future):
     try:
-        control_conn._refresh_schema(response_future._connection, keyspace, table)
+        control_conn._refresh_schema(response_future._connection, keyspace, table, usertype)
     except Exception:
         log.exception("Exception refreshing schema in response to schema change:")
-        response_future.session.submit(control_conn.refresh_schema, keyspace, table)
+        response_future.session.submit(
+            control_conn.refresh_schema, keyspace, table, usertype)
     finally:
         response_future._set_final_result(None)
 
@@ -2231,7 +2250,8 @@ class ResponseFuture(object):
                     self.session.submit(
                         refresh_schema_and_set_result,
                         response.results['keyspace'],
-                        response.results['table'],
+                        response.results.get('table'),
+                        response.results.get('type'),
                         self.session.cluster.control_connection,
                         self)
                 else:
