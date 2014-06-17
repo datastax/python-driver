@@ -648,7 +648,8 @@ class ResultMessage(_MessageType):
             names_and_types = ((cls.read_string(f), cls.read_type(f))
                                for _ in xrange(num_fields))
             mapped_class = user_type_map.get(ks, {}).get(udt_name)
-            typeclass = typeclass.apply_parameters(udt_name, names_and_types, mapped_class)
+            typeclass = typeclass.apply_parameters(
+                ks, udt_name, names_and_types, mapped_class)
         elif typeclass == CUSTOM_TYPE:
             classname = read_string(f)
             typeclass = lookup_casstype(classname)

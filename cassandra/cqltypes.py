@@ -781,9 +781,9 @@ class UserDefinedType(_ParameterizedType):
     _cache = {}
 
     @classmethod
-    def apply_parameters(cls, udt_name, names_and_types, mapped_class):
+    def apply_parameters(cls, keyspace, udt_name, names_and_types, mapped_class):
         try:
-            return cls._cache[udt_name]
+            return cls._cache[(keyspace, udt_name)]
         except KeyError:
             fieldnames, types = zip(*names_and_types)
             instance = type(udt_name, (cls,), {'subtypes': types,
@@ -791,7 +791,7 @@ class UserDefinedType(_ParameterizedType):
                                                'typename': udt_name,
                                                'fieldnames': fieldnames,
                                                'mapped_class': mapped_class})
-            cls._cache[udt_name] = instance
+            cls._cache[(keyspace, udt_name)] = instance
             return instance
 
     @classmethod
