@@ -232,7 +232,6 @@ class AbstractQuerySet(object):
             return self._batch.add_query(q)
         else:
             result = execute_native(q, consistency_level=self._consistency)
-            import ipdb; ipdb.set_trace()
             return result
 
     def __unicode__(self):

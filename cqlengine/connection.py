@@ -24,6 +24,7 @@ from contextlib import contextmanager
 
 from thrift.transport.TTransport import TTransportException
 from cqlengine.statements import BaseCQLStatement
+from cassandra.query import dict_factory
 
 LOG = logging.getLogger('cqlengine.cql')
 
@@ -83,6 +84,7 @@ def setup(
 
     cluster = Cluster(hosts)
     session = cluster.connect()
+    session.row_factory = dict_factory
 
     _max_connections = max_connections
 
@@ -273,8 +275,14 @@ def execute_native(query, params=None, consistency_level=None):
         query = str(query)
     params = params or {}
     result = session.execute(query, params)
-    import ipdb; ipdb.set_trace()
-    return ([], result)
+
+    if result:
+        keys = result[0].keys()
+    else:
+        keys = []
+
+    return QueryResult(keys, result)
+
 
 def get_session():
     return session

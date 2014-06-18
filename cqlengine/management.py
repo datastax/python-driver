@@ -229,13 +229,13 @@ def get_fields(model):
     # Tables containing only primary keys do not appear to create
     # any entries in system.schema_columns, as only non-primary-key attributes
     # appear to be inserted into the schema_columns table
-    if not tmp:
+    if not tmp[1]:
         return []
 
     try:
-        return [Field(x.column_name, x.validator) for x in tmp if x.type == 'regular']
+        return [Field(x['column_name'], x['validator']) for x in tmp[1] if x['type'] == 'regular']
     except ValueError:
-        return [Field(x.column_name, x.validator) for x in tmp]
+        return [Field(x['column_name'], x['validator']) for x in tmp[1]]
     # convert to Field named tuples
 
 
