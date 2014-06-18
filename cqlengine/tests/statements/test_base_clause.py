@@ -8,7 +8,7 @@ class BaseClauseTests(TestCase):
         ss = BaseClause('a', 'b')
         assert ss.get_context_size() == 1
 
-        ctx = []
+        ctx = {}
         ss.set_context_id(10)
         ss.update_context(ctx)
         assert ctx == {'10': 'b'}
