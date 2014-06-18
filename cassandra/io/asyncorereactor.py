@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import absolute_import  # to enable import io from stdlib
 import atexit
 from collections import deque
 from functools import partial
+import io
 import logging
 import os
 import socket
@@ -22,7 +24,6 @@ import sys
 from threading import Event, Lock, Thread
 import weakref
 
-from six import BytesIO
 from six.moves import range
 
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL, EISCONN, errorcode
@@ -59,6 +60,7 @@ def _cleanup(loop_weakref):
 class AsyncoreLoop(object):
 
     def __init__(self):
+        self._pid = os.getpid()
         self._loop_lock = Lock()
         self._started = False
         self._shutdown = False
@@ -145,6 +147,18 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
     def initialize_reactor(cls):
         if not cls._loop:
             cls._loop = AsyncoreLoop()
+        else:
+            current_pid = os.getpid()
+            if cls._loop._pid != current_pid:
+                log.debug("Detected fork, clearing and reinitializing reactor state")
+                cls.handle_fork()
+                cls._loop = AsyncoreLoop()
+
+    @classmethod
+    def handle_fork(cls):
+        if cls._loop:
+            cls._loop._cleanup()
+            cls._loop = None
 
     @classmethod
     def factory(cls, *args, **kwargs):
@@ -164,7 +178,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         asyncore.dispatcher.__init__(self)
 
         self.connected_event = Event()
-        self._iobuf = BytesIO()
+        self._iobuf = io.BytesIO()
 
         self._callbacks = {}
         self.deque = deque()
@@ -317,7 +331,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
 
                         # leave leftover in current buffer
                         leftover = self._iobuf.read()
-                        self._iobuf = BytesIO()
+                        self._iobuf = io.BytesIO()
                         self._iobuf.write(leftover)
 
                         self._total_reqd_bytes = 0

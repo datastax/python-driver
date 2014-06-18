@@ -107,3 +107,21 @@ class BoundStatementTestCase(unittest.TestCase):
             self.assertIn('list', str(e))
         else:
             self.fail('Passed invalid type but exception was not thrown')
+
+    def test_inherit_fetch_size(self):
+        keyspace = 'keyspace1'
+        column_family = 'cf1'
+
+        column_metadata = [
+            (keyspace, column_family, 'foo1', Int32Type),
+            (keyspace, column_family, 'foo2', Int32Type)
+        ]
+
+        prepared_statement = PreparedStatement(column_metadata=column_metadata,
+                                               query_id=None,
+                                               routing_key_indexes=[],
+                                               query=None,
+                                               keyspace=keyspace,
+                                               fetch_size=1234)
+        bound_statement = BoundStatement(prepared_statement=prepared_statement)
+        self.assertEqual(1234, bound_statement.fetch_size)

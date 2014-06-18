@@ -27,8 +27,10 @@ the corresponding CQL or Cassandra type strings.
 # for example), these classes would be a good place to tack on
 # .from_cql_literal() and .as_cql_literal() classmethods (or whatever).
 
+from __future__ import absolute_import  # to enable import io from stdlib
 import calendar
 from decimal import Decimal
+import io
 import re
 import socket
 import time
@@ -560,7 +562,8 @@ class DateType(_CassandraType):
 
             if not _have_warned_about_timestamps:
                 _have_warned_about_timestamps = True
-                warnings.warn("timestamp columns in Cassandra hold a number of "
+                warnings.warn(
+                    "timestamp columns in Cassandra hold a number of "
                     "milliseconds since the unix epoch.  Currently, when executing "
                     "prepared statements, this driver multiplies timestamp "
                     "values by 1000 so that the result of time.time() "
@@ -666,7 +669,7 @@ class _SimpleParameterizedType(_ParameterizedType):
             raise TypeError("Received a string for a type that expects a sequence")
 
         subtype, = cls.subtypes
-        buf = six.BytesIO()
+        buf = io.BytesIO()
         buf.write(uint16_pack(len(items)))
         for item in items:
             itembytes = subtype.to_binary(item)
@@ -719,7 +722,7 @@ class MapType(_ParameterizedType):
     @classmethod
     def serialize_safe(cls, themap):
         subkeytype, subvaltype = cls.subtypes
-        buf = six.BytesIO()
+        buf = io.BytesIO()
         buf.write(uint16_pack(len(themap)))
         try:
             items = six.iteritems(themap)
