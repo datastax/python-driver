@@ -380,7 +380,7 @@ class CounterUpdateClause(ContainerUpdateClause):
     def __unicode__(self):
         delta = self.value - self.previous
         sign = '-' if delta < 0 else '+'
-        return '"{0}" = "{0}" {1} %({})s'.format(self.field, sign, self.context_id)
+        return '"{0}" = "{0}" {1} %({2})s'.format(self.field, sign, self.context_id)
 
 
 class BaseDeleteClause(BaseClause):
