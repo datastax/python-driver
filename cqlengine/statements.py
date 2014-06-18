@@ -428,7 +428,7 @@ class MapDeleteClause(BaseDeleteClause):
 
     def __unicode__(self):
         if not self._analyzed: self._analyze()
-        return ', '.join(['"{}"[%({})s]'.format(self.field) for i in range(len(self._removals))])
+        return ', '.join(['"{}"[%({})s]'.format(self.field, self.context_id + i) for i in range(len(self._removals))])
 
 
 class BaseCQLStatement(object):
