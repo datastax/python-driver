@@ -605,7 +605,7 @@ class ResultMessage(_MessageType):
                 colksname = read_string(f)
                 colcfname = read_string(f)
             colname = read_string(f)
-            coltype = cls.read_type(f)
+            coltype = cls.read_type(f, user_type_map)
             column_metadata.append((colksname, colcfname, colname, coltype))
         return paging_state, column_metadata
 
@@ -635,17 +635,17 @@ class ResultMessage(_MessageType):
             raise NotSupportedError("Unknown data type code 0x%04x. Have to skip"
                                     " entire result set." % (optid,))
         if typeclass in (ListType, SetType):
-            subtype = cls.read_type(f)
+            subtype = cls.read_type(f, user_type_map)
             typeclass = typeclass.apply_parameters((subtype,))
         elif typeclass == MapType:
-            keysubtype = cls.read_type(f)
-            valsubtype = cls.read_type(f)
+            keysubtype = cls.read_type(f, user_type_map)
+            valsubtype = cls.read_type(f, user_type_map)
             typeclass = typeclass.apply_parameters((keysubtype, valsubtype))
         elif typeclass == UserDefinedType:
             ks = cls.read_string(f)
             udt_name = cls.read_string(f)
             num_fields = cls.read_short(f)
-            names_and_types = ((cls.read_string(f), cls.read_type(f))
+            names_and_types = ((cls.read_string(f), cls.read_type(f, user_type_map))
                                for _ in xrange(num_fields))
             mapped_class = user_type_map.get(ks, {}).get(udt_name)
             typeclass = typeclass.apply_parameters(
