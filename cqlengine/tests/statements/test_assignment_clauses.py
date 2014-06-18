@@ -190,7 +190,7 @@ class ListUpdateClauseTests(TestCase):
         self.assertEqual(c._prepend, [1, 2])
 
         self.assertEqual(c.get_context_size(), 1)
-        self.assertEqual(str(c), '"s" = ? + "s"')
+        self.assertEqual(str(c), '"s" = %(0)s + "s"')
 
         ctx = {}
         c.update_context(ctx)
@@ -225,7 +225,7 @@ class ListUpdateClauseTests(TestCase):
         self.assertIsNone(c._prepend)
 
         self.assertEqual(c.get_context_size(), 1)
-        self.assertEqual(str(c), '"s" = ?')
+        self.assertEqual(str(c), '"s" = %(0)s')
 
         ctx = {}
         c.update_context(ctx)
@@ -241,7 +241,7 @@ class MapUpdateTests(TestCase):
 
         self.assertEqual(c._updates, [3, 5])
         self.assertEqual(c.get_context_size(), 4)
-        self.assertEqual(str(c), '"s"[?] = ?, "s"[?] = ?')
+        self.assertEqual(str(c), '"s"[%(0)s] = %(1)s, "s"[%(2)s] = %(3)s')
 
         ctx = {}
         c.update_context(ctx)
@@ -313,7 +313,7 @@ class MapDeleteTests(TestCase):
 
         self.assertEqual(c._removals, [1, 5])
         self.assertEqual(c.get_context_size(), 2)
-        self.assertEqual(str(c), '"s"[?], "s"[?]')
+        self.assertEqual(str(c), '"s"[%(0)s], "s"[%(1)s]')
 
         ctx = {}
         c.update_context(ctx)
