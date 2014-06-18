@@ -196,13 +196,15 @@ class OptionsTest(BaseCassEngTestCase):
         drop_table(AllSizeTieredOptionsModel)
         sync_table(AllSizeTieredOptionsModel)
 
-        settings = get_table_settings(AllSizeTieredOptionsModel)
-        options = json.loads(settings['compaction_strategy_options'])
+        options = get_table_settings(AllSizeTieredOptionsModel).options['compaction_strategy_options']
+        options = json.loads(options)
+
         expected = {u'min_threshold': u'2',
                     u'bucket_low': u'0.3',
                     u'tombstone_compaction_interval': u'86400',
                     u'bucket_high': u'2',
                     u'max_threshold': u'64'}
+
         self.assertDictEqual(options, expected)
 
 
