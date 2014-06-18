@@ -231,7 +231,9 @@ class AbstractQuerySet(object):
         if self._batch:
             return self._batch.add_query(q)
         else:
-            return execute(q, consistency_level=self._consistency)
+            result = execute_native(q, consistency_level=self._consistency)
+            import ipdb; ipdb.set_trace()
+            return result
 
     def __unicode__(self):
         return unicode(self._select_query())
@@ -775,7 +777,8 @@ class DMLQuery(object):
         if self._batch:
             return self._batch.add_query(q)
         else:
-            return execute_native(q, consistency_level=self._consistency)
+            tmp = execute_native(q, consistency_level=self._consistency)
+            return tmp
 
     def batch(self, batch_obj):
         if batch_obj is not None and not isinstance(batch_obj, BatchQuery):

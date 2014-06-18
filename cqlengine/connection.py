@@ -273,7 +273,8 @@ def execute_native(query, params=None, consistency_level=None):
         query = str(query)
     params = params or {}
     result = session.execute(query, params)
-    return result
+    import ipdb; ipdb.set_trace()
+    return ([], result)
 
 def get_session():
     return session
