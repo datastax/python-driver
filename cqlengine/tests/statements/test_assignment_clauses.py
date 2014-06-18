@@ -275,7 +275,7 @@ class CounterUpdateTests(TestCase):
         c.set_context_id(5)
 
         self.assertEqual(c.get_context_size(), 1)
-        self.assertEqual(str(c), '"a" = "a" + %(0)s')
+        self.assertEqual(str(c), '"a" = "a" + %(5)s')
 
         ctx = {}
         c.update_context(ctx)
