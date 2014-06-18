@@ -240,7 +240,7 @@ class ListUpdateClause(ContainerUpdateClause):
             ctx_id += 1
 
         if self._append:
-            qs += ['"{0}" = "{{0}}" + %({1})s'.format(self.field, ctx_id)]
+            qs += ['"{0}" = "{0}" + %({1})s'.format(self.field, ctx_id)]
 
         return ', '.join(qs)
 

@@ -174,7 +174,7 @@ class ListUpdateClauseTests(TestCase):
         self.assertIsNone(c._prepend)
 
         self.assertEqual(c.get_context_size(), 1)
-        self.assertEqual(str(c), '"s" = "s" + ?')
+        self.assertEqual(str(c), '"s" = "s" + %(0)s')
 
         ctx = {}
         c.update_context(ctx)
