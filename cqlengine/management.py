@@ -244,7 +244,6 @@ def get_table_settings(model):
     cluster = get_cluster()
     ks = model._get_keyspace()
     table = model.column_family_name(include_keyspace=False)
-
     table = cluster.metadata.keyspaces[ks].tables[table]
     return table
 
@@ -259,11 +258,14 @@ def update_compaction(model):
     """
     logger.debug("Checking %s for compaction differences", model)
     table = get_table_settings(model)
-    existing_options = table.compaction_options.copy()
 
-    desired_options = get_compaction_options(model)
+    existing_options = table.options.copy()
+
+    desired_options = get_compaction_options(model).get("compaction_strategy_options", {})
 
     desired_options.pop('class', None)
+
+    do_update = False
 
     for k, v in desired_options.items():
         val = existing_options.pop(k, None)

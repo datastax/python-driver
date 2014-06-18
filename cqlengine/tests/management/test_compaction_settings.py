@@ -136,7 +136,7 @@ class AlterTableTest(BaseCassEngTestCase):
 
         table_settings = get_table_settings(tmp)
 
-        self.assertRegexpMatches(table_settings['compaction_strategy_class'], '.*SizeTieredCompactionStrategy$')
+        self.assertRegexpMatches(table_settings.options['compaction_strategy_class'], '.*SizeTieredCompactionStrategy$')
 
 
     def test_alter_options(self):

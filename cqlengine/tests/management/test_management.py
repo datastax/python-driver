@@ -122,7 +122,8 @@ class SyncTableTests(BaseCassEngTestCase):
         # blows up with DoesNotExist if table does not exist
         table_settings = management.get_table_settings(PrimaryKeysOnlyModel)
         # let make sure the flag we care about
-        assert LeveledCompactionStrategy in table_settings['compaction_strategy_class']
+
+        assert LeveledCompactionStrategy in table_settings.options['compaction_strategy_class']
 
 
         # Now we are "updating" the table:
@@ -138,4 +139,4 @@ class SyncTableTests(BaseCassEngTestCase):
         sync_table(PrimaryKeysOnlyModel)
 
         table_settings = management.get_table_settings(PrimaryKeysOnlyModel)
-        assert SizeTieredCompactionStrategy in table_settings['compaction_strategy_class']
+        assert SizeTieredCompactionStrategy in table_settings.options['compaction_strategy_class']
