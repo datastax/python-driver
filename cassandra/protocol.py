@@ -632,11 +632,11 @@ class ResultMessage(_MessageType):
             valsubtype = cls.read_type(f, user_type_map)
             typeclass = typeclass.apply_parameters((keysubtype, valsubtype))
         elif typeclass == UserDefinedType:
-            ks = cls.read_string(f)
-            udt_name = cls.read_string(f)
-            num_fields = cls.read_short(f)
-            names_and_types = ((cls.read_string(f), cls.read_type(f, user_type_map))
-                               for _ in xrange(num_fields))
+            ks = read_string(f)
+            udt_name = read_string(f)
+            num_fields = read_short(f)
+            names_and_types = tuple((read_string(f), cls.read_type(f, user_type_map))
+                                    for _ in xrange(num_fields))
             mapped_class = user_type_map.get(ks, {}).get(udt_name)
             typeclass = typeclass.apply_parameters(
                 ks, udt_name, names_and_types, mapped_class)

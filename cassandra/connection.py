@@ -344,7 +344,7 @@ class Connection(object):
                     % (opcode, stream_id))
 
             if body_len > 0:
-                body = msg[8:]
+                body = msg[self._full_header_length:]
             elif body_len == 0:
                 body = six.binary_type()
             else:

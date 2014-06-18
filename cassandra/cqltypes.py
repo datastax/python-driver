@@ -297,8 +297,7 @@ class _CassandraType(object):
         if cls.num_subtypes != 'UNKNOWN' and len(subtypes) != cls.num_subtypes:
             raise ValueError("%s types require %d subtypes (%d given)"
                              % (cls.typename, cls.num_subtypes, len(subtypes)))
-        # newname = cls.cass_parameterized_type_with(subtypes).encode('utf8')
-        newname = cls.cass_parameterized_type_with(subtypes)
+        newname = cls.cass_parameterized_type_with(subtypes).encode('utf8')
         return type(newname, (cls,), {'subtypes': subtypes, 'cassname': cls.cassname})
 
     @classmethod
@@ -782,6 +781,7 @@ class UserDefinedType(_ParameterizedType):
 
     @classmethod
     def apply_parameters(cls, keyspace, udt_name, names_and_types, mapped_class):
+        udt_name = udt_name.encode('utf-8')
         try:
             return cls._cache[(keyspace, udt_name)]
         except KeyError:

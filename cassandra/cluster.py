@@ -459,7 +459,7 @@ class Cluster(object):
     def register_user_type(self, keyspace, user_type, klass):
         self._user_types[keyspace][user_type] = klass
         for session in self.sessions:
-            self.session.user_type_registered(keyspace, user_type, klass)
+            session.user_type_registered(keyspace, user_type, klass)
 
     def get_min_requests_per_connection(self, host_distance):
         return self._min_requests_per_connection[host_distance]
@@ -1076,17 +1076,6 @@ class Session(object):
 
     encoders = None
 
-    def user_type_registered(self, keyspace, user_type, klass):
-        type_meta = self.cluster.metadata.keyspaces[keyspace].user_types[user_type]
-
-        def encode(val):
-            return '{ %s }' % ' , '.join('%s : %s' % (
-                field_name,
-                cql_encode_all_types(getattr(val, field_name))
-            ) for field_name in type_meta.field_names)
-
-        self._encoders[klass] = encode
-
     def __init__(self, cluster, hosts):
         self.cluster = cluster
         self.hosts = hosts
@@ -1457,6 +1446,22 @@ class Session(object):
         for pool in self._pools.values():
             pool._set_keyspace_for_all_conns(keyspace, pool_finished_setting_keyspace)
 
+    def user_type_registered(self, keyspace, user_type, klass):
+        """
+        Called by the parent Cluster instance when the user registers a new
+        mapping from a user-defined type to a class.  Intended for internal
+        use only.
+        """
+        type_meta = self.cluster.metadata.keyspaces[keyspace].user_types[user_type]
+
+        def encode(val):
+            return '{ %s }' % ' , '.join('%s : %s' % (
+                field_name,
+                cql_encode_all_types(getattr(val, field_name))
+            ) for field_name in type_meta.field_names)
+
+        self._encoders[klass] = encode
+
     def submit(self, fn, *args, **kwargs):
         """ Internal """
         if not self.is_shutdown:
@@ -1521,7 +1526,7 @@ class ControlConnection(object):
     _SELECT_KEYSPACES = "SELECT * FROM system.schema_keyspaces"
     _SELECT_COLUMN_FAMILIES = "SELECT * FROM system.schema_columnfamilies"
     _SELECT_COLUMNS = "SELECT * FROM system.schema_columns"
-    _SELECT_TYPES = "SELECT * FROM system.schema_types"
+    _SELECT_USERTYPES = "SELECT * FROM system.schema_usertypes"
 
     _SELECT_PEERS = "SELECT peer, data_center, rack, tokens, rpc_address, schema_version FROM system.peers"
     _SELECT_LOCAL = "SELECT cluster_name, data_center, rack, tokens, partitioner, schema_version FROM system.local WHERE key='local'"
@@ -1725,7 +1730,7 @@ class ControlConnection(object):
             cf_result, col_result = connection.wait_for_responses(
                 cf_query, col_query)
 
-            log.debug("[control connection] Fetched table info for %s.%s, rebuilding metadata", (keyspace, table))
+            log.debug("[control connection] Fetched table info for %s.%s, rebuilding metadata", keyspace, table)
             cf_result = dict_factory(*cf_result.results) if cf_result else {}
             col_result = dict_factory(*col_result.results) if col_result else {}
             self._cluster.metadata.table_changed(keyspace, table, cf_result, col_result)
@@ -1734,7 +1739,7 @@ class ControlConnection(object):
             where_clause = " WHERE keyspace_name = '%s' AND type_name = '%s'" % (keyspace, usertype)
             types_query = QueryMessage(query=self._SELECT_USERTYPES + where_clause, consistency_level=cl)
             types_result = connection.wait_for_response(types_query)
-            log.debug("[control connection] Fetched user type info for %s.%s, rebuilding metadata", (keyspace, usertype))
+            log.debug("[control connection] Fetched user type info for %s.%s, rebuilding metadata", keyspace, usertype)
             types_result = dict_factory(*types_result.results) if types_result.results else {}
             self._cluster.metadata.usertype_changed(keyspace, usertype, types_result)
         elif keyspace:
@@ -1742,7 +1747,7 @@ class ControlConnection(object):
             where_clause = " WHERE keyspace_name = '%s'" % (keyspace,)
             ks_query = QueryMessage(query=self._SELECT_KEYSPACES + where_clause, consistency_level=cl)
             ks_result = connection.wait_for_response(ks_query)
-            log.debug("[control connection] Fetched keyspace info for %s, rebuilding metadata", (keyspace,))
+            log.debug("[control connection] Fetched keyspace info for %s, rebuilding metadata", keyspace)
             ks_result = dict_factory(*ks_result.results) if ks_result.results else {}
             self._cluster.metadata.keyspace_changed(keyspace, ks_result)
         else:

@@ -119,7 +119,7 @@ class Metadata(object):
                 keyspace_meta.tables[table_meta.name] = table_meta
 
             for usertype_row in usertype_rows.get(keyspace_meta.name, []):
-                usertype = self._build_usertype(usertype_row)
+                usertype = self._build_usertype(keyspace_meta.name, usertype_row)
                 keyspace_meta.user_types[usertype.name] = usertype
 
             current_keyspaces.add(keyspace_meta.name)
@@ -149,6 +149,7 @@ class Metadata(object):
         old_keyspace_meta = self.keyspaces.get(keyspace, None)
         self.keyspaces[keyspace] = keyspace_meta
         if old_keyspace_meta:
+            keyspace_meta.user_types = old_keyspace_meta.user_types
             if (keyspace_meta.replication_strategy != old_keyspace_meta.replication_strategy):
                 self._keyspace_updated(keyspace)
         else:
@@ -156,7 +157,7 @@ class Metadata(object):
 
     def usertype_changed(self, keyspace, name, type_results):
         new_usertype = self._build_usertype(keyspace, type_results[0])
-        self.user_types[name] = new_usertype
+        self.keyspaces[keyspace].user_types[name] = new_usertype
 
     def table_changed(self, keyspace, table, cf_results, col_results):
         try:
