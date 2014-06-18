@@ -261,11 +261,20 @@ def update_compaction(model):
 
     existing_options = table.options.copy()
 
-    desired_options = get_compaction_options(model).get("compaction_strategy_options", {})
+    existing_compaction_strategy = existing_options['compaction_strategy_class']
+
+    existing_options = json.loads(existing_options['compaction_strategy_options'])
+
+    desired_options = get_compaction_options(model)
+
+    desired_compact_strategy = desired_options.get('class', SizeTieredCompactionStrategy)
 
     desired_options.pop('class', None)
 
     do_update = False
+
+    if desired_compact_strategy not in existing_compaction_strategy:
+        do_update = True
 
     for k, v in desired_options.items():
         val = existing_options.pop(k, None)

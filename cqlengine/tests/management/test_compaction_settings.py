@@ -220,7 +220,8 @@ class OptionsTest(BaseCassEngTestCase):
         drop_table(AllLeveledOptionsModel)
         sync_table(AllLeveledOptionsModel)
 
-        settings = get_table_settings(AllLeveledOptionsModel)
+        settings = get_table_settings(AllLeveledOptionsModel).options
+
         options = json.loads(settings['compaction_strategy_options'])
         self.assertDictEqual(options, {u'sstable_size_in_mb': u'64'})
 
