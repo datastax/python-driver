@@ -612,19 +612,9 @@ class ResultMessage(_MessageType):
     @classmethod
     def recv_results_schema_change(cls, f, protocol_version):
         change_type = read_string(f)
-        if protocol_version >= 3:
-            target = read_string(f)
-            keyspace = read_string(f)
-            if target != "KEYSPACE":
-                table_or_type = read_string(f)
-                return {'change_type': change_type, 'keyspace': keyspace, target.lower(): table_or_type}
-            else:
-                return {'change_type': change_type, 'keyspace': keyspace}
-
-        else:
-            keyspace = read_string(f)
-            table = read_string(f)
-            return {'change_type': change_type, 'keyspace': keyspace, 'table': table}
+        keyspace = read_string(f)
+        table = read_string(f)
+        return {'change_type': change_type, 'keyspace': keyspace, 'table': table}
 
     @classmethod
     def read_type(cls, f, user_type_map):
@@ -805,30 +795,39 @@ class EventMessage(_MessageType):
         event_type = read_string(f).upper()
         if event_type in known_event_types:
             read_method = getattr(cls, 'recv_' + event_type.lower())
-            return cls(event_type=event_type, event_args=read_method(f))
+            return cls(event_type=event_type, event_args=read_method(f, protocol_version))
         raise NotSupportedError('Unknown event type %r' % event_type)
 
     @classmethod
-    def recv_topology_change(cls, f):
+    def recv_topology_change(cls, f, protocol_version):
         # "NEW_NODE" or "REMOVED_NODE"
         change_type = read_string(f)
         address = read_inet(f)
         return dict(change_type=change_type, address=address)
 
     @classmethod
-    def recv_status_change(cls, f):
+    def recv_status_change(cls, f, protocol_version):
         # "UP" or "DOWN"
         change_type = read_string(f)
         address = read_inet(f)
         return dict(change_type=change_type, address=address)
 
     @classmethod
-    def recv_schema_change(cls, f):
+    def recv_schema_change(cls, f, protocol_version):
         # "CREATED", "DROPPED", or "UPDATED"
         change_type = read_string(f)
-        keyspace = read_string(f)
-        table = read_string(f)
-        return dict(change_type=change_type, keyspace=keyspace, table=table)
+        if protocol_version >= 3:
+            target = read_string(f)
+            keyspace = read_string(f)
+            if target != "KEYSPACE":
+                table_or_type = read_string(f)
+                return {'change_type': change_type, 'keyspace': keyspace, target.lower(): table_or_type}
+            else:
+                return {'change_type': change_type, 'keyspace': keyspace}
+        else:
+            keyspace = read_string(f)
+            table = read_string(f)
+            return {'change_type': change_type, 'keyspace': keyspace, 'table': table}
 
 
 def write_header(f, version, flags, stream_id, opcode, length):
