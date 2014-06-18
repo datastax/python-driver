@@ -272,7 +272,6 @@ def execute_native(query, params=None, consistency_level=None):
         params = query.get_context()
         query = str(query)
     params = params or {}
-
     result = session.execute(query, params)
     return result
 

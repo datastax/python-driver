@@ -626,7 +626,7 @@ class InsertStatement(AssignmentStatement):
 
         qs += ["({})".format(', '.join(['"{}"'.format(c) for c in columns]))]
         qs += ['VALUES']
-        qs += ["({})".format(', '.join(['?' for v in values]))]
+        qs += ["({})".format(', '.join(['%({})s'.format(v) for v in values]))]
 
         if self.ttl:
             qs += ["USING TTL {}".format(self.ttl)]
