@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from cqlengine import BaseContainerColumn, Map, columns
 from cqlengine.columns import Counter, List, Set
 
-from cqlengine.connection import execute, RowResult
+from cqlengine.connection import execute, RowResult, execute_native
 
 from cqlengine.exceptions import CQLEngineException, ValidationError
 from cqlengine.functions import Token, BaseQueryFunction, QueryValue
@@ -775,7 +775,7 @@ class DMLQuery(object):
         if self._batch:
             return self._batch.add_query(q)
         else:
-            return execute(q, consistency_level=self._consistency)
+            return execute_native(q, consistency_level=self._consistency)
 
     def batch(self, batch_obj):
         if batch_obj is not None and not isinstance(batch_obj, BatchQuery):

@@ -268,8 +268,12 @@ def connection_manager():
 
 def execute_native(query, params=None, consistency_level=None):
     # TODO use consistency level
-    prepared = session.prepare(query)
-    result = session.execute(prepared, params)
+    if isinstance(query, BaseCQLStatement):
+        params = query.get_context()
+        query = str(query)
+    params = params or {}
+
+    result = session.execute(query, params)
     return result
 
 def get_session():

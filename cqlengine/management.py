@@ -223,7 +223,7 @@ def get_fields(model):
     ks_name = model._get_keyspace()
     col_family = model.column_family_name(include_keyspace=False)
 
-    query = "select * from system.schema_columns where keyspace_name = ? and columnfamily_name = ?"
+    query = "select * from system.schema_columns where keyspace_name = %s and columnfamily_name = %s"
     tmp = execute_native(query, [ks_name, col_family])
 
     # Tables containing only primary keys do not appear to create
