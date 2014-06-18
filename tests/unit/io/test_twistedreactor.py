@@ -20,15 +20,18 @@ from mock import Mock, patch
 
 try:
     from twisted.test import proto_helpers
+    from twisted.python.failure import Failure
     from cassandra.io import twistedreactor
 except ImportError:
-    twistedreactor = None
+    twistedreactor = None  # NOQA
 
 
 class TestTwistedProtocol(unittest.TestCase):
+
     def setUp(self):
         if twistedreactor is None:
             raise unittest.SkipTest("Twisted libraries not available")
+        twistedreactor.TwistedConnection.initialize_reactor()
         self.tr = proto_helpers.StringTransportWithDisconnection()
         self.tr.connector = Mock()
         self.mock_connection = Mock()
@@ -63,6 +66,7 @@ class TestTwistedClientFactory(unittest.TestCase):
     def setUp(self):
         if twistedreactor is None:
             raise unittest.SkipTest("Twisted libraries not available")
+        twistedreactor.TwistedConnection.initialize_reactor()
         self.mock_connection = Mock()
         self.obj_ut = twistedreactor.TwistedConnectionClientFactory(
             self.mock_connection)
@@ -71,21 +75,24 @@ class TestTwistedClientFactory(unittest.TestCase):
         """
         Verify that connection failed causes the connection object to close.
         """
-        self.obj_ut.clientConnectionFailed(None, 'a test')
-        self.mock_connection.close.assert_called_with()
+        exc = Exception('a test')
+        self.obj_ut.clientConnectionFailed(None, Failure(exc))
+        self.mock_connection.defunct.assert_called_with(exc)
 
     def test_client_connection_lost(self):
         """
         Verify that connection lost causes the connection object to close.
         """
-        self.obj_ut.clientConnectionLost(None, 'a test')
-        self.mock_connection.close.assert_called_with()
+        exc = Exception('a test')
+        self.obj_ut.clientConnectionLost(None, Failure(exc))
+        self.mock_connection.defunct.assert_called_with(exc)
 
 
 class TestTwistedConnection(unittest.TestCase):
     def setUp(self):
         if twistedreactor is None:
             raise unittest.SkipTest("Twisted libraries not available")
+        twistedreactor.TwistedConnection.initialize_reactor()
         self.reactor_cft_patcher = patch(
             'twisted.internet.reactor.callFromThread')
         self.reactor_running_patcher = patch(
@@ -99,15 +106,14 @@ class TestTwistedConnection(unittest.TestCase):
     def tearDown(self):
         self.reactor_cft_patcher.stop()
         self.reactor_run_patcher.stop()
-        if self.obj_ut._thread:
-            self.obj_ut._thread.join()
+        self.obj_ut._loop._cleanup()
 
     def test_connection_initialization(self):
         """
         Verify that __init__() works correctly.
         """
         self.mock_reactor_cft.assert_called_with(self.obj_ut.add_connection)
-        self.obj_ut._thread.join()  # make sure thread exits before checking
+        self.obj_ut._loop._cleanup()
         self.mock_reactor_run.assert_called_with(installSignalHandlers=False)
 
     @patch('twisted.internet.reactor.connectTCP')
@@ -140,17 +146,6 @@ class TestTwistedConnection(unittest.TestCase):
         self.obj_ut.connector.disconnect.assert_called_with()
         self.assertTrue(self.obj_ut.connected_event.is_set())
         self.assertTrue(self.obj_ut.error_all_callbacks.called)
-
-    def test_handle_close(self):
-        """
-        Skipped for now, since it just calls close() and isn't really used.
-        """
-
-    def test_handle_write(self):
-        """
-        Verify that this raises an exception if called.
-        """
-        self.assertRaises(RuntimeError, self.obj_ut.handle_write)
 
     def test_handle_read__incomplete(self):
         """
