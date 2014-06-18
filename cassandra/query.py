@@ -567,9 +567,10 @@ class BatchStatement(Statement):
     """
 
     _statements_and_parameters = None
+    _session = None
 
     def __init__(self, batch_type=BatchType.LOGGED, retry_policy=None,
-                 consistency_level=None):
+                 consistency_level=None, session=None):
         """
         `batch_type` specifies The :class:`.BatchType` for the batch operation.
         Defaults to :attr:`.BatchType.LOGGED`.
@@ -605,6 +606,7 @@ class BatchStatement(Statement):
         """
         self.batch_type = batch_type
         self._statements_and_parameters = []
+        self._session = session
         Statement.__init__(self, retry_policy=retry_policy, consistency_level=consistency_level)
 
     def add(self, statement, parameters=None):
@@ -617,7 +619,8 @@ class BatchStatement(Statement):
         """
         if isinstance(statement, six.string_types):
             if parameters:
-                statement = bind_params(statement, parameters)
+                encoders = cql_encoders if self._session is None else self._session.encoders
+                statement = bind_params(statement, parameters, encoders)
             self._statements_and_parameters.append((False, statement, ()))
         elif isinstance(statement, PreparedStatement):
             query_id = statement.query_id
@@ -635,7 +638,8 @@ class BatchStatement(Statement):
             # it must be a SimpleStatement
             query_string = statement.query_string
             if parameters:
-                query_string = bind_params(query_string, parameters)
+                encoders = cql_encoders if self._session is None else self._session.encoders
+                query_string = bind_params(query_string, parameters, encoders)
             self._statements_and_parameters.append((False, query_string, ()))
         return self
 
@@ -677,11 +681,11 @@ class ValueSequence(object):
         return cql_encode_sequence(self.sequence)
 
 
-def bind_params(query, params):
+def bind_params(query, params, encoders):
     if isinstance(params, dict):
-        return query % dict((k, cql_encoders.get(type(v), cql_encode_object)(v)) for k, v in six.iteritems(params))
+        return query % dict((k, encoders.get(type(v), cql_encode_object)(v)) for k, v in six.iteritems(params))
     else:
-        return query % tuple(cql_encoders.get(type(v), cql_encode_object)(v) for v in params)
+        return query % tuple(encoders.get(type(v), cql_encode_object)(v) for v in params)
 
 
 class TraceUnavailable(Exception):

@@ -560,14 +560,14 @@ class ResultMessage(_MessageType):
             ksname = read_string(f)
             results = ksname
         elif kind == RESULT_KIND_PREPARED:
-            results = cls.recv_results_prepared(f)
+            results = cls.recv_results_prepared(f, user_type_map)
         elif kind == RESULT_KIND_SCHEMA_CHANGE:
             results = cls.recv_results_schema_change(f, protocol_version)
         return cls(kind, results, paging_state)
 
     @classmethod
     def recv_results_rows(cls, f, protocol_version, user_type_map):
-        paging_state, column_metadata = cls.recv_results_metadata(f)
+        paging_state, column_metadata = cls.recv_results_metadata(f, user_type_map)
         rowcount = read_int(f)
         rows = [cls.recv_row(f, len(column_metadata)) for _ in range(rowcount)]
         colnames = [c[2] for c in column_metadata]
@@ -579,9 +579,9 @@ class ResultMessage(_MessageType):
         return (paging_state, (colnames, parsed_rows))
 
     @classmethod
-    def recv_results_prepared(cls, f):
+    def recv_results_prepared(cls, f, user_type_map):
         query_id = read_binary_string(f)
-        _, column_metadata = cls.recv_results_metadata(f)
+        _, column_metadata = cls.recv_results_metadata(f, user_type_map)
         return (query_id, column_metadata)
 
     @classmethod

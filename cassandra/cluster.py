@@ -44,6 +44,7 @@ from itertools import groupby
 from cassandra import (ConsistencyLevel, AuthenticationFailed,
                        OperationTimedOut, UnsupportedOperation)
 from cassandra.connection import ConnectionException, ConnectionShutdown
+from cassandra.encoder import cql_encode_all_types, cql_encoders
 from cassandra.protocol import (QueryMessage, ResultMessage,
                                 ErrorMessage, ReadTimeoutErrorMessage,
                                 WriteTimeoutErrorMessage,
@@ -409,8 +410,7 @@ class Cluster(object):
         self._listener_lock = Lock()
 
         # let Session objects be GC'ed (and shutdown) when the user no longer
-        # holds a reference. Normally the cycle detector would handle this,
-        # but implementing __del__ prevents that.
+        # holds a reference.
         self.sessions = WeakSet()
         self.metadata = Metadata(self)
         self.control_connection = None
@@ -451,8 +451,10 @@ class Cluster(object):
         self.control_connection = ControlConnection(
             self, self.control_connection_timeout)
 
-    def register_type_class(self, keyspace, user_type, klass):
+    def register_user_type(self, keyspace, user_type, klass):
         self._user_types[keyspace][user_type] = klass
+        for session in self.sessions:
+            self.session.user_type_registered(keyspace, user_type, klass)
 
     def get_min_requests_per_connection(self, host_distance):
         return self._min_requests_per_connection[host_distance]
@@ -602,6 +604,9 @@ class Cluster(object):
 
     def _new_session(self):
         session = Session(self, self.metadata.all_hosts())
+        for keyspace, type_map in six.iteritems(self._user_types):
+            for udt_name, klass in six.iteritems(type_map):
+                session.user_type_registered(keyspace, udt_name, klass)
         self.sessions.add(session)
         return session
 
@@ -1064,6 +1069,19 @@ class Session(object):
     _metrics = None
     _protocol_version = None
 
+    encoders = None
+
+    def user_type_registered(self, keyspace, user_type, klass):
+        type_meta = self.cluster.metadata.keyspaces[keyspace].user_types[user_type]
+
+        def encode(val):
+            return '{ %s }' % ' , '.join('%s : %s' % (
+                field_name,
+                cql_encode_all_types(getattr(val, field_name))
+            ) for field_name in type_meta.field_names)
+
+        self._encoders[klass] = encode
+
     def __init__(self, cluster, hosts):
         self.cluster = cluster
         self.hosts = hosts
@@ -1073,6 +1091,8 @@ class Session(object):
         self._load_balancer = cluster.load_balancing_policy
         self._metrics = cluster.metrics
         self._protocol_version = self.cluster.protocol_version
+
+        self._encoders = cql_encoders.copy()
 
         # create connection pools in parallel
         futures = []
@@ -1196,7 +1216,7 @@ class Session(object):
         if isinstance(query, SimpleStatement):
             query_string = query.query_string
             if parameters:
-                query_string = bind_params(query.query_string, parameters)
+                query_string = bind_params(query.query_string, parameters, self._encoders)
             message = QueryMessage(
                 query_string, cl, query.serial_consistency_level,
                 fetch_size, timestamp=timestamp)
@@ -1701,8 +1721,8 @@ class ControlConnection(object):
                 cf_query, col_query)
 
             log.debug("[control connection] Fetched table info for %s.%s, rebuilding metadata", (keyspace, table))
-            cf_result = dict_factory(*cf_result.results)
-            col_result = dict_factory(*col_result.results)
+            cf_result = dict_factory(*cf_result.results) if cf_result else {}
+            col_result = dict_factory(*col_result.results) if col_result else {}
             self._cluster.metadata.table_changed(keyspace, table, cf_result, col_result)
         elif usertype:
             # user defined types within this keyspace changed
@@ -1710,7 +1730,7 @@ class ControlConnection(object):
             types_query = QueryMessage(query=self._SELECT_USERTYPES + where_clause, consistency_level=cl)
             types_result = connection.wait_for_response(types_query)
             log.debug("[control connection] Fetched user type info for %s.%s, rebuilding metadata", (keyspace, usertype))
-            types_result = dict_factory(*types_result)
+            types_result = dict_factory(*types_result.results) if types_result.results else {}
             self._cluster.metadata.usertype_changed(keyspace, usertype, types_result)
         elif keyspace:
             # only the keyspace itself changed (such as replication settings)
@@ -1718,7 +1738,7 @@ class ControlConnection(object):
             ks_query = QueryMessage(query=self._SELECT_KEYSPACES + where_clause, consistency_level=cl)
             ks_result = connection.wait_for_response(ks_query)
             log.debug("[control connection] Fetched keyspace info for %s, rebuilding metadata", (keyspace,))
-            ks_result = dict_factory(*types_result)
+            ks_result = dict_factory(*ks_result.results) if ks_result.results else {}
             self._cluster.metadata.keyspace_changed(keyspace, ks_result)
         else:
             # build everything from scratch
@@ -1730,12 +1750,12 @@ class ControlConnection(object):
             if self._protocol_version >= 3:
                 queries.append(QueryMessage(query=self._SELECT_USERTYPES, consistency_level=cl))
                 ks_result, cf_result, col_result, types_result = connection.wait_for_responses(*queries)
-                types_result = dict_factory(*types_result)
+                types_result = dict_factory(*types_result.results) if types_result.results else {}
             else:
                 ks_result, cf_result, col_result = connection.wait_for_responses(*queries)
                 types_result = {}
 
-            ks_result = dict_factory(*types_result)
+            ks_result = dict_factory(*ks_result.results)
             cf_result = dict_factory(*cf_result.results)
             col_result = dict_factory(*col_result.results)
 
