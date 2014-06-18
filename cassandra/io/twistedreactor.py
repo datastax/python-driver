@@ -23,7 +23,7 @@ import weakref
 import atexit
 import os
 
-from six import BytesIO
+from io import BytesIO
 
 from cassandra import OperationTimedOut
 from cassandra.connection import Connection, ConnectionShutdown
