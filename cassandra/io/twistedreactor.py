@@ -188,19 +188,6 @@ class TwistedConnection(Connection):
             # don't leave in-progress operations hanging
             self.connected_event.set()
 
-    def handle_close(self):
-        """
-        Not used, but kept for consistency with other reactors.
-        """
-        self.close()
-
-    def handle_write(self):
-        """
-        This function is not needed, so if it is called, blow up.
-        """
-        raise RuntimeError("handle_write() should not be called"
-                           "in TwistedConnection")
-
     def handle_read(self):
         """
         Process the incoming data buffer.
