@@ -39,13 +39,14 @@ CLUSTER_NAME = 'test_cluster'
 MULTIDC_CLUSTER_NAME = 'multidc_test_cluster'
 CCM_CLUSTER = None
 
+CASSANDRA_DIR = os.getenv('CASSANDRA_DIR', None)
 CASSANDRA_VERSION = os.getenv('CASSANDRA_VERSION', '2.0.6')
 
 if CASSANDRA_VERSION.startswith('1'):
-    DEFAULT_PROTOCOL_VERSION = 1
+    default_protocol_version = 1
 else:
-    DEFAULT_PROTOCOL_VERSION = 2
-PROTOCOL_VERSION = int(os.getenv('PROTOCOL_VERSION', DEFAULT_PROTOCOL_VERSION))
+    default_protocol_version = 2
+PROTOCOL_VERSION = int(os.getenv('PROTOCOL_VERSION', default_protocol_version))
 
 path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ccm')
 if not os.path.exists(path):
@@ -100,10 +101,17 @@ def setup_package():
             cluster = CCMCluster.load(path, CLUSTER_NAME)
             log.debug("Found existing ccm test cluster, clearing")
             cluster.clear()
-            cluster.set_cassandra_dir(cassandra_version=CASSANDRA_VERSION)
+            if CASSANDRA_DIR:
+                cluster.set_cassandra_dir(cassandra_dir=CASSANDRA_DIR)
+            else:
+                cluster.set_cassandra_dir(cassandra_version=CASSANDRA_VERSION)
         except Exception:
-            log.debug("Creating new ccm test cluster with version %s", CASSANDRA_VERSION)
-            cluster = CCMCluster(path, CLUSTER_NAME, cassandra_version=CASSANDRA_VERSION)
+            if CASSANDRA_DIR:
+                log.debug("Creating new ccm test cluster with cassandra dir %s", CASSANDRA_DIR)
+                cluster = CCMCluster(path, CLUSTER_NAME, cassandra_dir=CASSANDRA_DIR)
+            else:
+                log.debug("Creating new ccm test cluster with version %s", CASSANDRA_VERSION)
+                cluster = CCMCluster(path, CLUSTER_NAME, cassandra_version=CASSANDRA_VERSION)
             cluster.set_configuration_options({'start_native_transport': True})
             common.switch_cluster(path, CLUSTER_NAME)
             cluster.populate(3)
@@ -128,7 +136,10 @@ def use_multidc(dc_list):
             cluster.clear()
         except Exception:
             log.debug("Creating new ccm test multi-dc cluster")
-            cluster = CCMCluster(path, MULTIDC_CLUSTER_NAME, cassandra_version=CASSANDRA_VERSION)
+            if CASSANDRA_DIR:
+                cluster = CCMCluster(path, MULTIDC_CLUSTER_NAME, cassandra_dir=CASSANDRA_DIR)
+            else:
+                cluster = CCMCluster(path, MULTIDC_CLUSTER_NAME, cassandra_version=CASSANDRA_VERSION)
             cluster.set_configuration_options({'start_native_transport': True})
             common.switch_cluster(path, MULTIDC_CLUSTER_NAME)
             cluster.populate(dc_list)
