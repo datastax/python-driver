@@ -67,6 +67,10 @@ class TwistedConnectionProtocol(protocol.Protocol):
         """
         self.transport.connector.factory.conn.client_connection_made()
 
+    def connectionLost(self, reason):
+        # reason is a Failure instance
+        self.transport.connector.factory.conn.defunct(reason.value)
+
 
 class TwistedConnectionClientFactory(protocol.ClientFactory):
 
@@ -88,15 +92,21 @@ class TwistedConnectionClientFactory(protocol.ClientFactory):
         connection attempt fails.
         """
         log.debug("Connect failed: %s", reason)
-        self.conn.close()
+        self.conn.defunct(reason.value)
 
     def clientConnectionLost(self, connector, reason):
         """
         Overridden twisted callback which is called when the
         connection goes away (cleanly or otherwise).
+
+        It should be safe to call defunct() here instead of just close, because
+        we can assume that if the connection was closed cleanly, there are no
+        callbacks to error out. If this assumption turns out to be false, we
+        can call close() instead of defunct() when "reason" is an appropriate
+        type.
         """
         log.debug("Connect lost: %s", reason)
-        self.conn.close()
+        self.conn.defunct(reason.value)
 
 
 class TwistedLoop(object):
