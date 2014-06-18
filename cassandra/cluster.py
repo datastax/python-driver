@@ -67,7 +67,7 @@ from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              named_tuple_factory, dict_factory)
 
 # default to gevent when we are monkey patched, otherwise if libev is available, use that as the
-# default because it's faster than asyncore
+# default because it's fastest. Otherwise, use asyncore.
 if 'gevent.monkey' in sys.modules:
     from cassandra.io.geventreactor import GeventConnection as DefaultConnection
 else:
@@ -310,6 +310,8 @@ class Cluster(object):
 
     * :class:`cassandra.io.asyncorereactor.AsyncoreConnection`
     * :class:`cassandra.io.libevreactor.LibevConnection`
+    * :class:`cassandra.io.libevreactor.GeventConnection` (requires monkey-patching)
+    * :class:`cassandra.io.libevreactor.TwistedConnection`
 
     By default, ``AsyncoreConnection`` will be used, which uses
     the ``asyncore`` module in the Python standard library.  The
@@ -317,6 +319,9 @@ class Cluster(object):
     supported on a wider range of systems.
 
     If ``libev`` is installed, ``LibevConnection`` will be used instead.
+
+    If gevent monkey-patching of the standard library is detected,
+    GeventConnection will be used automatically.
     """
 
     control_connection_timeout = 2.0

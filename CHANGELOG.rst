@@ -1,10 +1,13 @@
-2.0.3
+2.1.0
 =====
 In Progress
 
 Features
 --------
 * Use io.BytesIO for reduced CPU consumption (github #143)
+* Support Twisted as a reactor. Note that a Twisted-compatible
+  API is not exposed (so no Deferreds), this is just a reactor
+  implementation. (github #135, PYTHON-8)
 
 Bug Fixes
 ---------

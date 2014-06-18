@@ -26,6 +26,7 @@ dirname = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(dirname)
 sys.path.append(os.path.join(dirname, '..'))
 
+import cassandra
 from cassandra.cluster import Cluster
 from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.policies import HostDistance
@@ -44,39 +45,47 @@ try:
 except ImportError as exc:
     pass
 
-KEYSPACE = "testkeyspace"
+have_twisted = False
+try:
+    from cassandra.io.twistedreactor import TwistedConnection
+    have_twisted = True
+    supported_reactors.append(TwistedConnection)
+except ImportError as exc:
+    log.exception("Error importing twisted")
+    pass
+
+KEYSPACE = "testkeyspace" + str(int(time.time()))
 TABLE = "testtable"
 
 
 def setup(hosts):
+    log.info("Using 'cassandra' package from %s", cassandra.__path__)
 
     cluster = Cluster(hosts)
     cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
-    session = cluster.connect()
+    try:
+        session = cluster.connect()
 
-    rows = session.execute("SELECT keyspace_name FROM system.schema_keyspaces")
-    if KEYSPACE in [row[0] for row in rows]:
-        log.debug("dropping existing keyspace...")
-        session.execute("DROP KEYSPACE " + KEYSPACE)
+        log.debug("Creating keyspace...")
+        session.execute("""
+            CREATE KEYSPACE %s
+            WITH replication = { 'class': 'SimpleStrategy', 'replication_factor': '2' }
+            """ % KEYSPACE)
 
-    log.debug("Creating keyspace...")
-    session.execute("""
-        CREATE KEYSPACE %s
-        WITH replication = { 'class': 'SimpleStrategy', 'replication_factor': '2' }
-        """ % KEYSPACE)
+        log.debug("Setting keyspace...")
+        session.set_keyspace(KEYSPACE)
 
-    log.debug("Setting keyspace...")
-    session.set_keyspace(KEYSPACE)
-
-    log.debug("Creating table...")
-    session.execute("""
-        CREATE TABLE %s (
-            thekey text,
-            col1 text,
-            col2 text,
-            PRIMARY KEY (thekey, col1)
-        )
-        """ % TABLE)
+        log.debug("Creating table...")
+        session.execute("""
+            CREATE TABLE %s (
+                thekey text,
+                col1 text,
+                col2 text,
+                PRIMARY KEY (thekey, col1)
+            )
+            """ % TABLE)
+    finally:
+        cluster.shutdown()
 
 
 def teardown(hosts):
@@ -84,6 +93,7 @@ def teardown(hosts):
     cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
     session = cluster.connect()
     session.execute("DROP KEYSPACE " + KEYSPACE)
+    cluster.shutdown()
 
 
 def benchmark(thread_class):
@@ -124,6 +134,7 @@ def benchmark(thread_class):
 
             end = time.time()
         finally:
+            cluster.shutdown()
             teardown(options.hosts)
 
         total = end - start
@@ -164,6 +175,8 @@ def parse_options():
                       help='only benchmark with asyncore connections')
     parser.add_option('--libev-only', action='store_true', dest='libev_only',
                       help='only benchmark with libev connections')
+    parser.add_option('--twisted-only', action='store_true', dest='twisted_only',
+                      help='only benchmark with Twisted connections')
     parser.add_option('-m', '--metrics', action='store_true', dest='enable_metrics',
                       help='enable and print metrics for operations')
     parser.add_option('-l', '--log-level', default='info',
@@ -184,6 +197,11 @@ def parse_options():
             log.error("libev is not available")
             sys.exit(1)
         options.supported_reactors = [LibevConnection]
+    elif options.twisted_only:
+        if not have_twisted:
+            log.error("Twisted is not available")
+            sys.exit(1)
+        options.supported_reactors = [TwistedConnection]
     else:
         options.supported_reactors = supported_reactors
         if not have_libev:
