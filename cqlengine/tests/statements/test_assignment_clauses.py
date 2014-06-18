@@ -25,7 +25,7 @@ class SetUpdateClauseTests(TestCase):
         self.assertIsNone(c._removals)
 
         self.assertEqual(c.get_context_size(), 1)
-        self.assertEqual(str(c), '"s" = ?')
+        self.assertEqual(str(c), '"s" = %(0)s')
 
         ctx = {}
         c.update_context(ctx)
@@ -75,7 +75,7 @@ class SetUpdateClauseTests(TestCase):
         self.assertIsNone(c._removals)
 
         self.assertEqual(c.get_context_size(), 1)
-        self.assertEqual(str(c), '"s" = "s" + ?')
+        self.assertEqual(str(c), '"s" = "s" + %(0)s')
 
         ctx = {}
         c.update_context(ctx)
@@ -91,7 +91,7 @@ class SetUpdateClauseTests(TestCase):
         self.assertEqual(c._removals, {3})
 
         self.assertEqual(c.get_context_size(), 1)
-        self.assertEqual(str(c), '"s" = "s" - ?')
+        self.assertEqual(str(c), '"s" = "s" - %(0)s')
 
         ctx = {}
         c.update_context(ctx)
@@ -107,7 +107,7 @@ class SetUpdateClauseTests(TestCase):
         self.assertEqual(c._removals, {1})
 
         self.assertEqual(c.get_context_size(), 2)
-        self.assertEqual(str(c), '"s" = "s" + ?, "s" = "s" - ?')
+        self.assertEqual(str(c), '"s" = "s" + %(0)s, "s" = "s" - %(1)s')
 
         ctx = {}
         c.update_context(ctx)
@@ -126,7 +126,7 @@ class ListUpdateClauseTests(TestCase):
         self.assertIsNone(c._prepend)
 
         self.assertEqual(c.get_context_size(), 1)
-        self.assertEqual(str(c), '"s" = ?')
+        self.assertEqual(str(c), '"s" = %(0)s')
 
         ctx = {}
         c.update_context(ctx)
@@ -142,7 +142,7 @@ class ListUpdateClauseTests(TestCase):
         self.assertIsNone(c._prepend)
 
         self.assertEqual(c.get_context_size(), 1)
-        self.assertEqual(str(c), '"s" = ?')
+        self.assertEqual(str(c), '"s" = %(0)s')
 
         ctx = {}
         c.update_context(ctx)
@@ -158,7 +158,7 @@ class ListUpdateClauseTests(TestCase):
         self.assertIsNone(c._prepend)
 
         self.assertEqual(c.get_context_size(), 1)
-        self.assertEqual(str(c), '"s" = ?')
+        self.assertEqual(str(c), '"s" = %(0)s')
 
         ctx = {}
         c.update_context(ctx)
@@ -254,7 +254,7 @@ class MapUpdateTests(TestCase):
 
         self.assertEqual(c._updates, [3, 5])
         self.assertEqual(c.get_context_size(), 4)
-        self.assertEqual(str(c), '"s"[?] = ?, "s"[?] = ?')
+        self.assertEqual(str(c), '"s"[%(0)s] = %(1)s, "s"[%(2)s] = %(3)s')
 
         ctx = {}
         c.update_context(ctx)
@@ -297,7 +297,7 @@ class CounterUpdateTests(TestCase):
         c.set_context_id(5)
 
         self.assertEqual(c.get_context_size(), 1)
-        self.assertEqual(str(c), '"a" = "a" + ?')
+        self.assertEqual(str(c), '"a" = "a" + %(0)s')
 
         ctx = {}
         c.update_context(ctx)
