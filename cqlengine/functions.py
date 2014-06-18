@@ -9,7 +9,7 @@ class QueryValue(object):
     be passed into .filter() keyword args
     """
 
-    format_string = ':{}'
+    format_string = '%({})s'
 
     def __init__(self, value):
         self.value = value

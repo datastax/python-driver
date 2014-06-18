@@ -16,7 +16,7 @@ class UpdateStatementTests(TestCase):
         us.add_assignment_clause(AssignmentClause('a', 'b'))
         us.add_assignment_clause(AssignmentClause('c', 'd'))
         us.add_where_clause(WhereClause('a', EqualsOperator(), 'x'))
-        self.assertEqual(unicode(us), 'UPDATE table SET "a" = ?, "c" = ? WHERE "a" = ?', unicode(us))
+        self.assertEqual(unicode(us), 'UPDATE table SET "a" = %(0)s, "c" = %(1)s WHERE "a" = %(2)s', unicode(us))
 
     def test_context(self):
         us = UpdateStatement('table')
