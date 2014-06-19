@@ -268,6 +268,17 @@ Values Lists
     There is a special QuerySet's method ``.values_list()`` - when called, QuerySet returns lists of values instead of model instances. It may significantly speedup things with lower memory footprint for large responses.
     Each tuple contains the value from the respective field passed into the ``values_list()`` call — so the first item is the first field, etc. For example:
 
+    .. code-block:: python
+    
+        items = list(range(20))
+        random.shuffle(items)
+        for i in items:
+            TestModel.create(id=1, clustering_key=i)
+
+        values = list(TestModel.objects.values_list('clustering_key', flat=True))
+        # [19L, 18L, 17L, 16L, 15L, 14L, 13L, 12L, 11L, 10L, 9L, 8L, 7L, 6L, 5L, 4L, 3L, 2L, 1L, 0L]
+
+
 
 Batch Queries
 =============
