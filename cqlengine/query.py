@@ -174,7 +174,7 @@ class BatchQuery(object):
 
         query_list.append('APPLY BATCH;')
 
-        execute('\n'.join(query_list), parameters, self._consistency)
+        execute_native('\n'.join(query_list), parameters, self._consistency)
 
         self.queries = []
         self._execute_callbacks()
