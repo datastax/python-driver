@@ -4,7 +4,6 @@ from cqlengine.models import Model
 from uuid import uuid4
 from cqlengine import columns
 import mock
-from cqlengine.connection import ConnectionPool
 from cqlengine import ALL, BatchQuery
 
 class TestConsistencyModel(Model):

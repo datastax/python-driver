@@ -4,7 +4,7 @@ from cqlengine.models import Model
 from uuid import uuid4
 from cqlengine import columns
 import mock
-from cqlengine.connection import ConnectionPool, get_session
+from cqlengine.connection import get_session
 
 
 class TestTTLModel(Model):

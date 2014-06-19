@@ -6,7 +6,7 @@ from decimal import Decimal as D
 from unittest import TestCase
 from uuid import uuid4, uuid1
 from cqlengine import ValidationError
-from cqlengine.connection import execute
+from cqlengine.connection import execute, execute_native
 
 from cqlengine.tests.base import BaseCassEngTestCase
 
@@ -175,7 +175,7 @@ class TestUUID(BaseCassEngTestCase):
     @classmethod
     def tearDownClass(cls):
         super(TestUUID, cls).tearDownClass()
-        delete_table(cls.UUIDTest)  
+        delete_table(cls.UUIDTest)
 
     def test_uuid_str_with_dashes(self):
         a_uuid = uuid4()
@@ -298,7 +298,7 @@ class TestPythonDoesntDieWhenExtraFieldIsInCassandra(BaseCassEngTestCase):
         drop_table(self.TestModel)
         sync_table(self.TestModel)
         self.TestModel.create()
-        execute("ALTER TABLE {} add blah int".format(self.TestModel.column_family_name(include_keyspace=True)))
+        execute_native("ALTER TABLE {} add blah int".format(self.TestModel.column_family_name(include_keyspace=True)))
         self.TestModel.objects().all()
 
 class TestTimeUUIDFromDatetime(TestCase):

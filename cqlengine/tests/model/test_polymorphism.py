@@ -3,7 +3,7 @@ import mock
 
 from cqlengine import columns
 from cqlengine import models
-from cqlengine.connection import ConnectionPool, get_session
+from cqlengine.connection import get_session
 from cqlengine.tests.base import BaseCassEngTestCase
 from cqlengine import management
 

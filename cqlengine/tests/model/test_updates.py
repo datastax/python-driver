@@ -7,7 +7,6 @@ from cqlengine.tests.base import BaseCassEngTestCase
 from cqlengine.models import Model
 from cqlengine import columns
 from cqlengine.management import sync_table, drop_table
-from cqlengine.connection import ConnectionPool
 
 
 class TestUpdateModel(Model):
