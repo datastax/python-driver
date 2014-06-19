@@ -98,6 +98,7 @@ class TestModelIO(BaseCassEngTestCase):
         tm.save()
 
         tm2 = TestModel.objects(id=tm.pk).first()
+
         assert tm2.text is None
         assert tm2._values['text'].previous_value is None
 

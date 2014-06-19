@@ -233,9 +233,9 @@ def get_fields(model):
         return []
 
     try:
-        return [Field(x['column_name'], x['validator']) for x in tmp[1] if x['type'] == 'regular']
+        return [Field(x.column_name, x.validator) for x in tmp[1] if x.type == 'regular']
     except ValueError:
-        return [Field(x['column_name'], x['validator']) for x in tmp[1]]
+        return [Field(x.column_name, xvalidator) for x in tmp[1]]
     # convert to Field named tuples
 
 

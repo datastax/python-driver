@@ -84,7 +84,7 @@ def setup(
 
     cluster = Cluster(hosts)
     session = cluster.connect()
-    session.row_factory = dict_factory
+    #session.row_factory = dict_factory
 
     _max_connections = max_connections
 
@@ -262,10 +262,11 @@ def execute(query, params=None, consistency_level=None):
 @contextmanager
 def connection_manager():
     """ :rtype: ConnectionPool """
-    global connection_pool
-    # tmp = connection_pool.get()
-    yield connection_pool
-    # connection_pool.put(tmp)
+    raise Exception("deprecated")
+    # global connection_pool
+    # # tmp = connection_pool.get()
+    # yield connection_pool
+    # # connection_pool.put(tmp)
 
 
 def execute_native(query, params=None, consistency_level=None):
@@ -277,7 +278,7 @@ def execute_native(query, params=None, consistency_level=None):
     result = session.execute(query, params)
 
     if result:
-        keys = result[0].keys()
+        keys = [x for x in result[0]._fields]
     else:
         keys = []
 
