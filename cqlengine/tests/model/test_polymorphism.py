@@ -3,7 +3,7 @@ import mock
 
 from cqlengine import columns
 from cqlengine import models
-from cqlengine.connection import ConnectionPool
+from cqlengine.connection import ConnectionPool, get_session
 from cqlengine.tests.base import BaseCassEngTestCase
 from cqlengine import management
 
@@ -122,8 +122,8 @@ class TestPolymorphicModel(BaseCassEngTestCase):
 
     def test_delete_on_polymorphic_subclass_does_not_include_polymorphic_key(self):
         p1 = Poly1.create()
-
-        with mock.patch.object(ConnectionPool, 'execute') as m:
+        session = get_session()
+        with mock.patch.object(session, 'execute') as m:
             Poly1.objects(partition=p1.partition).delete()
 
         # make sure our polymorphic key isn't in the CQL

@@ -507,8 +507,8 @@ class AbstractQuerySet(object):
         if self._result_cache is None:
             query = self._select_query()
             query.count = True
-            _, result = self._execute(query)
-            return result[0][0]
+            result = self._execute(query)
+            return result[0]['count']
         else:
             return len(self._result_cache)
 
