@@ -655,7 +655,7 @@ class ModelQuerySet(AbstractQuerySet):
         """ Returns a function that will be used to instantiate query results """
         if not self._values_list: # we want models
             return lambda rows: self.model._construct_instance(rows)
-        elif self._flat_values_list: # the user has requested flattened tuples
+        elif self._flat_values_list: # the user has requested flattened list (1 value per row)
             return lambda row: row.popitem()[1]
         else:
             return lambda rows: self._get_tuple_list_nested(rows)

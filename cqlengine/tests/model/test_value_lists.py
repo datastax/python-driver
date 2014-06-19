@@ -6,6 +6,7 @@ from cqlengine.management import drop_table
 from cqlengine.models import Model
 from cqlengine import columns
 
+
 class TestModel(Model):
     id = columns.Integer(primary_key=True)
     clustering_key = columns.Integer(primary_key=True, clustering_order='desc')
@@ -55,3 +56,4 @@ class TestClusteringOrder(BaseCassEngTestCase):
 
         self.assertEquals([2] * 20, values)
         drop_table(TestClusteringComplexModel)
+
