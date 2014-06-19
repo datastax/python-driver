@@ -18,7 +18,8 @@ diff --git a/setup.py b/setup.py
 index 0c28d3d..c0fd6c1 100644
 --- a/setup.py
 +++ b/setup.py
-@@ -1,8 +1,5 @@
+@@ -15,9 +15,6 @@
+ from __future__ import print_function
  import sys
  
 -import ez_setup
@@ -27,12 +28,12 @@ index 0c28d3d..c0fd6c1 100644
  if __name__ == '__main__' and sys.argv[1] == "gevent_nosetests":
      from gevent.monkey import patch_all
      patch_all()
-@@ -174,8 +171,8 @@ def run_setup(extensions):
+@@ -192,8 +189,8 @@
          author_email='tyler@datastax.com',
          packages=['cassandra', 'cassandra.io'],
          include_package_data=True,
 -        install_requires=dependencies,
--        tests_require=['nose', 'mock', 'ccm', 'unittest2', 'PyYAML', 'pytz'],
+-        tests_require=['nose', 'mock', 'PyYAML', 'pytz'],
 +        install_requires=(),
 +        tests_require=(),
          classifiers=[
