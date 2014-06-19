@@ -45,7 +45,7 @@ class TTLModelTests(BaseTTLTest):
         with mock.patch.object(session, 'execute') as m:
             TestTTLModel.ttl(60).create(text="hello blake")
 
-        query = m.call_args[0][0]
+        query = m.call_args[0][0].query_string
         self.assertIn("USING TTL", query)
 
     def test_queryset_is_returned_on_class(self):
@@ -65,7 +65,7 @@ class TTLInstanceUpdateTest(BaseTTLTest):
         with mock.patch.object(session, 'execute') as m:
             model.ttl(60).update(text="goodbye forever")
 
-        query = m.call_args[0][0]
+        query = m.call_args[0][0].query_string
         self.assertIn("USING TTL", query)
 
     def test_update_syntax_valid(self):
@@ -98,7 +98,7 @@ class TTLInstanceTest(BaseTTLTest):
         with mock.patch.object(session, 'execute') as m:
             o.save()
 
-        query = m.call_args[0][0]
+        query = m.call_args[0][0].query_string
         self.assertIn("USING TTL", query)
 
 
@@ -112,7 +112,7 @@ class TTLBlindUpdateTest(BaseTTLTest):
         with mock.patch.object(session, 'execute') as m:
             TestTTLModel.objects(id=tid).ttl(60).update(text="bacon")
 
-        query = m.call_args[0][0]
+        query = m.call_args[0][0].query_string
         self.assertIn("USING TTL", query)
 
 

@@ -56,6 +56,7 @@ class TestConsistency(BaseConsistencyTest):
                 TestConsistencyModel.batch(b).create(text="monkey")
 
         args = m.call_args
+
         self.assertEqual(ALL, args[0][0].consistency_level)
 
         with mock.patch.object(self.session, 'execute') as m:

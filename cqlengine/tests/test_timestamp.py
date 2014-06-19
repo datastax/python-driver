@@ -48,7 +48,7 @@ class CreateWithTimestampTest(BaseTimestampTest):
         with mock.patch.object(self.session, "execute") as m:
             TestTimestampModel.create(count=2)
 
-        "USING TIMESTAMP".shouldnt.be.within(m.call_args[0][0])
+        "USING TIMESTAMP".shouldnt.be.within(m.call_args[0][0].query_string)
 
     def test_timestamp_is_set_on_model_queryset(self):
         delta = timedelta(seconds=30)
@@ -64,7 +64,7 @@ class CreateWithTimestampTest(BaseTimestampTest):
         with mock.patch.object(self.session, "execute") as m:
             TestTimestampModel.timestamp(timedelta(seconds=30)).create(count=1)
 
-        query = m.call_args[0][0]
+        query = m.call_args[0][0].query_string
 
         "USING TIMESTAMP".should.be.within(query)
 
@@ -80,7 +80,7 @@ class UpdateWithTimestampTest(BaseTimestampTest):
         with mock.patch.object(self.session, "execute") as m:
             self.instance.timestamp(timedelta(seconds=30)).update(count=2)
 
-        "USING TIMESTAMP".should.be.within(m.call_args[0][0])
+        "USING TIMESTAMP".should.be.within(m.call_args[0][0].query_string)
 
     def test_instance_update_in_batch(self):
         with mock.patch.object(self.session, "execute") as m, BatchQuery() as b:

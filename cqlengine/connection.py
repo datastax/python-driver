@@ -73,7 +73,6 @@ def setup(
     session.row_factory = dict_factory
 
 def execute_native(query, params=None, consistency_level=None):
-    # TODO use consistency level
     if isinstance(query, Statement):
         pass
 
@@ -81,6 +80,10 @@ def execute_native(query, params=None, consistency_level=None):
         params = query.get_context()
         query = str(query)
         query = SimpleStatement(query, consistency_level=consistency_level)
+
+    elif isinstance(query, basestring):
+        query = SimpleStatement(query, consistency_level=consistency_level)
+
 
     params = params or {}
     result = session.execute(query, params)
