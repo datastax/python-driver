@@ -1,9 +1,6 @@
-import random
-import string
-
 from mock import MagicMock, patch
 
-from cqlengine import ONE, ALL, KEYS_ONLY, ROWS_ONLY, NONE
+from cqlengine import ONE, ALL, NONE
 from cqlengine.exceptions import CQLEngineException
 from cqlengine.management import create_table, delete_table, get_fields, sync_table
 from cqlengine.tests.base import BaseCassEngTestCase
@@ -194,9 +191,6 @@ class TablePropertiesTests(BaseCassEngTestCase):
         }, management.get_table_settings(ModelWithTableProperties))
 
     def test_table_property_update(self):
-        # Create vanilla table
-        #sync_table(ModelWithTableProperties)
-
         ModelWithTableProperties.__bloom_filter_fp_chance__ = 0.66778
         ModelWithTableProperties.__caching__ = NONE
         ModelWithTableProperties.__comment__ = 'xirAkRWZVVvsmzRvXamiEcQkshkUIDINVJZgLYSdnGHweiBrAiJdLJkVohdRy'
