@@ -69,11 +69,11 @@ class ModelUpdateTests(BaseCassEngTestCase):
         """ tests that calling update on a model with no changes will do nothing. """
         m0 = TestUpdateModel.create(count=5, text='monkey')
 
-        with patch.object(ConnectionPool, 'execute') as execute:
+        with patch.object(self.session, 'execute') as execute:
             m0.update()
         assert execute.call_count == 0
 
-        with patch.object(ConnectionPool, 'execute') as execute:
+        with patch.object(self.session, 'execute') as execute:
             m0.update(count=5)
         assert execute.call_count == 0
 
