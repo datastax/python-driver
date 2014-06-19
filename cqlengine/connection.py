@@ -85,34 +85,7 @@ def setup(
     cluster = Cluster(hosts)
     session = cluster.connect()
     session.row_factory = dict_factory
-    return
 
-    _max_connections = max_connections
-
-    if default_keyspace:
-        from cqlengine import models
-        models.DEFAULT_KEYSPACE = default_keyspace
-
-    _hosts = []
-    for host in hosts:
-        host = host.strip()
-        host = host.split(':')
-        if len(host) == 1:
-            port = 9160
-        elif len(host) == 2:
-            try:
-                port = int(host[1])
-            except ValueError:
-                raise CQLConnectionError("Can't parse port as int {}".format(':'.join(host)))
-        else:
-            raise CQLConnectionError("Can't parse host string {}".format(':'.join(host)))
-
-        _hosts.append(Host(host[0], port))
-
-    if not _hosts:
-        raise CQLConnectionError("At least one host required")
-
-    connection_pool = ConnectionPool(_hosts, username, password, consistency, timeout)
 
 
 class ConnectionPool(object):
