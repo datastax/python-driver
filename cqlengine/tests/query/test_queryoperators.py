@@ -19,7 +19,7 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         where = WhereClause('time', EqualsOperator(), functions.MaxTimeUUID(now))
         where.set_context_id(5)
 
-        self.assertEqual(str(where), '"time" = MaxTimeUUID(:5)')
+        self.assertEqual(str(where), '"time" = MaxTimeUUID(%(5)s)')
         ctx = {}
         where.update_context(ctx)
         self.assertEqual(ctx, {'5': DateTime().to_database(now)})
