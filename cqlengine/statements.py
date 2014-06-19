@@ -320,7 +320,6 @@ class MapUpdateClause(ContainerUpdateClause):
     def __init__(self, field, value, operation=None, previous=None, column=None):
         super(MapUpdateClause, self).__init__(field, value, operation, previous, column=column)
         self._updates = None
-        self.previous = self.previous
 
     def _analyze(self):
         if self._operation == "update":
