@@ -658,10 +658,13 @@ class ModelQuerySet(AbstractQuerySet):
         elif self._flat_values_list: # the user has requested flattened list (1 value per row)
             return lambda row: row.popitem()[1]
         else:
-            return lambda rows: self._get_tuple_list_nested(rows)
+            return lambda row: self._get_row_value_list(self._only_fields, row)
 
-    def _get_tuple_list_nested(self, rows):
-        return map(lambda (c, v): c.to_python(v), zip(columns, rows))
+    def _get_row_value_list(self, fields, row):
+        result = []
+        for x in fields:
+            result.append(row[x])
+        return result
 
     def _get_ordering_condition(self, colname):
         colname, order_type = super(ModelQuerySet, self)._get_ordering_condition(colname)
