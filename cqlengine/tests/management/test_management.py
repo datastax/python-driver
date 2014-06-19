@@ -152,39 +152,78 @@ class AddColumnTest(BaseCassEngTestCase):
         self.assertEqual(len(fields), 4)
 
 
+class ModelWithTableProperties(Model):
+    # Set random table properties
+    __bloom_filter_fp_chance__ = 0.76328
+    __caching__ = ALL
+    __comment__ = 'TxfguvBdzwROQALmQBOziRMbkqVGFjqcJfVhwGR'
+    __default_time_to_live__ = 4756
+    __gc_grace_seconds__ = 2063
+    __index_interval__ = 98706
+    __memtable_flush_period_in_ms__ = 43681
+    __populate_io_cache_on_flush__ = True
+    __read_repair_chance__ = 0.17985
+    __replicate_on_write__ = False
+    __dclocal_read_repair_chance__ = 0.50811
+
+    key = columns.UUID(primary_key=True)
+
+
 class TablePropertiesTests(BaseCassEngTestCase):
 
-    table_properties = {
-        'bloom_filter_fp_chance': random.randint(0, 99999) / 100000.0,
-        'caching': random.choice([ALL, KEYS_ONLY, ROWS_ONLY, NONE]),
-        'comment': ''.join(random.choice(string.ascii_letters)
-                           for i in range(random.randint(4, 99))),
-        'dclocal_read_repair_chance': random.randint(0, 99999) / 100000.0,
-        'default_time_to_live': random.randint(0, 99999),
-        'gc_grace_seconds': random.randint(0, 99999),
-        'index_interval': random.randint(0, 99999),
-        'memtable_flush_period_in_ms': random.randint(0, 99999),
-        'populate_io_cache_on_flush': random.choice([True, False]),
-        'read_repair_chance': random.randint(0, 99999) / 100000.0,
-        'replicate_on_write': random.choice([True, False]),
-    }
-
     def setUp(self):
-        delete_table(FirstModel)
+        delete_table(ModelWithTableProperties)
 
     def test_set_table_properties(self):
-        for property_name, property_value in self.table_properties.items():
-            property_id = '__{}__'.format(property_name)
-            setattr(FirstModel, property_id, property_value)
-        sync_table(FirstModel)
-        table_settings = management.get_table_settings(FirstModel)
-        for property_name, property_value in self.table_properties.items():
-            if property_name == 'dclocal_read_repair_chance':
-                # For some reason 'dclocal_read_repair_chance' in CQL is called
-                # just 'local_read_repair_chance' in the schema table.
-                # Source: https://issues.apache.org/jira/browse/CASSANDRA-6717
-                property_name = 'local_read_repair_chance'
-            assert table_settings[property_name] == property_value
+        create_table(ModelWithTableProperties)
+        self.assertDictContainsSubset({
+            'bloom_filter_fp_chance': 0.76328,
+            'caching': ALL,
+            'comment': 'TxfguvBdzwROQALmQBOziRMbkqVGFjqcJfVhwGR',
+            'default_time_to_live': 4756,
+            'gc_grace_seconds': 2063,
+            'index_interval': 98706,
+            'memtable_flush_period_in_ms': 43681,
+            'populate_io_cache_on_flush': True,
+            'read_repair_chance': 0.17985,
+            'replicate_on_write': False,
+            # For some reason 'dclocal_read_repair_chance' in CQL is called
+            # just 'local_read_repair_chance' in the schema table.
+            # Source: https://issues.apache.org/jira/browse/CASSANDRA-6717
+            'local_read_repair_chance': 0.50811,
+        }, management.get_table_settings(ModelWithTableProperties))
+
+    def test_table_property_update(self):
+        # Create vanilla table
+        #sync_table(ModelWithTableProperties)
+
+        ModelWithTableProperties.__bloom_filter_fp_chance__ = 0.66778
+        ModelWithTableProperties.__caching__ = NONE
+        ModelWithTableProperties.__comment__ = 'xirAkRWZVVvsmzRvXamiEcQkshkUIDINVJZgLYSdnGHweiBrAiJdLJkVohdRy'
+        ModelWithTableProperties.__default_time_to_live__ = 65178
+        ModelWithTableProperties.__gc_grace_seconds__ = 96362
+        ModelWithTableProperties.__index_interval__ = 94207
+        ModelWithTableProperties.__memtable_flush_period_in_ms__ = 60210
+        ModelWithTableProperties.__populate_io_cache_on_flush__ = False
+        ModelWithTableProperties.__read_repair_chance__ = 0.2989
+        ModelWithTableProperties.__replicate_on_write__ = True
+        ModelWithTableProperties.__dclocal_read_repair_chance__ = 0.12732
+
+        sync_table(ModelWithTableProperties)
+
+        self.assertDictContainsSubset({
+            'bloom_filter_fp_chance': 0.66778,
+            'caching': NONE,
+            'comment': 'xirAkRWZVVvsmzRvXamiEcQkshkUIDINVJZgLYSdnGHweiBrAiJdLJkVohdRy',
+            'default_time_to_live': 65178,
+            'gc_grace_seconds': 96362,
+            'index_interval': 94207,
+            'memtable_flush_period_in_ms': 60210,
+            'populate_io_cache_on_flush': False,
+            'read_repair_chance': 0.2989,
+            'replicate_on_write': True,
+            'local_read_repair_chance': 0.12732,
+        }, management.get_table_settings(ModelWithTableProperties))
 
 
 class SyncTableTests(BaseCassEngTestCase):
