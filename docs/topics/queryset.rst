@@ -269,7 +269,7 @@ Values Lists
     Each tuple contains the value from the respective field passed into the ``values_list()`` call — so the first item is the first field, etc. For example:
 
     .. code-block:: python
-    
+
         items = list(range(20))
         random.shuffle(items)
         for i in items:
