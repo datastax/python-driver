@@ -1,5 +1,7 @@
 import pkg_resources
 
+from cassandra import ConsistencyLevel
+
 from cqlengine.columns import *
 from cqlengine.functions import *
 from cqlengine.models import Model
@@ -15,12 +17,11 @@ SizeTieredCompactionStrategy = "SizeTieredCompactionStrategy"
 LeveledCompactionStrategy = "LeveledCompactionStrategy"
 
 
-ANY = "ANY"
-ONE = "ONE"
-TWO = "TWO"
-THREE = "THREE"
-QUORUM = "QUORUM"
-LOCAL_QUORUM = "LOCAL_QUORUM"
-EACH_QUORUM = "EACH_QUORUM"
-ALL = "ALL"
-
+ANY = ConsistencyLevel.ANY
+ONE = ConsistencyLevel.ONE
+TWO = ConsistencyLevel.TWO
+THREE = ConsistencyLevel.THREE
+QUORUM = ConsistencyLevel.QUORUM
+LOCAL_QUORUM = ConsistencyLevel.LOCAL_QUORUM
+EACH_QUORUM = ConsistencyLevel.EACH_QUORUM
+ALL = ConsistencyLevel.ALL

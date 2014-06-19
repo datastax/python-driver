@@ -6,5 +6,4 @@ If you're calling setup() with the old thrift port in place, you will get connec
 
 The cqlengine connection pool has been removed.  Connections are now managed by the native driver.  This should drastically reduce the socket overhead as the native driver can multiplex queries.
 
-
-
+If you were previously manually using "ALL", "QUORUM", etc, to specificy consistency levels, you will need to migrate to the cqlengine.ALL, QUORUM, etc instead.  If you had been using the module level constants before, nothing should need to change.

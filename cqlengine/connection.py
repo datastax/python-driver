@@ -4,6 +4,7 @@
 
 from collections import namedtuple
 from cassandra.cluster import Cluster
+from cassandra.query import SimpleStatement, Statement
 
 try:
     import Queue as queue
@@ -24,10 +25,6 @@ class CQLConnectionError(CQLEngineException): pass
 
 Host = namedtuple('Host', ['name', 'port'])
 
-_max_connections = 10
-
-# global connection pool
-connection_pool = None
 cluster = None
 session = None
 
@@ -49,7 +46,6 @@ def setup(
         hosts,
         username=None,
         password=None,
-        max_connections=10,
         default_keyspace=None,
         consistency='ONE',
         timeout=None):
@@ -62,8 +58,6 @@ def setup(
     :type username: str
     :param password: The cassandra password
     :type password: str
-    :param max_connections: The maximum number of connections to service
-    :type max_connections: int or long
     :param default_keyspace: The default keyspace to use
     :type default_keyspace: str
     :param consistency: The global consistency level
@@ -72,34 +66,21 @@ def setup(
     :type timeout: int or long
 
     """
-    global _max_connections, connection_pool, cluster, session
+    global cluster, session
 
     cluster = Cluster(hosts)
     session = cluster.connect()
     session.row_factory = dict_factory
 
-
-def execute(query, params=None, consistency_level=None):
-
-    raise Exception("shut up")
-
-    if isinstance(query, BaseCQLStatement):
-        params = query.get_context()
-        query = str(query)
-
-    params = params or {}
-    if consistency_level is None:
-        consistency_level = connection_pool._consistency
-    return connection_pool.execute(query, params, consistency_level)
-
-    #return execute_native(query, params, consistency_level)
-
-
 def execute_native(query, params=None, consistency_level=None):
     # TODO use consistency level
-    if isinstance(query, BaseCQLStatement):
+    if isinstance(query, Statement):
+        pass
+
+    elif isinstance(query, BaseCQLStatement):
         params = query.get_context()
         query = str(query)
+        query = SimpleStatement(query, consistency_level=consistency_level)
 
     params = params or {}
     result = session.execute(query, params)
