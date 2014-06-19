@@ -10,19 +10,11 @@ try:
 except ImportError:
     # python 3
     import queue
-import random
 
-import cql
 import logging
 
-from copy import copy
 from cqlengine.exceptions import CQLEngineException
 
-from cql import OperationalError
-
-from contextlib import contextmanager
-
-from thrift.transport.TTransport import TTransportException
 from cqlengine.statements import BaseCQLStatement
 from cassandra.query import dict_factory
 
@@ -94,7 +86,7 @@ def execute(query, params=None, consistency_level=None):
     if isinstance(query, BaseCQLStatement):
         params = query.get_context()
         query = str(query)
-        
+
     params = params or {}
     if consistency_level is None:
         consistency_level = connection_pool._consistency
