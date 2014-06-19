@@ -42,7 +42,7 @@ class MinTimeUUID(BaseQueryFunction):
     http://cassandra.apache.org/doc/cql3/CQL.html#timeuuidFun
     """
 
-    format_string = 'MinTimeUUID(:{})'
+    format_string = 'MinTimeUUID(%({})s)'
 
     def __init__(self, value):
         """
