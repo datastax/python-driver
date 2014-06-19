@@ -653,14 +653,19 @@ class ModelQuerySet(AbstractQuerySet):
 
     def _get_result_constructor(self):
         """ Returns a function that will be used to instantiate query results """
-        if not self._values_list:
+        if not self._values_list: # we want models
             return lambda rows: self.model._construct_instance(rows)
+        elif self._flat_values_list: # the user has requested flattened tuples
+            return lambda rows: self._get_tuple_list_flat(rows)
         else:
-            columns = [self.model._columns[n] for n in names]
-            if self._flat_values_list:
-                return lambda values: columns[0].to_python(values[0])
-            else:
-                return lambda values: map(lambda (c, v): c.to_python(v), zip(columns, values))
+            return lambda rows: self._get_tuple_list_nested(rows)
+
+
+    def _get_tuple_list_nested(self, rows):
+        return map(lambda (c, v): c.to_python(v), zip(columns, rows))
+
+    def _get_tuple_list_flat(self, rows):
+        return columns[0].to_python(rows[0])
 
     def _get_ordering_condition(self, colname):
         colname, order_type = super(ModelQuerySet, self)._get_ordering_condition(colname)
