@@ -614,12 +614,12 @@ class SimpleQuerySet(AbstractQuerySet):
 
     """
 
-    def _get_result_constructor(self, names):
+    def _get_result_constructor(self):
         """
         Returns a function that will be used to instantiate query results
         """
         def _construct_instance(values):
-            return ResultObject(zip(names, values))
+            return ResultObject(values)
         return _construct_instance
 
 
