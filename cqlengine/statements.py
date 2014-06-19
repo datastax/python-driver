@@ -355,7 +355,7 @@ class MapUpdateClause(ContainerUpdateClause):
 
         ctx_id = self.context_id
         if self.previous is None and not self._updates:
-            qs += ['"int_map" = %({})s']
+            qs += ['"int_map" = %({})s'.format(ctx_id)]
         else:
             for _ in self._updates or []:
                 qs += ['"{}"[%({})s] = %({})s'.format(self.field, ctx_id, ctx_id + 1)]
