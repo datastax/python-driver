@@ -2,7 +2,7 @@ import random
 from cqlengine.tests.base import BaseCassEngTestCase
 
 from cqlengine.management import sync_table
-from cqlengine.management import delete_table
+from cqlengine.management import drop_table
 from cqlengine.models import Model
 from cqlengine import columns
 
@@ -25,7 +25,7 @@ class TestClusteringOrder(BaseCassEngTestCase):
     @classmethod
     def tearDownClass(cls):
         super(TestClusteringOrder, cls).tearDownClass()
-        delete_table(TestModel)
+        drop_table(TestModel)
 
     def test_clustering_order(self):
         """
@@ -54,4 +54,4 @@ class TestClusteringOrder(BaseCassEngTestCase):
         values = list(TestClusteringComplexModel.objects.values_list('some_value', flat=True))
 
         self.assertEquals([2] * 20, values)
-        delete_table(TestClusteringComplexModel)
+        drop_table(TestClusteringComplexModel)
