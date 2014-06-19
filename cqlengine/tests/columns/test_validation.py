@@ -6,7 +6,7 @@ from decimal import Decimal as D
 from unittest import TestCase
 from uuid import uuid4, uuid1
 from cqlengine import ValidationError
-from cqlengine.connection import execute, execute_native
+from cqlengine.connection import execute_native
 
 from cqlengine.tests.base import BaseCassEngTestCase
 

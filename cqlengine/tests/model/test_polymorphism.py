@@ -130,7 +130,7 @@ class TestPolymorphicModel(BaseCassEngTestCase):
         # not sure how we would even get here if it was in there
         # since the CQL would fail.
 
-        self.assertNotIn("row_type", m.call_args[0][0])
+        self.assertNotIn("row_type", m.call_args[0][0].query_string)
 
 
 

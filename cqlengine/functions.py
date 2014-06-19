@@ -69,7 +69,7 @@ class MaxTimeUUID(BaseQueryFunction):
     http://cassandra.apache.org/doc/cql3/CQL.html#timeuuidFun
     """
 
-    format_string = 'MaxTimeUUID(:{})'
+    format_string = 'MaxTimeUUID(%({})s)'
 
     def __init__(self, value):
         """
@@ -109,7 +109,7 @@ class Token(BaseQueryFunction):
         return len(self.value)
 
     def __unicode__(self):
-        token_args = ', '.join(':{}'.format(self.context_id + i) for i in range(self.get_context_size()))
+        token_args = ', '.join('%({})s'.format(self.context_id + i) for i in range(self.get_context_size()))
         return "token({})".format(token_args)
 
     def update_context(self, ctx):
