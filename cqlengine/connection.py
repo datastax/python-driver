@@ -84,7 +84,8 @@ def setup(
 
     cluster = Cluster(hosts)
     session = cluster.connect()
-    #session.row_factory = dict_factory
+    session.row_factory = dict_factory
+    return
 
     _max_connections = max_connections
 
@@ -249,6 +250,8 @@ class ConnectionPool(object):
 
 def execute(query, params=None, consistency_level=None):
 
+    raise Exception("shut up")
+
     if isinstance(query, BaseCQLStatement):
         params = query.get_context()
         query = str(query)
@@ -274,15 +277,11 @@ def execute_native(query, params=None, consistency_level=None):
     if isinstance(query, BaseCQLStatement):
         params = query.get_context()
         query = str(query)
+
     params = params or {}
     result = session.execute(query, params)
 
-    if result:
-        keys = [x for x in result[0]._fields]
-    else:
-        keys = []
-
-    return QueryResult(keys, result)
+    return result
 
 
 def get_session():

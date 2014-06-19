@@ -6,6 +6,7 @@ from cqlengine.columns import Counter, List, Set
 
 from cqlengine.connection import execute, RowResult, execute_native
 
+
 from cqlengine.exceptions import CQLEngineException, ValidationError
 from cqlengine.functions import Token, BaseQueryFunction, QueryValue
 
@@ -293,8 +294,8 @@ class AbstractQuerySet(object):
         if self._batch:
             raise CQLEngineException("Only inserts, updates, and deletes are available in batch mode")
         if self._result_cache is None:
-            columns, self._result_cache = self._execute(self._select_query())
-            self._construct_result = self._get_result_constructor(columns)
+            self._result_cache = self._execute(self._select_query())
+            self._construct_result = self._get_result_constructor()
 
     def _fill_result_cache_to_idx(self, idx):
         self._execute_query()
@@ -319,7 +320,7 @@ class AbstractQuerySet(object):
 
         for idx in range(len(self._result_cache)):
             instance = self._result_cache[idx]
-            if isinstance(instance, RowResult):
+            if isinstance(instance, dict):
                 self._fill_result_cache_to_idx(idx)
             yield self._result_cache[idx]
 
@@ -350,7 +351,7 @@ class AbstractQuerySet(object):
                 self._fill_result_cache_to_idx(s)
                 return self._result_cache[s]
 
-    def _get_result_constructor(self, names):
+    def _get_result_constructor(self):
         """
         Returns a function that will be used to instantiate query results
         """
@@ -650,10 +651,10 @@ class ModelQuerySet(AbstractQuerySet):
             return [self.model._columns[f].db_field_name for f in fields]
         return super(ModelQuerySet, self)._select_fields()
 
-    def _get_result_constructor(self, names):
+    def _get_result_constructor(self):
         """ Returns a function that will be used to instantiate query results """
         if not self._values_list:
-            return lambda values: self.model._construct_instance(names, values)
+            return lambda rows: self.model._construct_instance(rows)
         else:
             columns = [self.model._columns[n] for n in names]
             if self._flat_values_list:
