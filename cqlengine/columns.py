@@ -451,22 +451,12 @@ class TimeUUID(UUID):
 class Boolean(Column):
     db_type = 'boolean'
 
-    class Quoter(ValueQuoter):
-        """ Cassandra 1.2.5 is stricter about boolean values """
-        def __str__(self):
-            return 'true' if self.value else 'false'
-
     def validate(self, value):
         """ Always returns a Python boolean. """
-        if isinstance(value, self.Quoter):
-            value = value.value
         return bool(value)
 
     def to_python(self, value):
         return self.validate(value)
-
-    def to_database(self, value):
-        return self.Quoter(self.validate(value))
 
 
 class Float(Column):
