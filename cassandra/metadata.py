@@ -156,8 +156,12 @@ class Metadata(object):
             self._keyspace_added(keyspace)
 
     def usertype_changed(self, keyspace, name, type_results):
-        new_usertype = self._build_usertype(keyspace, type_results[0])
-        self.keyspaces[keyspace].user_types[name] = new_usertype
+        if type_results:
+            new_usertype = self._build_usertype(keyspace, type_results[0])
+            self.keyspaces[keyspace].user_types[name] = new_usertype
+        else:
+            # the type was deleted
+            self.keyspaces[keyspace].user_types.pop(name, None)
 
     def table_changed(self, keyspace, table, cf_results, col_results):
         try:
