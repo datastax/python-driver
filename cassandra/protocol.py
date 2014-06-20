@@ -611,10 +611,7 @@ class ResultMessage(_MessageType):
 
     @classmethod
     def recv_results_schema_change(cls, f, protocol_version):
-        change_type = read_string(f)
-        keyspace = read_string(f)
-        table = read_string(f)
-        return {'change_type': change_type, 'keyspace': keyspace, 'table': table}
+        return EventMessage.recv_schema_change(f, protocol_version)
 
     @classmethod
     def read_type(cls, f, user_type_map):
