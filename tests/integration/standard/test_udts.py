@@ -26,8 +26,6 @@ from cassandra.cluster import Cluster
 
 from tests.integration import get_server_versions, PROTOCOL_VERSION
 
-import time
-
 
 class TypeTests(unittest.TestCase):
 
@@ -49,8 +47,6 @@ class TypeTests(unittest.TestCase):
         s.execute("CREATE TYPE user (age int, name text)")
         s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b user)")
 
-        time.sleep(1)
-
         User = namedtuple('user', ('age', 'name'))
         c.register_user_type("udt_test_unprepared_registered", "user", User)
 
@@ -71,8 +67,6 @@ class TypeTests(unittest.TestCase):
         s.execute("CREATE TYPE user (state text, is_cool boolean)")
         s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b user)")
 
-        time.sleep(1)
-
         User = namedtuple('user', ('state', 'is_cool'))
         c.register_user_type("udt_test_unprepared_registered2", "user", User)
 
@@ -83,6 +77,8 @@ class TypeTests(unittest.TestCase):
         self.assertEqual('Texas', row.b.state)
         self.assertEqual(True, row.b.is_cool)
         self.assertTrue(type(row.b) is User)
+
+        c.shutdown()
 
     def test_register_before_connecting(self):
         User1 = namedtuple('user', ('age', 'name'))
@@ -106,8 +102,6 @@ class TypeTests(unittest.TestCase):
         s.set_keyspace("udt_test_register_before_connecting2")
         s.execute("CREATE TYPE user (state text, is_cool boolean)")
         s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b user)")
-
-        time.sleep(1)
 
         # now that types are defined, shutdown and re-create Cluster
         c.shutdown()
@@ -135,6 +129,8 @@ class TypeTests(unittest.TestCase):
         self.assertEqual('Texas', row.b.state)
         self.assertEqual(True, row.b.is_cool)
         self.assertTrue(type(row.b) is User2)
+
+        c.shutdown()
 
     def test_prepared_unregistered_udts(self):
         c = Cluster(protocol_version=PROTOCOL_VERSION)
@@ -179,6 +175,8 @@ class TypeTests(unittest.TestCase):
         self.assertEqual('Texas', row.b.state)
         self.assertEqual(True, row.b.is_cool)
 
+        c.shutdown()
+
     def test_prepared_registered_udts(self):
         c = Cluster(protocol_version=PROTOCOL_VERSION)
         s = c.connect()
@@ -189,10 +187,10 @@ class TypeTests(unittest.TestCase):
             """)
         s.set_keyspace("udt_test_prepared_registered")
         s.execute("CREATE TYPE user (age int, name text)")
-        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b user)")
-
         User = namedtuple('user', ('age', 'name'))
         c.register_user_type("udt_test_prepared_registered", "user", User)
+
+        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b user)")
 
         insert = s.prepare("INSERT INTO mytable (a, b) VALUES (?, ?)")
         s.execute(insert, (0, User(42, 'bob')))
@@ -212,10 +210,10 @@ class TypeTests(unittest.TestCase):
             """)
         s.set_keyspace("udt_test_prepared_registered2")
         s.execute("CREATE TYPE user (state text, is_cool boolean)")
-        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b user)")
-
         User = namedtuple('user', ('state', 'is_cool'))
         c.register_user_type("udt_test_prepared_registered2", "user", User)
+
+        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b user)")
 
         insert = s.prepare("INSERT INTO mytable (a, b) VALUES (?, ?)")
         s.execute(insert, (0, User('Texas', True)))
@@ -227,3 +225,5 @@ class TypeTests(unittest.TestCase):
         self.assertEqual('Texas', row.b.state)
         self.assertEqual(True, row.b.is_cool)
         self.assertTrue(type(row.b) is User)
+
+        c.shutdown()
