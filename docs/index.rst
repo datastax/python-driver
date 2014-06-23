@@ -56,6 +56,9 @@ Getting Started
         # the list of hosts will be passed to create a Cluster() instance
         >>> connection.setup(['127.0.0.1'])
 
+        # if you're connecting to a 1.2 cluster
+        >>> connection.setup(['127.0.0.1'], protocol_version=1)
+
         #...and create your CQL table
         >>> from cqlengine.management import sync_table
         >>> sync_table(ExampleModel)
