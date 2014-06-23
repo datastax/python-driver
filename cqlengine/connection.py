@@ -15,7 +15,7 @@ except ImportError:
 import logging
 
 from cqlengine.exceptions import CQLEngineException
-
+from cassandra import ConsistencyLevel
 from cqlengine.statements import BaseCQLStatement
 from cassandra.query import dict_factory
 
@@ -27,16 +27,12 @@ Host = namedtuple('Host', ['name', 'port'])
 
 cluster = None
 session = None
-
-
-class CQLConnectionError(CQLEngineException): pass
-
+default_consistency_level = None
 
 def setup(
         hosts,
         default_keyspace=None,
-        consistency='ONE',
-        timeout=None,
+        consistency=ConsistencyLevel.ONE,
         **kwargs):
     """
     Records the hosts and connects to one of them
@@ -55,16 +51,21 @@ def setup(
     :type timeout: int or long
 
     """
-    global cluster, session
+    global cluster, session, default_consistency_level
 
     if 'username' in kwargs or 'password' in kwargs:
         raise CQLEngineException("Username & Password are now handled by using the native driver's auth_provider")
 
+    default_consistency_level = consistency
     cluster = Cluster(hosts, **kwargs)
     session = cluster.connect()
     session.row_factory = dict_factory
 
 def execute(query, params=None, consistency_level=None):
+
+    if consistency_level is None:
+        consistency_level = default_consistency_level
+
     if isinstance(query, Statement):
         pass
 
