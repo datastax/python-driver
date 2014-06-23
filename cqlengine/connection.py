@@ -39,14 +39,10 @@ def setup(
 
     :param hosts: list of hosts, strings in the <hostname>:<port>, or just <hostname>
     :type hosts: list
-    :param username: The cassandra username
-    :type username: str
-    :param password: The cassandra password
-    :type password: str
     :param default_keyspace: The default keyspace to use
     :type default_keyspace: str
     :param consistency: The global consistency level
-    :type consistency: str
+    :type consistency: int
     :param timeout: The connection timeout in milliseconds
     :type timeout: int or long
 
