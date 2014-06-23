@@ -232,7 +232,7 @@ def get_fields(model):
 
     try:
         return [Field(x['column_name'], x['validator']) for x in tmp if x['type'] == 'regular']
-    except ValueError:
+    except KeyError:
         return [Field(x['column_name'], x['validator']) for x in tmp]
     # convert to Field named tuples
 
