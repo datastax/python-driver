@@ -32,16 +32,6 @@ session = None
 class CQLConnectionError(CQLEngineException): pass
 
 
-class RowResult(tuple):
-    pass
-
-QueryResult = namedtuple('RowResult', ('columns', 'results'))
-
-
-def _column_tuple_factory(colnames, values):
-    return tuple(colnames), [RowResult(v) for v in values]
-
-
 def setup(
         hosts,
         default_keyspace=None,

@@ -4,8 +4,7 @@ from datetime import datetime, timedelta
 from cqlengine import BaseContainerColumn, Map, columns
 from cqlengine.columns import Counter, List, Set
 
-from cqlengine.connection import RowResult, execute
-
+from cqlengine.connection import execute
 
 from cqlengine.exceptions import CQLEngineException, ValidationError
 from cqlengine.functions import Token, BaseQueryFunction, QueryValue
