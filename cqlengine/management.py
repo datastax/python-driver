@@ -4,7 +4,7 @@ from cqlengine import SizeTieredCompactionStrategy, LeveledCompactionStrategy
 from cqlengine import ONE
 from cqlengine.named import NamedTable
 
-from cqlengine.connection import execute_native, get_cluster
+from cqlengine.connection import execute, get_cluster
 from cqlengine.exceptions import CQLEngineException
 
 import logging
@@ -50,13 +50,13 @@ def create_keyspace(name, strategy_class='SimpleStrategy', replication_factor=3,
         if strategy_class != 'SimpleStrategy':
             query += " AND DURABLE_WRITES = {}".format('true' if durable_writes else 'false')
 
-        execute_native(query)
+        execute(query)
 
 
 def delete_keyspace(name):
     cluster = get_cluster()
     if name in cluster.metadata.keyspaces:
-        execute_native("DROP KEYSPACE {}".format(name))
+        execute("DROP KEYSPACE {}".format(name))
 
 def create_table(model, create_missing_keyspace=True):
     warnings.warn("create_table has been deprecated in favor of sync_table and will be removed in a future release", DeprecationWarning)
@@ -96,7 +96,7 @@ def sync_table(model, create_missing_keyspace=True):
         qs = get_create_table(model)
 
         try:
-            execute_native(qs)
+            execute(qs)
         except CQLEngineException as ex:
             # 1.2 doesn't return cf names, so we have to examine the exception
             # and ignore if it says the column family already exists
@@ -113,7 +113,7 @@ def sync_table(model, create_missing_keyspace=True):
             # add missing column using the column def
             query = "ALTER TABLE {} add {}".format(cf_name, col.get_column_def())
             logger.debug(query)
-            execute_native(query)
+            execute(query)
 
         update_compaction(model)
 
@@ -130,7 +130,7 @@ def sync_table(model, create_missing_keyspace=True):
         qs += ['ON {}'.format(cf_name)]
         qs += ['("{}")'.format(column.db_field_name)]
         qs = ' '.join(qs)
-        execute_native(qs)
+        execute(qs)
 
 def get_create_table(model):
     cf_name = model.column_family_name()
@@ -224,7 +224,7 @@ def get_fields(model):
     col_family = model.column_family_name(include_keyspace=False)
 
     query = "select * from system.schema_columns where keyspace_name = %s and columnfamily_name = %s"
-    tmp = execute_native(query, [ks_name, col_family])
+    tmp = execute(query, [ks_name, col_family])
 
     # Tables containing only primary keys do not appear to create
     # any entries in system.schema_columns, as only non-primary-key attributes
@@ -287,7 +287,7 @@ def update_compaction(model):
         cf_name = model.column_family_name()
         query = "ALTER TABLE {} with compaction = {}".format(cf_name, options)
         logger.debug(query)
-        execute_native(query)
+        execute(query)
         return True
 
     return False
@@ -308,7 +308,7 @@ def drop_table(model):
 
     try:
         table = meta.keyspaces[ks_name].tables[raw_cf_name]
-        execute_native('drop table {};'.format(model.column_family_name(include_keyspace=True)))
+        execute('drop table {};'.format(model.column_family_name(include_keyspace=True)))
     except KeyError:
         pass
 

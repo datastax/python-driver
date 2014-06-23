@@ -44,11 +44,10 @@ def _column_tuple_factory(colnames, values):
 
 def setup(
         hosts,
-        username=None,
-        password=None,
         default_keyspace=None,
         consistency='ONE',
-        timeout=None):
+        timeout=None,
+        **kwargs):
     """
     Records the hosts and connects to one of them
 
@@ -68,11 +67,14 @@ def setup(
     """
     global cluster, session
 
-    cluster = Cluster(hosts)
+    if 'username' in kwargs or 'password' in kwargs:
+        raise CQLEngineException("Username & Password are now handled by using the native driver's auth_provider")
+
+    cluster = Cluster(hosts, **kwargs)
     session = cluster.connect()
     session.row_factory = dict_factory
 
-def execute_native(query, params=None, consistency_level=None):
+def execute(query, params=None, consistency_level=None):
     if isinstance(query, Statement):
         pass
 

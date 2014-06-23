@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from cqlengine import BaseContainerColumn, Map, columns
 from cqlengine.columns import Counter, List, Set
 
-from cqlengine.connection import RowResult, execute_native
+from cqlengine.connection import RowResult, execute
 
 
 from cqlengine.exceptions import CQLEngineException, ValidationError
@@ -174,7 +174,7 @@ class BatchQuery(object):
 
         query_list.append('APPLY BATCH;')
 
-        execute_native('\n'.join(query_list), parameters, self._consistency)
+        execute('\n'.join(query_list), parameters, self._consistency)
 
         self.queries = []
         self._execute_callbacks()
@@ -232,7 +232,7 @@ class AbstractQuerySet(object):
         if self._batch:
             return self._batch.add_query(q)
         else:
-            result = execute_native(q, consistency_level=self._consistency)
+            result = execute(q, consistency_level=self._consistency)
             return result
 
     def __unicode__(self):
@@ -781,7 +781,7 @@ class DMLQuery(object):
         if self._batch:
             return self._batch.add_query(q)
         else:
-            tmp = execute_native(q, consistency_level=self._consistency)
+            tmp = execute(q, consistency_level=self._consistency)
             return tmp
 
     def batch(self, batch_obj):
