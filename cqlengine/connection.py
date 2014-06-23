@@ -37,15 +37,12 @@ def setup(
     """
     Records the hosts and connects to one of them
 
-    :param hosts: list of hosts, strings in the <hostname>:<port>, or just <hostname>
+    :param hosts: list of hosts, see http://datastax.github.io/python-driver/api/cassandra/cluster.html
     :type hosts: list
     :param default_keyspace: The default keyspace to use
     :type default_keyspace: str
     :param consistency: The global consistency level
     :type consistency: int
-    :param timeout: The connection timeout in milliseconds
-    :type timeout: int or long
-
     """
     global cluster, session, default_consistency_level
 
