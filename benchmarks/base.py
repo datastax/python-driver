@@ -124,7 +124,9 @@ def benchmark(thread_class):
         start = time.time()
         try:
             for i in range(options.threads):
-                thread = thread_class(i, session, query, values, per_thread, options.profile)
+                thread = thread_class(
+                    i, session, query, values, per_thread,
+                    cluster.protocol_version, options.profile)
                 thread.daemon = True
                 threads.append(thread)
 
@@ -217,13 +219,14 @@ def parse_options():
 
 class BenchmarkThread(Thread):
 
-    def __init__(self, thread_num, session, query, values, num_queries, profile):
+    def __init__(self, thread_num, session, query, values, num_queries, protocol_version, profile):
         Thread.__init__(self)
         self.thread_num = thread_num
         self.session = session
         self.query = query
         self.values = values
         self.num_queries = num_queries
+        self.protocol_version = protocol_version
         self.profiler = Profile() if profile else None
 
     def start_profile(self):
