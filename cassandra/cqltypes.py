@@ -839,7 +839,24 @@ class UserDefinedType(TupleType):
 
     @classmethod
     def deserialize_safe(cls, byts, protocol_version):
-        values = TupleType.deserialize_safe(byts, protocol_version)
+        proto_version = max(3, protocol_version)
+        p = 0
+        values = []
+        for col_type in cls.subtypes:
+            if p == len(byts):
+                break
+            itemlen = int32_unpack(byts[p:p + 4])
+            p += 4
+            item = byts[p:p + itemlen]
+            p += itemlen
+            # collections inside UDTs are always encoded with at least the
+            # version 3 format
+            values.append(col_type.from_binary(item, proto_version))
+
+        if len(values) < len(cls.subtypes):
+            nones = [None] * (len(cls.subtypes) - len(values))
+            values = values + nones
+
         if cls.mapped_class:
             return cls.mapped_class(**dict(zip(cls.fieldnames, values)))
         else:
