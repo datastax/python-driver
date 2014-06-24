@@ -699,11 +699,12 @@ class _SimpleParameterizedType(_ParameterizedType):
             raise TypeError("Received a string for a type that expects a sequence")
 
         subtype, = cls.subtypes
+        pack = int32_pack if protocol_version >= 3 else uint16_pack
         buf = io.BytesIO()
-        buf.write(uint16_pack(len(items)))
+        buf.write(pack(len(items)))
         for item in items:
             itembytes = subtype.to_binary(item, protocol_version)
-            buf.write(uint16_pack(len(itembytes)))
+            buf.write(pack(len(itembytes)))
             buf.write(itembytes)
         return buf.getvalue()
 
@@ -758,8 +759,9 @@ class MapType(_ParameterizedType):
     @classmethod
     def serialize_safe(cls, themap, protocol_version):
         subkeytype, subvaltype = cls.subtypes
+        pack = int32_pack if protocol_version >= 3 else uint16_pack
         buf = io.BytesIO()
-        buf.write(uint16_pack(len(themap)))
+        buf.write(pack(len(themap)))
         try:
             items = six.iteritems(themap)
         except AttributeError:
@@ -767,9 +769,9 @@ class MapType(_ParameterizedType):
         for key, val in items:
             keybytes = subkeytype.to_binary(key, protocol_version)
             valbytes = subvaltype.to_binary(val, protocol_version)
-            buf.write(uint16_pack(len(keybytes)))
+            buf.write(pack(len(keybytes)))
             buf.write(keybytes)
-            buf.write(uint16_pack(len(valbytes)))
+            buf.write(pack(len(valbytes)))
             buf.write(valbytes)
         return buf.getvalue()
 
