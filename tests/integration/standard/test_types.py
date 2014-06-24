@@ -76,7 +76,10 @@ class TypeTests(unittest.TestCase):
         if six.PY2 and self._cql_version >= (3, 1, 0):
             # Blob values can't be specified using string notation in CQL 3.1.0 and
             # above which is used by default in Cassandra 2.0.
-            msg = r'.*Invalid STRING constant \(.*?\) for b of type blob.*'
+            if self._cass_version >= (2, 1, 0):
+                msg = r'.*Invalid STRING constant \(.*?\) for "b" of type blob.*'
+            else:
+                msg = r'.*Invalid STRING constant \(.*?\) for b of type blob.*'
             self.assertRaisesRegexp(InvalidRequest, msg, s.execute, query, params)
             return
         elif six.PY2:
