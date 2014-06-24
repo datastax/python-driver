@@ -742,10 +742,17 @@ class CompositeType(_ParameterizedType):
     typename = "'org.apache.cassandra.db.marshal.CompositeType'"
     num_subtypes = 'UNKNOWN'
 
+    @classmethod
+    def cql_parameterized_type(cls):
+        """
+        There is no CQL notation for Composites, so we override this.
+        """
+        typestring = cls.cass_parameterized_type(full=True)
+        return "'%s'" % (typestring,)
 
-class DynamicCompositeType(_ParameterizedType):
+
+class DynamicCompositeType(CompositeType):
     typename = "'org.apache.cassandra.db.marshal.DynamicCompositeType'"
-    num_subtypes = 'UNKNOWN'
 
 
 class ColumnToCollectionType(_ParameterizedType):

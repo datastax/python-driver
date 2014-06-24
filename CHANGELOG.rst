@@ -20,6 +20,8 @@ Bug Fixes
   process has connected a Cluster before forking (github #141)
 * Don't share prepared statement lock across Cluster
   instances
+* Format CompositeType and DynamicCompositeType columns correctly
+  in CREATE TABLE statements.
 
 2.0.2
 =====
