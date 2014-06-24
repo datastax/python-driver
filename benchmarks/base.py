@@ -102,8 +102,11 @@ def benchmark(thread_class):
         setup(options.hosts)
         log.info("==== %s ====" % (conn_class.__name__,))
 
-        cluster = Cluster(options.hosts, metrics_enabled=options.enable_metrics)
-        cluster.connection_class = conn_class
+        kwargs = {'metrics_enabled': options.enable_metrics,
+                  'connection_class': conn_class}
+        if options.protocol_version:
+            kwargs['protocol_version'] = options.protocol_version
+        cluster = Cluster(options.hosts, **kwargs)
         session = cluster.connect(KEYSPACE)
 
         log.debug("Sleeping for two seconds...")
@@ -183,6 +186,8 @@ def parse_options():
                       help='logging level: debug, info, warning, or error')
     parser.add_option('-p', '--profile', action='store_true', dest='profile',
                       help='Profile the run')
+    parser.add_option('--protocol-version', type='int', dest='protocol_version',
+                      help='Native protocol version to use')
 
     options, args = parser.parse_args()
 
