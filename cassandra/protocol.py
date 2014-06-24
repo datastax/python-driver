@@ -629,6 +629,10 @@ class ResultMessage(_MessageType):
             keysubtype = cls.read_type(f, user_type_map)
             valsubtype = cls.read_type(f, user_type_map)
             typeclass = typeclass.apply_parameters((keysubtype, valsubtype))
+        elif typeclass == TupleType:
+            num_items = read_short(f)
+            types = tuple(cls.read_type(f, user_type_map) for _ in xrange(num_items))
+            typeclass = typeclass.apply_parameters(types)
         elif typeclass == UserDefinedType:
             ks = read_string(f)
             udt_name = read_string(f)
