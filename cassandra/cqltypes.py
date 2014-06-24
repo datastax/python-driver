@@ -774,10 +774,45 @@ class MapType(_ParameterizedType):
         return buf.getvalue()
 
 
-class UserDefinedType(_ParameterizedType):
-    typename = "'org.apache.cassandra.db.marshal.UserType'"
+class TupleType(_ParameterizedType):
+    typename = 'tuple'
+    num_subtypes = 'UNKNOWN'
 
-    FIELD_LENGTH = 4
+    @classmethod
+    def deserialize_safe(cls, byts, protocol_version):
+        proto_version = max(3, protocol_version)
+        p = 0
+        values = []
+        for col_type in cls.subtypes:
+            if p == len(byts):
+                break
+            itemlen = int32_unpack(byts[p:p + 4])
+            p += 4
+            item = byts[p:p + itemlen]
+            p += itemlen
+            # collections inside UDTs are always encoded with at least the
+            # version 3 format
+            values.append(col_type.from_binary(item, proto_version))
+
+        if len(values) < len(cls.subtypes):
+            nones = [None] * (len(cls.subtypes) - len(values))
+            values = values + nones
+
+        return tuple(values)
+
+    @classmethod
+    def serialize_safe(cls, val, protocol_version):
+        proto_version = max(3, protocol_version)
+        buf = io.BytesIO()
+        for item, subtype in zip(val, cls.subtypes):
+            packed_item = subtype.to_binary(item, proto_version)
+            buf.write(int32_pack(len(packed_item)))
+            buf.write(packed_item)
+        return buf.getvalue()
+
+
+class UserDefinedType(TupleType):
+    typename = "'org.apache.cassandra.db.marshal.UserType'"
 
     _cache = {}
 
@@ -804,24 +839,7 @@ class UserDefinedType(_ParameterizedType):
 
     @classmethod
     def deserialize_safe(cls, byts, protocol_version):
-        proto_version = max(3, protocol_version)
-        p = 0
-        values = []
-        for col_type in cls.subtypes:
-            if p == len(byts):
-                break
-            itemlen = int32_unpack(byts[p:p + cls.FIELD_LENGTH])
-            p += cls.FIELD_LENGTH
-            item = byts[p:p + itemlen]
-            p += itemlen
-            # collections inside UDTs are always encoded with at least the
-            # version 3 format
-            values.append(col_type.from_binary(item, proto_version))
-
-        if len(values) < len(cls.subtypes):
-            nones = [None] * (len(cls.subtypes) - len(values))
-            values = values + nones
-
+        values = TupleType.deserialize_safe(byts, protocol_version)
         if cls.mapped_class:
             return cls.mapped_class(**dict(zip(cls.fieldnames, values)))
         else:

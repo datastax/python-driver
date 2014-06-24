@@ -33,6 +33,7 @@ except ImportError:
 from cassandra import InvalidRequest
 from cassandra.cluster import Cluster
 from cassandra.cqltypes import Int32Type, EMPTY
+from cassandra.encoder import cql_encode_tuple
 from cassandra.query import dict_factory
 from cassandra.util import OrderedDict
 
@@ -398,3 +399,37 @@ class TypeTests(unittest.TestCase):
         s.execute(prepared, parameters=(dt,))
         result = s.execute("SELECT b FROM mytable WHERE a='key2'")[0].b
         self.assertEqual(dt.utctimetuple(), result.utctimetuple())
+
+    def test_tuple_type(self):
+        if self._cass_version < (2, 1, 0):
+            raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
+
+        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        s = c.connect()
+        s.encoders[tuple] = cql_encode_tuple
+
+        s.execute("""CREATE KEYSPACE test_tuple_type
+            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}""")
+        s.set_keyspace("test_tuple_type")
+        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b tuple<ascii, int, boolean>)")
+
+        # test non-prepared statement
+        complete = ('foo', 123, True)
+        s.execute("INSERT INTO mytable (a, b) VALUES (0, %s)", parameters=(complete,))
+        result = s.execute("SELECT b FROM mytable WHERE a=0")[0]
+        self.assertEqual(complete, result.b)
+
+        partial = ('bar', 456)
+        partial_result = partial + (None,)
+        s.execute("INSERT INTO mytable (a, b) VALUES (1, %s)", parameters=(partial,))
+        result = s.execute("SELECT b FROM mytable WHERE a=1")[0]
+        self.assertEqual(partial_result, result.b)
+
+        # test prepared statement
+        prepared = s.prepare("INSERT INTO mytable (a, b) VALUES (?, ?)")
+        s.execute(prepared, parameters=(2, complete))
+        s.execute(prepared, parameters=(3, partial))
+
+        prepared = s.prepare("SELECT b FROM mytable WHERE a=?")
+        self.assertEqual(complete, s.execute(prepared, (2,))[0].b)
+        self.assertEqual(partial_result, s.execute(prepared, (3,))[0].b)

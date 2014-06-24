@@ -84,6 +84,7 @@ def cql_encode_date(val):
 def cql_encode_sequence(val):
     return '( %s )' % ' , '.join(cql_encoders.get(type(v), cql_encode_object)(v)
                                  for v in val)
+cql_encode_tuple = cql_encode_sequence
 
 
 def cql_encode_map_collection(val):

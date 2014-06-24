@@ -1086,7 +1086,7 @@ class Session(object):
         self._metrics = cluster.metrics
         self._protocol_version = self.cluster.protocol_version
 
-        self._encoders = cql_encoders.copy()
+        self.encoders = cql_encoders.copy()
 
         # create connection pools in parallel
         futures = []
@@ -1210,7 +1210,7 @@ class Session(object):
         if isinstance(query, SimpleStatement):
             query_string = query.query_string
             if parameters:
-                query_string = bind_params(query.query_string, parameters, self._encoders)
+                query_string = bind_params(query.query_string, parameters, self.encoders)
             message = QueryMessage(
                 query_string, cl, query.serial_consistency_level,
                 fetch_size, timestamp=timestamp)
@@ -1460,7 +1460,7 @@ class Session(object):
                 cql_encode_all_types(getattr(val, field_name))
             ) for field_name in type_meta.field_names)
 
-        self._encoders[klass] = encode
+        self.encoders[klass] = encode
 
     def submit(self, fn, *args, **kwargs):
         """ Internal """
