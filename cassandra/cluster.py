@@ -61,7 +61,8 @@ from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy)
 from cassandra.pool import (_ReconnectionHandler, _HostReconnectionHandler,
-                            HostConnectionPool, NoConnectionsAvailable)
+                            HostConnectionPool, HostConnection,
+                            NoConnectionsAvailable)
 from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              BatchStatement, bind_params, QueryTrace, Statement,
                              named_tuple_factory, dict_factory)
@@ -260,6 +261,15 @@ class Cluster(object):
     A factory function which creates instances of
     :class:`.policies.ConvictionPolicy`.  Defaults to
     :class:`.policies.SimpleConvictionPolicy`.
+    """
+
+    connect_to_remote_hosts = True
+    """
+    If left as :const:`True`, hosts that are considered :attr:`~.HostDistance.REMOTE`
+    by the :attr:`~.Cluster.load_balancing_policy` will have a connection
+    opened to them.  Otherwise, they will not have a connection opened to them.
+
+    .. versionadded:: 2.1.0
     """
 
     metrics_enabled = False
@@ -465,12 +475,20 @@ class Cluster(object):
         return self._min_requests_per_connection[host_distance]
 
     def set_min_requests_per_connection(self, host_distance, min_requests):
+        if self.protocol_version >= 3:
+            raise UnsupportedOperation(
+                "Cluster.set_min_requests_per_connection() only has an effect "
+                "when using protocol_version 1 or 2.")
         self._min_requests_per_connection[host_distance] = min_requests
 
     def get_max_requests_per_connection(self, host_distance):
         return self._max_requests_per_connection[host_distance]
 
     def set_max_requests_per_connection(self, host_distance, max_requests):
+        if self.protocol_version >= 3:
+            raise UnsupportedOperation(
+                "Cluster.set_max_requests_per_connection() only has an effect "
+                "when using protocol_version 1 or 2.")
         self._max_requests_per_connection[host_distance] = max_requests
 
     def get_core_connections_per_host(self, host_distance):
@@ -479,6 +497,9 @@ class Cluster(object):
         for each host with :class:`~.HostDistance` equal to `host_distance`.
         The default is 2 for :attr:`~HostDistance.LOCAL` and 1 for
         :attr:`~HostDistance.REMOTE`.
+
+        This property is ignored if :attr:`~.Cluster.protocol_version` is
+        3 or higher.
         """
         return self._core_connections_per_host[host_distance]
 
@@ -488,7 +509,16 @@ class Cluster(object):
         for each host with :class:`~.HostDistance` equal to `host_distance`.
         The default is 2 for :attr:`~HostDistance.LOCAL` and 1 for
         :attr:`~HostDistance.REMOTE`.
+
+        If :attr:`~.Cluster.protocol_version` is set to 3 or higher, this
+        is not supported (there is always one connection per host, unless
+        the host is remote and :attr:`connect_to_remote_hosts` is :const:`False`)
+        and using this will result in an :exc:`~.UnsupporteOperation`.
         """
+        if self.protocol_version >= 3:
+            raise UnsupportedOperation(
+                "Cluster.set_core_connections_per_host() only has an effect "
+                "when using protocol_version 1 or 2.")
         old = self._core_connections_per_host[host_distance]
         self._core_connections_per_host[host_distance] = core_connections
         if old < core_connections:
@@ -500,6 +530,9 @@ class Cluster(object):
         for each host with :class:`~.HostDistance` equal to `host_distance`.
         The default is 8 for :attr:`~HostDistance.LOCAL` and 2 for
         :attr:`~HostDistance.REMOTE`.
+
+        This property is ignored if :attr:`~.Cluster.protocol_version` is
+        3 or higher.
         """
         return self._max_connections_per_host[host_distance]
 
@@ -509,7 +542,16 @@ class Cluster(object):
         for each host with :class:`~.HostDistance` equal to `host_distance`.
         The default is 2 for :attr:`~HostDistance.LOCAL` and 1 for
         :attr:`~HostDistance.REMOTE`.
+
+        If :attr:`~.Cluster.protocol_version` is set to 3 or higher, this
+        is not supported (there is always one connection per host, unless
+        the host is remote and :attr:`connect_to_remote_hosts` is :const:`False`)
+        and using this will result in an :exc:`~.UnsupporteOperation`.
         """
+        if self.protocol_version >= 3:
+            raise UnsupportedOperation(
+                "Cluster.set_max_connections_per_host() only has an effect "
+                "when using protocol_version 1 or 2.")
         self._max_connections_per_host[host_distance] = max_connections
 
     def connection_factory(self, address, *args, **kwargs):
@@ -1341,14 +1383,17 @@ class Session(object):
 
         def run_add_or_renew_pool():
             try:
-                new_pool = HostConnectionPool(host, distance, self)
+                if self._protocol_version >= 3:
+                    new_pool = HostConnection(host, distance, self)
+                else:
+                    new_pool = HostConnectionPool(host, distance, self)
             except AuthenticationFailed as auth_exc:
                 conn_exc = ConnectionException(str(auth_exc), host=host)
                 self.cluster.signal_connection_failure(host, conn_exc, is_host_addition)
                 return False
             except Exception as conn_exc:
-                log.warning("Failed to create connection pool for new host %s: %s",
-                            host, conn_exc)
+                log.warning("Failed to create connection pool for new host %s:",
+                            host, exc_info=conn_exc)
                 # the host itself will still be marked down, so we need to pass
                 # a special flag to make sure the reconnector is created
                 self.cluster.signal_connection_failure(

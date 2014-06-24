@@ -20,7 +20,7 @@ import logging
 import re
 import socket
 import time
-from threading import RLock, Condition
+from threading import Lock, RLock, Condition
 import weakref
 try:
     from weakref import WeakSet
@@ -29,6 +29,7 @@ except ImportError:
 
 from cassandra import AuthenticationFailed
 from cassandra.connection import ConnectionException
+from cassandra.policies import HostDistance
 
 log = logging.getLogger(__name__)
 
@@ -283,11 +284,117 @@ class _HostReconnectionHandler(_ReconnectionHandler):
             return True
 
 
+class HostConnection(object):
+    """
+    When using v3 of the native protocol, this is used instead of a connection
+    pool per host (HostConnectionPool) due to the increased in-flight capacity
+    of individual connections.
+    """
+
+    host = None
+    host_distance = None
+    is_shutdown = False
+
+    _session = None
+    _connection = None
+    _lock = None
+
+    def __init__(self, host, host_distance, session):
+        self.host = host
+        self.host_distance = host_distance
+        self._session = weakref.proxy(session)
+        self._lock = Lock()
+
+        if host_distance == HostDistance.IGNORED:
+            log.debug("Not opening connection to ignored host %s", self.host)
+            return
+        elif host_distance == HostDistance.REMOTE and not session.cluster.connect_to_remote_hosts:
+            log.debug("Not opening connection to remote host %s", self.host)
+            return
+
+        log.debug("Initializing connection for host %s", self.host)
+        self._connection = session.cluster.connection_factory(host.address)
+        if session.keyspace:
+            self._connection.set_keyspace_blocking(session.keyspace)
+        log.debug("Finished initializing connection for host %s", self.host)
+
+    def borrow_connection(self, timeout):
+        if self.is_shutdown:
+            raise ConnectionException(
+                "Pool for %s is shutdown" % (self.host,), self.host)
+
+        conn = self._connection
+        if not conn:
+            raise NoConnectionsAvailable()
+
+        with conn.lock:
+            if conn.in_flight > conn.max_request_id:
+                raise NoConnectionsAvailable("All request IDs are currently in use")
+            conn.in_flight += 1
+            return conn, conn.get_request_id()
+
+    def return_connection(self, connection):
+        with connection.lock:
+            connection.in_flight -= 1
+
+        if connection.is_defunct or connection.is_closed:
+            log.debug("Defunct or closed connection (%s) returned to pool, potentially "
+                      "marking host %s as down", id(connection), self.host)
+            is_down = self._session.cluster.signal_connection_failure(
+                    self.host, connection.last_error, is_host_addition=False)
+            if is_down:
+                self.shutdown()
+            else:
+                self._connection = None
+                with self._lock:
+                    if self._is_replacing:
+                        return
+                    self._is_replacing = True
+                    self._session.submit(self._replace, connection)
+
+    def _replace(self, connection):
+        log.debug("Replacing connection (%s) to %s", id(connection), self.host)
+        conn = self._session.cluster.connection_factory(self.host.address)
+        if self._session.keyspace:
+            conn.set_keyspace_blocking(self._session.keyspace)
+        self._connection = conn
+        with self._lock:
+            self._is_replacing = False
+
+    def shutdown(self):
+        with self._lock:
+            if self.is_shutdown:
+                return
+            else:
+                self.is_shutdown = True
+
+        if self._connection:
+            self._connection.close()
+
+    def _set_keyspace_for_all_conns(self, keyspace, callback):
+        if self.is_shutdown or not self._connection:
+            return
+
+        def connection_finished_setting_keyspace(conn, error):
+            errors = [] if not error else [error]
+            callback(self, errors)
+
+        self._connection.set_keyspace_async(keyspace, connection_finished_setting_keyspace)
+
+    def get_state(self):
+        have_conn = self._connection is not None
+        in_flight = self._connection.in_flight if have_conn else 0
+        return "shutdown: %s, open: %s, in_flights: %s" % (self.is_shutdown, have_conn, in_flight)
+
+
 _MAX_SIMULTANEOUS_CREATION = 1
 _MIN_TRASH_INTERVAL = 10
 
 
 class HostConnectionPool(object):
+    """
+    Used to pool connections to a host for v1 and v2 native protocol.
+    """
 
     host = None
     host_distance = None
