@@ -33,7 +33,7 @@ from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 InetAddressType, IntegerType, ListType,
                                 LongType, MapType, SetType, TimeUUIDType,
                                 UTF8Type, UUIDType, UserDefinedType,
-                                lookup_casstype)
+                                TupleType, lookup_casstype)
 from cassandra.policies import WriteType
 
 log = logging.getLogger(__name__)
@@ -536,6 +536,7 @@ class ResultMessage(_MessageType):
         0x0021: MapType,
         0x0022: SetType,
         0x0030: UserDefinedType,
+        0x0031: TupleType,
     }
 
     _FLAGS_GLOBAL_TABLES_SPEC = 0x0001
