@@ -151,6 +151,8 @@ class ClusterTests(unittest.TestCase):
         """
         Test connection setting getters and setters
         """
+        if PROTOCOL_VERSION >= 3:
+            raise unittest.SkipTest("min/max requests and core/max conns aren't used with v3 protocol")
 
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
 
