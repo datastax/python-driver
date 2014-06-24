@@ -739,13 +739,6 @@ class BatchMessage(_MessageType):
 
     def send_body(self, f, protocol_version):
         write_byte(f, self.batch_type.value)
-        if protocol_version >= 3:
-            flags = 0
-            if self.serial_consistency_level:
-                flags |= _WITH_SERIAL_CONSISTENCY_FLAG
-            if self.timestamp is not None:
-                flags |= _PROTOCOL_TIMESTAMP
-            write_byte(f, flags)
         write_short(f, len(self.queries))
         for prepared, string_or_query_id, params in self.queries:
             if not prepared:
@@ -760,10 +753,18 @@ class BatchMessage(_MessageType):
                 write_value(f, param)
 
         write_consistency_level(f, self.consistency_level)
-        if protocol_version >= 3 and self.serial_consistency_level:
-            write_consistency_level(f, self.serial_consistency_level)
-        if self.timestamp is not None:
-            write_long(f, self.timestamp)
+        if protocol_version >= 3:
+            flags = 0
+            if self.serial_consistency_level:
+                flags |= _WITH_SERIAL_CONSISTENCY_FLAG
+            if self.timestamp is not None:
+                flags |= _PROTOCOL_TIMESTAMP
+            write_byte(f, flags)
+
+            if self.serial_consistency_level:
+                write_consistency_level(f, self.serial_consistency_level)
+            if self.timestamp is not None:
+                write_long(f, self.timestamp)
 
 
 known_event_types = frozenset((
