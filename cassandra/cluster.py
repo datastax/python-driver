@@ -1091,8 +1091,10 @@ class Session(object):
 
     default_fetch_size = 5000
     """
-    By default, this many rows will be fetched at a time.  This can be
-    specified per-query through :attr:`.Statement.fetch_size`.
+    By default, this many rows will be fetched at a time. Setting
+    this to :const:`None` will disable automatic paging for large query
+    results.  The fetch size can be also specified per-query through
+    :attr:`.Statement.fetch_size`.
 
     This only takes effect when protocol version 2 or higher is used.
     See :attr:`.Cluster.protocol_version` for details.
