@@ -14,8 +14,9 @@ class TestWhereClause(TestCase):
         """ tests that where clauses are rendered properly """
         wc = WhereClause('a', EqualsOperator(), 'c')
         wc.set_context_id(5)
-        self.assertEqual('"a" = :5', unicode(wc))
-        self.assertEqual('"a" = :5', str(wc))
+
+        self.assertEqual('"a" = %(5)s', unicode(wc), unicode(wc))
+        self.assertEqual('"a" = %(5)s', str(wc), type(wc))
 
     def test_equality_method(self):
         """ tests that 2 identical where clauses evaluate as == """

@@ -7,7 +7,6 @@ from cqlengine.tests.base import BaseCassEngTestCase
 from cqlengine.models import Model
 from cqlengine import columns
 from cqlengine.management import sync_table, drop_table
-from cqlengine.connection import ConnectionPool
 
 
 class TestUpdateModel(Model):
@@ -69,11 +68,11 @@ class ModelUpdateTests(BaseCassEngTestCase):
         """ tests that calling update on a model with no changes will do nothing. """
         m0 = TestUpdateModel.create(count=5, text='monkey')
 
-        with patch.object(ConnectionPool, 'execute') as execute:
+        with patch.object(self.session, 'execute') as execute:
             m0.update()
         assert execute.call_count == 0
 
-        with patch.object(ConnectionPool, 'execute') as execute:
+        with patch.object(self.session, 'execute') as execute:
             m0.update(count=5)
         assert execute.call_count == 0
 

@@ -4,7 +4,7 @@ from cqlengine import SizeTieredCompactionStrategy, LeveledCompactionStrategy
 from cqlengine import ONE
 from cqlengine.named import NamedTable
 
-from cqlengine.connection import connection_manager, execute
+from cqlengine.connection import execute, get_cluster
 from cqlengine.exceptions import CQLEngineException
 
 import logging
@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 # system keyspaces
 schema_columnfamilies = NamedTable('system', 'schema_columnfamilies')
 
-
 def create_keyspace(name, strategy_class='SimpleStrategy', replication_factor=3, durable_writes=True, **replication_values):
     """
     creates a keyspace
@@ -28,37 +27,36 @@ def create_keyspace(name, strategy_class='SimpleStrategy', replication_factor=3,
     :param durable_writes: 1.2 only, write log is bypassed if set to False
     :param **replication_values: 1.2 only, additional values to ad to the replication data map
     """
-    with connection_manager() as con:
-        _, keyspaces = con.execute("""SELECT keyspace_name FROM system.schema_keyspaces""", {}, ONE)
-        if name not in [r[0] for r in keyspaces]:
-            #try the 1.2 method
-            replication_map = {
-                'class': strategy_class,
-                'replication_factor':replication_factor
-            }
-            replication_map.update(replication_values)
-            if strategy_class.lower() != 'simplestrategy':
-                # Although the Cassandra documentation states for `replication_factor`
-                # that it is "Required if class is SimpleStrategy; otherwise,
-                # not used." we get an error if it is present.
-                replication_map.pop('replication_factor', None)
+    cluster = get_cluster()
 
-            query = """
-            CREATE KEYSPACE {}
-            WITH REPLICATION = {}
-            """.format(name, json.dumps(replication_map).replace('"', "'"))
+    if name not in cluster.metadata.keyspaces:
+        #try the 1.2 method
+        replication_map = {
+            'class': strategy_class,
+            'replication_factor':replication_factor
+        }
+        replication_map.update(replication_values)
+        if strategy_class.lower() != 'simplestrategy':
+            # Although the Cassandra documentation states for `replication_factor`
+            # that it is "Required if class is SimpleStrategy; otherwise,
+            # not used." we get an error if it is present.
+            replication_map.pop('replication_factor', None)
 
-            if strategy_class != 'SimpleStrategy':
-                query += " AND DURABLE_WRITES = {}".format('true' if durable_writes else 'false')
+        query = """
+        CREATE KEYSPACE {}
+        WITH REPLICATION = {}
+        """.format(name, json.dumps(replication_map).replace('"', "'"))
 
-            execute(query)
+        if strategy_class != 'SimpleStrategy':
+            query += " AND DURABLE_WRITES = {}".format('true' if durable_writes else 'false')
+
+        execute(query)
 
 
 def delete_keyspace(name):
-    with connection_manager() as con:
-        _, keyspaces = con.execute("""SELECT keyspace_name FROM system.schema_keyspaces""", {}, ONE)
-        if name in [r[0] for r in keyspaces]:
-            execute("DROP KEYSPACE {}".format(name))
+    cluster = get_cluster()
+    if name in cluster.metadata.keyspaces:
+        execute("DROP KEYSPACE {}".format(name))
 
 def create_table(model, create_missing_keyspace=True):
     warnings.warn("create_table has been deprecated in favor of sync_table and will be removed in a future release", DeprecationWarning)
@@ -88,13 +86,10 @@ def sync_table(model, create_missing_keyspace=True):
     if create_missing_keyspace:
         create_keyspace(ks_name)
 
-    with connection_manager() as con:
-        tables = con.execute(
-            "SELECT columnfamily_name from system.schema_columnfamilies WHERE keyspace_name = :ks_name",
-            {'ks_name': ks_name},
-            ONE
-        )
-    tables = [x[0] for x in tables.results]
+    cluster = get_cluster()
+
+    keyspace = cluster.metadata.keyspaces[ks_name]
+    tables = keyspace.tables
 
     #check for an existing column family
     if raw_cf_name not in tables:
@@ -123,31 +118,19 @@ def sync_table(model, create_missing_keyspace=True):
         update_compaction(model)
 
 
-    #get existing index names, skip ones that already exist
-    with connection_manager() as con:
-        _, idx_names = con.execute(
-            "SELECT index_name from system.\"IndexInfo\" WHERE table_name=:table_name",
-            {'table_name': raw_cf_name},
-            ONE
-        )
-
-    idx_names = [i[0] for i in idx_names]
-    idx_names = filter(None, idx_names)
+    table = cluster.metadata.keyspaces[ks_name].tables[raw_cf_name]
 
     indexes = [c for n,c in model._columns.items() if c.index]
-    if indexes:
-        for column in indexes:
-            if column.db_index_name in idx_names: continue
-            qs = ['CREATE INDEX index_{}_{}'.format(raw_cf_name, column.db_field_name)]
-            qs += ['ON {}'.format(cf_name)]
-            qs += ['("{}")'.format(column.db_field_name)]
-            qs = ' '.join(qs)
 
-            try:
-                execute(qs)
-            except CQLEngineException:
-                # index already exists
-                pass
+    for column in indexes:
+        if table.columns[column.db_field_name].index:
+            continue
+
+        qs = ['CREATE INDEX index_{}_{}'.format(raw_cf_name, column.db_field_name)]
+        qs += ['ON {}'.format(cf_name)]
+        qs += ['("{}")'.format(column.db_field_name)]
+        qs = ' '.join(qs)
+        execute(qs)
 
 def get_create_table(model):
     cf_name = model.column_family_name()
@@ -240,35 +223,27 @@ def get_fields(model):
     ks_name = model._get_keyspace()
     col_family = model.column_family_name(include_keyspace=False)
 
-    with connection_manager() as con:
-        query = "SELECT * FROM system.schema_columns \
-                 WHERE keyspace_name = :ks_name AND columnfamily_name = :col_family"
-
-        logger.debug("get_fields %s %s", ks_name, col_family)
-
-        tmp = con.execute(query, {'ks_name': ks_name, 'col_family': col_family}, ONE)
+    query = "select * from system.schema_columns where keyspace_name = %s and columnfamily_name = %s"
+    tmp = execute(query, [ks_name, col_family])
 
     # Tables containing only primary keys do not appear to create
     # any entries in system.schema_columns, as only non-primary-key attributes
     # appear to be inserted into the schema_columns table
-    if not tmp.results:
-        return []
 
-    column_name_positon = tmp.columns.index('column_name')
-    validator_positon = tmp.columns.index('validator')
     try:
-        type_position = tmp.columns.index('type')
-        return [Field(x[column_name_positon], x[validator_positon]) for x in tmp.results if x[type_position] == 'regular']
-    except ValueError:
-        return [Field(x[column_name_positon], x[validator_positon]) for x in tmp.results]
+        return [Field(x['column_name'], x['validator']) for x in tmp if x['type'] == 'regular']
+    except KeyError:
+        return [Field(x['column_name'], x['validator']) for x in tmp]
     # convert to Field named tuples
 
 
 def get_table_settings(model):
-    return schema_columnfamilies.objects.consistency(ONE).get(
-        keyspace_name=model._get_keyspace(),
-        columnfamily_name=model.column_family_name(include_keyspace=False))
-
+    # returns the table as provided by the native driver for a given model
+    cluster = get_cluster()
+    ks = model._get_keyspace()
+    table = model.column_family_name(include_keyspace=False)
+    table = cluster.metadata.keyspaces[ks].tables[table]
+    return table
 
 def update_compaction(model):
     """Updates the compaction options for the given model if necessary.
@@ -280,22 +255,24 @@ def update_compaction(model):
     :rtype: bool
     """
     logger.debug("Checking %s for compaction differences", model)
-    row = get_table_settings(model)
-    # check compaction_strategy_class
-    if not model.__compaction__:
-        return
+    table = get_table_settings(model)
 
-    do_update = not row['compaction_strategy_class'].endswith(model.__compaction__)
+    existing_options = table.options.copy()
 
-    existing_options = json.loads(row['compaction_strategy_options'])
-    # The min/max thresholds are stored differently in the system data dictionary
-    existing_options.update({
-        'min_threshold': str(row['min_compaction_threshold']),
-        'max_threshold': str(row['max_compaction_threshold']),
-        })
+    existing_compaction_strategy = existing_options['compaction_strategy_class']
+
+    existing_options = json.loads(existing_options['compaction_strategy_options'])
 
     desired_options = get_compaction_options(model)
+
+    desired_compact_strategy = desired_options.get('class', SizeTieredCompactionStrategy)
+
     desired_options.pop('class', None)
+
+    do_update = False
+
+    if desired_compact_strategy not in existing_compaction_strategy:
+        do_update = True
 
     for k, v in desired_options.items():
         val = existing_options.pop(k, None)
@@ -324,18 +301,16 @@ def delete_table(model):
 def drop_table(model):
 
     # don't try to delete non existant tables
-    ks_name = model._get_keyspace()
-    with connection_manager() as con:
-        _, tables = con.execute(
-            "SELECT columnfamily_name from system.schema_columnfamilies WHERE keyspace_name = :ks_name",
-            {'ks_name': ks_name},
-            ONE
-        )
-    raw_cf_name = model.column_family_name(include_keyspace=False)
-    if raw_cf_name not in [t[0] for t in tables]:
-        return
+    meta = get_cluster().metadata
 
-    cf_name = model.column_family_name()
-    execute('drop table {};'.format(cf_name))
+    ks_name = model._get_keyspace()
+    raw_cf_name = model.column_family_name(include_keyspace=False)
+
+    try:
+        table = meta.keyspaces[ks_name].tables[raw_cf_name]
+        execute('drop table {};'.format(model.column_family_name(include_keyspace=True)))
+    except KeyError:
+        pass
+
 
 

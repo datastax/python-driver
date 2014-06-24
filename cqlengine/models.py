@@ -307,12 +307,17 @@ class BaseModel(object):
         return cls._polymorphic_map.get(key)
 
     @classmethod
-    def _construct_instance(cls, names, values):
+    def _construct_instance(cls, values):
         """
         method used to construct instances from query results
         this is where polymorphic deserialization occurs
         """
-        field_dict = dict((cls._db_map.get(k, k), v) for k, v in zip(names, values))
+        # we're going to take the values, which is from the DB as a dict
+        # and translate that into our local fields
+        # the db_map is a db_field -> model field map
+        items = values.items()
+        field_dict = dict([(cls._db_map.get(k, k),v) for k,v in items])
+
         if cls._is_polymorphic:
             poly_key = field_dict.get(cls._polymorphic_column_name)
 
@@ -703,6 +708,8 @@ class ModelMetaClass(type):
         attrs['_columns'] = column_dict
         attrs['_primary_keys'] = primary_keys
         attrs['_defined_columns'] = defined_columns
+
+        # maps the database field to the models key
         attrs['_db_map'] = db_map
         attrs['_pk_name'] = pk_name
         attrs['_dynamic_columns'] = {}

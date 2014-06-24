@@ -136,7 +136,7 @@ class AlterTableTest(BaseCassEngTestCase):
 
         table_settings = get_table_settings(tmp)
 
-        self.assertRegexpMatches(table_settings['compaction_strategy_class'], '.*SizeTieredCompactionStrategy$')
+        self.assertRegexpMatches(table_settings.options['compaction_strategy_class'], '.*SizeTieredCompactionStrategy$')
 
 
     def test_alter_options(self):
@@ -196,13 +196,15 @@ class OptionsTest(BaseCassEngTestCase):
         drop_table(AllSizeTieredOptionsModel)
         sync_table(AllSizeTieredOptionsModel)
 
-        settings = get_table_settings(AllSizeTieredOptionsModel)
-        options = json.loads(settings['compaction_strategy_options'])
+        options = get_table_settings(AllSizeTieredOptionsModel).options['compaction_strategy_options']
+        options = json.loads(options)
+
         expected = {u'min_threshold': u'2',
                     u'bucket_low': u'0.3',
                     u'tombstone_compaction_interval': u'86400',
                     u'bucket_high': u'2',
                     u'max_threshold': u'64'}
+
         self.assertDictEqual(options, expected)
 
 
@@ -218,7 +220,8 @@ class OptionsTest(BaseCassEngTestCase):
         drop_table(AllLeveledOptionsModel)
         sync_table(AllLeveledOptionsModel)
 
-        settings = get_table_settings(AllLeveledOptionsModel)
+        settings = get_table_settings(AllLeveledOptionsModel).options
+
         options = json.loads(settings['compaction_strategy_options'])
         self.assertDictEqual(options, {u'sstable_size_in_mb': u'64'})
 

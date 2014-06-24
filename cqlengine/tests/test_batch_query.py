@@ -1,7 +1,6 @@
 from unittest import skip
 from uuid import uuid4
 import random
-from cqlengine.connection import ConnectionPool
 
 import mock
 import sure

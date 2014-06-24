@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from cqlengine import BaseContainerColumn, Map, columns
 from cqlengine.columns import Counter, List, Set
 
-from cqlengine.connection import execute, RowResult
+from cqlengine.connection import execute
 
 from cqlengine.exceptions import CQLEngineException, ValidationError
 from cqlengine.functions import Token, BaseQueryFunction, QueryValue
@@ -231,7 +231,8 @@ class AbstractQuerySet(object):
         if self._batch:
             return self._batch.add_query(q)
         else:
-            return execute(q, consistency_level=self._consistency)
+            result = execute(q, consistency_level=self._consistency)
+            return result
 
     def __unicode__(self):
         return unicode(self._select_query())
@@ -292,8 +293,8 @@ class AbstractQuerySet(object):
         if self._batch:
             raise CQLEngineException("Only inserts, updates, and deletes are available in batch mode")
         if self._result_cache is None:
-            columns, self._result_cache = self._execute(self._select_query())
-            self._construct_result = self._get_result_constructor(columns)
+            self._result_cache = self._execute(self._select_query())
+            self._construct_result = self._get_result_constructor()
 
     def _fill_result_cache_to_idx(self, idx):
         self._execute_query()
@@ -318,7 +319,7 @@ class AbstractQuerySet(object):
 
         for idx in range(len(self._result_cache)):
             instance = self._result_cache[idx]
-            if isinstance(instance, RowResult):
+            if isinstance(instance, dict):
                 self._fill_result_cache_to_idx(idx)
             yield self._result_cache[idx]
 
@@ -349,7 +350,7 @@ class AbstractQuerySet(object):
                 self._fill_result_cache_to_idx(s)
                 return self._result_cache[s]
 
-    def _get_result_constructor(self, names):
+    def _get_result_constructor(self):
         """
         Returns a function that will be used to instantiate query results
         """
@@ -505,8 +506,8 @@ class AbstractQuerySet(object):
         if self._result_cache is None:
             query = self._select_query()
             query.count = True
-            _, result = self._execute(query)
-            return result[0][0]
+            result = self._execute(query)
+            return result[0]['count']
         else:
             return len(self._result_cache)
 
@@ -612,12 +613,12 @@ class SimpleQuerySet(AbstractQuerySet):
 
     """
 
-    def _get_result_constructor(self, names):
+    def _get_result_constructor(self):
         """
         Returns a function that will be used to instantiate query results
         """
         def _construct_instance(values):
-            return ResultObject(zip(names, values))
+            return ResultObject(values)
         return _construct_instance
 
 
@@ -649,16 +650,20 @@ class ModelQuerySet(AbstractQuerySet):
             return [self.model._columns[f].db_field_name for f in fields]
         return super(ModelQuerySet, self)._select_fields()
 
-    def _get_result_constructor(self, names):
+    def _get_result_constructor(self):
         """ Returns a function that will be used to instantiate query results """
-        if not self._values_list:
-            return lambda values: self.model._construct_instance(names, values)
+        if not self._values_list: # we want models
+            return lambda rows: self.model._construct_instance(rows)
+        elif self._flat_values_list: # the user has requested flattened list (1 value per row)
+            return lambda row: row.popitem()[1]
         else:
-            columns = [self.model._columns[n] for n in names]
-            if self._flat_values_list:
-                return lambda values: columns[0].to_python(values[0])
-            else:
-                return lambda values: map(lambda (c, v): c.to_python(v), zip(columns, values))
+            return lambda row: self._get_row_value_list(self._only_fields, row)
+
+    def _get_row_value_list(self, fields, row):
+        result = []
+        for x in fields:
+            result.append(row[x])
+        return result
 
     def _get_ordering_condition(self, colname):
         colname, order_type = super(ModelQuerySet, self)._get_ordering_condition(colname)
@@ -775,7 +780,8 @@ class DMLQuery(object):
         if self._batch:
             return self._batch.add_query(q)
         else:
-            return execute(q, consistency_level=self._consistency)
+            tmp = execute(q, consistency_level=self._consistency)
+            return tmp
 
     def batch(self, batch_obj):
         if batch_obj is not None and not isinstance(batch_obj, BatchQuery):

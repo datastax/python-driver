@@ -19,7 +19,7 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         where = WhereClause('time', EqualsOperator(), functions.MaxTimeUUID(now))
         where.set_context_id(5)
 
-        self.assertEqual(str(where), '"time" = MaxTimeUUID(:5)')
+        self.assertEqual(str(where), '"time" = MaxTimeUUID(%(5)s)')
         ctx = {}
         where.update_context(ctx)
         self.assertEqual(ctx, {'5': DateTime().to_database(now)})
@@ -32,7 +32,7 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         where = WhereClause('time', EqualsOperator(), functions.MinTimeUUID(now))
         where.set_context_id(5)
 
-        self.assertEqual(str(where), '"time" = MinTimeUUID(:5)')
+        self.assertEqual(str(where), '"time" = MinTimeUUID(%(5)s)')
         ctx = {}
         where.update_context(ctx)
         self.assertEqual(ctx, {'5': DateTime().to_database(now)})
@@ -82,7 +82,7 @@ class TestTokenFunction(BaseCassEngTestCase):
         q = TestModel.objects.filter(pk__token__gt=func)
         where = q._where[0]
         where.set_context_id(1)
-        self.assertEquals(str(where), 'token("p1", "p2") > token(:{}, :{})'.format(1, 2))
+        self.assertEquals(str(where), 'token("p1", "p2") > token(%({})s, %({})s)'.format(1, 2))
 
         # Verify that a SELECT query can be successfully generated
         str(q._select_query())
@@ -94,7 +94,7 @@ class TestTokenFunction(BaseCassEngTestCase):
         q = TestModel.objects.filter(pk__token__gt=func)
         where = q._where[0]
         where.set_context_id(1)
-        self.assertEquals(str(where), 'token("p1", "p2") > token(:{}, :{})'.format(1, 2))
+        self.assertEquals(str(where), 'token("p1", "p2") > token(%({})s, %({})s)'.format(1, 2))
         str(q._select_query())
 
         # The 'pk__token' virtual column may only be compared to a Token

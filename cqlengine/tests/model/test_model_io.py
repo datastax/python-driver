@@ -39,7 +39,10 @@ class TestModelIO(BaseCassEngTestCase):
         Tests that models can be saved and retrieved
         """
         tm = TestModel.create(count=8, text='123456789')
+        self.assertIsInstance(tm, TestModel)
+
         tm2 = TestModel.objects(id=tm.pk).first()
+        self.assertIsInstance(tm2, TestModel)
 
         for cname in tm._columns.keys():
             self.assertEquals(getattr(tm, cname), getattr(tm2, cname))
@@ -98,6 +101,8 @@ class TestModelIO(BaseCassEngTestCase):
         tm.save()
 
         tm2 = TestModel.objects(id=tm.pk).first()
+        self.assertIsInstance(tm2, TestModel)
+
         assert tm2.text is None
         assert tm2._values['text'].previous_value is None
 
@@ -285,7 +290,9 @@ class TestQuerying(BaseCassEngTestCase):
     def test_query_with_date(self):
         uid = uuid4()
         day = date(2013, 11, 26)
-        TestQueryModel.create(test_id=uid, date=day, description=u'foo')
+        obj = TestQueryModel.create(test_id=uid, date=day, description=u'foo')
+
+        self.assertEqual(obj.description, u'foo')
 
         inst = TestQueryModel.filter(
             TestQueryModel.test_id == uid,

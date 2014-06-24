@@ -16,7 +16,7 @@ class UpdateStatementTests(TestCase):
         us.add_assignment_clause(AssignmentClause('a', 'b'))
         us.add_assignment_clause(AssignmentClause('c', 'd'))
         us.add_where_clause(WhereClause('a', EqualsOperator(), 'x'))
-        self.assertEqual(unicode(us), 'UPDATE table SET "a" = :0, "c" = :1 WHERE "a" = :2', unicode(us))
+        self.assertEqual(unicode(us), 'UPDATE table SET "a" = %(0)s, "c" = %(1)s WHERE "a" = %(2)s', unicode(us))
 
     def test_context(self):
         us = UpdateStatement('table')
@@ -31,7 +31,7 @@ class UpdateStatementTests(TestCase):
         us.add_assignment_clause(AssignmentClause('c', 'd'))
         us.add_where_clause(WhereClause('a', EqualsOperator(), 'x'))
         us.update_context_id(3)
-        self.assertEqual(unicode(us), 'UPDATE table SET "a" = :4, "c" = :5 WHERE "a" = :3')
+        self.assertEqual(unicode(us), 'UPDATE table SET "a" = %(4)s, "c" = %(5)s WHERE "a" = %(3)s')
         self.assertEqual(us.get_context(), {'4': 'b', '5': 'd', '3': 'x'})
 
     def test_additional_rendering(self):

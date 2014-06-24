@@ -7,7 +7,6 @@ from uuid import uuid4
 import mock
 import sure
 from cqlengine import Model, columns, BatchQuery
-from cqlengine.connection import ConnectionPool
 from cqlengine.management import sync_table
 from cqlengine.tests.base import BaseCassEngTestCase
 
@@ -28,28 +27,28 @@ class BaseTimestampTest(BaseCassEngTestCase):
 class BatchTest(BaseTimestampTest):
 
     def test_batch_is_included(self):
-        with mock.patch.object(ConnectionPool, "execute") as m, BatchQuery(timestamp=timedelta(seconds=30)) as b:
+        with mock.patch.object(self.session, "execute") as m, BatchQuery(timestamp=timedelta(seconds=30)) as b:
             TestTimestampModel.batch(b).create(count=1)
 
-        "USING TIMESTAMP".should.be.within(m.call_args[0][0])
+        "USING TIMESTAMP".should.be.within(m.call_args[0][0].query_string)
 
 
 class CreateWithTimestampTest(BaseTimestampTest):
 
     def test_batch(self):
-        with mock.patch.object(ConnectionPool, "execute") as m, BatchQuery() as b:
+        with mock.patch.object(self.session, "execute") as m, BatchQuery() as b:
             TestTimestampModel.timestamp(timedelta(seconds=10)).batch(b).create(count=1)
 
-        query = m.call_args[0][0]
+        query = m.call_args[0][0].query_string
 
         query.should.match(r"INSERT.*USING TIMESTAMP")
         query.should_not.match(r"TIMESTAMP.*INSERT")
 
     def test_timestamp_not_included_on_normal_create(self):
-        with mock.patch.object(ConnectionPool, "execute") as m:
+        with mock.patch.object(self.session, "execute") as m:
             TestTimestampModel.create(count=2)
 
-        "USING TIMESTAMP".shouldnt.be.within(m.call_args[0][0])
+        "USING TIMESTAMP".shouldnt.be.within(m.call_args[0][0].query_string)
 
     def test_timestamp_is_set_on_model_queryset(self):
         delta = timedelta(seconds=30)
@@ -62,10 +61,10 @@ class CreateWithTimestampTest(BaseTimestampTest):
 
     def test_non_batch_syntax_unit(self):
 
-        with mock.patch.object(ConnectionPool, "execute") as m:
+        with mock.patch.object(self.session, "execute") as m:
             TestTimestampModel.timestamp(timedelta(seconds=30)).create(count=1)
 
-        query = m.call_args[0][0]
+        query = m.call_args[0][0].query_string
 
         "USING TIMESTAMP".should.be.within(query)
 
@@ -73,20 +72,21 @@ class CreateWithTimestampTest(BaseTimestampTest):
 class UpdateWithTimestampTest(BaseTimestampTest):
     def setUp(self):
         self.instance = TestTimestampModel.create(count=1)
+        super(UpdateWithTimestampTest, self).setUp()
 
     def test_instance_update_includes_timestamp_in_query(self):
         # not a batch
 
-        with mock.patch.object(ConnectionPool, "execute") as m:
+        with mock.patch.object(self.session, "execute") as m:
             self.instance.timestamp(timedelta(seconds=30)).update(count=2)
 
-        "USING TIMESTAMP".should.be.within(m.call_args[0][0])
+        "USING TIMESTAMP".should.be.within(m.call_args[0][0].query_string)
 
     def test_instance_update_in_batch(self):
-        with mock.patch.object(ConnectionPool, "execute") as m, BatchQuery() as b:
+        with mock.patch.object(self.session, "execute") as m, BatchQuery() as b:
             self.instance.batch(b).timestamp(timedelta(seconds=30)).update(count=2)
 
-        query = m.call_args[0][0]
+        query = m.call_args[0][0].query_string
         "USING TIMESTAMP".should.be.within(query)
 
 

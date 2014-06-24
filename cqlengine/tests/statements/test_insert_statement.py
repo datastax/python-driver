@@ -17,7 +17,7 @@ class InsertStatementTests(TestCase):
 
         self.assertEqual(
             unicode(ist),
-            'INSERT INTO table ("a", "c") VALUES (:0, :1)'
+            'INSERT INTO table ("a", "c") VALUES (%(0)s, %(1)s)'
         )
 
     def test_context_update(self):
@@ -28,7 +28,7 @@ class InsertStatementTests(TestCase):
         ist.update_context_id(4)
         self.assertEqual(
             unicode(ist),
-            'INSERT INTO table ("a", "c") VALUES (:4, :5)'
+            'INSERT INTO table ("a", "c") VALUES (%(4)s, %(5)s)'
         )
         ctx = ist.get_context()
         self.assertEqual(ctx, {'4': 'b', '5': 'd'})

@@ -4,7 +4,8 @@ from cqlengine.models import Model
 from uuid import uuid4
 from cqlengine import columns
 import mock
-from cqlengine.connection import ConnectionPool
+from cqlengine.connection import get_session
+
 
 class TestTTLModel(Model):
     id      = columns.UUID(primary_key=True, default=lambda:uuid4())
@@ -39,10 +40,12 @@ class TTLModelTests(BaseTTLTest):
 
     def test_ttl_included_on_create(self):
         """ tests that ttls on models work as expected """
-        with mock.patch.object(ConnectionPool, 'execute') as m:
+        session = get_session()
+
+        with mock.patch.object(session, 'execute') as m:
             TestTTLModel.ttl(60).create(text="hello blake")
 
-        query = m.call_args[0][0]
+        query = m.call_args[0][0].query_string
         self.assertIn("USING TTL", query)
 
     def test_queryset_is_returned_on_class(self):
@@ -56,11 +59,13 @@ class TTLModelTests(BaseTTLTest):
 
 class TTLInstanceUpdateTest(BaseTTLTest):
     def test_update_includes_ttl(self):
+        session = get_session()
+
         model = TestTTLModel.create(text="goodbye blake")
-        with mock.patch.object(ConnectionPool, 'execute') as m:
+        with mock.patch.object(session, 'execute') as m:
             model.ttl(60).update(text="goodbye forever")
 
-        query = m.call_args[0][0]
+        query = m.call_args[0][0].query_string
         self.assertIn("USING TTL", query)
 
     def test_update_syntax_valid(self):
@@ -84,25 +89,30 @@ class TTLInstanceTest(BaseTTLTest):
         self.assertEqual(60, o._ttl)
 
     def test_ttl_is_include_with_query_on_update(self):
+        session = get_session()
+
         o = TestTTLModel.create(text="whatever")
         o.text = "new stuff"
         o = o.ttl(60)
 
-        with mock.patch.object(ConnectionPool, 'execute') as m:
+        with mock.patch.object(session, 'execute') as m:
             o.save()
-        query = m.call_args[0][0]
+
+        query = m.call_args[0][0].query_string
         self.assertIn("USING TTL", query)
 
 
 class TTLBlindUpdateTest(BaseTTLTest):
     def test_ttl_included_with_blind_update(self):
+        session = get_session()
+
         o = TestTTLModel.create(text="whatever")
         tid = o.id
 
-        with mock.patch.object(ConnectionPool, 'execute') as m:
+        with mock.patch.object(session, 'execute') as m:
             TestTTLModel.objects(id=tid).ttl(60).update(text="bacon")
 
-        query = m.call_args[0][0]
+        query = m.call_args[0][0].query_string
         self.assertIn("USING TTL", query)
 
 

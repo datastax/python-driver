@@ -1,53 +1,10 @@
-from mock import MagicMock, patch
 
-from cqlengine import ONE
-from cqlengine.exceptions import CQLEngineException
-from cqlengine.management import create_table, delete_table, get_fields, sync_table
+from cqlengine.management import  get_fields, sync_table, drop_table
 from cqlengine.tests.base import BaseCassEngTestCase
-from cqlengine.connection import ConnectionPool, Host
 from cqlengine import management
 from cqlengine.tests.query.test_queryset import TestModel
 from cqlengine.models import Model
 from cqlengine import columns, SizeTieredCompactionStrategy, LeveledCompactionStrategy
-
-class ConnectionPoolFailoverTestCase(BaseCassEngTestCase):
-    """Test cassandra connection pooling."""
-
-    def setUp(self):
-        self.host = Host('127.0.0.1', '9160')
-        self.pool = ConnectionPool([self.host])
-
-    def test_totally_dead_pool(self):
-        # kill the con
-        with patch('cqlengine.connection.cql.connect') as mock:
-            mock.side_effect=CQLEngineException
-            with self.assertRaises(CQLEngineException):
-                self.pool.execute("select * from system.peers", {}, ONE)
-
-    def test_dead_node(self):
-        """
-        tests that a single dead node doesn't mess up the pool
-        """
-        self.pool._hosts.append(self.host)
-
-        # cursor mock needed so set_cql_version doesn't crap out
-        ok_cur = MagicMock()
-
-        ok_conn = MagicMock()
-        ok_conn.return_value = ok_cur
-
-
-        returns = [CQLEngineException(), ok_conn]
-
-        def side_effect(*args, **kwargs):
-            result = returns.pop(0)
-            if isinstance(result, Exception):
-                raise result
-            return result
-
-        with patch('cqlengine.connection.cql.connect') as mock:
-            mock.side_effect = side_effect
-            conn = self.pool._create_connection()
 
 
 class CreateKeyspaceTest(BaseCassEngTestCase):
@@ -61,10 +18,10 @@ class DeleteTableTest(BaseCassEngTestCase):
         """
 
         """
-        create_table(TestModel)
+        sync_table(TestModel)
 
-        delete_table(TestModel)
-        delete_table(TestModel)
+        drop_table(TestModel)
+        drop_table(TestModel)
 
 class LowercaseKeyModel(Model):
     first_key = columns.Integer(primary_key=True)
@@ -87,11 +44,11 @@ class CapitalizedKeyTest(BaseCassEngTestCase):
 
     def test_table_definition(self):
         """ Tests that creating a table with capitalized column names succeedso """
-        create_table(LowercaseKeyModel)
-        create_table(CapitalizedKeyModel)
+        sync_table(LowercaseKeyModel)
+        sync_table(CapitalizedKeyModel)
 
-        delete_table(LowercaseKeyModel)
-        delete_table(CapitalizedKeyModel)
+        drop_table(LowercaseKeyModel)
+        drop_table(CapitalizedKeyModel)
 
 
 class FirstModel(Model):
@@ -125,25 +82,25 @@ class FourthModel(Model):
 
 class AddColumnTest(BaseCassEngTestCase):
     def setUp(self):
-        delete_table(FirstModel)
+        drop_table(FirstModel)
 
     def test_add_column(self):
-        create_table(FirstModel)
+        sync_table(FirstModel)
         fields = get_fields(FirstModel)
 
         # this should contain the second key
         self.assertEqual(len(fields), 2)
         # get schema
-        create_table(SecondModel)
+        sync_table(SecondModel)
 
         fields = get_fields(FirstModel)
         self.assertEqual(len(fields), 3)
 
-        create_table(ThirdModel)
+        sync_table(ThirdModel)
         fields = get_fields(FirstModel)
         self.assertEqual(len(fields), 4)
 
-        create_table(FourthModel)
+        sync_table(FourthModel)
         fields = get_fields(FirstModel)
         self.assertEqual(len(fields), 4)
 
@@ -151,7 +108,7 @@ class AddColumnTest(BaseCassEngTestCase):
 class SyncTableTests(BaseCassEngTestCase):
 
     def setUp(self):
-        delete_table(PrimaryKeysOnlyModel)
+        drop_table(PrimaryKeysOnlyModel)
 
     def test_sync_table_works_with_primary_keys_only_tables(self):
 
@@ -165,7 +122,8 @@ class SyncTableTests(BaseCassEngTestCase):
         # blows up with DoesNotExist if table does not exist
         table_settings = management.get_table_settings(PrimaryKeysOnlyModel)
         # let make sure the flag we care about
-        assert LeveledCompactionStrategy in table_settings['compaction_strategy_class']
+
+        assert LeveledCompactionStrategy in table_settings.options['compaction_strategy_class']
 
 
         # Now we are "updating" the table:
@@ -181,4 +139,4 @@ class SyncTableTests(BaseCassEngTestCase):
         sync_table(PrimaryKeysOnlyModel)
 
         table_settings = management.get_table_settings(PrimaryKeysOnlyModel)
-        assert SizeTieredCompactionStrategy in table_settings['compaction_strategy_class']
+        assert SizeTieredCompactionStrategy in table_settings.options['compaction_strategy_class']

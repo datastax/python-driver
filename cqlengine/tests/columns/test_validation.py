@@ -175,7 +175,7 @@ class TestUUID(BaseCassEngTestCase):
     @classmethod
     def tearDownClass(cls):
         super(TestUUID, cls).tearDownClass()
-        delete_table(cls.UUIDTest)  
+        delete_table(cls.UUIDTest)
 
     def test_uuid_str_with_dashes(self):
         a_uuid = uuid4()
