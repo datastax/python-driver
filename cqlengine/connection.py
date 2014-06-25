@@ -49,6 +49,10 @@ def setup(
     if 'username' in kwargs or 'password' in kwargs:
         raise CQLEngineException("Username & Password are now handled by using the native driver's auth_provider")
 
+    if default_keyspace:
+        from cqlengine import models
+        models.DEFAULT_KEYSPACE = default_keyspace
+
     default_consistency_level = consistency
     cluster = Cluster(hosts, **kwargs)
     session = cluster.connect()
