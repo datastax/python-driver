@@ -124,46 +124,6 @@ class TestSetColumn(BaseCassEngTestCase):
         m2 = TestSetModel.get(partition=m1.partition)
         assert m2.int_set == {2, 3, 4, 5}
 
-    def test_partial_update_creation(self):
-        """
-        Tests that proper update statements are created for a partial set update
-        :return:
-        """
-        ctx = {}
-        col = columns.Set(columns.Integer, db_field="TEST")
-        statements = col.get_update_statement({1, 2, 3, 4}, {2, 3, 4, 5}, ctx)
-
-        assert len([v for v in ctx.values() if {1} == v.value]) == 1
-        assert len([v for v in ctx.values() if {5} == v.value]) == 1
-        assert len([s for s in statements if '"TEST" = "TEST" -' in s]) == 1
-        assert len([s for s in statements if '"TEST" = "TEST" +' in s]) == 1
-
-    def test_update_from_none(self):
-        """ Tests that updating a 'None' list creates a straight insert statement """
-        ctx = {}
-        col = columns.Set(columns.Integer, db_field="TEST")
-        statements = col.get_update_statement({1, 2, 3, 4}, None, ctx)
-
-        #only one variable /statement should be generated
-        assert len(ctx) == 1
-        assert len(statements) == 1
-
-        assert ctx.values()[0].value == {1, 2, 3, 4}
-        assert statements[0] == '"TEST" = :{}'.format(ctx.keys()[0])
-
-    def test_update_from_empty(self):
-        """ Tests that updating an empty list creates a straight insert statement """
-        ctx = {}
-        col = columns.Set(columns.Integer, db_field="TEST")
-        statements = col.get_update_statement({1, 2, 3, 4}, set(), ctx)
-
-        #only one variable /statement should be generated
-        assert len(ctx) == 1
-        assert len(statements) == 1
-
-        assert ctx.values()[0].value == {1, 2, 3, 4}
-        assert statements[0] == '"TEST" = :{}'.format(ctx.keys()[0])
-
     def test_instantiation_with_column_class(self):
         """
         Tests that columns instantiated with a column class work properly
@@ -272,46 +232,6 @@ class TestListColumn(BaseCassEngTestCase):
 
         m2 = TestListModel.get(partition=m1.partition)
         assert list(m2.int_list) == final
-
-    def test_partial_update_creation(self):
-        """ Tests that proper update statements are created for a partial list update """
-        final = range(10)
-        initial = final[3:7]
-
-        ctx = {}
-        col = columns.List(columns.Integer, db_field="TEST")
-        statements = col.get_update_statement(final, initial, ctx)
-
-        assert len([v for v in ctx.values() if [2, 1, 0] == v.value]) == 1
-        assert len([v for v in ctx.values() if [7, 8, 9] == v.value]) == 1
-        assert len([s for s in statements if '"TEST" = "TEST" +' in s]) == 1
-        assert len([s for s in statements if '+ "TEST"' in s]) == 1
-
-    def test_update_from_none(self):
-        """ Tests that updating an 'None' list creates a straight insert statement """
-        ctx = {}
-        col = columns.List(columns.Integer, db_field="TEST")
-        statements = col.get_update_statement([1, 2, 3], None, ctx)
-
-        #only one variable /statement should be generated
-        assert len(ctx) == 1
-        assert len(statements) == 1
-
-        assert ctx.values()[0].value == [1, 2, 3]
-        assert statements[0] == '"TEST" = :{}'.format(ctx.keys()[0])
-
-    def test_update_from_empty(self):
-        """ Tests that updating an empty list creates a straight insert statement """
-        ctx = {}
-        col = columns.List(columns.Integer, db_field="TEST")
-        statements = col.get_update_statement([1, 2, 3], [], ctx)
-
-        #only one variable /statement should be generated
-        assert len(ctx) == 1
-        assert len(statements) == 1
-
-        assert ctx.values()[0].value == [1, 2, 3]
-        assert statements[0] == '"TEST" = :{}'.format(ctx.keys()[0])
 
     def test_instantiation_with_column_class(self):
         """

@@ -315,17 +315,6 @@ class Counter(Integer):
             required=required,
         )
 
-    def get_update_statement(self, val, prev, ctx):
-        val = self.to_database(val)
-        prev = self.to_database(prev or 0)
-        field_id = uuid4().hex
-
-        delta = val - prev
-        sign = '-' if delta < 0 else '+'
-        delta = abs(delta)
-        ctx[field_id] = delta
-        return ['"{0}" = "{0}" {1} {2}'.format(self.db_field_name, sign, delta)]
-
 
 class DateTime(Column):
     db_type = 'timestamp'
@@ -544,11 +533,6 @@ class BaseContainerColumn(Column):
         db_type = self.db_type.format(self.value_type.db_type)
         return '{} {}'.format(self.cql, db_type)
 
-    def get_update_statement(self, val, prev, ctx):
-        """
-        Used to add partial update statements
-        """
-        raise NotImplementedError
 
     def _val_is_null(self, val):
         return not val
@@ -609,48 +593,7 @@ class Set(BaseContainerColumn):
         if isinstance(value, self.Quoter): return value
         return self.Quoter({self.value_col.to_database(v) for v in value})
 
-    def get_update_statement(self, val, prev, ctx):
-        """
-        Returns statements that will be added to an object's update statement
-        also updates the query context
 
-        :param val: the current column value
-        :param prev: the previous column value
-        :param ctx: the values that will be passed to the query
-        :rtype: list
-        """
-
-        # remove from Quoter containers, if applicable
-        val = self.to_database(val)
-        prev = self.to_database(prev)
-        if isinstance(val, self.Quoter): val = val.value
-        if isinstance(prev, self.Quoter): prev = prev.value
-
-        if val is None or val == prev:
-            # don't return anything if the new value is the same as
-            # the old one, or if the new value is none
-            return []
-        elif prev is None or not any({v in prev for v in val}):
-            field = uuid1().hex
-            ctx[field] = self.Quoter(val)
-            return ['"{}" = :{}'.format(self.db_field_name, field)]
-        else:
-            # partial update time
-            to_create = val - prev
-            to_delete = prev - val
-            statements = []
-
-            if to_create:
-                field_id = uuid1().hex
-                ctx[field_id] = self.Quoter(to_create)
-                statements += ['"{0}" = "{0}" + :{1}'.format(self.db_field_name, field_id)]
-
-            if to_delete:
-                field_id = uuid1().hex
-                ctx[field_id] = self.Quoter(to_delete)
-                statements += ['"{0}" = "{0}" - :{1}'.format(self.db_field_name, field_id)]
-
-            return statements
 
 
 class List(BaseContainerColumn):
@@ -690,82 +633,6 @@ class List(BaseContainerColumn):
         if value is None: return None
         if isinstance(value, self.Quoter): return value
         return self.Quoter([self.value_col.to_database(v) for v in value])
-
-    def get_update_statement(self, val, prev, values):
-        """
-        Returns statements that will be added to an object's update statement
-        also updates the query context
-        """
-        # remove from Quoter containers, if applicable
-        val = self.to_database(val)
-        prev = self.to_database(prev)
-        if isinstance(val, self.Quoter): val = val.value
-        if isinstance(prev, self.Quoter): prev = prev.value
-
-        def _insert():
-            field_id = uuid1().hex
-            values[field_id] = self.Quoter(val)
-            return ['"{}" = :{}'.format(self.db_field_name, field_id)]
-
-        if val is None or val == prev:
-            return []
-
-        elif prev is None:
-            return _insert()
-
-        elif len(val) < len(prev):
-            # if elements have been removed,
-            # rewrite the whole list
-            return _insert()
-
-        elif len(prev) == 0:
-            # if we're updating from an empty
-            # list, do a complete insert
-            return _insert()
-
-        else:
-            # the prepend and append lists,
-            # if both of these are still None after looking
-            # at both lists, an insert statement will be returned
-            prepend = None
-            append = None
-
-            # the max start idx we want to compare
-            search_space = len(val) - max(0, len(prev)-1)
-
-            # the size of the sub lists we want to look at
-            search_size = len(prev)
-
-            for i in range(search_space):
-                #slice boundary
-                j = i + search_size
-                sub = val[i:j]
-                idx_cmp = lambda idx: prev[idx] == sub[idx]
-                if idx_cmp(0) and idx_cmp(-1) and prev == sub:
-                    prepend = val[:i]
-                    append = val[j:]
-                    break
-
-            # create update statements
-            if prepend is append is None:
-                return _insert()
-
-            statements = []
-            if prepend:
-                field_id = uuid1().hex
-                # CQL seems to prepend element at a time, starting
-                # with the element at idx 0, we can either reverse
-                # it here, or have it inserted in reverse
-                prepend.reverse()
-                values[field_id] = self.Quoter(prepend)
-                statements += ['"{0}" = :{1} + "{0}"'.format(self.db_field_name, field_id)]
-
-            if append:
-                field_id = uuid1().hex
-                values[field_id] = self.Quoter(append)
-                statements += ['"{0}" = "{0}" + :{1}'.format(self.db_field_name, field_id)]
-
-            return statements
 
 
 class Map(BaseContainerColumn):
@@ -841,55 +708,6 @@ class Map(BaseContainerColumn):
         if isinstance(value, self.Quoter): return value
         return self.Quoter({self.key_col.to_database(k):self.value_col.to_database(v) for k,v in value.items()})
 
-    def get_update_statement(self, val, prev, ctx):
-        """
-        http://www.datastax.com/docs/1.2/cql_cli/using/collections_map#deletion
-        """
-        # remove from Quoter containers, if applicable
-        val = self.to_database(val)
-        prev = self.to_database(prev)
-        if isinstance(val, self.Quoter): val = val.value
-        if isinstance(prev, self.Quoter): prev = prev.value
-        val = val or {}
-        prev = prev or {}
-
-        #get the updated map
-        update = {k:v for k,v in val.items() if v != prev.get(k)}
-
-        statements = []
-        for k,v in update.items():
-            key_id = uuid1().hex
-            val_id = uuid1().hex
-            ctx[key_id] = k
-            ctx[val_id] = v
-            statements += ['"{}"[:{}] = :{}'.format(self.db_field_name, key_id, val_id)]
-
-        return statements
-
-    def get_delete_statement(self, val, prev, ctx):
-        """
-        Returns statements that will be added to an object's delete statement
-        also updates the query context, used for removing keys from a map
-        """
-        if val is prev is None:
-            return []
-
-        val = self.to_database(val)
-        prev = self.to_database(prev)
-        if isinstance(val, self.Quoter): val = val.value
-        if isinstance(prev, self.Quoter): prev = prev.value
-
-        old_keys = set(prev.keys()) if prev else set()
-        new_keys = set(val.keys()) if val else set()
-        del_keys = old_keys - new_keys
-
-        del_statements = []
-        for key in del_keys:
-            field_id = uuid1().hex
-            ctx[field_id] = key
-            del_statements += ['"{}"[:{}]'.format(self.db_field_name, field_id)]
-
-        return del_statements
 
 
 class _PartitionKeysToken(Column):
