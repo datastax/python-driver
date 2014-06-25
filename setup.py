@@ -31,7 +31,7 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     keywords='cassandra,cql,orm',
-    install_requires = ['cassandra-driver >= 2.0.0', "cql"],
+    install_requires = ['cassandra-driver >= 2.0.0'],
     author='Blake Eggleston, Jon Haddad',
     author_email='bdeggleston@gmail.com',
     url='https://github.com/cqlengine/cqlengine',
