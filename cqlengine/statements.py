@@ -13,7 +13,7 @@ class ValueQuoter(object):
         self.value = value
 
     def __unicode__(self):
-        from cql.query import cql_quote
+        from cassandra.encoder import cql_quote
         if isinstance(self.value, bool):
             return 'true' if self.value else 'false'
         elif isinstance(self.value, (list, tuple)):
