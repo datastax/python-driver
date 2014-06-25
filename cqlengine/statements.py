@@ -36,7 +36,7 @@ class ValueQuoter(object):
 class InQuoter(ValueQuoter):
 
     def __unicode__(self):
-        from cql.query import cql_quote
+        from cassandra.encoder import cql_quote
         return '(' + ', '.join([cql_quote(v) for v in self.value]) + ')'
 
 
