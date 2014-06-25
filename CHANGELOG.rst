@@ -2,8 +2,19 @@
 =====
 In Progress
 
+This release adds support for Cassandra 2.1 features, including version
+3 of the native protocol.
+
 Features
 --------
+* When using the v3 protocol, only one connection is opened per-host, and
+  throughput is improved due to reduced pooling overhead and lock contention.
+* Support for user-defined types (Cassandra 2.1+)
+* Support for tuple type in (limited usage Cassandra 2.0.9, full usage
+  in Cassandra 2.1)
+* Protocol-level client-side timestamps (see Session.use_client_timestamp)
+* Overridable type encoding for non-prepared statements (see Session.encoders)
+* Configurable serial consistency levels for batch statements
 * Use io.BytesIO for reduced CPU consumption (github #143)
 * Support Twisted as a reactor. Note that a Twisted-compatible
   API is not exposed (so no Deferreds), this is just a reactor
@@ -11,17 +22,16 @@ Features
 
 Bug Fixes
 ---------
-* Fix references to xrange that do not go through "six" in
-  libevreactor and geventreactor (github #138)
+* Fix references to xrange that do not go through "six" in libevreactor and
+  geventreactor (github #138)
 * Make BoundStatements inherit fetch_size from their parent
   PreparedStatement (PYTHON-80)
-* Clear reactor state in child process after forking
-  to prevent errors with multiprocessing when the parent
-  process has connected a Cluster before forking (github #141)
-* Don't share prepared statement lock across Cluster
-  instances
-* Format CompositeType and DynamicCompositeType columns correctly
-  in CREATE TABLE statements.
+* Clear reactor state in child process after forking to prevent errors with
+  multiprocessing when the parent process has connected a Cluster before
+  forking (github #141)
+* Don't share prepared statement lock across Cluster instances
+* Format CompositeType and DynamicCompositeType columns correctly in
+  CREATE TABLE statements.
 
 2.0.2
 =====
@@ -36,12 +46,10 @@ Bug Fixes
   asyncore event loop is restarted multiple times
 * Delay initialization of reactors in order to avoid problems
   with shared state when using multiprocessing (PYTHON-60)
-* Add python-six to debian dependencies, move python-blist to
-  recommends
+* Add python-six to debian dependencies, move python-blist to recommends
 * Fix memory leak when libev connections are created and
   destroyed (github #93)
-* Ensure token map is rebuilt when hosts are removed from
-  the cluster
+* Ensure token map is rebuilt when hosts are removed from the cluster
 
 2.0.1
 =====
