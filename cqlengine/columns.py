@@ -3,11 +3,10 @@ from copy import deepcopy, copy
 from datetime import datetime
 from datetime import date
 import re
-from uuid import uuid1, uuid4
-from cql.query import cql_quote
-from cql.cqltypes import DateType
+from cassandra.cqltypes import DateType
 
 from cqlengine.exceptions import ValidationError
+from cassandra.encoder import cql_quote
 
 
 class BaseValueManager(object):
