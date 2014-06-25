@@ -78,6 +78,24 @@ class TestDatetime(BaseCassEngTestCase):
         assert dts[0][0] is None
 
 
+class TestBoolDefault(BaseCassEngTestCase):
+    class BoolDefaultValueTest(Model):
+        test_id = Integer(primary_key=True)
+        stuff = Boolean(default=True)
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestBoolDefault, cls).setUpClass()
+        sync_table(cls.BoolDefaultValueTest)
+
+    def test_default_is_set(self):
+        tmp = self.BoolDefaultValueTest.create(test_id=1)
+        self.assertEqual(True, tmp.stuff)
+        tmp2 = self.BoolDefaultValueTest.get(test_id=1)
+        self.assertEqual(True, tmp2.stuff)
+
+
+
 class TestVarInt(BaseCassEngTestCase):
     class VarIntTest(Model):
         test_id = Integer(primary_key=True)
@@ -86,12 +104,12 @@ class TestVarInt(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(TestVarInt, cls).setUpClass()
-        create_table(cls.VarIntTest)
+        sync_table(cls.VarIntTest)
 
     @classmethod
     def tearDownClass(cls):
         super(TestVarInt, cls).tearDownClass()
-        delete_table(cls.VarIntTest)
+        sync_table(cls.VarIntTest)
 
     def test_varint_io(self):
         long_int = sys.maxint + 1

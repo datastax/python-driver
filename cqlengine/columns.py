@@ -442,6 +442,7 @@ class Boolean(Column):
 
     def validate(self, value):
         """ Always returns a Python boolean. """
+        value = super(Boolean, self).validate(value)
         return bool(value)
 
     def to_python(self, value):
