@@ -27,7 +27,7 @@ from six.moves import range
 from threading import Event
 
 from cassandra.cluster import Cluster
-from cassandra.concurrent import execute_concurrent
+from cassandra.concurrent import execute_concurrent, execute_concurrent_with_args
 from cassandra.policies import HostDistance
 from cassandra.query import SimpleStatement
 
@@ -266,3 +266,18 @@ class QueryPagingTests(unittest.TestCase):
             future.add_callbacks(callback=handle_page, callback_args=(future, counter), errback=handle_error)
             event.wait()
             self.assertEquals(next(counter), 100)
+
+    def test_concurrent_with_paging(self):
+        statements_and_params = zip(cycle(["INSERT INTO test3rf.test (k, v) VALUES (%s, 0)"]),
+                                    [(i, ) for i in range(100)])
+        execute_concurrent(self.session, list(statements_and_params))
+
+        prepared = self.session.prepare("SELECT * FROM test3rf.test")
+
+        for fetch_size in (2, 3, 7, 10, 99, 100, 101, 10000):
+            self.session.default_fetch_size = fetch_size
+            results = execute_concurrent_with_args(self.session, prepared, [None] * 10)
+            self.assertEquals(10, len(results))
+            for (success, result) in results:
+                self.assertTrue(success)
+                self.assertEquals(100, len(list(result)))

@@ -2704,6 +2704,11 @@ class ResponseFuture(object):
         self.add_callback(callback, *callback_args, **(callback_kwargs or {}))
         self.add_errback(errback, *errback_args, **(errback_kwargs or {}))
 
+    def clear_callbacks(self):
+        with self._callback_lock:
+            self._callback = None
+            self._errback = None
+
     def __str__(self):
         result = "(no result yet)" if self._final_result is _NOT_SET else self._final_result
         return "<ResponseFuture: query='%s' request_id=%s result=%s exception=%s host=%s>" \
@@ -2744,6 +2749,8 @@ class PagedResult(object):
     .. versionadded: 2.0.0
     """
 
+    response_future = None
+
     def __init__(self, response_future, initial_response):
         self.response_future = response_future
         self.current_response = iter(initial_response)
@@ -2755,7 +2762,7 @@ class PagedResult(object):
         try:
             return next(self.current_response)
         except StopIteration:
-            if self.response_future._paging_state is None:
+            if not self.response_future.has_more_pages:
                 raise
 
         self.response_future.start_fetching_next_page()

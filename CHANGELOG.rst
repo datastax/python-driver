@@ -32,6 +32,8 @@ Bug Fixes
 * Don't share prepared statement lock across Cluster instances
 * Format CompositeType and DynamicCompositeType columns correctly in
   CREATE TABLE statements.
+* Fix cassandra.concurrent behavior when dealing with automatic paging
+  (PYTHON-81)
 
 2.0.2
 =====
