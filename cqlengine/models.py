@@ -11,7 +11,7 @@ class ModelDefinitionException(ModelException): pass
 
 class PolyMorphicModelException(ModelException): pass
 
-DEFAULT_KEYSPACE = 'cqlengine'
+DEFAULT_KEYSPACE = None
 
 
 class hybrid_classmethod(object):

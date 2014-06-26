@@ -31,7 +31,7 @@ default_consistency_level = None
 
 def setup(
         hosts,
-        default_keyspace=None,
+        default_keyspace,
         consistency=ConsistencyLevel.ONE,
         **kwargs):
     """
