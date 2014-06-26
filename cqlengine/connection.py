@@ -60,6 +60,9 @@ def setup(
 
 def execute(query, params=None, consistency_level=None):
 
+    if not session:
+        raise CQLEngineException("It is required to setup() cqlengine before executing queries")
+    
     if consistency_level is None:
         consistency_level = default_consistency_level
 
@@ -73,6 +76,7 @@ def execute(query, params=None, consistency_level=None):
 
     elif isinstance(query, basestring):
         query = SimpleStatement(query, consistency_level=consistency_level)
+
 
 
     params = params or {}
