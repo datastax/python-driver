@@ -436,3 +436,10 @@ class TypeTests(unittest.TestCase):
         prepared = s.prepare("SELECT b FROM mytable WHERE a=?")
         self.assertEqual(complete, s.execute(prepared, (2,))[0].b)
         self.assertEqual(partial_result, s.execute(prepared, (3,))[0].b)
+
+    def test_unicode_query_string(self):
+        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        s = c.connect()
+
+        query = u"SELECT * FROM system.schema_columnfamilies WHERE keyspace_name = 'ef\u2052ef' AND columnfamily_name = %s"
+        s.execute(query, (u"fe\u2051fe",))

@@ -35,6 +35,7 @@ Bug Fixes
 * Fix cassandra.concurrent behavior when dealing with automatic paging
   (PYTHON-81)
 * Properly defunct connections after protocol errors
+* Avoid UnicodeDecodeError when query string is unicode (PYTHON-76)
 
 2.0.2
 =====

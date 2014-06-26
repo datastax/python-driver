@@ -1253,8 +1253,10 @@ class Session(object):
 
         if isinstance(query, SimpleStatement):
             query_string = query.query_string
+            if six.PY2 and isinstance(query_string, six.text_type):
+                query_string = query_string.encode('utf-8')
             if parameters:
-                query_string = bind_params(query.query_string, parameters, self.encoders)
+                query_string = bind_params(query_string, parameters, self.encoders)
             message = QueryMessage(
                 query_string, cl, query.serial_consistency_level,
                 fetch_size, timestamp=timestamp)
