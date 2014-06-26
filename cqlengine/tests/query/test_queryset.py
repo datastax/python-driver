@@ -239,7 +239,8 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         assert TestModel.objects.count() == 12
 
         q = TestModel.objects(TestModel.test_id == 0).limit(2)
-        assert q.count() == 2
+        result = q.count()
+        self.assertEqual(2, result)
 
     def test_iteration(self):
         """ Tests that iterating over a query set pulls back all of the expected results """
