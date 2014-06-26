@@ -34,6 +34,7 @@ Bug Fixes
   CREATE TABLE statements.
 * Fix cassandra.concurrent behavior when dealing with automatic paging
   (PYTHON-81)
+* Properly defunct connections after protocol errors
 
 2.0.2
 =====

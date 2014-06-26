@@ -35,7 +35,7 @@ from cassandra.protocol import (ReadyMessage, AuthenticateMessage, OptionsMessag
                                 QueryMessage, ResultMessage, decode_response,
                                 InvalidRequestException, SupportedMessage,
                                 AuthResponseMessage, AuthChallengeMessage,
-                                AuthSuccessMessage)
+                                AuthSuccessMessage, ProtocolException)
 from cassandra.util import OrderedDict
 
 
@@ -361,10 +361,14 @@ class Connection(object):
             return
 
         try:
-            if stream_id < 0:
+            if stream_id >= 0:
+                if isinstance(response, ProtocolException):
+                    log.error("Closing connection %s due to protocol error: %s", self, response.summary_msg())
+                    self.defunct(response)
+                if callback is not None:
+                    callback(response)
+            else:
                 self.handle_pushed(response)
-            elif callback is not None:
-                callback(response)
         except Exception:
             log.exception("Callback handler errored, ignoring:")
 
