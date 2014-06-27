@@ -523,6 +523,10 @@ class SelectStatement(BaseCQLStatement):
                  limit=None,
                  allow_filtering=False):
 
+        """
+        :param where
+        :type where list of cqlengine.statements.WhereClause
+        """
         super(SelectStatement, self).__init__(
             table,
             consistency=consistency,
