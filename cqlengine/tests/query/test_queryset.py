@@ -1,12 +1,14 @@
 from datetime import datetime
 import time
+from unittest import TestCase
 from uuid import uuid1, uuid4
+import uuid
 
 from cqlengine.tests.base import BaseCassEngTestCase
 
 from cqlengine.exceptions import ModelException
 from cqlengine import functions
-from cqlengine.management import create_table, drop_table
+from cqlengine.management import create_table, drop_table, sync_table
 from cqlengine.management import delete_table
 from cqlengine.models import Model
 from cqlengine import columns
@@ -367,6 +369,28 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
     def test_allow_filtering_flag(self):
         """
         """
+
+
+def test_non_quality_filtering():
+    class NonEqualityFilteringModel(Model):
+        example_id = columns.UUID(primary_key=True, default=uuid.uuid4)
+        sequence_id = columns.Integer(primary_key=True)  # sequence_id is a clustering key
+        example_type = columns.Integer(index=True)
+        created_at = columns.DateTime()
+
+    drop_table(NonEqualityFilteringModel)
+    sync_table(NonEqualityFilteringModel)
+
+    # setup table, etc.
+
+    NonEqualityFilteringModel.create(sequence_id=1, example_type=0, created_at=datetime.now())
+    NonEqualityFilteringModel.create(sequence_id=3, example_type=0, created_at=datetime.now())
+    NonEqualityFilteringModel.create(sequence_id=5, example_type=1, created_at=datetime.now())
+
+    qA = NonEqualityFilteringModel.objects(NonEqualityFilteringModel.sequence_id > 3).allow_filtering()
+    num = qA.count()
+    assert num == 1, num
+
 
 
 class TestQuerySetOrdering(BaseQuerySetUsage):
