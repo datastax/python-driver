@@ -262,9 +262,9 @@ class TestAbstractModelClasses(BaseCassEngTestCase):
 
     def test_attempting_to_create_abstract_table_fails(self):
         """ Attempting to create a table from an abstract model should fail """
-        from cqlengine.management import create_table
+        from cqlengine.management import sync_table
         with self.assertRaises(CQLEngineException):
-            create_table(AbstractModelWithFullCols)
+            sync_table(AbstractModelWithFullCols)
 
     def test_attempting_query_on_abstract_model_fails(self):
         """ Tests attempting to execute query with an abstract model fails """
@@ -279,8 +279,8 @@ class TestAbstractModelClasses(BaseCassEngTestCase):
 
     def test_concrete_class_table_creation_cycle(self):
         """ Tests that models with inherited abstract classes can be created, and have io performed """
-        from cqlengine.management import create_table, delete_table
-        create_table(ConcreteModelWithCol)
+        from cqlengine.management import sync_table, delete_table
+        sync_table(ConcreteModelWithCol)
 
         w1 = ConcreteModelWithCol.create(pkey=5, data=6)
         w2 = ConcreteModelWithCol.create(pkey=6, data=7)
