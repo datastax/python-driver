@@ -35,7 +35,7 @@ Once a connection has been made to Cassandra, you can use the functions in ``cql
 
     syncs a python model to cassandra (creates & alters)
 
-.. function:: delete_table(model)
+.. function:: drop_table(model)
 
     :param model: the :class:`~cqlengine.model.Model` class to delete a column family for
     :type model: :class:`~cqlengine.model.Model`
