@@ -405,6 +405,9 @@ class AbstractQuerySet(object):
         :rtype: AbstractQuerySet
         """
         #add arguments to the where clause filters
+        if kwargs.values().count(None):
+            raise CQLEngineException("None values on filter are not allowed")
+
         clone = copy.deepcopy(self)
         for operator in args:
             if not isinstance(operator, WhereClause):

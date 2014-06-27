@@ -500,6 +500,9 @@ class BaseModel(object):
 
     @classmethod
     def filter(cls, *args, **kwargs):
+        # if kwargs.values().count(None):
+        #     raise CQLEngineException("Cannot pass None as a filter")
+
         return cls.objects.filter(*args, **kwargs)
 
     @classmethod

@@ -2,10 +2,11 @@ from uuid import uuid4
 import random
 from datetime import date
 from operator import itemgetter
+from cqlengine.exceptions import CQLEngineException
 from cqlengine.tests.base import BaseCassEngTestCase
 
-from cqlengine.management import create_table
-from cqlengine.management import delete_table
+from cqlengine.management import sync_table
+from cqlengine.management import drop_table
 from cqlengine.models import Model
 from cqlengine import columns
 
@@ -27,12 +28,12 @@ class TestModelIO(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(TestModelIO, cls).setUpClass()
-        create_table(TestModel)
+        sync_table(TestModel)
 
     @classmethod
     def tearDownClass(cls):
         super(TestModelIO, cls).tearDownClass()
-        delete_table(TestModel)
+        drop_table(TestModel)
 
     def test_model_save_and_load(self):
         """
@@ -109,8 +110,8 @@ class TestModelIO(BaseCassEngTestCase):
     def test_a_sensical_error_is_raised_if_you_try_to_create_a_table_twice(self):
         """
         """
-        create_table(TestModel)
-        create_table(TestModel)
+        sync_table(TestModel)
+        sync_table(TestModel)
 
 
 class TestMultiKeyModel(Model):
@@ -125,13 +126,13 @@ class TestDeleting(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(TestDeleting, cls).setUpClass()
-        delete_table(TestMultiKeyModel)
-        create_table(TestMultiKeyModel)
+        drop_table(TestMultiKeyModel)
+        sync_table(TestMultiKeyModel)
 
     @classmethod
     def tearDownClass(cls):
         super(TestDeleting, cls).tearDownClass()
-        delete_table(TestMultiKeyModel)
+        drop_table(TestMultiKeyModel)
 
     def test_deleting_only_deletes_one_object(self):
         partition = random.randint(0,1000)
@@ -152,13 +153,13 @@ class TestUpdating(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(TestUpdating, cls).setUpClass()
-        delete_table(TestMultiKeyModel)
-        create_table(TestMultiKeyModel)
+        drop_table(TestMultiKeyModel)
+        sync_table(TestMultiKeyModel)
 
     @classmethod
     def tearDownClass(cls):
         super(TestUpdating, cls).tearDownClass()
-        delete_table(TestMultiKeyModel)
+        drop_table(TestMultiKeyModel)
 
     def setUp(self):
         super(TestUpdating, self).setUp()
@@ -201,13 +202,13 @@ class TestCanUpdate(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(TestCanUpdate, cls).setUpClass()
-        delete_table(TestModel)
-        create_table(TestModel)
+        drop_table(TestModel)
+        sync_table(TestModel)
 
     @classmethod
     def tearDownClass(cls):
         super(TestCanUpdate, cls).tearDownClass()
-        delete_table(TestModel)
+        drop_table(TestModel)
 
     def test_success_case(self):
         tm = TestModel(count=8, text='123456789')
@@ -245,8 +246,8 @@ class IndexDefinitionModel(Model):
 class TestIndexedColumnDefinition(BaseCassEngTestCase):
 
     def test_exception_isnt_raised_if_an_index_is_defined_more_than_once(self):
-        create_table(IndexDefinitionModel)
-        create_table(IndexDefinitionModel)
+        sync_table(IndexDefinitionModel)
+        sync_table(IndexDefinitionModel)
 
 class ReservedWordModel(Model):
     token   = columns.Text(primary_key=True)
@@ -257,7 +258,7 @@ class TestQueryQuoting(BaseCassEngTestCase):
     def test_reserved_cql_words_can_be_used_as_column_names(self):
         """
         """
-        create_table(ReservedWordModel)
+        sync_table(ReservedWordModel)
 
         model1 = ReservedWordModel.create(token='1', insert=5)
 
@@ -279,13 +280,13 @@ class TestQuerying(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(TestQuerying, cls).setUpClass()
-        delete_table(TestQueryModel)
-        create_table(TestQueryModel)
+        drop_table(TestQueryModel)
+        sync_table(TestQueryModel)
 
     @classmethod
     def tearDownClass(cls):
         super(TestQuerying, cls).tearDownClass()
-        delete_table(TestQueryModel)
+        drop_table(TestQueryModel)
 
     def test_query_with_date(self):
         uid = uuid4()
@@ -300,3 +301,18 @@ class TestQuerying(BaseCassEngTestCase):
 
         assert inst.test_id == uid
         assert inst.date == day
+
+def test_none_filter_fails():
+    class NoneFilterModel(Model):
+        pk = columns.Integer(primary_key=True)
+        v = columns.Integer()
+    sync_table(NoneFilterModel)
+
+    try:
+        NoneFilterModel.objects(pk=None)
+        raise Exception("fail")
+    except CQLEngineException as e:
+        pass
+
+
+
