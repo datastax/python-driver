@@ -279,7 +279,7 @@ class TestAbstractModelClasses(BaseCassEngTestCase):
 
     def test_concrete_class_table_creation_cycle(self):
         """ Tests that models with inherited abstract classes can be created, and have io performed """
-        from cqlengine.management import sync_table, delete_table
+        from cqlengine.management import sync_table, drop_table
         sync_table(ConcreteModelWithCol)
 
         w1 = ConcreteModelWithCol.create(pkey=5, data=6)
@@ -293,7 +293,7 @@ class TestAbstractModelClasses(BaseCassEngTestCase):
         assert w2.pkey == r2.pkey
         assert w2.data == r2.data
 
-        delete_table(ConcreteModelWithCol)
+        drop_table(ConcreteModelWithCol)
 
 
 class TestCustomQuerySet(BaseCassEngTestCase):
