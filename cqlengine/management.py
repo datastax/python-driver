@@ -59,8 +59,7 @@ def delete_keyspace(name):
         execute("DROP KEYSPACE {}".format(name))
 
 def create_table(model, create_missing_keyspace=True):
-    warnings.warn("create_table has been deprecated in favor of sync_table and will be removed in a future release", DeprecationWarning)
-    sync_table(model, create_missing_keyspace)
+    raise CQLEngineException("create_table is deprecated, please use sync_table")
 
 def sync_table(model, create_missing_keyspace=True):
     """
@@ -76,7 +75,7 @@ def sync_table(model, create_missing_keyspace=True):
 
     if not issubclass(model, Model):
         raise CQLEngineException("Models must be derived from base Model.")
-    
+
     if model.__abstract__:
         raise CQLEngineException("cannot create table from abstract model")
 
@@ -308,8 +307,7 @@ def update_compaction(model):
 
 
 def delete_table(model):
-    warnings.warn("delete_table has been deprecated in favor of drop_table()", DeprecationWarning)
-    return drop_table(model)
+    raise CQLEngineException("delete_table has been deprecated in favor of drop_table()")
 
 
 def drop_table(model):
