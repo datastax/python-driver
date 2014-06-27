@@ -1,4 +1,3 @@
-cql==1.4.0
 ipython==0.13.1
 ipdb==0.7
 Sphinx==1.1.3
