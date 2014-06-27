@@ -26,14 +26,14 @@ Once a connection has been made to Cassandra, you can use the functions in ``cql
 
     deletes the keyspace with the given name
 
-.. function:: create_table(model [, create_missing_keyspace=True])
-    
+.. function:: sync_table(model [, create_missing_keyspace=True])
+
     :param model: the :class:`~cqlengine.model.Model` class to make a table with
     :type model: :class:`~cqlengine.model.Model`
     :param create_missing_keyspace: *Optional* If True, the model's keyspace will be created if it does not already exist. Defaults to ``True``
     :type create_missing_keyspace: bool
 
-    creates a CQL table for the given model
+    syncs a python model to cassandra (creates & alters)
 
 .. function:: delete_table(model)
 
@@ -42,7 +42,7 @@ Once a connection has been made to Cassandra, you can use the functions in ``cql
 
     deletes the CQL table for the given model
 
-    
+
 
 See the example at :ref:`getting-started`
 
