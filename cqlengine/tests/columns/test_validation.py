@@ -24,7 +24,7 @@ from cqlengine.columns import Boolean
 from cqlengine.columns import Float
 from cqlengine.columns import Decimal
 
-from cqlengine.management import create_table, delete_table, sync_table, drop_table
+from cqlengine.management import sync_table, drop_table
 from cqlengine.models import Model
 
 import sys
@@ -38,12 +38,12 @@ class TestDatetime(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(TestDatetime, cls).setUpClass()
-        create_table(cls.DatetimeTest)
+        sync_table(cls.DatetimeTest)
 
     @classmethod
     def tearDownClass(cls):
         super(TestDatetime, cls).tearDownClass()
-        delete_table(cls.DatetimeTest)
+        drop_table(cls.DatetimeTest)
 
     def test_datetime_io(self):
         now = datetime.now()
@@ -126,12 +126,12 @@ class TestDate(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(TestDate, cls).setUpClass()
-        create_table(cls.DateTest)
+        sync_table(cls.DateTest)
 
     @classmethod
     def tearDownClass(cls):
         super(TestDate, cls).tearDownClass()
-        delete_table(cls.DateTest)
+        drop_table(cls.DateTest)
 
     def test_date_io(self):
         today = date.today()
@@ -164,12 +164,12 @@ class TestDecimal(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(TestDecimal, cls).setUpClass()
-        create_table(cls.DecimalTest)
+        sync_table(cls.DecimalTest)
 
     @classmethod
     def tearDownClass(cls):
         super(TestDecimal, cls).tearDownClass()
-        delete_table(cls.DecimalTest)
+        drop_table(cls.DecimalTest)
 
     def test_decimal_io(self):
         dt = self.DecimalTest.objects.create(test_id=0, dec_val=D('0.00'))
@@ -188,12 +188,12 @@ class TestUUID(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(TestUUID, cls).setUpClass()
-        create_table(cls.UUIDTest)
+        sync_table(cls.UUIDTest)
 
     @classmethod
     def tearDownClass(cls):
         super(TestUUID, cls).tearDownClass()
-        delete_table(cls.UUIDTest)
+        drop_table(cls.UUIDTest)
 
     def test_uuid_str_with_dashes(self):
         a_uuid = uuid4()
@@ -215,12 +215,12 @@ class TestTimeUUID(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(TestTimeUUID, cls).setUpClass()
-        create_table(cls.TimeUUIDTest)
+        sync_table(cls.TimeUUIDTest)
 
     @classmethod
     def tearDownClass(cls):
         super(TestTimeUUID, cls).tearDownClass()
-        delete_table(cls.TimeUUIDTest)
+        drop_table(cls.TimeUUIDTest)
 
     def test_timeuuid_io(self):
         """
