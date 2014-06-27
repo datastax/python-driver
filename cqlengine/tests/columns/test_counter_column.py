@@ -2,7 +2,7 @@ from uuid import uuid4
 
 from cqlengine import Model
 from cqlengine import columns
-from cqlengine.management import create_table, delete_table
+from cqlengine.management import sync_table, drop_table
 from cqlengine.models import ModelDefinitionException
 from cqlengine.tests.base import BaseCassEngTestCase
 
@@ -46,13 +46,13 @@ class TestCounterColumn(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(TestCounterColumn, cls).setUpClass()
-        delete_table(TestCounterModel)
-        create_table(TestCounterModel)
+        drop_table(TestCounterModel)
+        sync_table(TestCounterModel)
 
     @classmethod
     def tearDownClass(cls):
         super(TestCounterColumn, cls).tearDownClass()
-        delete_table(TestCounterModel)
+        drop_table(TestCounterModel)
 
     def test_updates(self):
         """ Tests that counter updates work as intended """
