@@ -12,7 +12,7 @@ from collections import namedtuple
 Field = namedtuple('Field', ['name', 'type'])
 
 logger = logging.getLogger(__name__)
-
+from cqlengine.models import Model
 
 # system keyspaces
 schema_columnfamilies = NamedTable('system', 'schema_columnfamilies')
@@ -74,8 +74,12 @@ def sync_table(model, create_missing_keyspace=True):
     :type create_missing_keyspace: bool
     """
 
+    if not issubclass(model, Model):
+        raise CQLEngineException("Models must be derived from base Model.")
+    
     if model.__abstract__:
         raise CQLEngineException("cannot create table from abstract model")
+
 
     #construct query string
     cf_name = model.column_family_name()

@@ -1,4 +1,4 @@
-
+from cqlengine.exceptions import CQLEngineException
 from cqlengine.management import  get_fields, sync_table, drop_table
 from cqlengine.tests.base import BaseCassEngTestCase
 from cqlengine import management
@@ -140,3 +140,11 @@ class SyncTableTests(BaseCassEngTestCase):
 
         table_settings = management.get_table_settings(PrimaryKeysOnlyModel)
         assert SizeTieredCompactionStrategy in table_settings.options['compaction_strategy_class']
+
+class NonModelFailureTest(BaseCassEngTestCase):
+    class FakeModel(object):
+        pass
+
+    def test_failure(self):
+        with self.assertRaises(CQLEngineException):
+            sync_table(self.FakeModel)
