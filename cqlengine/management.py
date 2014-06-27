@@ -157,22 +157,32 @@ def get_create_table(model):
 
     qs += ['({})'.format(', '.join(qtypes))]
 
-    with_qs = ['read_repair_chance = {}'.format(model.__read_repair_chance__)]
+    with_qs = []
+
+    table_properties = ['bloom_filter_fp_chance', 'caching', 'comment',
+        'dclocal_read_repair_chance', 'default_time_to_live', 'gc_grace_seconds',
+        'index_interval', 'memtable_flush_period_in_ms', 'populate_io_cache_on_flush',
+        'read_repair_chance', 'replicate_on_write']
+    for prop_name in table_properties:
+        prop_value = getattr(model, '__{}__'.format(prop_name), None)
+        if prop_value is not None:
+            # Strings needs to be single quoted
+            if isinstance(prop_value, basestring):
+                prop_value = "'{}'".format(prop_value)
+            with_qs.append("{} = {}".format(prop_name, prop_value))
 
     _order = ['"{}" {}'.format(c.db_field_name, c.clustering_order or 'ASC') for c in model._clustering_keys.values()]
-
     if _order:
         with_qs.append('clustering order by ({})'.format(', '.join(_order)))
 
     compaction_options = get_compaction_options(model)
-
     if compaction_options:
         compaction_options = json.dumps(compaction_options).replace('"', "'")
         with_qs.append("compaction = {}".format(compaction_options))
 
-    # add read_repair_chance
-    qs += ['WITH {}'.format(' AND '.join(with_qs))]
-
+    # Add table properties.
+    if with_qs:
+        qs += ['WITH {}'.format(' AND '.join(with_qs))]
 
     qs = ' '.join(qs)
     return qs

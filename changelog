@@ -7,6 +7,11 @@ CHANGELOG
 * use stable version of sure package (maedhroz)
 * performance improvements 
 
+<<<<<<< HEAD
+=======
+* Check number of elements in collections.
+* Add support for table properties.
+>>>>>>> 3c56fec1d8d79d6037d3b83703608d4889994012
 
 0.13.0
 * adding support for post batch callbacks (thanks Daniel Dotsenko github.com/dvdotsenko)
