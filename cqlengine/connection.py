@@ -27,12 +27,14 @@ Host = namedtuple('Host', ['name', 'port'])
 
 cluster = None
 session = None
+delayed_connect_args = None
 default_consistency_level = None
 
 def setup(
         hosts,
         default_keyspace=None,
         consistency=ConsistencyLevel.ONE,
+        delayed_connect=False,
         **kwargs):
     """
     Records the hosts and connects to one of them
@@ -43,8 +45,10 @@ def setup(
     :type default_keyspace: str
     :param consistency: The global consistency level
     :type consistency: int
+    :param delayed_connect: True if should not connect until first use
+    :type delayed_connect: bool
     """
-    global cluster, session, default_consistency_level
+    global cluster, session, default_consistency_level, delayed_connect_args
 
     if 'username' in kwargs or 'password' in kwargs:
         raise CQLEngineException("Username & Password are now handled by using the native driver's auth_provider")
@@ -54,11 +58,17 @@ def setup(
         models.DEFAULT_KEYSPACE = default_keyspace
 
     default_consistency_level = consistency
+    if delayed_connect:
+        delayed_connect_args = (hosts, default_keyspace, consistency, kwargs)
+        return
+
     cluster = Cluster(hosts, **kwargs)
     session = cluster.connect()
     session.row_factory = dict_factory
 
 def execute(query, params=None, consistency_level=None):
+
+    handle_delayed_connect()
 
     if consistency_level is None:
         consistency_level = default_consistency_level
@@ -82,7 +92,16 @@ def execute(query, params=None, consistency_level=None):
 
 
 def get_session():
+    handle_delayed_connect()
     return session
 
 def get_cluster():
+    handle_delayed_connect()
     return cluster
+
+def handle_delayed_connect():
+    global delayed_connect_args
+    if delayed_connect_args:
+        hosts, default_keyspace, consistency, kwargs = delayed_connect_args
+        delayed_connect_args = None
+        setup(hosts, default_keyspace, consistency, **kwargs)
