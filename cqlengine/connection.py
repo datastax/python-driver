@@ -27,14 +27,14 @@ Host = namedtuple('Host', ['name', 'port'])
 
 cluster = None
 session = None
-delayed_connect_args = None
+lazy_connect_args = None
 default_consistency_level = None
 
 def setup(
         hosts,
         default_keyspace=None,
         consistency=ConsistencyLevel.ONE,
-        delayed_connect=False,
+        lazy_connect=False,
         **kwargs):
     """
     Records the hosts and connects to one of them
@@ -45,10 +45,10 @@ def setup(
     :type default_keyspace: str
     :param consistency: The global consistency level
     :type consistency: int
-    :param delayed_connect: True if should not connect until first use
-    :type delayed_connect: bool
+    :param lazy_connect: True if should not connect until first use
+    :type lazy_connect: bool
     """
-    global cluster, session, default_consistency_level, delayed_connect_args
+    global cluster, session, default_consistency_level, lazy_connect_args
 
     if 'username' in kwargs or 'password' in kwargs:
         raise CQLEngineException("Username & Password are now handled by using the native driver's auth_provider")
@@ -58,8 +58,8 @@ def setup(
         models.DEFAULT_KEYSPACE = default_keyspace
 
     default_consistency_level = consistency
-    if delayed_connect:
-        delayed_connect_args = (hosts, default_keyspace, consistency, kwargs)
+    if lazy_connect:
+        lazy_connect_args = (hosts, default_keyspace, consistency, kwargs)
         return
 
     cluster = Cluster(hosts, **kwargs)
@@ -68,7 +68,7 @@ def setup(
 
 def execute(query, params=None, consistency_level=None):
 
-    handle_delayed_connect()
+    handle_lazy_connect()
 
     if consistency_level is None:
         consistency_level = default_consistency_level
@@ -92,16 +92,16 @@ def execute(query, params=None, consistency_level=None):
 
 
 def get_session():
-    handle_delayed_connect()
+    handle_lazy_connect()
     return session
 
 def get_cluster():
-    handle_delayed_connect()
+    handle_lazy_connect()
     return cluster
 
-def handle_delayed_connect():
-    global delayed_connect_args
-    if delayed_connect_args:
-        hosts, default_keyspace, consistency, kwargs = delayed_connect_args
-        delayed_connect_args = None
+def handle_lazy_connect():
+    global lazy_connect_args
+    if lazy_connect_args:
+        hosts, default_keyspace, consistency, kwargs = lazy_connect_args
+        lazy_connect_args = None
         setup(hosts, default_keyspace, consistency, **kwargs)
