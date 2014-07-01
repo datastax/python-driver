@@ -222,6 +222,7 @@ class AbstractQuerySet(object):
         self._ttl = None
         self._consistency = None
         self._timestamp = None
+        self._check_exist = False
 
     @property
     def column_family_name(self):
@@ -571,7 +572,7 @@ class AbstractQuerySet(object):
 
     def create(self, **kwargs):
         return self.model(**kwargs).batch(self._batch).ttl(self._ttl).\
-            consistency(self._consistency).\
+            consistency(self._consistency).check_exist(self._check_exist).\
             timestamp(self._timestamp).save()
 
     def delete(self):
@@ -710,6 +711,11 @@ class ModelQuerySet(AbstractQuerySet):
         clone._timestamp = timestamp
         return clone
 
+    def check_exist(self, check_exist):
+        clone = copy.deepcopy(self)
+        clone._check_exist = check_exist
+        return clone
+
     def update(self, **values):
         """ Updates the rows in this queryset """
         if not values:
@@ -769,8 +775,9 @@ class DMLQuery(object):
     _ttl = None
     _consistency = None
     _timestamp = None
+    _check_exist = False
 
-    def __init__(self, model, instance=None, batch=None, ttl=None, consistency=None, timestamp=None):
+    def __init__(self, model, instance=None, batch=None, ttl=None, consistency=None, timestamp=None, check_exist=False):
         self.model = model
         self.column_family_name = self.model.column_family_name()
         self.instance = instance
@@ -778,6 +785,7 @@ class DMLQuery(object):
         self._ttl = ttl
         self._consistency = consistency
         self._timestamp = timestamp
+        self._check_exist = check_exist
 
     def _execute(self, q):
         if self._batch:
@@ -889,7 +897,7 @@ class DMLQuery(object):
         if self.instance._has_counter or self.instance._can_update():
             return self.update()
         else:
-            insert = InsertStatement(self.column_family_name, ttl=self._ttl, timestamp=self._timestamp)
+            insert = InsertStatement(self.column_family_name, ttl=self._ttl, timestamp=self._timestamp, check_exist=self._check_exist)
             for name, col in self.instance._columns.items():
                 val = getattr(self.instance, name, None)
                 if col._val_is_null(val):
@@ -905,7 +913,6 @@ class DMLQuery(object):
         # caused by pointless update queries
         if not insert.is_empty:
             self._execute(insert)
-
         # delete any nulled columns
         self._delete_null_columns()
 
