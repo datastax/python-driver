@@ -36,6 +36,8 @@ Bug Fixes
   (PYTHON-81)
 * Properly defunct connections after protocol errors
 * Avoid UnicodeDecodeError when query string is unicode (PYTHON-76)
+* Correctly capture dclocal_read_repair_chance for tables and
+  use it when generating CREATE TABLE statements (PYTHON-84)
 
 2.0.2
 =====

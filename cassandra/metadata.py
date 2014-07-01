@@ -301,6 +301,16 @@ class Metadata(object):
     def _build_table_options(self, row):
         """ Setup the mostly-non-schema table options, like caching settings """
         options = dict((o, row.get(o)) for o in TableMetadata.recognized_options if o in row)
+
+        # the option name when creating tables is "dclocal_read_repair_chance",
+        # but the column name in system.schema_columnfamilies is
+        # "local_read_repair_chance".  We'll store this as dclocal_read_repair_chance,
+        # since that's probably what users are expecting (and we need it for the
+        # CREATE TABLE statement anyway).
+        if "local_read_repair_chance" in options:
+            val = options.pop("local_read_repair_chance")
+            options["dc_local_read_repair_chance"] = val
+
         return options
 
     def _build_column_metadata(self, table_metadata, row):
@@ -662,7 +672,8 @@ class TableMetadata(object):
     recognized_options = (
         "comment",
         "read_repair_chance",
-        "dclocal_read_repair_chance",
+        "dclocal_read_repair_chance",  # kept to be safe, but see _build_table_options()
+        "local_read_repair_chance",
         "replicate_on_write",
         "gc_grace_seconds",
         "bloom_filter_fp_chance",
