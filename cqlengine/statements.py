@@ -626,7 +626,7 @@ class InsertStatement(AssignmentStatement):
                  where=None,
                  ttl=None,
                  timestamp=None,
-                 check_exist=False):
+                 if_not_exists=False):
         super(InsertStatement, self).__init__(
                 table,
                 assignments=assignments,
@@ -635,7 +635,7 @@ class InsertStatement(AssignmentStatement):
                 ttl=ttl,
                 timestamp=timestamp)
 
-        self.check_exist = check_exist
+        self.if_not_exists = if_not_exists
 
     def add_where_clause(self, clause):
         raise StatementException("Cannot add where clauses to insert statements")
@@ -651,7 +651,7 @@ class InsertStatement(AssignmentStatement):
         qs += ['VALUES']
         qs += ["({})".format(', '.join(['%({})s'.format(v) for v in values]))]
 
-        if self.check_exist:
+        if self.if_not_exists:
             qs += ["IF NOT EXISTS"]
 
         if self.ttl:
