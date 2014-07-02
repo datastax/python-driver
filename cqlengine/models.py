@@ -111,19 +111,19 @@ class TimestampDescriptor(object):
     def __call__(self, *args, **kwargs):
         raise NotImplementedError
 
-class CheckExistDescriptor(object):
+class IfNotExistsDescriptor(object):
     """
-    return a query set descriptor with a check-exist flag specified
+    return a query set descriptor with a if_not_exists flag specified
     """
     def __get__(self, instance, model):
         if instance:
             # instance method
-            def checkexist_setter(ce):
-                instance._check_exist = ce
+            def ifnotexists_setter(ife):
+                instance._if_not_exists = ife
                 return instance
-            return checkexist_setter
+            return ifnotexists_setter
 
-        return model.objects.check_exist
+        return model.objects.if_not_exists
 
     def __call__(self, *args, **kwargs):
         raise NotImplementedError
@@ -238,7 +238,7 @@ class BaseModel(object):
     # custom timestamps, see USING TIMESTAMP X
     timestamp = TimestampDescriptor()
     
-    check_exist = CheckExistDescriptor()
+    if_not_exists = IfNotExistsDescriptor()
 
     # _len is lazily created by __len__
 
@@ -290,7 +290,7 @@ class BaseModel(object):
 
     _timestamp = None # optional timestamp to include with the operation (USING TIMESTAMP)
 
-    _check_exist = False # optional check_exist flag to check existence before insertion
+    _if_not_exists = False # optional if_not_exists flag to check existence before insertion
 
     def __init__(self, **values):
         self._values = {}
@@ -545,7 +545,7 @@ class BaseModel(object):
                           ttl=self._ttl,
                           timestamp=self._timestamp,
                           consistency=self.__consistency__,
-                          check_exist=self._check_exist).save()
+                          if_not_exists=self._if_not_exists).save()
 
         #reset the value managers
         for v in self._values.values():
