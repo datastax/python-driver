@@ -309,7 +309,7 @@ class Metadata(object):
         # CREATE TABLE statement anyway).
         if "local_read_repair_chance" in options:
             val = options.pop("local_read_repair_chance")
-            options["dc_local_read_repair_chance"] = val
+            options["dclocal_read_repair_chance"] = val
 
         return options
 
