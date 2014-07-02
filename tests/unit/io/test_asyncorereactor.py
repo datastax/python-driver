@@ -101,7 +101,7 @@ class AsyncoreConnectionTest(unittest.TestCase):
         # let it write out a StartupMessage
         c.handle_write()
 
-        header = self.make_header_prefix(ReadyMessage, stream_id=0)
+        header = self.make_header_prefix(ReadyMessage, stream_id=1)
         c.socket.recv.return_value = self.make_msg(header)
         c.handle_read()
 
@@ -173,7 +173,7 @@ class AsyncoreConnectionTest(unittest.TestCase):
         # let it write out a StartupMessage
         c.handle_write()
 
-        header = self.make_header_prefix(ServerError, stream_id=0)
+        header = self.make_header_prefix(ServerError, stream_id=1)
         body = self.make_error_body(ServerError.error_code, ServerError.summary)
         c.socket.recv.return_value = self.make_msg(header, body)
         c.handle_read()
@@ -255,7 +255,7 @@ class AsyncoreConnectionTest(unittest.TestCase):
         # let it write out a StartupMessage
         c.handle_write()
 
-        header = self.make_header_prefix(ReadyMessage, stream_id=0)
+        header = self.make_header_prefix(ReadyMessage, stream_id=1)
         c.socket.recv.return_value = self.make_msg(header)
         c.handle_read()
 
@@ -282,7 +282,7 @@ class AsyncoreConnectionTest(unittest.TestCase):
         # let it write out a StartupMessage
         c.handle_write()
 
-        header = self.make_header_prefix(ReadyMessage, stream_id=0)
+        header = self.make_header_prefix(ReadyMessage, stream_id=1)
         c.socket.recv.return_value = self.make_msg(header)
         c.handle_read()
 

@@ -328,10 +328,11 @@ class HostConnection(object):
             raise NoConnectionsAvailable()
 
         with conn.lock:
-            if conn.in_flight > conn.max_request_id:
-                raise NoConnectionsAvailable("All request IDs are currently in use")
-            conn.in_flight += 1
-            return conn, conn.get_request_id()
+            if conn.in_flight < conn.max_request_id:
+                conn.in_flight += 1
+                return conn, conn.get_request_id()
+
+        raise NoConnectionsAvailable("All request IDs are currently in use")
 
     def return_connection(self, connection):
         with connection.lock:
@@ -341,7 +342,7 @@ class HostConnection(object):
             log.debug("Defunct or closed connection (%s) returned to pool, potentially "
                       "marking host %s as down", id(connection), self.host)
             is_down = self._session.cluster.signal_connection_failure(
-                    self.host, connection.last_error, is_host_addition=False)
+                self.host, connection.last_error, is_host_addition=False)
             if is_down:
                 self.shutdown()
             else:
@@ -463,13 +464,12 @@ class HostConnectionPool(object):
             # its in_flight count
             need_to_wait = False
             with least_busy.lock:
-
-                if least_busy.in_flight >= least_busy.max_request_id:
-                    # once we release the lock, wait for another connection
-                    need_to_wait = True
-                else:
+                if least_busy.in_flight < least_busy.max_request_id:
                     least_busy.in_flight += 1
                     request_id = least_busy.get_request_id()
+                else:
+                    # once we release the lock, wait for another connection
+                    need_to_wait = True
 
             if need_to_wait:
                 # wait_for_conn will increment in_flight on the conn
@@ -587,7 +587,7 @@ class HostConnectionPool(object):
             log.debug("Defunct or closed connection (%s) returned to pool, potentially "
                       "marking host %s as down", id(connection), self.host)
             is_down = self._session.cluster.signal_connection_failure(
-                    self.host, connection.last_error, is_host_addition=False)
+                self.host, connection.last_error, is_host_addition=False)
             if is_down:
                 self.shutdown()
             else:
