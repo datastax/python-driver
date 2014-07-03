@@ -9,7 +9,7 @@ from cqlengine.connection import get_session
 
 class TestIfNotExistsModel(Model):
 
-    __keyspace__ = 'cqlengine_test_ifnotexists'
+    __keyspace__ = 'cqlengine_test_lwt'
 
     id      = columns.UUID(primary_key=True, default=lambda:uuid4())
     count   = columns.Integer()
