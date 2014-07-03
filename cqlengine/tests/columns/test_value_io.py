@@ -4,8 +4,8 @@ from uuid import uuid1, uuid4, UUID
 
 from cqlengine.tests.base import BaseCassEngTestCase
 
-from cqlengine.management import create_table
-from cqlengine.management import delete_table
+from cqlengine.management import sync_table
+from cqlengine.management import drop_table
 from cqlengine.models import Model
 from cqlengine.columns import ValueQuoter
 from cqlengine import columns
@@ -44,7 +44,7 @@ class BaseColumnIOTest(BaseCassEngTestCase):
             pkey = cls.column(primary_key=True)
             data = cls.column()
         cls._generated_model = IOTestModel
-        create_table(cls._generated_model)
+        sync_table(cls._generated_model)
 
         #tupleify the tested values
         if not isinstance(cls.pkey_val, tuple):
@@ -56,7 +56,7 @@ class BaseColumnIOTest(BaseCassEngTestCase):
     def tearDownClass(cls):
         super(BaseColumnIOTest, cls).tearDownClass()
         if not cls.column: return
-        delete_table(cls._generated_model)
+        drop_table(cls._generated_model)
 
     def comparator_converter(self, val):
         """ If you want to convert the original value used to compare the model vales """

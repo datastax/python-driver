@@ -227,7 +227,7 @@ Token Function
         last = first_page[-1]
         next_page = list(query.filter(pk__token__gt=cqlengine.Token(last.pk)))
 
-QuerySets are imutable
+QuerySets are immutable
 ======================
 
     When calling any method that changes a queryset, the method does not actually change the queryset object it's called on, but returns a new queryset object with the attributes of the original queryset, plus the attributes added in the method call.
@@ -505,3 +505,23 @@ QuerySet method reference
 
             # add items to a map
             Row.objects(row_id=5).update(map_column__update={1: 2, 3: 4})
+
+
+Named Tables
+===================
+
+Named tables are a way of querying a table without creating an class.  They're useful for querying system tables or exploring an unfamiliar database.
+
+
+    .. code-block:: python
+
+        from cqlengine.connection import setup
+        setup("127.0.0.1", "cqlengine_test")
+
+        from cqlengine.named import NamedTable
+        user = NamedTable("cqlengine_test", "user")
+        user.objects()
+        user.objects()[0]
+
+        # {u'pk': 1, u't': datetime.datetime(2014, 6, 26, 17, 10, 31, 774000)}
+

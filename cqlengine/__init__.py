@@ -16,6 +16,11 @@ __version__ = open(__cqlengine_version_path__, 'r').readline().strip()
 SizeTieredCompactionStrategy = "SizeTieredCompactionStrategy"
 LeveledCompactionStrategy = "LeveledCompactionStrategy"
 
+# Caching constants.
+CACHING_ALL = "ALL"
+CACHING_KEYS_ONLY = "KEYS_ONLY"
+CACHING_ROWS_ONLY = "ROWS_ONLY"
+CACHING_NONE = "NONE"
 
 ANY = ConsistencyLevel.ANY
 ONE = ConsistencyLevel.ONE

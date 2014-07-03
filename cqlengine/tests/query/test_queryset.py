@@ -1,13 +1,15 @@
 from datetime import datetime
 import time
+from unittest import TestCase
 from uuid import uuid1, uuid4
+import uuid
 
 from cqlengine.tests.base import BaseCassEngTestCase
 
 from cqlengine.exceptions import ModelException
 from cqlengine import functions
-from cqlengine.management import create_table, drop_table
-from cqlengine.management import delete_table
+from cqlengine.management import sync_table, drop_table, sync_table
+from cqlengine.management import drop_table
 from cqlengine.models import Model
 from cqlengine import columns
 from cqlengine import query
@@ -172,11 +174,11 @@ class BaseQuerySetUsage(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(BaseQuerySetUsage, cls).setUpClass()
-        delete_table(TestModel)
-        delete_table(IndexedTestModel)
-        create_table(TestModel)
-        create_table(IndexedTestModel)
-        create_table(TestMultiClusteringModel)
+        drop_table(TestModel)
+        drop_table(IndexedTestModel)
+        sync_table(TestModel)
+        sync_table(IndexedTestModel)
+        sync_table(TestMultiClusteringModel)
 
         TestModel.objects.create(test_id=0, attempt_id=0, description='try1', expected_result=5, test_result=30)
         TestModel.objects.create(test_id=0, attempt_id=1, description='try2', expected_result=10, test_result=30)
@@ -233,6 +235,14 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
 
         q = TestModel.objects(TestModel.test_id == 0)
         assert q.count() == 4
+
+    def test_query_limit_count(self):
+        """ Tests that adding query with a limit affects the count as expected """
+        assert TestModel.objects.count() == 12
+
+        q = TestModel.objects(TestModel.test_id == 0).limit(2)
+        result = q.count()
+        self.assertEqual(2, result)
 
     def test_iteration(self):
         """ Tests that iterating over a query set pulls back all of the expected results """
@@ -359,6 +369,28 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
     def test_allow_filtering_flag(self):
         """
         """
+
+
+def test_non_quality_filtering():
+    class NonEqualityFilteringModel(Model):
+        example_id = columns.UUID(primary_key=True, default=uuid.uuid4)
+        sequence_id = columns.Integer(primary_key=True)  # sequence_id is a clustering key
+        example_type = columns.Integer(index=True)
+        created_at = columns.DateTime()
+
+    drop_table(NonEqualityFilteringModel)
+    sync_table(NonEqualityFilteringModel)
+
+    # setup table, etc.
+
+    NonEqualityFilteringModel.create(sequence_id=1, example_type=0, created_at=datetime.now())
+    NonEqualityFilteringModel.create(sequence_id=3, example_type=0, created_at=datetime.now())
+    NonEqualityFilteringModel.create(sequence_id=5, example_type=1, created_at=datetime.now())
+
+    qA = NonEqualityFilteringModel.objects(NonEqualityFilteringModel.sequence_id > 3).allow_filtering()
+    num = qA.count()
+    assert num == 1, num
+
 
 
 class TestQuerySetOrdering(BaseQuerySetUsage):
@@ -519,12 +551,12 @@ class TestMinMaxTimeUUIDFunctions(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(TestMinMaxTimeUUIDFunctions, cls).setUpClass()
-        create_table(TimeUUIDQueryModel)
+        sync_table(TimeUUIDQueryModel)
 
     @classmethod
     def tearDownClass(cls):
         super(TestMinMaxTimeUUIDFunctions, cls).tearDownClass()
-        delete_table(TimeUUIDQueryModel)
+        drop_table(TimeUUIDQueryModel)
 
     def test_tzaware_datetime_support(self):
         """Test that using timezone aware datetime instances works with the

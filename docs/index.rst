@@ -31,6 +31,7 @@ Contents:
     topics/columns
     topics/connection
     topics/manage_schemas
+    topics/faq
 
 .. _getting-started:
 

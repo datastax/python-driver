@@ -1,5 +1,14 @@
 CHANGELOG
 
+0.16.0
+
+* Check number of elements in collections.
+* Add support for table properties.
+
+
+0.15.0 
+* native driver integration
+
 0.14.0
 
 * fix for setting map to empty (Lifto)
