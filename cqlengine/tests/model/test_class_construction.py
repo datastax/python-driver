@@ -1,9 +1,10 @@
 from uuid import uuid4
+import warnings
 from cqlengine.query import QueryException, ModelQuerySet, DMLQuery
 from cqlengine.tests.base import BaseCassEngTestCase
 
 from cqlengine.exceptions import ModelException, CQLEngineException
-from cqlengine.models import Model, ModelDefinitionException, ColumnQueryEvaluator
+from cqlengine.models import Model, ModelDefinitionException, ColumnQueryEvaluator, UndefinedKeyspaceWarning
 from cqlengine import columns
 import cqlengine
 
@@ -208,6 +209,23 @@ class TestModelClassFunction(BaseCassEngTestCase):
         except Exception:
             assert False, "Model2 exception should not be caught by Model1"
 
+    def test_no_keyspace_warning(self):
+        with warnings.catch_warnings(record=True) as warn:
+            class NoKeyspace(Model):
+                key = columns.UUID(primary_key=True)
+
+        self.assertEqual(len(warn), 1)
+        warn_message = warn[0]
+        self.assertEqual(warn_message.category, UndefinedKeyspaceWarning)
+
+    def test_abstract_model_keyspace_warning_is_skipped(self):
+        with warnings.catch_warnings(record=True) as warn:
+            class NoKeyspace(Model):
+                __abstract__ = True
+                key = columns.UUID(primary_key=True)
+
+        self.assertEqual(len(warn), 0)
+
 class TestManualTableNaming(BaseCassEngTestCase):
 
     class RenamedTest(cqlengine.Model):
@@ -223,6 +241,7 @@ class TestManualTableNaming(BaseCassEngTestCase):
 
 class AbstractModel(Model):
     __abstract__ = True
+    __keyspace__ = 'test'
 
 class ConcreteModel(AbstractModel):
     pkey = columns.Integer(primary_key=True)
