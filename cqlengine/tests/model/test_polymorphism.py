@@ -14,6 +14,7 @@ class TestPolymorphicClassConstruction(BaseCassEngTestCase):
         """ Tests that defining a model with more than one polymorphic key fails """
         with self.assertRaises(models.ModelDefinitionException):
             class M(models.Model):
+                __keyspace__ = 'test'
                 partition = columns.Integer(primary_key=True)
                 type1 = columns.Integer(polymorphic_key=True)
                 type2 = columns.Integer(polymorphic_key=True)
@@ -21,6 +22,7 @@ class TestPolymorphicClassConstruction(BaseCassEngTestCase):
     def test_polymorphic_key_inheritance(self):
         """ Tests that polymorphic_key attribute is not inherited """
         class Base(models.Model):
+            __keyspace__ = 'test'
             partition = columns.Integer(primary_key=True)
             type1 = columns.Integer(polymorphic_key=True)
 
@@ -35,6 +37,7 @@ class TestPolymorphicClassConstruction(BaseCassEngTestCase):
     def test_polymorphic_metaclass(self):
         """ Tests that the model meta class configures polymorphic models properly """
         class Base(models.Model):
+            __keyspace__ = 'test'
             partition = columns.Integer(primary_key=True)
             type1 = columns.Integer(polymorphic_key=True)
 
@@ -55,6 +58,7 @@ class TestPolymorphicClassConstruction(BaseCassEngTestCase):
 
     def test_table_names_are_inherited_from_poly_base(self):
         class Base(models.Model):
+            __keyspace__ = 'test'
             partition = columns.Integer(primary_key=True)
             type1 = columns.Integer(polymorphic_key=True)
 
@@ -66,11 +70,13 @@ class TestPolymorphicClassConstruction(BaseCassEngTestCase):
     def test_collection_columns_cant_be_polymorphic_keys(self):
         with self.assertRaises(models.ModelDefinitionException):
             class Base(models.Model):
+                __keyspace__ = 'test'
                 partition = columns.Integer(primary_key=True)
                 type1 = columns.Set(columns.Integer, polymorphic_key=True)
 
 
 class PolyBase(models.Model):
+    __keyspace__ = 'test'
     partition = columns.UUID(primary_key=True, default=uuid.uuid4)
     row_type = columns.Integer(polymorphic_key=True)
 
@@ -137,6 +143,7 @@ class TestPolymorphicModel(BaseCassEngTestCase):
 
 
 class UnindexedPolyBase(models.Model):
+    __keyspace__ = 'test'
     partition = columns.UUID(primary_key=True, default=uuid.uuid4)
     cluster = columns.UUID(primary_key=True, default=uuid.uuid4)
     row_type = columns.Integer(polymorphic_key=True)
@@ -194,6 +201,7 @@ class TestUnindexedPolymorphicQuery(BaseCassEngTestCase):
 
 
 class IndexedPolyBase(models.Model):
+    __keyspace__ = 'test'
     partition = columns.UUID(primary_key=True, default=uuid.uuid4)
     cluster = columns.UUID(primary_key=True, default=uuid.uuid4)
     row_type = columns.Integer(polymorphic_key=True, index=True)

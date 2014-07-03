@@ -9,6 +9,7 @@ from cqlengine.tests.base import BaseCassEngTestCase
 
 
 class TestSetModel(Model):
+    __keyspace__ = 'test'
 
     partition = columns.UUID(primary_key=True, default=uuid4)
     int_set = columns.Set(columns.Integer, required=False)
@@ -161,6 +162,7 @@ class TestSetColumn(BaseCassEngTestCase):
 
 
 class TestListModel(Model):
+    __keyspace__ = 'test'
 
     partition = columns.UUID(primary_key=True, default=uuid4)
     int_list = columns.List(columns.Integer, required=False)
@@ -306,6 +308,7 @@ class TestListColumn(BaseCassEngTestCase):
         assert m3.int_list == []
 
 class TestMapModel(Model):
+    __keyspace__ = 'test'
 
     partition = columns.UUID(primary_key=True, default=uuid4)
     int_map = columns.Map(columns.Integer, columns.UUID, required=False)
@@ -505,6 +508,7 @@ class TestMapColumn(BaseCassEngTestCase):
 
 
 class TestCamelMapModel(Model):
+    __keyspace__ = 'test'
 
     partition = columns.UUID(primary_key=True, default=uuid4)
     camelMap = columns.Map(columns.Text, columns.Integer, required=False)
