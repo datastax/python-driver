@@ -2,11 +2,27 @@ CHANGELOG
 
 0.16.0
 
-* Check number of elements in collections.
-* Add support for table properties.
+  222: figure out how to make travis not totally fail when a test is skipped
+  220: delayed connect. use setup(delayed_connect=True)
+  218: throw exception on create_table and delete_table
+  212: Unchanged primary key trigger error on update
+  206: FAQ - why we dont' do #189
+  191: Add support for simple table properties.
+  172: raise exception when None is passed in as query param
+  170: trying to perform queries before connection is established should raise useful exception
+  162: Not Possible to Make Non-Equality Filtering Queries
+  161: Filtering on DateTime column
+  154: Blob(bytes) column type issue
+  128: remove default read_repair_chance & ensure changes are saved when using sync_table
+  106: specify caching on model
+   99: specify caching options  table management
+   94: type checking on sync_table (currently allows anything then fails miserably)
+   73: remove default 'cqlengine' keyspace  table management
+   71: add named table and query expression usage to docs
 
 
-0.15.0 
+
+0.15.0
 * native driver integration
 
 0.14.0
@@ -14,7 +30,7 @@ CHANGELOG
 * fix for setting map to empty (Lifto)
 * report when creating models with attributes that conflict with cqlengine (maedhroz)
 * use stable version of sure package (maedhroz)
-* performance improvements 
+* performance improvements
 
 
 0.13.0
