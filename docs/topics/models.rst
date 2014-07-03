@@ -169,9 +169,13 @@ Model Attributes
 
         *Optional.* Sets the name of the CQL table for this model. If left blank, the table name will be the name of the model, with it's module name as it's prefix. Manually defined table names are not inherited.
 
+    .. _keyspace-change:
     .. attribute:: Model.__keyspace__
 
-        *Optional.* Sets the name of the keyspace used by this model. Defaults to cqlengine
+        Sets the name of the keyspace used by this model.
+
+        **Prior to cqlengine 0.16, this setting defaulted
+        to 'cqlengine'. As of 0.16, this field needs to be set on all non-abstract models, or their base classes.**
 
 
 Table Polymorphism
