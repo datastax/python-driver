@@ -20,6 +20,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         """
 
         class TestModel(Model):
+            __keyspace__ = 'test'
             id  = columns.UUID(primary_key=True, default=lambda:uuid4())
             text = columns.Text()
 
@@ -41,6 +42,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         -the db_map allows columns
         """
         class WildDBNames(Model):
+            __keyspace__ = 'test'
             id  = columns.UUID(primary_key=True, default=lambda:uuid4())
             content = columns.Text(db_field='words_and_whatnot')
             numbers = columns.Integer(db_field='integers_etc')
@@ -65,6 +67,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         """
 
         class Stuff(Model):
+            __keyspace__ = 'test'
             id  = columns.UUID(primary_key=True, default=lambda:uuid4())
             words = columns.Text()
             content = columns.Text()
@@ -75,6 +78,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
     def test_exception_raised_when_creating_class_without_pk(self):
         with self.assertRaises(ModelDefinitionException):
             class TestModel(Model):
+                __keyspace__ = 'test'
                 count   = columns.Integer()
                 text    = columns.Text(required=False)
 
@@ -84,6 +88,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         Tests that instance value managers are isolated from other instances
         """
         class Stuff(Model):
+            __keyspace__ = 'test'
             id  = columns.UUID(primary_key=True, default=lambda:uuid4())
             num = columns.Integer()
 
@@ -99,6 +104,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         Tests that fields defined on the super class are inherited properly
         """
         class TestModel(Model):
+            __keyspace__ = 'test'
             id  = columns.UUID(primary_key=True, default=lambda:uuid4())
             text = columns.Text()
 
@@ -111,6 +117,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
     def test_column_family_name_generation(self):
         """ Tests that auto column family name generation works as expected """
         class TestModel(Model):
+            __keyspace__ = 'test'
             id  = columns.UUID(primary_key=True, default=lambda:uuid4())
             text = columns.Text()
 
@@ -146,6 +153,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         Test compound partition key definition
         """
         class ModelWithPartitionKeys(cqlengine.Model):
+            __keyspace__ = 'test'
             id = columns.UUID(primary_key=True, default=lambda:uuid4())
             c1 = cqlengine.Text(primary_key=True)
             p1 = cqlengine.Text(partition_key=True)
@@ -167,6 +175,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
     def test_del_attribute_is_assigned_properly(self):
         """ Tests that columns that can be deleted have the del attribute """
         class DelModel(Model):
+            __keyspace__ = 'test'
             id  = columns.UUID(primary_key=True, default=lambda:uuid4())
             key = columns.Integer(primary_key=True)
             data = columns.Integer(required=False)
@@ -180,9 +189,11 @@ class TestModelClassFunction(BaseCassEngTestCase):
         """ Tests that DoesNotExist exceptions are not the same exception between models """
 
         class Model1(Model):
+            __keyspace__ = 'test'
             id  = columns.UUID(primary_key=True, default=lambda:uuid4())
 
         class Model2(Model):
+            __keyspace__ = 'test'
             id  = columns.UUID(primary_key=True, default=lambda:uuid4())
 
         try:
@@ -196,6 +207,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
     def test_does_not_exist_inherits_from_superclass(self):
         """ Tests that a DoesNotExist exception can be caught by it's parent class DoesNotExist """
         class Model1(Model):
+            __keyspace__ = 'test'
             id  = columns.UUID(primary_key=True, default=lambda:uuid4())
 
         class Model2(Model1):
@@ -248,6 +260,7 @@ class ConcreteModel(AbstractModel):
     data = columns.Integer()
 
 class AbstractModelWithCol(Model):
+    __keyspace__ = 'test'
     __abstract__ = True
     pkey = columns.Integer(primary_key=True)
 
@@ -256,6 +269,7 @@ class ConcreteModelWithCol(AbstractModelWithCol):
 
 class AbstractModelWithFullCols(Model):
     __abstract__ = True
+    __keyspace__ = 'test'
     pkey = columns.Integer(primary_key=True)
     data = columns.Integer()
 
@@ -328,6 +342,7 @@ class TestCustomQuerySet(BaseCassEngTestCase):
 
         class CQModel(Model):
             __queryset__ = QSet
+            __keyspace__ = 'test'
             part = columns.UUID(primary_key=True)
             data = columns.Text()
 
@@ -341,6 +356,7 @@ class TestCustomQuerySet(BaseCassEngTestCase):
                 raise self.TestException
 
         class CDQModel(Model):
+            __keyspace__ = 'test'
             __dmlquery__ = DMLQ
             part = columns.UUID(primary_key=True)
             data = columns.Text()

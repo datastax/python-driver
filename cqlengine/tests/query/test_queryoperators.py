@@ -39,6 +39,7 @@ class TestQuerySetOperation(BaseCassEngTestCase):
 
 
 class TokenTestModel(Model):
+    __keyspace__ = 'test'
     key = columns.Integer(primary_key=True)
     val = columns.Integer()
 
@@ -74,6 +75,7 @@ class TestTokenFunction(BaseCassEngTestCase):
     def test_compound_pk_token_function(self):
 
         class TestModel(Model):
+            __keyspace__ = 'test'
             p1 = columns.Text(partition_key=True)
             p2 = columns.Text(partition_key=True)
 

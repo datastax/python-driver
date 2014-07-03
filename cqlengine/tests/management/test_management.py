@@ -27,16 +27,19 @@ class DeleteTableTest(BaseCassEngTestCase):
         drop_table(TestModel)
 
 class LowercaseKeyModel(Model):
+    __keyspace__ = 'test'
     first_key = columns.Integer(primary_key=True)
     second_key = columns.Integer(primary_key=True)
     some_data = columns.Text()
 
 class CapitalizedKeyModel(Model):
+    __keyspace__ = 'test'
     firstKey = columns.Integer(primary_key=True)
     secondKey = columns.Integer(primary_key=True)
     someData = columns.Text()
 
 class PrimaryKeysOnlyModel(Model):
+    __keyspace__ = 'test'
     __compaction__ = LeveledCompactionStrategy
 
     first_ey = columns.Integer(primary_key=True)
@@ -55,12 +58,14 @@ class CapitalizedKeyTest(BaseCassEngTestCase):
 
 
 class FirstModel(Model):
+    __keyspace__ = 'test'
     __table_name__ = 'first_model'
     first_key = columns.UUID(primary_key=True)
     second_key = columns.UUID()
     third_key = columns.Text()
 
 class SecondModel(Model):
+    __keyspace__ = 'test'
     __table_name__ = 'first_model'
     first_key = columns.UUID(primary_key=True)
     second_key = columns.UUID()
@@ -68,6 +73,7 @@ class SecondModel(Model):
     fourth_key = columns.Text()
 
 class ThirdModel(Model):
+    __keyspace__ = 'test'
     __table_name__ = 'first_model'
     first_key = columns.UUID(primary_key=True)
     second_key = columns.UUID()
@@ -76,6 +82,7 @@ class ThirdModel(Model):
     blah = columns.Map(columns.Text, columns.Text)
 
 class FourthModel(Model):
+    __keyspace__ = 'test'
     __table_name__ = 'first_model'
     first_key = columns.UUID(primary_key=True)
     second_key = columns.UUID()
@@ -109,6 +116,7 @@ class AddColumnTest(BaseCassEngTestCase):
 
 
 class ModelWithTableProperties(Model):
+    __keyspace__ = 'test'
     # Set random table properties
     __bloom_filter_fp_chance__ = 0.76328
     __caching__ = CACHING_ALL
