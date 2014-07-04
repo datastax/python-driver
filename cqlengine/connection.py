@@ -3,7 +3,7 @@
 #http://cassandra.apache.org/doc/cql/CQL.html
 
 from collections import namedtuple
-from cassandra.cluster import Cluster
+from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.query import SimpleStatement, Statement
 
 try:
@@ -35,6 +35,7 @@ def setup(
         default_keyspace,
         consistency=ConsistencyLevel.ONE,
         lazy_connect=False,
+        retry_connect=False,
         **kwargs):
     """
     Records the hosts and connects to one of them
@@ -59,11 +60,24 @@ def setup(
 
     default_consistency_level = consistency
     if lazy_connect:
-        lazy_connect_args = (hosts, default_keyspace, consistency, kwargs)
+        kwargs['default_keyspace'] = default_keyspace
+        kwargs['consistency'] = consistency
+        kwargs['lazy_connect'] = False
+        kwargs['retry_connect'] = retry_connect
+        lazy_connect_args = (hosts, kwargs)
         return
 
     cluster = Cluster(hosts, **kwargs)
-    session = cluster.connect()
+    try:
+        session = cluster.connect()
+    except NoHostAvailable:
+        if retry_connect:
+            kwargs['default_keyspace'] = default_keyspace
+            kwargs['consistency'] = consistency
+            kwargs['lazy_connect'] = False
+            kwargs['retry_connect'] = retry_connect
+            lazy_connect_args = (hosts, kwargs)
+        raise
     session.row_factory = dict_factory
 
 def execute(query, params=None, consistency_level=None):
@@ -106,6 +120,6 @@ def get_cluster():
 def handle_lazy_connect():
     global lazy_connect_args
     if lazy_connect_args:
-        hosts, default_keyspace, consistency, kwargs = lazy_connect_args
+        hosts, kwargs = lazy_connect_args
         lazy_connect_args = None
-        setup(hosts, default_keyspace, consistency, **kwargs)
+        setup(hosts, **kwargs)
