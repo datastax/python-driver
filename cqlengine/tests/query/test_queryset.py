@@ -1,11 +1,11 @@
 from datetime import datetime
 import time
-from unittest import TestCase
+from unittest import TestCase, skipUnless
 from uuid import uuid1, uuid4
 import uuid
 
 from cqlengine.tests.base import BaseCassEngTestCase
-
+import mock
 from cqlengine.exceptions import ModelException
 from cqlengine import functions
 from cqlengine.management import sync_table, drop_table, sync_table
@@ -18,6 +18,11 @@ from datetime import tzinfo
 
 from cqlengine import statements
 from cqlengine import operators
+
+
+from cqlengine.connection import get_cluster, get_session
+
+cluster = get_cluster()
 
 
 class TzOffset(tzinfo):
@@ -682,5 +687,23 @@ class TestObjectsProperty(BaseQuerySetUsage):
         assert TestModel.objects._result_cache is None
         len(TestModel.objects) # evaluate queryset
         assert TestModel.objects._result_cache is None
+
+
+@skipUnless(cluster.protocol_version >= 2, "only runs against the cql3 protocol v2.0")
+def test_paged_result_handling():
+    # addresses #225
+    class PagingTest(Model):
+        id = columns.Integer(primary_key=True)
+        val = columns.Integer()
+    sync_table(PagingTest)
+
+    PagingTest.create(id=1, val=1)
+    PagingTest.create(id=2, val=2)
+
+    session = get_session()
+    with mock.patch.object(session, 'default_fetch_size', 1):
+        results = PagingTest.objects()[:]
+
+    assert len(results) == 2
 
 

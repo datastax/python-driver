@@ -762,16 +762,6 @@ class ModelMetaClass(type):
         #create the class and add a QuerySet to it
         klass = super(ModelMetaClass, cls).__new__(cls, name, bases, attrs)
 
-        if not klass.__abstract__ and klass.__keyspace__ is None:
-            warnings.warn(
-                "No keyspace defined on {}.{}\n"
-                "  The default keyspace 'cqlengine' was removed in 0.16.\n"
-                "  Please define a keyspace on the '__keyspace__' model class attribute\n"
-                "  or set a default keyspace with management.setup function\n"
-                .format(klass.__module__, klass.__name__),
-                UndefinedKeyspaceWarning
-            )
-
         return klass
 
 

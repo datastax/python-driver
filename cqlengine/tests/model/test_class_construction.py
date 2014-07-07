@@ -221,15 +221,6 @@ class TestModelClassFunction(BaseCassEngTestCase):
         except Exception:
             assert False, "Model2 exception should not be caught by Model1"
 
-    def test_no_keyspace_warning(self):
-        with warnings.catch_warnings(record=True) as warn:
-            class NoKeyspace(Model):
-                key = columns.UUID(primary_key=True)
-
-        self.assertEqual(len(warn), 1)
-        warn_message = warn[0]
-        self.assertEqual(warn_message.category, UndefinedKeyspaceWarning)
-
     def test_abstract_model_keyspace_warning_is_skipped(self):
         with warnings.catch_warnings(record=True) as warn:
             class NoKeyspace(Model):
