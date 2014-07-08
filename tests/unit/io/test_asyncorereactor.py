@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import sys
 import six
 
 try:
@@ -42,6 +43,8 @@ class AsyncoreConnectionTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        if 'gevent.monkey' in sys.modules:
+            raise unittest.SkipTest("gevent monkey-patching detected")
         AsyncoreConnection.initialize_reactor()
         cls.socket_patcher = patch('socket.socket', spec=socket.socket)
         cls.mock_socket = cls.socket_patcher.start()
