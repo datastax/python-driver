@@ -12,10 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import absolute_import  # to enable import io from stdlib
 from collections import defaultdict, deque
 import errno
 from functools import wraps, partial
+import io
 import logging
+import os
 import sys
 from threading import Event, RLock
 import time
@@ -29,7 +32,7 @@ import six
 from six.moves import range
 
 from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut
-from cassandra.marshal import int32_pack, header_unpack, v3_header_unpack
+from cassandra.marshal import int32_pack, header_unpack, v3_header_unpack, int32_unpack
 from cassandra.protocol import (ReadyMessage, AuthenticateMessage, OptionsMessage,
                                 StartupMessage, ErrorMessage, CredentialsMessage,
                                 QueryMessage, ResultMessage, decode_response,
@@ -170,6 +173,7 @@ class Connection(object):
     user_type_map = None
 
     is_control_connection = False
+    _iobuf = None
 
     def __init__(self, host='127.0.0.1', port=9042, authenticator=None,
                  ssl_options=None, sockopts=None, compression=True,
@@ -186,6 +190,7 @@ class Connection(object):
         self.is_control_connection = is_control_connection
         self.user_type_map = user_type_map
         self._push_watchers = defaultdict(set)
+        self._iobuf = io.BytesIO()
         if protocol_version >= 3:
             self._header_unpack = v3_header_unpack
             self._header_length = 5
@@ -343,6 +348,39 @@ class Connection(object):
     def control_conn_disposed(self):
         self.is_control_connection = False
         self._push_watchers = {}
+
+    def process_io_buffer(self):
+        while True:
+            pos = self._iobuf.tell()
+            if pos < self._full_header_length or (self._total_reqd_bytes > 0 and pos < self._total_reqd_bytes):
+                # we don't have a complete header yet or we
+                # already saw a header, but we don't have a
+                # complete message yet
+                return
+            else:
+                # have enough for header, read body len from header
+                self._iobuf.seek(self._header_length)
+                body_len = int32_unpack(self._iobuf.read(4))
+
+                # seek to end to get length of current buffer
+                self._iobuf.seek(0, os.SEEK_END)
+                pos = self._iobuf.tell()
+
+                if pos >= body_len + self._full_header_length:
+                    # read message header and body
+                    self._iobuf.seek(0)
+                    msg = self._iobuf.read(self._full_header_length + body_len)
+
+                    # leave leftover in current buffer
+                    leftover = self._iobuf.read()
+                    self._iobuf = io.BytesIO()
+                    self._iobuf.write(leftover)
+
+                    self._total_reqd_bytes = 0
+                    self.process_msg(msg, body_len)
+                else:
+                    self._total_reqd_bytes = body_len + self._full_header_length
+                    return
 
     @defunct_on_error
     def process_msg(self, msg, body_len):

@@ -21,14 +21,10 @@ from functools import partial
 import logging
 import weakref
 import atexit
-import os
-
-from io import BytesIO
 
 from cassandra import OperationTimedOut
 from cassandra.connection import Connection, ConnectionShutdown
 from cassandra.protocol import RegisterMessage
-from cassandra.marshal import int32_unpack
 
 
 log = logging.getLogger(__name__)
@@ -182,7 +178,6 @@ class TwistedConnection(Connection):
         Connection.__init__(self, *args, **kwargs)
 
         self.connected_event = Event()
-        self._iobuf = BytesIO()
         self.is_closed = True
         self.connector = None
 
@@ -231,38 +226,7 @@ class TwistedConnection(Connection):
         """
         Process the incoming data buffer.
         """
-        while True:
-            pos = self._iobuf.tell()
-            if pos < 8 or (self._total_reqd_bytes > 0 and
-                           pos < self._total_reqd_bytes):
-                # we don't have a complete header yet or we
-                # already saw a header, but we don't have a
-                # complete message yet
-                return
-            else:
-                # have enough for header, read body len from header
-                self._iobuf.seek(4)
-                body_len = int32_unpack(self._iobuf.read(4))
-
-                # seek to end to get length of current buffer
-                self._iobuf.seek(0, os.SEEK_END)
-                pos = self._iobuf.tell()
-
-                if pos >= body_len + 8:
-                    # read message header and body
-                    self._iobuf.seek(0)
-                    msg = self._iobuf.read(8 + body_len)
-
-                    # leave leftover in current buffer
-                    leftover = self._iobuf.read()
-                    self._iobuf = BytesIO()
-                    self._iobuf.write(leftover)
-
-                    self._total_reqd_bytes = 0
-                    self.process_msg(msg, body_len)
-                else:
-                    self._total_reqd_bytes = body_len + 8
-                    return
+        self.process_io_buffer()
 
     def push(self, data):
         """
