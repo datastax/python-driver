@@ -8,12 +8,14 @@ from cqlengine.query import BatchQuery, DMLQuery
 from cqlengine.tests.base import BaseCassEngTestCase
 
 class TestMultiKeyModel(Model):
+    __keyspace__ = 'test'
     partition   = columns.Integer(primary_key=True)
     cluster     = columns.Integer(primary_key=True)
     count       = columns.Integer(required=False)
     text        = columns.Text(required=False)
 
 class BatchQueryLogModel(Model):
+    __keyspace__ = 'test'
     # simple k/v table
     k = columns.Integer(primary_key=True)
     v = columns.Integer()

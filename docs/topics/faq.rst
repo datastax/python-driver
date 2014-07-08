@@ -2,7 +2,7 @@
 Frequently Asked Questions
 ==========================
 
-Q: Why does calling my Model(field=blah, field2=blah2) not work?
+Q: Why don't updates work correctly on models instantiated as Model(field=blah, field2=blah2)?
 -------------------------------------------------------------------
 
-A: The __init__() of a model is used by cqlengine internally.  If you want to create a new row in the database, use create().
+A: The recommended way to create new rows is with the models .create method. The values passed into a model's init method are interpreted by the model as the values as they were read from a row. This allows the model to "know" which rows have changed since the row was read out of cassandra, and create suitable update statements.

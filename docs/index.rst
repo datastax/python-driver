@@ -5,9 +5,7 @@
 cqlengine documentation
 =======================
 
-**Users of versions < 0.4, please read this post before upgrading:** `Breaking Changes`_
-
-.. _Breaking Changes: https://groups.google.com/forum/?fromgroups#!topic/cqlengine-users/erkSNe1JwuU
+**Users of versions < 0.16, the default keyspace 'cqlengine' has been removed. Please read this before upgrading:** :ref:`Breaking Changes <keyspace-change>`
 
 cqlengine is a Cassandra CQL 3 Object Mapper for Python
 

@@ -8,10 +8,12 @@ from cqlengine import columns
 
 
 class TestModel(Model):
+    __keyspace__ = 'test'
     id = columns.Integer(primary_key=True)
     clustering_key = columns.Integer(primary_key=True, clustering_order='desc')
 
 class TestClusteringComplexModel(Model):
+    __keyspace__ = 'test'
     id = columns.Integer(primary_key=True)
     clustering_key = columns.Integer(primary_key=True, clustering_order='desc')
     some_value = columns.Integer()

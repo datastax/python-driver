@@ -1,11 +1,11 @@
 from datetime import datetime
 import time
-from unittest import TestCase
+from unittest import TestCase, skipUnless
 from uuid import uuid1, uuid4
 import uuid
 
 from cqlengine.tests.base import BaseCassEngTestCase
-
+import mock
 from cqlengine.exceptions import ModelException
 from cqlengine import functions
 from cqlengine.management import sync_table, drop_table, sync_table
@@ -18,6 +18,11 @@ from datetime import tzinfo
 
 from cqlengine import statements
 from cqlengine import operators
+
+
+from cqlengine.connection import get_cluster, get_session
+
+cluster = get_cluster()
 
 
 class TzOffset(tzinfo):
@@ -39,6 +44,7 @@ class TzOffset(tzinfo):
 
 
 class TestModel(Model):
+    __keyspace__ = 'test'
     test_id = columns.Integer(primary_key=True)
     attempt_id = columns.Integer(primary_key=True)
     description = columns.Text()
@@ -47,6 +53,7 @@ class TestModel(Model):
 
 
 class IndexedTestModel(Model):
+    __keyspace__ = 'test'
     test_id = columns.Integer(primary_key=True)
     attempt_id = columns.Integer(index=True)
     description = columns.Text()
@@ -55,6 +62,7 @@ class IndexedTestModel(Model):
 
 
 class TestMultiClusteringModel(Model):
+    __keyspace__ = 'test'
     one = columns.Integer(primary_key=True)
     two = columns.Integer(primary_key=True)
     three = columns.Integer(primary_key=True)
@@ -373,6 +381,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
 
 def test_non_quality_filtering():
     class NonEqualityFilteringModel(Model):
+        __keyspace__ = 'test'
         example_id = columns.UUID(primary_key=True, default=uuid.uuid4)
         sequence_id = columns.Integer(primary_key=True)  # sequence_id is a clustering key
         example_type = columns.Integer(index=True)
@@ -542,6 +551,7 @@ class TestQuerySetConnectionHandling(BaseQuerySetUsage):
 
 
 class TimeUUIDQueryModel(Model):
+    __keyspace__ = 'test'
     partition = columns.UUID(primary_key=True)
     time = columns.TimeUUID(primary_key=True)
     data = columns.Text(required=False)
@@ -677,5 +687,23 @@ class TestObjectsProperty(BaseQuerySetUsage):
         assert TestModel.objects._result_cache is None
         len(TestModel.objects) # evaluate queryset
         assert TestModel.objects._result_cache is None
+
+
+@skipUnless(cluster.protocol_version >= 2, "only runs against the cql3 protocol v2.0")
+def test_paged_result_handling():
+    # addresses #225
+    class PagingTest(Model):
+        id = columns.Integer(primary_key=True)
+        val = columns.Integer()
+    sync_table(PagingTest)
+
+    PagingTest.create(id=1, val=1)
+    PagingTest.create(id=2, val=2)
+
+    session = get_session()
+    with mock.patch.object(session, 'default_fetch_size', 1):
+        results = PagingTest.objects()[:]
+
+    assert len(results) == 2
 
 
