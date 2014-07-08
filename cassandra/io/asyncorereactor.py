@@ -262,12 +262,12 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
 
     def handle_write(self):
         while True:
-            try:
-                with self.deque_lock:
+            with self.deque_lock:
+                try:
                     next_msg = self.deque.popleft()
-            except IndexError:
-                self._writable = False
-                return
+                except IndexError:
+                    self._writable = False
+                    return
 
             try:
                 sent = self.send(next_msg)
@@ -318,8 +318,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
 
         with self.deque_lock:
             self.deque.extend(chunks)
-
-        self._writable = True
+            self._writable = True
 
     def writable(self):
         return self._writable
