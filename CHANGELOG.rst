@@ -40,6 +40,9 @@ Bug Fixes
   use it when generating CREATE TABLE statements (PYTHON-84)
 * Avoid race condition with AsyncoreConnection that may cause messages
   to fail to be written until a new message is pushed
+* Make sure cluster.metadata.partitioner and cluster.metadata.token_map
+  are populated when all nodes in the cluster are included in the
+  contact points (PYTHON-90)
 
 2.0.2
 =====

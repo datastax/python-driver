@@ -1867,7 +1867,10 @@ class ControlConnection(object):
             if partitioner and tokens:
                 token_map[host] = tokens
 
-        should_rebuild_token_map = force_token_rebuild
+        # Check metadata.partitioner to see if we haven't built anything yet. If
+        # every node in the cluster was in the contact points, we won't discover
+        # any new nodes, so we need this additional check.  (See PYTHON-90)
+        should_rebuild_token_map = force_token_rebuild or self._cluster.metadata.partitioner is None
         found_hosts = set()
         for row in peers_result:
             addr = row.get("rpc_address")
