@@ -37,6 +37,7 @@ except ImportError as e:
 
 CLUSTER_NAME = 'test_cluster'
 MULTIDC_CLUSTER_NAME = 'multidc_test_cluster'
+
 CCM_CLUSTER = None
 
 CASSANDRA_DIR = os.getenv('CASSANDRA_DIR', None)
@@ -128,6 +129,11 @@ def setup_package():
 
 
 def use_multidc(dc_list):
+    global CCM_CLUSTER
+    if CCM_CLUSTER.name == MULTIDC_CLUSTER_NAME:
+        log.debug("Cluster is alread multi-dc, not replacing")
+        return
+
     teardown_package()
     try:
         try:
@@ -150,13 +156,17 @@ def use_multidc(dc_list):
         log.exception("Failed to start ccm cluster:")
         raise
 
-    global CCM_CLUSTER
     CCM_CLUSTER = cluster
     setup_test_keyspace()
     log.debug("Switched to multidc cluster")
 
 
 def use_singledc():
+    global CCM_CLUSTER
+    if CCM_CLUSTER.name == CLUSTER_NAME:
+        log.debug("Cluster is alread single-dc, not replacing")
+        return
+
     teardown_package()
 
     setup_package()
