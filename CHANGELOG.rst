@@ -45,6 +45,9 @@ Bug Fixes
   contact points (PYTHON-90)
 * Make Murmur3 hash match Cassandra's hash for all values (PYTHON-89,
   github #147)
+* Don't attempt to reconnect to hosts that should be ignored (according
+  to the load balancing policy) when a notification is received that the
+  host is down.
 
 2.0.2
 =====

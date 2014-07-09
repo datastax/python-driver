@@ -772,6 +772,9 @@ class Cluster(object):
         return futures
 
     def _start_reconnector(self, host, is_host_addition):
+        if self.load_balancing_policy.distance(host) == HostDistance.IGNORED:
+            return
+
         schedule = self.reconnection_policy.new_schedule()
 
         # in order to not hold references to this Cluster open and prevent
