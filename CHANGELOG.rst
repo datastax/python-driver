@@ -43,6 +43,8 @@ Bug Fixes
 * Make sure cluster.metadata.partitioner and cluster.metadata.token_map
   are populated when all nodes in the cluster are included in the
   contact points (PYTHON-90)
+* Make Murmur3 hash match Cassandra's hash for all values (PYTHON-89,
+  github #147)
 
 2.0.2
 =====

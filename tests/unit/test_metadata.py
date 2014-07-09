@@ -222,6 +222,9 @@ class TestTokens(unittest.TestCase):
         try:
             murmur3_token = Murmur3Token(cassandra.metadata.MIN_LONG - 1)
             self.assertEqual(murmur3_token.hash_fn('123'), -7468325962851647638)
+            self.assertEqual(murmur3_token.hash_fn('\x00\xff\x10\xfa\x99' * 10), 5837342703291459765)
+            self.assertEqual(murmur3_token.hash_fn('\xfe' * 8), -8927430733708461935)
+            self.assertEqual(murmur3_token.hash_fn('\x10' * 8), 1446172840243228796)
             self.assertEqual(murmur3_token.hash_fn(str(cassandra.metadata.MAX_LONG)), 7162290910810015547)
             self.assertEqual(str(murmur3_token), '<Murmur3Token: -9223372036854775809>')
         except NoMurmur3:
