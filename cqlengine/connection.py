@@ -14,7 +14,7 @@ except ImportError:
 
 import logging
 
-from cqlengine.exceptions import CQLEngineException
+from cqlengine.exceptions import CQLEngineException, UndefinedKeyspaceException
 from cassandra import ConsistencyLevel
 from cqlengine.statements import BaseCQLStatement
 from cassandra.query import dict_factory
@@ -53,9 +53,11 @@ def setup(
     if 'username' in kwargs or 'password' in kwargs:
         raise CQLEngineException("Username & Password are now handled by using the native driver's auth_provider")
 
-    if default_keyspace:
-        from cqlengine import models
-        models.DEFAULT_KEYSPACE = default_keyspace
+    if not default_keyspace:
+        raise UndefinedKeyspaceException()
+
+    from cqlengine import models
+    models.DEFAULT_KEYSPACE = default_keyspace
 
     default_consistency_level = consistency
     if lazy_connect:

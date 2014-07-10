@@ -294,7 +294,7 @@ class AbstractQuerySet(object):
         if self._batch:
             raise CQLEngineException("Only inserts, updates, and deletes are available in batch mode")
         if self._result_cache is None:
-            self._result_cache = self._execute(self._select_query())
+            self._result_cache = list(self._execute(self._select_query()))
             self._construct_result = self._get_result_constructor()
 
     def _fill_result_cache_to_idx(self, idx):

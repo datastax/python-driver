@@ -8,6 +8,7 @@ import resource
 import gc
 
 class LoadTest(Model):
+    __keyspace__ = 'test'
     k = Integer(primary_key=True)
     v = Integer()
 

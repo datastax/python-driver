@@ -2,6 +2,7 @@ CHANGELOG
 
 0.16.0
 
+  225: No handling of PagedResult from execute
   222: figure out how to make travis not totally fail when a test is skipped
   220: delayed connect. use setup(delayed_connect=True)
   218: throw exception on create_table and delete_table

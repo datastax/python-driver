@@ -1,5 +1,7 @@
 from collections import OrderedDict
 import re
+import warnings
+
 from cqlengine import columns
 from cqlengine.exceptions import ModelException, CQLEngineException, ValidationError
 from cqlengine.query import ModelQuerySet, DMLQuery, AbstractQueryableColumn
@@ -12,6 +14,9 @@ class ModelDefinitionException(ModelException): pass
 class PolyMorphicModelException(ModelException): pass
 
 DEFAULT_KEYSPACE = None
+
+class UndefinedKeyspaceWarning(Warning):
+    pass
 
 
 class hybrid_classmethod(object):
@@ -778,6 +783,7 @@ class ModelMetaClass(type):
 
         #create the class and add a QuerySet to it
         klass = super(ModelMetaClass, cls).__new__(cls, name, bases, attrs)
+
         return klass
 
 
