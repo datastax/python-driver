@@ -1,6 +1,6 @@
-2.1.0
-=====
-In Progress
+2.1.0b1
+=======
+July 11, 2014
 
 This release adds support for Cassandra 2.1 features, including version
 3 of the native protocol.
