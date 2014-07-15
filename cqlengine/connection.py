@@ -70,10 +70,11 @@ def setup(
 
 def execute(query, params=None, consistency_level=None):
 
+    handle_lazy_connect()
+    
     if not session:
         raise CQLEngineException("It is required to setup() cqlengine before executing queries")
 
-    handle_lazy_connect()
 
     if consistency_level is None:
         consistency_level = default_consistency_level
