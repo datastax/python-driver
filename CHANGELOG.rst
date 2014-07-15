@@ -1,3 +1,11 @@
+2.1.0c1
+=======
+In Progress
+
+Bug Fixes
+---------
+* Properly specify UDTs for columns in CREATE TABLE statements
+
 2.1.0b1
 =======
 July 11, 2014

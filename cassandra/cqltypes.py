@@ -28,6 +28,7 @@ the corresponding CQL or Cassandra type strings.
 # .from_cql_literal() and .as_cql_literal() classmethods (or whatever).
 
 from __future__ import absolute_import  # to enable import io from stdlib
+from binascii import unhexlify
 import calendar
 from collections import namedtuple
 from decimal import Decimal
@@ -136,6 +137,7 @@ def parse_casstype_args(typestring):
         elif tok == ')':
             types, names = args.pop()
             prev_types, prev_names = args[-1]
+
             prev_types[-1] = prev_types[-1].apply_parameters(types, names)
         else:
             types, names = args[-1]
@@ -813,13 +815,13 @@ class TupleType(_ParameterizedType):
         return buf.getvalue()
 
 
-class UserDefinedType(TupleType):
+class UserType(TupleType):
     typename = "'org.apache.cassandra.db.marshal.UserType'"
 
     _cache = {}
 
     @classmethod
-    def apply_parameters(cls, keyspace, udt_name, names_and_types, mapped_class):
+    def make_udt_class(cls, keyspace, udt_name, names_and_types, mapped_class):
         if six.PY2 and isinstance(udt_name, unicode):
             udt_name = udt_name.encode('utf-8')
 
@@ -831,9 +833,22 @@ class UserDefinedType(TupleType):
                                                'cassname': cls.cassname,
                                                'typename': udt_name,
                                                'fieldnames': fieldnames,
+                                               'keyspace': keyspace,
                                                'mapped_class': mapped_class})
             cls._cache[(keyspace, udt_name)] = instance
             return instance
+
+    @classmethod
+    def apply_parameters(cls, subtypes, names):
+        keyspace = subtypes[0]
+        udt_name = unhexlify(subtypes[1].cassname)
+        field_names = [unhexlify(encoded_name) for encoded_name in names[2:]]
+        assert len(field_names) == len(subtypes[2:])
+        return type(udt_name, (cls,), {'subtypes': subtypes[2:],
+                                       'cassname': cls.cassname,
+                                       'typename': udt_name,
+                                       'fieldnames': field_names,
+                                       'keyspace': keyspace})
 
     @classmethod
     def cql_parameterized_type(cls):

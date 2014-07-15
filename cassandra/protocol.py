@@ -32,7 +32,7 @@ from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 DoubleType, FloatType, Int32Type,
                                 InetAddressType, IntegerType, ListType,
                                 LongType, MapType, SetType, TimeUUIDType,
-                                UTF8Type, UUIDType, UserDefinedType,
+                                UTF8Type, UUIDType, UserType,
                                 TupleType, lookup_casstype)
 from cassandra.policies import WriteType
 
@@ -535,7 +535,7 @@ class ResultMessage(_MessageType):
         0x0020: ListType,
         0x0021: MapType,
         0x0022: SetType,
-        0x0030: UserDefinedType,
+        0x0030: UserType,
         0x0031: TupleType,
     }
 
@@ -633,14 +633,14 @@ class ResultMessage(_MessageType):
             num_items = read_short(f)
             types = tuple(cls.read_type(f, user_type_map) for _ in xrange(num_items))
             typeclass = typeclass.apply_parameters(types)
-        elif typeclass == UserDefinedType:
+        elif typeclass == UserType:
             ks = read_string(f)
             udt_name = read_string(f)
             num_fields = read_short(f)
             names_and_types = tuple((read_string(f), cls.read_type(f, user_type_map))
                                     for _ in xrange(num_fields))
             mapped_class = user_type_map.get(ks, {}).get(udt_name)
-            typeclass = typeclass.apply_parameters(
+            typeclass = typeclass.make_udt_class(
                 ks, udt_name, names_and_types, mapped_class)
         elif typeclass == CUSTOM_TYPE:
             classname = read_string(f)
