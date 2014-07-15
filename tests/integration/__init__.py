@@ -24,7 +24,6 @@ import logging
 log = logging.getLogger(__name__)
 
 import os
-from six import print_
 from threading import Event
 
 from cassandra.cluster import Cluster
@@ -96,7 +95,10 @@ def get_node(node_id):
 
 
 def setup_package():
-    print_('Using Cassandra version: %s' % CASSANDRA_VERSION)
+    if CASSANDRA_DIR:
+        log.info("Using Cassandra dir: %s", CASSANDRA_DIR)
+    else:
+        log.info('Using Cassandra version: %s', CASSANDRA_VERSION)
     try:
         try:
             cluster = CCMCluster.load(path, CLUSTER_NAME)
