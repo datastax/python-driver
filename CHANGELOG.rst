@@ -6,6 +6,11 @@ Bug Fixes
 ---------
 * Properly specify UDTs for columns in CREATE TABLE statements
 
+Other
+-----
+* Return list collection columns as python lists instead of tuples
+  now that tuples are a specific Cassandra type
+
 2.1.0b1
 =======
 July 11, 2014

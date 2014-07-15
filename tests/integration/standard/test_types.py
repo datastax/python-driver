@@ -203,7 +203,7 @@ class TypeTests(unittest.TestCase):
             1.25,  # float
             "1.2.3.4",  # inet
             12345,  # int
-            ('a', 'b', 'c'),  # list<text> collection
+            ['a', 'b', 'c'],  # list<text> collection
             sortedset((1, 2, 3)),  # set<int> collection
             {'a': 1, 'b': 2},  # map<text, int> collection
             "text",  # text
@@ -280,11 +280,11 @@ class TypeTests(unittest.TestCase):
         s.execute("INSERT INTO mytable (a, b, c, o, s, l, n) VALUES ('a', 'b', %s, %s, %s, %s, %s)",
                   ('', '', '', [''], {'': 3}))
         self.assertEqual(
-            {'c': '', 'o': '', 's': '', 'l': ('', ), 'n': OrderedDict({'': 3})},
+            {'c': '', 'o': '', 's': '', 'l': [''], 'n': OrderedDict({'': 3})},
             s.execute("SELECT c, o, s, l, n FROM mytable WHERE a='a' AND b='b'")[0])
 
         self.assertEqual(
-            {'c': '', 'o': '', 's': '', 'l': ('', ), 'n': OrderedDict({'': 3})},
+            {'c': '', 'o': '', 's': '', 'l': [''], 'n': OrderedDict({'': 3})},
             s.execute(s.prepare("SELECT c, o, s, l, n FROM mytable WHERE a='a' AND b='b'"), [])[0])
 
         # non-string types shouldn't accept empty strings

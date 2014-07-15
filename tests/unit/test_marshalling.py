@@ -81,9 +81,9 @@ marshalled_value_pairs = (
     (b'', 'ListType(FloatType)', None),
     (b'', 'SetType(LongType)', None),
     (b'\x00\x00', 'MapType(DecimalType, BooleanType)', OrderedDict()),
-    (b'\x00\x00', 'ListType(FloatType)', ()),
+    (b'\x00\x00', 'ListType(FloatType)', []),
     (b'\x00\x00', 'SetType(IntegerType)', sortedset()),
-    (b'\x00\x01\x00\x10\xafYC\xa3\xea<\x11\xe1\xabc\xc4,\x03"y\xf0', 'ListType(TimeUUIDType)', (UUID(bytes=b'\xafYC\xa3\xea<\x11\xe1\xabc\xc4,\x03"y\xf0'),)),
+    (b'\x00\x01\x00\x10\xafYC\xa3\xea<\x11\xe1\xabc\xc4,\x03"y\xf0', 'ListType(TimeUUIDType)', [UUID(bytes=b'\xafYC\xa3\xea<\x11\xe1\xabc\xc4,\x03"y\xf0')]),
 )
 
 ordered_dict_value = OrderedDict()

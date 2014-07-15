@@ -714,7 +714,7 @@ class _SimpleParameterizedType(_ParameterizedType):
 class ListType(_SimpleParameterizedType):
     typename = 'list'
     num_subtypes = 1
-    adapter = tuple
+    adapter = list
 
 
 class SetType(_SimpleParameterizedType):
@@ -848,7 +848,8 @@ class UserType(TupleType):
                                        'cassname': cls.cassname,
                                        'typename': udt_name,
                                        'fieldnames': field_names,
-                                       'keyspace': keyspace})
+                                       'keyspace': keyspace,
+                                       'mapped_class': None})
 
     @classmethod
     def cql_parameterized_type(cls):
