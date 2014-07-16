@@ -63,12 +63,12 @@ The Comment model's ``create table`` would look like the following:
 
 To sync the models to the database, you may do the following:
 
-`` code-block:: python
+.. code-block:: python
 
     from cqlengine.management import sync_table
     sync_table(Person)
     sync_table(Comment)
-    
+
 
 Columns
 =======
