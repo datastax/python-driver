@@ -38,6 +38,18 @@ The Person model would create this CQL table:
        PRIMARY KEY (id)
    )
 
+Here's an example of a comment table created with clustering keys, in descending order:
+
+.. code-block:: python
+
+    from cqlengine import columns
+    from cqlengine.models import Model
+
+    class Comment(Model):
+        photo_id = columns.UUID(primary_key=True)
+        comment_id = columns.TimeUUID(primary_key=True, clustering_order="DESC")
+        comment = columns.Text()
+
 Columns
 =======
 
