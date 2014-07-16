@@ -28,7 +28,7 @@ from cassandra.metadata import (Metadata, KeyspaceMetadata, TableMetadata,
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
-from tests.integration import get_cluster, PROTOCOL_VERSION
+from tests.integration import get_cluster, PROTOCOL_VERSION, CASSANDRA_VERSION
 
 
 class SchemaMetadataTest(unittest.TestCase):
@@ -326,6 +326,45 @@ class TestCodeCoverage(unittest.TestCase):
             keyspace_metadata = cluster.metadata.keyspaces[keyspace]
             self.assertIsInstance(keyspace_metadata.export_as_string(), six.string_types)
             self.assertIsInstance(keyspace_metadata.as_cql_query(), six.string_types)
+
+    def test_export_keyspace_schema_udts(self):
+        """
+        Test udt exports
+        """
+
+        if not CASSANDRA_VERSION.startswith('2.1'):
+            raise unittest.SkipTest('UDTs only supported in 2.1+')
+
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        session = cluster.connect()
+
+        session.execute("""
+            CREATE KEYSPACE export_udts
+            WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
+            AND durable_writes = true;
+        """)
+        session.execute("""
+            CREATE TYPE export_udts.street (
+                street_number int,
+                street_name text)
+        """)
+        session.execute("""
+            CREATE TYPE export_udts.zip (
+                zipcode int,
+                zip_plus_4 int)
+        """)
+        session.execute("""
+            CREATE TYPE export_udts.address (
+                street_address street,
+                zip_code zip)
+        """)
+        session.execute("""
+            CREATE TABLE export_udts.users (
+            user text PRIMARY KEY,
+            addresses map<text, address>)
+        """)
+
+        self.assertEqual(cluster.metadata.keyspaces['export_udts'].export_as_string(), 'TODO')
 
     def test_case_sensitivity(self):
         """
