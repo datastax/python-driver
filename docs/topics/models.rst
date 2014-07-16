@@ -81,6 +81,9 @@ Column Options
         If True, this column is created as partition primary key. There may be many partition keys defined,
         forming a *composite partition key*
 
+    :attr:`~cqlengine.columns.BaseColumn.clustering_order`
+        ``ASC`` or ``DESC``, determines the clustering order of a clustering key.
+
     :attr:`~cqlengine.columns.BaseColumn.index`
         If True, an index will be created for this column. Defaults to False.
 
