@@ -366,6 +366,9 @@ class TestCodeCoverage(unittest.TestCase):
 
         self.assertEqual(cluster.metadata.keyspaces['export_udts'].export_as_string(), 'TODO')
 
+        table_meta = cluster.metadata.keyspaces['export_udts'].tables['users']
+        self.assertEqual(table_meta.export_as_string(), 'TODO')
+
     def test_case_sensitivity(self):
         """
         Test that names that need to be escaped in CREATE statements are
