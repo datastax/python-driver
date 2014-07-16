@@ -50,6 +50,17 @@ Here's an example of a comment table created with clustering keys, in descending
         comment_id = columns.TimeUUID(primary_key=True, clustering_order="DESC")
         comment = columns.Text()
 
+The Comment model's ``create table`` would look like the following:
+
+.. code-block:: sql
+
+    CREATE TABLE comment (
+      photo_id uuid,
+      comment_id timeuuid,
+      comment text,
+      PRIMARY KEY (photo_id, comment_id)
+    ) WITH CLUSTERING ORDER BY (comment_id DESC)
+
 Columns
 =======
 
