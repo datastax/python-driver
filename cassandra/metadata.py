@@ -607,17 +607,65 @@ class KeyspaceMetadata(object):
 
 
 class UserType(object):
+    """
+    A user defined type, as created by ``CREATE TYPE`` statements.
+
+    User-defined types were introduced in Cassandra 2.1.
+
+    .. versionadded:: 2.1.0
+    """
 
     keyspace = None
+    """
+    The string name of the keyspace in which this type is defined.
+    """
+
     name = None
+    """
+    The name of this type.
+    """
+
     field_names = None
+    """
+    An ordered list of the names for each field in this user-defined type.
+    """
+
     field_types = None
+    """
+    An ordered list of the types for each field in this user-defined type.
+    """
 
     def __init__(self, keyspace, name, field_names, field_types):
         self.keyspace = keyspace
         self.name = name
         self.field_names = field_names
         self.field_types = field_types
+
+    def as_cql_query(self, formatted=False):
+        """
+        Returns a CQL query that can be used to recreate this type.
+        If `formatted` is set to :const:`True`, extra whitespace will
+        be added to make the query more readable.
+        """
+        ret = "CREATE TYPE %s.%s (%s" % (
+            protect_name(self.keyspace),
+            protect_name(self.name),
+            "\n" if formatted else "")
+
+        if formatted:
+            field_join = ",\n"
+            padding = "    "
+        else:
+            field_join = ", "
+            padding = ""
+
+        fields = []
+        for field_name, field_type in zip(self.field_names, self.field_types):
+            fields.append("%s %s" % (protect_name(field_name), field_type.cql_parameterized_type()))
+
+        ret += field_join.join("%s%s" % (padding, field) for field in fields)
+        ret += "\n)" if formatted else ")"
+        return ret
 
 
 class TableMetadata(object):

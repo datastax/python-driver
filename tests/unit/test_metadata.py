@@ -18,11 +18,13 @@ except ImportError:
     import unittest # noqa
 
 import cassandra
+from cassandra.cqltypes import IntegerType, AsciiType, TupleType
 from cassandra.metadata import (Murmur3Token, MD5Token,
                                 BytesToken, ReplicationStrategy,
                                 NetworkTopologyStrategy, SimpleStrategy,
                                 LocalStrategy, NoMurmur3, protect_name,
-                                protect_names, protect_value, is_valid_name)
+                                protect_names, protect_value, is_valid_name,
+                                UserType)
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
@@ -248,3 +250,21 @@ class TestTokens(unittest.TestCase):
             self.fail('Tokens for ByteOrderedPartitioner should be only strings')
         except TypeError:
             pass
+
+
+class TestUserTypes(unittest.TestCase):
+
+    def test_as_cql_query(self):
+        field_types = [IntegerType, AsciiType, TupleType.apply_parameters([IntegerType, AsciiType])]
+        udt = UserType("ks1", "mytype", ["a", "b", "c"], field_types)
+        self.assertEqual("CREATE TYPE ks1.mytype (a varint, b ascii, c tuple<varint, ascii>)", udt.as_cql_query(formatted=False))
+
+        self.assertEqual("""CREATE TYPE ks1.mytype (
+    a varint,
+    b ascii,
+    c tuple<varint, ascii>
+)""", udt.as_cql_query(formatted=True))
+
+    def test_as_cql_query_name_escaping(self):
+        udt = UserType("MyKeyspace", "MyType", ["AbA", "keyspace"], [AsciiType, AsciiType])
+        self.assertEqual('CREATE TYPE "MyKeyspace"."MyType" ("AbA" ascii, "keyspace" ascii)', udt.as_cql_query(formatted=False))
