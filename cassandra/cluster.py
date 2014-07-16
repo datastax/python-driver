@@ -2558,7 +2558,7 @@ class ResponseFuture(object):
             # to retry the operation
             return
 
-        if reuse_connection and self._query(self._current_host):
+        if reuse_connection and self._query(self._current_host) is not None:
             return
 
         # otherwise, move onto another host

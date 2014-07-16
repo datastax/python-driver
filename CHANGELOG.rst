@@ -5,6 +5,7 @@ In Progress
 Bug Fixes
 ---------
 * Properly specify UDTs for columns in CREATE TABLE statements
+* Avoid moving retries to a new host when using request ID zero (PYTHON-88)
 
 Other
 -----
