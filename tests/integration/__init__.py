@@ -40,6 +40,7 @@ MULTIDC_CLUSTER_NAME = 'multidc_test_cluster'
 CCM_CLUSTER = None
 
 CASSANDRA_DIR = os.getenv('CASSANDRA_DIR', None)
+CASSANDRA_HOME = os.getenv('CASSANDRA_HOME', None)
 CASSANDRA_VERSION = os.getenv('CASSANDRA_VERSION', '2.0.9')
 
 if CASSANDRA_VERSION.startswith('1'):
@@ -97,6 +98,8 @@ def get_node(node_id):
 def setup_package():
     if CASSANDRA_DIR:
         log.info("Using Cassandra dir: %s", CASSANDRA_DIR)
+    elif CASSANDRA_HOME:
+        log.info("Using Cassandra home: %s", CASSANDRA_HOME)
     else:
         log.info('Using Cassandra version: %s', CASSANDRA_VERSION)
     try:
