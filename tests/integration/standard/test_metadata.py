@@ -28,7 +28,7 @@ from cassandra.metadata import (Metadata, KeyspaceMetadata, TableMetadata,
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
-from tests.integration import get_cluster, PROTOCOL_VERSION, CASSANDRA_VERSION
+from tests.integration import get_cluster, PROTOCOL_VERSION, get_server_versions
 
 
 class SchemaMetadataTest(unittest.TestCase):
@@ -332,8 +332,8 @@ class TestCodeCoverage(unittest.TestCase):
         Test udt exports
         """
 
-        if not CASSANDRA_VERSION.startswith('2.1'):
-            raise unittest.SkipTest('UDTs only supported in 2.1+')
+        if get_server_versions()[0] < (2, 1, 0):
+            raise unittest.SkipTest('UDTs were introduced in Cassandra 2.1')
 
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
