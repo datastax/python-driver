@@ -12,8 +12,8 @@ Models
 
 A model is a python class representing a CQL table.
 
-Example
-=======
+Examples
+========
 
 This example defines a Person table, with the columns ``first_name`` and ``last_name``
 
