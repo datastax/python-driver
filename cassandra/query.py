@@ -182,7 +182,7 @@ class Statement(object):
         if serial_consistency_level is not None:
             self.serial_consistency_level = serial_consistency_level
         if fetch_size is not None:
-            self.fetch_size = None
+            self.fetch_size = fetch_size
         self._routing_key = routing_key
 
     def _get_routing_key(self):
