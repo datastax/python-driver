@@ -65,7 +65,7 @@ from cassandra.pool import (_ReconnectionHandler, _HostReconnectionHandler,
                             NoConnectionsAvailable)
 from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              BatchStatement, bind_params, QueryTrace, Statement,
-                             named_tuple_factory, dict_factory)
+                             named_tuple_factory, dict_factory, FETCH_SIZE_UNSET)
 
 # default to gevent when we are monkey patched, otherwise if libev is available, use that as the
 # default because it's fastest. Otherwise, use asyncore.
@@ -1246,7 +1246,7 @@ class Session(object):
 
         cl = query.consistency_level if query.consistency_level is not None else self.default_consistency_level
         fetch_size = query.fetch_size
-        if not fetch_size and self._protocol_version >= 2:
+        if fetch_size is FETCH_SIZE_UNSET and self._protocol_version >= 2:
             fetch_size = self.default_fetch_size
 
         if self._protocol_version >= 3 and self.use_client_timestamp:

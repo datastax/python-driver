@@ -6,6 +6,9 @@ Bug Fixes
 ---------
 * Properly specify UDTs for columns in CREATE TABLE statements
 * Avoid moving retries to a new host when using request ID zero (PYTHON-88)
+* Don't ignore fetch_size arguments to Statement constructors (github-151)
+* Allow disabling automatic paging on a per-statement basis when it's
+  enabled by default for the session (PYTHON-93)
 
 Other
 -----
