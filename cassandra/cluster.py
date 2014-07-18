@@ -42,7 +42,7 @@ from functools import partial, wraps
 from itertools import groupby
 
 from cassandra import (ConsistencyLevel, AuthenticationFailed,
-                       OperationTimedOut, UnsupportedOperation)
+                       InvalidRequest, OperationTimedOut, UnsupportedOperation)
 from cassandra.connection import ConnectionException, ConnectionShutdown
 from cassandra.encoder import cql_encode_all_types, cql_encoders
 from cassandra.protocol import (QueryMessage, ResultMessage,
@@ -1893,19 +1893,37 @@ class ControlConnection(object):
             queries = [
                 QueryMessage(query=self._SELECT_KEYSPACES, consistency_level=cl),
                 QueryMessage(query=self._SELECT_COLUMN_FAMILIES, consistency_level=cl),
-                QueryMessage(query=self._SELECT_COLUMNS, consistency_level=cl)
+                QueryMessage(query=self._SELECT_COLUMNS, consistency_level=cl),
+                QueryMessage(query=self._SELECT_USERTYPES, consistency_level=cl)
             ]
-            if self._protocol_version >= 3:
-                queries.append(QueryMessage(query=self._SELECT_USERTYPES, consistency_level=cl))
-                ks_result, cf_result, col_result, types_result = connection.wait_for_responses(*queries)
+
+            responses = connection.wait_for_responses(*queries, fail_on_error=False)
+            (ks_success, ks_result), (cf_success, cf_result), (col_success, col_result), (types_success, types_result) = responses
+
+            if ks_success:
+                ks_result = dict_factory(*ks_result.results)
+            else:
+                raise ks_result
+
+            if cf_success:
+                cf_result = dict_factory(*cf_result.results)
+            else:
+                raise cf_result
+
+            if col_success:
+                col_result = dict_factory(*col_result.results)
+            else:
+                raise col_result
+
+            # if we're connected to Cassandra < 2.1, the usertypes table will not exist
+            if types_success:
                 types_result = dict_factory(*types_result.results) if types_result.results else {}
             else:
-                ks_result, cf_result, col_result = connection.wait_for_responses(*queries)
-                types_result = {}
-
-            ks_result = dict_factory(*ks_result.results)
-            cf_result = dict_factory(*cf_result.results)
-            col_result = dict_factory(*col_result.results)
+                if isinstance(types_result, InvalidRequest):
+                    log.debug("[control connection] user types table not found")
+                    types_result = {}
+                else:
+                    raise types_result
 
             log.debug("[control connection] Fetched schema, rebuilding metadata")
             self._cluster.metadata.rebuild_schema(ks_result, types_result, cf_result, col_result)
