@@ -1162,13 +1162,35 @@ class Session(object):
     .. versionadded:: 2.1.0
     """
 
+    encoders = None
+    """
+    A map of python types to CQL encoder functions that will be used when
+    formatting query parameters for non-prepared statements.  This mapping
+    is not used for prepared statements (because prepared statements
+    give the driver more information about what CQL types are expected, allowing
+    it to accept a wider range of python types).
+
+    This mapping can be be modified by users as they see fit.  Functions from
+    :mod:`cassandra.encoder` should be used, if possible, because they take
+    precautions to avoid injections and properly sanitize data.
+
+    Example::
+
+        from cassandra.encoder import cql_encode_tuple
+
+        cluster = Cluster()
+        session = cluster.connect("mykeyspace")
+        session.encoders[tuple] = cql_encode_tuple
+
+        session.execute("CREATE TABLE mytable (k int PRIMARY KEY, col tuple<int, ascii>)")
+        session.execute("INSERT INTO mytable (k, col) VALUES (%s, %s)", [0, (123, 'abc')])
+    """
+
     _lock = None
     _pools = None
     _load_balancer = None
     _metrics = None
     _protocol_version = None
-
-    encoders = None
 
     def __init__(self, cluster, hosts):
         self.cluster = cluster
