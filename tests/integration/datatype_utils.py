@@ -39,10 +39,15 @@ DATA_TYPE_NON_PRIMITIVE_NAMES = [
     'list',
     'set',
     'map',
+    'tuple'
 ]
 
 
 def get_sample_data():
+    """
+    Create a standard set of sample inputs for testing.
+    """
+
     sample_data = {}
 
     for datatype in DATA_TYPE_PRIMITIVES:
@@ -103,4 +108,8 @@ def get_sample_data():
 SAMPLE_DATA = get_sample_data()
 
 def get_sample(datatype):
+    """
+    Helper method to access created sample data
+    """
+
     return SAMPLE_DATA[datatype]
