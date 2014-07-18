@@ -43,6 +43,8 @@
 
    .. automethod:: shutdown
 
+   .. automethod:: register_user_type
+
    .. automethod:: register_listener
 
    .. automethod:: unregister_listener
@@ -62,6 +64,10 @@
    .. autoattribute:: row_factory
 
    .. autoattribute:: default_fetch_size
+
+   .. autoattribute:: use_client_timestamp
+
+   .. autoattribute:: encoders
 
    .. automethod:: execute(statement[, parameters][, timeout][, trace])
 
