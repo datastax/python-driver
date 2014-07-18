@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 
 from collections import namedtuple
 
-from cassandra.cluster import Cluster, UserTypeDoesNotExist
+from cassandra.cluster import Cluster
 
 from tests.integration import get_server_versions, PROTOCOL_VERSION
 from tests.integration.long.datatype_utils import get_sample
@@ -290,21 +290,7 @@ class TypeTests(unittest.TestCase):
         )
 
         insert = s.prepare("INSERT INTO mytable (a, b) VALUES (?, ?)")
-        s.execute(insert, (0, Alldatatypes(params[0],
-                                            params[1],
-                                            params[2],
-                                            params[3],
-                                            params[4],
-                                            params[5],
-                                            params[6],
-                                            params[7],
-                                            params[8],
-                                            params[9],
-                                            params[10],
-                                            params[11],
-                                            params[12],
-                                            params[13],
-                                            params[14])))
+        s.execute(insert, (0, Alldatatypes(*params)))
 
         # retrieve and verify data
         results = s.execute("SELECT * FROM mytable")
