@@ -229,43 +229,41 @@ class TypeTests(unittest.TestCase):
 
         c.shutdown()
 
-    create_datatype_types = """
-        CREATE TYPE alldatatypes (
-            a ascii,
-            b bigint,
-            c blob,
-            d boolean,
-            e decimal,
-            f double,
-            g float,
-            h inet,
-            i int,
-            j text,
-            k timestamp,
-            l timeuuid,
-            m uuid,
-            n varchar,
-            o varint,
-            )
-        """
-
     def test_datatypes(self):
         c = Cluster(protocol_version=PROTOCOL_VERSION)
         s = c.connect()
 
-        #create keyspace
+        # create keyspace
         s.execute("""
             CREATE KEYSPACE datatypetests
-            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}
+            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1' }
             """)
         s.set_keyspace("datatypetests")
 
-        #create UDT's
-        s.execute(self.create_datatype_types)
-        AllDataTypes = namedtuple('alldatatypes', ('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o'))
+        # create UDT's
+        s.execute("""
+            CREATE TYPE alldatatypes (a ascii,
+                                        b bigint,
+                                        c blob,
+                                        d boolean,
+                                        e decimal,
+                                        f double,
+                                        g float,
+                                        h inet,
+                                        i int,
+                                        j text,
+                                        k timestamp,
+                                        l timeuuid,
+                                        m uuid,
+                                        n varchar,
+                                        o varint,
+                                        )
+        """)
 
         s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b alldatatypes)")
+        Alldatatypes = namedtuple('alldatatypes', ('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o'))
 
+        # insert UDT data
         params = (
             get_sample('ascii'),
             get_sample('bigint'),
@@ -284,44 +282,30 @@ class TypeTests(unittest.TestCase):
             get_sample('varint')
         )
 
-        #try with regular statement
-        s.execute("""
-            INSERT INTO mytable (a, b)
-            VALUES (%s, %s)
-            """, (0, AllDataTypes(params)))
+        insert = s.prepare("INSERT INTO mytable (a, b) VALUES (?, ?)")
+        s.execute(insert, (0, Alldatatypes(params[0],
+                                            params[1],
+                                            params[2],
+                                            params[3],
+                                            params[4],
+                                            params[5],
+                                            params[6],
+                                            params[7],
+                                            params[8],
+                                            params[9],
+                                            params[10],
+                                            params[11],
+                                            params[12],
+                                            params[13],
+                                            params[14])))
 
+        # retrieve and verify data
         results = s.execute("SELECT * FROM mytable")
-        self.assertEqual(1, len(result))
+        self.assertEqual(1, len(results))
 
-        row = result[0]
-        for expected, actual in zip(params, results[0]):
+        row = results[0][1]
+        print row
+        for expected, actual in zip(params, row):
             self.assertEqual(expected, actual)
-
-        #retry with prepared statement
-        prepared = s.prepare("""
-            INSERT INTO mytable (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """)
-
-        s.execute(prepared, (0, AllDataTypes(get_sample('ascii'), get_sample('bigint'), get_sample('blob'), get_sample('boolean'),
-                                           get_sample('decimal'), get_sample('double'), get_sample('float'), get_sample('inet'),
-                                           get_sample('int'), get_sample('text'), get_sample('timestamp'), get_sample('timeuuid'),
-                                           get_sample('uuid'), get_sample('varchar'), get_sample('varint'))))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
         c.shutdown()
