@@ -30,7 +30,6 @@ from tests.integration.long.datatype_utils import get_sample
 class TypeTests(unittest.TestCase):
 
     def setUp(self):
-        PROTOCOL_VERSION = 3
         if PROTOCOL_VERSION < 3:
             raise unittest.SkipTest("v3 protocol is required for UDT tests")
 
@@ -235,12 +234,12 @@ class TypeTests(unittest.TestCase):
 
         # create keyspace
         s.execute("""
-            CREATE KEYSPACE datatypetests
+            CREATE KEYSPACE test_datatypes
             WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1' }
             """)
-        s.set_keyspace("datatypetests")
+        s.set_keyspace("test_datatypes")
 
-        # create UDT's
+        # create UDT
         s.execute("""
             CREATE TYPE alldatatypes (a ascii,
                                         b bigint,
@@ -261,7 +260,8 @@ class TypeTests(unittest.TestCase):
         """)
 
         s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b alldatatypes)")
-        Alldatatypes = namedtuple('alldatatypes', ('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o'))
+        Alldatatypes = namedtuple('alldatatypes', ('a', 'b', 'c', 'd', 'e', 'f', 'g',
+                                                    'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o'))
 
         # insert UDT data
         params = (
@@ -303,8 +303,7 @@ class TypeTests(unittest.TestCase):
         results = s.execute("SELECT * FROM mytable")
         self.assertEqual(1, len(results))
 
-        row = results[0][1]
-        print row
+        row = results[0].b
         for expected, actual in zip(params, row):
             self.assertEqual(expected, actual)
 
