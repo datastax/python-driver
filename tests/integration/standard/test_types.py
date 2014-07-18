@@ -88,8 +88,8 @@ class TypeTests(unittest.TestCase):
 
         s.execute(query, params)
         expected_vals = [
-           'key1',
-           bytearray(b'blobyblob')
+            'key1',
+            bytearray(b'blobyblob')
         ]
 
         results = s.execute("SELECT * FROM mytable")
@@ -450,8 +450,6 @@ class TypeTests(unittest.TestCase):
         if self._cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
-        MAX_LENGTH = 384
-
         c = Cluster(protocol_version=PROTOCOL_VERSION)
         s = c.connect()
         s.row_factory = dict_factory
@@ -461,12 +459,13 @@ class TypeTests(unittest.TestCase):
             WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}""")
         s.set_keyspace("test_tuple_type_varying_lengths")
 
+        lengths = (1, 2, 3, 384)
         value_schema = []
-        for i in range(1, MAX_LENGTH):
-            value_schema += [' v_%s tuple<%s>' % (i, ','.join(['int'] * i))]
-        s.execute("CREATE TABLE mytable (k int PRIMARY KEY, %s)", (','.join(value_schema),))
+        for i in lengths:
+            value_schema += [' v_%s tuple<%s>' % (i, ', '.join(['int'] * i))]
+        s.execute("CREATE TABLE mytable (k int PRIMARY KEY, %s)" % (', '.join(value_schema),))
 
-        for i in range(1, MAX_LENGTH):
+        for i in lengths:
             created_tuple = tuple(range(0, i))
 
             s.execute("INSERT INTO mytable (k, v_%s) VALUES (0, %s)", (i, created_tuple))
@@ -474,7 +473,7 @@ class TypeTests(unittest.TestCase):
             result = s.execute("SELECT v_%s FROM mytable WHERE k=0", (i,))[0]
             self.assertEqual(tuple(created_tuple), result['v_%s' % i])
 
-    def test_tuple_types(self):
+    def test_tuple_subtypes(self):
         if self._cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
