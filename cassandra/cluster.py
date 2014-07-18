@@ -1551,7 +1551,17 @@ class Session(object):
         mapping from a user-defined type to a class.  Intended for internal
         use only.
         """
-        type_meta = self.cluster.metadata.keyspaces[keyspace].user_types[user_type]
+        try:
+            ks_meta = self.cluster.metadata.keyspaces[keyspace]
+        except KeyError:
+            raise UserTypeDoesNotExist(
+                'Keyspace %s does not exist or has not been discovered by the driver' % (keyspace,))
+
+        try:
+            type_meta = ks_meta.user_types[user_type]
+        except KeyError:
+            raise UserTypeDoesNotExist(
+                'User type %s does not exist in keyspace %s' % (user_type, keyspace))
 
         def encode(val):
             return '{ %s }' % ' , '.join('%s : %s' % (
@@ -1568,6 +1578,13 @@ class Session(object):
 
     def get_pool_state(self):
         return dict((host, pool.get_state()) for host, pool in self._pools.items())
+
+
+class UserTypeDoesNotExist(Exception):
+    """
+    An attempt was made to use a user-defined type that does not exist.
+    """
+    pass
 
 
 class _ControlReconnectionHandler(_ReconnectionHandler):

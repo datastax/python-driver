@@ -104,3 +104,5 @@
 
 .. autoexception:: NoHostAvailable ()
    :members:
+
+.. autoexception:: UserTypeDoesNotExist ()
