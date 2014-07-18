@@ -467,6 +467,53 @@ class Cluster(object):
             self, self.control_connection_timeout)
 
     def register_user_type(self, keyspace, user_type, klass):
+        """
+        Registers a class to use to represent a particular user-defined type.
+        Query parameters for this user-defined type will be assumed to be
+        instances of `klass`.  Result sets for this user-defined type will
+        be instances of `klass`.  If no class is registered for a user-defined
+        type, a namedtuple will be used for result sets, and non-prepared
+        statements may not encode parameters for this type correctly.
+
+        `keyspace` is the name of the keyspace that the UDT is defined in.
+
+        `user_type` is the string name of the UDT to register the mapping
+        for.
+
+        `klass` should be a class with attributes whose names match the
+        fields of the user-defined type.  The constructor must accepts kwargs
+        for each of the fields in the UDT.
+
+        This method should only be called after the type has been created
+        within Cassandra.
+
+        Example::
+
+            cluster = Cluster(protocol_version=3)
+            session = cluster.connect()
+            session.set_keyspace('mykeyspace')
+            session.execute("CREATE TYPE address (street text, zipcode int)")
+            session.execute("CREATE TABLE users (id int PRIMARY KEY, location address)")
+
+            # create a class to map to the "address" UDT
+            class Address(object):
+
+                def __init__(self, street, zipcode):
+                    self.street = street
+                    self.zipcode = zipcode
+
+            cluster.register_user_type('mykeyspace', 'address', Address)
+
+            # insert a row using an instance of Address
+            session.execute("INSERT INTO users (id, location) VALUES (%s, %s)",
+                            (0, Address("123 Main St.", 78723)))
+
+            # results will include Address instances
+            results = session.execute("SELECT * FROM users")
+            row = results[0]
+            print row.id, row.location.street, row.location.zipcode
+
+        """
         self._user_types[keyspace][user_type] = klass
         for session in self.sessions:
             session.user_type_registered(keyspace, user_type, klass)
