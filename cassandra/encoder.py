@@ -11,6 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+These functions are used to convert Python objects into CQL strings.
+When non-prepared statements are executed, these encoder functions are
+called on each query parameter.
+"""
 
 import logging
 log = logging.getLogger(__name__)
@@ -45,14 +50,23 @@ def cql_quote(term):
 
 
 def cql_encode_none(val):
+    """
+    Converts :const:`None` to the string 'NULL'.
+    """
     return 'NULL'
 
 
 def cql_encode_unicode(val):
+    """
+    Converts :class:`unicode` objects to UTF-8 encoded strings with quote escaping.
+    """
     return cql_quote(val.encode('utf-8'))
 
 
 def cql_encode_str(val):
+    """
+    Escapes quotes in :class:`str` objects.
+    """
     return cql_quote(val)
 
 
@@ -69,25 +83,51 @@ else:
 
 
 def cql_encode_object(val):
+    """
+    Default encoder for all objects that do not have a specific encoder function
+    registered. This function simply calls :meth:`str()` on the object.
+    """
     return str(val)
 
 
 def cql_encode_datetime(val):
+    """
+    Converts a :class:`datetime.datetime` object to a (string) integer timestamp
+    with millisecond precision.
+    """
     timestamp = calendar.timegm(val.utctimetuple())
     return str(long(timestamp * 1e3 + getattr(val, 'microsecond', 0) / 1e3))
 
 
 def cql_encode_date(val):
+    """
+    Converts a :class:`datetime.date` object to a string with format
+    ``YYYY-MM-DD-0000``.
+    """
     return "'%s'" % val.strftime('%Y-%m-%d-0000')
 
 
 def cql_encode_sequence(val):
+    """
+    Converts a sequence to a string of the form ``(item1, item2, ...)``.  This
+    is suitable for ``IN`` value lists.
+    """
     return '( %s )' % ' , '.join(cql_encoders.get(type(v), cql_encode_object)(v)
                                  for v in val)
+
+
 cql_encode_tuple = cql_encode_sequence
+"""
+Converts a sequence to a string of the form ``(item1, item2, ...)``.  This
+is suitable for ``tuple`` type columns.
+"""
 
 
 def cql_encode_map_collection(val):
+    """
+    Converts a dict into a string of the form ``{key1: val1, key2: val2, ...}``.
+    This is suitable for ``map`` type columns.
+    """
     return '{ %s }' % ' , '.join('%s : %s' % (
         cql_encode_all_types(k),
         cql_encode_all_types(v)
@@ -95,14 +135,26 @@ def cql_encode_map_collection(val):
 
 
 def cql_encode_list_collection(val):
+    """
+    Converts a sequence to a string of the form ``[item1, item2, ...]``.  This
+    is suitable for ``list`` type columns.
+    """
     return '[ %s ]' % ' , '.join(map(cql_encode_all_types, val))
 
 
 def cql_encode_set_collection(val):
+    """
+    Converts a sequence to a string of the form ``{item1, item2, ...}``.  This
+    is suitable for ``set`` type columns.
+    """
     return '{ %s }' % ' , '.join(map(cql_encode_all_types, val))
 
 
 def cql_encode_all_types(val):
+    """
+    Converts any type into a CQL string, defaulting to ``cql_encode_object``
+    if :attr:`~.cql_encoders` does not contain an entry for the type.
+    """
     return cql_encoders.get(type(val), cql_encode_object)(val)
 
 
@@ -122,6 +174,9 @@ cql_encoders = {
     frozenset: cql_encode_set_collection,
     types.GeneratorType: cql_encode_list_collection
 }
+"""
+A map of python types to encoder functions.
+"""
 
 if six.PY2:
     cql_encoders.update({

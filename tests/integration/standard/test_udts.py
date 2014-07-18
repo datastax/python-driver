@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 
 from collections import namedtuple
 
-from cassandra.cluster import Cluster
+from cassandra.cluster import Cluster, UserTypeDoesNotExist
 
 from tests.integration import get_server_versions, PROTOCOL_VERSION
 from tests.integration.long.datatype_utils import get_sample
@@ -227,6 +227,13 @@ class TypeTests(unittest.TestCase):
         self.assertTrue(type(row.b) is User)
 
         c.shutdown()
+
+    def test_non_existing_types(self):
+        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        c.connect()
+        User = namedtuple('user', ('age', 'name'))
+        self.assertRaises(UserTypeDoesNotExist, c.register_user_type, "some_bad_keyspace", "user", User)
+        self.assertRaises(UserTypeDoesNotExist, c.register_user_type, "system", "user", User)
 
     def test_datatypes(self):
         c = Cluster(protocol_version=PROTOCOL_VERSION)

@@ -240,21 +240,3 @@ class HostConnectionPoolTests(unittest.TestCase):
         self.assertEqual(a, b, 'Two Host instances should be equal when sharing.')
         self.assertNotEqual(a, c, 'Two Host instances should NOT be equal when using two different addresses.')
         self.assertNotEqual(b, c, 'Two Host instances should NOT be equal when using two different addresses.')
-
-
-class HostTests(unittest.TestCase):
-
-    def test_version_parsing(self):
-        host = Host('127.0.0.1', SimpleConvictionPolicy)
-
-        host.set_version("1.0.0")
-        self.assertEqual((1, 0, 0), host.version)
-
-        host.set_version("1.0")
-        self.assertEqual((1, 0, 0), host.version)
-
-        host.set_version("1.0.0-beta1")
-        self.assertEqual((1, 0, 0, 'beta1'), host.version)
-
-        host.set_version("1.0-SNAPSHOT")
-        self.assertEqual((1, 0, 0, 'SNAPSHOT'), host.version)

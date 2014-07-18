@@ -137,7 +137,7 @@ when you execute:
         """
         INSERT INTO users (name, credits, user_id)
         VALUES (%s, %s, %s)
-        """
+        """,
         ("John O'Reilly", 42, uuid.uuid1())
     )
 

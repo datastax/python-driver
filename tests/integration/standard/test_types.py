@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from tests.integration.datatype_utils import get_sample, DATA_TYPE_PRIMITIVES
 
 try:
     import unittest2 as unittest
@@ -87,8 +88,8 @@ class TypeTests(unittest.TestCase):
 
         s.execute(query, params)
         expected_vals = [
-           'key1',
-           bytearray(b'blobyblob')
+            'key1',
+            bytearray(b'blobyblob')
         ]
 
         results = s.execute("SELECT * FROM mytable")
@@ -404,11 +405,17 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(dt.utctimetuple(), result.utctimetuple())
 
     def test_tuple_type(self):
+        """
+        Basic test of tuple functionality
+        """
+
         if self._cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
         s = c.connect()
+
+        # use this encoder in order to insert tuples
         s.encoders[tuple] = cql_encode_tuple
 
         s.execute("""CREATE KEYSPACE test_tuple_type
@@ -428,14 +435,93 @@ class TypeTests(unittest.TestCase):
         result = s.execute("SELECT b FROM mytable WHERE a=1")[0]
         self.assertEqual(partial_result, result.b)
 
+        # test single value tuples
+        subpartial = ('zoo',)
+        subpartial_result = subpartial + (None, None)
+        s.execute("INSERT INTO mytable (a, b) VALUES (2, %s)", parameters=(subpartial,))
+        result = s.execute("SELECT b FROM mytable WHERE a=2")[0]
+        self.assertEqual(subpartial_result, result.b)
+
         # test prepared statement
         prepared = s.prepare("INSERT INTO mytable (a, b) VALUES (?, ?)")
-        s.execute(prepared, parameters=(2, complete))
-        s.execute(prepared, parameters=(3, partial))
+        s.execute(prepared, parameters=(3, complete))
+        s.execute(prepared, parameters=(4, partial))
+        s.execute(prepared, parameters=(5, subpartial))
 
         prepared = s.prepare("SELECT b FROM mytable WHERE a=?")
-        self.assertEqual(complete, s.execute(prepared, (2,))[0].b)
-        self.assertEqual(partial_result, s.execute(prepared, (3,))[0].b)
+        self.assertEqual(complete, s.execute(prepared, (3,))[0].b)
+        self.assertEqual(partial_result, s.execute(prepared, (4,))[0].b)
+        self.assertEqual(subpartial_result, s.execute(prepared, (5,))[0].b)
+
+    def test_tuple_type_varying_lengths(self):
+        """
+        Test tuple types of lengths of 1, 2, 3, and 384 to ensure edge cases work
+        as expected.
+        """
+
+        if self._cass_version < (2, 1, 0):
+            raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
+
+        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        s = c.connect()
+
+        # set the row_factory to dict_factory for programmatic access
+        # set the encoder for tuples for the ability to write tuples
+        s.row_factory = dict_factory
+        s.encoders[tuple] = cql_encode_tuple
+
+        s.execute("""CREATE KEYSPACE test_tuple_type_varying_lengths
+            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}""")
+        s.set_keyspace("test_tuple_type_varying_lengths")
+
+        # programmatically create the table with tuples of said sizes
+        lengths = (1, 2, 3, 384)
+        value_schema = []
+        for i in lengths:
+            value_schema += [' v_%s tuple<%s>' % (i, ', '.join(['int'] * i))]
+        s.execute("CREATE TABLE mytable (k int PRIMARY KEY, %s)" % (', '.join(value_schema),))
+
+        # insert tuples into same key using different columns
+        # and verify the results
+        for i in lengths:
+            created_tuple = tuple(range(0, i))
+
+            s.execute("INSERT INTO mytable (k, v_%s) VALUES (0, %s)", (i, created_tuple))
+
+            result = s.execute("SELECT v_%s FROM mytable WHERE k=0", (i,))[0]
+            self.assertEqual(tuple(created_tuple), result['v_%s' % i])
+
+    def test_tuple_subtypes(self):
+        """
+        Ensure tuple subtypes are appropriately handled.
+        """
+
+        if self._cass_version < (2, 1, 0):
+            raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
+
+        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        s = c.connect()
+        s.encoders[tuple] = cql_encode_tuple
+
+        s.execute("""CREATE KEYSPACE test_tuple_types
+            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}""")
+        s.set_keyspace("test_tuple_types")
+
+        s.execute("CREATE TABLE mytable ("
+                  "k int PRIMARY KEY, "
+                  "v tuple<%s>)" % ','.join(DATA_TYPE_PRIMITIVES))
+
+        for i in range(len(DATA_TYPE_PRIMITIVES)):
+            # create tuples to be written and ensure they match with the expected response
+            # responses have trailing None values for every element that has not been written
+            created_tuple = [get_sample(DATA_TYPE_PRIMITIVES[j]) for j in range(i + 1)]
+            response_tuple = tuple(created_tuple + [None for j in range(len(DATA_TYPE_PRIMITIVES) - i - 1)])
+            written_tuple = tuple(created_tuple)
+
+            s.execute("INSERT INTO mytable (k, v) VALUES (%s, %s)", (i, written_tuple))
+
+            result = s.execute("SELECT v FROM mytable WHERE k=%s", (i,))[0]
+            self.assertEqual(response_tuple, result.v)
 
     def test_unicode_query_string(self):
         c = Cluster(protocol_version=PROTOCOL_VERSION)
