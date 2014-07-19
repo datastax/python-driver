@@ -25,7 +25,7 @@ from collections import namedtuple
 from cassandra.cluster import Cluster
 
 from tests.integration import get_server_versions, PROTOCOL_VERSION
-from tests.integration.long.datatype_utils import get_sample
+from tests.integration.long.datatype_utils import get_sample, DATA_TYPE_PRIMITIVES
 
 class TypeTests(unittest.TestCase):
 
@@ -236,6 +236,9 @@ class TypeTests(unittest.TestCase):
         self.assertRaises(UserTypeDoesNotExist, c.register_user_type, "system", "user", User)
 
     def test_datatypes(self):
+        """
+        Test for inserting various types of datatypes into UDT's
+        """
         c = Cluster(protocol_version=PROTOCOL_VERSION)
         s = c.connect()
 
@@ -266,28 +269,26 @@ class TypeTests(unittest.TestCase):
                                         )
         """)
 
+        # alpha_type_list = []
+        # i = ord('a')
+        # for datatype in DATA_TYPE_PRIMITIVES:
+        #     alpha_type_list.append("{0} {1}".format(chr(i), datatype))
+        #     i += 1
+        # s.execute("""
+        #     CREATE TYPE alldatatypes %s
+        # """, (alpha_type_list,))
+
         s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b alldatatypes)")
-        Alldatatypes = namedtuple('alldatatypes', ('a', 'b', 'c', 'd', 'e', 'f', 'g',
-                                                    'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o'))
+
+        alphabet_list = []
+        for i in range(ord('a'), ord('a')+len(DATA_TYPE_PRIMITIVES)):
+            alphabet_list.append('{}'.format(chr(i)))
+        Alldatatypes = namedtuple('alldatatypes', alphabet_list)
 
         # insert UDT data
-        params = (
-            get_sample('ascii'),
-            get_sample('bigint'),
-            get_sample('blob'),
-            get_sample('boolean'),
-            get_sample('decimal'),
-            get_sample('double'),
-            get_sample('float'),
-            get_sample('inet'),
-            get_sample('int'),
-            get_sample('text'),
-            get_sample('timestamp'),
-            get_sample('timeuuid'),
-            get_sample('uuid'),
-            get_sample('varchar'),
-            get_sample('varint')
-        )
+        params = []
+        for datatype in DATA_TYPE_PRIMITIVES:
+            params.append((get_sample(datatype)))
 
         insert = s.prepare("INSERT INTO mytable (a, b) VALUES (?, ?)")
         s.execute(insert, (0, Alldatatypes(*params)))
