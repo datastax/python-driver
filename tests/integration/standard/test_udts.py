@@ -251,10 +251,9 @@ class TypeTests(unittest.TestCase):
 
         # create UDT
         alpha_type_list = []
-        i = ord('a')
-        for datatype in DATA_TYPE_PRIMITIVES:
-            alpha_type_list.append("{0} {1}".format(chr(i), datatype))
-            i += 1
+        start_index = ord('a')
+        for i, datatype in enumerate(DATA_TYPE_PRIMITIVES):
+            alpha_type_list.append("{0} {1}".format(chr(start_index + i), datatype))
 
         s.execute("""
             CREATE TYPE alldatatypes ({0})
