@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from tests.integration.datatype_utils import get_sample, DATA_TYPE_PRIMITIVES
+from tests.integration.datatype_utils import get_sample, DATA_TYPE_PRIMITIVES, DATA_TYPE_NON_PRIMITIVE_NAMES
 
 try:
     import unittest2 as unittest
@@ -491,7 +491,7 @@ class TypeTests(unittest.TestCase):
             result = s.execute("SELECT v_%s FROM mytable WHERE k=0", (i,))[0]
             self.assertEqual(tuple(created_tuple), result['v_%s' % i])
 
-    def test_tuple_subtypes(self):
+    def test_tuple_primitive_subtypes(self):
         """
         Ensure tuple subtypes are appropriately handled.
         """
@@ -503,9 +503,9 @@ class TypeTests(unittest.TestCase):
         s = c.connect()
         s.encoders[tuple] = cql_encode_tuple
 
-        s.execute("""CREATE KEYSPACE test_tuple_types
+        s.execute("""CREATE KEYSPACE test_tuple_primitive_subtypes
             WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}""")
-        s.set_keyspace("test_tuple_types")
+        s.set_keyspace("test_tuple_primitive_subtypes")
 
         s.execute("CREATE TABLE mytable ("
                   "k int PRIMARY KEY, "
@@ -522,6 +522,88 @@ class TypeTests(unittest.TestCase):
 
             result = s.execute("SELECT v FROM mytable WHERE k=%s", (i,))[0]
             self.assertEqual(response_tuple, result.v)
+
+    def test_tuple_non_primitive_subtypes(self):
+        """
+        Ensure tuple subtypes are appropriately handled for maps, sets, and lists.
+        """
+
+        if self._cass_version < (2, 1, 0):
+            raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
+
+        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        s = c.connect()
+
+        # set the row_factory to dict_factory for programmatic access
+        # set the encoder for tuples for the ability to write tuples
+        s.row_factory = dict_factory
+        s.encoders[tuple] = cql_encode_tuple
+
+        s.execute("""CREATE KEYSPACE test_tuple_non_primitive_subtypes
+            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}""")
+        s.set_keyspace("test_tuple_non_primitive_subtypes")
+
+        values = []
+
+        # create list values
+        for datatype in DATA_TYPE_PRIMITIVES:
+            values.append('v_{} tuple<list<{}>>'.format(len(values), datatype))
+
+        # create set values
+        for datatype in DATA_TYPE_PRIMITIVES:
+            values.append('v_{} tuple<set<{}>>'.format(len(values), datatype))
+
+        # create map values
+        for datatype in DATA_TYPE_PRIMITIVES:
+            datatype_1 = datatype_2 = datatype
+            if datatype == 'blob':
+                # unhashable type: 'bytearray'
+                datatype_1 = 'ascii'
+            values.append('v_{} tuple<map<{}, {}>>'.format(len(values), datatype_1, datatype_2))
+
+        # make sure we're testing all non primitive data types in the future
+        if set(DATA_TYPE_NON_PRIMITIVE_NAMES) != set(['tuple', 'list', 'map', 'set']):
+            raise NotImplemented('Missing datatype not implemented: {}'.format(
+                set(DATA_TYPE_NON_PRIMITIVE_NAMES) - set(['tuple', 'list', 'map', 'set'])
+            ))
+
+        # create table
+        s.execute("CREATE TABLE mytable ("
+                  "k int PRIMARY KEY, "
+                  "%s)" % ', '.join(values))
+
+        i = 0
+        # test tuple<list<datatype>>
+        for datatype in DATA_TYPE_PRIMITIVES:
+            created_tuple = tuple([[get_sample(datatype)]])
+            s.execute("INSERT INTO mytable (k, v_%s) VALUES (0, %s)", (i, created_tuple))
+
+            result = s.execute("SELECT v_%s FROM mytable WHERE k=0", (i,))[0]
+            self.assertEqual(created_tuple, result['v_%s' % i])
+            i += 1
+
+        # test tuple<set<datatype>>
+        for datatype in DATA_TYPE_PRIMITIVES:
+            created_tuple = tuple([sortedset([get_sample(datatype)])])
+            s.execute("INSERT INTO mytable (k, v_%s) VALUES (0, %s)", (i, created_tuple))
+
+            result = s.execute("SELECT v_%s FROM mytable WHERE k=0", (i,))[0]
+            self.assertEqual(created_tuple, result['v_%s' % i])
+            i += 1
+
+        # test tuple<map<datatype, datatype>>
+        for datatype in DATA_TYPE_PRIMITIVES:
+            if datatype == 'blob':
+                # unhashable type: 'bytearray'
+                created_tuple = tuple([{get_sample('ascii'): get_sample(datatype)}])
+            else:
+                created_tuple = tuple([{get_sample(datatype): get_sample(datatype)}])
+
+            s.execute("INSERT INTO mytable (k, v_%s) VALUES (0, %s)", (i, created_tuple))
+
+            result = s.execute("SELECT v_%s FROM mytable WHERE k=0", (i,))[0]
+            self.assertEqual(created_tuple, result['v_%s' % i])
+            i += 1
 
     def test_unicode_query_string(self):
         c = Cluster(protocol_version=PROTOCOL_VERSION)
