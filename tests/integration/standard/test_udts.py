@@ -237,7 +237,7 @@ class TypeTests(unittest.TestCase):
 
     def test_datatypes(self):
         """
-        Test for inserting various types of datatypes into UDT's
+        Test for inserting various types of DATA_TYPE_PRIMITIVES into UDT's
         """
         c = Cluster(protocol_version=PROTOCOL_VERSION)
         s = c.connect()
@@ -250,40 +250,25 @@ class TypeTests(unittest.TestCase):
         s.set_keyspace("test_datatypes")
 
         # create UDT
-        s.execute("""
-            CREATE TYPE alldatatypes (a ascii,
-                                        b bigint,
-                                        c blob,
-                                        d boolean,
-                                        e decimal,
-                                        f double,
-                                        g float,
-                                        h inet,
-                                        i int,
-                                        j text,
-                                        k timestamp,
-                                        l timeuuid,
-                                        m uuid,
-                                        n varchar,
-                                        o varint,
-                                        )
-        """)
+        alpha_type_list = []
+        i = ord('a')
+        for datatype in DATA_TYPE_PRIMITIVES:
+            alpha_type_list.append("{0} {1}".format(chr(i), datatype))
+            i += 1
 
-        # alpha_type_list = []
-        # i = ord('a')
-        # for datatype in DATA_TYPE_PRIMITIVES:
-        #     alpha_type_list.append("{0} {1}".format(chr(i), datatype))
-        #     i += 1
-        # s.execute("""
-        #     CREATE TYPE alldatatypes %s
-        # """, (alpha_type_list,))
+        s.execute("""
+            CREATE TYPE alldatatypes ({0})
+        """.format(', '.join(alpha_type_list))
+        )
 
         s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b alldatatypes)")
 
+        # register UDT
         alphabet_list = []
         for i in range(ord('a'), ord('a')+len(DATA_TYPE_PRIMITIVES)):
             alphabet_list.append('{}'.format(chr(i)))
-        Alldatatypes = namedtuple('alldatatypes', alphabet_list)
+        Alldatatypes = namedtuple("alldatatypes", alphabet_list)
+        c.register_user_type("test_datatypes", "alldatatypes", Alldatatypes)
 
         # insert UDT data
         params = []
