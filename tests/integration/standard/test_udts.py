@@ -239,7 +239,6 @@ class TypeTests(unittest.TestCase):
         else:
             return udts[i](self.nested_udt_helper(udts, i - 1))
 
-
     def test_nested_registered_udts(self):
         """
         Test for ensuring nested udts are handled correctly.
@@ -308,7 +307,16 @@ class TypeTests(unittest.TestCase):
         Test for ensuring nested unregistered udts are handled correctly.
         """
 
-        # is this even possible?
+        # close copy to test_nested_registered_udts
+        pass
+
+    def test_nested_registered_udts_with_different_namedtuples(self):
+        """
+        Test for ensuring nested udts are handled correctly when the
+        created namedtuples are use names that are different the cql type.
+        """
+
+        # close copy to test_nested_registered_udts
         pass
 
     def test_non_existing_types(self):
