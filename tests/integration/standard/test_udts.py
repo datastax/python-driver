@@ -287,7 +287,7 @@ class TypeTests(unittest.TestCase):
 
         # create and register the nested udt types
         for i in range(MAX_NESTING_DEPTH):
-            udt = namedtuple('depth_{}'.format(i + 1), ('depth_{}'.format(i)))
+            udt = namedtuple('depth_{}'.format(i + 1), ('value'))
             udts.append(udt)
             c.register_user_type("test_nested_unregistered_udts", "depth_{}".format(i + 1), udts[i + 1])
 
