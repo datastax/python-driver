@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from cassandra.decoder import dict_factory
 
 try:
     import unittest2 as unittest
@@ -227,6 +228,49 @@ class TypeTests(unittest.TestCase):
         self.assertTrue(type(row.b) is User)
 
         c.shutdown()
+
+    def test_udt_sizes(self):
+        """
+        Test for ensuring extra-lengthy udts are handled correctly.
+        """
+
+        if self._cass_version < (2, 1, 0):
+            raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
+
+        MAX_TEST_LENGTH = 16384
+
+        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        s = c.connect()
+
+        s.execute("""CREATE KEYSPACE test_udt_sizes
+            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}""")
+        s.set_keyspace("test_udt_sizes")
+
+        # create the seed udt
+        s.execute("CREATE TYPE lengthy_udt ({})".format(', '.join(['v_{} int'.format(i) for i in range(MAX_TEST_LENGTH)])))
+
+        # create a table with multiple sizes of nested udts
+        # no need for all nested types, only a spot checked few and the largest one
+        s.execute("CREATE TABLE mytable ("
+                  "k int PRIMARY KEY, "
+                  "v lengthy_udt)")
+
+        # create and register the seed udt type
+        udt = namedtuple('lengthy_udt', tuple(['v_{}'.format(i) for i in range(MAX_TEST_LENGTH)]))
+        c.register_user_type("test_udt_sizes", "lengthy_udt", udt)
+
+        # verify inserts and reads
+        for i in (0, 1, 2, 3, MAX_TEST_LENGTH):
+            # create udt
+            params = [j for j in range(i)] + [None for j in range(MAX_TEST_LENGTH - i)]
+            created_udt = udt(*params)
+
+            # write udt
+            s.execute("INSERT INTO mytable (k, v) VALUES (0, %s)", (created_udt,))
+
+            # verify udt was written and read correctly
+            result = s.execute("SELECT v FROM mytable WHERE k=0")[0]
+            self.assertEqual(created_udt, result.v)
 
     def test_non_existing_types(self):
         c = Cluster(protocol_version=PROTOCOL_VERSION)
