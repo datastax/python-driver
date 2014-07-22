@@ -9,6 +9,7 @@ Bug Fixes
 * Don't ignore fetch_size arguments to Statement constructors (github-151)
 * Allow disabling automatic paging on a per-statement basis when it's
   enabled by default for the session (PYTHON-93)
+* Correctly encode nested tuples and UDTs for non-prepared statements (PYTHON-100)
 
 Other
 -----
