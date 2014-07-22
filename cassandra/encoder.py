@@ -49,154 +49,156 @@ def cql_quote(term):
         return str(term)
 
 
-def cql_encode_none(val):
+class ValueSequence(list):
+    pass
+
+
+class Encoder(object):
     """
-    Converts :const:`None` to the string 'NULL'.
+    A container for mapping python types to CQL string literals when working
+    with non-prepared statements.  The type :attr:`~.Encoder.mapping` can be
+    directly customized by users.
     """
-    return 'NULL'
 
-
-def cql_encode_unicode(val):
+    mapping = None
     """
-    Converts :class:`unicode` objects to UTF-8 encoded strings with quote escaping.
+    A map of python types to encoder functions.
     """
-    return cql_quote(val.encode('utf-8'))
 
+    def __init__(self):
+        self.mapping = {
+            float: self.cql_encode_object,
+            bytearray: self.cql_encode_bytes,
+            str: self.cql_encode_str,
+            int: self.cql_encode_object,
+            UUID: self.cql_encode_object,
+            datetime.datetime: self.cql_encode_datetime,
+            datetime.date: self.cql_encode_date,
+            dict: self.cql_encode_map_collection,
+            OrderedDict: self.cql_encode_map_collection,
+            list: self.cql_encode_list_collection,
+            tuple: self.cql_encode_list_collection,
+            set: self.cql_encode_set_collection,
+            frozenset: self.cql_encode_set_collection,
+            types.GeneratorType: self.cql_encode_list_collection,
+            ValueSequence: self.cql_encode_sequence
+        }
 
-def cql_encode_str(val):
-    """
-    Escapes quotes in :class:`str` objects.
-    """
-    return cql_quote(val)
+        if six.PY2:
+            self.mapping.update({
+                unicode: self.cql_encode_unicode,
+                buffer: self.cql_encode_bytes,
+                long: self.cql_encode_object,
+                types.NoneType: self.cql_encode_none,
+            })
+        else:
+            self.mapping.update({
+                memoryview: self.cql_encode_bytes,
+                bytes: self.cql_encode_bytes,
+                type(None): self.cql_encode_none,
+            })
 
+        # sortedset is optional
+        try:
+            from blist import sortedset
+            self.mapping.update({
+                sortedset: self.cql_encode_set_collection
+            })
+        except ImportError:
+            pass
 
-if six.PY3:
-    def cql_encode_bytes(val):
-        return (b'0x' + hexlify(val)).decode('utf-8')
-elif sys.version_info >= (2, 7):
-    def cql_encode_bytes(val):  # noqa
-        return b'0x' + hexlify(val)
-else:
-    # python 2.6 requires string or read-only buffer for hexlify
-    def cql_encode_bytes(val):  # noqa
-        return b'0x' + hexlify(buffer(val))
+    def cql_encode_none(self, val):
+        """
+        Converts :const:`None` to the string 'NULL'.
+        """
+        return 'NULL'
 
+    def cql_encode_unicode(self, val):
+        """
+        Converts :class:`unicode` objects to UTF-8 encoded strings with quote escaping.
+        """
+        return cql_quote(val.encode('utf-8'))
 
-def cql_encode_object(val):
-    """
-    Default encoder for all objects that do not have a specific encoder function
-    registered. This function simply calls :meth:`str()` on the object.
-    """
-    return str(val)
+    def cql_encode_str(self, val):
+        """
+        Escapes quotes in :class:`str` objects.
+        """
+        return cql_quote(val)
 
+    if six.PY3:
+        def cql_encode_bytes(self, val):
+            return (b'0x' + hexlify(val)).decode('utf-8')
+    elif sys.version_info >= (2, 7):
+        def cql_encode_bytes(self, val):  # noqa
+            return b'0x' + hexlify(val)
+    else:
+        # python 2.6 requires string or read-only buffer for hexlify
+        def cql_encode_bytes(self, val):  # noqa
+            return b'0x' + hexlify(buffer(val))
 
-def cql_encode_datetime(val):
-    """
-    Converts a :class:`datetime.datetime` object to a (string) integer timestamp
-    with millisecond precision.
-    """
-    timestamp = calendar.timegm(val.utctimetuple())
-    return str(long(timestamp * 1e3 + getattr(val, 'microsecond', 0) / 1e3))
+    def cql_encode_object(self, val):
+        """
+        Default encoder for all objects that do not have a specific encoder function
+        registered. This function simply calls :meth:`str()` on the object.
+        """
+        return str(val)
 
+    def cql_encode_datetime(self, val):
+        """
+        Converts a :class:`datetime.datetime` object to a (string) integer timestamp
+        with millisecond precision.
+        """
+        timestamp = calendar.timegm(val.utctimetuple())
+        return str(long(timestamp * 1e3 + getattr(val, 'microsecond', 0) / 1e3))
 
-def cql_encode_date(val):
-    """
-    Converts a :class:`datetime.date` object to a string with format
-    ``YYYY-MM-DD-0000``.
-    """
-    return "'%s'" % val.strftime('%Y-%m-%d-0000')
+    def cql_encode_date(self, val):
+        """
+        Converts a :class:`datetime.date` object to a string with format
+        ``YYYY-MM-DD-0000``.
+        """
+        return "'%s'" % val.strftime('%Y-%m-%d-0000')
 
+    def cql_encode_sequence(self, val):
+        """
+        Converts a sequence to a string of the form ``(item1, item2, ...)``.  This
+        is suitable for ``IN`` value lists.
+        """
+        return '( %s )' % ' , '.join(self.mapping.get(type(v), self.cql_encode_object)(v)
+                                     for v in val)
 
-def cql_encode_sequence(val):
+    cql_encode_tuple = cql_encode_sequence
     """
     Converts a sequence to a string of the form ``(item1, item2, ...)``.  This
-    is suitable for ``IN`` value lists.
+    is suitable for ``tuple`` type columns.
     """
-    return '( %s )' % ' , '.join(cql_encoders.get(type(v), cql_encode_object)(v)
-                                 for v in val)
 
+    def cql_encode_map_collection(self, val):
+        """
+        Converts a dict into a string of the form ``{key1: val1, key2: val2, ...}``.
+        This is suitable for ``map`` type columns.
+        """
+        return '{ %s }' % ' , '.join('%s : %s' % (
+            self.mapping.get(type(k), self.cql_encode_object)(k),
+            self.mapping.get(type(v), self.cql_encode_object)(v)
+        ) for k, v in six.iteritems(val))
 
-cql_encode_tuple = cql_encode_sequence
-"""
-Converts a sequence to a string of the form ``(item1, item2, ...)``.  This
-is suitable for ``tuple`` type columns.
-"""
+    def cql_encode_list_collection(self, val):
+        """
+        Converts a sequence to a string of the form ``[item1, item2, ...]``.  This
+        is suitable for ``list`` type columns.
+        """
+        return '[ %s ]' % ' , '.join(self.mapping.get(type(v), self.cql_encode_object)(v) for v in val)
 
+    def cql_encode_set_collection(self, val):
+        """
+        Converts a sequence to a string of the form ``{item1, item2, ...}``.  This
+        is suitable for ``set`` type columns.
+        """
+        return '{ %s }' % ' , '.join(self.mapping.get(type(v), self.cql_encode_object)(v) for v in val)
 
-def cql_encode_map_collection(val):
-    """
-    Converts a dict into a string of the form ``{key1: val1, key2: val2, ...}``.
-    This is suitable for ``map`` type columns.
-    """
-    return '{ %s }' % ' , '.join('%s : %s' % (
-        cql_encode_all_types(k),
-        cql_encode_all_types(v)
-    ) for k, v in six.iteritems(val))
-
-
-def cql_encode_list_collection(val):
-    """
-    Converts a sequence to a string of the form ``[item1, item2, ...]``.  This
-    is suitable for ``list`` type columns.
-    """
-    return '[ %s ]' % ' , '.join(map(cql_encode_all_types, val))
-
-
-def cql_encode_set_collection(val):
-    """
-    Converts a sequence to a string of the form ``{item1, item2, ...}``.  This
-    is suitable for ``set`` type columns.
-    """
-    return '{ %s }' % ' , '.join(map(cql_encode_all_types, val))
-
-
-def cql_encode_all_types(val):
-    """
-    Converts any type into a CQL string, defaulting to ``cql_encode_object``
-    if :attr:`~.cql_encoders` does not contain an entry for the type.
-    """
-    return cql_encoders.get(type(val), cql_encode_object)(val)
-
-
-cql_encoders = {
-    float: cql_encode_object,
-    bytearray: cql_encode_bytes,
-    str: cql_encode_str,
-    int: cql_encode_object,
-    UUID: cql_encode_object,
-    datetime.datetime: cql_encode_datetime,
-    datetime.date: cql_encode_date,
-    dict: cql_encode_map_collection,
-    OrderedDict: cql_encode_map_collection,
-    list: cql_encode_list_collection,
-    tuple: cql_encode_list_collection,
-    set: cql_encode_set_collection,
-    frozenset: cql_encode_set_collection,
-    types.GeneratorType: cql_encode_list_collection
-}
-"""
-A map of python types to encoder functions.
-"""
-
-if six.PY2:
-    cql_encoders.update({
-        unicode: cql_encode_unicode,
-        buffer: cql_encode_bytes,
-        long: cql_encode_object,
-        types.NoneType: cql_encode_none,
-    })
-else:
-    cql_encoders.update({
-        memoryview: cql_encode_bytes,
-        bytes: cql_encode_bytes,
-        type(None): cql_encode_none,
-    })
-
-# sortedset is optional
-try:
-    from blist import sortedset
-    cql_encoders.update({
-        sortedset: cql_encode_set_collection
-    })
-except ImportError:
-    pass
+    def cql_encode_all_types(self, val):
+        """
+        Converts any type into a CQL string, defaulting to ``cql_encode_object``
+        if :attr:`~Encoder.mapping` does not contain an entry for the type.
+        """
+        return self.mapping.get(type(val), self.cql_encode_object)(val)
