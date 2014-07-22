@@ -3,41 +3,34 @@
 
 .. module:: cassandra.encoder
 
-.. data:: cql_encoders
+.. autoclass:: Encoder ()
 
-    A map of python types to encoder functions.
+   .. autoattribute:: cassandra.encoder.Encoder.mapping
 
-.. autofunction:: cql_encode_none ()
+   .. automethod:: cassandra.encoder.Encoder.cql_encode_none ()
 
-.. autofunction:: cql_encode_object ()
+   .. automethod:: cassandra.encoder.Encoder.cql_encode_object ()
 
-.. autofunction:: cql_encode_all_types ()
+   .. automethod:: cassandra.encoder.Encoder.cql_encode_all_types ()
 
-.. autofunction:: cql_encode_sequence ()
+   .. automethod:: cassandra.encoder.Encoder.cql_encode_sequence ()
 
-String Types
-------------
+   .. automethod:: cassandra.encoder.Encoder.cql_encode_str ()
 
-.. autofunction:: cql_encode_str ()
+   .. automethod:: cassandra.encoder.Encoder.cql_encode_unicode ()
 
-.. autofunction:: cql_encode_unicode ()
+   .. automethod:: cassandra.encoder.Encoder.cql_encode_bytes ()
 
-.. autofunction:: cql_encode_bytes ()
+      Converts strings, buffers, and bytearrays into CQL blob literals.
 
-Date Types
-----------
+   .. automethod:: cassandra.encoder.Encoder.cql_encode_datetime ()
 
-.. autofunction:: cql_encode_datetime ()
+   .. automethod:: cassandra.encoder.Encoder.cql_encode_date ()
 
-.. autofunction:: cql_encode_date ()
+   .. automethod:: cassandra.encoder.Encoder.cql_encode_map_collection ()
 
-Collection Types
-----------------
+   .. automethod:: cassandra.encoder.Encoder.cql_encode_list_collection ()
 
-.. autofunction:: cql_encode_map_collection ()
+   .. automethod:: cassandra.encoder.Encoder.cql_encode_set_collection ()
 
-.. autofunction:: cql_encode_list_collection ()
-
-.. autofunction:: cql_encode_set_collection ()
-
-.. autofunction:: cql_encode_tuple ()
+   .. automethod:: cql_encode_tuple ()
