@@ -22,11 +22,12 @@ log = logging.getLogger(__name__)
 
 from collections import namedtuple
 
-from cassandra.cluster import Cluster
+from cassandra.cluster import Cluster, UserTypeDoesNotExist
 
 from tests.integration import get_server_versions, PROTOCOL_VERSION
 from tests.integration.datatype_utils import get_sample, get_nonprim_sample,\
     DATA_TYPE_PRIMITIVES, DATA_TYPE_NON_PRIMITIVE_NAMES
+
 
 class TypeTests(unittest.TestCase):
 
@@ -265,7 +266,7 @@ class TypeTests(unittest.TestCase):
 
         # register UDT
         alphabet_list = []
-        for i in range(ord('a'), ord('a')+len(DATA_TYPE_PRIMITIVES)):
+        for i in range(ord('a'), ord('a') + len(DATA_TYPE_PRIMITIVES)):
             alphabet_list.append('{}'.format(chr(i)))
         Alldatatypes = namedtuple("alldatatypes", alphabet_list)
         c.register_user_type("test_primitive_datatypes", "alldatatypes", Alldatatypes)
@@ -308,11 +309,12 @@ class TypeTests(unittest.TestCase):
         for i, nonprim_datatype in enumerate(DATA_TYPE_NON_PRIMITIVE_NAMES):
             for j, datatype in enumerate(DATA_TYPE_PRIMITIVES):
                 if nonprim_datatype == "map":
-                    alpha_type_list.append("{0}_{1} {2}<{3}, {3}>".format(chr(start_index + i), chr(start_index + j),
-                                                                          nonprim_datatype, datatype))
+                    type_string = "{0}_{1} {2}<{3}, {3}>".format(chr(start_index + i), chr(start_index + j),
+                                                                 nonprim_datatype, datatype)
                 else:
-                    alpha_type_list.append("{0}_{1} {2}<{3}>".format(chr(start_index + i), chr(start_index + j),
-                                                                     nonprim_datatype, datatype))
+                    type_string = "{0}_{1} {2}<{3}>".format(chr(start_index + i), chr(start_index + j),
+                                                            nonprim_datatype, datatype)
+                alpha_type_list.append(type_string)
 
         s.execute("""
             CREATE TYPE alldatatypes ({0})
@@ -323,8 +325,8 @@ class TypeTests(unittest.TestCase):
 
         # register UDT
         alphabet_list = []
-        for i in range(ord('a'), ord('a')+len(DATA_TYPE_NON_PRIMITIVE_NAMES)):
-            for j in range(ord('a'), ord('a')+len(DATA_TYPE_PRIMITIVES)):
+        for i in range(ord('a'), ord('a') + len(DATA_TYPE_NON_PRIMITIVE_NAMES)):
+            for j in range(ord('a'), ord('a') + len(DATA_TYPE_PRIMITIVES)):
                 alphabet_list.append('{0}_{1}'.format(chr(i), chr(j)))
 
         Alldatatypes = namedtuple("alldatatypes", alphabet_list)
