@@ -448,6 +448,9 @@ class TypeTests(unittest.TestCase):
         s.execute(prepared, parameters=(4, partial))
         s.execute(prepared, parameters=(5, subpartial))
 
+        # extra items in the tuple should result in an error
+        self.assertRaises(ValueError, s.execute, prepared, parameters=(0, (1, 2, 3, 4, 5, 6)))
+
         prepared = s.prepare("SELECT b FROM mytable WHERE a=?")
         self.assertEqual(complete, s.execute(prepared, (3,))[0].b)
         self.assertEqual(partial_result, s.execute(prepared, (4,))[0].b)
