@@ -119,18 +119,21 @@ def get_sample(datatype):
 
     return SAMPLE_DATA[datatype]
 
-def get_nonprim_sample(non_prim_type):
+def get_nonprim_sample(non_prim_type, datatype):
     """
     Helper method to access created sample data for non-primitives
     """
 
     if non_prim_type == 'list':
-        return ['text', 'text']
+        return [get_sample(datatype), get_sample(datatype)]
     elif non_prim_type == 'set':
-        return sortedset(['text'])
+        return sortedset([get_sample(datatype)])
     elif non_prim_type == 'map':
-        return {'text': 'text'}
+        if datatype == 'blob':
+            return {get_sample('ascii'): get_sample(datatype)}
+        else:
+            return {get_sample(datatype): get_sample(datatype)}
     elif non_prim_type == 'tuple':
-        return ('text', 'text')
+        return (get_sample(datatype),)
     else:
         raise Exception('Missing handling of non-primitive type {0}.'.format(non_prim_type))
