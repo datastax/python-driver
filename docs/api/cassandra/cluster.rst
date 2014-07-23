@@ -67,7 +67,7 @@
 
    .. autoattribute:: use_client_timestamp
 
-   .. autoattribute:: encoders
+   .. autoattribute:: encoder
 
    .. automethod:: execute(statement[, parameters][, timeout][, trace])
 

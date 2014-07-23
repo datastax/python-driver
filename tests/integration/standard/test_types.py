@@ -34,7 +34,6 @@ except ImportError:
 from cassandra import InvalidRequest
 from cassandra.cluster import Cluster
 from cassandra.cqltypes import Int32Type, EMPTY
-from cassandra.encoder import cql_encode_tuple
 from cassandra.query import dict_factory
 from cassandra.util import OrderedDict
 
@@ -416,7 +415,7 @@ class TypeTests(unittest.TestCase):
         s = c.connect()
 
         # use this encoder in order to insert tuples
-        s.encoders[tuple] = cql_encode_tuple
+        s.encoder.mapping[tuple] = s.encoder.cql_encode_tuple
 
         s.execute("""CREATE KEYSPACE test_tuple_type
             WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}""")
@@ -448,6 +447,9 @@ class TypeTests(unittest.TestCase):
         s.execute(prepared, parameters=(4, partial))
         s.execute(prepared, parameters=(5, subpartial))
 
+        # extra items in the tuple should result in an error
+        self.assertRaises(ValueError, s.execute, prepared, parameters=(0, (1, 2, 3, 4, 5, 6)))
+
         prepared = s.prepare("SELECT b FROM mytable WHERE a=?")
         self.assertEqual(complete, s.execute(prepared, (3,))[0].b)
         self.assertEqual(partial_result, s.execute(prepared, (4,))[0].b)
@@ -468,7 +470,7 @@ class TypeTests(unittest.TestCase):
         # set the row_factory to dict_factory for programmatic access
         # set the encoder for tuples for the ability to write tuples
         s.row_factory = dict_factory
-        s.encoders[tuple] = cql_encode_tuple
+        s.encoder.mapping[tuple] = s.encoder.cql_encode_tuple
 
         s.execute("""CREATE KEYSPACE test_tuple_type_varying_lengths
             WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}""")
@@ -501,7 +503,7 @@ class TypeTests(unittest.TestCase):
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
         s = c.connect()
-        s.encoders[tuple] = cql_encode_tuple
+        s.encoder.mapping[tuple] = s.encoder.cql_encode_tuple
 
         s.execute("""CREATE KEYSPACE test_tuple_primitive_subtypes
             WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}""")
@@ -523,6 +525,26 @@ class TypeTests(unittest.TestCase):
             result = s.execute("SELECT v FROM mytable WHERE k=%s", (i,))[0]
             self.assertEqual(response_tuple, result.v)
 
+    def nested_tuples_schema_helper(self, depth):
+        """
+        Helper method for creating nested tuple schema
+        """
+
+        if depth == 0:
+            return 'int'
+        else:
+            return 'tuple<%s>' % self.nested_tuples_schema_helper(depth - 1)
+
+    def nested_tuples_creator_helper(self, depth):
+        """
+        Helper method for creating nested tuples
+        """
+
+        if depth == 0:
+            return 303
+        else:
+            return (self.nested_tuples_creator_helper(depth - 1), )
+
     def test_tuple_non_primitive_subtypes(self):
         """
         Ensure tuple subtypes are appropriately handled for maps, sets, and lists.
@@ -537,7 +559,7 @@ class TypeTests(unittest.TestCase):
         # set the row_factory to dict_factory for programmatic access
         # set the encoder for tuples for the ability to write tuples
         s.row_factory = dict_factory
-        s.encoders[tuple] = cql_encode_tuple
+        s.encoder.mapping[tuple] = s.encoder.cql_encode_tuple
 
         s.execute("""CREATE KEYSPACE test_tuple_non_primitive_subtypes
             WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}""")
@@ -604,6 +626,49 @@ class TypeTests(unittest.TestCase):
             result = s.execute("SELECT v_%s FROM mytable WHERE k=0", (i,))[0]
             self.assertEqual(created_tuple, result['v_%s' % i])
             i += 1
+
+    def test_nested_tuples(self):
+        """
+        Ensure nested are appropriately handled.
+        """
+
+        if self._cass_version < (2, 1, 0):
+            raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
+
+        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        s = c.connect()
+
+        # set the row_factory to dict_factory for programmatic access
+        # set the encoder for tuples for the ability to write tuples
+        s.row_factory = dict_factory
+        s.encoder.mapping[tuple] = s.encoder.cql_encode_tuple
+
+        s.execute("""CREATE KEYSPACE test_nested_tuples
+            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}""")
+        s.set_keyspace("test_nested_tuples")
+
+        # create a table with multiple sizes of nested tuples
+        s.execute("CREATE TABLE mytable ("
+                  "k int PRIMARY KEY, "
+                  "v_1 %s,"
+                  "v_2 %s,"
+                  "v_3 %s,"
+                  "v_128 %s"
+                  ")" % (self.nested_tuples_schema_helper(1),
+                        self.nested_tuples_schema_helper(2),
+                        self.nested_tuples_schema_helper(3),
+                        self.nested_tuples_schema_helper(128)))
+
+        for i in (1, 2, 3, 128):
+            # create tuple
+            created_tuple = self.nested_tuples_creator_helper(i)
+
+            # write tuple
+            s.execute("INSERT INTO mytable (k, v_%s) VALUES (%s, %s)", (i, i, created_tuple))
+
+            # verify tuple was written and read correctly
+            result = s.execute("SELECT v_%s FROM mytable WHERE k=%s", (i, i))[0]
+            self.assertEqual(created_tuple, result['v_%s' % i])
 
     def test_unicode_query_string(self):
         c = Cluster(protocol_version=PROTOCOL_VERSION)
