@@ -26,6 +26,8 @@ from collections import namedtuple
 from cassandra.cluster import Cluster, UserTypeDoesNotExist
 
 from tests.integration import get_server_versions, PROTOCOL_VERSION
+from tests.integration.datatype_utils import get_sample, get_nonprim_sample,\
+    DATA_TYPE_PRIMITIVES, DATA_TYPE_NON_PRIMITIVE_NAMES
 
 
 class TypeTests(unittest.TestCase):
@@ -325,3 +327,117 @@ class TypeTests(unittest.TestCase):
         User = namedtuple('user', ('age', 'name'))
         self.assertRaises(UserTypeDoesNotExist, c.register_user_type, "some_bad_keyspace", "user", User)
         self.assertRaises(UserTypeDoesNotExist, c.register_user_type, "system", "user", User)
+
+    def test_primitive_datatypes(self):
+        """
+        Test for inserting various types of DATA_TYPE_PRIMITIVES into UDT's
+        """
+        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        s = c.connect()
+
+        # create keyspace
+        s.execute("""
+            CREATE KEYSPACE test_primitive_datatypes
+            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1' }
+            """)
+        s.set_keyspace("test_primitive_datatypes")
+
+        # create UDT
+        alpha_type_list = []
+        start_index = ord('a')
+        for i, datatype in enumerate(DATA_TYPE_PRIMITIVES):
+            alpha_type_list.append("{0} {1}".format(chr(start_index + i), datatype))
+
+        s.execute("""
+            CREATE TYPE alldatatypes ({0})
+        """.format(', '.join(alpha_type_list))
+        )
+
+        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b alldatatypes)")
+
+        # register UDT
+        alphabet_list = []
+        for i in range(ord('a'), ord('a') + len(DATA_TYPE_PRIMITIVES)):
+            alphabet_list.append('{}'.format(chr(i)))
+        Alldatatypes = namedtuple("alldatatypes", alphabet_list)
+        c.register_user_type("test_primitive_datatypes", "alldatatypes", Alldatatypes)
+
+        # insert UDT data
+        params = []
+        for datatype in DATA_TYPE_PRIMITIVES:
+            params.append((get_sample(datatype)))
+
+        insert = s.prepare("INSERT INTO mytable (a, b) VALUES (?, ?)")
+        s.execute(insert, (0, Alldatatypes(*params)))
+
+        # retrieve and verify data
+        results = s.execute("SELECT * FROM mytable")
+        self.assertEqual(1, len(results))
+
+        row = results[0].b
+        for expected, actual in zip(params, row):
+            self.assertEqual(expected, actual)
+
+        c.shutdown()
+
+    def test_nonprimitive_datatypes(self):
+        """
+        Test for inserting various types of DATA_TYPE_NON_PRIMITIVE into UDT's
+        """
+        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        s = c.connect()
+
+        # create keyspace
+        s.execute("""
+            CREATE KEYSPACE test_nonprimitive_datatypes
+            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1' }
+            """)
+        s.set_keyspace("test_nonprimitive_datatypes")
+
+        # create UDT
+        alpha_type_list = []
+        start_index = ord('a')
+        for i, nonprim_datatype in enumerate(DATA_TYPE_NON_PRIMITIVE_NAMES):
+            for j, datatype in enumerate(DATA_TYPE_PRIMITIVES):
+                if nonprim_datatype == "map":
+                    type_string = "{0}_{1} {2}<{3}, {3}>".format(chr(start_index + i), chr(start_index + j),
+                                                                 nonprim_datatype, datatype)
+                else:
+                    type_string = "{0}_{1} {2}<{3}>".format(chr(start_index + i), chr(start_index + j),
+                                                            nonprim_datatype, datatype)
+                alpha_type_list.append(type_string)
+
+        s.execute("""
+            CREATE TYPE alldatatypes ({0})
+        """.format(', '.join(alpha_type_list))
+        )
+
+        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b alldatatypes)")
+
+        # register UDT
+        alphabet_list = []
+        for i in range(ord('a'), ord('a') + len(DATA_TYPE_NON_PRIMITIVE_NAMES)):
+            for j in range(ord('a'), ord('a') + len(DATA_TYPE_PRIMITIVES)):
+                alphabet_list.append('{0}_{1}'.format(chr(i), chr(j)))
+
+        Alldatatypes = namedtuple("alldatatypes", alphabet_list)
+        c.register_user_type("test_nonprimitive_datatypes", "alldatatypes", Alldatatypes)
+
+        # insert UDT data
+        params = []
+        for nonprim_datatype in DATA_TYPE_NON_PRIMITIVE_NAMES:
+            for datatype in DATA_TYPE_PRIMITIVES:
+                params.append((get_nonprim_sample(nonprim_datatype, datatype)))
+
+        insert = s.prepare("INSERT INTO mytable (a, b) VALUES (?, ?)")
+        s.execute(insert, (0, Alldatatypes(*params)))
+
+        # retrieve and verify data
+        results = s.execute("SELECT * FROM mytable")
+        self.assertEqual(1, len(results))
+
+        row = results[0].b
+        for expected, actual in zip(params, row):
+            self.assertEqual(expected, actual)
+
+        c.shutdown()
