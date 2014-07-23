@@ -1585,10 +1585,10 @@ class Session(object):
             raise UserTypeDoesNotExist(
                 'User type %s does not exist in keyspace %s' % (user_type, keyspace))
 
-        def encode(encoder_self, val):
+        def encode(val):
             return '{ %s }' % ' , '.join('%s : %s' % (
                 field_name,
-                encoder_self.cql_encode_all_types(getattr(val, field_name))
+                self.encoder.cql_encode_all_types(getattr(val, field_name))
             ) for field_name in type_meta.field_names)
 
         self.encoder.mapping[klass] = encode
