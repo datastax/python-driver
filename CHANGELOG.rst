@@ -11,6 +11,7 @@ Bug Fixes
   enabled by default for the session (PYTHON-93)
 * Raise ValueError when tuple query parameters for prepared statements
   have extra items (PYTHON-98)
+* Correctly encode nested tuples and UDTs for non-prepared statements (PYTHON-100)
 
 Other
 -----

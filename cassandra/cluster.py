@@ -44,7 +44,7 @@ from itertools import groupby
 from cassandra import (ConsistencyLevel, AuthenticationFailed,
                        InvalidRequest, OperationTimedOut, UnsupportedOperation)
 from cassandra.connection import ConnectionException, ConnectionShutdown
-from cassandra.encoder import cql_encode_all_types, cql_encoders
+from cassandra.encoder import Encoder
 from cassandra.protocol import (QueryMessage, ResultMessage,
                                 ErrorMessage, ReadTimeoutErrorMessage,
                                 WriteTimeoutErrorMessage,
@@ -1162,25 +1162,25 @@ class Session(object):
     .. versionadded:: 2.1.0
     """
 
-    encoders = None
+    encoder = None
     """
-    A map of python types to CQL encoder functions that will be used when
-    formatting query parameters for non-prepared statements.  This mapping
-    is not used for prepared statements (because prepared statements
-    give the driver more information about what CQL types are expected, allowing
-    it to accept a wider range of python types).
+    A :class:`~cassandra.encoder.Encoder` instance that will be used when
+    formatting query parameters for non-prepared statements.  This is not used
+    for prepared statements (because prepared statements give the driver more
+    information about what CQL types are expected, allowing it to accept a
+    wider range of python types).
 
-    This mapping can be be modified by users as they see fit.  Functions from
-    :mod:`cassandra.encoder` should be used, if possible, because they take
-    precautions to avoid injections and properly sanitize data.
+    The encoder uses a mapping from python types to encoder methods (for
+    specific CQL types).  This mapping can be be modified by users as they see
+    fit.  Methods of :class:`~cassandra.encoder.Encoder` should be used for mapping
+    values if possible, because they take precautions to avoid injections and
+    properly sanitize data.
 
     Example::
 
-        from cassandra.encoder import cql_encode_tuple
-
         cluster = Cluster()
         session = cluster.connect("mykeyspace")
-        session.encoders[tuple] = cql_encode_tuple
+        session.encoder.mapping[tuple] = session.encoder.cql_encode_tuple
 
         session.execute("CREATE TABLE mytable (k int PRIMARY KEY, col tuple<int, ascii>)")
         session.execute("INSERT INTO mytable (k, col) VALUES (%s, %s)", [0, (123, 'abc')])
@@ -1202,7 +1202,7 @@ class Session(object):
         self._metrics = cluster.metrics
         self._protocol_version = self.cluster.protocol_version
 
-        self.encoders = cql_encoders.copy()
+        self.encoder = Encoder()
 
         # create connection pools in parallel
         futures = []
@@ -1328,7 +1328,7 @@ class Session(object):
             if six.PY2 and isinstance(query_string, six.text_type):
                 query_string = query_string.encode('utf-8')
             if parameters:
-                query_string = bind_params(query_string, parameters, self.encoders)
+                query_string = bind_params(query_string, parameters, self.encoder)
             message = QueryMessage(
                 query_string, cl, query.serial_consistency_level,
                 fetch_size, timestamp=timestamp)
@@ -1585,13 +1585,13 @@ class Session(object):
             raise UserTypeDoesNotExist(
                 'User type %s does not exist in keyspace %s' % (user_type, keyspace))
 
-        def encode(val):
+        def encode(encoder_self, val):
             return '{ %s }' % ' , '.join('%s : %s' % (
                 field_name,
-                cql_encode_all_types(getattr(val, field_name))
+                encoder_self.cql_encode_all_types(getattr(val, field_name))
             ) for field_name in type_meta.field_names)
 
-        self.encoders[klass] = encode
+        self.encoder.mapping[klass] = encode
 
     def submit(self, fn, *args, **kwargs):
         """ Internal """
