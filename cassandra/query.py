@@ -27,8 +27,8 @@ import six
 
 from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.cqltypes import unix_time_from_uuid1
-from cassandra.encoder import (cql_encoders, cql_encode_object,
-                               cql_encode_sequence)
+from cassandra.encoder import Encoder
+import cassandra.encoder
 from cassandra.util import OrderedDict
 
 import logging
@@ -57,7 +57,7 @@ def tuple_factory(colnames, rows):
 
     Example::
 
-        >>> from cassandra.query import named_tuple_factory
+        >>> from cassandra.query import tuple_factory
         >>> session = cluster.connect('mykeyspace')
         >>> session.row_factory = tuple_factory
         >>> rows = session.execute("SELECT name, age FROM users LIMIT 1")
@@ -625,8 +625,8 @@ class BatchStatement(Statement):
         """
         if isinstance(statement, six.string_types):
             if parameters:
-                encoders = cql_encoders if self._session is None else self._session.encoders
-                statement = bind_params(statement, parameters, encoders)
+                encoder = Encoder() if self._session is None else self._session.encoder
+                statement = bind_params(statement, parameters, encoder)
             self._statements_and_parameters.append((False, statement, ()))
         elif isinstance(statement, PreparedStatement):
             query_id = statement.query_id
@@ -644,8 +644,8 @@ class BatchStatement(Statement):
             # it must be a SimpleStatement
             query_string = statement.query_string
             if parameters:
-                encoders = cql_encoders if self._session is None else self._session.encoders
-                query_string = bind_params(query_string, parameters, encoders)
+                encoder = Encoder() if self._session is None else self._session.encoder
+                query_string = bind_params(query_string, parameters, encoder)
             self._statements_and_parameters.append((False, query_string, ()))
         return self
 
@@ -665,33 +665,27 @@ class BatchStatement(Statement):
     __repr__ = __str__
 
 
-class ValueSequence(object):
-    """
-    A wrapper class that is used to specify that a sequence of values should
-    be treated as a CQL list of values instead of a single column collection when used
-    as part of the `parameters` argument for :meth:`.Session.execute()`.
+ValueSequence = cassandra.encoder.ValueSequence
+"""
+A wrapper class that is used to specify that a sequence of values should
+be treated as a CQL list of values instead of a single column collection when used
+as part of the `parameters` argument for :meth:`.Session.execute()`.
 
-    This is typically needed when supplying a list of keys to select.
-    For example::
+This is typically needed when supplying a list of keys to select.
+For example::
 
-        >>> my_user_ids = ('alice', 'bob', 'charles')
-        >>> query = "SELECT * FROM users WHERE user_id IN %s"
-        >>> session.execute(query, parameters=[ValueSequence(my_user_ids)])
+    >>> my_user_ids = ('alice', 'bob', 'charles')
+    >>> query = "SELECT * FROM users WHERE user_id IN %s"
+    >>> session.execute(query, parameters=[ValueSequence(my_user_ids)])
 
-    """
-
-    def __init__(self, sequence):
-        self.sequence = sequence
-
-    def __str__(self):
-        return cql_encode_sequence(self.sequence)
+"""
 
 
-def bind_params(query, params, encoders):
+def bind_params(query, params, encoder):
     if isinstance(params, dict):
-        return query % dict((k, encoders.get(type(v), cql_encode_object)(v)) for k, v in six.iteritems(params))
+        return query % dict((k, encoder.cql_encode_all_types(v)) for k, v in six.iteritems(params))
     else:
-        return query % tuple(encoders.get(type(v), cql_encode_object)(v) for v in params)
+        return query % tuple(encoder.cql_encode_all_types(v) for v in params)
 
 
 class TraceUnavailable(Exception):

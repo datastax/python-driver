@@ -34,8 +34,18 @@
 
     .. autoattribute:: COUNTER
 
-.. autoclass:: ValueSequence
-   :members:
+.. autoclass:: cassandra.query.ValueSequence
+
+    A wrapper class that is used to specify that a sequence of values should
+    be treated as a CQL list of values instead of a single column collection when used
+    as part of the `parameters` argument for :meth:`.Session.execute()`. 
+
+    This is typically needed when supplying a list of keys to select.
+    For example::
+
+        >>> my_user_ids = ('alice', 'bob', 'charles')
+        >>> query = "SELECT * FROM users WHERE user_id IN %s"
+        >>> session.execute(query, parameters=[ValueSequence(my_user_ids)])
 
 .. autoclass:: QueryTrace ()
    :members:

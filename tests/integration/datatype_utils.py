@@ -16,6 +16,11 @@ import datetime
 from uuid import UUID
 import pytz
 
+try:
+    from blist import sortedset
+except ImportError:
+    sortedset = set  # noqa
+
 DATA_TYPE_PRIMITIVES = [
     'ascii',
     'bigint',
@@ -113,3 +118,22 @@ def get_sample(datatype):
     """
 
     return SAMPLE_DATA[datatype]
+
+def get_nonprim_sample(non_prim_type, datatype):
+    """
+    Helper method to access created sample data for non-primitives
+    """
+
+    if non_prim_type == 'list':
+        return [get_sample(datatype), get_sample(datatype)]
+    elif non_prim_type == 'set':
+        return sortedset([get_sample(datatype)])
+    elif non_prim_type == 'map':
+        if datatype == 'blob':
+            return {get_sample('ascii'): get_sample(datatype)}
+        else:
+            return {get_sample(datatype): get_sample(datatype)}
+    elif non_prim_type == 'tuple':
+        return (get_sample(datatype),)
+    else:
+        raise Exception('Missing handling of non-primitive type {0}.'.format(non_prim_type))
