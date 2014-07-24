@@ -525,26 +525,6 @@ class TypeTests(unittest.TestCase):
             result = s.execute("SELECT v FROM mytable WHERE k=%s", (i,))[0]
             self.assertEqual(response_tuple, result.v)
 
-    def nested_tuples_schema_helper(self, depth):
-        """
-        Helper method for creating nested tuple schema
-        """
-
-        if depth == 0:
-            return 'int'
-        else:
-            return 'tuple<%s>' % self.nested_tuples_schema_helper(depth - 1)
-
-    def nested_tuples_creator_helper(self, depth):
-        """
-        Helper method for creating nested tuples
-        """
-
-        if depth == 0:
-            return 303
-        else:
-            return (self.nested_tuples_creator_helper(depth - 1), )
-
     def test_tuple_non_primitive_subtypes(self):
         """
         Ensure tuple subtypes are appropriately handled for maps, sets, and lists.
@@ -626,6 +606,26 @@ class TypeTests(unittest.TestCase):
             result = s.execute("SELECT v_%s FROM mytable WHERE k=0", (i,))[0]
             self.assertEqual(created_tuple, result['v_%s' % i])
             i += 1
+
+    def nested_tuples_schema_helper(self, depth):
+        """
+        Helper method for creating nested tuple schema
+        """
+
+        if depth == 0:
+            return 'int'
+        else:
+            return 'tuple<%s>' % self.nested_tuples_schema_helper(depth - 1)
+
+    def nested_tuples_creator_helper(self, depth):
+        """
+        Helper method for creating nested tuples
+        """
+
+        if depth == 0:
+            return 303
+        else:
+            return (self.nested_tuples_creator_helper(depth - 1), )
 
     def test_nested_tuples(self):
         """
