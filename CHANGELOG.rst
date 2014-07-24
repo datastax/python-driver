@@ -12,6 +12,7 @@ Bug Fixes
 * Raise ValueError when tuple query parameters for prepared statements
   have extra items (PYTHON-98)
 * Correctly encode nested tuples and UDTs for non-prepared statements (PYTHON-100)
+* Include User Defined Types in KeyspaceMetadata.export_as_string() (PYTHON-96)
 
 Other
 -----

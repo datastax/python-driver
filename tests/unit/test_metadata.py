@@ -15,7 +15,9 @@
 try:
     import unittest2 as unittest
 except ImportError:
-    import unittest # noqa
+    import unittest  # noqa
+
+from mock import Mock
 
 import cassandra
 from cassandra.cqltypes import IntegerType, AsciiType, TupleType
@@ -24,7 +26,7 @@ from cassandra.metadata import (Murmur3Token, MD5Token,
                                 NetworkTopologyStrategy, SimpleStrategy,
                                 LocalStrategy, NoMurmur3, protect_name,
                                 protect_names, protect_value, is_valid_name,
-                                UserType)
+                                UserType, KeyspaceMetadata)
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
@@ -183,12 +185,12 @@ class TestNameEscaping(unittest.TestCase):
                 'tests ?!@#$%^&*()',
                 '1'
             ]),
-             [
-                 'tests',
-                 "\"test's\"",
-                 '"tests ?!@#$%^&*()"',
-                 '"1"'
-             ])
+            [
+                'tests',
+                "\"test's\"",
+                '"tests ?!@#$%^&*()"',
+                '"1"'
+            ])
 
     def test_protect_value(self):
         """
@@ -252,19 +254,61 @@ class TestTokens(unittest.TestCase):
             pass
 
 
+class TestKeyspaceMetadata(unittest.TestCase):
+
+    def test_export_as_string_user_types(self):
+        keyspace_name = 'test'
+        keyspace = KeyspaceMetadata(keyspace_name, True, 'SimpleStrategy', dict(replication_factor=3))
+        keyspace.user_types['a'] = UserType(keyspace_name, 'a', ['one', 'two'],
+                                            [self.mock_user_type('UserType', 'c'),
+                                             self.mock_user_type('IntType', 'int')])
+        keyspace.user_types['b'] = UserType(keyspace_name, 'b', ['one', 'two', 'three'],
+                                            [self.mock_user_type('UserType', 'd'),
+                                             self.mock_user_type('IntType', 'int'),
+                                             self.mock_user_type('UserType', 'a')])
+        keyspace.user_types['c'] = UserType(keyspace_name, 'c', ['one'],
+                                            [self.mock_user_type('IntType', 'int')])
+        keyspace.user_types['d'] = UserType(keyspace_name, 'd', ['one'],
+                                            [self.mock_user_type('UserType', 'c')])
+
+        self.assertEqual("""CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '3'}  AND durable_writes = true;
+
+CREATE TYPE test.c (
+    one int
+);
+
+CREATE TYPE test.a (
+    one c,
+    two int
+);
+
+CREATE TYPE test.d (
+    one c
+);
+
+CREATE TYPE test.b (
+    one d,
+    two int,
+    three a
+);""", keyspace.export_as_string())
+
+    def mock_user_type(self, cassname, typename):
+        return Mock(**{'cassname': cassname, 'typename': typename, 'cql_parameterized_type.return_value': typename})
+
+
 class TestUserTypes(unittest.TestCase):
 
     def test_as_cql_query(self):
         field_types = [IntegerType, AsciiType, TupleType.apply_parameters([IntegerType, AsciiType])]
         udt = UserType("ks1", "mytype", ["a", "b", "c"], field_types)
-        self.assertEqual("CREATE TYPE ks1.mytype (a varint, b ascii, c tuple<varint, ascii>)", udt.as_cql_query(formatted=False))
+        self.assertEqual("CREATE TYPE ks1.mytype (a varint, b ascii, c tuple<varint, ascii>);", udt.as_cql_query(formatted=False))
 
         self.assertEqual("""CREATE TYPE ks1.mytype (
     a varint,
     b ascii,
     c tuple<varint, ascii>
-)""", udt.as_cql_query(formatted=True))
+);""", udt.as_cql_query(formatted=True))
 
     def test_as_cql_query_name_escaping(self):
         udt = UserType("MyKeyspace", "MyType", ["AbA", "keyspace"], [AsciiType, AsciiType])
-        self.assertEqual('CREATE TYPE "MyKeyspace"."MyType" ("AbA" ascii, "keyspace" ascii)', udt.as_cql_query(formatted=False))
+        self.assertEqual('CREATE TYPE "MyKeyspace"."MyType" ("AbA" ascii, "keyspace" ascii);', udt.as_cql_query(formatted=False))
