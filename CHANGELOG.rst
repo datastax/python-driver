@@ -13,6 +13,7 @@ Bug Fixes
   have extra items (PYTHON-98)
 * Correctly encode nested tuples and UDTs for non-prepared statements (PYTHON-100)
 * Raise TypeError when a string is used for contact_points (github #164)
+* Include User Defined Types in KeyspaceMetadata.export_as_string() (PYTHON-96)
 
 Other
 -----
