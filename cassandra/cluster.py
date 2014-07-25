@@ -380,7 +380,12 @@ class Cluster(object):
         Any of the mutable Cluster attributes may be set as keyword arguments
         to the constructor.
         """
-        self.contact_points = contact_points
+        if contact_points is not None:
+            if isinstance(contact_points, six.string_types):
+                raise TypeError("contact_points should not be a string, it should be a sequence (e.g. list) of strings")
+
+            self.contact_points = contact_points
+
         self.port = port
         self.compression = compression
         self.protocol_version = protocol_version
