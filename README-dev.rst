@@ -26,6 +26,7 @@ Releasing
   so that it looks like ``(x, y, z, 'post')``
   * After a beta or rc release, this should look like ``(2, 1, '0b1', 'post')``
 * Commit and push
+* Update the JIRA versions: https://datastax-oss.atlassian.net/plugins/servlet/project-config/PYTHON/versions
 
 Building the Docs
 =================
@@ -55,6 +56,12 @@ For example::
     git add --all
     git commit -m 'Update docs'
     git push origin gh-pages
+
+If docs build includes errors, those errors may not show up in the next build unless
+you have changed the files with errors.  It's good to occassionally clear the build
+directory and build from scratch::
+
+    rm -rf docs/_build/*
 
 Running the Tests
 =================
