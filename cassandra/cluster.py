@@ -1324,6 +1324,8 @@ class Session(object):
         fetch_size = query.fetch_size
         if fetch_size is FETCH_SIZE_UNSET and self._protocol_version >= 2:
             fetch_size = self.default_fetch_size
+        else:
+            fetch_size = None
 
         if self._protocol_version >= 3 and self.use_client_timestamp:
             timestamp = int(time.time() * 1e6)
