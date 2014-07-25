@@ -1,6 +1,6 @@
 2.1.0c1
 =======
-In Progress
+July 25, 2014
 
 Bug Fixes
 ---------
