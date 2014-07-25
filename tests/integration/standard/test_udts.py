@@ -354,7 +354,7 @@ class TypeTests(unittest.TestCase):
         if self._cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
-        MAX_NESTING_DEPTH = 4  # TODO: Move to 128, or similar
+        MAX_NESTING_DEPTH = 128
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
         s = c.connect()
@@ -389,22 +389,20 @@ class TypeTests(unittest.TestCase):
         # create and register the seed udt type
         udt = namedtuple('depth_0', ('age', 'name'))
         udts.append(udt)
-        # c.register_user_type("test_nested_unregistered_udts", "depth_0", udts[0])
 
         # create and register the nested udt types
         for i in range(MAX_NESTING_DEPTH):
             udt = namedtuple('depth_{}'.format(i + 1), ('value'))
             udts.append(udt)
-            # c.register_user_type("test_nested_unregistered_udts", "depth_{}".format(i + 1), udts[i + 1])
 
         # verify inserts and reads
         for i in (0, 1, 2, 3, MAX_NESTING_DEPTH):
             # create udt
             udt = self.nested_udt_helper(udts, i)
-            print udt
 
             # write udt
-            s.execute("INSERT INTO mytable (k, v_%s) VALUES (0, %s)", (i, udt))
+            insert = s.prepare("INSERT INTO mytable (k, v_{0}) VALUES (0, ?)".format(i))
+            s.execute(insert, (udt,))
 
             # verify udt was written and read correctly
             result = s.execute("SELECT v_%s FROM mytable WHERE k=0", (i,))[0]
