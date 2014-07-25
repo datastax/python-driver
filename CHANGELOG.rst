@@ -5,6 +5,15 @@ In Progress
 Bug Fixes
 ---------
 * Properly specify UDTs for columns in CREATE TABLE statements
+* Avoid moving retries to a new host when using request ID zero (PYTHON-88)
+* Don't ignore fetch_size arguments to Statement constructors (github-151)
+* Allow disabling automatic paging on a per-statement basis when it's
+  enabled by default for the session (PYTHON-93)
+* Raise ValueError when tuple query parameters for prepared statements
+  have extra items (PYTHON-98)
+* Correctly encode nested tuples and UDTs for non-prepared statements (PYTHON-100)
+* Raise TypeError when a string is used for contact_points (github #164)
+* Include User Defined Types in KeyspaceMetadata.export_as_string() (PYTHON-96)
 
 Other
 -----

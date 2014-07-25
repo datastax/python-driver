@@ -26,7 +26,7 @@ from itertools import cycle, count
 from six.moves import range
 from threading import Event
 
-from cassandra.cluster import Cluster
+from cassandra.cluster import Cluster, PagedResult
 from cassandra.concurrent import execute_concurrent, execute_concurrent_with_args
 from cassandra.policies import HostDistance
 from cassandra.query import SimpleStatement
@@ -281,3 +281,79 @@ class QueryPagingTests(unittest.TestCase):
             for (success, result) in results:
                 self.assertTrue(success)
                 self.assertEquals(100, len(list(result)))
+
+    def test_fetch_size(self):
+        """
+        Ensure per-statement fetch_sizes override the default fetch size.
+        """
+        statements_and_params = zip(cycle(["INSERT INTO test3rf.test (k, v) VALUES (%s, 0)"]),
+                                    [(i, ) for i in range(100)])
+        execute_concurrent(self.session, list(statements_and_params))
+
+        prepared = self.session.prepare("SELECT * FROM test3rf.test")
+
+        self.session.default_fetch_size = 10
+        result = self.session.execute(prepared, [])
+        self.assertIsInstance(result, PagedResult)
+
+        self.session.default_fetch_size = 2000
+        result = self.session.execute(prepared, [])
+        self.assertIsInstance(result, list)
+
+        self.session.default_fetch_size = None
+        result = self.session.execute(prepared, [])
+        self.assertIsInstance(result, list)
+
+        self.session.default_fetch_size = 10
+
+        prepared.fetch_size = 2000
+        result = self.session.execute(prepared, [])
+        self.assertIsInstance(result, list)
+
+        prepared.fetch_size = None
+        result = self.session.execute(prepared, [])
+        self.assertIsInstance(result, list)
+
+        prepared.fetch_size = 10
+        result = self.session.execute(prepared, [])
+        self.assertIsInstance(result, PagedResult)
+
+        prepared.fetch_size = 2000
+        bound = prepared.bind([])
+        result = self.session.execute(bound, [])
+        self.assertIsInstance(result, list)
+
+        prepared.fetch_size = None
+        bound = prepared.bind([])
+        result = self.session.execute(bound, [])
+        self.assertIsInstance(result, list)
+
+        prepared.fetch_size = 10
+        bound = prepared.bind([])
+        result = self.session.execute(bound, [])
+        self.assertIsInstance(result, PagedResult)
+
+        bound.fetch_size = 2000
+        result = self.session.execute(bound, [])
+        self.assertIsInstance(result, list)
+
+        bound.fetch_size = None
+        result = self.session.execute(bound, [])
+        self.assertIsInstance(result, list)
+
+        bound.fetch_size = 10
+        result = self.session.execute(bound, [])
+        self.assertIsInstance(result, PagedResult)
+
+        s = SimpleStatement("SELECT * FROM test3rf.test", fetch_size=None)
+        result = self.session.execute(s, [])
+        self.assertIsInstance(result, list)
+
+        s = SimpleStatement("SELECT * FROM test3rf.test")
+        result = self.session.execute(s, [])
+        self.assertIsInstance(result, PagedResult)
+
+        s = SimpleStatement("SELECT * FROM test3rf.test")
+        s.fetch_size = None
+        result = self.session.execute(s, [])
+        self.assertIsInstance(result, list)

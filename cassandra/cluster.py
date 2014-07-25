@@ -42,9 +42,9 @@ from functools import partial, wraps
 from itertools import groupby
 
 from cassandra import (ConsistencyLevel, AuthenticationFailed,
-                       OperationTimedOut, UnsupportedOperation)
+                       InvalidRequest, OperationTimedOut, UnsupportedOperation)
 from cassandra.connection import ConnectionException, ConnectionShutdown
-from cassandra.encoder import cql_encode_all_types, cql_encoders
+from cassandra.encoder import Encoder
 from cassandra.protocol import (QueryMessage, ResultMessage,
                                 ErrorMessage, ReadTimeoutErrorMessage,
                                 WriteTimeoutErrorMessage,
@@ -65,7 +65,7 @@ from cassandra.pool import (_ReconnectionHandler, _HostReconnectionHandler,
                             NoConnectionsAvailable)
 from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              BatchStatement, bind_params, QueryTrace, Statement,
-                             named_tuple_factory, dict_factory)
+                             named_tuple_factory, dict_factory, FETCH_SIZE_UNSET)
 
 # default to gevent when we are monkey patched, otherwise if libev is available, use that as the
 # default because it's fastest. Otherwise, use asyncore.
@@ -380,7 +380,12 @@ class Cluster(object):
         Any of the mutable Cluster attributes may be set as keyword arguments
         to the constructor.
         """
-        self.contact_points = contact_points
+        if contact_points is not None:
+            if isinstance(contact_points, six.string_types):
+                raise TypeError("contact_points should not be a string, it should be a sequence (e.g. list) of strings")
+
+            self.contact_points = contact_points
+
         self.port = port
         self.compression = compression
         self.protocol_version = protocol_version
@@ -467,6 +472,53 @@ class Cluster(object):
             self, self.control_connection_timeout)
 
     def register_user_type(self, keyspace, user_type, klass):
+        """
+        Registers a class to use to represent a particular user-defined type.
+        Query parameters for this user-defined type will be assumed to be
+        instances of `klass`.  Result sets for this user-defined type will
+        be instances of `klass`.  If no class is registered for a user-defined
+        type, a namedtuple will be used for result sets, and non-prepared
+        statements may not encode parameters for this type correctly.
+
+        `keyspace` is the name of the keyspace that the UDT is defined in.
+
+        `user_type` is the string name of the UDT to register the mapping
+        for.
+
+        `klass` should be a class with attributes whose names match the
+        fields of the user-defined type.  The constructor must accepts kwargs
+        for each of the fields in the UDT.
+
+        This method should only be called after the type has been created
+        within Cassandra.
+
+        Example::
+
+            cluster = Cluster(protocol_version=3)
+            session = cluster.connect()
+            session.set_keyspace('mykeyspace')
+            session.execute("CREATE TYPE address (street text, zipcode int)")
+            session.execute("CREATE TABLE users (id int PRIMARY KEY, location address)")
+
+            # create a class to map to the "address" UDT
+            class Address(object):
+
+                def __init__(self, street, zipcode):
+                    self.street = street
+                    self.zipcode = zipcode
+
+            cluster.register_user_type('mykeyspace', 'address', Address)
+
+            # insert a row using an instance of Address
+            session.execute("INSERT INTO users (id, location) VALUES (%s, %s)",
+                            (0, Address("123 Main St.", 78723)))
+
+            # results will include Address instances
+            results = session.execute("SELECT * FROM users")
+            row = results[0]
+            print row.id, row.location.street, row.location.zipcode
+
+        """
         self._user_types[keyspace][user_type] = klass
         for session in self.sessions:
             session.user_type_registered(keyspace, user_type, klass)
@@ -591,6 +643,8 @@ class Cluster(object):
                 raise Exception("Cluster is already shut down")
 
             if not self._is_setup:
+                log.debug("Connecting to cluster, contact points: %s; protocol version: %s",
+                          self.contact_points, self.protocol_version)
                 self.connection_class.initialize_reactor()
                 atexit.register(partial(_shutdown_cluster, self))
                 for address in self.contact_points:
@@ -1115,13 +1169,35 @@ class Session(object):
     .. versionadded:: 2.1.0
     """
 
+    encoder = None
+    """
+    A :class:`~cassandra.encoder.Encoder` instance that will be used when
+    formatting query parameters for non-prepared statements.  This is not used
+    for prepared statements (because prepared statements give the driver more
+    information about what CQL types are expected, allowing it to accept a
+    wider range of python types).
+
+    The encoder uses a mapping from python types to encoder methods (for
+    specific CQL types).  This mapping can be be modified by users as they see
+    fit.  Methods of :class:`~cassandra.encoder.Encoder` should be used for mapping
+    values if possible, because they take precautions to avoid injections and
+    properly sanitize data.
+
+    Example::
+
+        cluster = Cluster()
+        session = cluster.connect("mykeyspace")
+        session.encoder.mapping[tuple] = session.encoder.cql_encode_tuple
+
+        session.execute("CREATE TABLE mytable (k int PRIMARY KEY, col tuple<int, ascii>)")
+        session.execute("INSERT INTO mytable (k, col) VALUES (%s, %s)", [0, (123, 'abc')])
+    """
+
     _lock = None
     _pools = None
     _load_balancer = None
     _metrics = None
     _protocol_version = None
-
-    encoders = None
 
     def __init__(self, cluster, hosts):
         self.cluster = cluster
@@ -1133,7 +1209,7 @@ class Session(object):
         self._metrics = cluster.metrics
         self._protocol_version = self.cluster.protocol_version
 
-        self.encoders = cql_encoders.copy()
+        self.encoder = Encoder()
 
         # create connection pools in parallel
         futures = []
@@ -1246,8 +1322,10 @@ class Session(object):
 
         cl = query.consistency_level if query.consistency_level is not None else self.default_consistency_level
         fetch_size = query.fetch_size
-        if not fetch_size and self._protocol_version >= 2:
+        if fetch_size is FETCH_SIZE_UNSET and self._protocol_version >= 2:
             fetch_size = self.default_fetch_size
+        elif self._protocol_version == 1:
+            fetch_size = None
 
         if self._protocol_version >= 3 and self.use_client_timestamp:
             timestamp = int(time.time() * 1e6)
@@ -1259,7 +1337,7 @@ class Session(object):
             if six.PY2 and isinstance(query_string, six.text_type):
                 query_string = query_string.encode('utf-8')
             if parameters:
-                query_string = bind_params(query_string, parameters, self.encoders)
+                query_string = bind_params(query_string, parameters, self.encoder)
             message = QueryMessage(
                 query_string, cl, query.serial_consistency_level,
                 fetch_size, timestamp=timestamp)
@@ -1504,15 +1582,25 @@ class Session(object):
         mapping from a user-defined type to a class.  Intended for internal
         use only.
         """
-        type_meta = self.cluster.metadata.keyspaces[keyspace].user_types[user_type]
+        try:
+            ks_meta = self.cluster.metadata.keyspaces[keyspace]
+        except KeyError:
+            raise UserTypeDoesNotExist(
+                'Keyspace %s does not exist or has not been discovered by the driver' % (keyspace,))
+
+        try:
+            type_meta = ks_meta.user_types[user_type]
+        except KeyError:
+            raise UserTypeDoesNotExist(
+                'User type %s does not exist in keyspace %s' % (user_type, keyspace))
 
         def encode(val):
             return '{ %s }' % ' , '.join('%s : %s' % (
                 field_name,
-                cql_encode_all_types(getattr(val, field_name))
+                self.encoder.cql_encode_all_types(getattr(val, field_name))
             ) for field_name in type_meta.field_names)
 
-        self.encoders[klass] = encode
+        self.encoder.mapping[klass] = encode
 
     def submit(self, fn, *args, **kwargs):
         """ Internal """
@@ -1521,6 +1609,13 @@ class Session(object):
 
     def get_pool_state(self):
         return dict((host, pool.get_state()) for host, pool in self._pools.items())
+
+
+class UserTypeDoesNotExist(Exception):
+    """
+    An attempt was made to use a user-defined type that does not exist.
+    """
+    pass
 
 
 class _ControlReconnectionHandler(_ReconnectionHandler):
@@ -1807,19 +1902,37 @@ class ControlConnection(object):
             queries = [
                 QueryMessage(query=self._SELECT_KEYSPACES, consistency_level=cl),
                 QueryMessage(query=self._SELECT_COLUMN_FAMILIES, consistency_level=cl),
-                QueryMessage(query=self._SELECT_COLUMNS, consistency_level=cl)
+                QueryMessage(query=self._SELECT_COLUMNS, consistency_level=cl),
+                QueryMessage(query=self._SELECT_USERTYPES, consistency_level=cl)
             ]
-            if self._protocol_version >= 3:
-                queries.append(QueryMessage(query=self._SELECT_USERTYPES, consistency_level=cl))
-                ks_result, cf_result, col_result, types_result = connection.wait_for_responses(*queries)
+
+            responses = connection.wait_for_responses(*queries, fail_on_error=False)
+            (ks_success, ks_result), (cf_success, cf_result), (col_success, col_result), (types_success, types_result) = responses
+
+            if ks_success:
+                ks_result = dict_factory(*ks_result.results)
+            else:
+                raise ks_result
+
+            if cf_success:
+                cf_result = dict_factory(*cf_result.results)
+            else:
+                raise cf_result
+
+            if col_success:
+                col_result = dict_factory(*col_result.results)
+            else:
+                raise col_result
+
+            # if we're connected to Cassandra < 2.1, the usertypes table will not exist
+            if types_success:
                 types_result = dict_factory(*types_result.results) if types_result.results else {}
             else:
-                ks_result, cf_result, col_result = connection.wait_for_responses(*queries)
-                types_result = {}
-
-            ks_result = dict_factory(*ks_result.results)
-            cf_result = dict_factory(*cf_result.results)
-            col_result = dict_factory(*col_result.results)
+                if isinstance(types_result, InvalidRequest):
+                    log.debug("[control connection] user types table not found")
+                    types_result = {}
+                else:
+                    raise types_result
 
             log.debug("[control connection] Fetched schema, rebuilding metadata")
             self._cluster.metadata.rebuild_schema(ks_result, types_result, cf_result, col_result)
@@ -2558,7 +2671,7 @@ class ResponseFuture(object):
             # to retry the operation
             return
 
-        if reuse_connection and self._query(self._current_host):
+        if reuse_connection and self._query(self._current_host) is not None:
             return
 
         # otherwise, move onto another host

@@ -450,7 +450,7 @@ class SimpleStrategy(ReplicationStrategy):
             while len(hosts) < self.replication_factor and j < len(ring):
                 token = ring[(i + j) % len(ring)]
                 host = token_to_host_owner[token]
-                if not host in hosts:
+                if host not in hosts:
                     hosts.append(host)
                 j += 1
 
@@ -597,7 +597,7 @@ class KeyspaceMetadata(object):
         self.user_types = {}
 
     def export_as_string(self):
-        return "\n".join([self.as_cql_query()] + [t.export_as_string() for t in self.tables.values()])
+        return "\n\n".join([self.as_cql_query()] + self.user_type_strings() + [t.export_as_string() for t in self.tables.values()])
 
     def as_cql_query(self):
         ret = "CREATE KEYSPACE %s WITH replication = %s " % (
@@ -605,19 +605,83 @@ class KeyspaceMetadata(object):
             self.replication_strategy.export_for_schema())
         return ret + (' AND durable_writes = %s;' % ("true" if self.durable_writes else "false"))
 
+    def user_type_strings(self):
+        user_type_strings = []
+        types = self.user_types.copy()
+        keys = sorted(types.keys())
+        for k in keys:
+            if k in types:
+                self.resolve_user_types(k, types, user_type_strings)
+        return user_type_strings
+
+    def resolve_user_types(self, key, types, user_type_strings):
+        user_type = types.pop(key)
+        for field_type in user_type.field_types:
+            if field_type.cassname == 'UserType' and field_type.typename in types:
+                self.resolve_user_types(field_type.typename, types, user_type_strings)
+        user_type_strings.append(user_type.as_cql_query(formatted=True))
+
 
 class UserType(object):
+    """
+    A user defined type, as created by ``CREATE TYPE`` statements.
+
+    User-defined types were introduced in Cassandra 2.1.
+
+    .. versionadded:: 2.1.0
+    """
 
     keyspace = None
+    """
+    The string name of the keyspace in which this type is defined.
+    """
+
     name = None
+    """
+    The name of this type.
+    """
+
     field_names = None
+    """
+    An ordered list of the names for each field in this user-defined type.
+    """
+
     field_types = None
+    """
+    An ordered list of the types for each field in this user-defined type.
+    """
 
     def __init__(self, keyspace, name, field_names, field_types):
         self.keyspace = keyspace
         self.name = name
         self.field_names = field_names
         self.field_types = field_types
+
+    def as_cql_query(self, formatted=False):
+        """
+        Returns a CQL query that can be used to recreate this type.
+        If `formatted` is set to :const:`True`, extra whitespace will
+        be added to make the query more readable.
+        """
+        ret = "CREATE TYPE %s.%s (%s" % (
+            protect_name(self.keyspace),
+            protect_name(self.name),
+            "\n" if formatted else "")
+
+        if formatted:
+            field_join = ",\n"
+            padding = "    "
+        else:
+            field_join = ", "
+            padding = ""
+
+        fields = []
+        for field_name, field_type in zip(self.field_names, self.field_types):
+            fields.append("%s %s" % (protect_name(field_name), field_type.cql_parameterized_type()))
+
+        ret += field_join.join("%s%s" % (padding, field) for field in fields)
+        ret += "\n);" if formatted else ");"
+        return ret
 
 
 class TableMetadata(object):

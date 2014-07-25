@@ -806,6 +806,10 @@ class TupleType(_ParameterizedType):
 
     @classmethod
     def serialize_safe(cls, val, protocol_version):
+        if len(val) > len(cls.subtypes):
+            raise ValueError("Expected %d items in a tuple, but got %d: %s" %
+                             (len(cls.subtypes), len(val), val))
+
         proto_version = max(3, protocol_version)
         buf = io.BytesIO()
         for item, subtype in zip(val, cls.subtypes):

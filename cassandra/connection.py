@@ -302,10 +302,19 @@ class Connection(object):
         return self.wait_for_responses(msg, timeout=timeout)[0]
 
     def wait_for_responses(self, *msgs, **kwargs):
+        """
+        Returns a list of (success, response) tuples.  If success
+        is False, response will be an Exception.  Otherwise, response
+        will be the normal query response.
+
+        If fail_on_error was left as True and one of the requests
+        failed, the corresponding Exception will be raised.
+        """
         if self.is_closed or self.is_defunct:
             raise ConnectionShutdown("Connection %s is already closed" % (self, ))
         timeout = kwargs.get('timeout')
-        waiter = ResponseWaiter(self, len(msgs))
+        fail_on_error = kwargs.get('fail_on_error', True)
+        waiter = ResponseWaiter(self, len(msgs), fail_on_error)
 
         # busy wait for sufficient space on the connection
         messages_sent = 0
@@ -677,9 +686,10 @@ class Connection(object):
 
 class ResponseWaiter(object):
 
-    def __init__(self, connection, num_responses):
+    def __init__(self, connection, num_responses, fail_on_error):
         self.connection = connection
         self.pending = num_responses
+        self.fail_on_error = fail_on_error
         self.error = None
         self.responses = [None] * num_responses
         self.event = Event()
@@ -688,15 +698,33 @@ class ResponseWaiter(object):
         with self.connection.lock:
             self.connection.in_flight -= 1
         if isinstance(response, Exception):
-            self.error = response
-            self.event.set()
-        else:
-            self.responses[index] = response
-            self.pending -= 1
-            if not self.pending:
+            if hasattr(response, 'to_exception'):
+                response = response.to_exception()
+            if self.fail_on_error:
+                self.error = response
                 self.event.set()
+            else:
+                self.responses[index] = (False, response)
+        else:
+            if not self.fail_on_error:
+                self.responses[index] = (True, response)
+            else:
+                self.responses[index] = response
+
+        self.pending -= 1
+        if not self.pending:
+            self.event.set()
 
     def deliver(self, timeout=None):
+        """
+        If fail_on_error was set to False, a list of (success, response)
+        tuples will be returned.  If success is False, response will be
+        an Exception.  Otherwise, response will be the normal query response.
+
+        If fail_on_error was left as True and one of the requests
+        failed, the corresponding Exception will be raised. Otherwise,
+        the normal response will be returned.
+        """
         self.event.wait(timeout)
         if self.error:
             raise self.error

@@ -12,6 +12,7 @@ API Documentation
    cassandra/metrics
    cassandra/query
    cassandra/pool
+   cassandra/encoder
    cassandra/decoder
    cassandra/concurrent
    cassandra/connection

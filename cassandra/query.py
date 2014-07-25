@@ -27,8 +27,8 @@ import six
 
 from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.cqltypes import unix_time_from_uuid1
-from cassandra.encoder import (cql_encoders, cql_encode_object,
-                               cql_encode_sequence)
+from cassandra.encoder import Encoder
+import cassandra.encoder
 from cassandra.util import OrderedDict
 
 import logging
@@ -57,7 +57,7 @@ def tuple_factory(colnames, rows):
 
     Example::
 
-        >>> from cassandra.query import named_tuple_factory
+        >>> from cassandra.query import tuple_factory
         >>> session = cluster.connect('mykeyspace')
         >>> session.row_factory = tuple_factory
         >>> rows = session.execute("SELECT name, age FROM users LIMIT 1")
@@ -133,6 +133,9 @@ def ordered_dict_factory(colnames, rows):
     return [OrderedDict(zip(colnames, row)) for row in rows]
 
 
+FETCH_SIZE_UNSET = object()
+
+
 class Statement(object):
     """
     An abstract class representing a single query. There are three subclasses:
@@ -160,7 +163,7 @@ class Statement(object):
     the Session this is executed in will be used.
     """
 
-    fetch_size = None
+    fetch_size = FETCH_SIZE_UNSET
     """
     How many rows will be fetched at a time.  This overrides the default
     of :attr:`.Session.default_fetch_size`
@@ -175,14 +178,14 @@ class Statement(object):
     _routing_key = None
 
     def __init__(self, retry_policy=None, consistency_level=None, routing_key=None,
-                 serial_consistency_level=None, fetch_size=None):
+                 serial_consistency_level=None, fetch_size=FETCH_SIZE_UNSET):
         self.retry_policy = retry_policy
         if consistency_level is not None:
             self.consistency_level = consistency_level
         if serial_consistency_level is not None:
             self.serial_consistency_level = serial_consistency_level
-        if fetch_size is not None:
-            self.fetch_size = None
+        if fetch_size is not FETCH_SIZE_UNSET:
+            self.fetch_size = fetch_size
         self._routing_key = routing_key
 
     def _get_routing_key(self):
@@ -315,9 +318,11 @@ class PreparedStatement(object):
 
     _protocol_version = None
 
+    fetch_size = FETCH_SIZE_UNSET
+
     def __init__(self, column_metadata, query_id, routing_key_indexes, query, keyspace,
                  protocol_version, consistency_level=None, serial_consistency_level=None,
-                 fetch_size=None):
+                 fetch_size=FETCH_SIZE_UNSET):
         self.column_metadata = column_metadata
         self.query_id = query_id
         self.routing_key_indexes = routing_key_indexes
@@ -326,7 +331,8 @@ class PreparedStatement(object):
         self._protocol_version = protocol_version
         self.consistency_level = consistency_level
         self.serial_consistency_level = serial_consistency_level
-        self.fetch_size = fetch_size
+        if fetch_size is not FETCH_SIZE_UNSET:
+            self.fetch_size = fetch_size
 
     @classmethod
     def from_message(cls, query_id, column_metadata, cluster_metadata, query, keyspace, protocol_version):
@@ -619,8 +625,8 @@ class BatchStatement(Statement):
         """
         if isinstance(statement, six.string_types):
             if parameters:
-                encoders = cql_encoders if self._session is None else self._session.encoders
-                statement = bind_params(statement, parameters, encoders)
+                encoder = Encoder() if self._session is None else self._session.encoder
+                statement = bind_params(statement, parameters, encoder)
             self._statements_and_parameters.append((False, statement, ()))
         elif isinstance(statement, PreparedStatement):
             query_id = statement.query_id
@@ -638,8 +644,8 @@ class BatchStatement(Statement):
             # it must be a SimpleStatement
             query_string = statement.query_string
             if parameters:
-                encoders = cql_encoders if self._session is None else self._session.encoders
-                query_string = bind_params(query_string, parameters, encoders)
+                encoder = Encoder() if self._session is None else self._session.encoder
+                query_string = bind_params(query_string, parameters, encoder)
             self._statements_and_parameters.append((False, query_string, ()))
         return self
 
@@ -659,33 +665,27 @@ class BatchStatement(Statement):
     __repr__ = __str__
 
 
-class ValueSequence(object):
-    """
-    A wrapper class that is used to specify that a sequence of values should
-    be treated as a CQL list of values instead of a single column collection when used
-    as part of the `parameters` argument for :meth:`.Session.execute()`.
+ValueSequence = cassandra.encoder.ValueSequence
+"""
+A wrapper class that is used to specify that a sequence of values should
+be treated as a CQL list of values instead of a single column collection when used
+as part of the `parameters` argument for :meth:`.Session.execute()`.
 
-    This is typically needed when supplying a list of keys to select.
-    For example::
+This is typically needed when supplying a list of keys to select.
+For example::
 
-        >>> my_user_ids = ('alice', 'bob', 'charles')
-        >>> query = "SELECT * FROM users WHERE user_id IN %s"
-        >>> session.execute(query, parameters=[ValueSequence(my_user_ids)])
+    >>> my_user_ids = ('alice', 'bob', 'charles')
+    >>> query = "SELECT * FROM users WHERE user_id IN %s"
+    >>> session.execute(query, parameters=[ValueSequence(my_user_ids)])
 
-    """
-
-    def __init__(self, sequence):
-        self.sequence = sequence
-
-    def __str__(self):
-        return cql_encode_sequence(self.sequence)
+"""
 
 
-def bind_params(query, params, encoders):
+def bind_params(query, params, encoder):
     if isinstance(params, dict):
-        return query % dict((k, encoders.get(type(v), cql_encode_object)(v)) for k, v in six.iteritems(params))
+        return query % dict((k, encoder.cql_encode_all_types(v)) for k, v in six.iteritems(params))
     else:
-        return query % tuple(encoders.get(type(v), cql_encode_object)(v) for v in params)
+        return query % tuple(encoder.cql_encode_all_types(v) for v in params)
 
 
 class TraceUnavailable(Exception):
