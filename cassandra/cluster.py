@@ -643,6 +643,8 @@ class Cluster(object):
                 raise Exception("Cluster is already shut down")
 
             if not self._is_setup:
+                log.debug("Connecting to cluster, contact points: %s; protocol version: %s",
+                          self.contact_points, self.protocol_version)
                 self.connection_class.initialize_reactor()
                 atexit.register(partial(_shutdown_cluster, self))
                 for address in self.contact_points:
