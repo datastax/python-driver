@@ -10,6 +10,9 @@ Releasing
 
 * Update CHANGELOG.rst
 * Update the version in ``cassandra/__init__.py``
+  * For beta releases, use a version like ``(2, 1, '0b1')``
+  * For release candidates, use a version like ``(2, 1, '0c1')``
+  * When in doubt, follow PEP 386 versioning
 * Commit the changelog and version changes
 * Tag the release.  For example: ``git tag -a 1.0.0 -m 'version 1.0.0'``
 * Push the commit and tag: ``git push --tags origin master``
@@ -21,6 +24,7 @@ Releasing
 * Update the docs (see below)
 * Append a 'post' string to the version tuple in ``cassandra/__init__.py``
   so that it looks like ``(x, y, z, 'post')``
+  * After a beta or rc release, this should look like ``(2, 1, '0b1', 'post')``
 * Commit and push
 
 Building the Docs
