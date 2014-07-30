@@ -31,6 +31,7 @@ Releasing
 
 * Commit and push
 * Update the JIRA versions: https://datastax-oss.atlassian.net/plugins/servlet/project-config/PYTHON/versions
+* Make an announcement on the mailing list
 
 Building the Docs
 =================
