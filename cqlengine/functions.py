@@ -116,18 +116,3 @@ class Token(BaseQueryFunction):
         for i, (col, val) in enumerate(zip(self._columns, self.value)):
             ctx[str(self.context_id + i)] = col.to_database(val)
 
-
-class NotSet(object):
-    """
-    Different from None, so you know when it just wasn't set compared to passing in None
-    """
-    pass
-
-
-def format_timestamp(timestamp):
-    if isinstance(timestamp, datetime):
-        epoch = datetime(1970, 1, 1)
-        ts = long((timestamp - epoch).total_seconds() * 1000)
-    else :
-        ts = long(timestamp)
-    return ts

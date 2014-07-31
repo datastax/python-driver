@@ -8,7 +8,6 @@ from cqlengine.query import ModelQuerySet, DMLQuery, AbstractQueryableColumn
 from cqlengine.query import DoesNotExist as _DoesNotExist
 from cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
 
-
 class ModelDefinitionException(ModelException): pass
 
 
@@ -279,6 +278,9 @@ class BaseModel(object):
 
     def __init__(self, **values):
         self._values = {}
+        self._ttl = None
+        self._timestamp = None
+
         for name, column in self._columns.items():
             value =  values.get(name, None)
             if value is not None or isinstance(column, columns.BaseContainerColumn):
@@ -772,15 +774,3 @@ class Model(BaseModel):
     __metaclass__ = ModelMetaClass
 
 
-class CounterBaseModel(BaseModel):
-    def _can_update(self):
-        # INSERT is not allowed for counter column families
-        return True
-
-
-class CounterModel(CounterBaseModel):
-    """
-    the db name for the column family can be set as the attribute db_name, or
-    it will be genertaed from the class name
-    """
-    __metaclass__ = ModelMetaClass

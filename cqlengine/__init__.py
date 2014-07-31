@@ -4,7 +4,7 @@ from cassandra import ConsistencyLevel
 
 from cqlengine.columns import *
 from cqlengine.functions import *
-from cqlengine.models import Model, CounterModel
+from cqlengine.models import Model
 from cqlengine.query import BatchQuery
 
 
