@@ -133,12 +133,7 @@ def setup_package():
     setup_test_keyspace()
 
 
-def use_multidc(dc_list):
-    global CCM_CLUSTER
-    if CCM_CLUSTER.name == MULTIDC_CLUSTER_NAME:
-        log.debug("Cluster is alread multi-dc, not replacing")
-        return
-
+def clear_and_use_multidc(dc_list):
     teardown_package()
     try:
         try:
@@ -161,17 +156,13 @@ def use_multidc(dc_list):
         log.exception("Failed to start ccm cluster:")
         raise
 
+    global CCM_CLUSTER
     CCM_CLUSTER = cluster
     setup_test_keyspace()
     log.debug("Switched to multidc cluster")
 
 
-def use_singledc():
-    global CCM_CLUSTER
-    if CCM_CLUSTER.name == CLUSTER_NAME:
-        log.debug("Cluster is alread single-dc, not replacing")
-        return
-
+def clear_and_use_singledc():
     teardown_package()
 
     setup_package()
