@@ -204,7 +204,7 @@ class Connection(object):
             self._header_length = 4
             self.max_request_id = (2 ** 7) - 1
             self.request_ids = deque(range(self.max_request_id + 1))
-            self.highest_request_id = self.max_request_id + 1
+            self.highest_request_id = self.max_request_id
 
         # 0         8        16        24        32         40
         # +---------+---------+---------+---------+---------+
