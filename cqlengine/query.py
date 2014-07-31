@@ -219,7 +219,7 @@ class AbstractQuerySet(object):
         self._result_idx = None
 
         self._batch = None
-        self._ttl = getattr(self, 'DEFAULT_TTL', None)
+        self._ttl = getattr(model, '__default_ttl__', None)
         self._consistency = None
         self._timestamp = None
 

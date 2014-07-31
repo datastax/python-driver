@@ -27,6 +27,28 @@ class BaseTTLTest(BaseCassEngTestCase):
         drop_table(TestTTLModel)
 
 
+class TestDefaultTTLModel(Model):
+    __keyspace__ = 'test'
+    __default_ttl__ = 20
+    id      = columns.UUID(primary_key=True, default=lambda:uuid4())
+    count   = columns.Integer()
+    text    = columns.Text(required=False)
+
+
+class BaseDefaultTTLTest(BaseCassEngTestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super(BaseDefaultTTLTest, cls).setUpClass()
+        sync_table(TestDefaultTTLModel)
+        sync_table(TestTTLModel)
+
+    @classmethod
+    def tearDownClass(cls):
+        super(BaseDefaultTTLTest, cls).tearDownClass()
+        drop_table(TestDefaultTTLModel)
+        drop_table(TestTTLModel)
+
 
 class TTLQueryTests(BaseTTLTest):
 
@@ -117,5 +139,45 @@ class TTLBlindUpdateTest(BaseTTLTest):
         self.assertIn("USING TTL", query)
 
 
+class TTLDefaultTest(BaseDefaultTTLTest):
+    def test_default_ttl_not_set(self):
+        session = get_session()
 
+        o = TestTTLModel.create(text="some text")
+        tid = o.id
 
+        self.assertIsNone(o._ttl)
+
+        with mock.patch.object(session, 'execute') as m:
+            TestTTLModel.objects(id=tid).update(text="aligators")
+
+        query = m.call_args[0][0].query_string
+        self.assertNotIn("USING TTL", query)
+
+    def test_default_ttl_set(self):
+        session = get_session()
+        o = TestDefaultTTLModel.create(text="some text on ttl")
+        tid = o.id
+
+        self.assertEqual(o._ttl, TestDefaultTTLModel.__default_ttl__)
+
+        with mock.patch.object(session, 'execute') as m:
+            TestDefaultTTLModel.objects(id=tid).update(text="aligators expired")
+
+        query = m.call_args[0][0].query_string
+        self.assertIn("USING TTL", query)
+
+    def test_override_default_ttl(self):
+        session = get_session()
+        o = TestDefaultTTLModel.create(text="some text on ttl")
+        tid = o.id
+
+        self.assertEqual(o._ttl, TestDefaultTTLModel.__default_ttl__)
+        o.ttl(3600)
+        self.assertEqual(o._ttl, 3600)
+
+        with mock.patch.object(session, 'execute') as m:
+            TestDefaultTTLModel.objects(id=tid).ttl(None).update(text="aligators expired")
+
+        query = m.call_args[0][0].query_string
+        self.assertNotIn("USING TTL", query)

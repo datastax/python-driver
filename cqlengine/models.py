@@ -258,7 +258,7 @@ class BaseModel(object):
     __queryset__ = ModelQuerySet
     __dmlquery__ = DMLQuery
 
-    #__ttl__ = None # this doesn't seem to be used
+    __default_ttl__ = None # default ttl value to use
     __consistency__ = None # can be set per query
 
     # Additional table properties
@@ -278,7 +278,7 @@ class BaseModel(object):
 
     def __init__(self, **values):
         self._values = {}
-        self._ttl = getattr(self, 'DEFAULT_TTL', None)
+        self._ttl = self.__default_ttl__
         self._timestamp = None
 
         for name, column in self._columns.items():
@@ -535,7 +535,7 @@ class BaseModel(object):
             v.reset_previous_value()
         self._is_persisted = True
 
-        self._ttl = getattr(self, 'DEFAULT_TTL', None)
+        self._ttl = self.__default_ttl__
         self._timestamp = None
 
         return self
@@ -573,7 +573,7 @@ class BaseModel(object):
             v.reset_previous_value()
         self._is_persisted = True
 
-        self._ttl = getattr(self, 'DEFAULT_TTL', None)
+        self._ttl = self.__default_ttl__
         self._timestamp = None
 
         return self
