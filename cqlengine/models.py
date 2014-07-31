@@ -278,7 +278,7 @@ class BaseModel(object):
 
     def __init__(self, **values):
         self._values = {}
-        self._ttl = None
+        self._ttl = getattr(self, 'DEFAULT_TTL', None)
         self._timestamp = None
 
         for name, column in self._columns.items():
@@ -535,7 +535,7 @@ class BaseModel(object):
             v.reset_previous_value()
         self._is_persisted = True
 
-        self._ttl = None
+        self._ttl = getattr(self, 'DEFAULT_TTL', None)
         self._timestamp = None
 
         return self
@@ -573,7 +573,7 @@ class BaseModel(object):
             v.reset_previous_value()
         self._is_persisted = True
 
-        self._ttl = None
+        self._ttl = getattr(self, 'DEFAULT_TTL', None)
         self._timestamp = None
 
         return self
