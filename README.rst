@@ -30,6 +30,11 @@ A couple of links for getting up to speed:
 * `API docs <http://datastax.github.io/python-driver/api/index.html>`_
 * `Performance tips <http://datastax.github.io/python-driver/performance.html>`_
 
+Object Mapper
+-------------
+The recommended object mapper for CQL is `cqlengine <https://github.com/cqlengine/cqlengine>`_,
+which utilizes this driver.
+
 Reporting Problems
 ------------------
 Please report any bugs and make any feature requests on the
