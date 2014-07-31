@@ -458,6 +458,10 @@ class SimpleStrategy(ReplicationStrategy):
         return replica_map
 
     def export_for_schema(self):
+        """
+        Returns a string version of these replication options which are
+        suitable for use in a CREATE KEYSPACE statement.
+        """
         return "{'class': 'SimpleStrategy', 'replication_factor': '%d'}" \
                % (self.replication_factor,)
 
@@ -537,6 +541,10 @@ class NetworkTopologyStrategy(ReplicationStrategy):
         return replica_map
 
     def export_for_schema(self):
+        """
+        Returns a string version of these replication options which are
+        suitable for use in a CREATE KEYSPACE statement.
+        """
         ret = "{'class': 'NetworkTopologyStrategy'"
         for dc, repl_factor in self.dc_replication_factors:
             ret += ", '%s': '%d'" % (dc, repl_factor)
@@ -557,6 +565,10 @@ class LocalStrategy(ReplicationStrategy):
         return {}
 
     def export_for_schema(self):
+        """
+        Returns a string version of these replication options which are
+        suitable for use in a CREATE KEYSPACE statement.
+        """
         return "{'class': 'LocalStrategy'}"
 
     def __eq__(self, other):
@@ -588,6 +600,11 @@ class KeyspaceMetadata(object):
     """
 
     user_types = None
+    """
+    A map from user-defined type names to instances of :class:`~cassandra.metadata..UserType`.
+
+    .. versionadded:: 2.1.0
+    """
 
     def __init__(self, name, durable_writes, strategy_class, strategy_options):
         self.name = name
@@ -597,9 +614,17 @@ class KeyspaceMetadata(object):
         self.user_types = {}
 
     def export_as_string(self):
+        """
+        Returns a CQL query string that can be used to recreate the entire keyspace,
+        including user-defined types and tables.
+        """
         return "\n\n".join([self.as_cql_query()] + self.user_type_strings() + [t.export_as_string() for t in self.tables.values()])
 
     def as_cql_query(self):
+        """
+        Returns a CQL query string that can be used to recreate just this keyspace,
+        not including user-defined types and tables.
+        """
         ret = "CREATE KEYSPACE %s WITH replication = %s " % (
             protect_name(self.name),
             self.replication_strategy.export_for_schema())
@@ -950,6 +975,10 @@ class ColumnMetadata(object):
     """ The string name of this column. """
 
     data_type = None
+    """
+    The data type for the column in the form of an instance of one of
+    the type classes in :mod:`cassandra.cqltypes`.
+    """
 
     index = None
     """

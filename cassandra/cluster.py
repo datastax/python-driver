@@ -179,12 +179,29 @@ class Cluster(object):
 
     protocol_version = 2
     """
-    The version of the native protocol to use.  The protocol version 2
-    add support for lightweight transactions, batch operations, and
-    automatic query paging, but is only supported by Cassandra 2.0+.  When
-    working with Cassandra 1.2, this must be set to 1.  You can also set
-    this to 1 when working with Cassandra 2.0+, but features that require
-    the version 2 protocol will not be enabled.
+    The version of the native protocol to use.
+
+    Version 2 of the native protocol adds support for lightweight transactions,
+    batch operations, and automatic query paging. The v2 protocol is
+    supported by Cassandra 2.0+.
+
+    Version 3 of the native protocol adds support for protocol-level
+    client-side timestamps (see :attr:`.Session.use_client_timestamp`),
+    serial consistency levels for :class:`~.BatchStatement`, and an
+    improved connection pool.
+
+    The following table describes the native protocol versions that
+    are supported by each version of Cassandra:
+
+    +-------------------+-------------------+
+    | Cassandra Version | Protocol Versions |
+    +===================+===================+
+    | 1.2               | 1                 |
+    +-------------------+-------------------+
+    | 2.0               | 1, 2              |
+    +-------------------+-------------------+
+    | 2.1               | 1, 2, 3           |
+    +-------------------+-------------------+
     """
 
     compression = True
@@ -320,8 +337,8 @@ class Cluster(object):
 
     * :class:`cassandra.io.asyncorereactor.AsyncoreConnection`
     * :class:`cassandra.io.libevreactor.LibevConnection`
-    * :class:`cassandra.io.libevreactor.GeventConnection` (requires monkey-patching)
-    * :class:`cassandra.io.libevreactor.TwistedConnection`
+    * :class:`cassandra.io.geventreactor.GeventConnection` (requires monkey-patching)
+    * :class:`cassandra.io.twistedreactor.TwistedConnection`
 
     By default, ``AsyncoreConnection`` will be used, which uses
     the ``asyncore`` module in the Python standard library.  The
@@ -1191,6 +1208,8 @@ class Session(object):
 
         session.execute("CREATE TABLE mytable (k int PRIMARY KEY, col tuple<int, ascii>)")
         session.execute("INSERT INTO mytable (k, col) VALUES (%s, %s)", [0, (123, 'abc')])
+
+    .. versionadded:: 2.1.0
     """
 
     _lock = None
@@ -1614,6 +1633,8 @@ class Session(object):
 class UserTypeDoesNotExist(Exception):
     """
     An attempt was made to use a user-defined type that does not exist.
+
+    .. versionadded:: 2.1.0
     """
     pass
 

@@ -33,14 +33,9 @@ def main():
     cluster = Cluster(['127.0.0.1'])
     session = cluster.connect()
 
-    rows = session.execute("SELECT keyspace_name FROM system.schema_keyspaces")
-    if KEYSPACE in [row[0] for row in rows]:
-        log.info("dropping existing keyspace...")
-        session.execute("DROP KEYSPACE " + KEYSPACE)
-
     log.info("creating keyspace...")
     session.execute("""
-        CREATE KEYSPACE %s
+        CREATE KEYSPACE IF NOT EXISTS %s
         WITH replication = { 'class': 'SimpleStrategy', 'replication_factor': '2' }
         """ % KEYSPACE)
 
@@ -49,7 +44,7 @@ def main():
 
     log.info("creating table...")
     session.execute("""
-        CREATE TABLE mytable (
+        CREATE TABLE IF NOT EXISTS mytable (
             thekey text,
             col1 text,
             col2 text,

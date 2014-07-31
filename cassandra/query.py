@@ -572,11 +572,17 @@ class BatchStatement(Statement):
     :attr:`.BatchType.LOGGED`.
     """
 
+    serial_consistency_level = None
+    """
+    The same as :attr:`.Statement.serial_consistency_level`, but is only
+    supported when using protocol version 3 or higher.
+    """
+
     _statements_and_parameters = None
     _session = None
 
     def __init__(self, batch_type=BatchType.LOGGED, retry_policy=None,
-                 consistency_level=None, session=None):
+                 consistency_level=None, serial_consistency_level=None, session=None):
         """
         `batch_type` specifies The :class:`.BatchType` for the batch operation.
         Defaults to :attr:`.BatchType.LOGGED`.
@@ -609,11 +615,15 @@ class BatchStatement(Statement):
             session.execute(batch)
 
         .. versionadded:: 2.0.0
+
+        .. versionchanged:: 2.1.0
+            Added `serial_consistency_level` as a parameter
         """
         self.batch_type = batch_type
         self._statements_and_parameters = []
         self._session = session
-        Statement.__init__(self, retry_policy=retry_policy, consistency_level=consistency_level)
+        Statement.__init__(self, retry_policy=retry_policy, consistency_level=consistency_level,
+                           serial_consistency_level=serial_consistency_level)
 
     def add(self, statement, parameters=None):
         """

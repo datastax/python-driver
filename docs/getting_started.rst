@@ -190,6 +190,8 @@ Only data values should be supplied this way.  Other items, such as keyspaces,
 table names, and column names should be set ahead of time (typically using
 normal string formatting).
 
+.. _type-conversions:
+
 Type Conversions
 ^^^^^^^^^^^^^^^^
 For non-prepared statements, Python types are cast to CQL literals in the
@@ -360,9 +362,7 @@ handles re-preparing against new nodes and restarted nodes when necessary.
 
 Note that the placeholders for prepared statements are ``?`` characters.  This
 is different than for simple, non-prepared statements (although future versions
-of the driver may use the same placeholders for both).  Cassandra 2.0 added
-support for named placeholders; the 1.0 version of the driver does not support
-them, but the 2.0 version will.
+of the driver may use the same placeholders for both).
 
 Setting a Consistency Level with Prepared Statements
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

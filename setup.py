@@ -96,7 +96,7 @@ class DocCommand(Command):
 
             print("")
             print("Documentation step '%s' performed, results here:" % mode)
-            print("   %s/" % path)
+            print("   file://%s/%s/index.html" % (os.path.dirname(os.path.realpath(__file__)), path))
 
 
 class BuildFailed(Exception):
