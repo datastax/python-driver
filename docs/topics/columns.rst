@@ -2,6 +2,10 @@
 Columns
 =======
 
+**Users of versions < 0.4, please read this post before upgrading:** `Breaking Changes`_
+
+.. _Breaking Changes: https://groups.google.com/forum/?fromgroups#!topic/cqlengine-users/erkSNe1JwuU
+
 .. module:: cqlengine.columns
 
 .. class:: Bytes()
@@ -14,9 +18,9 @@ Columns
 .. class:: Ascii()
 
     Stores a US-ASCII character string ::
-        
+
         columns.Ascii()
-        
+
 
 .. class:: Text()
 
@@ -34,15 +38,25 @@ Columns
 
 .. class:: Integer()
 
-    Stores an integer value ::
+    Stores a 32-bit signed integer value ::
 
         columns.Integer()
+
+.. class:: BigInt()
+
+    Stores a 64-bit signed long value ::
+
+        columns.BigInt()
+
+.. class:: VarInt()
+
+    Stores an arbitrary-precision integer ::
+
+        columns.VarInt()
 
 .. class:: DateTime()
 
     Stores a datetime value.
-
-    Python's datetime.now callable is set as the default value for this column ::
 
         columns.DateTime()
 
@@ -50,9 +64,23 @@ Columns
 
     Stores a type 1 or type 4 UUID.
 
-    Python's uuid.uuid4 callable is set as the default value for this column. ::
-
         columns.UUID()
+
+.. class:: TimeUUID()
+
+    Stores a UUID value as the cql type 'timeuuid' ::
+
+        columns.TimeUUID()
+
+    .. classmethod:: from_datetime(dt)
+
+        generates a TimeUUID for the given datetime
+
+        :param dt: the datetime to create a time uuid from
+        :type dt: datetime.datetime
+
+        :returns: a time uuid created from the given datetime
+        :rtype: uuid1
 
 .. class:: Boolean()
 
@@ -77,16 +105,24 @@ Columns
 
         columns.Decimal()
 
+.. class:: Counter()
+
+    Counters can be incremented and decremented ::
+
+        columns.Counter()
+
+
 Collection Type Columns
 ----------------------------
 
     CQLEngine also supports container column types. Each container column requires a column class argument to specify what type of objects it will hold. The Map column requires 2, one for the key, and the other for the value
-    
+
     *Example*
 
     .. code-block:: python
-        
+
         class Person(Model):
+            id          = columns.UUID(primary_key=True, default=uuid.uuid4)
             first_name  = columns.Text()
             last_name   = columns.Text()
 
@@ -94,7 +130,7 @@ Collection Type Columns
             enemies     = columns.Set(columns.Text)
             todo_list   = columns.List(columns.Text)
             birthdays   = columns.Map(columns.Text, columns.DateTime)
-        
+
 
 
 .. class:: Set()
@@ -145,12 +181,16 @@ Column Options
 
         If True, this column is created as a primary key field. A model can have multiple primary keys. Defaults to False.
 
-        *In CQL, there are 2 types of primary keys: partition keys and clustering keys. As with CQL, the first primary key is the partition key, and all others are clustering keys.*
+        *In CQL, there are 2 types of primary keys: partition keys and clustering keys. As with CQL, the first primary key is the partition key, and all others are clustering keys, unless partition keys are specified manually using* :attr:`BaseColumn.partition_key`
+
+    .. attribute:: BaseColumn.partition_key
+
+        If True, this column is created as partition primary key. There may be many partition keys defined, forming a *composite partition key*
 
     .. attribute:: BaseColumn.index
 
         If True, an index will be created for this column. Defaults to False.
-        
+
         *Note: Indexes can only be created on models with one primary key*
 
     .. attribute:: BaseColumn.db_field
@@ -163,5 +203,8 @@ Column Options
 
     .. attribute:: BaseColumn.required
 
-        If True, this model cannot be saved without a value defined for this column. Defaults to True. Primary key fields cannot have their required fields set to False.
+        If True, this model cannot be saved without a value defined for this column. Defaults to False. Primary key fields cannot have their required fields set to False.
 
+    .. attribute:: BaseColumn.clustering_order
+
+        Defines CLUSTERING ORDER for this column (valid choices are "asc" (default) or "desc"). It may be specified only for clustering primary keys - more: http://www.datastax.com/docs/1.2/cql_cli/cql/CREATE_TABLE#using-clustering-order

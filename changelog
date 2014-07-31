@@ -1,6 +1,176 @@
 CHANGELOG
 
-0.2.1 (in progress)
+0.16.0
+
+  225: No handling of PagedResult from execute
+  222: figure out how to make travis not totally fail when a test is skipped
+  220: delayed connect. use setup(delayed_connect=True)
+  218: throw exception on create_table and delete_table
+  212: Unchanged primary key trigger error on update
+  206: FAQ - why we dont' do #189
+  191: Add support for simple table properties.
+  172: raise exception when None is passed in as query param
+  170: trying to perform queries before connection is established should raise useful exception
+  162: Not Possible to Make Non-Equality Filtering Queries
+  161: Filtering on DateTime column
+  154: Blob(bytes) column type issue
+  128: remove default read_repair_chance & ensure changes are saved when using sync_table
+  106: specify caching on model
+   99: specify caching options  table management
+   94: type checking on sync_table (currently allows anything then fails miserably)
+   73: remove default 'cqlengine' keyspace  table management
+   71: add named table and query expression usage to docs
+
+
+
+0.15.0
+* native driver integration
+
+0.14.0
+
+* fix for setting map to empty (Lifto)
+* report when creating models with attributes that conflict with cqlengine (maedhroz)
+* use stable version of sure package (maedhroz)
+* performance improvements
+
+
+0.13.0
+* adding support for post batch callbacks (thanks Daniel Dotsenko github.com/dvdotsenko)
+* fixing sync table for tables with multiple keys (thanks Daniel Dotsenko github.com/dvdotsenko)
+* fixing bug in Bytes column (thanks Netanel Cohen-Tzemach github.com/natict)
+* fixing bug with timestamps and DST (thanks Netanel Cohen-Tzemach github.com/natict)
+
+0.12.0
+
+* Normalize and unquote boolean values. (Thanks Kevin Deldycke github.com/kdeldycke)
+* Fix race condition in connection manager (Thanks Roey Berman github.com/bergundy)
+* allow access to instance columns as if it is a dict (Thanks Kevin Deldycke github.com/kdeldycke)
+* Added support for blind partial updates to queryset (Thanks Danny Cosson github.com/dcosson)
+* Model instance equality check bugfix (Thanks to Michael Hall, github.com/mahall)
+* Fixed bug syncing tables with camel cased names (Thanks to Netanel Cohen-Tzemach, github.com/natict)
+* Fixed bug dealing with eggs (Thanks Kevin Deldycke github.com/kdeldycke)
+
+0.11.0
+
+* support for USING TIMESTAMP <microseconds from epoch> via a .timestamp(timedelta(seconds=30)) syntax
+  - allows for long, timedelta, and datetime
+* fixed use of USING TIMESTAMP in batches
+* clear TTL and timestamp off models after persisting to DB
+* allows UUID without dashes - (Thanks to Michael Hall, github.com/mahall)
+* fixes regarding syncing schema settings (thanks Kai Lautaportti github.com/dokai)
+
+0.10.0
+
+* support for execute_on_exception within batches
+
+0.9.2
+* fixing create keyspace with network topology strategy
+* fixing regression with query expressions
+
+0.9
+* adding update method
+* adding support for ttls
+* adding support for per-query consistency
+* adding BigInt column (thanks @Lifto)
+* adding support for timezone aware time uuid functions (thanks @dokai)
+* only saving collection fields on insert if they've been modified
+* adding model method that returns a list of modified columns
+
+0.8.5
+* adding support for timeouts
+
+0.8.4
+* changing value manager previous value copying to deepcopy
+
+0.8.3
+* better logging for operational errors
+
+0.8.2
+* fix for connection failover
+
+0.8.1
+* fix for models not exactly matching schema
+
+0.8.0
+* support for table polymorphism
+* var int type
+
+0.7.1
+* refactoring query class to make defining custom model instantiation logic easier
+
+0.7.0
+* added counter columns
+* added support for compaction settings at the model level
+* deprecated delete_table in favor of drop_table
+* deprecated create_table in favor of sync_table
+* added support for custom QuerySets
+
+0.6.0
+* added table sync
+
+0.5.2
+* adding hex conversion to Bytes column
+
+0.5.1
+* improving connection pooling
+* fixing bug with clustering order columns not being quoted
+
+0.5
+* eagerly loading results into the query result cache, the cql driver does this anyway,
+    and pulling them from the cursor was causing some problems with gevented queries,
+    this will cause some breaking changes for users calling execute directly
+
+0.4.10
+* changing query parameter placeholders from uuid1 to uuid4
+
+0.4.7
+* adding support for passing None into query batch methods to clear any batch objects
+
+0.4.6
+* fixing the way models are compared
+
+0.4.5
+* fixed bug where container columns would not call their child to_python method, this only really affected columns with special to_python logic
+
+0.4.4
+* adding query logging back
+* fixed bug updating an empty list column
+
+0.4.3
+* fixed bug with Text column validation
+
+0.4.2
+* added support for instantiating container columns with column instances
+
+0.4.1
+* fixed bug in TimeUUID from datetime method
+
+0.4.0
+* removed default values from all column types
+* explicit primary key is required (automatic id removed)
+* added validation on keyname types on .create()
+* changed table_name to __table_name__, read_repair_chance to __read_repair_chance__, keyspace to __keyspace__
+* modified table name auto generator to ignore module name
+* changed internal implementation of model value get/set
+* added TimeUUID.from_datetime(), used for generating UUID1's for a specific
+time
+
+0.3.3
+* added abstract base class models
+
+0.3.2
+* comprehesive rewrite of connection management (thanks @rustyrazorblade)
+
+0.3
+* added support for Token function (thanks @mrk-its)
+* added support for compound partition key (thanks @mrk-its)s
+* added support for defining clustering key ordering (thanks @mrk-its)
+* added values_list to Query class, bypassing object creation if desired (thanks @mrk-its)
+* fixed bug with Model.objects caching values (thanks @mrk-its)
+* fixed Cassandra 1.2.5 compatibility bug
+* updated model exception inheritance
+
+0.2.1
 * adding support for datetimes with tzinfo (thanks @gdoermann)
 * fixing bug in saving map updates (thanks @pandu-rao)
 

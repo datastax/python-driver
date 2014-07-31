@@ -8,7 +8,9 @@ before_install:
   - sudo service cassandra start
 install:
   - "pip install -r requirements.txt --use-mirrors"
-  - "pip install pytest --use-mirrors"
+    #- "pip install pytest --use-mirrors"
+
 script:
   - while [ ! -f /var/run/cassandra.pid ] ; do sleep 1 ; done # wait until cassandra is ready
-  - "py.test cqlengine/tests/"
+  - "nosetests --no-skip"
+    #  - "py.test cqlengine/tests/"

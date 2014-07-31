@@ -3,184 +3,113 @@
 #http://cassandra.apache.org/doc/cql/CQL.html
 
 from collections import namedtuple
-import Queue
-import random
+from cassandra.cluster import Cluster
+from cassandra.query import SimpleStatement, Statement
 
-import cql
+try:
+    import Queue as queue
+except ImportError:
+    # python 3
+    import queue
 
-from cqlengine.exceptions import CQLEngineException
+import logging
 
-from thrift.transport.TTransport import TTransportException
+from cqlengine.exceptions import CQLEngineException, UndefinedKeyspaceException
+from cassandra import ConsistencyLevel
+from cqlengine.statements import BaseCQLStatement
+from cassandra.query import dict_factory
 
+LOG = logging.getLogger('cqlengine.cql')
 
 class CQLConnectionError(CQLEngineException): pass
 
 Host = namedtuple('Host', ['name', 'port'])
-_hosts = []
-_host_idx = 0
-_conn= None
-_username = None
-_password = None
-_max_connections = 10
 
-def setup(hosts, username=None, password=None, max_connections=10, default_keyspace=None, lazy=False):
+cluster = None
+session = None
+lazy_connect_args = None
+default_consistency_level = None
+
+def setup(
+        hosts,
+        default_keyspace,
+        consistency=ConsistencyLevel.ONE,
+        lazy_connect=False,
+        **kwargs):
     """
     Records the hosts and connects to one of them
 
-    :param hosts: list of hosts, strings in the <hostname>:<port>, or just <hostname>
+    :param hosts: list of hosts, see http://datastax.github.io/python-driver/api/cassandra/cluster.html
+    :type hosts: list
+    :param default_keyspace: The default keyspace to use
+    :type default_keyspace: str
+    :param consistency: The global consistency level
+    :type consistency: int
+    :param lazy_connect: True if should not connect until first use
+    :type lazy_connect: bool
     """
-    global _hosts
-    global _username
-    global _password
-    global _max_connections
-    _username = username
-    _password = password
-    _max_connections = max_connections
+    global cluster, session, default_consistency_level, lazy_connect_args
 
-    if default_keyspace:
-        from cqlengine import models
-        models.DEFAULT_KEYSPACE = default_keyspace
+    if 'username' in kwargs or 'password' in kwargs:
+        raise CQLEngineException("Username & Password are now handled by using the native driver's auth_provider")
 
-    for host in hosts:
-        host = host.strip()
-        host = host.split(':')
-        if len(host) == 1:
-            _hosts.append(Host(host[0], 9160))
-        elif len(host) == 2:
-            _hosts.append(Host(*host))
-        else:
-            raise CQLConnectionError("Can't parse {}".format(''.join(host)))
+    if not default_keyspace:
+        raise UndefinedKeyspaceException()
 
-    if not _hosts:
-        raise CQLConnectionError("At least one host required")
+    from cqlengine import models
+    models.DEFAULT_KEYSPACE = default_keyspace
 
-    random.shuffle(_hosts)
+    default_consistency_level = consistency
+    if lazy_connect:
+        lazy_connect_args = (hosts, default_keyspace, consistency, kwargs)
+        return
 
-    if not lazy:
-        con = ConnectionPool.get()
-        ConnectionPool.put(con)
+    cluster = Cluster(hosts, **kwargs)
+    session = cluster.connect()
+    session.row_factory = dict_factory
+
+def execute(query, params=None, consistency_level=None):
+
+    handle_lazy_connect()
+
+    if not session:
+        raise CQLEngineException("It is required to setup() cqlengine before executing queries")
 
 
-class ConnectionPool(object):
-    """Handles pooling of database connections."""
+    if consistency_level is None:
+        consistency_level = default_consistency_level
 
-    # Connection pool queue
-    _queue = None
+    if isinstance(query, Statement):
+        pass
 
-    @classmethod
-    def clear(cls):
-        """
-        Force the connection pool to be cleared. Will close all internal
-        connections.
-        """
-        try:
-            while not cls._queue.empty():
-                cls._queue.get().close()
-        except:
-            pass
+    elif isinstance(query, BaseCQLStatement):
+        params = query.get_context()
+        query = str(query)
+        query = SimpleStatement(query, consistency_level=consistency_level)
 
-    @classmethod
-    def get(cls):
-        """
-        Returns a usable database connection. Uses the internal queue to
-        determine whether to return an existing connection or to create
-        a new one.
-        """
-        try:
-            if cls._queue.empty():
-                return cls._create_connection()
-            return cls._queue.get()
-        except CQLConnectionError as cqle:
-            raise cqle
-        except:
-            if not cls._queue:
-                cls._queue = Queue.Queue(maxsize=_max_connections)
-            return cls._create_connection()
-
-    @classmethod
-    def put(cls, conn):
-        """
-        Returns a connection to the queue freeing it up for other queries to
-        use.
-
-        :param conn: The connection to be released
-        :type conn: connection
-        """
-        try:
-            if cls._queue.full():
-                conn.close()
-            else:
-                cls._queue.put(conn)
-        except:
-            if not cls._queue:
-                cls._queue = Queue.Queue(maxsize=_max_connections)
-            cls._queue.put(conn)
-
-    @classmethod
-    def _create_connection(cls):
-        """
-        Creates a new connection for the connection pool.
-        """
-        global _hosts
-        global _username
-        global _password
-
-        if not _hosts:
-            raise CQLConnectionError("At least one host required")
-
-        host = _hosts[_host_idx]
-
-        new_conn = cql.connect(host.name, host.port, user=_username, password=_password)
-        new_conn.set_cql_version('3.0.0')
-        return new_conn
+    elif isinstance(query, basestring):
+        query = SimpleStatement(query, consistency_level=consistency_level)
 
 
-class connection_manager(object):
-    """
-    Connection failure tolerant connection manager. Written to be used in a 'with' block for connection pooling
-    """
-    def __init__(self):
-        if not _hosts:
-            raise CQLConnectionError("No connections have been configured, call cqlengine.connection.setup")
-        self.keyspace = None
-        self.con = ConnectionPool.get()
-        self.cur = None
+    LOG.info(query.query_string)
 
-    def close(self):
-        if self.cur: self.cur.close()
-        ConnectionPool.put(self.con)
+    params = params or {}
+    result = session.execute(query, params)
 
-    def __enter__(self):
-        return self
+    return result
 
-    def __exit__(self, type, value, traceback):
-        self.close()
 
-    def execute(self, query, params=None):
-        """
-        Gets a connection from the pool and executes the given query, returns the cursor
+def get_session():
+    handle_lazy_connect()
+    return session
 
-        if there's a connection problem, this will silently create a new connection pool
-        from the available hosts, and remove the problematic host from the host list
-        """
-        if params is None:
-            params = {}
-        global _host_idx
+def get_cluster():
+    handle_lazy_connect()
+    return cluster
 
-        for i in range(len(_hosts)):
-            try:
-                self.cur = self.con.cursor()
-                self.cur.execute(query, params)
-                return self.cur
-            except cql.ProgrammingError as ex:
-                raise CQLEngineException(unicode(ex))
-            except TTransportException:
-                #TODO: check for other errors raised in the event of a connection / server problem
-                #move to the next connection and set the connection pool
-                _host_idx += 1
-                _host_idx %= len(_hosts)
-                self.con.close()
-                self.con = ConnectionPool._create_connection()
-
-        raise CQLConnectionError("couldn't reach a Cassandra server")
-
+def handle_lazy_connect():
+    global lazy_connect_args
+    if lazy_connect_args:
+        hosts, default_keyspace, consistency, kwargs = lazy_connect_args
+        lazy_connect_args = None
+        setup(hosts, default_keyspace, consistency, **kwargs)

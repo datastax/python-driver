@@ -1,12 +1,15 @@
 from unittest import skip
+from uuid import uuid4
 from cqlengine.tests.base import BaseCassEngTestCase
 
-from cqlengine.management import create_table
-from cqlengine.management import delete_table
+from cqlengine.management import sync_table
+from cqlengine.management import drop_table
 from cqlengine.models import Model
 from cqlengine import columns
 
 class TestModel(Model):
+    __keyspace__ = 'test'
+    id      = columns.UUID(primary_key=True, default=lambda:uuid4())
     count   = columns.Integer()
     text    = columns.Text(required=False)
 
@@ -15,7 +18,7 @@ class TestEqualityOperators(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(TestEqualityOperators, cls).setUpClass()
-        create_table(TestModel)
+        sync_table(TestModel)
 
     def setUp(self):
         super(TestEqualityOperators, self).setUp()
@@ -25,7 +28,7 @@ class TestEqualityOperators(BaseCassEngTestCase):
     @classmethod
     def tearDownClass(cls):
         super(TestEqualityOperators, cls).tearDownClass()
-        delete_table(TestModel)
+        drop_table(TestModel)
 
     def test_an_instance_evaluates_as_equal_to_itself(self):
         """

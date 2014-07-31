@@ -3,28 +3,35 @@ from unittest import skip
 from uuid import uuid4
 import random
 from cqlengine import Model, columns
-from cqlengine.management import delete_table, create_table
-from cqlengine.query import BatchQuery
+from cqlengine.management import drop_table, sync_table
+from cqlengine.query import BatchQuery, DMLQuery
 from cqlengine.tests.base import BaseCassEngTestCase
 
 class TestMultiKeyModel(Model):
+    __keyspace__ = 'test'
     partition   = columns.Integer(primary_key=True)
     cluster     = columns.Integer(primary_key=True)
     count       = columns.Integer(required=False)
     text        = columns.Text(required=False)
+
+class BatchQueryLogModel(Model):
+    __keyspace__ = 'test'
+    # simple k/v table
+    k = columns.Integer(primary_key=True)
+    v = columns.Integer()
 
 class BatchQueryTests(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
         super(BatchQueryTests, cls).setUpClass()
-        delete_table(TestMultiKeyModel)
-        create_table(TestMultiKeyModel)
+        drop_table(TestMultiKeyModel)
+        sync_table(TestMultiKeyModel)
 
     @classmethod
     def tearDownClass(cls):
         super(BatchQueryTests, cls).tearDownClass()
-        delete_table(TestMultiKeyModel)
+        drop_table(TestMultiKeyModel)
 
     def setUp(self):
         super(BatchQueryTests, self).setUp()
@@ -104,3 +111,61 @@ class BatchQueryTests(BaseCassEngTestCase):
         for m in TestMultiKeyModel.all():
             m.delete()
 
+    def test_none_success_case(self):
+        """ Tests that passing None into the batch call clears any batch object """
+        b = BatchQuery()
+
+        q = TestMultiKeyModel.objects.batch(b)
+        assert q._batch == b
+
+        q = q.batch(None)
+        assert q._batch is None
+
+    def test_dml_none_success_case(self):
+        """ Tests that passing None into the batch call clears any batch object """
+        b = BatchQuery()
+
+        q = DMLQuery(TestMultiKeyModel, batch=b)
+        assert q._batch == b
+
+        q.batch(None)
+        assert q._batch is None
+
+    def test_batch_execute_on_exception_succeeds(self):
+    # makes sure if execute_on_exception == True we still apply the batch
+        drop_table(BatchQueryLogModel)
+        sync_table(BatchQueryLogModel)
+
+        obj = BatchQueryLogModel.objects(k=1)
+        self.assertEqual(0, len(obj))
+
+        try:
+            with BatchQuery(execute_on_exception=True) as b:
+                BatchQueryLogModel.batch(b).create(k=1, v=1)
+                raise Exception("Blah")
+        except:
+            pass
+
+        obj = BatchQueryLogModel.objects(k=1)
+        # should be 1 because the batch should execute
+        self.assertEqual(1, len(obj))
+
+    def test_batch_execute_on_exception_skips_if_not_specified(self):
+    # makes sure if execute_on_exception == True we still apply the batch
+        drop_table(BatchQueryLogModel)
+        sync_table(BatchQueryLogModel)
+
+        obj = BatchQueryLogModel.objects(k=2)
+        self.assertEqual(0, len(obj))
+
+        try:
+            with BatchQuery() as b:
+                BatchQueryLogModel.batch(b).create(k=2, v=2)
+                raise Exception("Blah")
+        except:
+            pass
+
+        obj = BatchQueryLogModel.objects(k=2)
+        
+        # should be 0 because the batch should not execute
+        self.assertEqual(0, len(obj))

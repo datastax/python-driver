@@ -1,15 +1,15 @@
 cqlengine
 ===============
 
-cqlengine is a Cassandra CQL 3 Object Mapper for Python with an interface similar to the Django orm and mongoengine
+cqlengine is a Cassandra CQL 3 Object Mapper for Python
+
+**Users of versions < 0.16, the default keyspace 'cqlengine' has been removed. Please read this before upgrading:** [Breaking Changes](https://cqlengine.readthedocs.org/en/latest/topics/models.html#keyspace-change)
 
 [Documentation](https://cqlengine.readthedocs.org/en/latest/)
 
 [Report a Bug](https://github.com/bdeggleston/cqlengine/issues)
 
 [Users Mailing List](https://groups.google.com/forum/?fromgroups#!forum/cqlengine-users)
-
-[Dev Mailing List](https://groups.google.com/forum/?fromgroups#!forum/cqlengine-dev)
 
 ## Installation
 ```
@@ -20,23 +20,27 @@ pip install cqlengine
 
 ```python
 #first, define a model
+import uuid
 from cqlengine import columns
 from cqlengine.models import Model
 
 class ExampleModel(Model):
     read_repair_chance = 0.05 # optional - defaults to 0.1
-    example_id      = columns.UUID(primary_key=True)  
+    example_id      = columns.UUID(primary_key=True, default=uuid.uuid4)
     example_type    = columns.Integer(index=True)
     created_at      = columns.DateTime()
     description     = columns.Text(required=False)
 
 #next, setup the connection to your cassandra server(s)...
 >>> from cqlengine import connection
->>> connection.setup(['127.0.0.1:9160'])
+>>> connection.setup(['127.0.0.1'])
+
+# or if you're still on cassandra 1.2
+>>> connection.setup(['127.0.0.1'], protocol_version=1)
 
 #...and create your CQL table
->>> from cqlengine.management import create_table
->>> create_table(ExampleModel)
+>>> from cqlengine.management import sync_table
+>>> sync_table(ExampleModel)
 
 #now we can create some rows:
 >>> em1 = ExampleModel.create(example_type=0, description="example1", created_at=datetime.now())
@@ -47,8 +51,6 @@ class ExampleModel(Model):
 >>> em6 = ExampleModel.create(example_type=1, description="example6", created_at=datetime.now())
 >>> em7 = ExampleModel.create(example_type=1, description="example7", created_at=datetime.now())
 >>> em8 = ExampleModel.create(example_type=1, description="example8", created_at=datetime.now())
-# Note: the UUID and DateTime columns will create uuid4 and datetime.now
-# values automatically if we don't specify them when creating new rows
 
 #and now we can run some queries against our table
 >>> ExampleModel.objects.count()
@@ -57,7 +59,7 @@ class ExampleModel(Model):
 >>> q.count()
 4
 >>> for instance in q:
->>>     print q.description
+>>>     print instance.description
 example5
 example6
 example7
@@ -71,6 +73,10 @@ example8
 >>> q2.count()
 1
 >>> for instance in q2:
->>>     print q.description
+>>>     print instance.description
 example5
 ```
+
+## Contributing
+
+If you'd like to contribute to cqlengine, please read the [contributor guidelines](https://github.com/bdeggleston/cqlengine/blob/master/CONTRIBUTING.md)

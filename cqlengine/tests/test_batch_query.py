@@ -1,29 +1,35 @@
 from unittest import skip
 from uuid import uuid4
 import random
+
+import mock
+import sure
+
 from cqlengine import Model, columns
-from cqlengine.management import delete_table, create_table
+from cqlengine.management import drop_table, sync_table
 from cqlengine.query import BatchQuery
 from cqlengine.tests.base import BaseCassEngTestCase
 
 class TestMultiKeyModel(Model):
+    __keyspace__ = 'test'
     partition   = columns.Integer(primary_key=True)
     cluster     = columns.Integer(primary_key=True)
     count       = columns.Integer(required=False)
     text        = columns.Text(required=False)
+
 
 class BatchQueryTests(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
         super(BatchQueryTests, cls).setUpClass()
-        delete_table(TestMultiKeyModel)
-        create_table(TestMultiKeyModel)
+        drop_table(TestMultiKeyModel)
+        sync_table(TestMultiKeyModel)
 
     @classmethod
     def tearDownClass(cls):
         super(BatchQueryTests, cls).tearDownClass()
-        delete_table(TestMultiKeyModel)
+        drop_table(TestMultiKeyModel)
 
     def setUp(self):
         super(BatchQueryTests, self).setUp()
@@ -109,3 +115,80 @@ class BatchQueryTests(BaseCassEngTestCase):
 
         with BatchQuery() as b:
             pass
+
+class BatchQueryCallbacksTests(BaseCassEngTestCase):
+
+    def test_API_managing_callbacks(self):
+
+        # Callbacks can be added at init and after
+
+        def my_callback(*args, **kwargs):
+            pass
+
+        # adding on init:
+        batch = BatchQuery()
+
+        batch.add_callback(my_callback)
+        batch.add_callback(my_callback, 2, named_arg='value')
+        batch.add_callback(my_callback, 1, 3)
+
+        assert batch._callbacks == [
+            (my_callback, (), {}),
+            (my_callback, (2,), {'named_arg':'value'}),
+            (my_callback, (1, 3), {})
+        ]
+
+    def test_callbacks_properly_execute_callables_and_tuples(self):
+
+        call_history = []
+        def my_callback(*args, **kwargs):
+            call_history.append(args)
+
+        # adding on init:
+        batch = BatchQuery()
+
+        batch.add_callback(my_callback)
+        batch.add_callback(my_callback, 'more', 'args')
+
+        batch.execute()
+
+        assert len(call_history) == 2
+        assert [(), ('more', 'args')] == call_history
+
+    def test_callbacks_tied_to_execute(self):
+        """Batch callbacks should NOT fire if batch is not executed in context manager mode"""
+
+        call_history = []
+        def my_callback(*args, **kwargs):
+            call_history.append(args)
+
+        with BatchQuery() as batch:
+            batch.add_callback(my_callback)
+            pass
+
+        assert len(call_history) == 1
+
+        class SomeError(Exception):
+            pass
+
+        with self.assertRaises(SomeError):
+            with BatchQuery() as batch:
+                batch.add_callback(my_callback)
+                # this error bubbling up through context manager
+                # should prevent callback runs (along with b.execute())
+                raise SomeError
+
+        # still same call history. Nothing added
+        assert len(call_history) == 1
+
+        # but if execute ran, even with an error bubbling through
+        # the callbacks also would have fired
+        with self.assertRaises(SomeError):
+            with BatchQuery(execute_on_exception=True) as batch:
+                batch.add_callback(my_callback)
+                # this error bubbling up through context manager
+                # should prevent callback runs (along with b.execute())
+                raise SomeError
+
+        # still same call history
+        assert len(call_history) == 2

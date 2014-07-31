@@ -38,3 +38,8 @@ html/
 
 #Mr Developer
 .mr.developer.cfg
+.noseids
+/commitlog
+/data
+
+docs/_build
