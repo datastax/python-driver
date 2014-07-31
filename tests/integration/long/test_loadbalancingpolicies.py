@@ -21,7 +21,7 @@ from cassandra.policies import (RoundRobinPolicy, DCAwareRoundRobinPolicy,
                                 TokenAwarePolicy, WhiteListRoundRobinPolicy)
 from cassandra.query import SimpleStatement
 
-from tests.integration import use_multidc, use_singledc, PROTOCOL_VERSION
+from tests.integration import clear_and_use_multidc, clear_and_use_singledc, PROTOCOL_VERSION
 from tests.integration.long.utils import (wait_for_up, create_schema,
                                           CoordinatorStats, force_stop,
                                           wait_for_down, decommission, start,
@@ -40,7 +40,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        use_singledc()
+        clear_and_use_singledc()
 
     def _insert(self, session, keyspace, count=12,
                 consistency_level=ConsistencyLevel.ONE):
@@ -67,7 +67,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
                 self.coordinator_stats.add_coordinator(session.execute_async(ss))
 
     def test_roundrobin(self):
-        use_singledc()
+        clear_and_use_singledc()
         keyspace = 'test_roundrobin'
         cluster = Cluster(
             load_balancing_policy=RoundRobinPolicy(),
@@ -108,7 +108,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 3, 6)
 
     def test_roundrobin_two_dcs(self):
-        use_multidc([2, 2])
+        clear_and_use_multidc([2, 2])
         keyspace = 'test_roundrobin_two_dcs'
         cluster = Cluster(
             load_balancing_policy=RoundRobinPolicy(),
@@ -146,7 +146,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 5, 3)
 
     def test_roundrobin_two_dcs_2(self):
-        use_multidc([2, 2])
+        clear_and_use_multidc([2, 2])
         keyspace = 'test_roundrobin_two_dcs_2'
         cluster = Cluster(
             load_balancing_policy=RoundRobinPolicy(),
@@ -184,7 +184,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 5, 3)
 
     def test_dc_aware_roundrobin_two_dcs(self):
-        use_multidc([3, 2])
+        clear_and_use_multidc([3, 2])
         keyspace = 'test_dc_aware_roundrobin_two_dcs'
         cluster = Cluster(
             load_balancing_policy=DCAwareRoundRobinPolicy('dc1'),
@@ -207,7 +207,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 5, 0)
 
     def test_dc_aware_roundrobin_two_dcs_2(self):
-        use_multidc([3, 2])
+        clear_and_use_multidc([3, 2])
         keyspace = 'test_dc_aware_roundrobin_two_dcs_2'
         cluster = Cluster(
             load_balancing_policy=DCAwareRoundRobinPolicy('dc2'),
@@ -230,7 +230,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 5, 6)
 
     def test_dc_aware_roundrobin_one_remote_host(self):
-        use_multidc([2, 2])
+        clear_and_use_multidc([2, 2])
         keyspace = 'test_dc_aware_roundrobin_one_remote_host'
         cluster = Cluster(
             load_balancing_policy=DCAwareRoundRobinPolicy('dc2', used_hosts_per_remote_dc=1),
@@ -321,7 +321,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.token_aware(keyspace, True)
 
     def token_aware(self, keyspace, use_prepared=False):
-        use_singledc()
+        clear_and_use_singledc()
         cluster = Cluster(
             load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
             protocol_version=PROTOCOL_VERSION)
@@ -393,7 +393,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 2, 0)
 
     def test_token_aware_composite_key(self):
-        use_singledc()
+        clear_and_use_singledc()
         keyspace = 'test_token_aware_composite_key'
         table = 'composite'
         cluster = Cluster(
@@ -422,7 +422,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.assertTrue(results[0].i)
 
     def test_token_aware_with_rf_2(self, use_prepared=False):
-        use_singledc()
+        clear_and_use_singledc()
         keyspace = 'test_token_aware_with_rf_2'
         cluster = Cluster(
             load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
@@ -451,7 +451,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 3, 12)
 
     def test_white_list(self):
-        use_singledc()
+        clear_and_use_singledc()
         keyspace = 'test_white_list'
 
         cluster = Cluster(('127.0.0.2',),
