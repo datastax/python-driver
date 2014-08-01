@@ -231,6 +231,38 @@ class TypeTests(unittest.TestCase):
 
         c.shutdown()
 
+    def test_udts_with_nulls(self):
+        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        s = c.connect()
+
+        s.execute("""
+            CREATE KEYSPACE test_udts_with_nulls
+            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1' }
+            """)
+        s.set_keyspace("test_udts_with_nulls")
+        s.execute("CREATE TYPE user (a text, b int, c uuid, d blob)")
+        User = namedtuple('user', ('a', 'b', 'c', 'd'))
+        c.register_user_type("test_udts_with_nulls", "user", User)
+
+        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b user)")
+
+        insert = s.prepare("INSERT INTO mytable (a, b) VALUES (0, ?)")
+        s.execute(insert, [User(None, None, None, None)])
+
+        results = s.execute("SELECT b FROM mytable WHERE a=0")
+        self.assertEqual((None, None, None, None), results[0].b)
+
+        select = s.prepare("SELECT b FROM mytable WHERE a=0")
+        self.assertEqual((None, None, None, None), s.execute(select)[0].b)
+
+        # also test empty strings
+        s.execute(insert, [User('', None, None, '')])
+        results = s.execute("SELECT b FROM mytable WHERE a=0")
+        self.assertEqual(('', None, None, ''), results[0].b)
+        self.assertEqual(('', None, None, ''), s.execute(select)[0].b)
+
+        c.shutdown()
+
     def test_udt_sizes(self):
         """
         Test for ensuring extra-lengthy udts are handled correctly.

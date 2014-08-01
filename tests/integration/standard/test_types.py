@@ -670,6 +670,40 @@ class TypeTests(unittest.TestCase):
             result = s.execute("SELECT v_%s FROM mytable WHERE k=%s", (i, i))[0]
             self.assertEqual(created_tuple, result['v_%s' % i])
 
+    def test_tuples_with_nulls(self):
+        if self._cass_version < (2, 1, 0):
+            raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
+
+        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        s = c.connect()
+
+        s.execute("""CREATE KEYSPACE test_tuples_with_nulls
+            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}""")
+        s.set_keyspace("test_tuples_with_nulls")
+
+        s.execute("CREATE TABLE mytable (k int PRIMARY KEY, t tuple<text, int, uuid, blob>)")
+
+        insert = s.prepare("INSERT INTO mytable (k, t) VALUES (0, ?)")
+        s.execute(insert, [(None, None, None, None)])
+
+        result = s.execute("SELECT * FROM mytable WHERE k=0")
+        self.assertEquals((None, None, None, None), result[0].t)
+
+        read = s.prepare("SELECT * FROM mytable WHERE k=0")
+        self.assertEquals((None, None, None, None), s.execute(read)[0].t)
+
+        # also test empty strings where compatible
+        insert = s.prepare("INSERT INTO mytable (k, t) VALUES (0, ?)")
+        s.execute(insert, [('', None, None, '')])
+
+        result = s.execute("SELECT * FROM mytable WHERE k=0")
+        self.assertEquals(('', None, None, ''), result[0].t)
+
+        read = s.prepare("SELECT * FROM mytable WHERE k=0")
+        self.assertEquals(('', None, None, ''), s.execute(read)[0].t)
+
+        c.shutdown()
+
     def test_unicode_query_string(self):
         c = Cluster(protocol_version=PROTOCOL_VERSION)
         s = c.connect()

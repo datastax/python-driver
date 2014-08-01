@@ -792,8 +792,11 @@ class TupleType(_ParameterizedType):
                 break
             itemlen = int32_unpack(byts[p:p + 4])
             p += 4
-            item = byts[p:p + itemlen]
-            p += itemlen
+            if itemlen >= 0:
+                item = byts[p:p + itemlen]
+                p += itemlen
+            else:
+                item = None
             # collections inside UDTs are always encoded with at least the
             # version 3 format
             values.append(col_type.from_binary(item, proto_version))
@@ -813,9 +816,12 @@ class TupleType(_ParameterizedType):
         proto_version = max(3, protocol_version)
         buf = io.BytesIO()
         for item, subtype in zip(val, cls.subtypes):
-            packed_item = subtype.to_binary(item, proto_version)
-            buf.write(int32_pack(len(packed_item)))
-            buf.write(packed_item)
+            if item is not None:
+                packed_item = subtype.to_binary(item, proto_version)
+                buf.write(int32_pack(len(packed_item)))
+                buf.write(packed_item)
+            else:
+                buf.write(int32_pack(-1))
         return buf.getvalue()
 
 
@@ -869,8 +875,11 @@ class UserType(TupleType):
                 break
             itemlen = int32_unpack(byts[p:p + 4])
             p += 4
-            item = byts[p:p + itemlen]
-            p += itemlen
+            if itemlen >= 0:
+                item = byts[p:p + itemlen]
+                p += itemlen
+            else:
+                item = None
             # collections inside UDTs are always encoded with at least the
             # version 3 format
             values.append(col_type.from_binary(item, proto_version))
@@ -890,9 +899,13 @@ class UserType(TupleType):
         proto_version = max(3, protocol_version)
         buf = io.BytesIO()
         for fieldname, subtype in zip(cls.fieldnames, cls.subtypes):
-            packed_item = subtype.to_binary(getattr(val, fieldname), proto_version)
-            buf.write(int32_pack(len(packed_item)))
-            buf.write(packed_item)
+            item = getattr(val, fieldname)
+            if item is not None:
+                packed_item = subtype.to_binary(getattr(val, fieldname), proto_version)
+                buf.write(int32_pack(len(packed_item)))
+                buf.write(packed_item)
+            else:
+                buf.write(int32_pack(-1))
         return buf.getvalue()
 
 
