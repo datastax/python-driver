@@ -693,13 +693,9 @@ class TypeTests(unittest.TestCase):
         self.assertEquals((None, None, None, None), s.execute(read)[0].t)
 
         # also test empty strings where compatible
-        insert = s.prepare("INSERT INTO mytable (k, t) VALUES (0, ?)")
         s.execute(insert, [('', None, None, '')])
-
         result = s.execute("SELECT * FROM mytable WHERE k=0")
         self.assertEquals(('', None, None, ''), result[0].t)
-
-        read = s.prepare("SELECT * FROM mytable WHERE k=0")
         self.assertEquals(('', None, None, ''), s.execute(read)[0].t)
 
         c.shutdown()
