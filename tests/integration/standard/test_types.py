@@ -671,6 +671,9 @@ class TypeTests(unittest.TestCase):
             self.assertEqual(created_tuple, result['v_%s' % i])
 
     def test_tuples_with_nulls(self):
+        """
+        Test tuples with null and empty string fields.
+        """
         if self._cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 

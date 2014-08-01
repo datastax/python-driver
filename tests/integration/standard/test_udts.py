@@ -232,6 +232,9 @@ class TypeTests(unittest.TestCase):
         c.shutdown()
 
     def test_udts_with_nulls(self):
+        """
+        Test UDTs with null and empty string fields.
+        """
         c = Cluster(protocol_version=PROTOCOL_VERSION)
         s = c.connect()
 
