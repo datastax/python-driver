@@ -414,7 +414,6 @@ class TypeTests(unittest.TestCase):
         for i in (0, 1, 2, 3, MAX_NESTING_DEPTH):
             # create udt
             udt = self.nested_udt_helper(udts, i)
-            print udt
 
             # write udt
             s.execute("INSERT INTO mytable (k, v_%s) VALUES (0, %s)", (i, udt))
