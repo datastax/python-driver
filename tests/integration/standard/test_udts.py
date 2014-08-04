@@ -386,9 +386,62 @@ class TypeTests(unittest.TestCase):
         """
         Test for ensuring nested unregistered udts are handled correctly.
         """
+        if self._cass_version < (2, 1, 0):
+            raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
-        # close copy to test_nested_registered_udts
-        pass
+        MAX_NESTING_DEPTH = 128
+
+        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        s = c.connect()
+
+        # set the row_factory to dict_factory for programmatically accessing values
+        s.row_factory = dict_factory
+
+        s.execute("""CREATE KEYSPACE test_nested_unregistered_udts
+            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}""")
+        s.set_keyspace("test_nested_unregistered_udts")
+
+        # create the seed udt
+        s.execute("CREATE TYPE depth_0 (age int, name text)")
+
+        # create the nested udts
+        for i in range(MAX_NESTING_DEPTH):
+            s.execute("CREATE TYPE depth_{} (value depth_{})".format(i + 1, i))
+
+        # create a table with multiple sizes of nested udts
+        # no need for all nested types, only a spot checked few and the largest one
+        s.execute("CREATE TABLE mytable ("
+                  "k int PRIMARY KEY, "
+                  "v_0 depth_0, "
+                  "v_1 depth_1, "
+                  "v_2 depth_2, "
+                  "v_3 depth_3, "
+                  "v_{0} depth_{0})".format(MAX_NESTING_DEPTH))
+
+        # create the udt container
+        udts = []
+
+        # create and register the seed udt type
+        udt = namedtuple('depth_0', ('age', 'name'))
+        udts.append(udt)
+
+        # create and register the nested udt types
+        for i in range(MAX_NESTING_DEPTH):
+            udt = namedtuple('depth_{}'.format(i + 1), ('value'))
+            udts.append(udt)
+
+        # verify inserts and reads
+        for i in (0, 1, 2, 3, MAX_NESTING_DEPTH):
+            # create udt
+            udt = self.nested_udt_helper(udts, i)
+
+            # write udt
+            insert = s.prepare("INSERT INTO mytable (k, v_{0}) VALUES (0, ?)".format(i))
+            s.execute(insert, (udt,))
+
+            # verify udt was written and read correctly
+            result = s.execute("SELECT v_%s FROM mytable WHERE k=0", (i,))[0]
+            self.assertEqual(udt, result['v_%s' % i])
 
     def test_nested_registered_udts_with_different_namedtuples(self):
         """
