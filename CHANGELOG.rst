@@ -1,3 +1,11 @@
+2.1.0
+=====
+
+Bug Fixes
+---------
+* Correctly serialize and deserialize null values in tuples and
+  user-defined types (PYTHON-110)
+
 2.1.0c1
 =======
 July 25, 2014
