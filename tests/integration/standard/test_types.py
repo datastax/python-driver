@@ -486,6 +486,11 @@ class TypeTests(unittest.TestCase):
         # insert tuples into same key using different columns
         # and verify the results
         for i in lengths:
+            # ensure tuples of larger sizes throw an error
+            created_tuple = tuple(range(0, i + 1))
+            self.assertRaises(InvalidRequest, s.execute, "INSERT INTO mytable (k, v_%s) VALUES (0, %s)", (i, created_tuple))
+
+            # ensure tuples of proper sizes are written and read correctly
             created_tuple = tuple(range(0, i))
 
             s.execute("INSERT INTO mytable (k, v_%s) VALUES (0, %s)", (i, created_tuple))
