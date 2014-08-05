@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import atexit
 from collections import deque
 from functools import partial
@@ -22,7 +21,6 @@ import sys
 from threading import Event, Lock, Thread
 import weakref
 
-from six import BytesIO
 from six.moves import range
 
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL, EISCONN, errorcode
@@ -42,7 +40,6 @@ from cassandra import OperationTimedOut
 from cassandra.connection import (Connection, ConnectionShutdown,
                                   ConnectionException, NONBLOCKING)
 from cassandra.protocol import RegisterMessage
-from cassandra.marshal import int32_unpack
 
 log = logging.getLogger(__name__)
 
@@ -177,7 +174,6 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         asyncore.dispatcher.__init__(self)
 
         self.connected_event = Event()
-        self._iobuf = BytesIO()
 
         self._callbacks = {}
         self.deque = deque()
@@ -236,7 +232,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         self.socket.settimeout(1.0)
         err = self.socket.connect_ex(address)
         if err in (EINPROGRESS, EALREADY, EWOULDBLOCK) \
-        or err == EINVAL and os.name in ('nt', 'ce'):
+                or err == EINVAL and os.name in ('nt', 'ce'):
             raise ConnectionException("Timed out connecting to %s" % (address[0]))
         if err in (0, EISCONN):
             self.addr = address
@@ -272,17 +268,17 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         self.defunct(sys.exc_info()[1])
 
     def handle_close(self):
-        log.debug("connection (%s) to %s closed by server", id(self), self.host)
+        log.debug("Connection %s closed by server", self)
         self.close()
 
     def handle_write(self):
         while True:
-            try:
-                with self.deque_lock:
+            with self.deque_lock:
+                try:
                     next_msg = self.deque.popleft()
-            except IndexError:
-                self._writable = False
-                return
+                except IndexError:
+                    self._writable = False
+                    return
 
             try:
                 sent = self.send(next_msg)
@@ -318,38 +314,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
                 return
 
         if self._iobuf.tell():
-            while True:
-                pos = self._iobuf.tell()
-                if pos < 8 or (self._total_reqd_bytes > 0 and pos < self._total_reqd_bytes):
-                    # we don't have a complete header yet or we
-                    # already saw a header, but we don't have a
-                    # complete message yet
-                    break
-                else:
-                    # have enough for header, read body len from header
-                    self._iobuf.seek(4)
-                    body_len = int32_unpack(self._iobuf.read(4))
-
-                    # seek to end to get length of current buffer
-                    self._iobuf.seek(0, os.SEEK_END)
-                    pos = self._iobuf.tell()
-
-                    if pos >= body_len + 8:
-                        # read message header and body
-                        self._iobuf.seek(0)
-                        msg = self._iobuf.read(8 + body_len)
-
-                        # leave leftover in current buffer
-                        leftover = self._iobuf.read()
-                        self._iobuf = BytesIO()
-                        self._iobuf.write(leftover)
-
-                        self._total_reqd_bytes = 0
-                        self.process_msg(msg, body_len)
-                    else:
-                        self._total_reqd_bytes = body_len + 8
-                        break
-
+            self.process_io_buffer()
             if not self._callbacks and not self.is_control_connection:
                 self._readable = False
 
@@ -364,8 +329,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
 
         with self.deque_lock:
             self.deque.extend(chunks)
-
-        self._writable = True
+            self._writable = True
 
     def writable(self):
         return self._writable

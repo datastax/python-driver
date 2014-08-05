@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 try:
     import unittest2 as unittest
 except ImportError:
@@ -19,6 +18,7 @@ except ImportError:
 
 import errno
 import os
+import sys
 
 import six
 from six import BytesIO
@@ -48,6 +48,8 @@ except ImportError:
 class LibevConnectionTest(unittest.TestCase):
 
     def setUp(self):
+        if 'gevent.monkey' in sys.modules:
+            raise unittest.SkipTest("gevent monkey-patching detected")
         if LibevConnection is None:
             raise unittest.SkipTest('libev does not appear to be installed correctly')
         LibevConnection.initialize_reactor()

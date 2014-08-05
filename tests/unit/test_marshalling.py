@@ -81,9 +81,9 @@ marshalled_value_pairs = (
     (b'', 'ListType(FloatType)', None),
     (b'', 'SetType(LongType)', None),
     (b'\x00\x00', 'MapType(DecimalType, BooleanType)', OrderedDict()),
-    (b'\x00\x00', 'ListType(FloatType)', ()),
+    (b'\x00\x00', 'ListType(FloatType)', []),
     (b'\x00\x00', 'SetType(IntegerType)', sortedset()),
-    (b'\x00\x01\x00\x10\xafYC\xa3\xea<\x11\xe1\xabc\xc4,\x03"y\xf0', 'ListType(TimeUUIDType)', (UUID(bytes=b'\xafYC\xa3\xea<\x11\xe1\xabc\xc4,\x03"y\xf0'),)),
+    (b'\x00\x01\x00\x10\xafYC\xa3\xea<\x11\xe1\xabc\xc4,\x03"y\xf0', 'ListType(TimeUUIDType)', [UUID(bytes=b'\xafYC\xa3\xea<\x11\xe1\xabc\xc4,\x03"y\xf0')]),
 )
 
 ordered_dict_value = OrderedDict()
@@ -109,7 +109,7 @@ class TestUnmarshal(unittest.TestCase):
     def test_unmarshalling(self):
         for serializedval, valtype, nativeval in marshalled_value_pairs:
             unmarshaller = lookup_casstype(valtype)
-            whatwegot = unmarshaller.from_binary(serializedval)
+            whatwegot = unmarshaller.from_binary(serializedval, 1)
             self.assertEqual(whatwegot, nativeval,
                              msg='Unmarshaller for %s (%s) failed: unmarshal(%r) got %r instead of %r'
                                  % (valtype, unmarshaller, serializedval, whatwegot, nativeval))
@@ -120,7 +120,7 @@ class TestUnmarshal(unittest.TestCase):
     def test_marshalling(self):
         for serializedval, valtype, nativeval in marshalled_value_pairs:
             marshaller = lookup_casstype(valtype)
-            whatwegot = marshaller.to_binary(nativeval)
+            whatwegot = marshaller.to_binary(nativeval, 1)
             self.assertEqual(whatwegot, serializedval,
                              msg='Marshaller for %s (%s) failed: marshal(%r) got %r instead of %r'
                                  % (valtype, marshaller, nativeval, whatwegot, serializedval))

@@ -16,8 +16,13 @@ import six
 import sys
 
 from itertools import count, cycle
+import logging
 from six.moves import xrange
 from threading import Event
+
+from cassandra.cluster import PagedResult
+
+log = logging.getLogger(__name__)
 
 
 def execute_concurrent(session, statements_and_parameters, concurrency=100, raise_on_first_error=True):
@@ -81,7 +86,7 @@ def execute_concurrent(session, statements_and_parameters, concurrency=100, rais
     num_finished = count(start=1)
     statements = enumerate(iter(statements_and_parameters))
     for i in xrange(min(concurrency, len(statements_and_parameters))):
-        _execute_next(_sentinel, i, event, session, statements, results, num_finished, to_execute, first_error)
+        _execute_next(_sentinel, i, event, session, statements, results, None, num_finished, to_execute, first_error)
 
     event.wait()
     if first_error:
@@ -113,7 +118,8 @@ def execute_concurrent_with_args(session, statement, parameters, *args, **kwargs
 _sentinel = object()
 
 
-def _handle_error(error, result_index, event, session, statements, results, num_finished, to_execute, first_error):
+def _handle_error(error, result_index, event, session, statements, results,
+                  future, num_finished, to_execute, first_error):
     if first_error is not None:
         first_error.append(error)
         event.set()
@@ -129,9 +135,10 @@ def _handle_error(error, result_index, event, session, statements, results, num_
     except StopIteration:
         return
 
-    args = (next_index, event, session, statements, results, num_finished, to_execute, first_error)
     try:
-        session.execute_async(statement, params).add_callbacks(
+        future = session.execute_async(statement, params)
+        args = (next_index, event, session, statements, results, future, num_finished, to_execute, first_error)
+        future.add_callbacks(
             callback=_execute_next, callback_args=args,
             errback=_handle_error, errback_args=args)
     except Exception as exc:
@@ -149,8 +156,12 @@ def _handle_error(error, result_index, event, session, statements, results, num_
                 return
 
 
-def _execute_next(result, result_index, event, session, statements, results, num_finished, to_execute, first_error):
+def _execute_next(result, result_index, event, session, statements, results,
+                  future, num_finished, to_execute, first_error):
     if result is not _sentinel:
+        if future.has_more_pages:
+            result = PagedResult(future, result)
+            future.clear_callbacks()
         results[result_index] = (True, result)
         finished = next(num_finished)
         if finished >= to_execute:
@@ -162,9 +173,10 @@ def _execute_next(result, result_index, event, session, statements, results, num
     except StopIteration:
         return
 
-    args = (next_index, event, session, statements, results, num_finished, to_execute, first_error)
     try:
-        session.execute_async(statement, params).add_callbacks(
+        future = session.execute_async(statement, params)
+        args = (next_index, event, session, statements, results, future, num_finished, to_execute, first_error)
+        future.add_callbacks(
             callback=_execute_next, callback_args=args,
             errback=_handle_error, errback_args=args)
     except Exception as exc:

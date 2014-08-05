@@ -17,14 +17,9 @@ import struct
 
 
 def _make_packer(format_string):
-    try:
-        packer = struct.Struct(format_string)  # new in Python 2.5
-    except AttributeError:
-        pack = lambda x: struct.pack(format_string, x)
-        unpack = lambda s: struct.unpack(format_string, s)
-    else:
-        pack = packer.pack
-        unpack = lambda s: packer.unpack(s)[0]
+    packer = struct.Struct(format_string)
+    pack = packer.pack
+    unpack = lambda s: packer.unpack(s)[0]
     return pack, unpack
 
 int64_pack, int64_unpack = _make_packer('>q')
@@ -42,6 +37,11 @@ double_pack, double_unpack = _make_packer('>d')
 header_struct = struct.Struct('>BBbB')
 header_pack = header_struct.pack
 header_unpack = header_struct.unpack
+
+# in protocol version 3 and higher, the stream ID is two bytes
+v3_header_struct = struct.Struct('>BBhB')
+v3_header_pack = v3_header_struct.pack
+v3_header_unpack = v3_header_struct.unpack
 
 
 if six.PY3:

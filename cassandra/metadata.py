@@ -88,7 +88,7 @@ class Metadata(object):
         """
         return "\n".join(ks.export_as_string() for ks in self.keyspaces.values())
 
-    def rebuild_schema(self, ks_results, cf_results, col_results):
+    def rebuild_schema(self, ks_results, type_results, cf_results, col_results):
         """
         Rebuild the view of the current schema from a fresh set of rows from
         the system schema tables.
@@ -97,6 +97,7 @@ class Metadata(object):
         """
         cf_def_rows = defaultdict(list)
         col_def_rows = defaultdict(lambda: defaultdict(list))
+        usertype_rows = defaultdict(list)
 
         for row in cf_results:
             cf_def_rows[row["keyspace_name"]].append(row)
@@ -106,6 +107,9 @@ class Metadata(object):
             cfname = row["columnfamily_name"]
             col_def_rows[ksname][cfname].append(row)
 
+        for row in type_results:
+            usertype_rows[row["keyspace_name"]].append(row)
+
         current_keyspaces = set()
         for row in ks_results:
             keyspace_meta = self._build_keyspace_metadata(row)
@@ -113,6 +117,10 @@ class Metadata(object):
                 table_meta = self._build_table_metadata(
                     keyspace_meta, table_row, col_def_rows[keyspace_meta.name])
                 keyspace_meta.tables[table_meta.name] = table_meta
+
+            for usertype_row in usertype_rows.get(keyspace_meta.name, []):
+                usertype = self._build_usertype(keyspace_meta.name, usertype_row)
+                keyspace_meta.user_types[usertype.name] = usertype
 
             current_keyspaces.add(keyspace_meta.name)
             old_keyspace_meta = self.keyspaces.get(keyspace_meta.name, None)
@@ -130,35 +138,30 @@ class Metadata(object):
         for ksname in removed_keyspaces:
             self._keyspace_removed(ksname)
 
-    def keyspace_changed(self, keyspace, ks_results, cf_results, col_results):
+    def keyspace_changed(self, keyspace, ks_results):
         if not ks_results:
             if keyspace in self.keyspaces:
                 del self.keyspaces[keyspace]
                 self._keyspace_removed(keyspace)
             return
 
-        col_def_rows = defaultdict(list)
-        for row in col_results:
-            cfname = row["columnfamily_name"]
-            col_def_rows[cfname].append(row)
-
         keyspace_meta = self._build_keyspace_metadata(ks_results[0])
         old_keyspace_meta = self.keyspaces.get(keyspace, None)
-
-        new_table_metas = {}
-        for table_row in cf_results:
-            table_meta = self._build_table_metadata(
-                keyspace_meta, table_row, col_def_rows)
-            new_table_metas[table_meta.name] = table_meta
-
-        keyspace_meta.tables = new_table_metas
-
         self.keyspaces[keyspace] = keyspace_meta
         if old_keyspace_meta:
+            keyspace_meta.user_types = old_keyspace_meta.user_types
             if (keyspace_meta.replication_strategy != old_keyspace_meta.replication_strategy):
                 self._keyspace_updated(keyspace)
         else:
             self._keyspace_added(keyspace)
+
+    def usertype_changed(self, keyspace, name, type_results):
+        if type_results:
+            new_usertype = self._build_usertype(keyspace, type_results[0])
+            self.keyspaces[keyspace].user_types[name] = new_usertype
+        else:
+            # the type was deleted
+            self.keyspaces[keyspace].user_types.pop(name, None)
 
     def table_changed(self, keyspace, table, cf_results, col_results):
         try:
@@ -175,7 +178,7 @@ class Metadata(object):
         else:
             assert len(cf_results) == 1
             keyspace_meta.tables[table] = self._build_table_metadata(
-                    keyspace_meta, cf_results[0], {table: col_results})
+                keyspace_meta, cf_results[0], {table: col_results})
 
     def _keyspace_added(self, ksname):
         if self.token_map:
@@ -195,6 +198,11 @@ class Metadata(object):
         strategy_class = row["strategy_class"]
         strategy_options = json.loads(row["strategy_options"])
         return KeyspaceMetadata(name, durable_writes, strategy_class, strategy_options)
+
+    def _build_usertype(self, keyspace, usertype_row):
+        type_classes = map(types.lookup_casstype, usertype_row['field_types'])
+        return UserType(usertype_row['keyspace_name'], usertype_row['type_name'],
+                        usertype_row['field_names'], type_classes)
 
     def _build_table_metadata(self, keyspace_metadata, row, col_rows):
         cfname = row["columnfamily_name"]
@@ -293,6 +301,16 @@ class Metadata(object):
     def _build_table_options(self, row):
         """ Setup the mostly-non-schema table options, like caching settings """
         options = dict((o, row.get(o)) for o in TableMetadata.recognized_options if o in row)
+
+        # the option name when creating tables is "dclocal_read_repair_chance",
+        # but the column name in system.schema_columnfamilies is
+        # "local_read_repair_chance".  We'll store this as dclocal_read_repair_chance,
+        # since that's probably what users are expecting (and we need it for the
+        # CREATE TABLE statement anyway).
+        if "local_read_repair_chance" in options:
+            val = options.pop("local_read_repair_chance")
+            options["dclocal_read_repair_chance"] = val
+
         return options
 
     def _build_column_metadata(self, table_metadata, row):
@@ -339,7 +357,7 @@ class Metadata(object):
 
         all_tokens = sorted(ring)
         self.token_map = TokenMap(
-                token_class, token_to_host_owner, all_tokens, self)
+            token_class, token_to_host_owner, all_tokens, self)
 
     def get_replicas(self, keyspace, key):
         """
@@ -432,7 +450,7 @@ class SimpleStrategy(ReplicationStrategy):
             while len(hosts) < self.replication_factor and j < len(ring):
                 token = ring[(i + j) % len(ring)]
                 host = token_to_host_owner[token]
-                if not host in hosts:
+                if host not in hosts:
                     hosts.append(host)
                 j += 1
 
@@ -461,7 +479,7 @@ class NetworkTopologyStrategy(ReplicationStrategy):
 
     def __init__(self, dc_replication_factors):
         self.dc_replication_factors = dict(
-                (str(k), int(v)) for k, v in dc_replication_factors.items())
+            (str(k), int(v)) for k, v in dc_replication_factors.items())
 
     def make_token_replica_map(self, token_to_host_owner, ring):
         # note: this does not account for hosts having different racks
@@ -569,20 +587,101 @@ class KeyspaceMetadata(object):
     A map from table names to instances of :class:`~.TableMetadata`.
     """
 
+    user_types = None
+
     def __init__(self, name, durable_writes, strategy_class, strategy_options):
         self.name = name
         self.durable_writes = durable_writes
         self.replication_strategy = ReplicationStrategy.create(strategy_class, strategy_options)
         self.tables = {}
+        self.user_types = {}
 
     def export_as_string(self):
-        return "\n".join([self.as_cql_query()] + [t.export_as_string() for t in self.tables.values()])
+        return "\n\n".join([self.as_cql_query()] + self.user_type_strings() + [t.export_as_string() for t in self.tables.values()])
 
     def as_cql_query(self):
         ret = "CREATE KEYSPACE %s WITH replication = %s " % (
             protect_name(self.name),
             self.replication_strategy.export_for_schema())
         return ret + (' AND durable_writes = %s;' % ("true" if self.durable_writes else "false"))
+
+    def user_type_strings(self):
+        user_type_strings = []
+        types = self.user_types.copy()
+        keys = sorted(types.keys())
+        for k in keys:
+            if k in types:
+                self.resolve_user_types(k, types, user_type_strings)
+        return user_type_strings
+
+    def resolve_user_types(self, key, types, user_type_strings):
+        user_type = types.pop(key)
+        for field_type in user_type.field_types:
+            if field_type.cassname == 'UserType' and field_type.typename in types:
+                self.resolve_user_types(field_type.typename, types, user_type_strings)
+        user_type_strings.append(user_type.as_cql_query(formatted=True))
+
+
+class UserType(object):
+    """
+    A user defined type, as created by ``CREATE TYPE`` statements.
+
+    User-defined types were introduced in Cassandra 2.1.
+
+    .. versionadded:: 2.1.0
+    """
+
+    keyspace = None
+    """
+    The string name of the keyspace in which this type is defined.
+    """
+
+    name = None
+    """
+    The name of this type.
+    """
+
+    field_names = None
+    """
+    An ordered list of the names for each field in this user-defined type.
+    """
+
+    field_types = None
+    """
+    An ordered list of the types for each field in this user-defined type.
+    """
+
+    def __init__(self, keyspace, name, field_names, field_types):
+        self.keyspace = keyspace
+        self.name = name
+        self.field_names = field_names
+        self.field_types = field_types
+
+    def as_cql_query(self, formatted=False):
+        """
+        Returns a CQL query that can be used to recreate this type.
+        If `formatted` is set to :const:`True`, extra whitespace will
+        be added to make the query more readable.
+        """
+        ret = "CREATE TYPE %s.%s (%s" % (
+            protect_name(self.keyspace),
+            protect_name(self.name),
+            "\n" if formatted else "")
+
+        if formatted:
+            field_join = ",\n"
+            padding = "    "
+        else:
+            field_join = ", "
+            padding = ""
+
+        fields = []
+        for field_name, field_type in zip(self.field_names, self.field_types):
+            fields.append("%s %s" % (protect_name(field_name), field_type.cql_parameterized_type()))
+
+        ret += field_join.join("%s%s" % (padding, field) for field in fields)
+        ret += "\n);" if formatted else ");"
+        return ret
 
 
 class TableMetadata(object):
@@ -637,7 +736,8 @@ class TableMetadata(object):
     recognized_options = (
         "comment",
         "read_repair_chance",
-        "dclocal_read_repair_chance",
+        "dclocal_read_repair_chance",  # kept to be safe, but see _build_table_options()
+        "local_read_repair_chance",
         "replicate_on_write",
         "gc_grace_seconds",
         "bloom_filter_fp_chance",

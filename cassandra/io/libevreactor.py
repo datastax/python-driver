@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import atexit
 from collections import deque
 from functools import partial
@@ -21,13 +20,11 @@ import socket
 from threading import Event, Lock, Thread
 import weakref
 
-from six import BytesIO
 from six.moves import xrange
 
 from cassandra import OperationTimedOut
 from cassandra.connection import Connection, ConnectionShutdown, NONBLOCKING
 from cassandra.protocol import RegisterMessage
-from cassandra.marshal import int32_unpack
 try:
     import cassandra.io.libevwrapper as libev
 except ImportError:
@@ -256,7 +253,6 @@ class LibevConnection(Connection):
         Connection.__init__(self, *args, **kwargs)
 
         self.connected_event = Event()
-        self._iobuf = BytesIO()
 
         self._callbacks = {}
         self.deque = deque()
@@ -367,37 +363,7 @@ class LibevConnection(Connection):
                 return
 
         if self._iobuf.tell():
-            while True:
-                pos = self._iobuf.tell()
-                if pos < 8 or (self._total_reqd_bytes > 0 and pos < self._total_reqd_bytes):
-                    # we don't have a complete header yet or we
-                    # already saw a header, but we don't have a
-                    # complete message yet
-                    break
-                else:
-                    # have enough for header, read body len from header
-                    self._iobuf.seek(4)
-                    body_len = int32_unpack(self._iobuf.read(4))
-
-                    # seek to end to get length of current buffer
-                    self._iobuf.seek(0, os.SEEK_END)
-                    pos = self._iobuf.tell()
-
-                    if pos >= body_len + 8:
-                        # read message header and body
-                        self._iobuf.seek(0)
-                        msg = self._iobuf.read(8 + body_len)
-
-                        # leave leftover in current buffer
-                        leftover = self._iobuf.read()
-                        self._iobuf = BytesIO()
-                        self._iobuf.write(leftover)
-
-                        self._total_reqd_bytes = 0
-                        self.process_msg(msg, body_len)
-                    else:
-                        self._total_reqd_bytes = body_len + 8
-                        break
+            self.process_io_buffer()
         else:
             log.debug("Connection %s closed by server", self)
             self.close()

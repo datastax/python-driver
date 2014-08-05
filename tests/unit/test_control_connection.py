@@ -397,27 +397,15 @@ class ControlConnectionTest(unittest.TestCase):
 
     def test_handle_schema_change(self):
 
-        for change_type in ('CREATED', 'DROPPED'):
+        for change_type in ('CREATED', 'DROPPED', 'UPDATED'):
             event = {
                 'change_type': change_type,
                 'keyspace': 'ks1',
                 'table': 'table1'
             }
             self.control_connection._handle_schema_change(event)
-            self.cluster.executor.submit.assert_called_with(self.control_connection.refresh_schema, 'ks1')
+            self.cluster.executor.submit.assert_called_with(self.control_connection.refresh_schema, 'ks1', 'table1', None)
 
             event['table'] = None
             self.control_connection._handle_schema_change(event)
-            self.cluster.executor.submit.assert_called_with(self.control_connection.refresh_schema, None)
-
-        event = {
-            'change_type': 'UPDATED',
-            'keyspace': 'ks1',
-            'table': 'table1'
-        }
-        self.control_connection._handle_schema_change(event)
-        self.cluster.executor.submit.assert_called_with(self.control_connection.refresh_schema, 'ks1', 'table1')
-
-        event['table'] = None
-        self.control_connection._handle_schema_change(event)
-        self.cluster.executor.submit.assert_called_with(self.control_connection.refresh_schema, 'ks1', None)
+            self.cluster.executor.submit.assert_called_with(self.control_connection.refresh_schema, 'ks1', None, None)

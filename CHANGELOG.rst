@@ -1,16 +1,75 @@
-2.0.3
-=====
-In Progress
+2.1.0c1
+=======
+July 25, 2014
 
 Bug Fixes
 ---------
-* Fix references to xrange that do not go through "six" in
-  libevreactor and geventreactor (github #138)
+* Properly specify UDTs for columns in CREATE TABLE statements
+* Avoid moving retries to a new host when using request ID zero (PYTHON-88)
+* Don't ignore fetch_size arguments to Statement constructors (github-151)
+* Allow disabling automatic paging on a per-statement basis when it's
+  enabled by default for the session (PYTHON-93)
+* Raise ValueError when tuple query parameters for prepared statements
+  have extra items (PYTHON-98)
+* Correctly encode nested tuples and UDTs for non-prepared statements (PYTHON-100)
+* Raise TypeError when a string is used for contact_points (github #164)
+* Include User Defined Types in KeyspaceMetadata.export_as_string() (PYTHON-96)
+
+Other
+-----
+* Return list collection columns as python lists instead of tuples
+  now that tuples are a specific Cassandra type
+
+2.1.0b1
+=======
+July 11, 2014
+
+This release adds support for Cassandra 2.1 features, including version
+3 of the native protocol.
+
+Features
+--------
+* When using the v3 protocol, only one connection is opened per-host, and
+  throughput is improved due to reduced pooling overhead and lock contention.
+* Support for user-defined types (Cassandra 2.1+)
+* Support for tuple type in (limited usage Cassandra 2.0.9, full usage
+  in Cassandra 2.1)
+* Protocol-level client-side timestamps (see Session.use_client_timestamp)
+* Overridable type encoding for non-prepared statements (see Session.encoders)
+* Configurable serial consistency levels for batch statements
+* Use io.BytesIO for reduced CPU consumption (github #143)
+* Support Twisted as a reactor. Note that a Twisted-compatible
+  API is not exposed (so no Deferreds), this is just a reactor
+  implementation. (github #135, PYTHON-8)
+
+Bug Fixes
+---------
+* Fix references to xrange that do not go through "six" in libevreactor and
+  geventreactor (github #138)
 * Make BoundStatements inherit fetch_size from their parent
   PreparedStatement (PYTHON-80)
-* Clear reactor state in child process after forking
-  to prevent errors with multiprocessing when the parent
-  process has connected a Cluster before forking (github #141)
+* Clear reactor state in child process after forking to prevent errors with
+  multiprocessing when the parent process has connected a Cluster before
+  forking (github #141)
+* Don't share prepared statement lock across Cluster instances
+* Format CompositeType and DynamicCompositeType columns correctly in
+  CREATE TABLE statements.
+* Fix cassandra.concurrent behavior when dealing with automatic paging
+  (PYTHON-81)
+* Properly defunct connections after protocol errors
+* Avoid UnicodeDecodeError when query string is unicode (PYTHON-76)
+* Correctly capture dclocal_read_repair_chance for tables and
+  use it when generating CREATE TABLE statements (PYTHON-84)
+* Avoid race condition with AsyncoreConnection that may cause messages
+  to fail to be written until a new message is pushed
+* Make sure cluster.metadata.partitioner and cluster.metadata.token_map
+  are populated when all nodes in the cluster are included in the
+  contact points (PYTHON-90)
+* Make Murmur3 hash match Cassandra's hash for all values (PYTHON-89,
+  github #147)
+* Don't attempt to reconnect to hosts that should be ignored (according
+  to the load balancing policy) when a notification is received that the
+  host is down.
 
 2.0.2
 =====
@@ -25,12 +84,10 @@ Bug Fixes
   asyncore event loop is restarted multiple times
 * Delay initialization of reactors in order to avoid problems
   with shared state when using multiprocessing (PYTHON-60)
-* Add python-six to debian dependencies, move python-blist to
-  recommends
+* Add python-six to debian dependencies, move python-blist to recommends
 * Fix memory leak when libev connections are created and
   destroyed (github #93)
-* Ensure token map is rebuilt when hosts are removed from
-  the cluster
+* Ensure token map is rebuilt when hosts are removed from the cluster
 
 2.0.1
 =====

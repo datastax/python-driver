@@ -572,12 +572,18 @@ class WriteType(object):
     internally before a BATCH write.
     """
 
+    CAS = 5
+    """
+    A lighweight-transaction write, such as "DELETE ... IF EXISTS".
+    """
+
 WriteType.name_to_value = {
     'SIMPLE': WriteType.SIMPLE,
     'BATCH': WriteType.BATCH,
     'UNLOGGED_BATCH': WriteType.UNLOGGED_BATCH,
     'COUNTER': WriteType.COUNTER,
     'BATCH_LOG': WriteType.BATCH_LOG,
+    'CAS': WriteType.CAS
 }
 
 

@@ -1,3 +1,9 @@
+python-cassandra-driver (2.0.2-2) unstable; urgency=low
+
+  * Fixed debian/patches
+
+ -- Carsten Aulbert <carsten.aulbert@aei.mpg.de>  Thu, 19 Jun 2014 14:07:27 +0200
+
 python-cassandra-driver (2.0.2-1) unstable; urgency=low
 
   * Release 2.0.2

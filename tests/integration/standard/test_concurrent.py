@@ -33,7 +33,8 @@ class ClusterTests(unittest.TestCase):
 
     def setUp(self):
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
+        if PROTOCOL_VERSION < 3:
+            self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         self.session = self.cluster.connect()
         self.session.row_factory = tuple_factory
 

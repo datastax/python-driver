@@ -80,10 +80,12 @@ class ConnectionTest(object):
             else:
                 conn.send_msg(
                     QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE),
+                    request_id=0,
                     cb=partial(cb, count))
 
         conn.send_msg(
             QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE),
+            request_id=0,
             cb=partial(cb, 0))
         event.wait()
 
@@ -105,6 +107,7 @@ class ConnectionTest(object):
         for i in range(100):
             conn.send_msg(
                 QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE),
+                request_id=i,
                 cb=partial(cb, responses, i))
 
         event.wait()
@@ -125,11 +128,13 @@ class ConnectionTest(object):
             else:
                 conn.send_msg(
                     QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE),
+                    request_id=count,
                     cb=partial(cb, event, conn, count))
 
         for event, conn in zip(events, conns):
             conn.send_msg(
                 QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE),
+                request_id=0,
                 cb=partial(cb, event, conn, 0))
 
         for event in events:
@@ -156,7 +161,9 @@ class ConnectionTest(object):
         def send_msgs(all_responses, thread_responses):
             for i in range(num_requests_per_conn):
                 qmsg = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
-                conn.send_msg(qmsg, cb=partial(cb, all_responses, thread_responses, i))
+                with conn.lock:
+                    request_id = conn.get_request_id()
+                conn.send_msg(qmsg, request_id, cb=partial(cb, all_responses, thread_responses, i))
 
         all_responses = []
         threads = []
@@ -195,7 +202,9 @@ class ConnectionTest(object):
             thread_responses = [False] * num_requests_per_conn
             for i in range(num_requests_per_conn):
                 qmsg = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
-                conn.send_msg(qmsg, cb=partial(cb, conn, event, thread_responses, i))
+                with conn.lock:
+                    request_id = conn.get_request_id()
+                conn.send_msg(qmsg, request_id, cb=partial(cb, conn, event, thread_responses, i))
 
             event.wait()
 

@@ -18,9 +18,8 @@ except ImportError:
     import unittest # noqa
 
 from cassandra import ConsistencyLevel
-from cassandra.query import (PreparedStatement, BoundStatement, ValueSequence,
-                             SimpleStatement, BatchStatement, BatchType,
-                             dict_factory)
+from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
+                             BatchStatement, BatchType, dict_factory)
 from cassandra.cluster import Cluster
 from cassandra.policies import HostDistance
 
@@ -44,14 +43,6 @@ class QueryTest(unittest.TestCase):
         self.assertEqual(2, len(bound.values))
         session.execute(bound)
         self.assertEqual(bound.routing_key, b'\x00\x00\x00\x01')
-
-    def test_value_sequence(self):
-        """
-        Test the output of ValueSequences()
-        """
-
-        my_user_ids = ('alice', 'bob', 'charles')
-        self.assertEqual(str(ValueSequence(my_user_ids)), "( 'alice' , 'bob' , 'charles' )")
 
     def test_trace_prints_okay(self):
         """
@@ -223,7 +214,8 @@ class BatchStatementTests(unittest.TestCase):
                 % (PROTOCOL_VERSION,))
 
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
+        if PROTOCOL_VERSION < 3:
+            self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         self.session = self.cluster.connect()
 
         self.session.execute("TRUNCATE test3rf.test")
@@ -318,7 +310,8 @@ class SerialConsistencyTests(unittest.TestCase):
                 % (PROTOCOL_VERSION,))
 
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
+        if PROTOCOL_VERSION < 3:
+            self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         self.session = self.cluster.connect()
 
     def test_conditional_update(self):

@@ -24,7 +24,6 @@ import logging
 log = logging.getLogger(__name__)
 
 import os
-from six import print_
 from threading import Event
 
 from cassandra.cluster import Cluster
@@ -37,15 +36,18 @@ except ImportError as e:
 
 CLUSTER_NAME = 'test_cluster'
 MULTIDC_CLUSTER_NAME = 'multidc_test_cluster'
+
 CCM_CLUSTER = None
 
-CASSANDRA_VERSION = os.getenv('CASSANDRA_VERSION', '2.0.6')
+CASSANDRA_DIR = os.getenv('CASSANDRA_DIR', None)
+CASSANDRA_HOME = os.getenv('CASSANDRA_HOME', None)
+CASSANDRA_VERSION = os.getenv('CASSANDRA_VERSION', '2.0.9')
 
 if CASSANDRA_VERSION.startswith('1'):
-    DEFAULT_PROTOCOL_VERSION = 1
+    default_protocol_version = 1
 else:
-    DEFAULT_PROTOCOL_VERSION = 2
-PROTOCOL_VERSION = int(os.getenv('PROTOCOL_VERSION', DEFAULT_PROTOCOL_VERSION))
+    default_protocol_version = 2
+PROTOCOL_VERSION = int(os.getenv('PROTOCOL_VERSION', default_protocol_version))
 
 path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ccm')
 if not os.path.exists(path):
@@ -94,16 +96,28 @@ def get_node(node_id):
 
 
 def setup_package():
-    print_('Using Cassandra version: %s' % CASSANDRA_VERSION)
+    if CASSANDRA_DIR:
+        log.info("Using Cassandra dir: %s", CASSANDRA_DIR)
+    elif CASSANDRA_HOME:
+        log.info("Using Cassandra home: %s", CASSANDRA_HOME)
+    else:
+        log.info('Using Cassandra version: %s', CASSANDRA_VERSION)
     try:
         try:
             cluster = CCMCluster.load(path, CLUSTER_NAME)
             log.debug("Found existing ccm test cluster, clearing")
             cluster.clear()
-            cluster.set_cassandra_dir(cassandra_version=CASSANDRA_VERSION)
+            if CASSANDRA_DIR:
+                cluster.set_cassandra_dir(cassandra_dir=CASSANDRA_DIR)
+            else:
+                cluster.set_cassandra_dir(cassandra_version=CASSANDRA_VERSION)
         except Exception:
-            log.debug("Creating new ccm test cluster with version %s", CASSANDRA_VERSION)
-            cluster = CCMCluster(path, CLUSTER_NAME, cassandra_version=CASSANDRA_VERSION)
+            if CASSANDRA_DIR:
+                log.debug("Creating new ccm test cluster with cassandra dir %s", CASSANDRA_DIR)
+                cluster = CCMCluster(path, CLUSTER_NAME, cassandra_dir=CASSANDRA_DIR)
+            else:
+                log.debug("Creating new ccm test cluster with version %s", CASSANDRA_VERSION)
+                cluster = CCMCluster(path, CLUSTER_NAME, cassandra_version=CASSANDRA_VERSION)
             cluster.set_configuration_options({'start_native_transport': True})
             common.switch_cluster(path, CLUSTER_NAME)
             cluster.populate(3)
@@ -120,6 +134,11 @@ def setup_package():
 
 
 def use_multidc(dc_list):
+    global CCM_CLUSTER
+    if CCM_CLUSTER.name == MULTIDC_CLUSTER_NAME:
+        log.debug("Cluster is alread multi-dc, not replacing")
+        return
+
     teardown_package()
     try:
         try:
@@ -128,7 +147,10 @@ def use_multidc(dc_list):
             cluster.clear()
         except Exception:
             log.debug("Creating new ccm test multi-dc cluster")
-            cluster = CCMCluster(path, MULTIDC_CLUSTER_NAME, cassandra_version=CASSANDRA_VERSION)
+            if CASSANDRA_DIR:
+                cluster = CCMCluster(path, MULTIDC_CLUSTER_NAME, cassandra_dir=CASSANDRA_DIR)
+            else:
+                cluster = CCMCluster(path, MULTIDC_CLUSTER_NAME, cassandra_version=CASSANDRA_VERSION)
             cluster.set_configuration_options({'start_native_transport': True})
             common.switch_cluster(path, MULTIDC_CLUSTER_NAME)
             cluster.populate(dc_list)
@@ -139,13 +161,17 @@ def use_multidc(dc_list):
         log.exception("Failed to start ccm cluster:")
         raise
 
-    global CCM_CLUSTER
     CCM_CLUSTER = cluster
     setup_test_keyspace()
     log.debug("Switched to multidc cluster")
 
 
 def use_singledc():
+    global CCM_CLUSTER
+    if CCM_CLUSTER.name == CLUSTER_NAME:
+        log.debug("Cluster is alread single-dc, not replacing")
+        return
+
     teardown_package()
 
     setup_package()

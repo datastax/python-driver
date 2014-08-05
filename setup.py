@@ -15,12 +15,13 @@
 from __future__ import print_function
 import sys
 
-import ez_setup
-ez_setup.use_setuptools()
-
 if __name__ == '__main__' and sys.argv[1] == "gevent_nosetests":
+    print("Running gevent tests")
     from gevent.monkey import patch_all
     patch_all()
+
+import ez_setup
+ez_setup.use_setuptools()
 
 from setuptools import setup
 from distutils.command.build_ext import build_ext
@@ -109,8 +110,9 @@ murmur3_ext = Extension('cassandra.murmur3',
 
 libev_ext = Extension('cassandra.io.libevwrapper',
                       sources=['cassandra/io/libevwrapper.c'],
-                      include_dirs=['/usr/include/libev'],
-                      libraries=['ev'])
+                      include_dirs=['/usr/include/libev', '/usr/local/include'],
+                      libraries=['ev'],
+                      library_dirs=['/usr/local/lib'])
 
 
 class build_extensions(build_ext):

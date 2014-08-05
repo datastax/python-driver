@@ -28,7 +28,7 @@ from cassandra.metadata import (Metadata, KeyspaceMetadata, TableMetadata,
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
-from tests.integration import get_cluster, PROTOCOL_VERSION
+from tests.integration import get_cluster, PROTOCOL_VERSION, get_server_versions
 
 
 class SchemaMetadataTest(unittest.TestCase):
@@ -326,6 +326,100 @@ class TestCodeCoverage(unittest.TestCase):
             keyspace_metadata = cluster.metadata.keyspaces[keyspace]
             self.assertIsInstance(keyspace_metadata.export_as_string(), six.string_types)
             self.assertIsInstance(keyspace_metadata.as_cql_query(), six.string_types)
+
+    def test_export_keyspace_schema_udts(self):
+        """
+        Test udt exports
+        """
+
+        if get_server_versions()[0] < (2, 1, 0):
+            raise unittest.SkipTest('UDTs were introduced in Cassandra 2.1')
+
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        session = cluster.connect()
+
+        session.execute("""
+            CREATE KEYSPACE export_udts
+            WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
+            AND durable_writes = true;
+        """)
+        session.execute("""
+            CREATE TYPE export_udts.street (
+                street_number int,
+                street_name text)
+        """)
+        session.execute("""
+            CREATE TYPE export_udts.zip (
+                zipcode int,
+                zip_plus_4 int)
+        """)
+        session.execute("""
+            CREATE TYPE export_udts.address (
+                street_address street,
+                zip_code zip)
+        """)
+        session.execute("""
+            CREATE TABLE export_udts.users (
+            user text PRIMARY KEY,
+            addresses map<text, address>)
+        """)
+
+        expected_string = """CREATE KEYSPACE export_udts WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;
+
+CREATE TYPE export_udts.street (
+    street_number int,
+    street_name text
+);
+
+CREATE TYPE export_udts.zip (
+    zipcode int,
+    zip_plus_4 int
+);
+
+CREATE TYPE export_udts.address (
+    street_address street,
+    zip_code zip
+);
+
+CREATE TABLE export_udts.users (
+    user text PRIMARY KEY,
+    addresses map<text, address>
+) WITH bloom_filter_fp_chance = 0.01
+    AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
+    AND comment = ''
+    AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
+    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+    AND dclocal_read_repair_chance = 0.1
+    AND default_time_to_live = 0
+    AND gc_grace_seconds = 864000
+    AND max_index_interval = 2048
+    AND memtable_flush_period_in_ms = 0
+    AND min_index_interval = 128
+    AND read_repair_chance = 0.0
+    AND speculative_retry = '99.0PERCENTILE';"""
+
+        self.assertEqual(cluster.metadata.keyspaces['export_udts'].export_as_string(), expected_string)
+
+        table_meta = cluster.metadata.keyspaces['export_udts'].tables['users']
+
+        expected_string = """CREATE TABLE export_udts.users (
+    user text PRIMARY KEY,
+    addresses map<text, address>
+) WITH bloom_filter_fp_chance = 0.01
+    AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
+    AND comment = ''
+    AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
+    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+    AND dclocal_read_repair_chance = 0.1
+    AND default_time_to_live = 0
+    AND gc_grace_seconds = 864000
+    AND max_index_interval = 2048
+    AND memtable_flush_period_in_ms = 0
+    AND min_index_interval = 128
+    AND read_repair_chance = 0.0
+    AND speculative_retry = '99.0PERCENTILE';"""
+
+        self.assertEqual(table_meta.export_as_string(), expected_string)
 
     def test_case_sensitivity(self):
         """

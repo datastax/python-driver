@@ -17,10 +17,9 @@ Connection pooling and host management.
 """
 
 import logging
-import re
 import socket
 import time
-from threading import RLock, Condition
+from threading import Lock, RLock, Condition
 import weakref
 try:
     from weakref import WeakSet
@@ -28,7 +27,8 @@ except ImportError:
     from cassandra.util import WeakSet  # NOQA
 
 from cassandra import AuthenticationFailed
-from cassandra.connection import MAX_STREAM_PER_CONNECTION, ConnectionException
+from cassandra.connection import ConnectionException
+from cassandra.policies import HostDistance
 
 log = logging.getLogger(__name__)
 
@@ -39,13 +39,6 @@ class NoConnectionsAvailable(Exception):
     no open connections.
     """
     pass
-
-
-# example matches:
-# 1.0.0
-# 1.0.0-beta1
-# 2.0-SNAPSHOT
-version_re = re.compile(r"(?P<major>\d+)\.(?P<minor>\d+)(?:\.(?P<patch>\d+))?(?:-(?P<label>\w+))?")
 
 
 class Host(object):
@@ -69,12 +62,6 @@ class Host(object):
     :const:`True` if the node is considered up, :const:`False` if it is
     considered down, and :const:`None` if it is not known if the node is
     up or down.
-    """
-
-    version = None
-    """
-    A tuple representing the Cassandra version for this host.  This will
-    remain as :const:`None` if the version is unknown.
     """
 
     _datacenter = None
@@ -113,14 +100,6 @@ class Host(object):
         """
         self._datacenter = datacenter
         self._rack = rack
-
-    def set_version(self, version_string):
-        match = version_re.match(version_string)
-        if match is not None:
-            version = [int(match.group('major')), int(match.group('minor')), int(match.group('patch') or 0)]
-            if match.group('label'):
-                version.append(match.group('label'))
-            self.version = tuple(version)
 
     def set_up(self):
         if not self.is_up:
@@ -283,11 +262,118 @@ class _HostReconnectionHandler(_ReconnectionHandler):
             return True
 
 
+class HostConnection(object):
+    """
+    When using v3 of the native protocol, this is used instead of a connection
+    pool per host (HostConnectionPool) due to the increased in-flight capacity
+    of individual connections.
+    """
+
+    host = None
+    host_distance = None
+    is_shutdown = False
+
+    _session = None
+    _connection = None
+    _lock = None
+
+    def __init__(self, host, host_distance, session):
+        self.host = host
+        self.host_distance = host_distance
+        self._session = weakref.proxy(session)
+        self._lock = Lock()
+
+        if host_distance == HostDistance.IGNORED:
+            log.debug("Not opening connection to ignored host %s", self.host)
+            return
+        elif host_distance == HostDistance.REMOTE and not session.cluster.connect_to_remote_hosts:
+            log.debug("Not opening connection to remote host %s", self.host)
+            return
+
+        log.debug("Initializing connection for host %s", self.host)
+        self._connection = session.cluster.connection_factory(host.address)
+        if session.keyspace:
+            self._connection.set_keyspace_blocking(session.keyspace)
+        log.debug("Finished initializing connection for host %s", self.host)
+
+    def borrow_connection(self, timeout):
+        if self.is_shutdown:
+            raise ConnectionException(
+                "Pool for %s is shutdown" % (self.host,), self.host)
+
+        conn = self._connection
+        if not conn:
+            raise NoConnectionsAvailable()
+
+        with conn.lock:
+            if conn.in_flight < conn.max_request_id:
+                conn.in_flight += 1
+                return conn, conn.get_request_id()
+
+        raise NoConnectionsAvailable("All request IDs are currently in use")
+
+    def return_connection(self, connection):
+        with connection.lock:
+            connection.in_flight -= 1
+
+        if connection.is_defunct or connection.is_closed:
+            log.debug("Defunct or closed connection (%s) returned to pool, potentially "
+                      "marking host %s as down", id(connection), self.host)
+            is_down = self._session.cluster.signal_connection_failure(
+                self.host, connection.last_error, is_host_addition=False)
+            if is_down:
+                self.shutdown()
+            else:
+                self._connection = None
+                with self._lock:
+                    if self._is_replacing:
+                        return
+                    self._is_replacing = True
+                    self._session.submit(self._replace, connection)
+
+    def _replace(self, connection):
+        log.debug("Replacing connection (%s) to %s", id(connection), self.host)
+        conn = self._session.cluster.connection_factory(self.host.address)
+        if self._session.keyspace:
+            conn.set_keyspace_blocking(self._session.keyspace)
+        self._connection = conn
+        with self._lock:
+            self._is_replacing = False
+
+    def shutdown(self):
+        with self._lock:
+            if self.is_shutdown:
+                return
+            else:
+                self.is_shutdown = True
+
+        if self._connection:
+            self._connection.close()
+
+    def _set_keyspace_for_all_conns(self, keyspace, callback):
+        if self.is_shutdown or not self._connection:
+            return
+
+        def connection_finished_setting_keyspace(conn, error):
+            errors = [] if not error else [error]
+            callback(self, errors)
+
+        self._connection.set_keyspace_async(keyspace, connection_finished_setting_keyspace)
+
+    def get_state(self):
+        have_conn = self._connection is not None
+        in_flight = self._connection.in_flight if have_conn else 0
+        return "shutdown: %s, open: %s, in_flights: %s" % (self.is_shutdown, have_conn, in_flight)
+
+
 _MAX_SIMULTANEOUS_CREATION = 1
 _MIN_TRASH_INTERVAL = 10
 
 
 class HostConnectionPool(object):
+    """
+    Used to pool connections to a host for v1 and v2 native protocol.
+    """
 
     host = None
     host_distance = None
@@ -349,22 +435,23 @@ class HostConnectionPool(object):
             max_conns = self._session.cluster.get_max_connections_per_host(self.host_distance)
 
             least_busy = min(conns, key=lambda c: c.in_flight)
+            request_id = None
             # to avoid another thread closing this connection while
             # trashing it (through the return_connection process), hold
             # the connection lock from this point until we've incremented
             # its in_flight count
             need_to_wait = False
             with least_busy.lock:
-
-                if least_busy.in_flight >= MAX_STREAM_PER_CONNECTION:
+                if least_busy.in_flight < least_busy.max_request_id:
+                    least_busy.in_flight += 1
+                    request_id = least_busy.get_request_id()
+                else:
                     # once we release the lock, wait for another connection
                     need_to_wait = True
-                else:
-                    least_busy.in_flight += 1
 
             if need_to_wait:
                 # wait_for_conn will increment in_flight on the conn
-                least_busy = self._wait_for_conn(timeout)
+                least_busy, request_id = self._wait_for_conn(timeout)
 
             # if we have too many requests on this connection but we still
             # have space to open a new connection against this host, go ahead
@@ -372,7 +459,7 @@ class HostConnectionPool(object):
             if least_busy.in_flight >= max_reqs and len(self._connections) < max_conns:
                 self._maybe_spawn_new_connection()
 
-            return least_busy
+            return least_busy, request_id
 
     def _maybe_spawn_new_connection(self):
         with self._lock:
@@ -461,9 +548,9 @@ class HostConnectionPool(object):
             if conns:
                 least_busy = min(conns, key=lambda c: c.in_flight)
                 with least_busy.lock:
-                    if least_busy.in_flight < MAX_STREAM_PER_CONNECTION:
+                    if least_busy.in_flight < least_busy.max_request_id:
                         least_busy.in_flight += 1
-                        return least_busy
+                        return least_busy, least_busy.get_request_id()
 
             remaining = timeout - (time.time() - start)
 
@@ -478,7 +565,7 @@ class HostConnectionPool(object):
             log.debug("Defunct or closed connection (%s) returned to pool, potentially "
                       "marking host %s as down", id(connection), self.host)
             is_down = self._session.cluster.signal_connection_failure(
-                    self.host, connection.last_error, is_host_addition=False)
+                self.host, connection.last_error, is_host_addition=False)
             if is_down:
                 self.shutdown()
             else:

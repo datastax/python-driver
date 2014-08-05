@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from tests.integration.datatype_utils import get_sample, DATA_TYPE_PRIMITIVES, DATA_TYPE_NON_PRIMITIVE_NAMES
 
 try:
     import unittest2 as unittest
@@ -75,7 +76,10 @@ class TypeTests(unittest.TestCase):
         if six.PY2 and self._cql_version >= (3, 1, 0):
             # Blob values can't be specified using string notation in CQL 3.1.0 and
             # above which is used by default in Cassandra 2.0.
-            msg = r'.*Invalid STRING constant \(.*?\) for b of type blob.*'
+            if self._cass_version >= (2, 1, 0):
+                msg = r'.*Invalid STRING constant \(.*?\) for "b" of type blob.*'
+            else:
+                msg = r'.*Invalid STRING constant \(.*?\) for b of type blob.*'
             self.assertRaisesRegexp(InvalidRequest, msg, s.execute, query, params)
             return
         elif six.PY2:
@@ -83,8 +87,8 @@ class TypeTests(unittest.TestCase):
 
         s.execute(query, params)
         expected_vals = [
-           'key1',
-           bytearray(b'blobyblob')
+            'key1',
+            bytearray(b'blobyblob')
         ]
 
         results = s.execute("SELECT * FROM mytable")
@@ -199,7 +203,7 @@ class TypeTests(unittest.TestCase):
             1.25,  # float
             "1.2.3.4",  # inet
             12345,  # int
-            ('a', 'b', 'c'),  # list<text> collection
+            ['a', 'b', 'c'],  # list<text> collection
             sortedset((1, 2, 3)),  # set<int> collection
             {'a': 1, 'b': 2},  # map<text, int> collection
             "text",  # text
@@ -276,11 +280,11 @@ class TypeTests(unittest.TestCase):
         s.execute("INSERT INTO mytable (a, b, c, o, s, l, n) VALUES ('a', 'b', %s, %s, %s, %s, %s)",
                   ('', '', '', [''], {'': 3}))
         self.assertEqual(
-            {'c': '', 'o': '', 's': '', 'l': ('', ), 'n': OrderedDict({'': 3})},
+            {'c': '', 'o': '', 's': '', 'l': [''], 'n': OrderedDict({'': 3})},
             s.execute("SELECT c, o, s, l, n FROM mytable WHERE a='a' AND b='b'")[0])
 
         self.assertEqual(
-            {'c': '', 'o': '', 's': '', 'l': ('', ), 'n': OrderedDict({'': 3})},
+            {'c': '', 'o': '', 's': '', 'l': [''], 'n': OrderedDict({'': 3})},
             s.execute(s.prepare("SELECT c, o, s, l, n FROM mytable WHERE a='a' AND b='b'"), [])[0])
 
         # non-string types shouldn't accept empty strings
@@ -398,3 +402,277 @@ class TypeTests(unittest.TestCase):
         s.execute(prepared, parameters=(dt,))
         result = s.execute("SELECT b FROM mytable WHERE a='key2'")[0].b
         self.assertEqual(dt.utctimetuple(), result.utctimetuple())
+
+    def test_tuple_type(self):
+        """
+        Basic test of tuple functionality
+        """
+
+        if self._cass_version < (2, 1, 0):
+            raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
+
+        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        s = c.connect()
+
+        # use this encoder in order to insert tuples
+        s.encoder.mapping[tuple] = s.encoder.cql_encode_tuple
+
+        s.execute("""CREATE KEYSPACE test_tuple_type
+            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}""")
+        s.set_keyspace("test_tuple_type")
+        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b tuple<ascii, int, boolean>)")
+
+        # test non-prepared statement
+        complete = ('foo', 123, True)
+        s.execute("INSERT INTO mytable (a, b) VALUES (0, %s)", parameters=(complete,))
+        result = s.execute("SELECT b FROM mytable WHERE a=0")[0]
+        self.assertEqual(complete, result.b)
+
+        partial = ('bar', 456)
+        partial_result = partial + (None,)
+        s.execute("INSERT INTO mytable (a, b) VALUES (1, %s)", parameters=(partial,))
+        result = s.execute("SELECT b FROM mytable WHERE a=1")[0]
+        self.assertEqual(partial_result, result.b)
+
+        # test single value tuples
+        subpartial = ('zoo',)
+        subpartial_result = subpartial + (None, None)
+        s.execute("INSERT INTO mytable (a, b) VALUES (2, %s)", parameters=(subpartial,))
+        result = s.execute("SELECT b FROM mytable WHERE a=2")[0]
+        self.assertEqual(subpartial_result, result.b)
+
+        # test prepared statement
+        prepared = s.prepare("INSERT INTO mytable (a, b) VALUES (?, ?)")
+        s.execute(prepared, parameters=(3, complete))
+        s.execute(prepared, parameters=(4, partial))
+        s.execute(prepared, parameters=(5, subpartial))
+
+        # extra items in the tuple should result in an error
+        self.assertRaises(ValueError, s.execute, prepared, parameters=(0, (1, 2, 3, 4, 5, 6)))
+
+        prepared = s.prepare("SELECT b FROM mytable WHERE a=?")
+        self.assertEqual(complete, s.execute(prepared, (3,))[0].b)
+        self.assertEqual(partial_result, s.execute(prepared, (4,))[0].b)
+        self.assertEqual(subpartial_result, s.execute(prepared, (5,))[0].b)
+
+    def test_tuple_type_varying_lengths(self):
+        """
+        Test tuple types of lengths of 1, 2, 3, and 384 to ensure edge cases work
+        as expected.
+        """
+
+        if self._cass_version < (2, 1, 0):
+            raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
+
+        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        s = c.connect()
+
+        # set the row_factory to dict_factory for programmatic access
+        # set the encoder for tuples for the ability to write tuples
+        s.row_factory = dict_factory
+        s.encoder.mapping[tuple] = s.encoder.cql_encode_tuple
+
+        s.execute("""CREATE KEYSPACE test_tuple_type_varying_lengths
+            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}""")
+        s.set_keyspace("test_tuple_type_varying_lengths")
+
+        # programmatically create the table with tuples of said sizes
+        lengths = (1, 2, 3, 384)
+        value_schema = []
+        for i in lengths:
+            value_schema += [' v_%s tuple<%s>' % (i, ', '.join(['int'] * i))]
+        s.execute("CREATE TABLE mytable (k int PRIMARY KEY, %s)" % (', '.join(value_schema),))
+
+        # insert tuples into same key using different columns
+        # and verify the results
+        for i in lengths:
+            created_tuple = tuple(range(0, i))
+
+            s.execute("INSERT INTO mytable (k, v_%s) VALUES (0, %s)", (i, created_tuple))
+
+            result = s.execute("SELECT v_%s FROM mytable WHERE k=0", (i,))[0]
+            self.assertEqual(tuple(created_tuple), result['v_%s' % i])
+
+    def test_tuple_primitive_subtypes(self):
+        """
+        Ensure tuple subtypes are appropriately handled.
+        """
+
+        if self._cass_version < (2, 1, 0):
+            raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
+
+        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        s = c.connect()
+        s.encoder.mapping[tuple] = s.encoder.cql_encode_tuple
+
+        s.execute("""CREATE KEYSPACE test_tuple_primitive_subtypes
+            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}""")
+        s.set_keyspace("test_tuple_primitive_subtypes")
+
+        s.execute("CREATE TABLE mytable ("
+                  "k int PRIMARY KEY, "
+                  "v tuple<%s>)" % ','.join(DATA_TYPE_PRIMITIVES))
+
+        for i in range(len(DATA_TYPE_PRIMITIVES)):
+            # create tuples to be written and ensure they match with the expected response
+            # responses have trailing None values for every element that has not been written
+            created_tuple = [get_sample(DATA_TYPE_PRIMITIVES[j]) for j in range(i + 1)]
+            response_tuple = tuple(created_tuple + [None for j in range(len(DATA_TYPE_PRIMITIVES) - i - 1)])
+            written_tuple = tuple(created_tuple)
+
+            s.execute("INSERT INTO mytable (k, v) VALUES (%s, %s)", (i, written_tuple))
+
+            result = s.execute("SELECT v FROM mytable WHERE k=%s", (i,))[0]
+            self.assertEqual(response_tuple, result.v)
+
+    def test_tuple_non_primitive_subtypes(self):
+        """
+        Ensure tuple subtypes are appropriately handled for maps, sets, and lists.
+        """
+
+        if self._cass_version < (2, 1, 0):
+            raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
+
+        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        s = c.connect()
+
+        # set the row_factory to dict_factory for programmatic access
+        # set the encoder for tuples for the ability to write tuples
+        s.row_factory = dict_factory
+        s.encoder.mapping[tuple] = s.encoder.cql_encode_tuple
+
+        s.execute("""CREATE KEYSPACE test_tuple_non_primitive_subtypes
+            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}""")
+        s.set_keyspace("test_tuple_non_primitive_subtypes")
+
+        values = []
+
+        # create list values
+        for datatype in DATA_TYPE_PRIMITIVES:
+            values.append('v_{} tuple<list<{}>>'.format(len(values), datatype))
+
+        # create set values
+        for datatype in DATA_TYPE_PRIMITIVES:
+            values.append('v_{} tuple<set<{}>>'.format(len(values), datatype))
+
+        # create map values
+        for datatype in DATA_TYPE_PRIMITIVES:
+            datatype_1 = datatype_2 = datatype
+            if datatype == 'blob':
+                # unhashable type: 'bytearray'
+                datatype_1 = 'ascii'
+            values.append('v_{} tuple<map<{}, {}>>'.format(len(values), datatype_1, datatype_2))
+
+        # make sure we're testing all non primitive data types in the future
+        if set(DATA_TYPE_NON_PRIMITIVE_NAMES) != set(['tuple', 'list', 'map', 'set']):
+            raise NotImplemented('Missing datatype not implemented: {}'.format(
+                set(DATA_TYPE_NON_PRIMITIVE_NAMES) - set(['tuple', 'list', 'map', 'set'])
+            ))
+
+        # create table
+        s.execute("CREATE TABLE mytable ("
+                  "k int PRIMARY KEY, "
+                  "%s)" % ', '.join(values))
+
+        i = 0
+        # test tuple<list<datatype>>
+        for datatype in DATA_TYPE_PRIMITIVES:
+            created_tuple = tuple([[get_sample(datatype)]])
+            s.execute("INSERT INTO mytable (k, v_%s) VALUES (0, %s)", (i, created_tuple))
+
+            result = s.execute("SELECT v_%s FROM mytable WHERE k=0", (i,))[0]
+            self.assertEqual(created_tuple, result['v_%s' % i])
+            i += 1
+
+        # test tuple<set<datatype>>
+        for datatype in DATA_TYPE_PRIMITIVES:
+            created_tuple = tuple([sortedset([get_sample(datatype)])])
+            s.execute("INSERT INTO mytable (k, v_%s) VALUES (0, %s)", (i, created_tuple))
+
+            result = s.execute("SELECT v_%s FROM mytable WHERE k=0", (i,))[0]
+            self.assertEqual(created_tuple, result['v_%s' % i])
+            i += 1
+
+        # test tuple<map<datatype, datatype>>
+        for datatype in DATA_TYPE_PRIMITIVES:
+            if datatype == 'blob':
+                # unhashable type: 'bytearray'
+                created_tuple = tuple([{get_sample('ascii'): get_sample(datatype)}])
+            else:
+                created_tuple = tuple([{get_sample(datatype): get_sample(datatype)}])
+
+            s.execute("INSERT INTO mytable (k, v_%s) VALUES (0, %s)", (i, created_tuple))
+
+            result = s.execute("SELECT v_%s FROM mytable WHERE k=0", (i,))[0]
+            self.assertEqual(created_tuple, result['v_%s' % i])
+            i += 1
+
+    def nested_tuples_schema_helper(self, depth):
+        """
+        Helper method for creating nested tuple schema
+        """
+
+        if depth == 0:
+            return 'int'
+        else:
+            return 'tuple<%s>' % self.nested_tuples_schema_helper(depth - 1)
+
+    def nested_tuples_creator_helper(self, depth):
+        """
+        Helper method for creating nested tuples
+        """
+
+        if depth == 0:
+            return 303
+        else:
+            return (self.nested_tuples_creator_helper(depth - 1), )
+
+    def test_nested_tuples(self):
+        """
+        Ensure nested are appropriately handled.
+        """
+
+        if self._cass_version < (2, 1, 0):
+            raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
+
+        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        s = c.connect()
+
+        # set the row_factory to dict_factory for programmatic access
+        # set the encoder for tuples for the ability to write tuples
+        s.row_factory = dict_factory
+        s.encoder.mapping[tuple] = s.encoder.cql_encode_tuple
+
+        s.execute("""CREATE KEYSPACE test_nested_tuples
+            WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}""")
+        s.set_keyspace("test_nested_tuples")
+
+        # create a table with multiple sizes of nested tuples
+        s.execute("CREATE TABLE mytable ("
+                  "k int PRIMARY KEY, "
+                  "v_1 %s,"
+                  "v_2 %s,"
+                  "v_3 %s,"
+                  "v_128 %s"
+                  ")" % (self.nested_tuples_schema_helper(1),
+                        self.nested_tuples_schema_helper(2),
+                        self.nested_tuples_schema_helper(3),
+                        self.nested_tuples_schema_helper(128)))
+
+        for i in (1, 2, 3, 128):
+            # create tuple
+            created_tuple = self.nested_tuples_creator_helper(i)
+
+            # write tuple
+            s.execute("INSERT INTO mytable (k, v_%s) VALUES (%s, %s)", (i, i, created_tuple))
+
+            # verify tuple was written and read correctly
+            result = s.execute("SELECT v_%s FROM mytable WHERE k=%s", (i, i))[0]
+            self.assertEqual(created_tuple, result['v_%s' % i])
+
+    def test_unicode_query_string(self):
+        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        s = c.connect()
+
+        query = u"SELECT * FROM system.schema_columnfamilies WHERE keyspace_name = 'ef\u2052ef' AND columnfamily_name = %s"
+        s.execute(query, (u"fe\u2051fe",))

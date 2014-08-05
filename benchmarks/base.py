@@ -26,6 +26,7 @@ dirname = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(dirname)
 sys.path.append(os.path.join(dirname, '..'))
 
+import cassandra
 from cassandra.cluster import Cluster
 from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.policies import HostDistance
@@ -44,39 +45,47 @@ try:
 except ImportError as exc:
     pass
 
-KEYSPACE = "testkeyspace"
+have_twisted = False
+try:
+    from cassandra.io.twistedreactor import TwistedConnection
+    have_twisted = True
+    supported_reactors.append(TwistedConnection)
+except ImportError as exc:
+    log.exception("Error importing twisted")
+    pass
+
+KEYSPACE = "testkeyspace" + str(int(time.time()))
 TABLE = "testtable"
 
 
 def setup(hosts):
+    log.info("Using 'cassandra' package from %s", cassandra.__path__)
 
     cluster = Cluster(hosts)
     cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
-    session = cluster.connect()
+    try:
+        session = cluster.connect()
 
-    rows = session.execute("SELECT keyspace_name FROM system.schema_keyspaces")
-    if KEYSPACE in [row[0] for row in rows]:
-        log.debug("dropping existing keyspace...")
-        session.execute("DROP KEYSPACE " + KEYSPACE)
+        log.debug("Creating keyspace...")
+        session.execute("""
+            CREATE KEYSPACE %s
+            WITH replication = { 'class': 'SimpleStrategy', 'replication_factor': '2' }
+            """ % KEYSPACE)
 
-    log.debug("Creating keyspace...")
-    session.execute("""
-        CREATE KEYSPACE %s
-        WITH replication = { 'class': 'SimpleStrategy', 'replication_factor': '2' }
-        """ % KEYSPACE)
+        log.debug("Setting keyspace...")
+        session.set_keyspace(KEYSPACE)
 
-    log.debug("Setting keyspace...")
-    session.set_keyspace(KEYSPACE)
-
-    log.debug("Creating table...")
-    session.execute("""
-        CREATE TABLE %s (
-            thekey text,
-            col1 text,
-            col2 text,
-            PRIMARY KEY (thekey, col1)
-        )
-        """ % TABLE)
+        log.debug("Creating table...")
+        session.execute("""
+            CREATE TABLE %s (
+                thekey text,
+                col1 text,
+                col2 text,
+                PRIMARY KEY (thekey, col1)
+            )
+            """ % TABLE)
+    finally:
+        cluster.shutdown()
 
 
 def teardown(hosts):
@@ -84,6 +93,7 @@ def teardown(hosts):
     cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
     session = cluster.connect()
     session.execute("DROP KEYSPACE " + KEYSPACE)
+    cluster.shutdown()
 
 
 def benchmark(thread_class):
@@ -92,8 +102,11 @@ def benchmark(thread_class):
         setup(options.hosts)
         log.info("==== %s ====" % (conn_class.__name__,))
 
-        cluster = Cluster(options.hosts, metrics_enabled=options.enable_metrics)
-        cluster.connection_class = conn_class
+        kwargs = {'metrics_enabled': options.enable_metrics,
+                  'connection_class': conn_class}
+        if options.protocol_version:
+            kwargs['protocol_version'] = options.protocol_version
+        cluster = Cluster(options.hosts, **kwargs)
         session = cluster.connect(KEYSPACE)
 
         log.debug("Sleeping for two seconds...")
@@ -111,7 +124,9 @@ def benchmark(thread_class):
         start = time.time()
         try:
             for i in range(options.threads):
-                thread = thread_class(i, session, query, values, per_thread, options.profile)
+                thread = thread_class(
+                    i, session, query, values, per_thread,
+                    cluster.protocol_version, options.profile)
                 thread.daemon = True
                 threads.append(thread)
 
@@ -124,6 +139,7 @@ def benchmark(thread_class):
 
             end = time.time()
         finally:
+            cluster.shutdown()
             teardown(options.hosts)
 
         total = end - start
@@ -164,12 +180,16 @@ def parse_options():
                       help='only benchmark with asyncore connections')
     parser.add_option('--libev-only', action='store_true', dest='libev_only',
                       help='only benchmark with libev connections')
+    parser.add_option('--twisted-only', action='store_true', dest='twisted_only',
+                      help='only benchmark with Twisted connections')
     parser.add_option('-m', '--metrics', action='store_true', dest='enable_metrics',
                       help='enable and print metrics for operations')
     parser.add_option('-l', '--log-level', default='info',
                       help='logging level: debug, info, warning, or error')
     parser.add_option('-p', '--profile', action='store_true', dest='profile',
                       help='Profile the run')
+    parser.add_option('--protocol-version', type='int', dest='protocol_version',
+                      help='Native protocol version to use')
 
     options, args = parser.parse_args()
 
@@ -184,6 +204,11 @@ def parse_options():
             log.error("libev is not available")
             sys.exit(1)
         options.supported_reactors = [LibevConnection]
+    elif options.twisted_only:
+        if not have_twisted:
+            log.error("Twisted is not available")
+            sys.exit(1)
+        options.supported_reactors = [TwistedConnection]
     else:
         options.supported_reactors = supported_reactors
         if not have_libev:
@@ -194,13 +219,14 @@ def parse_options():
 
 class BenchmarkThread(Thread):
 
-    def __init__(self, thread_num, session, query, values, num_queries, profile):
+    def __init__(self, thread_num, session, query, values, num_queries, protocol_version, profile):
         Thread.__init__(self)
         self.thread_num = thread_num
         self.session = session
         self.query = query
         self.values = values
         self.num_queries = num_queries
+        self.protocol_version = protocol_version
         self.profiler = Profile() if profile else None
 
     def start_profile(self):

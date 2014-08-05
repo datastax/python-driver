@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import struct
+import time
 from cassandra import ConsistencyLevel, Unavailable
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.concurrent import execute_concurrent_with_args
@@ -469,9 +470,14 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 2, 12)
         self.coordinator_stats.assert_query_count_equals(self, 3, 0)
 
+        # white list policy should not allow reconnecting to ignored hosts
+        force_stop(3)
+        wait_for_down(cluster, 3)
+        self.assertFalse(cluster.metadata._hosts[IP_FORMAT % 3].is_currently_reconnecting())
+
         self.coordinator_stats.reset_counts()
-        decommission(2)
-        wait_for_down(cluster, 2, wait=True)
+        force_stop(2)
+        time.sleep(10)
 
         try:
             self._query(session, keyspace)

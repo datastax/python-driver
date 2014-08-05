@@ -40,7 +40,7 @@ behavior in some other way, this is the place to do it:
 .. code-block:: python
 
     from cassandra.cluster import Cluster
-    from cassandra.polices import DCAwareRoundRobinPolicy
+    from cassandra.policies import DCAwareRoundRobinPolicy
 
     cluster = Cluster(
         ['10.1.1.3', '10.1.1.4', '10.1.1.5'],
@@ -137,7 +137,7 @@ when you execute:
         """
         INSERT INTO users (name, credits, user_id)
         VALUES (%s, %s, %s)
-        """
+        """,
         ("John O'Reilly", 42, uuid.uuid1())
     )
 
