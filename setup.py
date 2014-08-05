@@ -110,9 +110,9 @@ murmur3_ext = Extension('cassandra.murmur3',
 
 libev_ext = Extension('cassandra.io.libevwrapper',
                       sources=['cassandra/io/libevwrapper.c'],
-                      include_dirs=['/usr/include/libev', '/usr/local/include'],
+                      include_dirs=['/usr/include/libev', '/usr/local/include', '/opt/local/include'],
                       libraries=['ev'],
-                      library_dirs=['/usr/local/lib'])
+                      library_dirs=['/usr/local/lib', '/opt/local/lib'])
 
 
 class build_extensions(build_ext):
