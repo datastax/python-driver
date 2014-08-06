@@ -63,6 +63,8 @@ If no class is registered for a user-defined type, query results
 will use a ``namedtuple`` class and data may only be inserted
 though prepared statements.
 
+See :ref:`udts` for more details.
+
 Customizing Encoders for Non-prepared Statements
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Starting with version 2.1 of the driver, it is possible to customize

@@ -30,6 +30,9 @@ Contents
 :doc:`query_paging`
     Notes on paging large query results.
 
+:doc:`user_defined_types`
+    Working with Cassandra 2.1's user-defined types.
+
 :doc:`security`
     An overview of the security features of the driver.
 
@@ -58,6 +61,7 @@ If you would like to contribute, please feel free to open a pull request.
    performance
    query_paging
    security
+   user_defined_types
 
 Indices and Tables
 ==================
