@@ -373,11 +373,18 @@ class LightweightTransactionsTests(unittest.TestCase):
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         self.session = self.cluster.connect()
 
+        ddl = '''
+            CREATE TABLE test3rf.lwt (
+                k int PRIMARY KEY,
+                v int )'''
+        self.session.execute(ddl)
+
 
     def tearDown(self):
         """
         Shutdown cluster
         """
+        self.session.execute("DROP TABLE test3rf.lwt")
         self.cluster.shutdown()
 
 
@@ -389,8 +396,8 @@ class LightweightTransactionsTests(unittest.TestCase):
         Default value is 1000
         """
         ok = True
-        insert_statement = self.session.prepare("INSERT INTO lightw.test (k, v) VALUES (0, 0) IF NOT EXISTS")
-        delete_statement = self.session.prepare("DELETE FROM lightw.test WHERE k = 0 IF EXISTS")
+        insert_statement = self.session.prepare("INSERT INTO test3rf.lwt (k, v) VALUES (0, 0) IF NOT EXISTS")
+        delete_statement = self.session.prepare("DELETE FROM test3rf.lwt WHERE k = 0 IF EXISTS")
 
         iterations = int(os.getenv("LWT_ITERATIONS", 1000))
         print("Started test for %d iterations" % iterations)

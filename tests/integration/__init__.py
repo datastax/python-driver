@@ -179,7 +179,7 @@ def setup_test_keyspace():
     try:
         results = session.execute("SELECT keyspace_name FROM system.schema_keyspaces")
         existing_keyspaces = [row[0] for row in results]
-        for ksname in ('test1rf', 'test2rf', 'test3rf', 'lightw'):
+        for ksname in ('test1rf', 'test2rf', 'test3rf'):
             if ksname in existing_keyspaces:
                 session.execute("DROP KEYSPACE %s" % ksname)
 
@@ -200,17 +200,6 @@ def setup_test_keyspace():
 
         ddl = '''
             CREATE TABLE test3rf.test (
-                k int PRIMARY KEY,
-                v int )'''
-        session.execute(ddl)
-
-        ddl = '''
-            CREATE KEYSPACE lightw
-            WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}'''
-        session.execute(ddl)
-
-        ddl = '''
-            CREATE TABLE lightw.test (
                 k int PRIMARY KEY,
                 v int )'''
         session.execute(ddl)
