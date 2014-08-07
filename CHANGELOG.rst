@@ -1,10 +1,13 @@
 2.1.0
 =====
+August 7, 2014
 
 Bug Fixes
 ---------
 * Correctly serialize and deserialize null values in tuples and
   user-defined types (PYTHON-110)
+* Include additional header and lib dirs, allowing libevwrapper to build
+  against Homebrew and Mac Ports installs of libev (PYTHON-112 and 804dea3)
 
 2.1.0c1
 =======
@@ -78,6 +81,7 @@ Bug Fixes
 * Don't attempt to reconnect to hosts that should be ignored (according
   to the load balancing policy) when a notification is received that the
   host is down.
+* Add CAS WriteType, avoiding KeyError on CAS write timeout (PYTHON-91)
 
 2.0.2
 =====
