@@ -21,7 +21,7 @@ try:
 except ImportError:
     import unittest  # noqa
 
-from cassandra import ConsistencyLevel, WriteTimeout
+from cassandra import ConsistencyLevel
 from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
                              BatchStatement, BatchType, dict_factory)
 from cassandra.cluster import Cluster
@@ -379,14 +379,12 @@ class LightweightTransactionsTests(unittest.TestCase):
                 v int )'''
         self.session.execute(ddl)
 
-
     def tearDown(self):
         """
         Shutdown cluster
         """
         self.session.execute("DROP TABLE test3rf.lwt")
         self.cluster.shutdown()
-
 
     def test_no_connection_refused_on_timeout(self):
         """
@@ -395,7 +393,6 @@ class LightweightTransactionsTests(unittest.TestCase):
         Number of iterations can be specified with LWT_ITERATIONS environment variable.
         Default value is 1000
         """
-        ok = True
         insert_statement = self.session.prepare("INSERT INTO test3rf.lwt (k, v) VALUES (0, 0) IF NOT EXISTS")
         delete_statement = self.session.prepare("DELETE FROM test3rf.lwt WHERE k = 0 IF EXISTS")
 
@@ -408,21 +405,21 @@ class LightweightTransactionsTests(unittest.TestCase):
             statements_and_params.append((insert_statement, ()))
             statements_and_params.append((delete_statement, ()))
 
+        received_timeout = False
         results = execute_concurrent(self.session, statements_and_params, raise_on_first_error=False)
         for (success, result) in results:
             if success:
                 continue
             # In this case result is an exception
             if type(result).__name__ == "NoHostAvailable":
-                print("PYTHON-91: Disconnected from Cassandra: %s" % result.message)
-                ok = False
+                self.fail("PYTHON-91: Disconnected from Cassandra: %s" % result.message)
                 break
             if type(result).__name__ == "WriteTimeout":
                 print("Timeout: %s" % result.message)
+                received_timeout = True
                 continue
-            ok = False
-            print("Unexpected exception %s: %s" % (type(result).__name__, result.message))
+            self.fail("Unexpected exception %s: %s" % (type(result).__name__, result.message))
             break
 
         # Make sure test passed
-        self.assertTrue(ok)
+        self.assertTrue(received_timeout)
