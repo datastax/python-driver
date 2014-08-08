@@ -212,6 +212,11 @@ Model Attributes
         **Prior to cqlengine 0.16, this setting defaulted
         to 'cqlengine'. As of 0.16, this field needs to be set on all non-abstract models, or their base classes.**
 
+    .. _ttl-change:
+    .. attribute:: Model.__default_ttl__
+
+        Sets the default ttl used by this model.  This can be overridden by using the ``ttl(ttl_in_sec)`` method.
+
 
 Table Polymorphism
 ==================
