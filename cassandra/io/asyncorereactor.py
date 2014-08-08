@@ -182,7 +182,8 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         self._loop.connection_created(self)
 
         sockerr = None
-        for (af, socktype, proto, canonname, sockaddr) in socket.getaddrinfo(self.host, self.port, 0, socket.SOCK_STREAM):
+        addresses = socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        for (af, socktype, proto, canonname, sockaddr) in addresses:
             try:
                 self.create_socket(af, socktype)
                 self.connect(sockaddr)
@@ -191,8 +192,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
             except socket.error as err:
                 sockerr = err
         if sockerr:
-            raise socket.error(sockerr.errno, "Tried connecting to all addresses. Last error was %s" % sockerr.message)
-
+            raise socket.error(sockerr.errno, "Tried connecting to %s. Last error: %s" % ([a[4] for a in addresses], sockerr.strerror))
 
         self.add_channel()
 
@@ -232,14 +232,14 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         self.socket.settimeout(1.0)
         err = self.socket.connect_ex(address)
         if err in (EINPROGRESS, EALREADY, EWOULDBLOCK) \
-                or err == EINVAL and os.name in ('nt', 'ce'):
+           or err == EINVAL and os.name in ('nt', 'ce'):
             raise ConnectionException("Timed out connecting to %s" % (address[0]))
         if err in (0, EISCONN):
             self.addr = address
             self.socket.setblocking(0)
             self.handle_connect_event()
         else:
-            raise socket.error(err, errorcode[err])
+            raise socket.error(err, os.strerror(err))
 
     def close(self):
         with self.lock:

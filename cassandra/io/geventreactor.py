@@ -72,21 +72,19 @@ class GeventConnection(Connection):
         self._callbacks = {}
         self._push_watchers = defaultdict(set)
 
-        addrinfo = socket.getaddrinfo(self.host, self.port, 0, socket.SOCK_STREAM)
-
-        # Only try connecting to the first address listed. This is not
-        # the proper way to do it, but I'm a bit too lazy to figure
-        # out the event loop callback stuff required to try all
-        # entries.
-        # At least try to warn the user about this limitation.
-        if len(addrinfo) > 1:
-            log.warning("This version of python-driver will only try the first address returned by getaddrinfo")
-
-        (af, socktype, proto, cannoname, sockaddr) = addrinfo[0]
-
-        self._socket = socket.socket(af, socktype, proto)
-        self._socket.settimeout(1.0)
-        self._socket.connect(sockaddr)
+        sockerr = None
+        addresses = socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        for (af, socktype, proto, canonname, sockaddr) in addresses:
+            try:
+                self._socket = socket.socket(af, socktype, proto)
+                self._socket.settimeout(1.0)
+                self._socket.connect(sockaddr)
+                sockerr = None
+                break
+            except socket.error as err:
+                sockerr = err
+        if sockerr:
+            raise socket.error(sockerr.errno, "Tried connecting to %s. Last error: %s" % ([a[4] for a in addresses], sockerr.strerror))
 
         if self.sockopts:
             for args in self.sockopts:

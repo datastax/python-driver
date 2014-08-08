@@ -227,7 +227,7 @@ class AsyncoreConnectionTest(ConnectionTest, unittest.TestCase):
 
     def setUp(self):
         if 'gevent.monkey' in sys.modules:
-            raise unittest.SkipTest("Can't test libev with gevent monkey patching")
+            raise unittest.SkipTest("Can't test asyncore with gevent monkey patching")
         ConnectionTest.setUp(self)
 
 
