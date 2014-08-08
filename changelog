@@ -5,6 +5,8 @@ CHANGELOG
 
 * retry_connect on setup()
 * optional default TTL on model
+* fixed caching documentation 
+
 
 0.16.0
 
