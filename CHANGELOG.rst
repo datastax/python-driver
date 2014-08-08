@@ -1,3 +1,11 @@
+2.1.1
+=====
+In Progress
+
+Bug Fixes
+---------
+* Fix NetworkTopologyStrategy.export_for_schema (PYTHON-120)
+
 2.1.0
 =====
 August 7, 2014
