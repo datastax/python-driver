@@ -212,6 +212,11 @@ Model Attributes
         **Prior to cqlengine 0.16, this setting defaulted
         to 'cqlengine'. As of 0.16, this field needs to be set on all non-abstract models, or their base classes.**
 
+    .. _ttl-change:
+    .. attribute:: Model.__default_ttl__
+
+        Sets the default ttl used by this model.  This can be overridden by using the ``ttl(ttl_in_sec)`` method.
+
 
 Table Polymorphism
 ==================
@@ -331,11 +336,11 @@ Table Properties
 
     .. code-block:: python
 
-        from cqlengine import ROWS_ONLY, columns
+        from cqlengine import CACHING_ROWS_ONLY, columns
         from cqlengine.models import Model
 
         class User(Model):
-            __caching__ = ROWS_ONLY  # cache only rows instead of keys only by default
+            __caching__ = CACHING_ROWS_ONLY  # cache only rows instead of keys only by default
             __gc_grace_seconds__ = 86400  # 1 day instead of the default 10 days
 
             user_id = columns.UUID(primary_key=True)
