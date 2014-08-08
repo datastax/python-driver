@@ -48,6 +48,8 @@ def setup(
     :type consistency: int
     :param lazy_connect: True if should not connect until first use
     :type lazy_connect: bool
+    :param retry_connect: bool
+    :param retry_connect: True if we should retry to connect even if there was a connection failure initially
     """
     global cluster, session, default_consistency_level, lazy_connect_args
 
