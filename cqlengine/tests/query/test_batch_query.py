@@ -3,9 +3,13 @@ from unittest import skip
 from uuid import uuid4
 import random
 from cqlengine import Model, columns
+from cqlengine.connection import NOT_SET
 from cqlengine.management import drop_table, sync_table
 from cqlengine.query import BatchQuery, DMLQuery
 from cqlengine.tests.base import BaseCassEngTestCase
+from cassandra.cluster import Session
+import mock
+
 
 class TestMultiKeyModel(Model):
     __keyspace__ = 'test'
@@ -169,3 +173,15 @@ class BatchQueryTests(BaseCassEngTestCase):
         
         # should be 0 because the batch should not execute
         self.assertEqual(0, len(obj))
+
+    def test_batch_execute_timeout(self):
+        with mock.patch.object(Session, 'execute', autospec=True) as mock_execute:
+            with BatchQuery(timeout=1) as b:
+                BatchQueryLogModel.batch(b).create(k=2, v=2)
+            mock_execute.assert_called_once_with(mock.ANY, mock.ANY, mock.ANY, timeout=1)
+
+    def test_batch_execute_no_timeout(self):
+        with mock.patch.object(Session, 'execute', autospec=True) as mock_execute:
+            with BatchQuery() as b:
+                BatchQueryLogModel.batch(b).create(k=2, v=2)
+            mock_execute.assert_called_once_with(mock.ANY, mock.ANY, mock.ANY, timeout=NOT_SET)
