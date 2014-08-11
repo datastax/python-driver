@@ -127,8 +127,9 @@ class TestStrategies(unittest.TestCase):
         self.assertEqual(set(replica_map[MD5Token(0)]), set([host]))
 
     def test_nts_export_for_schema(self):
-        # TODO: Cover NetworkTopologyStrategy.export_for_schema()
-        pass
+        strategy = NetworkTopologyStrategy({'dc1': '1', 'dc2': '2'})
+        self.assertEqual("{'class': 'NetworkTopologyStrategy', 'dc1': '1', 'dc2': '2'}",
+                         strategy.export_for_schema())
 
     def test_simple_strategy_make_token_replica_map(self):
         host1 = Host('1', SimpleConvictionPolicy)

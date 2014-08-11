@@ -546,7 +546,7 @@ class NetworkTopologyStrategy(ReplicationStrategy):
         suitable for use in a CREATE KEYSPACE statement.
         """
         ret = "{'class': 'NetworkTopologyStrategy'"
-        for dc, repl_factor in self.dc_replication_factors:
+        for dc, repl_factor in sorted(self.dc_replication_factors.items()):
             ret += ", '%s': '%d'" % (dc, repl_factor)
         return ret + "}"
 
