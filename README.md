@@ -7,7 +7,7 @@ cqlengine is a Cassandra CQL 3 Object Mapper for Python
 
 [Documentation](https://cqlengine.readthedocs.org/en/latest/)
 
-[Report a Bug](https://github.com/bdeggleston/cqlengine/issues)
+[Report a Bug](https://github.com/cqlengine/cqlengine/issues)
 
 [Users Mailing List](https://groups.google.com/forum/?fromgroups#!forum/cqlengine-users)
 
