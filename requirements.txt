@@ -3,4 +3,4 @@ ipdb
 Sphinx
 mock
 sure==1.2.5
-cassandra-driver>=2.0.0
+cassandra-driver>=2.1.0
