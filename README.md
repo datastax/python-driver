@@ -31,12 +31,12 @@ class ExampleModel(Model):
     created_at      = columns.DateTime()
     description     = columns.Text(required=False)
 
-#next, setup the connection to your cassandra server(s)...
+#next, setup the connection to your cassandra server(s) and the default keyspace...
 >>> from cqlengine import connection
->>> connection.setup(['127.0.0.1'])
+>>> connection.setup(['127.0.0.1'], "cqlengine")
 
 # or if you're still on cassandra 1.2
->>> connection.setup(['127.0.0.1'], protocol_version=1)
+>>> connection.setup(['127.0.0.1'], "cqlengine", protocol_version=1)
 
 #...and create your CQL table
 >>> from cqlengine.management import sync_table
