@@ -23,6 +23,7 @@ This example defines a Person table, with the columns ``first_name`` and ``last_
     from cqlengine.models import Model
 
     class Person(Model):
+        id = columns.UUID(primary_key=True)
         first_name  = columns.Text()
         last_name = columns.Text()
 
@@ -145,6 +146,7 @@ Model Methods
 
         #using the person model from earlier:
         class Person(Model):
+            id = columns.UUID(primary_key=True)
             first_name  = columns.Text()
             last_name = columns.Text()
 
