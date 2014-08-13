@@ -87,6 +87,7 @@ Column Types
     * :class:`~cqlengine.columns.Ascii`
     * :class:`~cqlengine.columns.Text`
     * :class:`~cqlengine.columns.Integer`
+    * :class:`~cqlengine.columns.BigInt`
     * :class:`~cqlengine.columns.DateTime`
     * :class:`~cqlengine.columns.UUID`
     * :class:`~cqlengine.columns.TimeUUID`
