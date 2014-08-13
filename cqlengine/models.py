@@ -698,7 +698,7 @@ class ModelMetaClass(type):
             if not is_abstract:
                 raise ModelException("at least one partition key must be defined")
         if len(partition_keys) == 1:
-            pk_name = partition_keys.keys()[0]
+            pk_name = [x for x in partition_keys.keys()][0]
             attrs['pk'] = attrs[pk_name]
         else:
             # composite partition key case, get/set a tuple of values

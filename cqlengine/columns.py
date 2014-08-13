@@ -240,7 +240,7 @@ class Text(Column):
     def validate(self, value):
         value = super(Text, self).validate(value)
         if value is None: return
-        if not isinstance(value, (basestring, bytearray)) and value is not None:
+        if not isinstance(value, (six.string_types, bytearray)) and value is not None:
             raise ValidationError('{} is not a string'.format(type(value)))
         if self.max_length:
             if len(value) > self.max_length:

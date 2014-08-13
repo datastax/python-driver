@@ -5,6 +5,7 @@
 from collections import namedtuple
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.query import SimpleStatement, Statement
+import six
 
 try:
     import Queue as queue
@@ -102,7 +103,7 @@ def execute(query, params=None, consistency_level=None):
         query = str(query)
         query = SimpleStatement(query, consistency_level=consistency_level)
 
-    elif isinstance(query, basestring):
+    elif isinstance(query, six.string_types):
         query = SimpleStatement(query, consistency_level=consistency_level)
 
     LOG.info(query.query_string)
