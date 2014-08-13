@@ -423,16 +423,16 @@ class TimeUUID(UUID):
         clock_seq = None
 
         nanoseconds = int(timestamp * 1e9)
-        timestamp = int(nanoseconds // 100) + 0x01b21dd213814000L
+        timestamp = int(nanoseconds // 100) + 0x01b21dd213814000
 
         if clock_seq is None:
             import random
-            clock_seq = random.randrange(1 << 14L)  # instead of stable storage
-        time_low = timestamp & 0xffffffffL
-        time_mid = (timestamp >> 32L) & 0xffffL
-        time_hi_version = (timestamp >> 48L) & 0x0fffL
-        clock_seq_low = clock_seq & 0xffL
-        clock_seq_hi_variant = (clock_seq >> 8L) & 0x3fL
+            clock_seq = random.randrange(1 << 14)  # instead of stable storage
+        time_low = timestamp & 0xffffffff
+        time_mid = (timestamp >> 32) & 0xffff
+        time_hi_version = (timestamp >> 48) & 0x0fff
+        clock_seq_low = clock_seq & 0xff
+        clock_seq_hi_variant = (clock_seq >> 8) & 0x3f
         if node is None:
             node = getnode()
         return pyUUID(fields=(time_low, time_mid, time_hi_version,

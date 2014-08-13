@@ -158,7 +158,7 @@ class TablePropertiesTests(BaseCassEngTestCase):
                     }
 
         if CASSANDRA_VERSION >= 20:
-            expected['default_time_to_live'] = 4756,
+            expected['default_time_to_live'] = 4756
             expected['index_interval'] = 98706
             expected['memtable_flush_period_in_ms'] = 43681
 
@@ -168,34 +168,37 @@ class TablePropertiesTests(BaseCassEngTestCase):
         ModelWithTableProperties.__bloom_filter_fp_chance__ = 0.66778
         ModelWithTableProperties.__caching__ = CACHING_NONE
         ModelWithTableProperties.__comment__ = 'xirAkRWZVVvsmzRvXamiEcQkshkUIDINVJZgLYSdnGHweiBrAiJdLJkVohdRy'
-        ModelWithTableProperties.__default_time_to_live__ = 65178
         ModelWithTableProperties.__gc_grace_seconds__ = 96362
-        ModelWithTableProperties.__index_interval__ = 94207
-        ModelWithTableProperties.__memtable_flush_period_in_ms__ = 60210
+
         ModelWithTableProperties.__populate_io_cache_on_flush__ = False
         ModelWithTableProperties.__read_repair_chance__ = 0.2989
         ModelWithTableProperties.__replicate_on_write__ = True
         ModelWithTableProperties.__dclocal_read_repair_chance__ = 0.12732
 
+        if CASSANDRA_VERSION >= 20:
+            ModelWithTableProperties.__default_time_to_live__ = 65178
+            ModelWithTableProperties.__memtable_flush_period_in_ms__ = 60210
+            ModelWithTableProperties.__index_interval__ = 94207
+
         sync_table(ModelWithTableProperties)
 
         table_settings = management.get_table_settings(ModelWithTableProperties).options
 
-        self.assertDictContainsSubset({
-            'bloom_filter_fp_chance': 0.66778,
-            'caching': CACHING_NONE,
-            'comment': 'xirAkRWZVVvsmzRvXamiEcQkshkUIDINVJZgLYSdnGHweiBrAiJdLJkVohdRy',
-            'default_time_to_live': 65178,
-            'gc_grace_seconds': 96362,
-            'index_interval': 94207,
-            'memtable_flush_period_in_ms': 60210,
-            'populate_io_cache_on_flush': False,
-            'read_repair_chance': 0.2989,
-            'replicate_on_write': True,
+        expected = {'bloom_filter_fp_chance': 0.66778,
+                    'caching': CACHING_NONE,
+                     'comment': 'xirAkRWZVVvsmzRvXamiEcQkshkUIDINVJZgLYSdnGHweiBrAiJdLJkVohdRy',
+                     'gc_grace_seconds': 96362,
+                     'populate_io_cache_on_flush': False,
+                     'read_repair_chance': 0.2989,
+                     'replicate_on_write': True  # TODO see above comment re: native driver missing local read repair chance
+                     #  'local_read_repair_chance': 0.12732,
+                    }
+        if CASSANDRA_VERSION >= 20:
+             expected['memtable_flush_period_in_ms'] = 60210
+             expected['default_time_to_live'] = 65178
+             expected['index_interval'] = 94207
 
-            # TODO see above comment re: native driver missing local read repair chance
-            # 'local_read_repair_chance': 0.12732,
-        }, table_settings)
+        self.assertDictContainsSubset(expected, table_settings)
 
 
 class SyncTableTests(BaseCassEngTestCase):
