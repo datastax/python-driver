@@ -10,7 +10,7 @@ sys.path.append("")
 from cqlengine import connection
 
 try:
-    CASSANDRA_VERSION = os.environ["CASSANDRA_VERSION"]
+    CASSANDRA_VERSION = int(os.environ["CASSANDRA_VERSION"])
 except:
     print "CASSANDRA_VERSION must be set as an environment variable. One of (12, 20, 21)"
     raise

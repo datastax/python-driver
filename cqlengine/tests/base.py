@@ -1,5 +1,4 @@
 from unittest import TestCase
-from cqlengine import connection
 import os
 from cqlengine.connection import get_session
 
