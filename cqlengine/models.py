@@ -636,7 +636,7 @@ class ModelMetaClass(type):
 
         is_polymorphic_base = any([c[1].polymorphic_key for c in column_definitions])
 
-        column_definitions = inherited_columns.items() + column_definitions
+        column_definitions = [x for x in inherited_columns.items()] + column_definitions
 
         polymorphic_columns = [c for c in column_definitions if c[1].polymorphic_key]
         is_polymorphic = len(polymorphic_columns) > 0
