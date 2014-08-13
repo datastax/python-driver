@@ -62,7 +62,8 @@ class TestModelIO(BaseCassEngTestCase):
             'a_bool': tm.a_bool,
         }
         self.assertEquals(sorted(tm.keys()), sorted(column_dict.keys()))
-        self.assertEquals(sorted(tm.values()), sorted(column_dict.values()))
+
+        self.assertItemsEqual(tm.values(), column_dict.values())
         self.assertEquals(
             sorted(tm.items(), key=itemgetter(0)),
             sorted(column_dict.items(), key=itemgetter(0)))
