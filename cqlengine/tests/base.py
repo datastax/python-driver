@@ -2,7 +2,7 @@ from unittest import TestCase
 import os
 from cqlengine.connection import get_session
 
-CASSANDRA_VERSION = os.environ['CASSANDRA_VERSION']
+CASSANDRA_VERSION = int(os.environ['CASSANDRA_VERSION'])
 
 class BaseCassEngTestCase(TestCase):
 

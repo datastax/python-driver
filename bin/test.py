@@ -27,5 +27,4 @@ else:
 
 connection.setup([CASSANDRA_TEST_HOST], protocol_version=protocol_version, default_keyspace='cqlengine_test')
 
-
 nose.main()
