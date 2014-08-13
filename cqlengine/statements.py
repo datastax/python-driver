@@ -1,5 +1,6 @@
 import time
 from datetime import datetime, timedelta
+import six
 from cqlengine.functions import QueryValue
 from cqlengine.operators import BaseWhereOperator, InOperator
 
@@ -7,7 +8,16 @@ from cqlengine.operators import BaseWhereOperator, InOperator
 class StatementException(Exception): pass
 
 
-class ValueQuoter(object):
+
+import sys
+
+class UnicodeMixin(object):
+    if sys.version_info > (3, 0):
+        __str__ = lambda x: x.__unicode__()
+    else:
+        __str__ = lambda x: six.text_type(x).encode('utf-8')
+
+class ValueQuoter(UnicodeMixin):
 
     def __init__(self, value):
         self.value = value
@@ -29,9 +39,6 @@ class ValueQuoter(object):
             return self.value == other.value
         return False
 
-    def __str__(self):
-        return unicode(self).encode('utf-8')
-
 
 class InQuoter(ValueQuoter):
 
@@ -40,7 +47,7 @@ class InQuoter(ValueQuoter):
         return '(' + ', '.join([cql_quote(v) for v in self.value]) + ')'
 
 
-class BaseClause(object):
+class BaseClause(UnicodeMixin):
 
     def __init__(self, field, value):
         self.field = field
@@ -49,9 +56,6 @@ class BaseClause(object):
 
     def __unicode__(self):
         raise NotImplementedError
-
-    def __str__(self):
-        return unicode(self).encode('utf-8')
 
     def __hash__(self):
         return hash(self.field) ^ hash(self.value)
@@ -101,7 +105,7 @@ class WhereClause(BaseClause):
 
     def __unicode__(self):
         field = ('"{}"' if self.quote_field else '{}').format(self.field)
-        return u'{} {} {}'.format(field, self.operator, unicode(self.query_value))
+        return u'{} {} {}'.format(field, self.operator, six.text_type(self.query_value))
 
     def __hash__(self):
         return super(WhereClause, self).__hash__() ^ hash(self.operator)
@@ -430,7 +434,7 @@ class MapDeleteClause(BaseDeleteClause):
         return ', '.join(['"{}"[%({})s]'.format(self.field, self.context_id + i) for i in range(len(self._removals))])
 
 
-class BaseCQLStatement(object):
+class BaseCQLStatement(UnicodeMixin):
     """ The base cql statement class """
 
     def __init__(self, table, consistency=None, timestamp=None, where=None):
@@ -486,7 +490,7 @@ class BaseCQLStatement(object):
         if not self.timestamp:
             return None
 
-        if isinstance(self.timestamp, (int, long)):
+        if isinstance(self.timestamp, six.integer_types):
             return self.timestamp
 
         if isinstance(self.timestamp, timedelta):
@@ -499,15 +503,13 @@ class BaseCQLStatement(object):
     def __unicode__(self):
         raise NotImplementedError
 
-    def __str__(self):
-        return unicode(self).encode('utf-8')
 
     def __repr__(self):
         return self.__unicode__()
 
     @property
     def _where(self):
-        return 'WHERE {}'.format(' AND '.join([unicode(c) for c in self.where_clauses]))
+        return 'WHERE {}'.format(' AND '.join([six.text_type(c) for c in self.where_clauses]))
 
 
 class SelectStatement(BaseCQLStatement):
@@ -533,9 +535,9 @@ class SelectStatement(BaseCQLStatement):
             where=where
         )
 
-        self.fields = [fields] if isinstance(fields, basestring) else (fields or [])
+        self.fields = [fields] if isinstance(fields, six.string_types) else (fields or [])
         self.count = count
-        self.order_by = [order_by] if isinstance(order_by, basestring) else order_by
+        self.order_by = [order_by] if isinstance(order_by, six.string_types) else order_by
         self.limit = limit
         self.allow_filtering = allow_filtering
 
@@ -551,7 +553,7 @@ class SelectStatement(BaseCQLStatement):
             qs += [self._where]
 
         if self.order_by and not self.count:
-            qs += ['ORDER BY {}'.format(', '.join(unicode(o) for o in self.order_by))]
+            qs += ['ORDER BY {}'.format(', '.join(six.text_type(o) for o in self.order_by))]
 
         if self.limit:
             qs += ['LIMIT {}'.format(self.limit)]
@@ -658,7 +660,7 @@ class UpdateStatement(AssignmentStatement):
             qs += ["USING {}".format(" AND ".join(using_options))]
 
         qs += ['SET']
-        qs += [', '.join([unicode(c) for c in self.assignments])]
+        qs += [', '.join([six.text_type(c) for c in self.assignments])]
 
         if self.where_clauses:
             qs += [self._where]
@@ -677,7 +679,7 @@ class DeleteStatement(BaseCQLStatement):
             timestamp=timestamp
         )
         self.fields = []
-        if isinstance(fields, basestring):
+        if isinstance(fields, six.string_types):
             fields = [fields]
         for field in fields or []:
             self.add_field(field)
@@ -695,7 +697,7 @@ class DeleteStatement(BaseCQLStatement):
         return ctx
 
     def add_field(self, field):
-        if isinstance(field, basestring):
+        if isinstance(field, six.string_types):
             field = FieldDeleteClause(field)
         if not isinstance(field, BaseClause):
             raise StatementException("only instances of AssignmentClause can be added to statements")
