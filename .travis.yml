@@ -29,6 +29,6 @@ install:
     #- "pip install pytest --use-mirrors"
 
 script:
-  - while [ ! -f /var/run/cassandra.pid ] ; do sleep 1 ; done # wait until cassandra is ready
+#  - while [ ! -f /var/run/cassandra.pid ] ; do sleep 1 ; done # wait until cassandra is ready, i don't think this is necessary anymore, and it seems to hang
   - "nosetests --no-skip"
     #  - "py.test cqlengine/tests/"
