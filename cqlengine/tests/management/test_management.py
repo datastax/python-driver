@@ -124,7 +124,7 @@ class ModelWithTableProperties(Model):
     __default_time_to_live__ = 4756
     __gc_grace_seconds__ = 2063
     __index_interval__ = 98706
-    __memtable_flush_period_in_ms__ = 43681
+    #__memtable_flush_period_in_ms__ = 43681 # not compatible w/ cassandra 1.2
     __populate_io_cache_on_flush__ = True
     __read_repair_chance__ = 0.17985
     __replicate_on_write__ = False
