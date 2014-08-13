@@ -121,9 +121,7 @@ class ModelWithTableProperties(Model):
     __bloom_filter_fp_chance__ = 0.76328
     __caching__ = CACHING_ALL
     __comment__ = 'TxfguvBdzwROQALmQBOziRMbkqVGFjqcJfVhwGR'
-    __default_time_to_live__ = 4756
     __gc_grace_seconds__ = 2063
-    __index_interval__ = 98706
     __populate_io_cache_on_flush__ = True
     __read_repair_chance__ = 0.17985
     __replicate_on_write__ = False
@@ -134,6 +132,8 @@ class ModelWithTableProperties(Model):
 # kind of a hack, but we only test this property on C >= 2.0
 if CASSANDRA_VERSION >= 20:
     ModelWithTableProperties.__memtable_flush_period_in_ms__ = 43681
+    ModelWithTableProperties.__index_interval__ = 98706
+    ModelWithTableProperties.__default_time_to_live__ = 4756
 
 class TablePropertiesTests(BaseCassEngTestCase):
 
@@ -146,9 +146,7 @@ class TablePropertiesTests(BaseCassEngTestCase):
         expected = {'bloom_filter_fp_chance': 0.76328,
                     'caching': CACHING_ALL,
                     'comment': 'TxfguvBdzwROQALmQBOziRMbkqVGFjqcJfVhwGR',
-                    'default_time_to_live': 4756,
                     'gc_grace_seconds': 2063,
-                    'index_interval': 98706,
                     'populate_io_cache_on_flush': True,
                     'read_repair_chance': 0.17985,
                     'replicate_on_write': False
@@ -160,6 +158,8 @@ class TablePropertiesTests(BaseCassEngTestCase):
                     }
 
         if CASSANDRA_VERSION >= 20:
+            expected['default_time_to_live'] = 4756,
+            expected['index_interval'] = 98706
             expected['memtable_flush_period_in_ms'] = 43681
 
         self.assertDictContainsSubset(expected, management.get_table_settings(ModelWithTableProperties).options)
