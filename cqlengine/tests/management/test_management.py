@@ -2,7 +2,7 @@
 from cqlengine import ALL, CACHING_ALL, CACHING_NONE
 from cqlengine.exceptions import CQLEngineException
 from cqlengine.management import  get_fields, sync_table, drop_table
-from cqlengine.tests.base import BaseCassEngTestCase
+from cqlengine.tests.base import BaseCassEngTestCase, CASSANDRA_VERSION
 from cqlengine import management
 from cqlengine.tests.query.test_queryset import TestModel
 from cqlengine.models import Model
@@ -124,7 +124,6 @@ class ModelWithTableProperties(Model):
     __default_time_to_live__ = 4756
     __gc_grace_seconds__ = 2063
     __index_interval__ = 98706
-    #__memtable_flush_period_in_ms__ = 43681 # not compatible w/ cassandra 1.2
     __populate_io_cache_on_flush__ = True
     __read_repair_chance__ = 0.17985
     __replicate_on_write__ = False
@@ -132,6 +131,9 @@ class ModelWithTableProperties(Model):
 
     key = columns.UUID(primary_key=True)
 
+# kind of a hack, but we only test this property on C >= 2.0
+if CASSANDRA_VERSION >= 20:
+    ModelWithTableProperties.__memtable_flush_period_in_ms__ = 43681
 
 class TablePropertiesTests(BaseCassEngTestCase):
 
@@ -139,26 +141,28 @@ class TablePropertiesTests(BaseCassEngTestCase):
         drop_table(ModelWithTableProperties)
 
     def test_set_table_properties(self):
+
         sync_table(ModelWithTableProperties)
-        self.assertDictContainsSubset({
-            'bloom_filter_fp_chance': 0.76328,
-            'caching': CACHING_ALL,
-            'comment': 'TxfguvBdzwROQALmQBOziRMbkqVGFjqcJfVhwGR',
-            'default_time_to_live': 4756,
-            'gc_grace_seconds': 2063,
-            'index_interval': 98706,
-            'memtable_flush_period_in_ms': 43681,
-            'populate_io_cache_on_flush': True,
-            'read_repair_chance': 0.17985,
-            'replicate_on_write': False,
-            # For some reason 'dclocal_read_repair_chance' in CQL is called
-            # just 'local_read_repair_chance' in the schema table.
-            # Source: https://issues.apache.org/jira/browse/CASSANDRA-6717
+        expected = {'bloom_filter_fp_chance': 0.76328,
+                    'caching': CACHING_ALL,
+                    'comment': 'TxfguvBdzwROQALmQBOziRMbkqVGFjqcJfVhwGR',
+                    'default_time_to_live': 4756,
+                    'gc_grace_seconds': 2063,
+                    'index_interval': 98706,
+                    'populate_io_cache_on_flush': True,
+                    'read_repair_chance': 0.17985,
+                    'replicate_on_write': False
+                     # For some reason 'dclocal_read_repair_chance' in CQL is called
+                     #  just 'local_read_repair_chance' in the schema table.
+                     #  Source: https://issues.apache.org/jira/browse/CASSANDRA-6717
+                     #  TODO: due to a bug in the native driver i'm not seeing the local read repair chance show up
+                     # 'local_read_repair_chance': 0.50811,
+                    }
 
-            # TODO: due to a bug in the native driver i'm not seeing the local read repair chance show up
-            #'local_read_repair_chance': 0.50811,
+        if CASSANDRA_VERSION >= 20:
+            expected['memtable_flush_period_in_ms'] = 43681
 
-        }, management.get_table_settings(ModelWithTableProperties).options)
+        self.assertDictContainsSubset(expected, management.get_table_settings(ModelWithTableProperties).options)
 
     def test_table_property_update(self):
         ModelWithTableProperties.__bloom_filter_fp_chance__ = 0.66778
