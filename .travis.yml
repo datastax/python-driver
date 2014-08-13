@@ -12,7 +12,6 @@ python:
 #  - cassandra
 
 before_install:
-  - sudo apt-get remove -y cassandra
   - sudo echo "deb http://www.apache.org/dist/cassandra/debian ${C_VERSION}x main" | sudo tee -a /etc/apt/sources.list
   - sudo echo "deb-src http://www.apache.org/dist/cassandra/debian ${C_VERSION}x main" | sudo tee -a /etc/apt/sources.list
   - sudo gpg --keyserver pgp.mit.edu --recv-keys F758CE318D77295D
@@ -21,7 +20,7 @@ before_install:
   - sudo gpg --export --armor 2B5C1B00 | sudo apt-key add -
   - sudo apt-get update
 #  - sudo rm /etc/security/limits.d/cassandra.conf # travis apparently already has this file
-  - sudo apt-get install -y cassandra
+  - sudo apt-get -o Dpkg::Options::="--force-confnew" install -y cassandra
   - sudo sh -c "echo 'JVM_OPTS=\"\${JVM_OPTS} -Djava.net.preferIPv4Stack=false\"' >> /usr/local/cassandra/conf/cassandra-env.sh"
   - sudo service cassandra start
 
