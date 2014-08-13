@@ -631,7 +631,8 @@ class ModelMetaClass(type):
             attrs[col_name] = ColumnDescriptor(col_obj)
 
         column_definitions = [(k,v) for k,v in attrs.items() if isinstance(v, columns.Column)]
-        column_definitions = sorted(column_definitions, lambda x,y: cmp(x[1].position, y[1].position))
+        #column_definitions = sorted(column_definitions, lambda x,y: cmp(x[1].position, y[1].position))
+        column_definitions = sorted(column_definitions, key=lambda x: x[1].position)
 
         is_polymorphic_base = any([c[1].polymorphic_key for c in column_definitions])
 
@@ -765,12 +766,15 @@ class ModelMetaClass(type):
         return klass
 
 
+import six
+
+@six.add_metaclass(ModelMetaClass)
 class Model(BaseModel):
     """
     the db name for the column family can be set as the attribute db_name, or
     it will be genertaed from the class name
     """
     __abstract__ = True
-    __metaclass__ = ModelMetaClass
+    # __metaclass__ = ModelMetaClass
 
 

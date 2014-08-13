@@ -7,6 +7,7 @@ from cassandra.cqltypes import DateType
 
 from cqlengine.exceptions import ValidationError
 from cassandra.encoder import cql_quote
+import six
 
 
 class BaseValueManager(object):
