@@ -12,14 +12,14 @@ python:
 #  - cassandra
 
 before_install:
-  - echo "deb http://www.apache.org/dist/cassandra/debian ${C_VERSION}x main" > /etc/apt/sources.list.d/cassandra.list
-  - echo "deb-src http://www.apache.org/dist/cassandra/debian ${C_VERSION}x main" >> /etc/apt/sources.list.d/cassandra.list
-  - gpg --keyserver pgp.mit.edu --recv-keys F758CE318D77295D
-  - gpg --export --armor F758CE318D77295D | apt-key add -
-  - gpg --keyserver pgp.mit.edu --recv-keys 2B5C1B00
-  - gpg --export --armor 2B5C1B00 | sudo apt-key add -
-  - apt-get update
-  - apt-get install -y cassandra
+  - sudo echo "deb http://www.apache.org/dist/cassandra/debian ${C_VERSION}x main" > /etc/apt/sources.list.d/cassandra.list
+  - sudo echo "deb-src http://www.apache.org/dist/cassandra/debian ${C_VERSION}x main" >> /etc/apt/sources.list.d/cassandra.list
+  - sudo gpg --keyserver pgp.mit.edu --recv-keys F758CE318D77295D
+  - sudo gpg --export --armor F758CE318D77295D | apt-key add -
+  - sudo gpg --keyserver pgp.mit.edu --recv-keys 2B5C1B00
+  - sudo gpg --export --armor 2B5C1B00 | sudo apt-key add -
+  - sudo apt-get update
+  - sudo apt-get install -y cassandra
   - sudo sh -c "echo 'JVM_OPTS=\"\${JVM_OPTS} -Djava.net.preferIPv4Stack=false\"' >> /usr/local/cassandra/conf/cassandra-env.sh"
   - sudo service cassandra start
 
