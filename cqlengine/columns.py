@@ -224,6 +224,9 @@ class Bytes(Column):
 class Ascii(Column):
     db_type = 'ascii'
 
+class Inet(Column):
+    db_type = 'inet'
+
 
 class Text(Column):
     db_type = 'text'
