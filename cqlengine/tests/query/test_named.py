@@ -184,8 +184,8 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
             iter1 = iter(q)
             iter2 = iter(q)
             for attempt_id in expected_order:
-                assert iter1.next().attempt_id == attempt_id
-                assert iter2.next().attempt_id == attempt_id
+                assert next(iter1).attempt_id == attempt_id
+                assert next(iter2).attempt_id == attempt_id
 
     def test_get_success_case(self):
         """
