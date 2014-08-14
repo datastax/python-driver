@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+import os
 import socket
 
 from cassandra.cluster import Cluster, NoHostAvailable
@@ -104,10 +105,10 @@ class IPV6ConnectionTest(object):
 
     def test_error(self):
         cluster = Cluster(connection_class=self.connection_class, contact_points=['::1'], port=9043, protocol_version=PROTOCOL_VERSION)
-        self.assertRaisesRegexp(NoHostAvailable, '\(\'Unable to connect.*61.*::1\', 9043.*Connection refused.*', cluster.connect)
+        self.assertRaisesRegexp(NoHostAvailable, '\(\'Unable to connect.*%s.*::1\', 9043.*Connection refused.*' % os.errno.ECONNREFUSED, cluster.connect)
 
     def test_error_multiple(self):
-        if len(socket.getaddrinfo('localhost', 9043)) < 2:
+        if len(socket.getaddrinfo('localhost', 9043, socket.AF_UNSPEC, socket.SOCK_STREAM)) < 2:
             raise unittest.SkipTest('localhost only resolves one address')
         cluster = Cluster(connection_class=self.connection_class, contact_points=['localhost'], port=9043, protocol_version=PROTOCOL_VERSION)
         self.assertRaisesRegexp(NoHostAvailable, '\(\'Unable to connect.*Tried connecting to \[\(.*\(.*\].*Last error', cluster.connect)
