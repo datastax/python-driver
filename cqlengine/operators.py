@@ -1,7 +1,19 @@
+import six
+
+
 class QueryOperatorException(Exception): pass
 
+import sys
 
-class BaseQueryOperator(object):
+# move to central spot
+class UnicodeMixin(object):
+    if sys.version_info > (3, 0):
+        __str__ = lambda x: x.__unicode__()
+    else:
+        __str__ = lambda x: six.text_type(x).encode('utf-8')
+
+
+class BaseQueryOperator(UnicodeMixin):
     # The symbol that identifies this operator in kwargs
     # ie: colname__<symbol>
     symbol = None
@@ -13,9 +25,6 @@ class BaseQueryOperator(object):
         if self.cql_symbol is None:
             raise QueryOperatorException("cql symbol is None")
         return self.cql_symbol
-
-    def __str__(self):
-        return unicode(self).encode('utf-8')
 
     @classmethod
     def get_operator(cls, symbol):
