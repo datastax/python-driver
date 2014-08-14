@@ -267,7 +267,7 @@ class Integer(Column):
         val = super(Integer, self).validate(value)
         if val is None: return
         try:
-            return long(val)
+            return int(val)
         except (TypeError, ValueError):
             raise ValidationError("{} can't be converted to integral value".format(value))
 
@@ -290,7 +290,7 @@ class VarInt(Column):
         if val is None:
             return
         try:
-            return long(val)
+            return int(val)
         except (TypeError, ValueError):
             raise ValidationError(
                 "{} can't be converted to integral value".format(value))
@@ -353,7 +353,7 @@ class DateTime(Column):
         epoch = datetime(1970, 1, 1, tzinfo=value.tzinfo)
         offset = epoch.tzinfo.utcoffset(epoch).total_seconds() if epoch.tzinfo else 0
 
-        return long(((value - epoch).total_seconds() - offset) * 1000)
+        return int(((value - epoch).total_seconds() - offset) * 1000)
 
 
 class Date(Column):
@@ -378,7 +378,7 @@ class Date(Column):
         if not isinstance(value, date):
             raise ValidationError("'{}' is not a date object".format(repr(value)))
 
-        return long((value - date(1970, 1, 1)).total_seconds() * 1000)
+        return int((value - date(1970, 1, 1)).total_seconds() * 1000)
 
 
 class UUID(Column):
