@@ -226,7 +226,7 @@ class TestListColumn(BaseCassEngTestCase):
 
     def test_partial_updates(self):
         """ Tests that partial udpates work as expected """
-        final = range(10)
+        final = list(range(10))
         initial = final[3:7]
         m1 = TestListModel.create(int_list=initial)
 
