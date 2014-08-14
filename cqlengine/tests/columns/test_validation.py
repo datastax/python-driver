@@ -118,10 +118,12 @@ class TestVarInt(BaseCassEngTestCase):
         sync_table(cls.VarIntTest)
 
     def test_varint_io(self):
+        # TODO: this is a weird test.  i changed the number from sys.maxint (which doesn't exist in python 3)
+        # to the giant number below and it broken between runs.
         long_int = 92834902384092834092384028340283048239048203480234823048230482304820348239
         int1 = self.VarIntTest.objects.create(test_id=0, bignum=long_int)
         int2 = self.VarIntTest.objects(test_id=0).first()
-        assert int1.bignum == int2.bignum
+        self.assertEqual(int1.bignum, int2.bignum)
 
 
 class TestDate(BaseCassEngTestCase):
