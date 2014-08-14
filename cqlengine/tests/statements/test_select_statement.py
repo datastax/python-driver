@@ -1,7 +1,7 @@
 from unittest import TestCase
 from cqlengine.statements import SelectStatement, WhereClause
 from cqlengine.operators import *
-
+import six
 
 class SelectStatementTests(TestCase):
 
@@ -13,31 +13,31 @@ class SelectStatementTests(TestCase):
     def test_field_rendering(self):
         """ tests that fields are properly added to the select statement """
         ss = SelectStatement('table', ['f1', 'f2'])
-        self.assertTrue(unicode(ss).startswith('SELECT "f1", "f2"'), unicode(ss))
+        self.assertTrue(six.text_type(ss).startswith('SELECT "f1", "f2"'), six.text_type(ss))
         self.assertTrue(str(ss).startswith('SELECT "f1", "f2"'), str(ss))
 
     def test_none_fields_rendering(self):
         """ tests that a '*' is added if no fields are passed in """
         ss = SelectStatement('table')
-        self.assertTrue(unicode(ss).startswith('SELECT *'), unicode(ss))
+        self.assertTrue(six.text_type(ss).startswith('SELECT *'), six.text_type(ss))
         self.assertTrue(str(ss).startswith('SELECT *'), str(ss))
 
     def test_table_rendering(self):
         ss = SelectStatement('table')
-        self.assertTrue(unicode(ss).startswith('SELECT * FROM table'), unicode(ss))
+        self.assertTrue(six.text_type(ss).startswith('SELECT * FROM table'), six.text_type(ss))
         self.assertTrue(str(ss).startswith('SELECT * FROM table'), str(ss))
 
     def test_where_clause_rendering(self):
         ss = SelectStatement('table')
         ss.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
-        self.assertEqual(unicode(ss), 'SELECT * FROM table WHERE "a" = %(0)s', unicode(ss))
+        self.assertEqual(six.text_type(ss), 'SELECT * FROM table WHERE "a" = %(0)s', six.text_type(ss))
 
     def test_count(self):
         ss = SelectStatement('table', count=True, limit=10, order_by='d')
         ss.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
-        self.assertEqual(unicode(ss), 'SELECT COUNT(*) FROM table WHERE "a" = %(0)s LIMIT 10', unicode(ss))
-        self.assertIn('LIMIT', unicode(ss))
-        self.assertNotIn('ORDER', unicode(ss))
+        self.assertEqual(six.text_type(ss), 'SELECT COUNT(*) FROM table WHERE "a" = %(0)s LIMIT 10', six.text_type(ss))
+        self.assertIn('LIMIT', six.text_type(ss))
+        self.assertNotIn('ORDER', six.text_type(ss))
 
     def test_context(self):
         ss = SelectStatement('table')
@@ -63,7 +63,7 @@ class SelectStatementTests(TestCase):
             limit=15,
             allow_filtering=True
         )
-        qstr = unicode(ss)
+        qstr = six.text_type(ss)
         self.assertIn('LIMIT 15', qstr)
         self.assertIn('ORDER BY x, y', qstr)
         self.assertIn('ALLOW FILTERING', qstr)

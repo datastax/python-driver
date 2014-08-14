@@ -1,6 +1,7 @@
 from unittest import TestCase
 from cqlengine.statements import InsertStatement, StatementException, AssignmentClause
 
+import six
 
 class InsertStatementTests(TestCase):
 
@@ -16,7 +17,7 @@ class InsertStatementTests(TestCase):
         ist.add_assignment_clause(AssignmentClause('c', 'd'))
 
         self.assertEqual(
-            unicode(ist),
+            six.text_type(ist),
             'INSERT INTO table ("a", "c") VALUES (%(0)s, %(1)s)'
         )
 
@@ -27,7 +28,7 @@ class InsertStatementTests(TestCase):
 
         ist.update_context_id(4)
         self.assertEqual(
-            unicode(ist),
+            six.text_type(ist),
             'INSERT INTO table ("a", "c") VALUES (%(4)s, %(5)s)'
         )
         ctx = ist.get_context()
@@ -37,4 +38,4 @@ class InsertStatementTests(TestCase):
         ist = InsertStatement('table', ttl=60)
         ist.add_assignment_clause(AssignmentClause('a', 'b'))
         ist.add_assignment_clause(AssignmentClause('c', 'd'))
-        self.assertIn('USING TTL 60', unicode(ist))
+        self.assertIn('USING TTL 60', six.text_type(ist))

@@ -20,6 +20,7 @@ class QueryException(CQLEngineException): pass
 class DoesNotExist(QueryException): pass
 class MultipleObjectsReturned(QueryException): pass
 
+import six
 
 class AbstractQueryableColumn(object):
     """

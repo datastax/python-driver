@@ -1,6 +1,7 @@
 from unittest import TestCase
 from cqlengine.operators import *
 
+import six
 
 class TestWhereOperators(TestCase):
 
@@ -20,11 +21,11 @@ class TestWhereOperators(TestCase):
 
     def test_operator_rendering(self):
         """ tests symbols are rendered properly """
-        self.assertEqual("=", unicode(EqualsOperator()))
-        self.assertEqual("IN", unicode(InOperator()))
-        self.assertEqual(">", unicode(GreaterThanOperator()))
-        self.assertEqual(">=", unicode(GreaterThanOrEqualOperator()))
-        self.assertEqual("<", unicode(LessThanOperator()))
-        self.assertEqual("<=", unicode(LessThanOrEqualOperator()))
+        self.assertEqual("=", six.text_type(EqualsOperator()))
+        self.assertEqual("IN", six.text_type(InOperator()))
+        self.assertEqual(">", six.text_type(GreaterThanOperator()))
+        self.assertEqual(">=", six.text_type(GreaterThanOrEqualOperator()))
+        self.assertEqual("<", six.text_type(LessThanOperator()))
+        self.assertEqual("<=", six.text_type(LessThanOrEqualOperator()))
 
 
