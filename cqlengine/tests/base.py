@@ -1,5 +1,7 @@
 from unittest import TestCase
 import os
+import sys
+import six
 from cqlengine.connection import get_session
 
 CASSANDRA_VERSION = int(os.environ['CASSANDRA_VERSION'])
@@ -22,3 +24,7 @@ class BaseCassEngTestCase(TestCase):
     def assertNotHasAttr(self, obj, attr):
         self.assertFalse(hasattr(obj, attr),
                 "{} shouldn't have the attribute: {}".format(obj, attr))
+
+    if sys.version_info > (3, 0):
+        def assertItemsEqual(self, first, second, msg=None):
+            return self.assertCountEqual(first, second, msg)
