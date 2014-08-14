@@ -498,7 +498,7 @@ class BaseCQLStatement(UnicodeMixin):
         else:
             tmp = self.timestamp
 
-        return long(time.mktime(tmp.timetuple()) * 1e+6 + tmp.microsecond)
+        return int(time.mktime(tmp.timetuple()) * 1e+6 + tmp.microsecond)
 
     def __unicode__(self):
         raise NotImplementedError

@@ -150,13 +150,13 @@ class BatchQuery(object):
         opener = 'BEGIN ' + (self.batch_type + ' ' if self.batch_type else '') + ' BATCH'
         if self.timestamp:
 
-            if isinstance(self.timestamp, (int, long)):
+            if isinstance(self.timestamp, six.integer_types):
                 ts = self.timestamp
             elif isinstance(self.timestamp, (datetime, timedelta)):
                 ts = self.timestamp
                 if isinstance(self.timestamp, timedelta):
                     ts += datetime.now()  # Apply timedelta
-                ts = long(time.mktime(ts.timetuple()) * 1e+6 + ts.microsecond)
+                ts = int(time.mktime(ts.timetuple()) * 1e+6 + ts.microsecond)
             else:
                 raise ValueError("Batch expects a long, a timedelta, or a datetime")
 
@@ -340,7 +340,7 @@ class AbstractQuerySet(object):
             return self._result_cache[s.start:s.stop:s.step]
         else:
             #return the object at this index
-            s = long(s)
+            s = int(s)
 
             #handle negative indexing
             if s < 0: s += num_results
@@ -520,7 +520,7 @@ class AbstractQuerySet(object):
         Sets the limit on the number of results returned
         CQL has a default limit of 10,000
         """
-        if not (v is None or isinstance(v, (int, long))):
+        if not (v is None or isinstance(v, six.integer_types)):
             raise TypeError
         if v == self._limit:
             return self
