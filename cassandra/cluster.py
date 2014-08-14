@@ -2893,7 +2893,7 @@ class PagedResult(object):
 
     response_future = None
 
-    def __init__(self, response_future, initial_response, timeout):
+    def __init__(self, response_future, initial_response, timeout=_NOT_SET):
         self.response_future = response_future
         self.current_response = iter(initial_response)
         self.timeout = timeout
