@@ -2730,7 +2730,7 @@ class ResponseFuture(object):
             if self._paging_state is None:
                 return self._final_result
             else:
-                return PagedResult(self, self._final_result)
+                return PagedResult(self, self._final_result, timeout)
         elif self._final_exception:
             raise self._final_exception
         else:
@@ -2739,7 +2739,7 @@ class ResponseFuture(object):
                 if self._paging_state is None:
                     return self._final_result
                 else:
-                    return PagedResult(self, self._final_result)
+                    return PagedResult(self, self._final_result, timeout)
             elif self._final_exception:
                 raise self._final_exception
             else:
@@ -2893,9 +2893,10 @@ class PagedResult(object):
 
     response_future = None
 
-    def __init__(self, response_future, initial_response):
+    def __init__(self, response_future, initial_response, timeout):
         self.response_future = response_future
         self.current_response = iter(initial_response)
+        self.timeout = timeout
 
     def __iter__(self):
         return self
@@ -2908,7 +2909,7 @@ class PagedResult(object):
                 raise
 
         self.response_future.start_fetching_next_page()
-        result = self.response_future.result()
+        result = self.response_future.result(self.timeout)
         if self.response_future.has_more_pages:
             self.current_response = result.current_response
         else:
