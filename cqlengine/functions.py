@@ -64,7 +64,7 @@ class MinTimeUUID(BaseQueryFunction):
     def to_database(self, val):
         epoch = datetime(1970, 1, 1, tzinfo=val.tzinfo)
         offset = epoch.tzinfo.utcoffset(epoch).total_seconds() if epoch.tzinfo else 0
-        return long(((val - epoch).total_seconds() - offset) * 1000)
+        return int(((val - epoch).total_seconds() - offset) * 1000)
 
     def update_context(self, ctx):
         ctx[str(self.context_id)] = self.to_database(self.value)
@@ -91,7 +91,7 @@ class MaxTimeUUID(BaseQueryFunction):
     def to_database(self, val):
         epoch = datetime(1970, 1, 1, tzinfo=val.tzinfo)
         offset = epoch.tzinfo.utcoffset(epoch).total_seconds() if epoch.tzinfo else 0
-        return long(((val - epoch).total_seconds() - offset) * 1000)
+        return int(((val - epoch).total_seconds() - offset) * 1000)
 
     def update_context(self, ctx):
         ctx[str(self.context_id)] = self.to_database(self.value)

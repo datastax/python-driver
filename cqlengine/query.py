@@ -368,7 +368,7 @@ class AbstractQuerySet(object):
 
     def first(self):
         try:
-            return iter(self).next()
+            return six.next(iter(self))
         except StopIteration:
             return None
 

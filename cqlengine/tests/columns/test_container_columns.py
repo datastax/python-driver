@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 import json
 from uuid import uuid4
+import six
 
 from cqlengine import Model, ValidationError
 from cqlengine import columns
@@ -22,7 +23,7 @@ class JsonTestColumn(columns.Column):
 
     def to_python(self, value):
         if value is None: return
-        if isinstance(value, basestring):
+        if isinstance(value, six.string_types):
             return json.loads(value)
         else:
             return value
