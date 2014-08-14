@@ -7,7 +7,7 @@ from cqlengine.columns import Counter, List, Set
 from cqlengine.connection import execute
 
 from cqlengine.exceptions import CQLEngineException, ValidationError
-from cqlengine.functions import Token, BaseQueryFunction, QueryValue
+from cqlengine.functions import Token, BaseQueryFunction, QueryValue, UnicodeMixin
 
 #CQL 3 reference:
 #http://www.datastax.com/docs/1.1/references/cql/index
@@ -22,7 +22,7 @@ class MultipleObjectsReturned(QueryException): pass
 
 import six
 
-class AbstractQueryableColumn(object):
+class AbstractQueryableColumn(UnicodeMixin):
     """
     exposes cql query operators through pythons
     builtin comparator symbols
@@ -33,9 +33,6 @@ class AbstractQueryableColumn(object):
 
     def __unicode__(self):
         raise NotImplementedError
-
-    def __str__(self):
-        return str(unicode(self))
 
     def _to_database(self, val):
         if isinstance(val, QueryValue):
@@ -49,22 +46,22 @@ class AbstractQueryableColumn(object):
 
         used where you'd typically want to use python's `in` operator
         """
-        return WhereClause(unicode(self), InOperator(), item)
+        return WhereClause(six.text_type(self), InOperator(), item)
 
     def __eq__(self, other):
-        return WhereClause(unicode(self), EqualsOperator(), self._to_database(other))
+        return WhereClause(six.text_type(self), EqualsOperator(), self._to_database(other))
 
     def __gt__(self, other):
-        return WhereClause(unicode(self), GreaterThanOperator(), self._to_database(other))
+        return WhereClause(six.text_type(self), GreaterThanOperator(), self._to_database(other))
 
     def __ge__(self, other):
-        return WhereClause(unicode(self), GreaterThanOrEqualOperator(), self._to_database(other))
+        return WhereClause(six.text_type(self), GreaterThanOrEqualOperator(), self._to_database(other))
 
     def __lt__(self, other):
-        return WhereClause(unicode(self), LessThanOperator(), self._to_database(other))
+        return WhereClause(six.text_type(self), LessThanOperator(), self._to_database(other))
 
     def __le__(self, other):
-        return WhereClause(unicode(self), LessThanOrEqualOperator(), self._to_database(other))
+        return WhereClause(six.text_type(self), LessThanOrEqualOperator(), self._to_database(other))
 
 
 class BatchType(object):
@@ -236,7 +233,7 @@ class AbstractQuerySet(object):
             return result
 
     def __unicode__(self):
-        return unicode(self._select_query())
+        return six.text_type(self._select_query())
 
     def __str__(self):
         return str(self.__unicode__())
