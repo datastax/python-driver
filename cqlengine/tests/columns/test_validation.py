@@ -6,6 +6,7 @@ from decimal import Decimal as D
 from unittest import TestCase
 from uuid import uuid4, uuid1
 from cassandra import InvalidRequest
+import six
 from cqlengine import ValidationError
 from cqlengine.connection import execute
 
@@ -117,7 +118,7 @@ class TestVarInt(BaseCassEngTestCase):
         sync_table(cls.VarIntTest)
 
     def test_varint_io(self):
-        long_int = sys.maxint + 1
+        long_int = 92834902384092834092384028340283048239048203480234823048230482304820348239
         int1 = self.VarIntTest.objects.create(test_id=0, bignum=long_int)
         int2 = self.VarIntTest.objects(test_id=0).first()
         assert int1.bignum == int2.bignum
