@@ -285,6 +285,8 @@ Batch Queries
 
     cqlengine now supports batch queries using the BatchQuery class. Batch queries can be started and stopped manually, or within a context manager. To add queries to the batch object, you just need to precede the create/save/delete call with a call to batch, and pass in the batch object.
 
+
+
 Batch Query General Use Pattern
 -------------------------------
 
@@ -374,6 +376,19 @@ Batch Query Execution Callbacks
 
     Failure in any of the callbacks does not affect the batch's execution, as the callbacks are started after the execution
     of the batch is complete.
+
+Logged vs Unlogged
+====================
+
+    By default, queries in cqlengine are LOGGED, which carries additional overhead from UNLOGGED.  To explicitly state which batch type to use, simply:
+
+
+    .. code-block:: python
+
+        from cqlengine.query import BatchType
+        with BatchQuery(batch_type=BatchType.Unlogged) as b:
+            LogEntry.batch(b).create(k=1, v=1)
+            LogEntry.batch(b).create(k=1, v=2)
 
 
 
