@@ -453,6 +453,8 @@ QuerySet method reference
 
         Sets the ttl to run the query query with. Note that running a select query with a ttl value will raise an exception
 
+    .. _blind_updates:
+
     .. method:: update(**values)
 
         Performs an update on the row selected by the queryset. Include values to update in the

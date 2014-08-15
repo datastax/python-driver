@@ -192,6 +192,8 @@ Model Methods
         fields. If no fields on the model have been modified since loading, no query will be
         performed. Model validation is performed normally.
 
+        It is possible to do a blind update, that is, to update a field without having first selected the object out of the database.  See :ref:`Blind Updates <blind_updates>`
+
     .. method:: get_changed_columns()
 
         Returns a list of column names that have changed since the model was instantiated or saved
