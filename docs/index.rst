@@ -29,6 +29,7 @@ Contents:
     topics/columns
     topics/connection
     topics/manage_schemas
+    topics/external_resources
     topics/development
     topics/faq
 
