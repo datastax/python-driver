@@ -213,23 +213,22 @@ class Column(object):
         return val is None
 
 
-class Bytes(Column):
+class Blob(Column):
     db_type = 'blob'
 
-    class Quoter(ValueQuoter):
-        def __str__(self):
-            return '0x' + self.value.encode('hex')
-
     def to_database(self, value):
-        val = super(Bytes, self).to_database(value)
-        if val is None: return
 
-        return self.Quoter(val)
+        if not isinstance(value, six.binary_type):
+            raise Exception("expecting a binary, got a %s" % type(value))
+
+        val = super(Bytes, self).to_database(value)
+        return six.b(val)
 
     def to_python(self, value):
         #return value[2:].decode('hex')
-        return value
+        return six.u(value)
 
+Bytes = Blob
 
 class Ascii(Column):
     db_type = 'ascii'
