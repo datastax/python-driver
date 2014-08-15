@@ -294,7 +294,7 @@ class TestText(BaseCassEngTestCase):
     def test_type_checking(self):
         Text().validate('string')
         Text().validate(u'unicode')
-        Text().validate(bytearray('bytearray'))
+        Text().validate(bytearray('bytearray', encoding='ascii'))
 
         with self.assertRaises(ValidationError):
             Text(required=True).validate(None)
