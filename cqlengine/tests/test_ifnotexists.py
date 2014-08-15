@@ -1,5 +1,5 @@
 from cqlengine.management import sync_table, drop_table, create_keyspace, delete_keyspace
-from cqlengine.tests.base import BaseCassEngTestCase
+from cqlengine.tests.base import BaseCassEngTestCase, CASSANDRA_VERSION
 from cqlengine.models import Model
 from cqlengine import columns
 from uuid import uuid4
@@ -41,31 +41,35 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
 
     def test_insert_if_not_exists_success(self):
         """ tests that insertion with if_not_exists work as expected """
-        id = uuid4()
 
-        TestIfNotExistsModel.create(id=id, count=8, text='123456789')
-        TestIfNotExistsModel.if_not_exists(True).create(id=id, count=9, text='111111111111')
+        if CASSANDRA_VERSION >= 20:
+            id = uuid4()
 
-        q = TestIfNotExistsModel.objects(id=id)
-        self.assertEqual(len(q), 1)
+            TestIfNotExistsModel.create(id=id, count=8, text='123456789')
+            TestIfNotExistsModel.if_not_exists(True).create(id=id, count=9, text='111111111111')
 
-        tm = q.first()
-        self.assertEquals(tm.count, 8)
-        self.assertEquals(tm.text, '123456789')
+            q = TestIfNotExistsModel.objects(id=id)
+            self.assertEqual(len(q), 1)
+
+            tm = q.first()
+            self.assertEquals(tm.count, 8)
+            self.assertEquals(tm.text, '123456789')
 
     def test_insert_if_not_exists_failure(self):
         """ tests that insertion with if_not_exists failure """
-        id = uuid4()
 
-        TestIfNotExistsModel.create(id=id, count=8, text='123456789')
-        TestIfNotExistsModel.if_not_exists(False).create(id=id, count=9, text='111111111111')
+        if CASSANDRA_VERSION >= 20:
+            id = uuid4()
 
-        q = TestIfNotExistsModel.objects(id=id)
-        self.assertEquals(len(q), 1)
+            TestIfNotExistsModel.create(id=id, count=8, text='123456789')
+            TestIfNotExistsModel.if_not_exists(False).create(id=id, count=9, text='111111111111')
 
-        tm = q.first()
-        self.assertEquals(tm.count, 9)
-        self.assertEquals(tm.text, '111111111111')
+            q = TestIfNotExistsModel.objects(id=id)
+            self.assertEquals(len(q), 1)
+
+            tm = q.first()
+            self.assertEquals(tm.count, 9)
+            self.assertEquals(tm.text, '111111111111')
 
 
 class IfNotExistsModelTest(BaseIfNotExistsTest):
@@ -82,6 +86,7 @@ class IfNotExistsModelTest(BaseIfNotExistsTest):
         self.assertIn("IF NOT EXISTS", query)
 
     def test_if_not_exists_included_on_save(self):
+        """ tests if we correctly put 'IF NOT EXISTS' for insert statement """
 
         session = get_session()
 
