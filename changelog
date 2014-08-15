@@ -2,7 +2,20 @@ CHANGELOG
 
 0.18.0
 
-
+[260] support for static columns
+[259] docs update - examples for the queryset method references
+[258] improve docs around blind updates
+[256] write docs about developing cqlengine itself
+[254] use CASSANDRA_VERSION in tests
+[252] memtable_flush_period_in_ms not in C 1.2 - guard against test failure
+[251] test fails occasionally despite lists looking the same 
+[246] document Batches default behaviour
+[239] add sphinx contrib module to docs
+[237] update to cassandra-driver 2.1
+[232] update docs w/ links to external tutorials
+[229] get travis to test different cassandra versions
+[211] inet datatype support
+[209] Python 3 support
 
 
 0.17.0
