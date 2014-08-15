@@ -1,5 +1,6 @@
-
+import mock
 from cqlengine import ALL, CACHING_ALL, CACHING_NONE
+from cqlengine.connection import get_session
 from cqlengine.exceptions import CQLEngineException
 from cqlengine.management import  get_fields, sync_table, drop_table
 from cqlengine.tests.base import BaseCassEngTestCase, CASSANDRA_VERSION
@@ -244,3 +245,30 @@ class NonModelFailureTest(BaseCassEngTestCase):
     def test_failure(self):
         with self.assertRaises(CQLEngineException):
             sync_table(self.FakeModel)
+
+
+def test_static_columns():
+    class StaticModel(Model):
+        id = columns.Integer(primary_key=True)
+        c = columns.Integer(primary_key=True)
+        name = columns.Text(static=True)
+
+    drop_table(StaticModel)
+
+    from mock import patch
+
+    from cqlengine.connection import get_session
+    session = get_session()
+
+    with patch.object(session, "execute", side_effect=Exception) as m:
+        try:
+            sync_table(StaticModel)
+        except:
+            pass
+
+    assert m.call_count > 0
+    statement = m.call_args[0][0].query_string
+    assert '"name" text static' in statement, statement
+
+
+

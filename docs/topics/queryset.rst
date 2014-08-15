@@ -464,7 +464,7 @@ QuerySet method reference
         Sets the field to order on.
 
         .. code-block:: python
-        
+
             from uuid import uuid1,uuid4
 
             class Comment(Model):

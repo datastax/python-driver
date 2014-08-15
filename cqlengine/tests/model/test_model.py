@@ -54,3 +54,5 @@ class BuiltInAttributeConflictTest(TestCase):
                 __keyspace__ = 'test'
                 my_primary_key = columns.Integer(primary_key=True)
                 filter = columns.Text()
+
+

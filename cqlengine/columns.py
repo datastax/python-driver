@@ -99,7 +99,8 @@ class Column(object):
                  default=None,
                  required=False,
                  clustering_order=None,
-                 polymorphic_key=False):
+                 polymorphic_key=False,
+                 static=False):
         """
         :param primary_key: bool flag, indicates this column is a primary key. The first primary key defined
             on a model is the partition key (unless partition keys are set), all others are cluster keys
@@ -125,6 +126,7 @@ class Column(object):
         self.polymorphic_key = polymorphic_key
         #the column name in the model definition
         self.column_name = None
+        self.static = static
 
         self.value = None
 
@@ -182,7 +184,8 @@ class Column(object):
         """
         Returns a column definition for CQL table definition
         """
-        return '{} {}'.format(self.cql, self.db_type)
+        static = "static" if self.static else ""
+        return '{} {} {}'.format(self.cql, self.db_type, static)
 
     def set_column_name(self, name):
         """
