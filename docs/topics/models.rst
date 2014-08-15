@@ -133,6 +133,9 @@ Column Options
     :attr:`~cqlengine.columns.BaseColumn.required`
         If True, this model cannot be saved without a value defined for this column. Defaults to False. Primary key fields always require values.
 
+    :attr:`~cqlengine.columns.BaseColumn.static`
+        Defined a column as static.  Static columns are shared by all rows in a partition.
+
 Model Methods
 =============
     Below are the methods that can be called on model instances.
