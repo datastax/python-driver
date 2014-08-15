@@ -29,8 +29,8 @@ Contents:
     topics/columns
     topics/connection
     topics/manage_schemas
-    topics/faq
     topics/development
+    topics/faq
 
 .. _getting-started:
 
