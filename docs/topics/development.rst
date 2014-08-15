@@ -21,11 +21,15 @@ Testing Locally
 
 Before testing, you'll need to set an environment variable to the version of Cassandra that's being tested.  The version cooresponds to the <Major><Minor> release, so for example if you're testing against Cassandra 2.1, you'd set the following:
 
-    export CASSANDRA_VERSION=20
+    .. code-block::bash
+
+        export CASSANDRA_VERSION=20
 
 At the command line, execute:
 
-    bin/test.py
+    .. code-block::bash
+
+        bin/test.py
 
 This is a wrapper for nose that also sets up the database connection.
 

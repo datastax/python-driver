@@ -98,7 +98,7 @@ Getting Started
         example5
 
 
-`Report a Bug <https://github.com/bdeggleston/cqlengine/issues>`_
+`Report a Bug <https://github.com/cqlengine/cqlengine/issues>`_
 
 `Users Mailing List <https://groups.google.com/forum/?fromgroups#!forum/cqlengine-users>`_
 
