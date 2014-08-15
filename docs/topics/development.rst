@@ -22,7 +22,7 @@ Pull Requests
 ===============
 Only Pull Requests that have passed the entire matrix will be considered for merge into the main codebase.
 
-Please see the <https://github.com/cqlengine/cqlengine/blob/master/CONTRIBUTING.md> .
+Please see the contributing guidelines: https://github.com/cqlengine/cqlengine/blob/master/CONTRIBUTING.md
 
 
 Testing Locally
