@@ -13,7 +13,7 @@ TimeUUID and Table Polymorphism: https://www.youtube.com/watch?v=clXN9pnakvI
 Blog Posts
 ===========
 
-Table Polymorphism: http://blakeeggleston.com/cqlengine-08-released.html
+Blake Eggleston on Table Polymorphism in the .8 release: http://blakeeggleston.com/cqlengine-08-released.html
 
 
 
