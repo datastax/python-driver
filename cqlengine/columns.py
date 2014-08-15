@@ -222,11 +222,11 @@ class Blob(Column):
             raise Exception("expecting a binary, got a %s" % type(value))
 
         val = super(Bytes, self).to_database(value)
-        return six.b(val)
+        return bytearray(val)
 
     def to_python(self, value):
         #return value[2:].decode('hex')
-        return six.u(value)
+        return value
 
 Bytes = Blob
 
