@@ -5,7 +5,7 @@ Development
 Travis CI
 ================
 
-Tests are run using Travis CI using a Matrix to test different Cassandra and Python versions.
+Tests are run using Travis CI using a Matrix to test different Cassandra and Python versions.  It is located here: https://travis-ci.org/cqlengine/cqlengine
 
 Python versions:
 
