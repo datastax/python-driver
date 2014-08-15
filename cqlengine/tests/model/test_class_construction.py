@@ -73,7 +73,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
             content = columns.Text()
             numbers = columns.Integer()
 
-        self.assertEquals(Stuff._columns.keys(), ['id', 'words', 'content', 'numbers'])
+        self.assertEquals([x for x in Stuff._columns.keys()], ['id', 'words', 'content', 'numbers'])
 
     def test_exception_raised_when_creating_class_without_pk(self):
         with self.assertRaises(ModelDefinitionException):

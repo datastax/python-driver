@@ -1,17 +1,10 @@
 from unittest import TestCase
-from cqlengine import connection
 import os
+import sys
+import six
 from cqlengine.connection import get_session
 
-
-if os.environ.get('CASSANDRA_TEST_HOST'):
-    CASSANDRA_TEST_HOST = os.environ['CASSANDRA_TEST_HOST']
-else:
-    CASSANDRA_TEST_HOST = 'localhost'
-
-protocol_version = int(os.environ.get("CASSANDRA_PROTOCOL_VERSION", 2))
-
-connection.setup([CASSANDRA_TEST_HOST], protocol_version=protocol_version, default_keyspace='cqlengine_test')
+CASSANDRA_VERSION = int(os.environ['CASSANDRA_VERSION'])
 
 class BaseCassEngTestCase(TestCase):
 
@@ -31,3 +24,7 @@ class BaseCassEngTestCase(TestCase):
     def assertNotHasAttr(self, obj, attr):
         self.assertFalse(hasattr(obj, attr),
                 "{} shouldn't have the attribute: {}".format(obj, attr))
+
+    if sys.version_info > (3, 0):
+        def assertItemsEqual(self, first, second, msg=None):
+            return self.assertCountEqual(first, second, msg)

@@ -29,6 +29,9 @@ Contents:
     topics/columns
     topics/connection
     topics/manage_schemas
+    topics/external_resources
+    topics/related_projects
+    topics/development
     topics/faq
 
 .. _getting-started:
@@ -53,10 +56,10 @@ Getting Started
 
         # see http://datastax.github.io/python-driver/api/cassandra/cluster.html for options
         # the list of hosts will be passed to create a Cluster() instance
-        >>> connection.setup(['127.0.0.1'])
+        >>> connection.setup(['127.0.0.1'], "cqlengine")
 
         # if you're connecting to a 1.2 cluster
-        >>> connection.setup(['127.0.0.1'], protocol_version=1)
+        >>> connection.setup(['127.0.0.1'], "cqlengine", protocol_version=1)
 
         #...and create your CQL table
         >>> from cqlengine.management import sync_table
@@ -97,7 +100,7 @@ Getting Started
         example5
 
 
-`Report a Bug <https://github.com/bdeggleston/cqlengine/issues>`_
+`Report a Bug <https://github.com/cqlengine/cqlengine/issues>`_
 
 `Users Mailing List <https://groups.google.com/forum/?fromgroups#!forum/cqlengine-users>`_
 

@@ -1,5 +1,13 @@
 CHANGELOG
 
+
+0.17.0
+
+* retry_connect on setup()
+* optional default TTL on model
+* fixed caching documentation 
+
+
 0.16.0
 
   225: No handling of PagedResult from execute

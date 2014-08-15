@@ -1,9 +1,17 @@
 from datetime import datetime
 from uuid import uuid1
-
+import sys
+import six
 from cqlengine.exceptions import ValidationError
+# move to central spot
 
-class QueryValue(object):
+class UnicodeMixin(object):
+    if sys.version_info > (3, 0):
+        __str__ = lambda x: x.__unicode__()
+    else:
+        __str__ = lambda x: six.text_type(x).encode('utf-8')
+
+class QueryValue(UnicodeMixin):
     """
     Base class for query filter values. Subclasses of these classes can
     be passed into .filter() keyword args
@@ -56,7 +64,7 @@ class MinTimeUUID(BaseQueryFunction):
     def to_database(self, val):
         epoch = datetime(1970, 1, 1, tzinfo=val.tzinfo)
         offset = epoch.tzinfo.utcoffset(epoch).total_seconds() if epoch.tzinfo else 0
-        return long(((val - epoch).total_seconds() - offset) * 1000)
+        return int(((val - epoch).total_seconds() - offset) * 1000)
 
     def update_context(self, ctx):
         ctx[str(self.context_id)] = self.to_database(self.value)
@@ -83,7 +91,7 @@ class MaxTimeUUID(BaseQueryFunction):
     def to_database(self, val):
         epoch = datetime(1970, 1, 1, tzinfo=val.tzinfo)
         offset = epoch.tzinfo.utcoffset(epoch).total_seconds() if epoch.tzinfo else 0
-        return long(((val - epoch).total_seconds() - offset) * 1000)
+        return int(((val - epoch).total_seconds() - offset) * 1000)
 
     def update_context(self, ctx):
         ctx[str(self.context_id)] = self.to_database(self.value)

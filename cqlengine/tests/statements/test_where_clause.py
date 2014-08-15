@@ -1,4 +1,5 @@
 from unittest import TestCase
+import six
 from cqlengine.operators import EqualsOperator
 from cqlengine.statements import StatementException, WhereClause
 
@@ -15,7 +16,7 @@ class TestWhereClause(TestCase):
         wc = WhereClause('a', EqualsOperator(), 'c')
         wc.set_context_id(5)
 
-        self.assertEqual('"a" = %(5)s', unicode(wc), unicode(wc))
+        self.assertEqual('"a" = %(5)s', six.text_type(wc), six.text_type(wc))
         self.assertEqual('"a" = %(5)s', str(wc), type(wc))
 
     def test_equality_method(self):

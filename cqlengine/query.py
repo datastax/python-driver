@@ -7,7 +7,7 @@ from cqlengine.columns import Counter, List, Set
 from cqlengine.connection import execute
 
 from cqlengine.exceptions import CQLEngineException, ValidationError
-from cqlengine.functions import Token, BaseQueryFunction, QueryValue
+from cqlengine.functions import Token, BaseQueryFunction, QueryValue, UnicodeMixin
 
 #CQL 3 reference:
 #http://www.datastax.com/docs/1.1/references/cql/index
@@ -20,8 +20,9 @@ class QueryException(CQLEngineException): pass
 class DoesNotExist(QueryException): pass
 class MultipleObjectsReturned(QueryException): pass
 
+import six
 
-class AbstractQueryableColumn(object):
+class AbstractQueryableColumn(UnicodeMixin):
     """
     exposes cql query operators through pythons
     builtin comparator symbols
@@ -32,9 +33,6 @@ class AbstractQueryableColumn(object):
 
     def __unicode__(self):
         raise NotImplementedError
-
-    def __str__(self):
-        return str(unicode(self))
 
     def _to_database(self, val):
         if isinstance(val, QueryValue):
@@ -48,22 +46,22 @@ class AbstractQueryableColumn(object):
 
         used where you'd typically want to use python's `in` operator
         """
-        return WhereClause(unicode(self), InOperator(), item)
+        return WhereClause(six.text_type(self), InOperator(), item)
 
     def __eq__(self, other):
-        return WhereClause(unicode(self), EqualsOperator(), self._to_database(other))
+        return WhereClause(six.text_type(self), EqualsOperator(), self._to_database(other))
 
     def __gt__(self, other):
-        return WhereClause(unicode(self), GreaterThanOperator(), self._to_database(other))
+        return WhereClause(six.text_type(self), GreaterThanOperator(), self._to_database(other))
 
     def __ge__(self, other):
-        return WhereClause(unicode(self), GreaterThanOrEqualOperator(), self._to_database(other))
+        return WhereClause(six.text_type(self), GreaterThanOrEqualOperator(), self._to_database(other))
 
     def __lt__(self, other):
-        return WhereClause(unicode(self), LessThanOperator(), self._to_database(other))
+        return WhereClause(six.text_type(self), LessThanOperator(), self._to_database(other))
 
     def __le__(self, other):
-        return WhereClause(unicode(self), LessThanOrEqualOperator(), self._to_database(other))
+        return WhereClause(six.text_type(self), LessThanOrEqualOperator(), self._to_database(other))
 
 
 class BatchType(object):
@@ -149,13 +147,13 @@ class BatchQuery(object):
         opener = 'BEGIN ' + (self.batch_type + ' ' if self.batch_type else '') + ' BATCH'
         if self.timestamp:
 
-            if isinstance(self.timestamp, (int, long)):
+            if isinstance(self.timestamp, six.integer_types):
                 ts = self.timestamp
             elif isinstance(self.timestamp, (datetime, timedelta)):
                 ts = self.timestamp
                 if isinstance(self.timestamp, timedelta):
                     ts += datetime.now()  # Apply timedelta
-                ts = long(time.mktime(ts.timetuple()) * 1e+6 + ts.microsecond)
+                ts = int(time.mktime(ts.timetuple()) * 1e+6 + ts.microsecond)
             else:
                 raise ValueError("Batch expects a long, a timedelta, or a datetime")
 
@@ -219,7 +217,7 @@ class AbstractQuerySet(object):
         self._result_idx = None
 
         self._batch = None
-        self._ttl = None
+        self._ttl = getattr(model, '__default_ttl__', None)
         self._consistency = None
         self._timestamp = None
         self._if_not_exists = False
@@ -236,7 +234,7 @@ class AbstractQuerySet(object):
             return result
 
     def __unicode__(self):
-        return unicode(self._select_query())
+        return six.text_type(self._select_query())
 
     def __str__(self):
         return str(self.__unicode__())
@@ -340,7 +338,7 @@ class AbstractQuerySet(object):
             return self._result_cache[s.start:s.stop:s.step]
         else:
             #return the object at this index
-            s = long(s)
+            s = int(s)
 
             #handle negative indexing
             if s < 0: s += num_results
@@ -371,7 +369,7 @@ class AbstractQuerySet(object):
 
     def first(self):
         try:
-            return iter(self).next()
+            return six.next(iter(self))
         except StopIteration:
             return None
 
@@ -406,7 +404,7 @@ class AbstractQuerySet(object):
         :rtype: AbstractQuerySet
         """
         #add arguments to the where clause filters
-        if kwargs.values().count(None):
+        if len([x for x in kwargs.values() if x is None]):
             raise CQLEngineException("None values on filter are not allowed")
 
         clone = copy.deepcopy(self)
@@ -520,7 +518,7 @@ class AbstractQuerySet(object):
         Sets the limit on the number of results returned
         CQL has a default limit of 10,000
         """
-        if not (v is None or isinstance(v, (int, long))):
+        if not (v is None or isinstance(v, six.integer_types)):
             raise TypeError
         if v == self._limit:
             return self
@@ -580,7 +578,7 @@ class AbstractQuerySet(object):
         Deletes the contents of a query
         """
         #validate where clause
-        partition_key = self.model._primary_keys.values()[0]
+        partition_key = [x for x in self.model._primary_keys.values()][0]
         if not any([c.field == partition_key.column_name for c in self._where]):
             raise QueryException("The partition key must be defined on delete queries")
 

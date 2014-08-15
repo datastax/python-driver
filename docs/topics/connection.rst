@@ -16,6 +16,9 @@ If there is a problem with one of the servers, cqlengine will try to connect to 
     :param hosts: list of hosts, strings in the <hostname>:<port>, or just <hostname>
     :type hosts: list
 
+    :param default_keyspace: keyspace to default to
+    :type default_keyspace: str
+
     :param consistency: the consistency level of the connection, defaults to 'ONE'
     :type consistency: int
 

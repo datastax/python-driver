@@ -277,7 +277,7 @@ class BaseModel(object):
     __queryset__ = ModelQuerySet
     __dmlquery__ = DMLQuery
 
-    #__ttl__ = None # this doesn't seem to be used
+    __default_ttl__ = None # default ttl value to use
     __consistency__ = None # can be set per query
 
     # Additional table properties
@@ -299,7 +299,7 @@ class BaseModel(object):
 
     def __init__(self, **values):
         self._values = {}
-        self._ttl = None
+        self._ttl = self.__default_ttl__
         self._timestamp = None
 
         for name, column in self._columns.items():
@@ -320,7 +320,7 @@ class BaseModel(object):
         Pretty printing of models by their primary key
         """
         return '{} <{}>'.format(self.__class__.__name__,
-                                ', '.join(('{}={}'.format(k, getattr(self, k)) for k,v in self._primary_keys.iteritems()))
+                                ', '.join(('{}={}'.format(k, getattr(self, k)) for k,v in six.iteritems(self._primary_keys)))
                                 )
 
 
@@ -472,7 +472,7 @@ class BaseModel(object):
 
     def __getitem__(self, key):
         """ Returns column's value. """
-        if not isinstance(key, basestring):
+        if not isinstance(key, six.string_types):
             raise TypeError
         if key not in self._columns.keys():
             raise KeyError
@@ -480,7 +480,7 @@ class BaseModel(object):
 
     def __setitem__(self, key, val):
         """ Sets a column's value. """
-        if not isinstance(key, basestring):
+        if not isinstance(key, six.string_types):
             raise TypeError
         if key not in self._columns.keys():
             raise KeyError
@@ -557,7 +557,7 @@ class BaseModel(object):
             v.reset_previous_value()
         self._is_persisted = True
 
-        self._ttl = None
+        self._ttl = self.__default_ttl__
         self._timestamp = None
 
         return self
@@ -595,7 +595,7 @@ class BaseModel(object):
             v.reset_previous_value()
         self._is_persisted = True
 
-        self._ttl = None
+        self._ttl = self.__default_ttl__
         self._timestamp = None
 
         return self
@@ -653,11 +653,12 @@ class ModelMetaClass(type):
             attrs[col_name] = ColumnDescriptor(col_obj)
 
         column_definitions = [(k,v) for k,v in attrs.items() if isinstance(v, columns.Column)]
-        column_definitions = sorted(column_definitions, lambda x,y: cmp(x[1].position, y[1].position))
+        #column_definitions = sorted(column_definitions, lambda x,y: cmp(x[1].position, y[1].position))
+        column_definitions = sorted(column_definitions, key=lambda x: x[1].position)
 
         is_polymorphic_base = any([c[1].polymorphic_key for c in column_definitions])
 
-        column_definitions = inherited_columns.items() + column_definitions
+        column_definitions = [x for x in inherited_columns.items()] + column_definitions
 
         polymorphic_columns = [c for c in column_definitions if c[1].polymorphic_key]
         is_polymorphic = len(polymorphic_columns) > 0
@@ -719,7 +720,7 @@ class ModelMetaClass(type):
             if not is_abstract:
                 raise ModelException("at least one partition key must be defined")
         if len(partition_keys) == 1:
-            pk_name = partition_keys.keys()[0]
+            pk_name = [x for x in partition_keys.keys()][0]
             attrs['pk'] = attrs[pk_name]
         else:
             # composite partition key case, get/set a tuple of values
@@ -787,12 +788,15 @@ class ModelMetaClass(type):
         return klass
 
 
+import six
+
+@six.add_metaclass(ModelMetaClass)
 class Model(BaseModel):
     """
     the db name for the column family can be set as the attribute db_name, or
     it will be genertaed from the class name
     """
     __abstract__ = True
-    __metaclass__ = ModelMetaClass
+    # __metaclass__ = ModelMetaClass
 
 

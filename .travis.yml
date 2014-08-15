@@ -1,16 +1,28 @@
 language: python
+
+env:
+  - CASSANDRA_VERSION=12
+  - CASSANDRA_VERSION=20
+
 python:
   - "2.7"
-services:
-  - cassandra
+  - "3.4"
+
 before_install:
+  - sudo echo "deb http://www.apache.org/dist/cassandra/debian ${CASSANDRA_VERSION}x main" | sudo tee -a /etc/apt/sources.list
+  - sudo echo "deb-src http://www.apache.org/dist/cassandra/debian ${CASSANDRA_VERSION}x main" | sudo tee -a /etc/apt/sources.list
+  - sudo gpg --keyserver pgp.mit.edu --recv-keys F758CE318D77295D
+  - sudo gpg --export --armor F758CE318D77295D | sudo apt-key add -
+  - sudo gpg --keyserver pgp.mit.edu --recv-keys 2B5C1B00
+  - sudo gpg --export --armor 2B5C1B00 | sudo apt-key add -
+  - sudo apt-get update
+  - sudo apt-get -o Dpkg::Options::="--force-confnew" install -y cassandra
   - sudo sh -c "echo 'JVM_OPTS=\"\${JVM_OPTS} -Djava.net.preferIPv4Stack=false\"' >> /usr/local/cassandra/conf/cassandra-env.sh"
   - sudo service cassandra start
+  - if [ "$C_VERSION" -le "20" ]; then export CASSANDRA_PROTOCOL_VERSION=1; fi
+
 install:
   - "pip install -r requirements.txt --use-mirrors"
-    #- "pip install pytest --use-mirrors"
 
 script:
-  - while [ ! -f /var/run/cassandra.pid ] ; do sleep 1 ; done # wait until cassandra is ready
-  - "nosetests --no-skip"
-    #  - "py.test cqlengine/tests/"
+  - "bin/test.py --no-skip"

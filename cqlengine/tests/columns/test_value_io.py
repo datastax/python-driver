@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import uuid1, uuid4, UUID
+import six
 
 from cqlengine.tests.base import BaseCassEngTestCase
 
@@ -80,9 +81,9 @@ class BaseColumnIOTest(BaseCassEngTestCase):
 
 class TestBlobIO(BaseColumnIOTest):
 
-    column = columns.Bytes
-    pkey_val = 'blake', uuid4().bytes
-    data_val = 'eggleston', uuid4().bytes
+    column = columns.Blob
+    pkey_val = six.b('blake'), uuid4().bytes
+    data_val = six.b('eggleston'), uuid4().bytes
 
 class TestTextIO(BaseColumnIOTest):
 

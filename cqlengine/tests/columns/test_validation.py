@@ -5,6 +5,8 @@ from datetime import tzinfo
 from decimal import Decimal as D
 from unittest import TestCase
 from uuid import uuid4, uuid1
+from cassandra import InvalidRequest
+import six
 from cqlengine import ValidationError
 from cqlengine.connection import execute
 
@@ -23,6 +25,7 @@ from cqlengine.columns import UUID
 from cqlengine.columns import Boolean
 from cqlengine.columns import Float
 from cqlengine.columns import Decimal
+from cqlengine.columns import Inet
 
 from cqlengine.management import sync_table, drop_table
 from cqlengine.models import Model
@@ -115,10 +118,12 @@ class TestVarInt(BaseCassEngTestCase):
         sync_table(cls.VarIntTest)
 
     def test_varint_io(self):
-        long_int = sys.maxint + 1
+        # TODO: this is a weird test.  i changed the number from sys.maxint (which doesn't exist in python 3)
+        # to the giant number below and it broken between runs.
+        long_int = 92834902384092834092384028340283048239048203480234823048230482304820348239
         int1 = self.VarIntTest.objects.create(test_id=0, bignum=long_int)
         int2 = self.VarIntTest.objects(test_id=0).first()
-        assert int1.bignum == int2.bignum
+        self.assertEqual(int1.bignum, int2.bignum)
 
 
 class TestDate(BaseCassEngTestCase):
@@ -289,7 +294,7 @@ class TestText(BaseCassEngTestCase):
     def test_type_checking(self):
         Text().validate('string')
         Text().validate(u'unicode')
-        Text().validate(bytearray('bytearray'))
+        Text().validate(bytearray('bytearray', encoding='ascii'))
 
         with self.assertRaises(ValidationError):
             Text(required=True).validate(None)
@@ -344,4 +349,25 @@ class TestTimeUUIDFromDatetime(TestCase):
 
         # checks that we created a UUID1 with the proper timestamp
         assert new_dt == dt
+
+class TestInet(BaseCassEngTestCase):
+
+    class InetTestModel(Model):
+        id = UUID(primary_key=True, default=uuid4)
+        address = Inet()
+
+    def setUp(self):
+        drop_table(self.InetTestModel)
+        sync_table(self.InetTestModel)
+
+    def test_inet_saves(self):
+        tmp = self.InetTestModel.create(address="192.168.1.1")
+
+        m = self.InetTestModel.get(id=tmp.id)
+
+        assert m.address == "192.168.1.1"
+
+    def test_non_address_fails(self):
+        with self.assertRaises(InvalidRequest):
+            self.InetTestModel.create(address="ham sandwich")
 

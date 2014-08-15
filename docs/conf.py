@@ -41,7 +41,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'cqlengine'
-copyright = u'2012, Blake Eggleston'
+copyright = u'2012, Blake Eggleston, Jon Haddad'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -185,7 +185,7 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-    ('index', 'cqlengine.tex', u'cqlengine Documentation', u'Blake Eggleston', 'manual'),
+    ('index', 'cqlengine.tex', u'cqlengine Documentation', u'Blake Eggleston, Jon Haddad', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -215,7 +215,7 @@ latex_documents = [
 # (source start file, name, description, authors, manual section).
 man_pages = [
     ('index', 'cqlengine', u'cqlengine Documentation',
-     [u'Blake Eggleston'], 1)
+     [u'Blake Eggleston, Jon Haddad'], 1)
 ]
 
 # If true, show URL addresses after external links.
@@ -229,7 +229,7 @@ man_pages = [
 #  dir menu entry, description, category)
 texinfo_documents = [
     ('index', 'cqlengine', u'cqlengine Documentation',
-     u'Blake Eggleston', 'cqlengine', 'One line description of project.',
+     u'Blake Eggleston, Jon Haddad', 'cqlengine', 'One line description of project.',
      'Miscellaneous'),
 ]
 

@@ -7,6 +7,16 @@ from cassandra.cqltypes import DateType
 
 from cqlengine.exceptions import ValidationError
 from cassandra.encoder import cql_quote
+import six
+
+import sys
+
+# move to central spot
+class UnicodeMixin(object):
+    if sys.version_info > (3, 0):
+        __str__ = lambda x: x.__unicode__()
+    else:
+        __str__ = lambda x: six.text_type(x).encode('utf-8')
 
 
 class BaseValueManager(object):
@@ -203,26 +213,28 @@ class Column(object):
         return val is None
 
 
-class Bytes(Column):
+class Blob(Column):
     db_type = 'blob'
 
-    class Quoter(ValueQuoter):
-        def __str__(self):
-            return '0x' + self.value.encode('hex')
-
     def to_database(self, value):
-        val = super(Bytes, self).to_database(value)
-        if val is None: return
 
-        return self.Quoter(val)
+        if not isinstance(value, six.binary_type):
+            raise Exception("expecting a binary, got a %s" % type(value))
+
+        val = super(Bytes, self).to_database(value)
+        return bytearray(val)
 
     def to_python(self, value):
         #return value[2:].decode('hex')
         return value
 
+Bytes = Blob
 
 class Ascii(Column):
     db_type = 'ascii'
+
+class Inet(Column):
+    db_type = 'inet'
 
 
 class Text(Column):
@@ -236,7 +248,7 @@ class Text(Column):
     def validate(self, value):
         value = super(Text, self).validate(value)
         if value is None: return
-        if not isinstance(value, (basestring, bytearray)) and value is not None:
+        if not isinstance(value, (six.string_types, bytearray)) and value is not None:
             raise ValidationError('{} is not a string'.format(type(value)))
         if self.max_length:
             if len(value) > self.max_length:
@@ -254,7 +266,7 @@ class Integer(Column):
         val = super(Integer, self).validate(value)
         if val is None: return
         try:
-            return long(val)
+            return int(val)
         except (TypeError, ValueError):
             raise ValidationError("{} can't be converted to integral value".format(value))
 
@@ -277,7 +289,7 @@ class VarInt(Column):
         if val is None:
             return
         try:
-            return long(val)
+            return int(val)
         except (TypeError, ValueError):
             raise ValidationError(
                 "{} can't be converted to integral value".format(value))
@@ -340,7 +352,7 @@ class DateTime(Column):
         epoch = datetime(1970, 1, 1, tzinfo=value.tzinfo)
         offset = epoch.tzinfo.utcoffset(epoch).total_seconds() if epoch.tzinfo else 0
 
-        return long(((value - epoch).total_seconds() - offset) * 1000)
+        return int(((value - epoch).total_seconds() - offset) * 1000)
 
 
 class Date(Column):
@@ -365,7 +377,7 @@ class Date(Column):
         if not isinstance(value, date):
             raise ValidationError("'{}' is not a date object".format(repr(value)))
 
-        return long((value - date(1970, 1, 1)).total_seconds() * 1000)
+        return int((value - date(1970, 1, 1)).total_seconds() * 1000)
 
 
 class UUID(Column):
@@ -381,7 +393,7 @@ class UUID(Column):
         if val is None: return
         from uuid import UUID as _UUID
         if isinstance(val, _UUID): return val
-        if isinstance(val, basestring) and self.re_uuid.match(val):
+        if isinstance(val, six.string_types) and self.re_uuid.match(val):
             return _UUID(val)
         raise ValidationError("{} is not a valid uuid".format(value))
 
@@ -420,16 +432,16 @@ class TimeUUID(UUID):
         clock_seq = None
 
         nanoseconds = int(timestamp * 1e9)
-        timestamp = int(nanoseconds // 100) + 0x01b21dd213814000L
+        timestamp = int(nanoseconds // 100) + 0x01b21dd213814000
 
         if clock_seq is None:
             import random
-            clock_seq = random.randrange(1 << 14L)  # instead of stable storage
-        time_low = timestamp & 0xffffffffL
-        time_mid = (timestamp >> 32L) & 0xffffL
-        time_hi_version = (timestamp >> 48L) & 0x0fffL
-        clock_seq_low = clock_seq & 0xffL
-        clock_seq_hi_variant = (clock_seq >> 8L) & 0x3fL
+            clock_seq = random.randrange(1 << 14)  # instead of stable storage
+        time_low = timestamp & 0xffffffff
+        time_mid = (timestamp >> 32) & 0xffff
+        time_hi_version = (timestamp >> 48) & 0x0fff
+        clock_seq_low = clock_seq & 0xff
+        clock_seq_hi_variant = (clock_seq >> 8) & 0x3f
         if node is None:
             node = getnode()
         return pyUUID(fields=(time_low, time_mid, time_hi_version,

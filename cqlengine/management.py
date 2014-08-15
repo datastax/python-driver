@@ -1,5 +1,6 @@
 import json
 import warnings
+import six
 from cqlengine import SizeTieredCompactionStrategy, LeveledCompactionStrategy
 from cqlengine import ONE
 from cqlengine.named import NamedTable
@@ -166,7 +167,7 @@ def get_create_table(model):
         prop_value = getattr(model, '__{}__'.format(prop_name), None)
         if prop_value is not None:
             # Strings needs to be single quoted
-            if isinstance(prop_value, basestring):
+            if isinstance(prop_value, six.string_types):
                 prop_value = "'{}'".format(prop_value)
             with_qs.append("{} = {}".format(prop_name, prop_value))
 
