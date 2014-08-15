@@ -1,6 +1,8 @@
 cqlengine
 ===============
 
+.. image:: https://travis-ci.org/cqlengine/cqlengine.svg?branch=master
+
 cqlengine is a Cassandra CQL 3 Object Mapper for Python
 
 **Users of versions < 0.16, the default keyspace 'cqlengine' has been removed. Please read this before upgrading:** [Breaking Changes](https://cqlengine.readthedocs.org/en/latest/topics/models.html#keyspace-change)
