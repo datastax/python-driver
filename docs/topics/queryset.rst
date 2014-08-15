@@ -377,9 +377,8 @@ Batch Query Execution Callbacks
     Failure in any of the callbacks does not affect the batch's execution, as the callbacks are started after the execution
     of the batch is complete.
 
-Logged vs Unlogged
-====================
-
+Logged vs Unlogged Batches
+---------------------------
     By default, queries in cqlengine are LOGGED, which carries additional overhead from UNLOGGED.  To explicitly state which batch type to use, simply:
 
 
@@ -460,11 +459,31 @@ QuerySet method reference
         update like so:
 
         .. code-block:: python
+
             Model.objects(key=n).update(value='x')
 
         Passing in updates for columns which are not part of the model will raise a ValidationError.
         Per column validation will be performed, but instance level validation will not
-        (`Model.validate` is not called).
+        (`Model.validate` is not called).  This is sometimes referred to as a blind update.
+
+        For example:
+
+        .. code-block:: python
+
+            class User(Model):
+                id = Integer(primary_key=True)
+                name = Text()
+
+            setup(["localhost"], "test")
+            sync_table(User)
+
+            u = User.create(id=1, name="jon")
+
+            User.objects(id=1).update(name="Steve")
+
+            # sets name to null
+            User.objects(id=1).update(name=None)
+
 
         The queryset update method also supports blindly adding and removing elements from container columns, without
         loading a model instance from Cassandra.
