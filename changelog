@@ -1,11 +1,15 @@
 CHANGELOG
 
+0.18.0
+
+
+
 
 0.17.0
 
 * retry_connect on setup()
 * optional default TTL on model
-* fixed caching documentation 
+* fixed caching documentation
 
 
 0.16.0

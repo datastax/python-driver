@@ -82,3 +82,9 @@ example5
 ## Contributing
 
 If you'd like to contribute to cqlengine, please read the [contributor guidelines](https://github.com/bdeggleston/cqlengine/blob/master/CONTRIBUTING.md)
+
+
+## Authors
+
+cqlengine was developed primarily by (Blake Eggleston)[blakeeggleston](https://twitter.com/blakeeggleston) and [Jon Haddad](https://twitter.com/rustyrazorblade), with contributions from several others in the community.
+
