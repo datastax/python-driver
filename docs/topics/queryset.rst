@@ -400,6 +400,12 @@ QuerySet method reference
 
         Returns a queryset matching all rows
 
+        .. code-block:: python
+
+            for user in User.objects().all():
+                print(user)
+
+
     .. method:: batch(batch_object)
 
         Sets the batch object to run the query on. Note that running a select query with a batch object will raise an exception
@@ -408,10 +414,19 @@ QuerySet method reference
 
         Sets the consistency level for the operation.  Options may be imported from the top level :attr:`cqlengine` package.
 
+        .. code-block:: python
+
+            for user in User.objects(id=3).consistency(ONE):
+                print(user)
+
 
     .. method:: count()
 
         Returns the number of matching rows in your QuerySet
+
+        .. code-block:: python
+
+            print(User.objects().count())
 
     .. method:: filter(\*\*values)
 
@@ -425,11 +440,21 @@ QuerySet method reference
 
         Returns a single object matching the QuerySet. If no objects are matched, a :attr:`~models.Model.DoesNotExist` exception is raised. If more than one object is found, a :attr:`~models.Model.MultipleObjectsReturned` exception is raised.
 
+        .. code-block:: python
+
+            user = User.get(id=1)
+
+
     .. method:: limit(num)
 
         Limits the number of results returned by Cassandra.
 
         *Note that CQL's default limit is 10,000, so all queries without a limit set explicitly will have an implicit limit of 10,000*
+
+        .. code-block:: python
+
+            for user in User.objects().limit(100):
+                print(user)
 
     .. method:: order_by(field_name)
 
@@ -437,6 +462,30 @@ QuerySet method reference
         :type field_name: string
 
         Sets the field to order on.
+
+        .. code-block:: python
+        
+            from uuid import uuid1,uuid4
+
+            class Comment(Model):
+                photo_id = UUID(primary_key=True)
+                comment_id = TimeUUID(primary_key=True, default=uuid1) # auto becomes clustering key
+                comment = Text()
+
+            sync_table(Comment)
+
+            u = uuid4()
+            for x in range(5):
+                Comment.create(photo_id=u, comment="test %d" % x)
+
+            print("Normal")
+            for comment in Comment.objects(photo_id=u):
+                print comment.comment_id
+
+            print("Reversed")
+            for comment in Comment.objects(photo_id=u).order_by("-comment_id"):
+                print comment.comment_id
+
 
     .. method:: allow_filtering()
 
