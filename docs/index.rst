@@ -30,6 +30,7 @@ Contents:
     topics/connection
     topics/manage_schemas
     topics/faq
+    topics/development
 
 .. _getting-started:
 
