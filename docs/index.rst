@@ -30,6 +30,7 @@ Contents:
     topics/connection
     topics/manage_schemas
     topics/external_resources
+    topics/related_projects
     topics/development
     topics/faq
 
