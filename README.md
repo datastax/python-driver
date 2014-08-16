@@ -3,6 +3,7 @@ cqlengine
 
 ![cqlengine build status](https://travis-ci.org/cqlengine/cqlengine.svg?branch=master)
 ![cqlengine pypi version](http://img.shields.io/pypi/v/cqlengine.svg)
+![cqlengine monthly downloads](http://img.shields.io/pypi/dm/cqlengine.svg)
 
 cqlengine is a Cassandra CQL 3 Object Mapper for Python
 
