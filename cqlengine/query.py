@@ -709,9 +709,9 @@ class ModelQuerySet(AbstractQuerySet):
         clone._timestamp = timestamp
         return clone
 
-    def if_not_exists(self, if_not_exists):
+    def if_not_exists(self):
         clone = copy.deepcopy(self)
-        clone._if_not_exists = if_not_exists
+        clone._if_not_exists = True
         return clone
 
     def update(self, **values):

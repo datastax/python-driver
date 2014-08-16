@@ -46,7 +46,7 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
             id = uuid4()
 
             TestIfNotExistsModel.create(id=id, count=8, text='123456789')
-            TestIfNotExistsModel.if_not_exists(True).create(id=id, count=9, text='111111111111')
+            TestIfNotExistsModel.if_not_exists().create(id=id, count=9, text='111111111111')
 
             q = TestIfNotExistsModel.objects(id=id)
             self.assertEqual(len(q), 1)
@@ -62,7 +62,7 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
             id = uuid4()
 
             TestIfNotExistsModel.create(id=id, count=8, text='123456789')
-            TestIfNotExistsModel.if_not_exists(False).create(id=id, count=9, text='111111111111')
+            TestIfNotExistsModel.create(id=id, count=9, text='111111111111')
 
             q = TestIfNotExistsModel.objects(id=id)
             self.assertEquals(len(q), 1)
@@ -80,7 +80,7 @@ class IfNotExistsModelTest(BaseIfNotExistsTest):
         session = get_session()
 
         with mock.patch.object(session, 'execute') as m:
-            TestIfNotExistsModel.if_not_exists(True).create(count=8)
+            TestIfNotExistsModel.if_not_exists().create(count=8)
 
         query = m.call_args[0][0].query_string
         self.assertIn("IF NOT EXISTS", query)
@@ -99,7 +99,7 @@ class IfNotExistsModelTest(BaseIfNotExistsTest):
 
     def test_queryset_is_returned_on_class(self):
         """ ensure we get a queryset description back """
-        qs = TestIfNotExistsModel.if_not_exists(True)
+        qs = TestIfNotExistsModel.if_not_exists()
         self.assertTrue(isinstance(qs, TestIfNotExistsModel.__queryset__), type(qs))
 
 
