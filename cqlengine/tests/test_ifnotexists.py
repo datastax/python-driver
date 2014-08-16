@@ -1,10 +1,13 @@
+from unittest import skipUnless
 from cqlengine.management import sync_table, drop_table, create_keyspace, delete_keyspace
-from cqlengine.tests.base import BaseCassEngTestCase, CASSANDRA_VERSION
+from cqlengine.tests.base import BaseCassEngTestCase
 from cqlengine.models import Model
 from cqlengine import columns
 from uuid import uuid4
 import mock
-from cqlengine.connection import get_session
+from cqlengine.connection import get_cluster, get_session
+
+cluster = get_cluster()
 
 
 class TestIfNotExistsModel(Model):
@@ -39,37 +42,37 @@ class BaseIfNotExistsTest(BaseCassEngTestCase):
 
 class IfNotExistsInsertTests(BaseIfNotExistsTest):
 
+    @skipUnless(cluster.protocol_version >= 2, "only runs against the cql3 protocol v2.0")
     def test_insert_if_not_exists_success(self):
         """ tests that insertion with if_not_exists work as expected """
 
-        if CASSANDRA_VERSION >= 20:
-            id = uuid4()
+        id = uuid4()
 
-            TestIfNotExistsModel.create(id=id, count=8, text='123456789')
-            TestIfNotExistsModel.if_not_exists().create(id=id, count=9, text='111111111111')
+        TestIfNotExistsModel.create(id=id, count=8, text='123456789')
+        TestIfNotExistsModel.if_not_exists().create(id=id, count=9, text='111111111111')
 
-            q = TestIfNotExistsModel.objects(id=id)
-            self.assertEqual(len(q), 1)
+        q = TestIfNotExistsModel.objects(id=id)
+        self.assertEqual(len(q), 1)
 
-            tm = q.first()
-            self.assertEquals(tm.count, 8)
-            self.assertEquals(tm.text, '123456789')
+        tm = q.first()
+        self.assertEquals(tm.count, 8)
+        self.assertEquals(tm.text, '123456789')
 
+    @skipUnless(cluster.protocol_version >= 2, "only runs against the cql3 protocol v2.0")
     def test_insert_if_not_exists_failure(self):
         """ tests that insertion with if_not_exists failure """
 
-        if CASSANDRA_VERSION >= 20:
-            id = uuid4()
+        id = uuid4()
 
-            TestIfNotExistsModel.create(id=id, count=8, text='123456789')
-            TestIfNotExistsModel.create(id=id, count=9, text='111111111111')
+        TestIfNotExistsModel.create(id=id, count=8, text='123456789')
+        TestIfNotExistsModel.create(id=id, count=9, text='111111111111')
 
-            q = TestIfNotExistsModel.objects(id=id)
-            self.assertEquals(len(q), 1)
+        q = TestIfNotExistsModel.objects(id=id)
+        self.assertEquals(len(q), 1)
 
-            tm = q.first()
-            self.assertEquals(tm.count, 9)
-            self.assertEquals(tm.text, '111111111111')
+        tm = q.first()
+        self.assertEquals(tm.count, 9)
+        self.assertEquals(tm.text, '111111111111')
 
 
 class IfNotExistsModelTest(BaseIfNotExistsTest):
