@@ -275,6 +275,7 @@ class TypeTests(unittest.TestCase):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
         MAX_TEST_LENGTH = 16384
+        timeout = 60
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
         s = c.connect()
@@ -283,8 +284,9 @@ class TypeTests(unittest.TestCase):
             WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}""")
         s.set_keyspace("test_udt_sizes")
 
-        # create the seed udt
-        s.execute("CREATE TYPE lengthy_udt ({})".format(', '.join(['v_{} int'.format(i) for i in range(MAX_TEST_LENGTH)])))
+        # create the seed udt, increase timeout to avoid the query failure on slow systems
+        s.execute("CREATE TYPE lengthy_udt ({})".format(', '.join(['v_{} int'.format(i)
+                                                                   for i in range(MAX_TEST_LENGTH)])), timeout=timeout)
 
         # create a table with multiple sizes of nested udts
         # no need for all nested types, only a spot checked few and the largest one
@@ -305,8 +307,8 @@ class TypeTests(unittest.TestCase):
             # write udt
             s.execute("INSERT INTO mytable (k, v) VALUES (0, %s)", (created_udt,))
 
-            # verify udt was written and read correctly
-            result = s.execute("SELECT v FROM mytable WHERE k=0")[0]
+            # verify udt was written and read correctly, increase timeout to avoid the query failure on slow systems
+            result = s.execute("SELECT v FROM mytable WHERE k=0", timeout=timeout)[0]
             self.assertEqual(created_udt, result.v)
 
     def nested_udt_helper(self, udts, i):
