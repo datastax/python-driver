@@ -1,5 +1,9 @@
 CHANGELOG
 
+0.18.1
+
+
+
 0.18.0
 
 [260] support for static columns
@@ -8,7 +12,7 @@ CHANGELOG
 [256] write docs about developing cqlengine itself
 [254] use CASSANDRA_VERSION in tests
 [252] memtable_flush_period_in_ms not in C 1.2 - guard against test failure
-[251] test fails occasionally despite lists looking the same 
+[251] test fails occasionally despite lists looking the same
 [246] document Batches default behaviour
 [239] add sphinx contrib module to docs
 [237] update to cassandra-driver 2.1

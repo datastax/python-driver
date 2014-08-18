@@ -85,6 +85,12 @@ class TestBlobIO(BaseColumnIOTest):
     pkey_val = six.b('blake'), uuid4().bytes
     data_val = six.b('eggleston'), uuid4().bytes
 
+class TestBlobIO2(BaseColumnIOTest):
+
+    column = columns.Blob
+    pkey_val = bytearray(six.b('blake')), uuid4().bytes
+    data_val = bytearray(six.b('eggleston')), uuid4().bytes
+
 class TestTextIO(BaseColumnIOTest):
 
     column = columns.Text

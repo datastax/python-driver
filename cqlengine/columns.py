@@ -221,7 +221,7 @@ class Blob(Column):
 
     def to_database(self, value):
 
-        if not isinstance(value, six.binary_type):
+        if not isinstance(value, (six.binary_type, bytearray)):
             raise Exception("expecting a binary, got a %s" % type(value))
 
         val = super(Bytes, self).to_database(value)
