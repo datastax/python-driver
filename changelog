@@ -2,6 +2,7 @@ CHANGELOG
 
 0.18.1
 
+[264] fixed support for bytearrays in blob columns
 
 
 0.18.0
