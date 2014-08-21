@@ -4,7 +4,7 @@ from cqlengine import Model
 from cqlengine import columns
 from cqlengine.management import sync_table, drop_table
 from cqlengine.models import ModelDefinitionException
-from cqlengine.tests.base import BaseCassEngTestCase
+from cqlengine.tests.base import BaseCassEngTestCase, CASSANDRA_VERSION
 from cqlengine.connection import get_cluster
 
 cluster = get_cluster()
@@ -23,7 +23,8 @@ class TestStaticColumn(BaseCassEngTestCase):
     def setUpClass(cls):
         super(TestStaticColumn, cls).setUpClass()
         drop_table(TestStaticModel)
-        sync_table(TestStaticModel)
+        if CASSANDRA_VERSION >= 20:
+            sync_table(TestStaticModel)
 
     @classmethod
     def tearDownClass(cls):
