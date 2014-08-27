@@ -42,3 +42,6 @@ html/
 /data
 
 docs/_build
+
+#iPython
+*.ipynb
