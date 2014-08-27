@@ -1695,6 +1695,7 @@ class ControlConnection(object):
     _SELECT_COLUMN_FAMILIES = "SELECT * FROM system.schema_columnfamilies"
     _SELECT_COLUMNS = "SELECT * FROM system.schema_columns"
     _SELECT_USERTYPES = "SELECT * FROM system.schema_usertypes"
+    _SELECT_TRIGGERS = "SELECT * FROM system.schema_triggers"
 
     _SELECT_PEERS = "SELECT peer, data_center, rack, tokens, rpc_address, schema_version FROM system.peers"
     _SELECT_LOCAL = "SELECT cluster_name, data_center, rack, tokens, partitioner, schema_version FROM system.local WHERE key='local'"
@@ -1895,13 +1896,15 @@ class ControlConnection(object):
             where_clause = " WHERE keyspace_name = '%s' AND columnfamily_name = '%s'" % (keyspace, table)
             cf_query = QueryMessage(query=self._SELECT_COLUMN_FAMILIES + where_clause, consistency_level=cl)
             col_query = QueryMessage(query=self._SELECT_COLUMNS + where_clause, consistency_level=cl)
-            cf_result, col_result = connection.wait_for_responses(
-                cf_query, col_query)
+            triggers_query = QueryMessage(query=self._SELECT_TRIGGERS + where_clause, consistency_level=cl)
+            cf_result, col_result, triggers_result = connection.wait_for_responses(
+                cf_query, col_query, triggers_query)
 
             log.debug("[control connection] Fetched table info for %s.%s, rebuilding metadata", keyspace, table)
             cf_result = dict_factory(*cf_result.results) if cf_result else {}
             col_result = dict_factory(*col_result.results) if col_result else {}
-            self._cluster.metadata.table_changed(keyspace, table, cf_result, col_result)
+            triggers_result = dict_factory(*triggers_result.results) if triggers_result else {}
+            self._cluster.metadata.table_changed(keyspace, table, cf_result, col_result, triggers_result)
         elif usertype:
             # user defined types within this keyspace changed
             where_clause = " WHERE keyspace_name = '%s' AND type_name = '%s'" % (keyspace, usertype)
@@ -1924,11 +1927,14 @@ class ControlConnection(object):
                 QueryMessage(query=self._SELECT_KEYSPACES, consistency_level=cl),
                 QueryMessage(query=self._SELECT_COLUMN_FAMILIES, consistency_level=cl),
                 QueryMessage(query=self._SELECT_COLUMNS, consistency_level=cl),
-                QueryMessage(query=self._SELECT_USERTYPES, consistency_level=cl)
+                QueryMessage(query=self._SELECT_USERTYPES, consistency_level=cl),
+                QueryMessage(query=self._SELECT_TRIGGERS, consistency_level=cl)
             ]
 
             responses = connection.wait_for_responses(*queries, fail_on_error=False)
-            (ks_success, ks_result), (cf_success, cf_result), (col_success, col_result), (types_success, types_result) = responses
+            (ks_success, ks_result), (cf_success, cf_result), \
+            (col_success, col_result), (types_success, types_result), \
+            (trigger_success, triggers_result) = responses
 
             if ks_success:
                 ks_result = dict_factory(*ks_result.results)
@@ -1945,6 +1951,11 @@ class ControlConnection(object):
             else:
                 raise col_result
 
+            if trigger_success:
+                triggers_result = dict_factory(*triggers_result.results)
+            else:
+                raise triggers_result
+
             # if we're connected to Cassandra < 2.1, the usertypes table will not exist
             if types_success:
                 types_result = dict_factory(*types_result.results) if types_result.results else {}
@@ -1956,7 +1967,7 @@ class ControlConnection(object):
                     raise types_result
 
             log.debug("[control connection] Fetched schema, rebuilding metadata")
-            self._cluster.metadata.rebuild_schema(ks_result, types_result, cf_result, col_result)
+            self._cluster.metadata.rebuild_schema(ks_result, types_result, cf_result, col_result, triggers_result)
 
     def refresh_node_list_and_token_map(self, force_token_rebuild=False):
         try:
