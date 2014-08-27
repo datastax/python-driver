@@ -303,7 +303,6 @@ class Metadata(object):
                 table_meta.columns[column_meta.name] = column_meta
 
         if trigger_rows:
-            log.debug("%s" % trigger_rows)
             for trigger_row in trigger_rows[cfname]:
                 trigger_meta = self._build_trigger_metadata(table_meta, trigger_row)
                 table_meta.triggers[trigger_meta.name] = trigger_meta
@@ -836,6 +835,9 @@ class TableMetadata(object):
             if col_meta.index:
                 ret += "\n%s;" % (col_meta.index.as_cql_query(),)
 
+        for trigger_meta in self.triggers.values():
+            ret += "\n%s;" % (trigger_meta.as_cql_query(),)
+
         return ret
 
     def as_cql_query(self, formatted=False):
@@ -1252,10 +1254,19 @@ class TriggerMetadata(object):
 
     options = None
     """
-    A dict mapping table option names to their specific settings for this
+    A dict mapping trigger option names to their specific settings for this
     table.
     """
     def __init__(self, table_metadata, trigger_name, options=None):
         self.table = table_metadata
         self.name = trigger_name
         self.options = options
+
+    def as_cql_query(self):
+        ret = "CREATE TRIGGER %s ON %s.%s USING %s" % (
+            protect_name(self.name),
+            protect_name(self.table.keyspace.name),
+            protect_name(self.table.name),
+            protect_value(self.options['class'])
+        )
+        return ret
