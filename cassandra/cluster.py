@@ -1903,7 +1903,9 @@ class ControlConnection(object):
             log.debug("[control connection] Fetched table info for %s.%s, rebuilding metadata", keyspace, table)
             cf_result = dict_factory(*cf_result.results) if cf_result else {}
             col_result = dict_factory(*col_result.results) if col_result else {}
-            triggers_result = dict_factory(*triggers_result.results) if triggers_result else {}
+            triggers_result = dict_factory(*triggers_result.results) \
+                if triggers_result and not isinstance(triggers_result, InvalidRequest) \
+                else {}
             self._cluster.metadata.table_changed(keyspace, table, cf_result, col_result, triggers_result)
         elif usertype:
             # user defined types within this keyspace changed
@@ -1951,10 +1953,15 @@ class ControlConnection(object):
             else:
                 raise col_result
 
+            # if we're connected to Cassandra < 2.0, the trigges table will not exist
             if trigger_success:
                 triggers_result = dict_factory(*triggers_result.results)
             else:
-                raise triggers_result
+                if isinstance(triggers_result, InvalidRequest):
+                    log.debug("[control connection] triggers table not found")
+                    triggers_result = {}
+                else:
+                    raise triggers_result
 
             # if we're connected to Cassandra < 2.1, the usertypes table will not exist
             if types_success:
