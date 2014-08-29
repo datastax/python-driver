@@ -1892,17 +1892,24 @@ class ControlConnection(object):
 
         cl = ConsistencyLevel.ONE
         if table:
+            def _handle_results(success, result):
+                if success:
+                    return dict_factory(*result.results) if result else {}
+                else:
+                    raise result
+
             # a particular table changed
             where_clause = " WHERE keyspace_name = '%s' AND columnfamily_name = '%s'" % (keyspace, table)
             cf_query = QueryMessage(query=self._SELECT_COLUMN_FAMILIES + where_clause, consistency_level=cl)
             col_query = QueryMessage(query=self._SELECT_COLUMNS + where_clause, consistency_level=cl)
             triggers_query = QueryMessage(query=self._SELECT_TRIGGERS + where_clause, consistency_level=cl)
-            cf_result, col_result, triggers_result = connection.wait_for_responses(
-                cf_query, col_query, triggers_query)
+            (cf_success, cf_result), (col_success, col_result), (triggers_success, triggers_result) \
+                = connection.wait_for_responses(cf_query, col_query, triggers_query, fail_on_error=False)
+
 
             log.debug("[control connection] Fetched table info for %s.%s, rebuilding metadata", keyspace, table)
-            cf_result = dict_factory(*cf_result.results) if cf_result else {}
-            col_result = dict_factory(*col_result.results) if col_result else {}
+            cf_result = _handle_results(cf_success, cf_result)
+            col_result = _handle_results(col_success, col_result)
             triggers_result = dict_factory(*triggers_result.results) \
                 if triggers_result and not isinstance(triggers_result, InvalidRequest) \
                 else {}
