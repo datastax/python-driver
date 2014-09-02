@@ -1910,9 +1910,9 @@ class ControlConnection(object):
             log.debug("[control connection] Fetched table info for %s.%s, rebuilding metadata", keyspace, table)
             cf_result = _handle_results(cf_success, cf_result)
             col_result = _handle_results(col_success, col_result)
-            triggers_result = dict_factory(*triggers_result.results) \
-                if triggers_result and not isinstance(triggers_result, InvalidRequest) \
-                else {}
+            triggers_result = _handle_results(
+                triggers_success or isinstance(triggers_result, InvalidRequest),
+                triggers_result if not isinstance(triggers_result, InvalidRequest) else {})
             self._cluster.metadata.table_changed(keyspace, table, cf_result, col_result, triggers_result)
         elif usertype:
             # user defined types within this keyspace changed
