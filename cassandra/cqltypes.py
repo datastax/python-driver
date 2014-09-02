@@ -824,6 +824,11 @@ class TupleType(_ParameterizedType):
                 buf.write(int32_pack(-1))
         return buf.getvalue()
 
+    @classmethod
+    def cql_parameterized_type(cls):
+        subtypes_string = ', '.join(sub.cql_parameterized_type() for sub in cls.subtypes)
+        return 'frozen<tuple<%s>>' % (subtypes_string,)
+
 
 class UserType(TupleType):
     typename = "'org.apache.cassandra.db.marshal.UserType'"
@@ -863,7 +868,7 @@ class UserType(TupleType):
 
     @classmethod
     def cql_parameterized_type(cls):
-        return cls.typename
+        return "frozen<%s>" % (cls.typename,)
 
     @classmethod
     def deserialize_safe(cls, byts, protocol_version):

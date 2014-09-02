@@ -6,6 +6,10 @@ Bug Fixes
 ---------
 * Fix NetworkTopologyStrategy.export_for_schema (PYTHON-120)
 
+Other
+-----
+* Add frozen<> type modifier to UDTs and tuples to handle CASSANDRA-7857
+
 2.1.0
 =====
 August 7, 2014

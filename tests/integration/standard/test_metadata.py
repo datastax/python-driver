@@ -355,13 +355,13 @@ class TestCodeCoverage(unittest.TestCase):
         """)
         session.execute("""
             CREATE TYPE export_udts.address (
-                street_address street,
-                zip_code zip)
+                street_address frozen<street>,
+                zip_code frozen<zip>)
         """)
         session.execute("""
             CREATE TABLE export_udts.users (
             user text PRIMARY KEY,
-            addresses map<text, address>)
+            addresses map<text, frozen<address>>)
         """)
 
         expected_string = """CREATE KEYSPACE export_udts WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;
@@ -377,13 +377,13 @@ CREATE TYPE export_udts.zip (
 );
 
 CREATE TYPE export_udts.address (
-    street_address street,
-    zip_code zip
+    street_address frozen<street>,
+    zip_code frozen<zip>
 );
 
 CREATE TABLE export_udts.users (
     user text PRIMARY KEY,
-    addresses map<text, address>
+    addresses map<text, frozen<address>>
 ) WITH bloom_filter_fp_chance = 0.01
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = ''
@@ -404,7 +404,7 @@ CREATE TABLE export_udts.users (
 
         expected_string = """CREATE TABLE export_udts.users (
     user text PRIMARY KEY,
-    addresses map<text, address>
+    addresses map<text, frozen<address>>
 ) WITH bloom_filter_fp_chance = 0.01
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = ''
