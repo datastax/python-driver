@@ -826,7 +826,7 @@ class DMLQuery(object):
         if self.instance is None:
             raise CQLEngineException("DML Query intance attribute is None")
         assert type(self.instance) == self.model
-
+        static_update_only = True
         statement = UpdateStatement(self.column_family_name, ttl=self._ttl, timestamp=self._timestamp)
         #get defined fields and their column names
         for name, col in self.model._columns.items():
@@ -841,7 +841,8 @@ class DMLQuery(object):
                 # don't update something if it hasn't changed
                 if not val_mgr.changed and not isinstance(col, Counter):
                     continue
-
+                
+                static_update_only = (static_update_only and col.static)
                 if isinstance(col, (BaseContainerColumn, Counter)):
                     # get appropriate clause
                     if isinstance(col, List): klass = ListUpdateClause
@@ -863,6 +864,8 @@ class DMLQuery(object):
 
         if statement.get_context_size() > 0 or self.instance._has_counter:
             for name, col in self.model._primary_keys.items():
+                if static_update_only and (not col.partition_key):
+                    continue
                 statement.add_where_clause(WhereClause(
                     col.db_field_name,
                     EqualsOperator(),

@@ -545,9 +545,9 @@ class BaseContainerColumn(Column):
         """
         Returns a column definition for CQL table definition
         """
+        static = "static" if self.static else ""
         db_type = self.db_type.format(self.value_type.db_type)
-        return '{} {}'.format(self.cql, db_type)
-
+        return '{} {} {}'.format(self.cql, db_type, static)
 
     def _val_is_null(self, val):
         return not val
@@ -703,7 +703,8 @@ class Map(BaseContainerColumn):
             self.key_type.db_type,
             self.value_type.db_type
         )
-        return '{} {}'.format(self.cql, db_type)
+        static = "static" if self.static else ""
+        return '{} {} {}'.format(self.cql, db_type, static)
 
     def validate(self, value):
         val = super(Map, self).validate(value)
