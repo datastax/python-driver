@@ -1906,13 +1906,16 @@ class ControlConnection(object):
             (cf_success, cf_result), (col_success, col_result), (triggers_success, triggers_result) \
                 = connection.wait_for_responses(cf_query, col_query, triggers_query, fail_on_error=False)
 
-
             log.debug("[control connection] Fetched table info for %s.%s, rebuilding metadata", keyspace, table)
             cf_result = _handle_results(cf_success, cf_result)
             col_result = _handle_results(col_success, col_result)
-            triggers_result = _handle_results(
-                triggers_success or isinstance(triggers_result, InvalidRequest),
-                triggers_result if not isinstance(triggers_result, InvalidRequest) else {})
+
+            # handle the triggers table not existing in Cassandra 1.2
+            if not triggers_success and isinstance(triggers_result, InvalidRequest):
+                triggers_result = {}
+            else:
+                triggers_result = _handle_results(triggers_success, triggers_result)
+
             self._cluster.metadata.table_changed(keyspace, table, cf_result, col_result, triggers_result)
         elif usertype:
             # user defined types within this keyspace changed

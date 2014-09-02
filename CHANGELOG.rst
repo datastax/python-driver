@@ -6,6 +6,11 @@ Bug Fixes
 ---------
 * Fix NetworkTopologyStrategy.export_for_schema (PYTHON-120)
 
+Features
+--------
+* Detect triggers and include them in CQL queries generated to recreate
+  the schema (github-189)
+
 2.1.0
 =====
 August 7, 2014
