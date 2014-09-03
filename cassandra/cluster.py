@@ -2175,8 +2175,9 @@ class ControlConnection(object):
                 self._time.sleep(0.2)
                 elapsed = self._time.time() - start
 
-            log.warn("Node %s is reporting a schema disagreement: %s",
-                     connection.host, schema_mismatches)
+            if schema_mismatches is not None:
+                log.warn("Node %s is reporting a schema disagreement: %s",
+                         connection.host, schema_mismatches)
             return False
 
     def _get_schema_mismatches(self, peers_result, local_result, local_address):
