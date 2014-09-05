@@ -2040,8 +2040,7 @@ class ControlConnection(object):
         for row in peers_result:
             addr = row.get("rpc_address")
 
-            # TODO handle ipv6 equivalent
-            if not addr or addr == "0.0.0.0":
+            if not addr or addr in ["0.0.0.0", "::"]:
                 addr = row.get("peer")
 
             found_hosts.add(addr)
