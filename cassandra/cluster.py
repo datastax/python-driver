@@ -2422,11 +2422,12 @@ class ResponseFuture(object):
             self._errors[host] = ConnectionException("Pool is shutdown")
             return None
 
+        self._current_host = host
+        self._current_pool = pool
+
         connection = None
         try:
             # TODO get connectTimeout from cluster settings
-            self._current_host = host
-            self._current_pool = pool
             connection, request_id = pool.borrow_connection(timeout=2.0)
             self._connection = connection
             connection.send_msg(message, request_id, cb=cb)
@@ -2443,7 +2444,6 @@ class ResponseFuture(object):
             if connection:
                 pool.return_connection(connection)
             return None
-
 
     @property
     def has_more_pages(self):
