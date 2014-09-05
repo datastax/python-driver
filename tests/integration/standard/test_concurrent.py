@@ -17,12 +17,12 @@ from tests.integration import PROTOCOL_VERSION
 try:
     import unittest2 as unittest
 except ImportError:
-    import unittest # noqa
+    import unittest  # noqa
 
 from itertools import cycle
 
 from cassandra import InvalidRequest, ConsistencyLevel
-from cassandra.cluster import Cluster
+from cassandra.cluster import Cluster, PagedResult
 from cassandra.concurrent import (execute_concurrent,
                                   execute_concurrent_with_args)
 from cassandra.policies import HostDistance
@@ -82,6 +82,31 @@ class ClusterTests(unittest.TestCase):
             results = execute_concurrent_with_args(self.session, statement, parameters)
             self.assertEqual(num_statements, len(results))
             self.assertEqual([(True, [(i,)]) for i in range(num_statements)], results)
+
+    def test_execute_concurrent_paged_result(self):
+        num_statements = 201
+        statement = SimpleStatement(
+            "INSERT INTO test3rf.test (k, v) VALUES (%s, %s)",
+            consistency_level=ConsistencyLevel.QUORUM)
+        parameters = [(i, i) for i in range(num_statements)]
+
+        results = execute_concurrent_with_args(self.session, statement, parameters)
+        self.assertEqual(num_statements, len(results))
+        self.assertEqual([(True, None)] * num_statements, results)
+
+        # read
+        statement = SimpleStatement(
+            "SELECT * FROM test3rf.test LIMIT %s",
+            consistency_level=ConsistencyLevel.QUORUM,
+            fetch_size=int(num_statements/2))
+        parameters = [(i, ) for i in range(num_statements)]
+
+        results = execute_concurrent_with_args(self.session, statement, [(num_statements,)])
+        self.assertEqual(1, len(results))
+        self.assertTrue(results[0][0])
+        result = results[0][1]
+        self.assertIsInstance(result, PagedResult)
+        self.assertEqual(num_statements, sum(1 for _ in result))
 
     def test_first_failure(self):
         statements = cycle(("INSERT INTO test3rf.test (k, v) VALUES (%s, %s)", ))

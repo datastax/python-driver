@@ -31,7 +31,7 @@ def execute_concurrent(session, statements_and_parameters, concurrency=100, rais
     ``parameters`` item must be a sequence or :const:`None`.
 
     A sequence of ``(success, result_or_exc)`` tuples is returned in the same
-    order that the statements were passed in.  If ``success`` if :const:`False`,
+    order that the statements were passed in.  If ``success`` is :const:`False`,
     there was an error executing the statement, and ``result_or_exc`` will be
     an :class:`Exception`.  If ``success`` is :const:`True`, ``result_or_exc``
     will be the query result.
