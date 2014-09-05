@@ -302,12 +302,12 @@ class TestUserTypes(unittest.TestCase):
     def test_as_cql_query(self):
         field_types = [IntegerType, AsciiType, TupleType.apply_parameters([IntegerType, AsciiType])]
         udt = UserType("ks1", "mytype", ["a", "b", "c"], field_types)
-        self.assertEqual("CREATE TYPE ks1.mytype (a varint, b ascii, c tuple<varint, ascii>);", udt.as_cql_query(formatted=False))
+        self.assertEqual("CREATE TYPE ks1.mytype (a varint, b ascii, c frozen<tuple<varint, ascii>>);", udt.as_cql_query(formatted=False))
 
         self.assertEqual("""CREATE TYPE ks1.mytype (
     a varint,
     b ascii,
-    c tuple<varint, ascii>
+    c frozen<tuple<varint, ascii>>
 );""", udt.as_cql_query(formatted=True))
 
     def test_as_cql_query_name_escaping(self):

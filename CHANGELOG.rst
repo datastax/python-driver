@@ -11,6 +11,10 @@ Features
 * Detect triggers and include them in CQL queries generated to recreate
   the schema (github-189)
 
+Other
+-----
+* Add frozen<> type modifier to UDTs and tuples to handle CASSANDRA-7857
+
 2.1.0
 =====
 August 7, 2014
