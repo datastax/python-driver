@@ -2,9 +2,9 @@ from unittest import skipUnless
 from cqlengine.management import sync_table, drop_table, create_keyspace, delete_keyspace
 from cqlengine.tests.base import BaseCassEngTestCase
 from cqlengine.models import Model
+from cqlengine.exceptions import LWTException
 from cqlengine import columns, BatchQuery
 from uuid import uuid4
-from datetime import datetime
 import mock
 from cqlengine.connection import get_cluster
 
@@ -50,7 +50,10 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
         id = uuid4()
 
         TestIfNotExistsModel.create(id=id, count=8, text='123456789')
-        TestIfNotExistsModel.if_not_exists().create(id=id, count=9, text='111111111111')
+        self.assertRaises(
+            LWTException,
+            TestIfNotExistsModel.if_not_exists().create, id=id, count=9, text='111111111111'
+            )
 
         q = TestIfNotExistsModel.objects(id=id)
         self.assertEqual(len(q), 1)
@@ -83,8 +86,9 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
         with BatchQuery() as b:
             TestIfNotExistsModel.batch(b).if_not_exists().create(id=id, count=8, text='123456789')
 
-        with BatchQuery() as b:
-            TestIfNotExistsModel.batch(b).if_not_exists().create(id=id, count=9, text='111111111111')
+        b = BatchQuery()
+        TestIfNotExistsModel.batch(b).if_not_exists().create(id=id, count=9, text='111111111111')
+        self.assertRaises(LWTException, b.execute)
 
         q = TestIfNotExistsModel.objects(id=id)
         self.assertEqual(len(q), 1)

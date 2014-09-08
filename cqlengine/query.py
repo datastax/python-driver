@@ -6,7 +6,7 @@ from cqlengine.columns import Counter, List, Set
 
 from cqlengine.connection import execute
 
-from cqlengine.exceptions import CQLEngineException, ValidationError
+from cqlengine.exceptions import CQLEngineException, ValidationError, LWTException
 from cqlengine.functions import Token, BaseQueryFunction, QueryValue, UnicodeMixin
 
 #CQL 3 reference:
@@ -21,6 +21,17 @@ class DoesNotExist(QueryException): pass
 class MultipleObjectsReturned(QueryException): pass
 
 import six
+
+
+def check_applied(result):
+    """
+    check if result contains some column '[applied]' with false value,
+    if that value is false, it means our light-weight transaction didn't
+    applied to database.
+    """
+    if result and '[applied]' in result[0] and result[0]['[applied]'] == False:
+        raise LWTException('')
+
 
 class AbstractQueryableColumn(UnicodeMixin):
     """
@@ -171,7 +182,8 @@ class BatchQuery(object):
 
         query_list.append('APPLY BATCH;')
 
-        execute('\n'.join(query_list), parameters, self._consistency)
+        tmp = execute('\n'.join(query_list), parameters, self._consistency)
+        check_applied(tmp)
 
         self.queries = []
         self._execute_callbacks()
@@ -790,6 +802,9 @@ class DMLQuery(object):
             return self._batch.add_query(q)
         else:
             tmp = execute(q, consistency_level=self._consistency)
+            if self._if_not_exists:
+                check_applied(tmp)
+ 
             return tmp
 
     def batch(self, batch_obj):
