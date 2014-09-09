@@ -21,7 +21,7 @@ instance through :meth:`.Cluster.register_user_type`:
     session = cluster.connect()
     session.set_keyspace('mykeyspace')
     session.execute("CREATE TYPE address (street text, zipcode int)")
-    session.execute("CREATE TABLE users (id int PRIMARY KEY, location address)")
+    session.execute("CREATE TABLE users (id int PRIMARY KEY, location frozen<address>)")
 
     # create a class to map to the "address" UDT
     class Address(object):
@@ -58,7 +58,7 @@ for the UDT:
     session = cluster.connect()
     session.set_keyspace('mykeyspace')
     session.execute("CREATE TYPE address (street text, zipcode int)")
-    session.execute("CREATE TABLE users (id int PRIMARY KEY, location address)")
+    session.execute("CREATE TABLE users (id int PRIMARY KEY, location frozen<address>)")
 
     class Foo(object):
 
@@ -72,13 +72,13 @@ for the UDT:
     # since we're using a prepared statement, we don't *have* to register
     # a class to map to the UDT to insert data.  The object just needs to have
     # "street" and "zipcode" attributes (which Foo does):
-    session.execute(insert_statement, [0, Foo("123 Main St.", 78723, "some other stuff")]
+    session.execute(insert_statement, [0, Foo("123 Main St.", 78723, "some other stuff")])
 
     # when we query data, UDT columns that don't have a class registered
     # will be returned as namedtuples:
     results = session.execute("SELECT * FROM users")
     first_row = results[0]
-    address = first_row.address
+    address = first_row.location
     print address  # prints "Address(street='123 Main St.', zipcode=78723)"
     street = address.street
     zipcode = address.street
