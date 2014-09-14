@@ -79,6 +79,8 @@ marshalled_value_pairs = (
     (b'\x00\x00', 'ListType(FloatType)', []),
     (b'\x00\x00', 'SetType(IntegerType)', sortedset()),
     (b'\x00\x01\x00\x10\xafYC\xa3\xea<\x11\xe1\xabc\xc4,\x03"y\xf0', 'ListType(TimeUUIDType)', [UUID(bytes=b'\xafYC\xa3\xea<\x11\xe1\xabc\xc4,\x03"y\xf0')]),
+    (b'\x00\x00>\xc7', 'SimpleDateType', '2014-01-01'),
+    (b'\x00\x00\x00\x00\x00\x00\x00\x01', 'TimeType', '00:00:00.000000001')
 )
 
 ordered_dict_value = OrderedDict()

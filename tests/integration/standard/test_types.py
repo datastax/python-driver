@@ -31,6 +31,7 @@ from cassandra.cluster import Cluster
 from cassandra.cqltypes import Int32Type, EMPTY
 from cassandra.query import dict_factory
 from cassandra.util import OrderedDict, sortedset
+from collections import namedtuple
 
 from tests.integration import get_server_versions, use_singledc, PROTOCOL_VERSION
 
@@ -151,6 +152,8 @@ class TypeTests(unittest.TestCase):
                 r timeuuid,
                 s varchar,
                 t varint,
+                u date,
+                v time,
                 PRIMARY KEY (a, b)
             )
         """
@@ -188,8 +191,13 @@ class TypeTests(unittest.TestCase):
             v4_uuid,  # uuid
             v1_uuid,  # timeuuid
             u"sometext\u1234",  # varchar
-            123456789123456789123456789  # varint
+            123456789123456789123456789,  # varint
+            '2014-01-01', # date
+            '01:02:03.456789012' # time
         ]
+
+        SimpleDate = namedtuple('SimpleDate', 'value')
+        Time = namedtuple('Time', 'value')
 
         expected_vals = (
             "sometext",
@@ -210,12 +218,14 @@ class TypeTests(unittest.TestCase):
             v4_uuid,  # uuid
             v1_uuid,  # timeuuid
             u"sometext\u1234",  # varchar
-            123456789123456789123456789  # varint
+            123456789123456789123456789,  # varint
+            SimpleDate(2147499719), # date
+            Time(3723456789012) # time
         )
 
         s.execute("""
-            INSERT INTO mytable (a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO mytable (a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, params)
 
         results = s.execute("SELECT * FROM mytable")
@@ -225,8 +235,8 @@ class TypeTests(unittest.TestCase):
 
         # try the same thing with a prepared statement
         prepared = s.prepare("""
-            INSERT INTO mytable (a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO mytable (a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """)
 
         s.execute(prepared.bind(params))
@@ -238,7 +248,7 @@ class TypeTests(unittest.TestCase):
 
         # query with prepared statement
         prepared = s.prepare("""
-            SELECT a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t FROM mytable
+            SELECT a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v FROM mytable
             """)
         results = s.execute(prepared.bind(()))
 
@@ -265,12 +275,12 @@ class TypeTests(unittest.TestCase):
         s.execute("INSERT INTO mytable (a, b) VALUES ('a', 'b')")
         s.row_factory = dict_factory
         results = s.execute("""
-            SELECT c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t FROM mytable
+            SELECT c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v FROM mytable
             """)
         self.assertTrue(all(x is None for x in results[0].values()))
 
         prepared = s.prepare("""
-            SELECT c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t FROM mytable
+            SELECT c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v FROM mytable
             """)
         results = s.execute(prepared.bind(()))
         self.assertTrue(all(x is None for x in results[0].values()))
@@ -309,48 +319,48 @@ class TypeTests(unittest.TestCase):
         # insert values for all columns
         values = ['a', 'b', 'a', 1, True, Decimal('1.0'), 0.1, 0.1,
                   "1.2.3.4", 1, ['a'], set([1]), {'a': 1}, 'a',
-                  datetime.now(), uuid4(), uuid1(), 'a', 1]
+                  datetime.now(), uuid4(), uuid1(), 'a', 1, '2014-01-01', '01:02:03.456789012']
         s.execute("""
-            INSERT INTO mytable (a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO mytable (a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, values)
 
         # then insert None, which should null them out
         null_values = values[:2] + ([None] * (len(values) - 2))
         s.execute("""
-            INSERT INTO mytable (a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO mytable (a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, null_values)
 
         results = s.execute("""
-            SELECT c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t FROM mytable
+            SELECT c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v FROM mytable
             """)
         self.assertEqual([], [(name, val) for (name, val) in results[0].items() if val is not None])
 
         prepared = s.prepare("""
-            SELECT c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t FROM mytable
+            SELECT c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v FROM mytable
             """)
         results = s.execute(prepared.bind(()))
         self.assertEqual([], [(name, val) for (name, val) in results[0].items() if val is not None])
 
         # do the same thing again, but use a prepared statement to insert the nulls
         s.execute("""
-            INSERT INTO mytable (a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO mytable (a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, values)
         prepared = s.prepare("""
-            INSERT INTO mytable (a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO mytable (a, b, c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """)
         s.execute(prepared, null_values)
 
         results = s.execute("""
-            SELECT c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t FROM mytable
+            SELECT c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v FROM mytable
             """)
         self.assertEqual([], [(name, val) for (name, val) in results[0].items() if val is not None])
 
         prepared = s.prepare("""
-            SELECT c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t FROM mytable
+            SELECT c, d, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v FROM mytable
             """)
         results = s.execute(prepared.bind(()))
         self.assertEqual([], [(name, val) for (name, val) in results[0].items() if val is not None])

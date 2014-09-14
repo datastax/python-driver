@@ -43,7 +43,8 @@ import warnings
 import six
 from six.moves import range
 
-from cassandra.marshal import (int8_pack, int8_unpack, uint16_pack, uint16_unpack,
+from cassandra.marshal import (int8_pack, int8_unpack,
+                               uint16_pack, uint16_unpack, uint32_pack, uint32_unpack,
                                int32_pack, int32_unpack, int64_pack, int64_unpack,
                                float_pack, float_unpack, double_pack, double_unpack,
                                varint_pack, varint_unpack)
@@ -54,9 +55,13 @@ apache_cassandra_type_prefix = 'org.apache.cassandra.db.marshal.'
 
 if six.PY3:
     _number_types = frozenset((int, float))
+    _time_types = frozenset((int))
+    _date_types = frozenset((int))
     long = int
 else:
     _number_types = frozenset((int, long, float))
+    _time_types = frozenset((int, long))
+    _date_types = frozenset((int, long))
 
 
 def trim_if_startswith(s, prefix):
@@ -523,8 +528,7 @@ class InetAddressType(_CassandraType):
 class CounterColumnType(LongType):
     typename = 'counter'
 
-
-cql_time_formats = (
+cql_timestamp_formats = (
     '%Y-%m-%d %H:%M',
     '%Y-%m-%d %H:%M:%S',
     '%Y-%m-%dT%H:%M',
@@ -551,7 +555,7 @@ class DateType(_CassandraType):
             date = date[:-5]
         else:
             offset = -time.timezone
-        for tformat in cql_time_formats:
+        for tformat in cql_timestamp_formats:
             try:
                 tval = time.strptime(date, tformat)
             except ValueError:
@@ -623,6 +627,93 @@ class TimeUUIDType(DateType):
             return timeuuid.bytes
         except AttributeError:
             raise TypeError("Got a non-UUID object for a UUID value")
+
+
+class SimpleDateType(_CassandraType):
+    typename = 'date'
+    seconds_per_day = 60 * 60 * 24
+    date_format = "%Y-%m-%d"
+
+    @classmethod
+    def validate(cls, date):
+        if isinstance(date, basestring):
+            date = cls.interpret_simpledate_string(date)
+        return date
+
+    @staticmethod
+    def interpret_simpledate_string(v):
+        try:
+            tval = time.strptime(v, SimpleDateType.date_format)
+            # shift upward w/epoch at 2**31
+            return (calendar.timegm(tval) / SimpleDateType.seconds_per_day) + 2**31
+        except TypeError:
+            # Ints are valid dates too
+            if type(v) not in _date_types:
+                raise TypeError('Date arguments must be an unsigned integer or string in the format YYYY-MM-DD')
+            return v
+
+    @staticmethod
+    def serialize(val, protocol_version):
+        date_val = SimpleDateType.interpret_simpledate_string(val)
+        return uint32_pack(date_val)
+
+    @staticmethod
+    def deserialize(byts, protocol_version):
+        Result = namedtuple('SimpleDate', 'value')
+        return Result(value=uint32_unpack(byts))
+
+
+class TimeType(_CassandraType):
+    typename = 'time'
+    ONE_MICRO=1000
+    ONE_MILLI=1000*ONE_MICRO
+    ONE_SECOND=1000*ONE_MILLI
+    ONE_MINUTE=60*ONE_SECOND
+    ONE_HOUR=60*ONE_MINUTE
+
+    @classmethod
+    def validate(cls, val):
+        if isinstance(val, basestring):
+            time = cls.interpret_timestring(val)
+        return time
+
+    @staticmethod
+    def interpret_timestring(val):
+        try:
+            nano = 0
+            try:
+                base_time_str = val
+                if '.' in base_time_str:
+                    base_time_str = val[0:val.find('.')]
+                base_time = time.strptime(base_time_str, "%H:%M:%S")
+                nano = base_time.tm_hour * TimeType.ONE_HOUR
+                nano += base_time.tm_min * TimeType.ONE_MINUTE
+                nano += base_time.tm_sec * TimeType.ONE_SECOND
+
+                if '.' in val:
+                    nano_time_str = val[val.find('.')+1:]
+                    # right pad to 9 digits
+                    while len(nano_time_str) < 9:
+                        nano_time_str += "0"
+                    nano += int(nano_time_str)
+
+            except AttributeError as e:
+                if type(val) not in _time_types:
+                    raise TypeError('TimeType arguments must be a string or whole number')
+                # long / int values passed in are acceptable too
+                nano = val
+            return nano
+        except ValueError as e:
+            raise ValueError("can't interpret %r as a time" % (val,))
+
+    @staticmethod
+    def serialize(val, protocol_version):
+        return int64_pack(TimeType.interpret_timestring(val))
+
+    @staticmethod
+    def deserialize(byts, protocol_version):
+        Result = namedtuple('Time', 'value')
+        return Result(value=int64_unpack(byts))
 
 
 class UTF8Type(_CassandraType):
