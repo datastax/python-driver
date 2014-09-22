@@ -42,7 +42,8 @@ from functools import partial, wraps
 from itertools import groupby
 
 from cassandra import (ConsistencyLevel, AuthenticationFailed,
-                       InvalidRequest, OperationTimedOut, UnsupportedOperation)
+                       InvalidRequest, OperationTimedOut,
+                       UnsupportedOperation, Unauthorized)
 from cassandra.connection import ConnectionException, ConnectionShutdown
 from cassandra.encoder import Encoder
 from cassandra.protocol import (QueryMessage, ResultMessage,
@@ -1969,6 +1970,10 @@ class ControlConnection(object):
             else:
                 if isinstance(triggers_result, InvalidRequest):
                     log.debug("[control connection] triggers table not found")
+                    triggers_result = {}
+                elif isinstance(triggers_result, Unauthorized):
+                    log.warn("[control connection] this version of Cassandra does not allow access to schema_triggers metadata with authorization enabled (CASSANDRA-7967); "
+                             "The driver will operate normally, but will not reflect triggers in the local metadata model, or schema strings.")
                     triggers_result = {}
                 else:
                     raise triggers_result
