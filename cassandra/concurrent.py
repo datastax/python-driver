@@ -83,7 +83,7 @@ def execute_concurrent(session, statements_and_parameters, concurrency=100, rais
     first_error = [] if raise_on_first_error else None
     to_execute = len(statements_and_parameters)
     results = [None] * to_execute
-    num_finished = count(start=1)
+    num_finished = count(1)
     statements = enumerate(iter(statements_and_parameters))
     for i in xrange(min(concurrency, len(statements_and_parameters))):
         _execute_next(_sentinel, i, event, session, statements, results, None, num_finished, to_execute, first_error)
