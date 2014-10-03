@@ -305,7 +305,7 @@ class AuthenticationTests(unittest.TestCase):
 
     def test_su_grant_all_permissions(self):
         """
-        su_grunt: superuser can grant user permissions and user can exercise them
+        su_grant: superuser can grant user permissions and user can exercise them
         GRANT ALL PERMISSIONS ON ALL KEYSPACES TO regular user
 
         """
