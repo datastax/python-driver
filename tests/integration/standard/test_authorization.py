@@ -20,7 +20,7 @@ from ccmlib import common
 from ccmlib.cluster import Cluster as CCMCluster
 
 from tests.integration import setup_package, teardown_package, PROTOCOL_VERSION, CASSANDRA_DIR, CASSANDRA_VERSION, path
-from cassandra.cluster import Cluster, NoHostAvailable, Unauthorized, InvalidRequest
+from cassandra.cluster import Cluster
 from cassandra.auth import PlainTextAuthProvider
 
 
@@ -265,7 +265,7 @@ class AuthenticationTests(unittest.TestCase):
         return users
 
     @staticmethod
-    def get_user_permissions(cluster, user):
+    def get_user_permissions(cluster):
         """
         Get information about users permissions as a dictionary with user name and superuser status
         :param cluster: cluster to use
@@ -279,6 +279,7 @@ class AuthenticationTests(unittest.TestCase):
             users[row.name] = row.super
         session.shutdown()
         return users
+
     @staticmethod
     def cluster_as(usr, pwd):
         """

@@ -357,7 +357,7 @@ class AuthenticationTests(unittest.TestCase):
         """
         session = self.root_cluster.connect()
 
-         # Turn test_user into superuser
+        # Turn test_user into superuser
         session.execute("ALTER USER %s WITH PASSWORD '%s' SUPERUSER " % (self.test_user, self.password))
         users = self.get_user_data(self.root_cluster)
         self.assertEqual(users[self.test_user], True, msg="%s has SUPERUSER set to %s"
@@ -369,7 +369,7 @@ class AuthenticationTests(unittest.TestCase):
         """
         session = self.root_cluster.connect()
 
-         # Turn suser into regular user
+        # Turn suser into regular user
         session.execute("ALTER USER %s WITH PASSWORD '%s' NOSUPERUSER " % (self.suser, self.password))
         users = self.get_user_data(self.root_cluster)
         self.assertEqual(users[self.suser], False, msg="%s has SUPERUSER set to %s" % (self.suser, users[self.suser]))
@@ -492,4 +492,3 @@ class AuthorizedAuthenticationTests(AuthenticationTests):
     Same test as AuthenticationTests but enables authorization
     """
     pass
-
