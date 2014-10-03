@@ -41,7 +41,7 @@ def wait_for_cassandra(port=7000, maxwait=120):
     :param maxwait: maximum wait time in seconds
     :return: True if can connect within 2 minutes, False otherwise
     """
-    sleeptime = 5
+    sleeptime = 2
     server_address = ('localhost', port)
 
     wait_time = 0
@@ -492,3 +492,4 @@ class AuthorizedAuthenticationTests(AuthenticationTests):
     Same test as AuthenticationTests but enables authorization
     """
     pass
+
