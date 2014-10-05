@@ -3,6 +3,7 @@ language: python
 env:
   - CASSANDRA_VERSION=12
   - CASSANDRA_VERSION=20
+  - CASSANDRA_VERSION=21
 
 python:
   - "2.7"
