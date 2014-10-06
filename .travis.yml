@@ -3,6 +3,7 @@ language: python
 env:
   - CASSANDRA_VERSION=12
   - CASSANDRA_VERSION=20
+  - CASSANDRA_VERSION=21
 
 python:
   - "2.7"
@@ -19,7 +20,8 @@ before_install:
   - sudo apt-get -o Dpkg::Options::="--force-confnew" install -y cassandra
   - sudo sh -c "echo 'JVM_OPTS=\"\${JVM_OPTS} -Djava.net.preferIPv4Stack=false\"' >> /usr/local/cassandra/conf/cassandra-env.sh"
   - sudo service cassandra start
-  - if [ "$C_VERSION" -le "20" ]; then export CASSANDRA_PROTOCOL_VERSION=1; fi
+  - cat /etc/cassandra/cassandra-env.sh
+  - cat /etc/cassandra/cassandra.yaml
 
 install:
   - "pip install -r requirements.txt --use-mirrors"

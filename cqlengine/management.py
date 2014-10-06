@@ -236,16 +236,15 @@ def get_fields(model):
     # returns all fields that aren't part of the PK
     ks_name = model._get_keyspace()
     col_family = model.column_family_name(include_keyspace=False)
-
+    field_types = ['regular', 'static']
     query = "select * from system.schema_columns where keyspace_name = %s and columnfamily_name = %s"
     tmp = execute(query, [ks_name, col_family])
 
     # Tables containing only primary keys do not appear to create
     # any entries in system.schema_columns, as only non-primary-key attributes
     # appear to be inserted into the schema_columns table
-
     try:
-        return [Field(x['column_name'], x['validator']) for x in tmp if x['type'] == 'regular']
+        return [Field(x['column_name'], x['validator']) for x in tmp if x['type'] in field_types]
     except KeyError:
         return [Field(x['column_name'], x['validator']) for x in tmp]
     # convert to Field named tuples

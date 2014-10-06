@@ -270,5 +270,16 @@ def test_static_columns():
     statement = m.call_args[0][0].query_string
     assert '"name" text static' in statement, statement
 
+    # if we sync again, we should not apply an alter w/ a static
+    sync_table(StaticModel)
+
+    with patch.object(session, "execute", wraps=session.execute) as m2:
+        sync_table(StaticModel)
+
+    assert len(m2.call_args_list) == 1
+    assert "ALTER" not in  m2.call_args[0][0].query_string
+
+
+
 
 
