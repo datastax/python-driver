@@ -23,13 +23,6 @@ before_install:
   - sudo rm -rf /var/lib/cassandra/*
   - sudo sh -c "echo 'JVM_OPTS=\"\${JVM_OPTS} -Djava.net.preferIPv4Stack=false\"' >> /etc/cassandra/cassandra-env.sh"
   - sudo service cassandra start
-  - sleep 5
-
-  - ps aux | grep cassandra
-  - sudo cat /var/log/cassandra/output.log
-  - cat /etc/cassandra/cassandra-env.sh
-  - cat /etc/cassandra/cassandra.yaml
-  - sudo netstat
 
 install:
   - "pip install -r requirements.txt --use-mirrors"
