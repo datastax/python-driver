@@ -16,9 +16,11 @@ before_install:
   - sudo gpg --export --armor F758CE318D77295D | sudo apt-key add -
   - sudo gpg --keyserver pgp.mit.edu --recv-keys 2B5C1B00
   - sudo gpg --export --armor 2B5C1B00 | sudo apt-key add -
+  - sudo gpg --keyserver pgp.mit.edu --recv-keys 0353B12C
+  - sudo gpg --export --armor 0353B12C | sudo apt-key add -
   - sudo apt-get update
   - sudo apt-get -o Dpkg::Options::="--force-confnew" install -y cassandra
-  - sudo sh -c "echo 'JVM_OPTS=\"\${JVM_OPTS} -Djava.net.preferIPv4Stack=false\"' >> /usr/local/cassandra/conf/cassandra-env.sh"
+  - sudo sh -c "echo 'JVM_OPTS=\"\${JVM_OPTS} -Djava.net.preferIPv4Stack=false\"' >> /etc/cassandra/cassandra-env.sh"
   - sudo service cassandra start
   - cat /etc/cassandra/cassandra-env.sh
   - cat /etc/cassandra/cassandra.yaml
