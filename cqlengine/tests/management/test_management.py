@@ -8,8 +8,9 @@ from cqlengine import management
 from cqlengine.tests.query.test_queryset import TestModel
 from cqlengine.models import Model
 from cqlengine import columns, SizeTieredCompactionStrategy, LeveledCompactionStrategy
-
-
+from unittest import skipUnless
+from cqlengine.connection import get_cluster
+cluster = get_cluster()
 
 class CreateKeyspaceTest(BaseCassEngTestCase):
     def test_create_succeeeds(self):
@@ -247,6 +248,7 @@ class NonModelFailureTest(BaseCassEngTestCase):
             sync_table(self.FakeModel)
 
 
+@skipUnless(cluster.protocol_version >= 2, "only runs against the cql3 protocol v2.0")
 def test_static_columns():
     class StaticModel(Model):
         id = columns.Integer(primary_key=True)
@@ -260,11 +262,8 @@ def test_static_columns():
     from cqlengine.connection import get_session
     session = get_session()
 
-    with patch.object(session, "execute", side_effect=Exception) as m:
-        try:
-            sync_table(StaticModel)
-        except:
-            pass
+    with patch.object(session, "execute", wraps=session.execute) as m:
+        sync_table(StaticModel)
 
     assert m.call_count > 0
     statement = m.call_args[0][0].query_string

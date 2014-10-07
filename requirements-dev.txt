@@ -1,3 +1,4 @@
+-r requirements.txt
 nose
 nose-progressive
 profilestats

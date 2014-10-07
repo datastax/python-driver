@@ -1,5 +1,3 @@
-ipython
-ipdb
 Sphinx
 mock
 sure==1.2.5
