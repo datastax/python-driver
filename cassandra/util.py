@@ -126,7 +126,7 @@ except ImportError:
             if isinstance(other, OrderedDict):
                 if len(self) != len(other):
                     return False
-                for p, q in  zip(self.items(), other.items()):
+                for p, q in zip(self.items(), other.items()):
                     if p != q:
                         return False
                 return True
@@ -349,3 +349,207 @@ class WeakSet(object):
 
     def isdisjoint(self, other):
         return len(self.intersection(other)) == 0
+
+try:
+    from blist import sortedset as SortedSet
+except ImportError:
+
+    import warnings
+
+    warnings.warn(
+        "The blist library is not available, so a pure python list-based set will "
+        "be used in place of blist.sortedset for set collection values. "
+        "You can find the blist library here: https://pypi.python.org/pypi/blist/")
+
+    from bisect import bisect_left
+
+    class SortedSet(object):
+        '''
+        A sorted set based on sorted list
+
+        This set is used in place of blist.sortedset in Python environments
+        where blist module/extension is not available.
+
+        A sorted set implementation is used in this case because it does not
+        require its elements to be immutable/hashable.
+
+        #Not implemented: update functions, inplace operators
+
+        '''
+
+        def __init__(self, iterable=()):
+            self._items = []
+            for i in iterable:
+                self.add(i)
+
+        def __len__(self):
+            return len(self._items)
+
+        def __iter__(self):
+            return iter(self._items)
+
+        def __reversed__(self):
+            return reversed(self._items)
+
+        def __repr__(self):
+            return '%s(%r)' % (
+                self.__class__.__name__,
+                self._items)
+
+        def __reduce__(self):
+            return self.__class__, (self._items,)
+
+        def __eq__(self, other):
+            if len(other) != len(self._items):
+                return False
+            if isinstance(other, self.__class__):
+                return self._items == other._items
+            else:
+                return all(item in other for item in self._items)
+
+        def __ne__(self, other):
+            if len(other) != len(self._items):
+                return True
+            if isinstance(other, self.__class__):
+                return self._items != other._items
+            else:
+                return any(item not in other for item in self._items)
+
+        def __le__(self, other):
+            return self.issubset(other)
+
+        def __lt__(self, other):
+            return len(other) > len(self._items) and self.issubset(other)
+
+        def __ge__(self, other):
+            return self.issuperset(other)
+
+        def __gt__(self, other):
+            return len(self._items) > len(other) and self.issuperset(other)
+
+        def __and__(self, other):
+            return self._intersect(other)
+
+        def __or__(self, other):
+            return self.union(other)
+
+        def __sub__(self, other):
+            return self._diff(other)
+
+        def __xor__(self, other):
+            return self.symmetric_difference(other)
+
+        def __contains__(self, item):
+            i = bisect_left(self._items, item)
+            return i < len(self._items) and self._items[i] == item
+
+        def add(self, item):
+            i = bisect_left(self._items, item)
+            if i < len(self._items):
+                if self._items[i] != item:
+                    self._items.insert(i, item)
+            else:
+                self._items.append(item)
+
+        def clear(self):
+            del self._items[:]
+
+        def copy(self):
+            new = SortedSet()
+            new._items = self._items
+            return new
+
+        def isdisjoint(self, other):
+            return len(self._intersect(other)) == 0
+
+        def issubset(self, other):
+            return len(self._intersect(other)) == len(self._items)
+
+        def issuperset(self, other):
+            return len(self._intersect(other)) == len(other)
+
+        def pop(self):
+            if not self._items:
+                raise KeyError("pop from empty set")
+            return self._items.pop()
+
+        def remove(self, item):
+            i = bisect_left(self._items, item)
+            if i < len(self._items):
+                if self._items[i] == item:
+                    self._items.pop(i)
+                    return
+            raise KeyError('%r' % item)
+
+        def union(self, *others):
+            union = SortedSet()
+            union._items = list(self._items)
+            for other in others:
+                if isinstance(other, self.__class__):
+                    i = 0
+                    for item in other._items:
+                        i = bisect_left(union._items, item, i)
+                        if i < len(union._items):
+                            if item != union._items[i]:
+                                union._items.insert(i, item)
+                        else:
+                            union._items.append(item)
+                else:
+                    for item in other:
+                        union.add(item)
+            return union
+
+        def intersection(self, *others):
+            isect = self.copy()
+            for other in others:
+                isect = isect._intersect(other)
+                if not isect:
+                    break
+            return isect
+
+        def difference(self, *others):
+            diff = self.copy()
+            for other in others:
+                diff = diff._diff(other)
+                if not diff:
+                    break
+            return diff
+
+        def symmetric_difference(self, other):
+            diff_self_other = self._diff(other)
+            diff_other_self = other.difference(self)
+            return diff_self_other.union(diff_other_self)
+
+        def _diff(self, other):
+            diff = SortedSet()
+            if isinstance(other, self.__class__):
+                i = 0
+                for item in self._items:
+                    i = bisect_left(other._items, item, i)
+                    if i < len(other._items):
+                        if item != other._items[i]:
+                            diff._items.append(item)
+                    else:
+                        diff._items.append(item)
+            else:
+                for item in self._items:
+                    if item not in other:
+                        diff.add(item)
+            return diff
+
+        def _intersect(self, other):
+            isect = SortedSet()
+            if isinstance(other, self.__class__):
+                i = 0
+                for item in self._items:
+                    i = bisect_left(other._items, item, i)
+                    if i < len(other._items):
+                        if item == other._items[i]:
+                            isect._items.append(item)
+                    else:
+                        break
+            else:
+                for item in self._items:
+                    if item in other:
+                        isect.add(item)
+            return isect

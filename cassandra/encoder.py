@@ -28,7 +28,7 @@ import types
 from uuid import UUID
 import six
 
-from cassandra.util import OrderedDict
+from cassandra.util import OrderedDict, SortedSet
 
 if six.PY3:
     long = int
@@ -79,6 +79,7 @@ class Encoder(object):
             list: self.cql_encode_list_collection,
             tuple: self.cql_encode_list_collection,
             set: self.cql_encode_set_collection,
+            SortedSet: self.cql_encode_set_collection,
             frozenset: self.cql_encode_set_collection,
             types.GeneratorType: self.cql_encode_list_collection,
             ValueSequence: self.cql_encode_sequence
@@ -97,15 +98,6 @@ class Encoder(object):
                 bytes: self.cql_encode_bytes,
                 type(None): self.cql_encode_none,
             })
-
-        # sortedset is optional
-        try:
-            from blist import sortedset
-            self.mapping.update({
-                sortedset: self.cql_encode_set_collection
-            })
-        except ImportError:
-            pass
 
     def cql_encode_none(self, val):
         """

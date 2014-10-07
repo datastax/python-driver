@@ -23,13 +23,8 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-try:
-    from blist import sortedset
-except ImportError:
-    sortedset = set
-
 from cassandra.cqltypes import lookup_casstype
-from cassandra.util import OrderedDict
+from cassandra.util import OrderedDict, SortedSet
 
 marshalled_value_pairs = (
     # binary form, type, python native type
@@ -82,7 +77,7 @@ marshalled_value_pairs = (
     (b'', 'SetType(LongType)', None),
     (b'\x00\x00', 'MapType(DecimalType, BooleanType)', OrderedDict()),
     (b'\x00\x00', 'ListType(FloatType)', []),
-    (b'\x00\x00', 'SetType(IntegerType)', sortedset()),
+    (b'\x00\x00', 'SetType(IntegerType)', SortedSet()),
     (b'\x00\x01\x00\x10\xafYC\xa3\xea<\x11\xe1\xabc\xc4,\x03"y\xf0', 'ListType(TimeUUIDType)', [UUID(bytes=b'\xafYC\xa3\xea<\x11\xe1\xabc\xc4,\x03"y\xf0')]),
 )
 
@@ -95,7 +90,7 @@ ordered_dict_value[u'\\'] = 0
 # vagaries of internal python ordering for unordered types
 marshalled_value_pairs_unsafe = (
     (b'\x00\x03\x00\x06\xe3\x81\xbfbob\x00\x04\x00\x00\x00\xc7\x00\x00\x00\x04\xff\xff\xff\xff\x00\x01\\\x00\x04\x00\x00\x00\x00', 'MapType(UTF8Type, Int32Type)', ordered_dict_value),
-    (b'\x00\x02\x00\x08@\x01\x99\x99\x99\x99\x99\x9a\x00\x08@\x14\x00\x00\x00\x00\x00\x00', 'SetType(DoubleType)', sortedset([2.2, 5.0])),
+    (b'\x00\x02\x00\x08@\x01\x99\x99\x99\x99\x99\x9a\x00\x08@\x14\x00\x00\x00\x00\x00\x00', 'SetType(DoubleType)', SortedSet([2.2, 5.0])),
     (b'\x00', 'IntegerType', 0),
 )
 

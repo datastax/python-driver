@@ -16,7 +16,7 @@ from tests.integration.datatype_utils import get_sample, DATA_TYPE_PRIMITIVES, D
 try:
     import unittest2 as unittest
 except ImportError:
-    import unittest # noqa
+    import unittest  # noqa
 
 import logging
 log = logging.getLogger(__name__)
@@ -26,16 +26,11 @@ from datetime import datetime
 import six
 from uuid import uuid1, uuid4
 
-try:
-    from blist import sortedset
-except ImportError:
-    sortedset = set  # noqa
-
 from cassandra import InvalidRequest
 from cassandra.cluster import Cluster
 from cassandra.cqltypes import Int32Type, EMPTY
 from cassandra.query import dict_factory
-from cassandra.util import OrderedDict
+from cassandra.util import OrderedDict, SortedSet
 
 from tests.integration import get_server_versions, PROTOCOL_VERSION
 
@@ -204,7 +199,7 @@ class TypeTests(unittest.TestCase):
             "1.2.3.4",  # inet
             12345,  # int
             ['a', 'b', 'c'],  # list<text> collection
-            sortedset((1, 2, 3)),  # set<int> collection
+            SortedSet((1, 2, 3)),  # set<int> collection
             {'a': 1, 'b': 2},  # map<text, int> collection
             "text",  # text
             mydatetime,  # timestamp
@@ -591,7 +586,7 @@ class TypeTests(unittest.TestCase):
 
         # test tuple<set<datatype>>
         for datatype in DATA_TYPE_PRIMITIVES:
-            created_tuple = tuple([sortedset([get_sample(datatype)])])
+            created_tuple = tuple([SortedSet([get_sample(datatype)])])
             s.execute("INSERT INTO mytable (k, v_%s) VALUES (0, %s)", (i, created_tuple))
 
             result = s.execute("SELECT v_%s FROM mytable WHERE k=0", (i,))[0]
@@ -660,9 +655,9 @@ class TypeTests(unittest.TestCase):
                   "v_3 frozen<%s>,"
                   "v_128 frozen<%s>"
                   ")" % (self.nested_tuples_schema_helper(1),
-                        self.nested_tuples_schema_helper(2),
-                        self.nested_tuples_schema_helper(3),
-                        self.nested_tuples_schema_helper(128)))
+                         self.nested_tuples_schema_helper(2),
+                         self.nested_tuples_schema_helper(3),
+                         self.nested_tuples_schema_helper(128)))
 
         for i in (1, 2, 3, 128):
             # create tuple
