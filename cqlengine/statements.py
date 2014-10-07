@@ -619,6 +619,24 @@ class AssignmentStatement(BaseCQLStatement):
 class InsertStatement(AssignmentStatement):
     """ an cql insert select statement """
 
+    def __init__(self,
+                 table,
+                 assignments=None,
+                 consistency=None,
+                 where=None,
+                 ttl=None,
+                 timestamp=None,
+                 if_not_exists=False):
+        super(InsertStatement, self).__init__(
+                table,
+                assignments=assignments,
+                consistency=consistency,
+                where=where,
+                ttl=ttl,
+                timestamp=timestamp)
+
+        self.if_not_exists = if_not_exists
+
     def add_where_clause(self, clause):
         raise StatementException("Cannot add where clauses to insert statements")
 
@@ -632,6 +650,9 @@ class InsertStatement(AssignmentStatement):
         qs += ["({})".format(', '.join(['"{}"'.format(c) for c in columns]))]
         qs += ['VALUES']
         qs += ["({})".format(', '.join(['%({})s'.format(v) for v in values]))]
+
+        if self.if_not_exists:
+            qs += ["IF NOT EXISTS"]
 
         if self.ttl:
             qs += ["USING TTL {}".format(self.ttl)]

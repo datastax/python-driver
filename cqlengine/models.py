@@ -116,6 +116,23 @@ class TimestampDescriptor(object):
     def __call__(self, *args, **kwargs):
         raise NotImplementedError
 
+class IfNotExistsDescriptor(object):
+    """
+    return a query set descriptor with a if_not_exists flag specified
+    """
+    def __get__(self, instance, model):
+        if instance:
+            # instance method
+            def ifnotexists_setter(ife):
+                instance._if_not_exists = ife
+                return instance
+            return ifnotexists_setter
+
+        return model.objects.if_not_exists
+
+    def __call__(self, *args, **kwargs):
+        raise NotImplementedError
+
 class ConsistencyDescriptor(object):
     """
     returns a query set descriptor if called on Class, instance if it was an instance call
@@ -225,6 +242,8 @@ class BaseModel(object):
 
     # custom timestamps, see USING TIMESTAMP X
     timestamp = TimestampDescriptor()
+    
+    if_not_exists = IfNotExistsDescriptor()
 
     # _len is lazily created by __len__
 
@@ -275,6 +294,8 @@ class BaseModel(object):
     __replicate_on_write__ = None
 
     _timestamp = None # optional timestamp to include with the operation (USING TIMESTAMP)
+
+    _if_not_exists = False # optional if_not_exists flag to check existence before insertion
 
     def __init__(self, **values):
         self._values = {}
@@ -528,7 +549,8 @@ class BaseModel(object):
                           batch=self._batch,
                           ttl=self._ttl,
                           timestamp=self._timestamp,
-                          consistency=self.__consistency__).save()
+                          consistency=self.__consistency__,
+                          if_not_exists=self._if_not_exists).save()
 
         #reset the value managers
         for v in self._values.values():

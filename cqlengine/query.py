@@ -6,7 +6,7 @@ from cqlengine.columns import Counter, List, Set
 
 from cqlengine.connection import execute
 
-from cqlengine.exceptions import CQLEngineException, ValidationError
+from cqlengine.exceptions import CQLEngineException, ValidationError, LWTException
 from cqlengine.functions import Token, BaseQueryFunction, QueryValue, UnicodeMixin
 
 #CQL 3 reference:
@@ -21,6 +21,17 @@ class DoesNotExist(QueryException): pass
 class MultipleObjectsReturned(QueryException): pass
 
 import six
+
+
+def check_applied(result):
+    """
+    check if result contains some column '[applied]' with false value,
+    if that value is false, it means our light-weight transaction didn't
+    applied to database.
+    """
+    if result and '[applied]' in result[0] and result[0]['[applied]'] == False:
+        raise LWTException('')
+
 
 class AbstractQueryableColumn(UnicodeMixin):
     """
@@ -171,7 +182,8 @@ class BatchQuery(object):
 
         query_list.append('APPLY BATCH;')
 
-        execute('\n'.join(query_list), parameters, self._consistency)
+        tmp = execute('\n'.join(query_list), parameters, self._consistency)
+        check_applied(tmp)
 
         self.queries = []
         self._execute_callbacks()
@@ -220,6 +232,7 @@ class AbstractQuerySet(object):
         self._ttl = getattr(model, '__default_ttl__', None)
         self._consistency = None
         self._timestamp = None
+        self._if_not_exists = False
 
     @property
     def column_family_name(self):
@@ -569,7 +582,7 @@ class AbstractQuerySet(object):
 
     def create(self, **kwargs):
         return self.model(**kwargs).batch(self._batch).ttl(self._ttl).\
-            consistency(self._consistency).\
+            consistency(self._consistency).if_not_exists(self._if_not_exists).\
             timestamp(self._timestamp).save()
 
     def delete(self):
@@ -708,6 +721,11 @@ class ModelQuerySet(AbstractQuerySet):
         clone._timestamp = timestamp
         return clone
 
+    def if_not_exists(self):
+        clone = copy.deepcopy(self)
+        clone._if_not_exists = True
+        return clone
+
     def update(self, **values):
         """ Updates the rows in this queryset """
         if not values:
@@ -767,8 +785,9 @@ class DMLQuery(object):
     _ttl = None
     _consistency = None
     _timestamp = None
+    _if_not_exists = False
 
-    def __init__(self, model, instance=None, batch=None, ttl=None, consistency=None, timestamp=None):
+    def __init__(self, model, instance=None, batch=None, ttl=None, consistency=None, timestamp=None, if_not_exists=False):
         self.model = model
         self.column_family_name = self.model.column_family_name()
         self.instance = instance
@@ -776,12 +795,16 @@ class DMLQuery(object):
         self._ttl = ttl
         self._consistency = consistency
         self._timestamp = timestamp
+        self._if_not_exists = if_not_exists
 
     def _execute(self, q):
         if self._batch:
             return self._batch.add_query(q)
         else:
             tmp = execute(q, consistency_level=self._consistency)
+            if self._if_not_exists:
+                check_applied(tmp)
+ 
             return tmp
 
     def batch(self, batch_obj):
@@ -890,7 +913,7 @@ class DMLQuery(object):
         if self.instance._has_counter or self.instance._can_update():
             return self.update()
         else:
-            insert = InsertStatement(self.column_family_name, ttl=self._ttl, timestamp=self._timestamp)
+            insert = InsertStatement(self.column_family_name, ttl=self._ttl, timestamp=self._timestamp, if_not_exists=self._if_not_exists)
             for name, col in self.instance._columns.items():
                 val = getattr(self.instance, name, None)
                 if col._val_is_null(val):
@@ -906,7 +929,6 @@ class DMLQuery(object):
         # caused by pointless update queries
         if not insert.is_empty:
             self._execute(insert)
-
         # delete any nulled columns
         self._delete_null_columns()
 

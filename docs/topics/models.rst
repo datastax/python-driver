@@ -188,6 +188,25 @@ Model Methods
 
         Sets the ttl values to run instance updates and inserts queries with.
 
+    .. method:: if_not_exists()
+
+        Check the existence of an object before insertion. The existence of an
+        object is determined by its primary key(s). And please note using this flag
+        would incur performance cost.
+
+        if the insertion didn't applied, a LWTException exception would be raised.
+
+        *Example*
+
+        .. code-block:: python
+            try:
+                TestIfNotExistsModel.if_not_exists().create(id=id, count=9, text='111111111111')
+            except LWTException as e:
+                # handle failure case
+                print e.existing # existing object
+
+        This method is supported on Cassandra 2.0 or later.
+
     .. method:: update(**values)
 
         Performs an update on the model instance. You can pass in values to set on the model
