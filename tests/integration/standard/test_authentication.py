@@ -94,8 +94,14 @@ def try_connecting(username='', password=''):
 #
 def setup_module():
     """
+    Test is skipped if run with cql version < 2
     Stop existing cluster started by generic tests init
     """
+
+    if PROTOCOL_VERSION < 2:
+        raise unittest.SkipTest(
+            "SASL Authentication is not supported in version 1 of the protocol")
+
     teardown_package()
 
 
@@ -134,7 +140,7 @@ class AuthenticationTests(unittest.TestCase):
         We create a cluster object here and save it in the provided class instance
         Create 2 regular users and a new superuser.
         Enable authentication by setting 'authenticator': 'PasswordAuthenticator'.
-        If invoked from authorisation class enable authorization by setting 'authorizer': 'CassandraAuthorizer'.
+        If invoked from authorization class enable authorization by setting 'authorizer': 'CassandraAuthorizer'.
         """
         try:
             try:
