@@ -26,6 +26,7 @@ before_install:
   - sudo cat /var/log/cassandra/output.log
   - cat /etc/cassandra/cassandra-env.sh
   - cat /etc/cassandra/cassandra.yaml
+  - sudo netstat
 
 install:
   - "pip install -r requirements.txt --use-mirrors"
