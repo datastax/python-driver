@@ -45,3 +45,6 @@ docs/_build
 
 #iPython
 *.ipynb
+
+cqlengine/tests/*
+cqlengine/tests*

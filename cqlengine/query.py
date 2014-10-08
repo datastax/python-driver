@@ -6,7 +6,11 @@ from cqlengine.columns import Counter, List, Set
 
 from cqlengine.connection import execute
 
+<<<<<<< HEAD
 from cqlengine.exceptions import CQLEngineException, ValidationError, LWTException
+=======
+from cqlengine.exceptions import CQLEngineException, ValidationError, TransactionException
+>>>>>>> Added a thrown exception when a transaction fails to be applied
 from cqlengine.functions import Token, BaseQueryFunction, QueryValue, UnicodeMixin
 
 #CQL 3 reference:
@@ -853,7 +857,12 @@ class DMLQuery(object):
             tmp = execute(q, consistency_level=self._consistency)
             if self._if_not_exists:
                 check_applied(tmp)
- 
+            if self._transaction and tmp[0].get('[applied]', True) is False:
+                tmp[0].pop('[applied]')
+                expected = ', '.join('{0}={1}'.format(t.field, t.value) for t in q.transactions)
+                actual = ', '.join('{0}={1}'.format(f, v) for f, v in tmp[0].items())
+                message = 'Transaction statement failed: Expected: {0}  Actual: {1}'.format(expected, actual)
+                raise TransactionException(message)
             return tmp
 
     def batch(self, batch_obj):
