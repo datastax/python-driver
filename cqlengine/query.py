@@ -409,11 +409,12 @@ class AbstractQuerySet(object):
             clone._transaction.append(operator)
 
         for col_name, val in kwargs.items():
+            exists = False
             try:
                 column = self.model._get_column(col_name)
             except KeyError:
                 if col_name in ['exists', 'not_exists']:
-                    pass
+                    exists = True
                 elif col_name == 'pk__token':
                     if not isinstance(val, Token):
                         raise QueryException("Virtual column 'pk__token' may only be compared to Token() values")
@@ -432,7 +433,7 @@ class AbstractQuerySet(object):
                             len(val.value), len(partition_columns)))
                 val.set_columns(partition_columns)
 
-            if isinstance(val, BaseQueryFunction):
+            if isinstance(val, BaseQueryFunction) or exists is True:
                 query_val = val
             else:
                 query_val = column.to_database(val)
@@ -615,9 +616,14 @@ class AbstractQuerySet(object):
         return self._only_or_defer('defer', fields)
 
     def create(self, **kwargs):
-        return self.model(**kwargs).batch(self._batch).ttl(self._ttl).\
+
+        x = self.model(**kwargs).batch(self._batch)
+        x = x.ttl(self._ttl).\
             consistency(self._consistency).\
-            timestamp(self._timestamp).save()
+            timestamp(self._timestamp)
+        x = x.transaction(self._transaction).save()
+
+        return x
 
     def delete(self):
         """
@@ -815,7 +821,7 @@ class DMLQuery(object):
     _consistency = None
     _timestamp = None
 
-    def __init__(self, model, instance=None, batch=None, ttl=None, consistency=None, timestamp=None):
+    def __init__(self, model, instance=None, batch=None, ttl=None, consistency=None, timestamp=None, transaction=None):
         self.model = model
         self.column_family_name = self.model.column_family_name()
         self.instance = instance
@@ -823,6 +829,7 @@ class DMLQuery(object):
         self._ttl = ttl
         self._consistency = consistency
         self._timestamp = timestamp
+        self._transaction = transaction
 
     def _execute(self, q):
         if self._batch:
@@ -874,7 +881,8 @@ class DMLQuery(object):
             raise CQLEngineException("DML Query intance attribute is None")
         assert type(self.instance) == self.model
         static_update_only = True
-        statement = UpdateStatement(self.column_family_name, ttl=self._ttl, timestamp=self._timestamp)
+        statement = UpdateStatement(self.column_family_name, ttl=self._ttl,
+                                    timestamp=self._timestamp, transactions=self._transaction)
         #get defined fields and their column names
         for name, col in self.model._columns.items():
             if not col.is_primary_key:
@@ -937,7 +945,8 @@ class DMLQuery(object):
         if self.instance._has_counter or self.instance._can_update():
             return self.update()
         else:
-            insert = InsertStatement(self.column_family_name, ttl=self._ttl, timestamp=self._timestamp)
+            insert = InsertStatement(self.column_family_name, ttl=self._ttl,
+                                     timestamp=self._timestamp, transactions=self._transaction)
             for name, col in self.instance._columns.items():
                 val = getattr(self.instance, name, None)
                 if col._val_is_null(val):
