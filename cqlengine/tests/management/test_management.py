@@ -146,7 +146,6 @@ class TablePropertiesTests(BaseCassEngTestCase):
 
         sync_table(ModelWithTableProperties)
         expected = {'bloom_filter_fp_chance': 0.76328,
-                    'caching': CACHING_ALL,
                     'comment': 'TxfguvBdzwROQALmQBOziRMbkqVGFjqcJfVhwGR',
                     'gc_grace_seconds': 2063,
                     'read_repair_chance': 0.17985,
@@ -157,6 +156,7 @@ class TablePropertiesTests(BaseCassEngTestCase):
                      # 'local_read_repair_chance': 0.50811,
                     }
         if CASSANDRA_VERSION <= 20:
+            expected['caching'] = CACHING_ALL
             expected['replicate_on_write'] = False
 
         if CASSANDRA_VERSION == 20:
@@ -190,7 +190,6 @@ class TablePropertiesTests(BaseCassEngTestCase):
         table_settings = management.get_table_settings(ModelWithTableProperties).options
 
         expected = {'bloom_filter_fp_chance': 0.66778,
-                    'caching': CACHING_NONE,
                      'comment': 'xirAkRWZVVvsmzRvXamiEcQkshkUIDINVJZgLYSdnGHweiBrAiJdLJkVohdRy',
                      'gc_grace_seconds': 96362,
                      'read_repair_chance': 0.2989,
@@ -205,6 +204,7 @@ class TablePropertiesTests(BaseCassEngTestCase):
 
         # these featuers removed in cassandra 2.1
         if CASSANDRA_VERSION <= 20:
+            expected['caching'] = CACHING_NONE
             expected['replicate_on_write'] = True
             expected['populate_io_cache_on_flush'] = False
 
