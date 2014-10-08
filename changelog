@@ -1,5 +1,11 @@
 CHANGELOG
 
+0.19.0
+
+Fixed tests with Cassandra version 1.2 and 2.1
+Fixed broken static columns
+support for IF NOT EXISTS via Model.if_not_exists().create()
+
 0.18.1
 
 [264] fixed support for bytearrays in blob columns
