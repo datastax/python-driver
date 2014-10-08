@@ -149,19 +149,22 @@ class TablePropertiesTests(BaseCassEngTestCase):
                     'caching': CACHING_ALL,
                     'comment': 'TxfguvBdzwROQALmQBOziRMbkqVGFjqcJfVhwGR',
                     'gc_grace_seconds': 2063,
-                    'populate_io_cache_on_flush': True,
                     'read_repair_chance': 0.17985,
-                    'replicate_on_write': False
                      # For some reason 'dclocal_read_repair_chance' in CQL is called
                      #  just 'local_read_repair_chance' in the schema table.
                      #  Source: https://issues.apache.org/jira/browse/CASSANDRA-6717
                      #  TODO: due to a bug in the native driver i'm not seeing the local read repair chance show up
                      # 'local_read_repair_chance': 0.50811,
                     }
+        if CASSANDRA_VERSION <= 20:
+            expected['replicate_on_write'] = False
+
+        if CASSANDRA_VERSION == 20:
+            expected['populate_io_cache_on_flush'] = True
+            expected['index_interval'] = 98706
 
         if CASSANDRA_VERSION >= 20:
             expected['default_time_to_live'] = 4756
-            expected['index_interval'] = 98706
             expected['memtable_flush_period_in_ms'] = 43681
 
         self.assertDictContainsSubset(expected, management.get_table_settings(ModelWithTableProperties).options)
@@ -190,15 +193,20 @@ class TablePropertiesTests(BaseCassEngTestCase):
                     'caching': CACHING_NONE,
                      'comment': 'xirAkRWZVVvsmzRvXamiEcQkshkUIDINVJZgLYSdnGHweiBrAiJdLJkVohdRy',
                      'gc_grace_seconds': 96362,
-                     'populate_io_cache_on_flush': False,
                      'read_repair_chance': 0.2989,
-                     'replicate_on_write': True  # TODO see above comment re: native driver missing local read repair chance
-                     #  'local_read_repair_chance': 0.12732,
+                     #'local_read_repair_chance': 0.12732,
                     }
         if CASSANDRA_VERSION >= 20:
              expected['memtable_flush_period_in_ms'] = 60210
              expected['default_time_to_live'] = 65178
+
+        if CASSANDRA_VERSION == 20:
              expected['index_interval'] = 94207
+
+        # these featuers removed in cassandra 2.1
+        if CASSANDRA_VERSION <= 20:
+            expected['replicate_on_write'] = True
+            expected['populate_io_cache_on_flush'] = False
 
         self.assertDictContainsSubset(expected, table_settings)
 
