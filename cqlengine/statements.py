@@ -152,6 +152,11 @@ class TransactionClause(BaseClause):
     def insert_tuple(self):
         return self.field, self.context_id
 
+    def update_context(self, ctx):
+        if self.field not in ['exists', 'not_exists']:
+            return super(TransactionClause, self).update_context(ctx)
+        return ctx
+
 
 class ContainerUpdateClause(AssignmentClause):
 
@@ -646,10 +651,12 @@ class AssignmentStatement(BaseCQLStatement):
         ctx = super(AssignmentStatement, self).get_context()
         for clause in self.assignments:
             clause.update_context(ctx)
+        for clause in self.transactions or []:
+            clause.update_context(ctx)
         return ctx
 
-    def _transactions(self):
-        return 'IF {}'.format(' AND '.join([six.text_type(c) for c in self.where_clauses]))
+    def _get_transactions(self):
+        return 'IF {}'.format(' AND '.join([six.text_type(c) for c in self.transactions]))
 
 
 class InsertStatement(AssignmentStatement):
@@ -697,7 +704,7 @@ class InsertStatement(AssignmentStatement):
             qs += ["USING TIMESTAMP {}".format(self.timestamp_normalized)]
 
         if len(self.transactions) > 0:
-            qs += [self._transactions]
+            qs += [self._get_transactions()]
 
         return ' '.join(qs)
 
@@ -726,7 +733,7 @@ class UpdateStatement(AssignmentStatement):
             qs += [self._where]
 
         if len(self.transactions) > 0:
-            qs += [self._transactions]
+            qs += [self._get_transactions()]
 
         return ' '.join(qs)
 
