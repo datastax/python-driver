@@ -139,6 +139,20 @@ class AssignmentClause(BaseClause):
         return self.field, self.context_id
 
 
+class TransactionClause(BaseClause):
+    """ A single variable transaction statement """
+
+    def __unicode__(self):
+        if self.field == 'exists':
+            return u'EXISTS'
+        if self.field == 'not_exists':
+            return u'NOT EXISTS'
+        return u'"{}" = %({})s'.format(self.field, self.context_id)
+
+    def insert_tuple(self):
+        return self.field, self.context_id
+
+
 class ContainerUpdateClause(AssignmentClause):
 
     def __init__(self, field, value, operation=None, previous=None, column=None):
@@ -573,7 +587,8 @@ class AssignmentStatement(BaseCQLStatement):
                  consistency=None,
                  where=None,
                  ttl=None,
-                 timestamp=None):
+                 timestamp=None,
+                 transactions=None):
         super(AssignmentStatement, self).__init__(
             table,
             consistency=consistency,
@@ -586,6 +601,11 @@ class AssignmentStatement(BaseCQLStatement):
         self.assignments = []
         for assignment in assignments or []:
             self.add_assignment_clause(assignment)
+
+        # Add transaction statements
+        self.transactions = []
+        for transaction in transactions or []:
+            self.add_transaction_clause(transaction)
 
     def update_context_id(self, i):
         super(AssignmentStatement, self).update_context_id(i)
@@ -605,6 +625,19 @@ class AssignmentStatement(BaseCQLStatement):
         self.context_counter += clause.get_context_size()
         self.assignments.append(clause)
 
+    def add_transaction_clause(self, clause):
+        """
+        Adds a transaction clause to this statement
+
+        :param clause: The clause that will be added to the transaction statement
+        :type clause: TransactionClause
+        """
+        if not isinstance(clause, TransactionClause):
+            raise StatementException('only instances of AssignmentClause can be added to statements')
+        clause.set_context_id(self.context_counter)
+        self.context_counter += clause.get_context_size()
+        self.transactions.append(clause)
+
     @property
     def is_empty(self):
         return len(self.assignments) == 0
@@ -614,6 +647,9 @@ class AssignmentStatement(BaseCQLStatement):
         for clause in self.assignments:
             clause.update_context(ctx)
         return ctx
+
+    def _transactions(self):
+        return 'IF {}'.format(' AND '.join([six.text_type(c) for c in self.where_clauses]))
 
 
 class InsertStatement(AssignmentStatement):
@@ -638,6 +674,9 @@ class InsertStatement(AssignmentStatement):
 
         if self.timestamp:
             qs += ["USING TIMESTAMP {}".format(self.timestamp_normalized)]
+
+        if len(self.transactions) > 0:
+            qs += [self._transactions]
 
         return ' '.join(qs)
 
@@ -664,6 +703,9 @@ class UpdateStatement(AssignmentStatement):
 
         if self.where_clauses:
             qs += [self._where]
+
+        if len(self.transactions) > 0:
+            qs += [self._transactions]
 
         return ' '.join(qs)
 
