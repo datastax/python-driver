@@ -339,7 +339,9 @@ class Metadata(object):
         index_name = row.get("index_name")
         index_type = row.get("index_type")
         if index_name or index_type:
-            return IndexMetadata(column_metadata, index_name, index_type)
+            options = row.get("index_options")
+            index_options = json.loads(options) if options else {}
+            return IndexMetadata(column_metadata, index_name, index_type, index_options)
         else:
             return None
 
@@ -1058,21 +1060,33 @@ class IndexMetadata(object):
     index_type = None
     """ A string representing the type of index. """
 
-    def __init__(self, column_metadata, index_name=None, index_type=None):
+    index_options = {}
+    """ A dict of index options. """
+
+    def __init__(self, column_metadata, index_name=None, index_type=None, index_options={}):
         self.column = column_metadata
         self.name = index_name
         self.index_type = index_type
+        self.index_options = index_options
 
     def as_cql_query(self):
         """
         Returns a CQL query that can be used to recreate this index.
         """
         table = self.column.table
-        return "CREATE INDEX %s ON %s.%s (%s)" % (
-            self.name,  # Cassandra doesn't like quoted index names for some reason
-            protect_name(table.keyspace.name),
-            protect_name(table.name),
-            protect_name(self.column.name))
+        if self.index_type != "CUSTOM":
+            return "CREATE INDEX %s ON %s.%s (%s)" % (
+                self.name,  # Cassandra doesn't like quoted index names for some reason
+                protect_name(table.keyspace.name),
+                protect_name(table.name),
+                protect_name(self.column.name))
+        else:
+            return "CREATE CUSTOM INDEX %s ON %s.%s (%s) USING '%s'" % (
+                self.name,  # Cassandra doesn't like quoted index names for some reason
+                protect_name(table.keyspace.name),
+                protect_name(table.name),
+                protect_name(self.column.name),
+                self.index_options["class_name"])
 
 
 class TokenMap(object):
