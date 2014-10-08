@@ -30,7 +30,7 @@ from cassandra import InvalidRequest
 from cassandra.cluster import Cluster
 from cassandra.cqltypes import Int32Type, EMPTY
 from cassandra.query import dict_factory
-from cassandra.util import OrderedDict, SortedSet
+from cassandra.util import OrderedDict, sortedset
 
 from tests.integration import get_server_versions, PROTOCOL_VERSION
 
@@ -199,7 +199,7 @@ class TypeTests(unittest.TestCase):
             "1.2.3.4",  # inet
             12345,  # int
             ['a', 'b', 'c'],  # list<text> collection
-            SortedSet((1, 2, 3)),  # set<int> collection
+            sortedset((1, 2, 3)),  # set<int> collection
             {'a': 1, 'b': 2},  # map<text, int> collection
             "text",  # text
             mydatetime,  # timestamp
@@ -586,7 +586,7 @@ class TypeTests(unittest.TestCase):
 
         # test tuple<set<datatype>>
         for datatype in DATA_TYPE_PRIMITIVES:
-            created_tuple = tuple([SortedSet([get_sample(datatype)])])
+            created_tuple = tuple([sortedset([get_sample(datatype)])])
             s.execute("INSERT INTO mytable (k, v_%s) VALUES (0, %s)", (i, created_tuple))
 
             result = s.execute("SELECT v_%s FROM mytable WHERE k=0", (i,))[0]

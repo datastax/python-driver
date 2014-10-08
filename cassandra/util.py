@@ -351,7 +351,7 @@ class WeakSet(object):
         return len(self.intersection(other)) == 0
 
 try:
-    from blist import sortedset as SortedSet
+    from blist import sortedset
 except ImportError:
 
     import warnings
@@ -363,7 +363,7 @@ except ImportError:
 
     from bisect import bisect_left
 
-    class SortedSet(object):
+    class sortedset(object):
         '''
         A sorted set based on sorted list
 
@@ -400,20 +400,22 @@ except ImportError:
             return self.__class__, (self._items,)
 
         def __eq__(self, other):
-            if len(other) != len(self._items):
-                return False
             if isinstance(other, self.__class__):
                 return self._items == other._items
             else:
-                return all(item in other for item in self._items)
+                if not isinstance(other, set):
+                    return False
+
+                return len(other) == len(self._items) and all(item in other for item in self._items)
 
         def __ne__(self, other):
-            if len(other) != len(self._items):
-                return True
             if isinstance(other, self.__class__):
                 return self._items != other._items
             else:
-                return any(item not in other for item in self._items)
+                if not isinstance(other, set):
+                    return True
+
+                return len(other) != len(self._items) or any(item not in other for item in self._items)
 
         def __le__(self, other):
             return self.issubset(other)
@@ -455,7 +457,7 @@ except ImportError:
             del self._items[:]
 
         def copy(self):
-            new = SortedSet()
+            new = sortedset()
             new._items = self._items
             return new
 
@@ -482,7 +484,7 @@ except ImportError:
             raise KeyError('%r' % item)
 
         def union(self, *others):
-            union = SortedSet()
+            union = sortedset()
             union._items = list(self._items)
             for other in others:
                 if isinstance(other, self.__class__):
@@ -521,7 +523,7 @@ except ImportError:
             return diff_self_other.union(diff_other_self)
 
         def _diff(self, other):
-            diff = SortedSet()
+            diff = sortedset()
             if isinstance(other, self.__class__):
                 i = 0
                 for item in self._items:
@@ -538,7 +540,7 @@ except ImportError:
             return diff
 
         def _intersect(self, other):
-            isect = SortedSet()
+            isect = sortedset()
             if isinstance(other, self.__class__):
                 i = 0
                 for item in self._items:

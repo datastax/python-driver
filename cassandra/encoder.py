@@ -28,7 +28,7 @@ import types
 from uuid import UUID
 import six
 
-from cassandra.util import OrderedDict, SortedSet
+from cassandra.util import OrderedDict, sortedset
 
 if six.PY3:
     long = int
@@ -79,7 +79,7 @@ class Encoder(object):
             list: self.cql_encode_list_collection,
             tuple: self.cql_encode_list_collection,
             set: self.cql_encode_set_collection,
-            SortedSet: self.cql_encode_set_collection,
+            sortedset: self.cql_encode_set_collection,
             frozenset: self.cql_encode_set_collection,
             types.GeneratorType: self.cql_encode_list_collection,
             ValueSequence: self.cql_encode_sequence
