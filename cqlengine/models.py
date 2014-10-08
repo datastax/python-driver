@@ -74,6 +74,27 @@ class QuerySetDescriptor(object):
         raise NotImplementedError
 
 
+class TransactionDescriptor(object):
+    """
+    returns a query set descriptor
+    """
+    def __get__(self, instance, model):
+        if instance:
+            def transaction_setter(transaction):
+                instance._transaction = transaction
+                return instance
+            return transaction_setter
+        qs = model.__queryset__(model)
+
+        def transaction_setter(transaction):
+            qs._transaction = transaction
+            return instance
+        return transaction_setter
+
+    def __call__(self, *args, **kwargs):
+        raise NotImplementedError
+
+
 class TTLDescriptor(object):
     """
     returns a query set descriptor
@@ -239,6 +260,7 @@ class BaseModel(object):
     objects = QuerySetDescriptor()
     ttl = TTLDescriptor()
     consistency = ConsistencyDescriptor()
+    transaction = TransactionDescriptor()
 
     # custom timestamps, see USING TIMESTAMP X
     timestamp = TimestampDescriptor()
@@ -303,7 +325,7 @@ class BaseModel(object):
         self._timestamp = None
 
         for name, column in self._columns.items():
-            value =  values.get(name, None)
+            value = values.get(name, None)
             if value is not None or isinstance(column, columns.BaseContainerColumn):
                 value = column.to_python(value)
             value_mngr = column.value_manager(self, column, value)
@@ -530,6 +552,10 @@ class BaseModel(object):
         #     raise CQLEngineException("Cannot pass None as a filter")
 
         return cls.objects.filter(*args, **kwargs)
+
+    @classmethod
+    def transaction(cls, *args, **kwargs):
+        return cls.objects.transaction(*args, **kwargs)
 
     @classmethod
     def get(cls, *args, **kwargs):

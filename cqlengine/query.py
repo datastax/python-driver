@@ -13,7 +13,7 @@ from cqlengine.functions import Token, BaseQueryFunction, QueryValue, UnicodeMix
 #http://www.datastax.com/docs/1.1/references/cql/index
 from cqlengine.operators import InOperator, EqualsOperator, GreaterThanOperator, GreaterThanOrEqualOperator
 from cqlengine.operators import LessThanOperator, LessThanOrEqualOperator, BaseWhereOperator
-from cqlengine.statements import WhereClause, SelectStatement, DeleteStatement, UpdateStatement, AssignmentClause, InsertStatement, BaseCQLStatement, MapUpdateClause, MapDeleteClause, ListUpdateClause, SetUpdateClause, CounterUpdateClause
+from cqlengine.statements import WhereClause, SelectStatement, DeleteStatement, UpdateStatement, AssignmentClause, InsertStatement, BaseCQLStatement, MapUpdateClause, MapDeleteClause, ListUpdateClause, SetUpdateClause, CounterUpdateClause, TransactionClause
 
 
 class QueryException(CQLEngineException): pass
@@ -205,6 +205,9 @@ class AbstractQuerySet(object):
 
         #Where clause filters
         self._where = []
+
+        # Transaction clause filters
+        self._transaction = []
 
         #ordering arguments
         self._order = []
@@ -406,6 +409,50 @@ class AbstractQuerySet(object):
             return statement[0], statement[1]
         else:
             raise QueryException("Can't parse '{}'".format(arg))
+
+    def transaction(self, *args, **kwargs):
+        """Adds IF statements to queryset"""
+        if len([x for x in kwargs.values() if x is None]):
+            raise CQLEngineException("None values on transaction are not allowed")
+
+        clone = copy.deepcopy(self)
+        for operator in args:
+            if not isinstance(operator, TransactionClause):
+                raise QueryException('{} is not a valid query operator'.format(operator))
+            clone._transaction.append(operator)
+
+        for col_name, val in kwargs.items():
+            try:
+                column = self.model._get_column(col_name)
+            except KeyError:
+                if col_name in ['exists', 'not_exists']:
+                    pass
+                elif col_name == 'pk__token':
+                    if not isinstance(val, Token):
+                        raise QueryException("Virtual column 'pk__token' may only be compared to Token() values")
+                    column = columns._PartitionKeysToken(self.model)
+                    quote_field = False
+                else:
+                    raise QueryException("Can't resolve column name: '{}'".format(col_name))
+
+            if isinstance(val, Token):
+                if col_name != 'pk__token':
+                    raise QueryException("Token() values may only be compared to the 'pk__token' virtual column")
+                partition_columns = column.partition_columns
+                if len(partition_columns) != len(val.value):
+                    raise QueryException(
+                        'Token() received {} arguments but model has {} partition keys'.format(
+                            len(val.value), len(partition_columns)))
+                val.set_columns(partition_columns)
+
+            if isinstance(val, BaseQueryFunction):
+                query_val = val
+            else:
+                query_val = column.to_database(val)
+
+            clone._transaction.append(TransactionClause(col_name, query_val))
+
+        return clone
 
     def filter(self, *args, **kwargs):
         """
