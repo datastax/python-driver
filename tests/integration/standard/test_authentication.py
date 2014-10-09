@@ -19,7 +19,7 @@ import socket
 from ccmlib import common
 from ccmlib.cluster import Cluster as CCMCluster
 
-from tests.integration import setup_package, teardown_package, PROTOCOL_VERSION, CASSANDRA_DIR, CASSANDRA_VERSION, path
+import tests.integration
 from cassandra.cluster import Cluster, NoHostAvailable, Unauthorized, InvalidRequest
 from cassandra.auth import PlainTextAuthProvider
 
@@ -68,17 +68,19 @@ def try_connecting(username='', password=''):
     :param password: optional password for connection
     :return: True if can successfully connect to cluster within 2 minutes, False otherwise
     """
+
     if username and password:
-        ap = PlainTextAuthProvider(username=username, password=password)
+        ap = AuthenticationTests.get_authentication_provider(username, password)
     else:
         ap = None
+
     maxwait = 120  # in seconds
     sleeptime = 1
 
     wait_time = 0
     while wait_time < maxwait:
         try:
-            cluster = Cluster(protocol_version=PROTOCOL_VERSION, auth_provider=ap)
+            cluster = Cluster(protocol_version=tests.integration.PROTOCOL_VERSION, auth_provider=ap)
             cluster.connect()
             log.debug("Can connect after %d seconds" % wait_time)
             return True
@@ -93,23 +95,15 @@ def try_connecting(username='', password=''):
 # Module level setup and teardown
 #
 def setup_module():
-    """
-    Test is skipped if run with cql version < 2
-    Stop existing cluster started by generic tests init
-    """
 
-    if PROTOCOL_VERSION < 2:
-        raise unittest.SkipTest(
-            "SASL Authentication is not supported in version 1 of the protocol")
-
-    teardown_package()
+    tests.integration.teardown_package()
 
 
 def teardown_module():
     """
     Start generic tests cluster
     """
-    setup_package()
+    tests.integration.setup_package()
     wait_for_cassandra()
     try_connecting()
 
@@ -143,46 +137,42 @@ class AuthenticationTests(unittest.TestCase):
         If invoked from authorization class enable authorization by setting 'authorizer': 'CassandraAuthorizer'.
         """
         try:
-            try:
-                ccm_cluster = CCMCluster.load(path, AUTH_CLUSTER_NAME)
-                log.debug("Found existing ccm test authentication cluster, removing")
-                ccm_cluster.remove()
-            except Exception:
-                log.debug("Can not load cluster %s ....." % AUTH_CLUSTER_NAME)
-
-            log.debug("Creating new ccm test authentication cluster")
-            if CASSANDRA_DIR:
-                ccm_cluster = CCMCluster(path, AUTH_CLUSTER_NAME, cassandra_dir=CASSANDRA_DIR)
-            else:
-                ccm_cluster = CCMCluster(path, AUTH_CLUSTER_NAME, cassandra_version=CASSANDRA_VERSION)
-
-            ccm_cluster.set_configuration_options({'start_native_transport': True})
-            ccm_cluster.set_configuration_options({'authenticator': 'PasswordAuthenticator'})
-
-            #
-            # This method is called either with AuthenticationTests class or with AuthorizedAuthenticationTests class.
-            # In the second case we enable CassandraAuthorizer
-            #
-            if cls.__name__ == 'AuthorizedAuthenticationTests':
-                print "Running tests with Cassandra Authorizer Enabled"
-                log.info("Running tests with Cassandra Authorizer Enabled")
-                ccm_cluster.set_configuration_options({'authorizer': 'CassandraAuthorizer'})
-            else:
-                print "Running tests with Cassandra Authorizer Disabled"
-                log.info("Running tests with Cassandra Authorizer Disabled")
-
-            common.switch_cluster(path, AUTH_CLUSTER_NAME)
-            ccm_cluster.populate(1)
-
-            log.debug("Starting ccm test authentication cluster")
-            ccm_cluster.start(wait_for_binary_proto=True)
+            ccm_cluster = CCMCluster.load(tests.integration.path, AUTH_CLUSTER_NAME)
+            log.debug("Found existing ccm test authentication cluster, removing")
+            ccm_cluster.remove()
         except Exception:
-            log.exception("Failed to start ccm authentication cluster:")
-            raise
+            log.debug("Can not load cluster %s ....." % AUTH_CLUSTER_NAME)
+
+        log.debug("Creating new ccm test authentication cluster")
+        if tests.integration.CASSANDRA_DIR:
+            ccm_cluster = CCMCluster(tests.integration.path, AUTH_CLUSTER_NAME, cassandra_dir=tests.integration.CASSANDRA_DIR)
+        else:
+            ccm_cluster = CCMCluster(tests.integration.path, AUTH_CLUSTER_NAME, cassandra_version=tests.integration.CASSANDRA_VERSION)
+
+        ccm_cluster.set_configuration_options({'start_native_transport': True})
+        ccm_cluster.set_configuration_options({'authenticator': 'PasswordAuthenticator'})
+
+        #
+        # This method is called either with AuthenticationTests class or with AuthorizedAuthenticationTests class.
+        # In the second case we enable CassandraAuthorizer
+        #
+        if cls.__name__ == 'AuthorizedAuthenticationTests':
+            print "Running tests with Cassandra Authorizer Enabled"
+            log.info("Running tests with Cassandra Authorizer Enabled")
+            ccm_cluster.set_configuration_options({'authorizer': 'CassandraAuthorizer'})
+        else:
+            print "Running tests with Cassandra Authorizer Disabled"
+            log.info("Running tests with Cassandra Authorizer Disabled")
+
+        common.switch_cluster(tests.integration.path, AUTH_CLUSTER_NAME)
+        ccm_cluster.populate(1)
+
+        log.debug("Starting ccm test authentication cluster")
+        ccm_cluster.start(wait_for_binary_proto=True)
 
         if not wait_for_cassandra() or not try_connecting('cassandra', 'cassandra'):
             log.exception("Can not talk to cassandra")
-            raise
+            raise Exception('Can not talk to cassandra')
 
         log.debug("Switched to AUTH_CLUSTER_NAME cluster")
         cls.ccm_cluster = ccm_cluster
@@ -219,6 +209,27 @@ class AuthenticationTests(unittest.TestCase):
         cls.authorizer = True
 
     @staticmethod
+    def v1_authentication_provider(username, password):
+        return dict(username=username, password=password)
+
+    @staticmethod
+    def get_authentication_provider(username, password):
+        """
+        Return correct authentication provider based on protocol version.
+        There is a difference in the semantics of authentication provider argument with protocol versions 1 and 2
+        For protocol version 2 and higher it should be a PlainTextAuthProvider object.
+        For protocol version 1 it should be a function taking hostname as an argument and returning a dictionary
+        containing username and password.
+        :param username: authentication username
+        :param password: authentication password
+        :return: authentication object suitable for Cluster.connect()
+        """
+        if tests.integration.PROTOCOL_VERSION < 2:
+            return lambda(hostname): dict(username=username, password=password)
+        else:
+            return PlainTextAuthProvider(username=username, password=password)
+
+    @staticmethod
     def create_user(cluster, usr, pwd, su=False):
         """
         Create user with given username and password and optional status
@@ -227,7 +238,7 @@ class AuthenticationTests(unittest.TestCase):
         if su:
             status = 'SUPERUSER'
         session = cluster.connect()
-        session.execute("CREATE USER IF NOT EXISTS %s WITH PASSWORD '%s' %s " % (usr, pwd, status))
+        session.execute("CREATE USER %s WITH PASSWORD '%s' %s " % (usr, pwd, status))
         session.shutdown()
 
     @staticmethod
@@ -263,9 +274,8 @@ class AuthenticationTests(unittest.TestCase):
         :param pwd: user password
         :return: CLuster object
         """
-        return Cluster(protocol_version=PROTOCOL_VERSION,
-                       auth_provider=PlainTextAuthProvider(username=usr,
-                                                           password=pwd))
+        return Cluster(protocol_version=tests.integration.PROTOCOL_VERSION,
+                       auth_provider=AuthenticationTests.get_authentication_provider(username=usr, password=pwd))
 
     def test_new_user_created(self):
         """
@@ -487,7 +497,7 @@ class AuthenticationTests(unittest.TestCase):
         su_connect_no_user_specified: can't connect with an empty user
         No user specified triggers "AuthenticationFailed /Remote end requires authentication
         """
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=tests.integration.PROTOCOL_VERSION)
         self.assertRaisesRegexp(NoHostAvailable,
                                 '.*AuthenticationFailed.*Remote end requires authentication.*',
                                 cluster.connect)
@@ -498,4 +508,3 @@ class AuthorizedAuthenticationTests(AuthenticationTests):
     Same test as AuthenticationTests but enables authorization
     """
     pass
-
