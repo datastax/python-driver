@@ -204,11 +204,14 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
     local_dc = None
     used_hosts_per_remote_dc = 0
 
-    def __init__(self, local_dc, used_hosts_per_remote_dc=0):
+    def __init__(self, local_dc='', used_hosts_per_remote_dc=0):
         """
         The `local_dc` parameter should be the name of the datacenter
         (such as is reported by ``nodetool ring``) that should
-        be considered local.
+        be considered local. If not specified, the driver will choose
+        a local_dc based on the first host among :attr:`.Cluster.contact_points`
+        having a valid DC. If relying on this mechanism, all specified
+        contact points should be nodes in a single, local DC.
 
         `used_hosts_per_remote_dc` controls how many nodes in
         each remote datacenter will have connections opened
@@ -220,6 +223,8 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
         self.local_dc = local_dc
         self.used_hosts_per_remote_dc = used_hosts_per_remote_dc
         self._dc_live_hosts = {}
+        self._position = 0
+        self._contact_points = []
         LoadBalancingPolicy.__init__(self)
 
     def _dc(self, host):
@@ -229,14 +234,10 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
         for dc, dc_hosts in groupby(hosts, lambda h: self._dc(h)):
             self._dc_live_hosts[dc] = tuple(set(dc_hosts))
 
-        # position is currently only used for local hosts
-        local_live = self._dc_live_hosts.get(self.local_dc)
-        if not local_live:
-            self._position = 0
-        elif len(local_live) == 1:
-            self._position = 0
-        else:
-            self._position = randint(0, len(local_live) - 1)
+        if not self.local_dc:
+            self._contact_points = cluster.contact_points
+
+        self._position = randint(0, len(hosts) - 1) if hosts else 0
 
     def distance(self, host):
         dc = self._dc(host)
@@ -274,32 +275,40 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
                 yield host
 
     def on_up(self, host):
+
+        # not worrying about threads because this will happen during
+        # control connection startup/refresh
+        if not self.local_dc and host.datacenter:
+            if host.address in self._contact_points:
+                self.local_dc = host.datacenter
+                log.info("Using datacenter '%s' for DCAwareRoundRobinPolicy (via host '%s'); "
+                         "if incorrect, please specify a local_dc to the constructor, "
+                         "or limit contact points to local cluster nodes" %
+                         (self.local_dc, host.address))
+                del self._contact_points
+
         dc = self._dc(host)
         with self._hosts_lock:
-            current_hosts = self._dc_live_hosts.setdefault(dc, ())
+            current_hosts = self._dc_live_hosts.get(dc, ())
             if host not in current_hosts:
                 self._dc_live_hosts[dc] = current_hosts + (host, )
 
     def on_down(self, host):
         dc = self._dc(host)
         with self._hosts_lock:
-            current_hosts = self._dc_live_hosts.setdefault(dc, ())
+            current_hosts = self._dc_live_hosts.get(dc, ())
             if host in current_hosts:
-                self._dc_live_hosts[dc] = tuple(h for h in current_hosts if h != host)
+                hosts = tuple(h for h in current_hosts if h != host)
+                if hosts:
+                    self._dc_live_hosts[dc] = tuple(h for h in current_hosts if h != host)
+                else:
+                    self._dc_live_hosts.pop(dc, None)
 
     def on_add(self, host):
-        dc = self._dc(host)
-        with self._hosts_lock:
-            current_hosts = self._dc_live_hosts.setdefault(dc, ())
-            if host not in current_hosts:
-                self._dc_live_hosts[dc] = current_hosts + (host, )
+        self.on_up(host)
 
     def on_remove(self, host):
-        dc = self._dc(host)
-        with self._hosts_lock:
-            current_hosts = self._dc_live_hosts.setdefault(dc, ())
-            if host in current_hosts:
-                self._dc_live_hosts[dc] = tuple(h for h in current_hosts if h != host)
+        self.on_down(host)
 
 
 class TokenAwarePolicy(LoadBalancingPolicy):
@@ -333,8 +342,8 @@ class TokenAwarePolicy(LoadBalancingPolicy):
                 '%s cannot be used with the cluster partitioner (%s) because '
                 'the relevant C extension for this driver was not compiled. '
                 'See the installation instructions for details on building '
-                'and installing the C extensions.' % (self.__class__.__name__,
-                self._cluster_metadata.partitioner))
+                'and installing the C extensions.' %
+                (self.__class__.__name__, self._cluster_metadata.partitioner))
 
     def distance(self, *args, **kwargs):
         return self._child_policy.distance(*args, **kwargs)
