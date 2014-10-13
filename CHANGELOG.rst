@@ -1,3 +1,21 @@
+2.1.2
+=====
+In Progress
+
+Features
+--------
+* Allow DCAwareRoundRobinPolicy to be constructed without a local_dc, defaulting
+  instead to the DC of a contact_point (PYTHON-126)
+* Set routing key in BatchStatement.add() if none specified in batch (PYTHON-148)
+* Improved feedback on ValueError using named_tuple_factory with invalid column names (PYTHON-122)
+
+Bug Fixes
+---------
+* Handle Unauthorized message on schema_triggers query (PYTHON-155)
+* Make execute_concurrent compatible with Python 2.6 (github-197)
+* Pure Python sorted set in support of UDTs nested in collections (PYTON-167)
+* Support CUSTOM index metadata and string export (PYTHON-165)
+
 2.1.1
 =====
 September 11, 2014
