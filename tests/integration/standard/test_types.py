@@ -16,7 +16,7 @@ from tests.integration.datatype_utils import get_sample, DATA_TYPE_PRIMITIVES, D
 try:
     import unittest2 as unittest
 except ImportError:
-    import unittest # noqa
+    import unittest  # noqa
 
 import logging
 log = logging.getLogger(__name__)
@@ -26,16 +26,11 @@ from datetime import datetime
 import six
 from uuid import uuid1, uuid4
 
-try:
-    from blist import sortedset
-except ImportError:
-    sortedset = set  # noqa
-
 from cassandra import InvalidRequest
 from cassandra.cluster import Cluster
 from cassandra.cqltypes import Int32Type, EMPTY
 from cassandra.query import dict_factory
-from cassandra.util import OrderedDict
+from cassandra.util import OrderedDict, sortedset
 
 from tests.integration import get_server_versions, PROTOCOL_VERSION
 
@@ -660,9 +655,9 @@ class TypeTests(unittest.TestCase):
                   "v_3 frozen<%s>,"
                   "v_128 frozen<%s>"
                   ")" % (self.nested_tuples_schema_helper(1),
-                        self.nested_tuples_schema_helper(2),
-                        self.nested_tuples_schema_helper(3),
-                        self.nested_tuples_schema_helper(128)))
+                         self.nested_tuples_schema_helper(2),
+                         self.nested_tuples_schema_helper(3),
+                         self.nested_tuples_schema_helper(128)))
 
         for i in (1, 2, 3, 128):
             # create tuple
