@@ -54,7 +54,7 @@ def execute_concurrent(session, statements_and_parameters, concurrency=100, rais
         statements_and_params = []
         for user_id in user_ids:
             params = (user_id, )
-            statatements_and_params.append((select_statement, params))
+            statements_and_params.append((select_statement, params))
 
         results = execute_concurrent(
             session, statements_and_params, raise_on_first_error=False)
@@ -73,7 +73,7 @@ def execute_concurrent(session, statements_and_parameters, concurrency=100, rais
         return []
 
     # TODO handle iterators and generators naturally without converting the
-    # whole thing to a list.  This would requires not building a result
+    # whole thing to a list.  This would require not building a result
     # list of Nones up front (we don't know how many results there will be),
     # so a dict keyed by index should be used instead.  The tricky part is
     # knowing when you're the final statement to finish.
@@ -100,7 +100,7 @@ def execute_concurrent(session, statements_and_parameters, concurrency=100, rais
         return results
 
 
-def execute_concurrent_with_args(session, statement, parameters, *args, **kwargs):
+def execute_concurrent_with_args(session, statement, parameters, concurrency=100, raise_on_first_error=True):
     """
     Like :meth:`~cassandra.concurrent.execute_concurrent()`, but takes a single
     statement and a sequence of parameters.  Each item in ``parameters``
@@ -112,7 +112,7 @@ def execute_concurrent_with_args(session, statement, parameters, *args, **kwargs
         parameters = [(x,) for x in range(1000)]
         execute_concurrent_with_args(session, statement, parameters)
     """
-    return execute_concurrent(session, list(zip(cycle((statement,)), parameters)), *args, **kwargs)
+    return execute_concurrent(session, list(zip(cycle((statement,)), parameters)), concurrency=concurrency, raise_on_first_error=True)
 
 
 _sentinel = object()
