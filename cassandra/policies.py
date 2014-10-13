@@ -275,7 +275,6 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
                 yield host
 
     def on_up(self, host):
-
         # not worrying about threads because this will happen during
         # control connection startup/refresh
         if not self.local_dc and host.datacenter:
@@ -300,9 +299,9 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
             if host in current_hosts:
                 hosts = tuple(h for h in current_hosts if h != host)
                 if hosts:
-                    self._dc_live_hosts[dc] = tuple(h for h in current_hosts if h != host)
+                    self._dc_live_hosts[dc] = hosts
                 else:
-                    self._dc_live_hosts.pop(dc, None)
+                    del self._dc_live_hosts[dc]
 
     def on_add(self, host):
         self.on_up(host)
