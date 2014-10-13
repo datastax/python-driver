@@ -99,7 +99,17 @@ def named_tuple_factory(colnames, rows):
     .. versionchanged:: 2.0.0
         moved from ``cassandra.decoder`` to ``cassandra.query``
     """
-    Row = namedtuple('Row', map(_clean_column_name, colnames))
+    clean_column_names = map(_clean_column_name, colnames)
+    try:
+        Row = namedtuple('Row', clean_column_names)
+    except:
+        log.warn("Failed creating named tuple for results with column names %s (cleaned: %s) (see Python 'namedtuple' documentation for details on name rules). "
+                 "Results will be returned with positional names. "
+                 "Avoid this by choosing different names, using SELECT \"<col name>\" AS aliases, "
+                 "or specifying a different row_factory on your Session" %
+                 (colnames, clean_column_names))
+        Row = namedtuple('Row', clean_column_names, rename=True)
+
     return [Row(*row) for row in rows]
 
 
