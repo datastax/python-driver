@@ -100,7 +100,7 @@ def execute_concurrent(session, statements_and_parameters, concurrency=100, rais
         return results
 
 
-def execute_concurrent_with_args(session, statement, parameters, concurrency=100, raise_on_first_error=True):
+def execute_concurrent_with_args(session, statement, parameters, *args, **kwargs):
     """
     Like :meth:`~cassandra.concurrent.execute_concurrent()`, but takes a single
     statement and a sequence of parameters.  Each item in ``parameters``
@@ -110,9 +110,9 @@ def execute_concurrent_with_args(session, statement, parameters, concurrency=100
 
         statement = session.prepare("INSERT INTO mytable (a, b) VALUES (1, ?)")
         parameters = [(x,) for x in range(1000)]
-        execute_concurrent_with_args(session, statement, parameters)
+        execute_concurrent_with_args(session, statement, parameters, concurrency=50)
     """
-    return execute_concurrent(session, list(zip(cycle((statement,)), parameters)), concurrency=concurrency, raise_on_first_error=True)
+    return execute_concurrent(session, list(zip(cycle((statement,)), parameters)), *args, **kwargs)
 
 
 _sentinel = object()
