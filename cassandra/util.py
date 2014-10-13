@@ -458,7 +458,7 @@ except ImportError:
 
         def copy(self):
             new = sortedset()
-            new._items = self._items
+            new._items = list(self._items)
             return new
 
         def isdisjoint(self, other):
