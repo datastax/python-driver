@@ -238,9 +238,9 @@ class Statement(object):
         self._serial_consistency_level = None
 
     serial_consistency_level = property(
-         _get_serial_consistency_level,
-         _set_serial_consistency_level,
-         _del_serial_consistency_level,
+        _get_serial_consistency_level,
+        _set_serial_consistency_level,
+        _del_serial_consistency_level,
         """
         The serial consistency level is only used by conditional updates
         (``INSERT``, ``UPDATE`` and ``DELETE`` with an ``IF`` condition).  For
@@ -366,9 +366,8 @@ class PreparedStatement(object):
                 try:
                     routing_key_indexes = [statement_indexes[c.name]
                                            for c in partition_key_columns]
-                except KeyError:
-                    pass  # we're missing a partition key component in the prepared
-                          # statement; just leave routing_key_indexes as None
+                except KeyError:  # we're missing a partition key component in the prepared
+                    pass          # statement; just leave routing_key_indexes as None
 
         return PreparedStatement(column_metadata, query_id, routing_key_indexes,
                                  query, keyspace, protocol_version)
@@ -651,6 +650,7 @@ class BatchStatement(Statement):
         elif isinstance(statement, PreparedStatement):
             query_id = statement.query_id
             bound_statement = statement.bind(() if parameters is None else parameters)
+            self._maybe_set_routing_key(bound_statement)
             self._statements_and_parameters.append(
                 (True, query_id, bound_statement.values))
         elif isinstance(statement, BoundStatement):
@@ -658,6 +658,7 @@ class BatchStatement(Statement):
                 raise ValueError(
                     "Parameters cannot be passed with a BoundStatement "
                     "to BatchStatement.add()")
+            self._maybe_set_routing_key(statement)
             self._statements_and_parameters.append(
                 (True, statement.prepared_statement.query_id, statement.values))
         else:
@@ -666,6 +667,7 @@ class BatchStatement(Statement):
             if parameters:
                 encoder = Encoder() if self._session is None else self._session.encoder
                 query_string = bind_params(query_string, parameters, encoder)
+            self._maybe_set_routing_key(statement)
             self._statements_and_parameters.append((False, query_string, ()))
         return self
 
@@ -677,6 +679,10 @@ class BatchStatement(Statement):
         """
         for statement, value in zip(statements, parameters):
             self.add(statement, parameters)
+
+    def _maybe_set_routing_key(self, statement):
+        if self.routing_key is None and statement.routing_key is not None:
+            self.routing_key = statement.routing_key
 
     def __str__(self):
         consistency = ConsistencyLevel.value_to_name.get(self.consistency_level, 'Not Set')
