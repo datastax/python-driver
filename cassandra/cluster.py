@@ -166,6 +166,18 @@ class Cluster(object):
 
     """
 
+    contact_points = ['127.0.0.1']
+    """
+    The list of contact points to try connecting for cluster discovery.
+
+    Defaults to loopback interface.
+
+    Note: When using :class:`.DCAwareLoadBalancingPolicy` with no explicit
+    local_dc set, the DC is chosen from an arbitrary host in contact_points.
+    In this case, contact_points should contain only nodes from a single,
+    local DC.
+    """
+
     port = 9042
     """
     The server-side port to open connections to. Defaults to 9042.
@@ -377,7 +389,7 @@ class Cluster(object):
     _listener_lock = None
 
     def __init__(self,
-                 contact_points=("127.0.0.1",),
+                 contact_points=["127.0.0.1"],
                  port=9042,
                  compression=True,
                  auth_provider=None,
@@ -1946,8 +1958,8 @@ class ControlConnection(object):
 
             responses = connection.wait_for_responses(*queries, fail_on_error=False)
             (ks_success, ks_result), (cf_success, cf_result), \
-            (col_success, col_result), (types_success, types_result), \
-            (trigger_success, triggers_result) = responses
+                (col_success, col_result), (types_success, types_result), \
+                (trigger_success, triggers_result) = responses
 
             if ks_success:
                 ks_result = dict_factory(*ks_result.results)
