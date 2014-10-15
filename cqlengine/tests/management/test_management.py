@@ -8,8 +8,9 @@ from cqlengine import management
 from cqlengine.tests.query.test_queryset import TestModel
 from cqlengine.models import Model
 from cqlengine import columns, SizeTieredCompactionStrategy, LeveledCompactionStrategy
-
-
+from unittest import skipUnless
+from cqlengine.connection import get_cluster
+cluster = get_cluster()
 
 class CreateKeyspaceTest(BaseCassEngTestCase):
     def test_create_succeeeds(self):
@@ -145,22 +146,25 @@ class TablePropertiesTests(BaseCassEngTestCase):
 
         sync_table(ModelWithTableProperties)
         expected = {'bloom_filter_fp_chance': 0.76328,
-                    'caching': CACHING_ALL,
                     'comment': 'TxfguvBdzwROQALmQBOziRMbkqVGFjqcJfVhwGR',
                     'gc_grace_seconds': 2063,
-                    'populate_io_cache_on_flush': True,
                     'read_repair_chance': 0.17985,
-                    'replicate_on_write': False
                      # For some reason 'dclocal_read_repair_chance' in CQL is called
                      #  just 'local_read_repair_chance' in the schema table.
                      #  Source: https://issues.apache.org/jira/browse/CASSANDRA-6717
                      #  TODO: due to a bug in the native driver i'm not seeing the local read repair chance show up
                      # 'local_read_repair_chance': 0.50811,
                     }
+        if CASSANDRA_VERSION <= 20:
+            expected['caching'] = CACHING_ALL
+            expected['replicate_on_write'] = False
+
+        if CASSANDRA_VERSION == 20:
+            expected['populate_io_cache_on_flush'] = True
+            expected['index_interval'] = 98706
 
         if CASSANDRA_VERSION >= 20:
             expected['default_time_to_live'] = 4756
-            expected['index_interval'] = 98706
             expected['memtable_flush_period_in_ms'] = 43681
 
         self.assertDictContainsSubset(expected, management.get_table_settings(ModelWithTableProperties).options)
@@ -186,18 +190,23 @@ class TablePropertiesTests(BaseCassEngTestCase):
         table_settings = management.get_table_settings(ModelWithTableProperties).options
 
         expected = {'bloom_filter_fp_chance': 0.66778,
-                    'caching': CACHING_NONE,
                      'comment': 'xirAkRWZVVvsmzRvXamiEcQkshkUIDINVJZgLYSdnGHweiBrAiJdLJkVohdRy',
                      'gc_grace_seconds': 96362,
-                     'populate_io_cache_on_flush': False,
                      'read_repair_chance': 0.2989,
-                     'replicate_on_write': True  # TODO see above comment re: native driver missing local read repair chance
-                     #  'local_read_repair_chance': 0.12732,
+                     #'local_read_repair_chance': 0.12732,
                     }
         if CASSANDRA_VERSION >= 20:
              expected['memtable_flush_period_in_ms'] = 60210
              expected['default_time_to_live'] = 65178
+
+        if CASSANDRA_VERSION == 20:
              expected['index_interval'] = 94207
+
+        # these featuers removed in cassandra 2.1
+        if CASSANDRA_VERSION <= 20:
+            expected['caching'] = CACHING_NONE
+            expected['replicate_on_write'] = True
+            expected['populate_io_cache_on_flush'] = False
 
         self.assertDictContainsSubset(expected, table_settings)
 
@@ -247,6 +256,7 @@ class NonModelFailureTest(BaseCassEngTestCase):
             sync_table(self.FakeModel)
 
 
+@skipUnless(cluster.protocol_version >= 2, "only runs against the cql3 protocol v2.0")
 def test_static_columns():
     class StaticModel(Model):
         id = columns.Integer(primary_key=True)
@@ -260,15 +270,23 @@ def test_static_columns():
     from cqlengine.connection import get_session
     session = get_session()
 
-    with patch.object(session, "execute", side_effect=Exception) as m:
-        try:
-            sync_table(StaticModel)
-        except:
-            pass
+    with patch.object(session, "execute", wraps=session.execute) as m:
+        sync_table(StaticModel)
 
     assert m.call_count > 0
     statement = m.call_args[0][0].query_string
     assert '"name" text static' in statement, statement
+
+    # if we sync again, we should not apply an alter w/ a static
+    sync_table(StaticModel)
+
+    with patch.object(session, "execute", wraps=session.execute) as m2:
+        sync_table(StaticModel)
+
+    assert len(m2.call_args_list) == 1
+    assert "ALTER" not in  m2.call_args[0][0].query_string
+
+
 
 
 

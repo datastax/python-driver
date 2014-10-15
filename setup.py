@@ -17,7 +17,7 @@ Cassandra CQL 3 Object Mapper for Python
 """
 
 setup(
-    name='cqlengine',
+    name='vk-cqlengine',
     version=version,
     description='Cassandra CQL 3 Object Mapper for Python',
     long_description=long_desc,
@@ -35,7 +35,7 @@ setup(
     author='Blake Eggleston, Jon Haddad',
     author_email='bdeggleston@gmail.com, jon@jonhaddad.com',
     url='https://github.com/cqlengine/cqlengine',
-    license='BSD',
+    license='Private',
     packages=find_packages(),
     include_package_data=True,
 )
