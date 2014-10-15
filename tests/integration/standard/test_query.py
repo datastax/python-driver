@@ -30,7 +30,7 @@ from cassandra.policies import HostDistance
 from tests.integration import PROTOCOL_VERSION
 
 
-class QueryTest(unittest.TestCase):
+class QueryTests(unittest.TestCase):
 
     def test_query(self):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
@@ -357,7 +357,7 @@ class SerialConsistencyTests(unittest.TestCase):
         self.assertRaises(ValueError, SimpleStatement, 'foo', serial_consistency_level=ConsistencyLevel.ONE)
 
 
-class LightweightTransactionsTests(unittest.TestCase):
+class LightweightTransactionTests(unittest.TestCase):
     def setUp(self):
         """
         Test is skipped if run with cql version < 2
@@ -423,7 +423,7 @@ class LightweightTransactionsTests(unittest.TestCase):
         self.assertTrue(received_timeout)
 
 
-class NamedTupleFactoryAndNumericColumnNames(unittest.TestCase):
+class NamedTupleFactoryAndNumericColNamesTests(unittest.TestCase):
     """
     Test for PYTHON-122: Improve Error Handling/Reporting for named_tuple_factory and Numeric Column Names
     """

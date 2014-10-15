@@ -31,7 +31,7 @@ from cassandra.pool import Host
 from tests.integration import get_cluster, PROTOCOL_VERSION, get_server_versions
 
 
-class SchemaMetadataTest(unittest.TestCase):
+class SchemaMetadataTests(unittest.TestCase):
 
     ksname = "schemametadatatest"
 

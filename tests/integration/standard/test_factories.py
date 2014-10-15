@@ -24,7 +24,7 @@ from cassandra.query import tuple_factory, named_tuple_factory, dict_factory, or
 from cassandra.util import OrderedDict
 
 
-class TestFactories(unittest.TestCase):
+class RowFactoryTests(unittest.TestCase):
     """
     Test different row_factories and access code
     """

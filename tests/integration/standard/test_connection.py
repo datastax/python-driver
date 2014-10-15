@@ -35,7 +35,7 @@ except ImportError:
     LibevConnection = None
 
 
-class ConnectionTest(object):
+class ConnectionTests(object):
 
     klass = None
 
@@ -221,7 +221,7 @@ class ConnectionTest(object):
             t.join()
 
 
-class AsyncoreConnectionTest(ConnectionTest, unittest.TestCase):
+class AsyncoreConnectionTests(ConnectionTests, unittest.TestCase):
 
     klass = AsyncoreConnection
 
@@ -231,7 +231,7 @@ class AsyncoreConnectionTest(ConnectionTest, unittest.TestCase):
         ConnectionTest.setUp(self)
 
 
-class LibevConnectionTest(ConnectionTest, unittest.TestCase):
+class LibevConnectionTests(ConnectionTests, unittest.TestCase):
 
     klass = LibevConnection
 
