@@ -422,7 +422,8 @@ class LightweightTransactionTests(unittest.TestCase):
         # Make sure test passed
         self.assertTrue(received_timeout)
 
-class BatchStatementAdd_And_RoutingKey(unittest.TestCase):
+
+class BatchStatementDefaultRoutingKeyTests(unittest.TestCase):
     # Test for PYTHON-126: BatchStatement.add() should set the routing key of the first added prepared statement
 
     def setUp(self):
@@ -432,144 +433,78 @@ class BatchStatementAdd_And_RoutingKey(unittest.TestCase):
                 % (PROTOCOL_VERSION,))
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         self.session = self.cluster.connect()
+        query = """
+                INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
+                """
+        self.simple_statement = SimpleStatement(query, routing_key='ss_rk')
+        self.prepared = self.session.prepare(query)
 
     def tearDown(self):
         self.cluster.shutdown()
 
-    def test_rk_from_BoundStatement(self):
+    def test_rk_from_bound(self):
         """
         batch routing key is inherited from BoundStatement
         """
-
-        prepared = self.session.prepare(
-                """
-                INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
-                """)
-
-        bound = prepared.bind((1, None))
+        bound = self.prepared.bind((1, None))
         batch = BatchStatement()
         batch.add(bound)
+        self.assertIsNotNone(batch.routing_key)
         self.assertEqual(batch.routing_key, bound.routing_key)
 
-    def test_rk_set_inBoundStatement(self):
-        """
-        batch routing key is inherited when set explicitly in BoundStatement
-        """
-
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        self.session = self.cluster.connect()
-
-        prepared = self.session.prepare(
-        """
-          INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
-        """)
-        bound = prepared.bind((1, None))
-        bound._set_routing_key('fake_key')
-
-        batch = BatchStatement()
-        batch.add(bound)
-        self.assertEqual(batch.routing_key, bound.routing_key)
-
-    def test_rk_from_SimpleStatement(self):
+    def test_rk_from_simple(self):
         """
         batch routing key is inherited from SimpleStatement
         """
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         self.session = self.cluster.connect()
-
-        query = """
-                INSERT INTO test1rf.test (k, v) VALUES  (?, ?)
-                """
-        statement = SimpleStatement(query)
-        statement._set_routing_key('another_fake_key')
         batch = BatchStatement()
-        batch.add(statement)
-        self.assertEqual(batch.routing_key, statement.routing_key)
+        batch.add(self.simple_statement)
+        self.assertIsNotNone(batch.routing_key)
+        self.assertEqual(batch.routing_key, self.simple_statement.routing_key)
 
-    def test_inherit_first_rk(self):
+    def test_inherit_first_rk_bound(self):
         """
         compound batch inherits the first routing key of the first added statement (bound statement is first)
         """
-
+        bound = self.prepared.bind((100000000, None))
         batch = BatchStatement()
-
-        query = """
-                INSERT INTO test1rf.test (k, v) VALUES  (?, ?)
-                """
-        statement = SimpleStatement(query)
-        statement._set_routing_key('another_fake_key')
-
-        prepared = self.session.prepare(
-                    """
-                    INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
-                    """)
-
-        bound = prepared.bind((1, None))
-        bound._set_routing_key('fake_key')
-
-        batch.add("INSERT INTO test3rf.test (k, v) VALUES (0, 0)")
+        batch.add("ss with no rk")
         batch.add(bound)
-        batch.add(statement)
+        batch.add(self.simple_statement)
 
         for i in range(3):
-            batch.add(prepared, (i, i))
+            batch.add(self.prepared, (i, i))
 
-        self.assertEqual(batch.routing_key, 'fake_key')
+        self.assertIsNotNone(batch.routing_key)
+        self.assertEqual(batch.routing_key, bound.routing_key)
 
-    def test_inherit_first_rk_1(self):
+    def test_inherit_first_rk_simple_statement(self):
         """
         compound batch inherits the first routing key of the first added statement (Simplestatement is first)
         """
+        bound = self.prepared.bind((1, None))
         batch = BatchStatement()
-
-        query = """
-                INSERT INTO test1rf.test (k, v) VALUES  (?, ?)
-                """
-        statement = SimpleStatement(query)
-        statement._set_routing_key('another_fake_key')
-
-        prepared = self.session.prepare(
-                    """
-                    INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
-                    """)
-
-        bound = prepared.bind((1, None))
-        bound._set_routing_key('fake_key')
-
-        batch.add("INSERT INTO test3rf.test (k, v) VALUES (0, 0)")
-        batch.add(statement)
+        batch.add("ss with no rk")
+        batch.add(self.simple_statement)
         batch.add(bound)
 
         for i in range(10):
-            batch.add(prepared, (i, i))
+            batch.add(self.prepared, (i, i))
 
-        self.assertEqual(batch.routing_key, 'another_fake_key')
+        self.assertIsNotNone(batch.routing_key)
+        self.assertEqual(batch.routing_key, self.simple_statement.routing_key)
 
-    def test_inherit_first_rk2(self):
+    def test_inherit_first_rk_prepared_param(self):
         """
         compound batch inherits the first routing key of the first added statement (prepared statement is first)
         """
-
+        bound = self.prepared.bind((2, None))
         batch = BatchStatement()
-
-        query = """
-                INSERT INTO test1rf.test (k, v) VALUES  (?, ?)
-                """
-        statement = SimpleStatement(query)
-        statement._set_routing_key('another_fake_key')
-
-        prepared = self.session.prepare(
-                    """
-                    INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
-                    """)
-        prepared.routing_key_indexes = {0: {0: 0}, 1: {1: 1}}
-
-        bound = prepared.bind((1, None))
-        bound._set_routing_key('fake_key')
-
-        batch.add("INSERT INTO test3rf.test (k, v) VALUES (0, 0)")
-        batch.add(prepared, (1, 0))
+        batch.add("ss with no rk")
+        batch.add(self.prepared, (1, 0))
         batch.add(bound)
-        batch.add(statement)
+        batch.add(self.simple_statement)
 
-        self.assertEqual(batch.routing_key, '\x04\x00\x00\x00\x04\x00\x00\x00')
+        self.assertIsNotNone(batch.routing_key)
+        self.assertEqual(batch.routing_key, self.prepared.bind((1, 0)).routing_key)
