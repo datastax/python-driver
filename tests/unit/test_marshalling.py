@@ -100,7 +100,7 @@ if platform.python_implementation() == 'CPython':
     marshalled_value_pairs += marshalled_value_pairs_unsafe
 
 
-class TestUnmarshal(unittest.TestCase):
+class UnmarshalTest(unittest.TestCase):
     def test_unmarshalling(self):
         for serializedval, valtype, nativeval in marshalled_value_pairs:
             unmarshaller = lookup_casstype(valtype)

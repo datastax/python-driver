@@ -31,7 +31,7 @@ from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
 
-class TestStrategies(unittest.TestCase):
+class StrategiesTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -161,7 +161,7 @@ class TestStrategies(unittest.TestCase):
         self.assertNotEqual(SimpleStrategy(1), NetworkTopologyStrategy({'dc1': 2}))
 
 
-class TestNameEscaping(unittest.TestCase):
+class NameEscapingTest(unittest.TestCase):
 
     def test_protect_name(self):
         """
@@ -221,7 +221,7 @@ class TestNameEscaping(unittest.TestCase):
             self.assertEqual(is_valid_name(keyword), False)
 
 
-class TestTokens(unittest.TestCase):
+class TokensTest(unittest.TestCase):
 
     def test_murmur3_tokens(self):
         try:
@@ -255,7 +255,7 @@ class TestTokens(unittest.TestCase):
             pass
 
 
-class TestKeyspaceMetadata(unittest.TestCase):
+class KeyspaceMetadataTest(unittest.TestCase):
 
     def test_export_as_string_user_types(self):
         keyspace_name = 'test'
@@ -297,7 +297,7 @@ CREATE TYPE test.b (
         return Mock(**{'cassname': cassname, 'typename': typename, 'cql_parameterized_type.return_value': typename})
 
 
-class TestUserTypes(unittest.TestCase):
+class UserTypesTest(unittest.TestCase):
 
     def test_as_cql_query(self):
         field_types = [IntegerType, AsciiType, TupleType.apply_parameters([IntegerType, AsciiType])]

@@ -40,7 +40,7 @@ from cassandra.query import Statement
 from six.moves import xrange
 
 
-class TestLoadBalancingPolicy(unittest.TestCase):
+class LoadBalancingPolicyTest(unittest.TestCase):
     def test_non_implemented(self):
         """
         Code coverage for interface-style base class
@@ -62,7 +62,7 @@ class TestLoadBalancingPolicy(unittest.TestCase):
         self.assertRaises(TypeError, Cluster, load_balancing_policy=RoundRobinPolicy)
 
 
-class TestRoundRobinPolicy(unittest.TestCase):
+class RoundRobinPolicyTest(unittest.TestCase):
 
     def test_basic(self):
         hosts = [0, 1, 2, 3]

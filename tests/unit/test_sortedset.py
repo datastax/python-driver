@@ -21,7 +21,7 @@ from cassandra.util import sortedset
 from cassandra.cqltypes import EMPTY
 
 
-class TestSortedSet(unittest.TestCase):
+class SortedSetTest(unittest.TestCase):
     def test_init(self):
         input = [5, 4, 3, 2, 1, 1, 1]
         expected = sorted(set(input))
