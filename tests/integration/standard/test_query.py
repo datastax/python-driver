@@ -306,7 +306,6 @@ class BatchStatementTests(unittest.TestCase):
 
 
 class SerialConsistencyTests(unittest.TestCase):
-
     def setUp(self):
         if PROTOCOL_VERSION < 2:
             raise unittest.SkipTest(
@@ -359,7 +358,6 @@ class SerialConsistencyTests(unittest.TestCase):
 
 
 class LightweightTransactionsTests(unittest.TestCase):
-
     def setUp(self):
         """
         Test is skipped if run with cql version < 2
@@ -423,3 +421,53 @@ class LightweightTransactionsTests(unittest.TestCase):
 
         # Make sure test passed
         self.assertTrue(received_timeout)
+
+
+class NamedTupleFactoryAndNumericColumnNames(unittest.TestCase):
+    """
+    Test for PYTHON-122: Improve Error Handling/Reporting for named_tuple_factory and Numeric Column Names
+    """
+    def setUp(self):
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.session = self.cluster.connect()
+
+        ddl = '''
+            CREATE TABLE test3rf.ToBeIndexed ( key blob PRIMARY KEY, "626972746864617465" blob )
+            WITH COMPACT STORAGE'''
+
+        self.session.execute(ddl)
+
+    def tearDown(self):
+        """
+        Shutdown cluster
+        """
+        self.session.execute("DROP TABLE test3rf.ToBeIndexed")
+        self.cluster.shutdown()
+
+    def test_no_exception_on_select(self):
+        """
+        no exception on SELECT for numeric column name
+        """
+        try:
+            self.session.execute('SELECT * FROM test3rf.ToBeIndexed')
+        except ValueError as e:
+            self.fail("Unexpected ValueError exception: %s" % e.message)
+
+    def test_can_select_using_alias(self):
+        """
+        can SELECT "<numeric col name>" AS aliases
+        """
+        try:
+            self.session.execute('SELECT key, "626972746864617465" AS my_col from test3rf.ToBeIndexed')
+        except ValueError as e:
+            self.fail("Unexpected ValueError exception: %s" % e.message)
+
+    def test_can_select_with_dict_factory(self):
+        """
+        can SELECT numeric column  using  dict_factory
+        """
+        self.session.row_factory = dict_factory
+        try:
+            self.session.execute('SELECT * FROM test3rf.ToBeIndexed')
+        except ValueError as e:
+            self.fail("Unexpected ValueError exception: %s" % e.message)
