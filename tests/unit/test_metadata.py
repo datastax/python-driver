@@ -26,7 +26,7 @@ from cassandra.metadata import (Murmur3Token, MD5Token,
                                 NetworkTopologyStrategy, SimpleStrategy,
                                 LocalStrategy, NoMurmur3, protect_name,
                                 protect_names, protect_value, is_valid_name,
-                                UserType, KeyspaceMetadata)
+                                UserType, KeyspaceMetadata, Metadata)
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
@@ -313,3 +313,24 @@ class UserTypesTest(unittest.TestCase):
     def test_as_cql_query_name_escaping(self):
         udt = UserType("MyKeyspace", "MyType", ["AbA", "keyspace"], [AsciiType, AsciiType])
         self.assertEqual('CREATE TYPE "MyKeyspace"."MyType" ("AbA" ascii, "keyspace" ascii);', udt.as_cql_query(formatted=False))
+
+
+class IndexTest(unittest.TestCase):
+
+    def test_build_index_as_cql(self):
+        column_meta = Mock()
+        column_meta.name = 'column_name_here'
+        column_meta.table.name = 'table_name_here'
+        column_meta.table.keyspace.name = 'keyspace_name_here'
+        meta_model = Metadata(Mock())
+
+        row = {'index_name': 'index_name_here', 'index_type': 'index_type_here'}
+        index_meta = meta_model._build_index_metadata(column_meta, row)
+        self.assertEqual(index_meta.as_cql_query(),
+                'CREATE INDEX index_name_here ON keyspace_name_here.table_name_here (column_name_here)')
+
+        row['index_options'] = '{ "class_name": "class_name_here" }'
+        row['index_type'] = 'CUSTOM'
+        index_meta = meta_model._build_index_metadata(column_meta, row)
+        self.assertEqual(index_meta.as_cql_query(),
+                "CREATE CUSTOM INDEX index_name_here ON keyspace_name_here.table_name_here (column_name_here) USING 'class_name_here'")
