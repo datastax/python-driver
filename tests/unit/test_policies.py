@@ -322,6 +322,45 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
         qplan = list(policy.make_query_plan())
         self.assertEqual(qplan, [])
 
+    def test_default_dc(self):
+        host_local = Host(1, SimpleConvictionPolicy, 'local')
+        host_remote = Host(2, SimpleConvictionPolicy, 'remote')
+        host_none = Host(1, SimpleConvictionPolicy)
+
+        # contact point is '1'
+        cluster = Mock(contact_points=[1])
+
+        # contact DC first
+        policy = DCAwareRoundRobinPolicy()
+        policy.populate(cluster, [host_none])
+        self.assertFalse(policy.local_dc)
+        policy.on_add(host_local)
+        policy.on_add(host_remote)
+        self.assertNotEqual(policy.local_dc, host_remote.datacenter)
+        self.assertEqual(policy.local_dc, host_local.datacenter)
+
+        # contact DC second
+        policy = DCAwareRoundRobinPolicy()
+        policy.populate(cluster, [host_none])
+        self.assertFalse(policy.local_dc)
+        policy.on_add(host_remote)
+        policy.on_add(host_local)
+        self.assertNotEqual(policy.local_dc, host_remote.datacenter)
+        self.assertEqual(policy.local_dc, host_local.datacenter)
+
+        # no DC
+        policy = DCAwareRoundRobinPolicy()
+        policy.populate(cluster, [host_none])
+        self.assertFalse(policy.local_dc)
+        policy.on_add(host_none)
+        self.assertFalse(policy.local_dc)
+
+        # only other DC
+        policy = DCAwareRoundRobinPolicy()
+        policy.populate(cluster, [host_none])
+        self.assertFalse(policy.local_dc)
+        policy.on_add(host_remote)
+        self.assertFalse(policy.local_dc)
 
 class TokenAwarePolicyTest(unittest.TestCase):
 
