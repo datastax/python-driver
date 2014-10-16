@@ -91,9 +91,10 @@ class TransactionDescriptor(object):
             return transaction_setter
         qs = model.__queryset__(model)
 
-        def transaction_setter(transaction):
-            qs._transaction = transaction
-            return instance
+        def transaction_setter(**unprepared_transactions):
+            transactions = model.objects.transaction(**unprepared_transactions)._transaction
+            qs._transaction = transactions
+            return qs
         return transaction_setter
 
     def __call__(self, *args, **kwargs):

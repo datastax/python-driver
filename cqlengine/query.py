@@ -413,7 +413,7 @@ class AbstractQuerySet(object):
             try:
                 column = self.model._get_column(col_name)
             except KeyError:
-                if col_name in ['exists', 'not_exists']:
+                if col_name == 'not_exists':
                     exists = True
                 elif col_name == 'pk__token':
                     if not isinstance(val, Token):
@@ -767,7 +767,8 @@ class ModelQuerySet(AbstractQuerySet):
             return
 
         nulled_columns = set()
-        us = UpdateStatement(self.column_family_name, where=self._where, ttl=self._ttl, timestamp=self._timestamp)
+        us = UpdateStatement(self.column_family_name, where=self._where, ttl=self._ttl,
+                             timestamp=self._timestamp, transactions=self._transaction)
         for name, val in values.items():
             col_name, col_op = self._parse_filter_arg(name)
             col = self.model._columns.get(col_name)
@@ -836,12 +837,6 @@ class DMLQuery(object):
             return self._batch.add_query(q)
         else:
             tmp = execute(q, consistency_level=self._consistency)
-            if tmp and tmp[0].get('[applied]', True) is False:
-                tmp[0].pop('[applied]')
-                expected = ', '.join('{0}={1}'.format(t.field, t.value) for t in q.transactions)
-                actual = ', '.join('{0}={1}'.format(f, v) for f, v in tmp[0].items())
-                message = 'Transaction statement failed: Expected: {0}  Actual: {1}'.format(expected, actual)
-                raise TransactionException(message)
             return tmp
 
     def batch(self, batch_obj):

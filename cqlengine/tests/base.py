@@ -2,9 +2,9 @@ from unittest import TestCase
 import os
 import sys
 import six
-from cqlengine.connection import get_session
+from cqlengine import connection
 
-CASSANDRA_VERSION = int(os.environ['CASSANDRA_VERSION'])
+CASSANDRA_VERSION = 20  #int(os.environ['CASSANDRA_VERSION'])
 
 class BaseCassEngTestCase(TestCase):
 
@@ -13,9 +13,11 @@ class BaseCassEngTestCase(TestCase):
     #     super(BaseCassEngTestCase, cls).setUpClass()
     session = None
 
-    def setUp(self):
-        self.session = get_session()
-        super(BaseCassEngTestCase, self).setUp()
+    @classmethod
+    def setUpClass(cls):
+        connection.setup(['192.168.56.103'], 'test')
+        cls.session = connection.get_session()
+        super(BaseCassEngTestCase, cls).setUpClass()
 
     def assertHasAttr(self, obj, attr):
         self.assertTrue(hasattr(obj, attr),
