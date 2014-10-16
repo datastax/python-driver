@@ -79,6 +79,9 @@ class GeventConnection(Connection):
                 self._socket = socket.socket(af, socktype, proto)
                 if self.ssl_options:
                     self._socket = ssl.wrap_socket(self._socket, **self.ssl_options)
+                    self._ssl_socket = True
+                else:
+                    self._ssl_socket = False
                 self._socket.settimeout(1.0)
                 self._socket.connect(sockaddr)
                 sockerr = None
@@ -158,6 +161,13 @@ class GeventConnection(Connection):
             try:
                 buf = self._socket.recv(self.in_buffer_size)
                 self._iobuf.write(buf)
+                if self._ssl_socket:
+                    # We need to drain pending data when dealing with a SSL socket
+                    data_left = self._socket.pending()
+                    while data_left:
+                        buf = self._socket.recv(data_left)
+                        self._iobuf.write(buf)
+                        data_left = self._socket.pending()
             except socket.error as err:
                 if not is_timeout(err):
                     log.debug("Exception during socket recv for %s: %s", self, err)
