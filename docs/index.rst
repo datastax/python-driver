@@ -31,6 +31,7 @@ Contents:
     topics/manage_schemas
     topics/external_resources
     topics/related_projects
+    topics/third_party
     topics/development
     topics/faq
 
