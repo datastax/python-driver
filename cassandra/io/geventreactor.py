@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import gevent
-from gevent import socket, ssl
+from gevent import select, socket, ssl
 from gevent.event import Event
 from gevent.queue import Queue
 
 from collections import defaultdict
+from functools import partial
 import logging
 import os
 
@@ -121,8 +122,17 @@ class GeventConnection(Connection):
         self.close()
 
     def handle_write(self):
+        run_select = partial(select.select, (), (self._socket,), ())
         while True:
-            next_msg = self._write_queue.get()
+            try:
+                next_msg = self._write_queue.get()
+                run_select()
+            except Exception as exc:
+                if not self.is_closed:
+                    log.debug("Exception during write select() for %s: %s", self, exc)
+                    self.defunct(exc)
+                return
+
             try:
                 self._socket.sendall(next_msg)
             except socket.error as err:
@@ -131,7 +141,20 @@ class GeventConnection(Connection):
                 return  # Leave the write loop
 
     def handle_read(self):
+        run_select = partial(select.select, (self._socket,), (), ())
         while True:
+            try:
+                ready_read, _, _ = run_select()
+            except Exception as exc:
+                if not self.is_closed:
+                    log.debug("Exception during read select() for %s: %s", self, exc)
+                    self.defunct(exc)
+                return
+
+            if not ready_read:
+                print 'foo'
+                continue
+
             try:
                 buf = self._socket.recv(self.in_buffer_size)
                 self._iobuf.write(buf)
