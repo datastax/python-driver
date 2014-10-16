@@ -5,12 +5,7 @@ from cqlengine import BaseContainerColumn, Map, columns
 from cqlengine.columns import Counter, List, Set
 
 from cqlengine.connection import execute
-
-<<<<<<< HEAD
-from cqlengine.exceptions import CQLEngineException, ValidationError, LWTException
-=======
-from cqlengine.exceptions import CQLEngineException, ValidationError, TransactionException
->>>>>>> Added a thrown exception when a transaction fails to be applied
+from cqlengine.exceptions import CQLEngineException, ValidationError, TransactionException, LWTException
 from cqlengine.functions import Token, BaseQueryFunction, QueryValue, UnicodeMixin
 
 #CQL 3 reference:
@@ -430,7 +425,7 @@ class AbstractQuerySet(object):
             try:
                 column = self.model._get_column(col_name)
             except KeyError:
-                if col_name in ['exists', 'not_exists']:
+                if col_name == 'not_exists':
                     exists = True
                 elif col_name == 'pk__token':
                     if not isinstance(val, Token):
@@ -784,7 +779,8 @@ class ModelQuerySet(AbstractQuerySet):
             return
 
         nulled_columns = set()
-        us = UpdateStatement(self.column_family_name, where=self._where, ttl=self._ttl, timestamp=self._timestamp)
+        us = UpdateStatement(self.column_family_name, where=self._where, ttl=self._ttl,
+                             timestamp=self._timestamp, transactions=self._transaction)
         for name, val in values.items():
             col_name, col_op = self._parse_filter_arg(name)
             col = self.model._columns.get(col_name)
@@ -855,6 +851,7 @@ class DMLQuery(object):
             return self._batch.add_query(q)
         else:
             tmp = execute(q, consistency_level=self._consistency)
+<<<<<<< HEAD
             if self._if_not_exists:
                 check_applied(tmp)
             if self._transaction and tmp[0].get('[applied]', True) is False:
@@ -863,6 +860,8 @@ class DMLQuery(object):
                 actual = ', '.join('{0}={1}'.format(f, v) for f, v in tmp[0].items())
                 message = 'Transaction statement failed: Expected: {0}  Actual: {1}'.format(expected, actual)
                 raise TransactionException(message)
+=======
+>>>>>>> Small fixes and tests added
             return tmp
 
     def batch(self, batch_obj):

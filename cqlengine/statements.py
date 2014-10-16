@@ -143,8 +143,6 @@ class TransactionClause(BaseClause):
     """ A single variable transaction statement """
 
     def __unicode__(self):
-        if self.field == 'exists':
-            return u'EXISTS'
         if self.field == 'not_exists':
             return u'NOT EXISTS'
         return u'"{}" = %({})s'.format(self.field, self.context_id)
@@ -153,9 +151,7 @@ class TransactionClause(BaseClause):
         return self.field, self.context_id
 
     def update_context(self, ctx):
-        if self.field not in ['exists', 'not_exists']:
-            return super(TransactionClause, self).update_context(ctx)
-        return ctx
+        return super(TransactionClause, self).update_context(ctx)
 
 
 class ContainerUpdateClause(AssignmentClause):
