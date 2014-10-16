@@ -147,16 +147,12 @@ class GeventConnection(Connection):
         run_select = partial(select.select, (self._socket,), (), ())
         while True:
             try:
-                ready_read, _, _ = run_select()
+                run_select()
             except Exception as exc:
                 if not self.is_closed:
                     log.debug("Exception during read select() for %s: %s", self, exc)
                     self.defunct(exc)
                 return
-
-            if not ready_read:
-                print 'foo'
-                continue
 
             try:
                 buf = self._socket.recv(self.in_buffer_size)
