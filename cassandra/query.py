@@ -102,7 +102,7 @@ def named_tuple_factory(colnames, rows):
     clean_column_names = map(_clean_column_name, colnames)
     try:
         Row = namedtuple('Row', clean_column_names)
-    except:
+    except Exception:
         log.warn("Failed creating named tuple for results with column names %s (cleaned: %s) (see Python 'namedtuple' documentation for details on name rules). "
                  "Results will be returned with positional names. "
                  "Avoid this by choosing different names, using SELECT \"<col name>\" AS aliases, "
