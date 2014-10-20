@@ -89,7 +89,7 @@ def setup(
 def execute(query, params=None, consistency_level=None):
 
     handle_lazy_connect()
-    statement = query
+
     if not session:
         raise CQLEngineException("It is required to setup() cqlengine before executing queries")
 

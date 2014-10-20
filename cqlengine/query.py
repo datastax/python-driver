@@ -25,7 +25,7 @@ import six
 def check_applied(result):
     """
     check if result contains some column '[applied]' with false value,
-    if that value is false, it means our light-weight iff didn't
+    if that value is false, it means our light-weight transaction didn't
     applied to database.
     """
     if result and '[applied]' in result[0] and result[0]['[applied]'] == False:
@@ -92,7 +92,7 @@ class BatchQuery(object):
         :param batch_type: (optional) One of batch type values available through BatchType enum
         :type batch_type: str or None
         :param timestamp: (optional) A datetime or timedelta object with desired timestamp to be applied
-            to the batch iff.
+            to the batch transaction.
         :type timestamp: datetime or timedelta or None
         :param consistency: (optional) One of consistency values ("ANY", "ONE", "QUORUM" etc)
         :type consistency: str or None
