@@ -851,7 +851,6 @@ class DMLQuery(object):
             return self._batch.add_query(q)
         else:
             tmp = execute(q, consistency_level=self._consistency)
-<<<<<<< HEAD
             if self._if_not_exists:
                 check_applied(tmp)
             if self._transaction and tmp[0].get('[applied]', True) is False:
@@ -860,8 +859,6 @@ class DMLQuery(object):
                 actual = ', '.join('{0}={1}'.format(f, v) for f, v in tmp[0].items())
                 message = 'Transaction statement failed: Expected: {0}  Actual: {1}'.format(expected, actual)
                 raise TransactionException(message)
-=======
->>>>>>> Small fixes and tests added
             return tmp
 
     def batch(self, batch_obj):
@@ -972,7 +969,6 @@ class DMLQuery(object):
             return self.update()
         else:
             insert = InsertStatement(self.column_family_name, ttl=self._ttl, timestamp=self._timestamp, if_not_exists=self._if_not_exists, transactions=self._transaction)
-
             for name, col in self.instance._columns.items():
                 val = getattr(self.instance, name, None)
                 if col._val_is_null(val):
