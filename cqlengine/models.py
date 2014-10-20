@@ -266,7 +266,7 @@ class BaseModel(object):
     objects = QuerySetDescriptor()
     ttl = TTLDescriptor()
     consistency = ConsistencyDescriptor()
-    transaction = TransactionDescriptor()
+    iff = TransactionDescriptor()
 
     # custom timestamps, see USING TIMESTAMP X
     timestamp = TimestampDescriptor()

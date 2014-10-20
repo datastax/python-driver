@@ -3,8 +3,11 @@ import os
 import sys
 import six
 from cqlengine.connection import get_session
+from cqlengine import connection
 
-CASSANDRA_VERSION = int(os.environ['CASSANDRA_VERSION'])
+CASSANDRA_VERSION = 20  #int(os.environ['CASSANDRA_VERSION'])
+
+connection.setup(['192.168.56.103'], 'cqlengine_test')
 
 class BaseCassEngTestCase(TestCase):
 

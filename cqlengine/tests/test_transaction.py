@@ -2,7 +2,7 @@ __author__ = 'Tim Martin'
 from cqlengine.management import sync_table, drop_table
 from cqlengine.tests.base import BaseCassEngTestCase
 from cqlengine.models import Model
-from cqlengine.exceptions import TransactionException
+from cqlengine.exceptions import LWTException
 from uuid import uuid4
 from cqlengine import columns
 import mock
@@ -41,7 +41,7 @@ class TestTransaction(BaseCassEngTestCase):
         t = TestTransactionModel.create(text='blah blah')
         t.text = 'new blah'
         t = t.iff(text='something wrong')
-        self.assertRaises(TransactionException, t.save)
+        self.assertRaises(LWTException, t.save)
 
     def test_blind_update(self):
         t = TestTransactionModel.create(text='blah blah')
@@ -59,4 +59,4 @@ class TestTransaction(BaseCassEngTestCase):
         t.text = 'something else'
         uid = t.id
         qs = TestTransactionModel.objects(id=uid).iff(text='Not dis!')
-        self.assertRaises(TransactionException, qs.update, text='this will never work')
+        self.assertRaises(LWTException, qs.update, text='this will never work')

@@ -5,7 +5,7 @@
 from collections import namedtuple
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.query import SimpleStatement, Statement
-from cqlengine.exceptions import TransactionException
+from cqlengine.exceptions import LWTException
 import six
 
 try:
@@ -112,12 +112,6 @@ def execute(query, params=None, consistency_level=None):
     params = params or {}
     result = session.execute(query, params)
 
-    if result and result[0].get('[applied]', True) is False:
-        result[0].pop('[applied]')
-        expected = ', '.join('{0}={1}'.format(t.field, t.value) for t in statement.transactions)
-        actual = ', '.join('{0}={1}'.format(f, v) for f, v in result[0].items())
-        message = 'Transaction statement failed: Expected: {0}  Actual: {1}'.format(expected, actual)
-        raise TransactionException(message)
     return result
 
 def get_session():

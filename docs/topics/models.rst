@@ -207,6 +207,14 @@ Model Methods
 
         This method is supported on Cassandra 2.0 or later.
 
+    .. method:: iff(**values)
+
+        Checks to ensure that the values specified are correct on the Cassandra cluster.
+        Simply specify the column(s) and the expected value(s).  As with if_not_exists,
+        this incurs a performance cost.
+
+        If the insertion isn't applied, a LWTException is raised
+
     .. method:: update(**values)
 
         Performs an update on the model instance. You can pass in values to set on the model

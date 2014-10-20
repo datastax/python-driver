@@ -5,7 +5,7 @@ from cqlengine import BaseContainerColumn, Map, columns
 from cqlengine.columns import Counter, List, Set
 
 from cqlengine.connection import execute
-from cqlengine.exceptions import CQLEngineException, ValidationError, TransactionException, LWTException
+from cqlengine.exceptions import CQLEngineException, ValidationError, LWTException
 from cqlengine.functions import Token, BaseQueryFunction, QueryValue, UnicodeMixin
 
 #CQL 3 reference:
@@ -849,14 +849,8 @@ class DMLQuery(object):
             return self._batch.add_query(q)
         else:
             tmp = execute(q, consistency_level=self._consistency)
-            if self._if_not_exists:
+            if self._if_not_exists or self._transaction:
                 check_applied(tmp)
-            if self._transaction and tmp[0].get('[applied]', True) is False:
-                tmp[0].pop('[applied]')
-                expected = ', '.join('{0}={1}'.format(t.field, t.value) for t in q.transactions)
-                actual = ', '.join('{0}={1}'.format(f, v) for f, v in tmp[0].items())
-                message = 'Transaction statement failed: Expected: {0}  Actual: {1}'.format(expected, actual)
-                raise TransactionException(message)
             return tmp
 
     def batch(self, batch_obj):
@@ -966,7 +960,7 @@ class DMLQuery(object):
         if self.instance._has_counter or self.instance._can_update():
             return self.update()
         else:
-            insert = InsertStatement(self.column_family_name, ttl=self._ttl, timestamp=self._timestamp, if_not_exists=self._if_not_exists, transactions=self._transaction)
+            insert = InsertStatement(self.column_family_name, ttl=self._ttl, timestamp=self._timestamp, if_not_exists=self._if_not_exists)
             for name, col in self.instance._columns.items():
                 val = getattr(self.instance, name, None)
                 if col._val_is_null(val):
