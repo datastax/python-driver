@@ -215,6 +215,13 @@ Model Methods
 
         If the insertion isn't applied, a LWTException is raised
 
+        .. code-block::
+            t = TestTransactionModel(text='some text', count=5)
+            try:
+                 t.iff(count=5).update('other text')
+            except LWTException as e:
+                # handle failure
+
     .. method:: update(**values)
 
         Performs an update on the model instance. You can pass in values to set on the model
