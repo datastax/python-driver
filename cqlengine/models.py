@@ -84,7 +84,7 @@ class TransactionDescriptor(object):
                 if len(prepared_transaction) > 0:
                     transactions = prepared_transaction[0]
                 else:
-                    transactions = instance.objects.transaction(**unprepared_transactions)._transaction
+                    transactions = instance.objects.iff(**unprepared_transactions)._transaction
                 instance._transaction = transactions
                 return instance
 
@@ -92,7 +92,7 @@ class TransactionDescriptor(object):
         qs = model.__queryset__(model)
 
         def transaction_setter(**unprepared_transactions):
-            transactions = model.objects.transaction(**unprepared_transactions)._transaction
+            transactions = model.objects.iff(**unprepared_transactions)._transaction
             qs._transaction = transactions
             return qs
         return transaction_setter

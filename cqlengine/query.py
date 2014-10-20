@@ -25,7 +25,7 @@ import six
 def check_applied(result):
     """
     check if result contains some column '[applied]' with false value,
-    if that value is false, it means our light-weight transaction didn't
+    if that value is false, it means our light-weight iff didn't
     applied to database.
     """
     if result and '[applied]' in result[0] and result[0]['[applied]'] == False:
@@ -92,7 +92,7 @@ class BatchQuery(object):
         :param batch_type: (optional) One of batch type values available through BatchType enum
         :type batch_type: str or None
         :param timestamp: (optional) A datetime or timedelta object with desired timestamp to be applied
-            to the batch transaction.
+            to the batch iff.
         :type timestamp: datetime or timedelta or None
         :param consistency: (optional) One of consistency values ("ANY", "ONE", "QUORUM" etc)
         :type consistency: str or None
@@ -409,10 +409,10 @@ class AbstractQuerySet(object):
         else:
             raise QueryException("Can't parse '{}'".format(arg))
 
-    def transaction(self, *args, **kwargs):
+    def iff(self, *args, **kwargs):
         """Adds IF statements to queryset"""
         if len([x for x in kwargs.values() if x is None]):
-            raise CQLEngineException("None values on transaction are not allowed")
+            raise CQLEngineException("None values on iff are not allowed")
 
         clone = copy.deepcopy(self)
         for operator in args:
@@ -425,9 +425,7 @@ class AbstractQuerySet(object):
             try:
                 column = self.model._get_column(col_name)
             except KeyError:
-                if col_name == 'not_exists':
-                    exists = True
-                elif col_name == 'pk__token':
+                if col_name == 'pk__token':
                     if not isinstance(val, Token):
                         raise QueryException("Virtual column 'pk__token' may only be compared to Token() values")
                     column = columns._PartitionKeysToken(self.model)

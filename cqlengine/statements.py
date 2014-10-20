@@ -140,7 +140,7 @@ class AssignmentClause(BaseClause):
 
 
 class TransactionClause(BaseClause):
-    """ A single variable transaction statement """
+    """ A single variable iff statement """
 
     def __unicode__(self):
         return u'"{}" = %({})s'.format(self.field, self.context_id)
@@ -694,7 +694,7 @@ class UpdateStatement(AssignmentStatement):
                                                ttl=ttl,
                                                timestamp=timestamp)
 
-        # Add transaction statements
+        # Add iff statements
         self.transactions = []
         for transaction in transactions or []:
             self.add_transaction_clause(transaction)
@@ -726,9 +726,9 @@ class UpdateStatement(AssignmentStatement):
 
     def add_transaction_clause(self, clause):
         """
-        Adds a transaction clause to this statement
+        Adds a iff clause to this statement
 
-        :param clause: The clause that will be added to the transaction statement
+        :param clause: The clause that will be added to the iff statement
         :type clause: TransactionClause
         """
         if not isinstance(clause, TransactionClause):

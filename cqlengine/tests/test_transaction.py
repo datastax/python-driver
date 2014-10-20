@@ -28,22 +28,11 @@ class TestTransaction(BaseCassEngTestCase):
         super(TestTransaction, cls).tearDownClass()
         drop_table(TestTransactionModel)
 
-    def test_create_uses_transaction(self):
-        qs = TestTransactionModel.transaction(not_exists=True)
-        with mock.patch.object(self.session, 'execute') as m:
-            qs.create(text='blah blah', count=2)
-        args = m.call_args
-        self.assertIn('IF NOT EXISTS', args[0][0].query_string)
-
-    def test_queryset_returned_on_create(self):
-        qs = TestTransactionModel.transaction(not_exists=True)
-        self.assertTrue(isinstance(qs, TestTransactionModel.__queryset__), type(qs))
-
     def test_update_using_transaction(self):
         t = TestTransactionModel.create(text='blah blah')
         t.text = 'new blah'
         with mock.patch.object(self.session, 'execute') as m:
-            t.transaction(text='blah blah').save()
+            t.iff(text='blah blah').save()
 
         args = m.call_args
         self.assertIn('IF "text" = %(0)s', args[0][0].query_string)
@@ -51,13 +40,8 @@ class TestTransaction(BaseCassEngTestCase):
     def test_update_failure(self):
         t = TestTransactionModel.create(text='blah blah')
         t.text = 'new blah'
-        t = t.transaction(text='something wrong')
+        t = t.iff(text='something wrong')
         self.assertRaises(TransactionException, t.save)
-
-    def test_creation_failure(self):
-        t = TestTransactionModel.create(text='blah blah')
-        t_clone = TestTransactionModel.transaction(not_exists=True)
-        self.assertRaises(TransactionException, t_clone.create, id=t.id, count=t.count, text=t.text)
 
     def test_blind_update(self):
         t = TestTransactionModel.create(text='blah blah')
@@ -65,7 +49,7 @@ class TestTransaction(BaseCassEngTestCase):
         uid = t.id
 
         with mock.patch.object(self.session, 'execute') as m:
-            TestTransactionModel.objects(id=uid).transaction(text='blah blah').update(text='oh hey der')
+            TestTransactionModel.objects(id=uid).iff(text='blah blah').update(text='oh hey der')
 
         args = m.call_args
         self.assertIn('IF "text" = %(1)s', args[0][0].query_string)
@@ -74,5 +58,5 @@ class TestTransaction(BaseCassEngTestCase):
         t = TestTransactionModel.create(text='blah blah')
         t.text = 'something else'
         uid = t.id
-        qs = TestTransactionModel.objects(id=uid).transaction(text='Not dis!')
+        qs = TestTransactionModel.objects(id=uid).iff(text='Not dis!')
         self.assertRaises(TransactionException, qs.update, text='this will never work')
