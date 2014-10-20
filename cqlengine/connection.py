@@ -5,7 +5,6 @@
 from collections import namedtuple
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.query import SimpleStatement, Statement
-from cqlengine.exceptions import LWTException
 import six
 
 try:
