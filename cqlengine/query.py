@@ -245,6 +245,8 @@ class AbstractQuerySet(object):
             return self._batch.add_query(q)
         else:
             result = execute(q, consistency_level=self._consistency)
+            if self._transaction:
+                check_applied(result)
             return result
 
     def __unicode__(self):

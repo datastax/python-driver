@@ -148,9 +148,6 @@ class TransactionClause(BaseClause):
     def insert_tuple(self):
         return self.field, self.context_id
 
-    def update_context(self, ctx):
-        return super(TransactionClause, self).update_context(ctx)
-
 
 class ContainerUpdateClause(AssignmentClause):
 
@@ -745,6 +742,12 @@ class UpdateStatement(AssignmentStatement):
 
     def _get_transactions(self):
         return 'IF {}'.format(' AND '.join([six.text_type(c) for c in self.transactions]))
+
+    def update_context_id(self, i):
+        super(UpdateStatement, self).update_context_id(i)
+        for transaction in self.transactions:
+            transaction.set_context_id(self.context_counter)
+            self.context_counter += transaction.get_context_size()
 
 
 class DeleteStatement(BaseCQLStatement):
