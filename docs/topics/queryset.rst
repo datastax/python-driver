@@ -613,10 +613,10 @@ None means no timeout.
 
         Row.objects().timeout(5).all()
 
-    Save a single row with a 50ms timeout
+    Create a single row with a 50ms timeout
     .. code-block:: python
 
-        Row(id=1, name='Jon').timeout(0.05).save()
+        Row(id=1, name='Jon').timeout(0.05).create()
 
     Delete a single row with no timeout
     .. code-block:: python
@@ -632,7 +632,7 @@ None means no timeout.
     .. code-block:: python
 
         with BatchQuery(timeout=10) as b:
-            Row(id=1, name='Jon').save()
+            Row(id=1, name='Jon').create()
 
 
     NOTE: You cannot set both timeout and batch at the same time, batch will use the timeout defined in it's constructor.
