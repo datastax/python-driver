@@ -457,7 +457,11 @@ class Boolean(Column):
     def validate(self, value):
         """ Always returns a Python boolean. """
         value = super(Boolean, self).validate(value)
-        return bool(value)
+
+        if value is not None:
+            value = bool(value)
+
+        return value
 
     def to_python(self, value):
         return self.validate(value)
