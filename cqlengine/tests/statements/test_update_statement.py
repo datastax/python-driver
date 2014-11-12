@@ -49,10 +49,15 @@ class UpdateStatementTests(TestCase):
         us.add_assignment_clause(SetUpdateClause('a', Set.Quoter({1}), operation='add'))
         self.assertEqual(six.text_type(us), 'UPDATE table SET "a" = "a" + %(0)s')
 
-    def test_update_set_add_does_not_assign(self):
+    def test_update_empty_set_add_does_not_assign(self):
         us = UpdateStatement('table')
         us.add_assignment_clause(SetUpdateClause('a', Set.Quoter(set()), operation='add'))
         self.assertEqual(six.text_type(us), 'UPDATE table SET "a" = "a" + %(0)s')
+
+    def test_update_empty_set_removal_does_not_assign(self):
+        us = UpdateStatement('table')
+        us.add_assignment_clause(SetUpdateClause('a', Set.Quoter(set()), operation='remove'))
+        self.assertEqual(six.text_type(us), 'UPDATE table SET "a" = "a" - %(0)s')
 
     def test_update_list_prepend_with_empty_list(self):
         us = UpdateStatement('table')
