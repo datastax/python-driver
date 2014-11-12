@@ -1,6 +1,7 @@
 from unittest import TestCase
-from cqlengine.statements import UpdateStatement, WhereClause, AssignmentClause
+from cqlengine.columns import Set
 from cqlengine.operators import *
+from cqlengine.statements import UpdateStatement, WhereClause, AssignmentClause, SetUpdateClause
 import six
 
 class UpdateStatementTests(TestCase):
@@ -40,3 +41,12 @@ class UpdateStatementTests(TestCase):
         us.add_where_clause(WhereClause('a', EqualsOperator(), 'x'))
         self.assertIn('USING TTL 60', six.text_type(us))
 
+    def test_update_set_add(self):
+        us = UpdateStatement('table')
+        us.add_assignment_clause(SetUpdateClause('a', Set.Quoter({1}), operation='add'))
+        self.assertEqual(six.text_type(us), 'UPDATE table SET "a" = "a" + %(0)s')
+
+    def test_update_set_add_does_not_assign(self):
+        us = UpdateStatement('table')
+        us.add_assignment_clause(SetUpdateClause('a', Set.Quoter(set()), operation='add'))
+        self.assertEqual(six.text_type(us), 'UPDATE table SET "a" = "a" + %(0)s')
