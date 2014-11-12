@@ -30,8 +30,6 @@ from cqlengine.columns import Inet
 from cqlengine.management import sync_table, drop_table
 from cqlengine.models import Model
 
-import sys
-
 
 class TestDatetime(BaseCassEngTestCase):
     class DatetimeTest(Model):
