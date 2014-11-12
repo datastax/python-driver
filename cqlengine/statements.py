@@ -248,11 +248,11 @@ class ListUpdateClause(ContainerUpdateClause):
             qs += ['"{}" = %({})s'.format(self.field, ctx_id)]
             ctx_id += 1
 
-        if self._prepend:
+        if self._prepend is not None:
             qs += ['"{0}" = %({1})s + "{0}"'.format(self.field, ctx_id)]
             ctx_id += 1
 
-        if self._append:
+        if self._append is not None:
             qs += ['"{0}" = "{0}" + %({1})s'.format(self.field, ctx_id)]
 
         return ', '.join(qs)
@@ -267,13 +267,13 @@ class ListUpdateClause(ContainerUpdateClause):
         if self._assignments is not None:
             ctx[str(ctx_id)] = self._to_database(self._assignments)
             ctx_id += 1
-        if self._prepend:
+        if self._prepend is not None:
             # CQL seems to prepend element at a time, starting
             # with the element at idx 0, we can either reverse
             # it here, or have it inserted in reverse
             ctx[str(ctx_id)] = self._to_database(list(reversed(self._prepend)))
             ctx_id += 1
-        if self._append:
+        if self._append is not None:
             ctx[str(ctx_id)] = self._to_database(self._append)
 
     def _analyze(self):
