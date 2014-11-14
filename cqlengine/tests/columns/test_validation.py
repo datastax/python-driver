@@ -99,7 +99,22 @@ class TestBoolDefault(BaseCassEngTestCase):
         tmp2 = self.BoolDefaultValueTest.get(test_id=1)
         self.assertEqual(True, tmp2.stuff)
 
+class TestBoolValidation(BaseCassEngTestCase):
+    class BoolValidationTest(Model):
+        __keyspace__ = 'test'
+        test_id = Integer(primary_key=True)
+        bool_column = Boolean()
 
+    @classmethod
+    def setUpClass(cls):
+        super(TestBoolValidation, cls).setUpClass()
+        sync_table(cls.BoolValidationTest)
+
+    def test_validation_preserves_none(self):
+        test_obj = self.BoolValidationTest(test_id=1)
+
+        test_obj.validate()
+        self.assertIsNone(test_obj.bool_column)
 
 class TestVarInt(BaseCassEngTestCase):
     class VarIntTest(Model):
