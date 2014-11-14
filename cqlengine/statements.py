@@ -173,15 +173,18 @@ class SetUpdateClause(ContainerUpdateClause):
     def __unicode__(self):
         qs = []
         ctx_id = self.context_id
-        if self.previous is None and not (self._assignments or self._additions or self._removals):
+        if (self.previous is None and
+                self._assignments is None and
+                self._additions is None and
+                self._removals is None):
             qs += ['"{}" = %({})s'.format(self.field, ctx_id)]
-        if self._assignments:
+        if self._assignments is not None:
             qs += ['"{}" = %({})s'.format(self.field, ctx_id)]
             ctx_id += 1
-        if self._additions:
+        if self._additions is not None:
             qs += ['"{0}" = "{0}" + %({1})s'.format(self.field, ctx_id)]
             ctx_id += 1
-        if self._removals:
+        if self._removals is not None:
             qs += ['"{0}" = "{0}" - %({1})s'.format(self.field, ctx_id)]
 
         return ', '.join(qs)
@@ -204,22 +207,28 @@ class SetUpdateClause(ContainerUpdateClause):
 
     def get_context_size(self):
         if not self._analyzed: self._analyze()
-        if self.previous is None and not (self._assignments or self._additions or self._removals):
+        if (self.previous is None and
+                self._assignments is None and
+                self._additions is None and
+                self._removals is None):
             return 1
         return int(bool(self._assignments)) + int(bool(self._additions)) + int(bool(self._removals))
 
     def update_context(self, ctx):
         if not self._analyzed: self._analyze()
         ctx_id = self.context_id
-        if self.previous is None and not (self._assignments or self._additions or self._removals):
+        if (self.previous is None and
+                self._assignments is None and
+                self._additions is None and
+                self._removals is None):
             ctx[str(ctx_id)] = self._to_database({})
-        if self._assignments:
+        if self._assignments is not None:
             ctx[str(ctx_id)] = self._to_database(self._assignments)
             ctx_id += 1
-        if self._additions:
+        if self._additions is not None:
             ctx[str(ctx_id)] = self._to_database(self._additions)
             ctx_id += 1
-        if self._removals:
+        if self._removals is not None:
             ctx[str(ctx_id)] = self._to_database(self._removals)
 
 
@@ -239,11 +248,11 @@ class ListUpdateClause(ContainerUpdateClause):
             qs += ['"{}" = %({})s'.format(self.field, ctx_id)]
             ctx_id += 1
 
-        if self._prepend:
+        if self._prepend is not None:
             qs += ['"{0}" = %({1})s + "{0}"'.format(self.field, ctx_id)]
             ctx_id += 1
 
-        if self._append:
+        if self._append is not None:
             qs += ['"{0}" = "{0}" + %({1})s'.format(self.field, ctx_id)]
 
         return ', '.join(qs)
@@ -258,13 +267,13 @@ class ListUpdateClause(ContainerUpdateClause):
         if self._assignments is not None:
             ctx[str(ctx_id)] = self._to_database(self._assignments)
             ctx_id += 1
-        if self._prepend:
+        if self._prepend is not None:
             # CQL seems to prepend element at a time, starting
             # with the element at idx 0, we can either reverse
             # it here, or have it inserted in reverse
             ctx[str(ctx_id)] = self._to_database(list(reversed(self._prepend)))
             ctx_id += 1
-        if self._append:
+        if self._append is not None:
             ctx[str(ctx_id)] = self._to_database(self._append)
 
     def _analyze(self):

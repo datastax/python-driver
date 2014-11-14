@@ -1,7 +1,11 @@
 from unittest import TestCase
-from cqlengine.statements import UpdateStatement, WhereClause, AssignmentClause
+from cqlengine.columns import Set, List
 from cqlengine.operators import *
+from cqlengine.statements import (UpdateStatement, WhereClause,
+                                  AssignmentClause, SetUpdateClause,
+                                  ListUpdateClause)
 import six
+
 
 class UpdateStatementTests(TestCase):
 
@@ -40,3 +44,27 @@ class UpdateStatementTests(TestCase):
         us.add_where_clause(WhereClause('a', EqualsOperator(), 'x'))
         self.assertIn('USING TTL 60', six.text_type(us))
 
+    def test_update_set_add(self):
+        us = UpdateStatement('table')
+        us.add_assignment_clause(SetUpdateClause('a', Set.Quoter({1}), operation='add'))
+        self.assertEqual(six.text_type(us), 'UPDATE table SET "a" = "a" + %(0)s')
+
+    def test_update_empty_set_add_does_not_assign(self):
+        us = UpdateStatement('table')
+        us.add_assignment_clause(SetUpdateClause('a', Set.Quoter(set()), operation='add'))
+        self.assertEqual(six.text_type(us), 'UPDATE table SET "a" = "a" + %(0)s')
+
+    def test_update_empty_set_removal_does_not_assign(self):
+        us = UpdateStatement('table')
+        us.add_assignment_clause(SetUpdateClause('a', Set.Quoter(set()), operation='remove'))
+        self.assertEqual(six.text_type(us), 'UPDATE table SET "a" = "a" - %(0)s')
+
+    def test_update_list_prepend_with_empty_list(self):
+        us = UpdateStatement('table')
+        us.add_assignment_clause(ListUpdateClause('a', List.Quoter([]), operation='prepend'))
+        self.assertEqual(six.text_type(us), 'UPDATE table SET "a" = %(0)s + "a"')
+
+    def test_update_list_append_with_empty_list(self):
+        us = UpdateStatement('table')
+        us.add_assignment_clause(ListUpdateClause('a', List.Quoter([]), operation='append'))
+        self.assertEqual(six.text_type(us), 'UPDATE table SET "a" = "a" + %(0)s')
