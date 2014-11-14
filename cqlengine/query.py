@@ -5,7 +5,6 @@ from cqlengine import BaseContainerColumn, Map, columns
 from cqlengine.columns import Counter, List, Set
 
 from cqlengine.connection import execute
-
 from cqlengine.exceptions import CQLEngineException, ValidationError, LWTException
 from cqlengine.functions import Token, BaseQueryFunction, QueryValue, UnicodeMixin
 
@@ -13,7 +12,7 @@ from cqlengine.functions import Token, BaseQueryFunction, QueryValue, UnicodeMix
 #http://www.datastax.com/docs/1.1/references/cql/index
 from cqlengine.operators import InOperator, EqualsOperator, GreaterThanOperator, GreaterThanOrEqualOperator
 from cqlengine.operators import LessThanOperator, LessThanOrEqualOperator, BaseWhereOperator
-from cqlengine.statements import WhereClause, SelectStatement, DeleteStatement, UpdateStatement, AssignmentClause, InsertStatement, BaseCQLStatement, MapUpdateClause, MapDeleteClause, ListUpdateClause, SetUpdateClause, CounterUpdateClause
+from cqlengine.statements import WhereClause, SelectStatement, DeleteStatement, UpdateStatement, AssignmentClause, InsertStatement, BaseCQLStatement, MapUpdateClause, MapDeleteClause, ListUpdateClause, SetUpdateClause, CounterUpdateClause, TransactionClause
 
 
 class QueryException(CQLEngineException): pass
@@ -206,6 +205,9 @@ class AbstractQuerySet(object):
         #Where clause filters
         self._where = []
 
+        # Transaction clause filters
+        self._transaction = []
+
         #ordering arguments
         self._order = []
 
@@ -243,6 +245,8 @@ class AbstractQuerySet(object):
             return self._batch.add_query(q)
         else:
             result = execute(q, consistency_level=self._consistency)
+            if self._transaction:
+                check_applied(result)
             return result
 
     def __unicode__(self):
@@ -406,6 +410,49 @@ class AbstractQuerySet(object):
             return statement[0], statement[1]
         else:
             raise QueryException("Can't parse '{}'".format(arg))
+
+    def iff(self, *args, **kwargs):
+        """Adds IF statements to queryset"""
+        if len([x for x in kwargs.values() if x is None]):
+            raise CQLEngineException("None values on iff are not allowed")
+
+        clone = copy.deepcopy(self)
+        for operator in args:
+            if not isinstance(operator, TransactionClause):
+                raise QueryException('{} is not a valid query operator'.format(operator))
+            clone._transaction.append(operator)
+
+        for col_name, val in kwargs.items():
+            exists = False
+            try:
+                column = self.model._get_column(col_name)
+            except KeyError:
+                if col_name == 'pk__token':
+                    if not isinstance(val, Token):
+                        raise QueryException("Virtual column 'pk__token' may only be compared to Token() values")
+                    column = columns._PartitionKeysToken(self.model)
+                    quote_field = False
+                else:
+                    raise QueryException("Can't resolve column name: '{}'".format(col_name))
+
+            if isinstance(val, Token):
+                if col_name != 'pk__token':
+                    raise QueryException("Token() values may only be compared to the 'pk__token' virtual column")
+                partition_columns = column.partition_columns
+                if len(partition_columns) != len(val.value):
+                    raise QueryException(
+                        'Token() received {} arguments but model has {} partition keys'.format(
+                            len(val.value), len(partition_columns)))
+                val.set_columns(partition_columns)
+
+            if isinstance(val, BaseQueryFunction) or exists is True:
+                query_val = val
+            else:
+                query_val = column.to_database(val)
+
+            clone._transaction.append(TransactionClause(col_name, query_val))
+
+        return clone
 
     def filter(self, *args, **kwargs):
         """
@@ -732,7 +779,8 @@ class ModelQuerySet(AbstractQuerySet):
             return
 
         nulled_columns = set()
-        us = UpdateStatement(self.column_family_name, where=self._where, ttl=self._ttl, timestamp=self._timestamp)
+        us = UpdateStatement(self.column_family_name, where=self._where, ttl=self._ttl,
+                             timestamp=self._timestamp, transactions=self._transaction)
         for name, val in values.items():
             col_name, col_op = self._parse_filter_arg(name)
             col = self.model._columns.get(col_name)
@@ -787,7 +835,7 @@ class DMLQuery(object):
     _timestamp = None
     _if_not_exists = False
 
-    def __init__(self, model, instance=None, batch=None, ttl=None, consistency=None, timestamp=None, if_not_exists=False):
+    def __init__(self, model, instance=None, batch=None, ttl=None, consistency=None, timestamp=None, if_not_exists=False, transaction=None):
         self.model = model
         self.column_family_name = self.model.column_family_name()
         self.instance = instance
@@ -796,15 +844,15 @@ class DMLQuery(object):
         self._consistency = consistency
         self._timestamp = timestamp
         self._if_not_exists = if_not_exists
+        self._transaction = transaction
 
     def _execute(self, q):
         if self._batch:
             return self._batch.add_query(q)
         else:
             tmp = execute(q, consistency_level=self._consistency)
-            if self._if_not_exists:
+            if self._if_not_exists or self._transaction:
                 check_applied(tmp)
- 
             return tmp
 
     def batch(self, batch_obj):
@@ -850,7 +898,8 @@ class DMLQuery(object):
             raise CQLEngineException("DML Query intance attribute is None")
         assert type(self.instance) == self.model
         static_update_only = True
-        statement = UpdateStatement(self.column_family_name, ttl=self._ttl, timestamp=self._timestamp)
+        statement = UpdateStatement(self.column_family_name, ttl=self._ttl,
+                                    timestamp=self._timestamp, transactions=self._transaction)
         #get defined fields and their column names
         for name, col in self.model._columns.items():
             if not col.is_primary_key:

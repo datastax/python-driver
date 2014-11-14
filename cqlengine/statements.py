@@ -139,6 +139,16 @@ class AssignmentClause(BaseClause):
         return self.field, self.context_id
 
 
+class TransactionClause(BaseClause):
+    """ A single variable iff statement """
+
+    def __unicode__(self):
+        return u'"{}" = %({})s'.format(self.field, self.context_id)
+
+    def insert_tuple(self):
+        return self.field, self.context_id
+
+
 class ContainerUpdateClause(AssignmentClause):
 
     def __init__(self, field, value, operation=None, previous=None, column=None):
@@ -675,6 +685,26 @@ class InsertStatement(AssignmentStatement):
 class UpdateStatement(AssignmentStatement):
     """ an cql update select statement """
 
+    def __init__(self,
+                 table,
+                 assignments=None,
+                 consistency=None,
+                 where=None,
+                 ttl=None,
+                 timestamp=None,
+                 transactions=None):
+        super(UpdateStatement, self). __init__(table,
+                                               assignments=assignments,
+                                               consistency=consistency,
+                                               where=where,
+                                               ttl=ttl,
+                                               timestamp=timestamp)
+
+        # Add iff statements
+        self.transactions = []
+        for transaction in transactions or []:
+            self.add_transaction_clause(transaction)
+
     def __unicode__(self):
         qs = ['UPDATE', self.table]
 
@@ -695,7 +725,38 @@ class UpdateStatement(AssignmentStatement):
         if self.where_clauses:
             qs += [self._where]
 
+        if len(self.transactions) > 0:
+            qs += [self._get_transactions()]
+
         return ' '.join(qs)
+
+    def add_transaction_clause(self, clause):
+        """
+        Adds a iff clause to this statement
+
+        :param clause: The clause that will be added to the iff statement
+        :type clause: TransactionClause
+        """
+        if not isinstance(clause, TransactionClause):
+            raise StatementException('only instances of AssignmentClause can be added to statements')
+        clause.set_context_id(self.context_counter)
+        self.context_counter += clause.get_context_size()
+        self.transactions.append(clause)
+
+    def get_context(self):
+        ctx = super(UpdateStatement, self).get_context()
+        for clause in self.transactions or []:
+            clause.update_context(ctx)
+        return ctx
+
+    def _get_transactions(self):
+        return 'IF {}'.format(' AND '.join([six.text_type(c) for c in self.transactions]))
+
+    def update_context_id(self, i):
+        super(UpdateStatement, self).update_context_id(i)
+        for transaction in self.transactions:
+            transaction.set_context_id(self.context_counter)
+            self.context_counter += transaction.get_context_size()
 
 
 class DeleteStatement(BaseCQLStatement):

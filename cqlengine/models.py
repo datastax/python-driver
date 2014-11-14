@@ -74,6 +74,33 @@ class QuerySetDescriptor(object):
         raise NotImplementedError
 
 
+class TransactionDescriptor(object):
+    """
+    returns a query set descriptor
+    """
+    def __get__(self, instance, model):
+        if instance:
+            def transaction_setter(*prepared_transaction, **unprepared_transactions):
+                if len(prepared_transaction) > 0:
+                    transactions = prepared_transaction[0]
+                else:
+                    transactions = instance.objects.iff(**unprepared_transactions)._transaction
+                instance._transaction = transactions
+                return instance
+
+            return transaction_setter
+        qs = model.__queryset__(model)
+
+        def transaction_setter(**unprepared_transactions):
+            transactions = model.objects.iff(**unprepared_transactions)._transaction
+            qs._transaction = transactions
+            return qs
+        return transaction_setter
+
+    def __call__(self, *args, **kwargs):
+        raise NotImplementedError
+
+
 class TTLDescriptor(object):
     """
     returns a query set descriptor
@@ -239,6 +266,7 @@ class BaseModel(object):
     objects = QuerySetDescriptor()
     ttl = TTLDescriptor()
     consistency = ConsistencyDescriptor()
+    iff = TransactionDescriptor()
 
     # custom timestamps, see USING TIMESTAMP X
     timestamp = TimestampDescriptor()
@@ -301,9 +329,10 @@ class BaseModel(object):
         self._values = {}
         self._ttl = self.__default_ttl__
         self._timestamp = None
+        self._transaction = None
 
         for name, column in self._columns.items():
-            value =  values.get(name, None)
+            value = values.get(name, None)
             if value is not None or isinstance(column, columns.BaseContainerColumn):
                 value = column.to_python(value)
             value_mngr = column.value_manager(self, column, value)
@@ -550,7 +579,8 @@ class BaseModel(object):
                           ttl=self._ttl,
                           timestamp=self._timestamp,
                           consistency=self.__consistency__,
-                          if_not_exists=self._if_not_exists).save()
+                          if_not_exists=self._if_not_exists,
+                          transaction=self._transaction).save()
 
         #reset the value managers
         for v in self._values.values():
@@ -588,7 +618,8 @@ class BaseModel(object):
                           batch=self._batch,
                           ttl=self._ttl,
                           timestamp=self._timestamp,
-                          consistency=self.__consistency__).update()
+                          consistency=self.__consistency__,
+                          transaction=self._transaction).update()
 
         #reset the value managers
         for v in self._values.values():
