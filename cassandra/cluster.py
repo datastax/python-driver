@@ -358,6 +358,12 @@ class Cluster(object):
     If set to :const:`None`, there will be no timeout for these queries.
     """
 
+    _session_class = None
+    """
+    The class that will be returned when calling Cluster.connect().  This must
+    be a subclass of cassandra.Session
+    """
+
     sessions = None
     control_connection = None
     scheduler = None
@@ -392,7 +398,8 @@ class Cluster(object):
                  protocol_version=2,
                  executor_threads=2,
                  max_schema_agreement_wait=10,
-                 control_connection_timeout=2.0):
+                 control_connection_timeout=2.0,
+                 session_class=None):
         """
         Any of the mutable Cluster attributes may be set as keyword arguments
         to the constructor.
@@ -487,6 +494,13 @@ class Cluster(object):
 
         self.control_connection = ControlConnection(
             self, self.control_connection_timeout)
+
+        if session_class and not issubclass(session_class, Session):
+            raise TypeError("session_class must be a child of cassandra.Session")
+        if session_class:
+            self._session_class = session_class
+        else:
+            self._session_class = Session
 
     def register_user_type(self, keyspace, user_type, klass):
         """
@@ -721,7 +735,7 @@ class Cluster(object):
             self.executor.shutdown()
 
     def _new_session(self):
-        session = Session(self, self.metadata.all_hosts())
+        session = self._session_class(self, self.metadata.all_hosts())
         for keyspace, type_map in six.iteritems(self._user_types):
             for udt_name, klass in six.iteritems(type_map):
                 session.user_type_registered(keyspace, udt_name, klass)
