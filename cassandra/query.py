@@ -507,7 +507,8 @@ class BoundStatement(Statement):
             components = []
             for statement_index in routing_indexes:
                 val = self.values[statement_index]
-                components.append(struct.pack("HsB", len(val), val, 0))
+                l = len(val)
+                components.append(struct.pack(">H%dsB" % l, l, val, 0))
 
             self._routing_key = b"".join(components)
 
