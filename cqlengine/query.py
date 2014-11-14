@@ -96,7 +96,7 @@ class BatchQuery(object):
             to the batch transaction.
         :type timestamp: datetime or timedelta or None
         :param consistency: (optional) One of consistency values ("ANY", "ONE", "QUORUM" etc)
-        :type consistency: str or None
+        :type consistency: The :class:`.ConsistencyLevel` to be used for the batch query, or None.
         :param execute_on_exception: (Defaults to False) Indicates that when the BatchQuery instance is used
             as a context manager the queries accumulated within the context must be executed despite
             encountering an error within the context. By default, any exception raised from within
