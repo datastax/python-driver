@@ -371,6 +371,12 @@ class Cluster(object):
     If set to :const:`None`, there will be no timeout for these queries.
     """
 
+    _session_class = None
+    """
+    The class that will be returned when calling Cluster.connect().  This must
+    be a subclass of cassandra.Session
+    """
+
     sessions = None
     control_connection = None
     scheduler = None
@@ -405,7 +411,8 @@ class Cluster(object):
                  protocol_version=2,
                  executor_threads=2,
                  max_schema_agreement_wait=10,
-                 control_connection_timeout=2.0):
+                 control_connection_timeout=2.0,
+                 session_class=None):
         """
         Any of the mutable Cluster attributes may be set as keyword arguments
         to the constructor.
@@ -500,6 +507,13 @@ class Cluster(object):
 
         self.control_connection = ControlConnection(
             self, self.control_connection_timeout)
+
+        if session_class and not issubclass(session_class, Session):
+            raise TypeError("session_class must be a child of cassandra.Session")
+        if session_class:
+            self._session_class = session_class
+        else:
+            self._session_class = Session
 
     def register_user_type(self, keyspace, user_type, klass):
         """
@@ -734,7 +748,7 @@ class Cluster(object):
             self.executor.shutdown()
 
     def _new_session(self):
-        session = Session(self, self.metadata.all_hosts())
+        session = self._session_class(self, self.metadata.all_hosts())
         for keyspace, type_map in six.iteritems(self._user_types):
             for udt_name, klass in six.iteritems(type_map):
                 session.user_type_registered(keyspace, udt_name, klass)
@@ -2378,8 +2392,8 @@ class ResponseFuture(object):
     _final_result = _NOT_SET
     _final_exception = None
     _query_trace = None
-    _callback = None
-    _errback = None
+    _callbacks = None
+    _errbacks = None
     _current_host = None
     _current_pool = None
     _connection = None
@@ -2402,6 +2416,8 @@ class ResponseFuture(object):
         self._make_query_plan()
         self._event = Event()
         self._errors = {}
+        self._callbacks = []
+        self._errbacks = []
 
     def _make_query_plan(self):
         # convert the list/generator/etc to an iterator so that subsequent
@@ -2701,8 +2717,10 @@ class ResponseFuture(object):
             self._final_result = response
 
         self._event.set()
-        if self._callback:
-            fn, args, kwargs = self._callback
+
+        # apply each callback
+        for callback in self._callbacks:
+            fn, args, kwargs = callback
             fn(response, *args, **kwargs)
 
     def _set_final_exception(self, response):
@@ -2712,8 +2730,9 @@ class ResponseFuture(object):
         with self._callback_lock:
             self._final_exception = response
         self._event.set()
-        if self._errback:
-            fn, args, kwargs = self._errback
+
+        for errback in self._errbacks:
+            fn, args, kwargs = errback
             fn(response, *args, **kwargs)
 
     def _retry(self, reuse_connection, consistency_level):
@@ -2841,7 +2860,7 @@ class ResponseFuture(object):
             if self._final_result is not _NOT_SET:
                 run_now = True
             else:
-                self._callback = (fn, args, kwargs)
+                self._callbacks.append((fn, args, kwargs))
         if run_now:
             fn(self._final_result, *args, **kwargs)
         return self
@@ -2857,7 +2876,7 @@ class ResponseFuture(object):
             if self._final_exception:
                 run_now = True
             else:
-                self._errback = (fn, args, kwargs)
+                self._errbacks.append((fn, args, kwargs))
         if run_now:
             fn(self._final_exception, *args, **kwargs)
         return self
@@ -2892,8 +2911,8 @@ class ResponseFuture(object):
 
     def clear_callbacks(self):
         with self._callback_lock:
-            self._callback = None
-            self._errback = None
+            self._callback = []
+            self._errback = []
 
     def __str__(self):
         result = "(no result yet)" if self._final_result is _NOT_SET else self._final_result

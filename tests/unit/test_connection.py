@@ -280,3 +280,15 @@ class ConnectionTest(unittest.TestCase):
     def test_set_connection_class(self):
         cluster = Cluster(connection_class='test')
         self.assertEqual('test', cluster.connection_class)
+
+
+    def test_set_session_class(self):
+        from cassandra.cluster import Session
+        class FakeSession(Session):
+            pass
+        cluster = Cluster(session_class=FakeSession)
+        self.assertEqual(cluster._session_class, FakeSession)
+
+        s = cluster._new_session()
+        self.assertIsInstance(s, FakeSession)
+
