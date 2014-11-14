@@ -42,7 +42,8 @@ from functools import partial, wraps
 from itertools import groupby
 
 from cassandra import (ConsistencyLevel, AuthenticationFailed,
-                       InvalidRequest, OperationTimedOut, UnsupportedOperation)
+                       InvalidRequest, OperationTimedOut,
+                       UnsupportedOperation, Unauthorized)
 from cassandra.connection import ConnectionException, ConnectionShutdown
 from cassandra.encoder import Encoder
 from cassandra.protocol import (QueryMessage, ResultMessage,
@@ -163,6 +164,18 @@ class Cluster(object):
         >>> ...
         >>> cluster.shutdown()
 
+    """
+
+    contact_points = ['127.0.0.1']
+    """
+    The list of contact points to try connecting for cluster discovery.
+
+    Defaults to loopback interface.
+
+    Note: When using :class:`.DCAwareLoadBalancingPolicy` with no explicit
+    local_dc set, the DC is chosen from an arbitrary host in contact_points.
+    In this case, contact_points should contain only nodes from a single,
+    local DC.
     """
 
     port = 9042
@@ -382,7 +395,7 @@ class Cluster(object):
     _listener_lock = None
 
     def __init__(self,
-                 contact_points=("127.0.0.1",),
+                 contact_points=["127.0.0.1"],
                  port=9042,
                  compression=True,
                  auth_provider=None,
@@ -1709,6 +1722,7 @@ class ControlConnection(object):
     _SELECT_COLUMN_FAMILIES = "SELECT * FROM system.schema_columnfamilies"
     _SELECT_COLUMNS = "SELECT * FROM system.schema_columns"
     _SELECT_USERTYPES = "SELECT * FROM system.schema_usertypes"
+    _SELECT_TRIGGERS = "SELECT * FROM system.schema_triggers"
 
     _SELECT_PEERS = "SELECT peer, data_center, rack, tokens, rpc_address, schema_version FROM system.peers"
     _SELECT_LOCAL = "SELECT cluster_name, data_center, rack, tokens, partitioner, schema_version FROM system.local WHERE key='local'"
@@ -1905,17 +1919,31 @@ class ControlConnection(object):
 
         cl = ConsistencyLevel.ONE
         if table:
+            def _handle_results(success, result):
+                if success:
+                    return dict_factory(*result.results) if result else {}
+                else:
+                    raise result
+
             # a particular table changed
             where_clause = " WHERE keyspace_name = '%s' AND columnfamily_name = '%s'" % (keyspace, table)
             cf_query = QueryMessage(query=self._SELECT_COLUMN_FAMILIES + where_clause, consistency_level=cl)
             col_query = QueryMessage(query=self._SELECT_COLUMNS + where_clause, consistency_level=cl)
-            cf_result, col_result = connection.wait_for_responses(
-                cf_query, col_query)
+            triggers_query = QueryMessage(query=self._SELECT_TRIGGERS + where_clause, consistency_level=cl)
+            (cf_success, cf_result), (col_success, col_result), (triggers_success, triggers_result) \
+                = connection.wait_for_responses(cf_query, col_query, triggers_query, fail_on_error=False)
 
             log.debug("[control connection] Fetched table info for %s.%s, rebuilding metadata", keyspace, table)
-            cf_result = dict_factory(*cf_result.results) if cf_result else {}
-            col_result = dict_factory(*col_result.results) if col_result else {}
-            self._cluster.metadata.table_changed(keyspace, table, cf_result, col_result)
+            cf_result = _handle_results(cf_success, cf_result)
+            col_result = _handle_results(col_success, col_result)
+
+            # handle the triggers table not existing in Cassandra 1.2
+            if not triggers_success and isinstance(triggers_result, InvalidRequest):
+                triggers_result = {}
+            else:
+                triggers_result = _handle_results(triggers_success, triggers_result)
+
+            self._cluster.metadata.table_changed(keyspace, table, cf_result, col_result, triggers_result)
         elif usertype:
             # user defined types within this keyspace changed
             where_clause = " WHERE keyspace_name = '%s' AND type_name = '%s'" % (keyspace, usertype)
@@ -1938,11 +1966,14 @@ class ControlConnection(object):
                 QueryMessage(query=self._SELECT_KEYSPACES, consistency_level=cl),
                 QueryMessage(query=self._SELECT_COLUMN_FAMILIES, consistency_level=cl),
                 QueryMessage(query=self._SELECT_COLUMNS, consistency_level=cl),
-                QueryMessage(query=self._SELECT_USERTYPES, consistency_level=cl)
+                QueryMessage(query=self._SELECT_USERTYPES, consistency_level=cl),
+                QueryMessage(query=self._SELECT_TRIGGERS, consistency_level=cl)
             ]
 
             responses = connection.wait_for_responses(*queries, fail_on_error=False)
-            (ks_success, ks_result), (cf_success, cf_result), (col_success, col_result), (types_success, types_result) = responses
+            (ks_success, ks_result), (cf_success, cf_result), \
+                (col_success, col_result), (types_success, types_result), \
+                (trigger_success, triggers_result) = responses
 
             if ks_success:
                 ks_result = dict_factory(*ks_result.results)
@@ -1959,6 +1990,20 @@ class ControlConnection(object):
             else:
                 raise col_result
 
+            # if we're connected to Cassandra < 2.0, the trigges table will not exist
+            if trigger_success:
+                triggers_result = dict_factory(*triggers_result.results)
+            else:
+                if isinstance(triggers_result, InvalidRequest):
+                    log.debug("[control connection] triggers table not found")
+                    triggers_result = {}
+                elif isinstance(triggers_result, Unauthorized):
+                    log.warn("[control connection] this version of Cassandra does not allow access to schema_triggers metadata with authorization enabled (CASSANDRA-7967); "
+                             "The driver will operate normally, but will not reflect triggers in the local metadata model, or schema strings.")
+                    triggers_result = {}
+                else:
+                    raise triggers_result
+
             # if we're connected to Cassandra < 2.1, the usertypes table will not exist
             if types_success:
                 types_result = dict_factory(*types_result.results) if types_result.results else {}
@@ -1970,7 +2015,7 @@ class ControlConnection(object):
                     raise types_result
 
             log.debug("[control connection] Fetched schema, rebuilding metadata")
-            self._cluster.metadata.rebuild_schema(ks_result, types_result, cf_result, col_result)
+            self._cluster.metadata.rebuild_schema(ks_result, types_result, cf_result, col_result, triggers_result)
 
     def refresh_node_list_and_token_map(self, force_token_rebuild=False):
         try:
@@ -2026,8 +2071,7 @@ class ControlConnection(object):
         for row in peers_result:
             addr = row.get("rpc_address")
 
-            # TODO handle ipv6 equivalent
-            if not addr or addr == "0.0.0.0":
+            if not addr or addr in ["0.0.0.0", "::"]:
                 addr = row.get("peer")
 
             found_hosts.add(addr)
@@ -2410,11 +2454,16 @@ class ResponseFuture(object):
             self._errors[host] = ConnectionException("Pool is shutdown")
             return None
 
+        self._current_host = host
+        self._current_pool = pool
+
         connection = None
         try:
             # TODO get connectTimeout from cluster settings
             connection, request_id = pool.borrow_connection(timeout=2.0)
+            self._connection = connection
             connection.send_msg(message, request_id, cb=cb)
+            return request_id
         except NoConnectionsAvailable as exc:
             log.debug("All connections for host %s are at capacity, moving to the next host", host)
             self._errors[host] = exc
@@ -2427,11 +2476,6 @@ class ResponseFuture(object):
             if connection:
                 pool.return_connection(connection)
             return None
-
-        self._current_host = host
-        self._current_pool = pool
-        self._connection = connection
-        return request_id
 
     @property
     def has_more_pages(self):
@@ -2749,7 +2793,7 @@ class ResponseFuture(object):
             if self._paging_state is None:
                 return self._final_result
             else:
-                return PagedResult(self, self._final_result)
+                return PagedResult(self, self._final_result, timeout)
         elif self._final_exception:
             raise self._final_exception
         else:
@@ -2758,7 +2802,7 @@ class ResponseFuture(object):
                 if self._paging_state is None:
                     return self._final_result
                 else:
-                    return PagedResult(self, self._final_result)
+                    return PagedResult(self, self._final_result, timeout)
             elif self._final_exception:
                 raise self._final_exception
             else:
@@ -2912,9 +2956,10 @@ class PagedResult(object):
 
     response_future = None
 
-    def __init__(self, response_future, initial_response):
+    def __init__(self, response_future, initial_response, timeout=_NOT_SET):
         self.response_future = response_future
         self.current_response = iter(initial_response)
+        self.timeout = timeout
 
     def __iter__(self):
         return self
@@ -2927,7 +2972,7 @@ class PagedResult(object):
                 raise
 
         self.response_future.start_fetching_next_page()
-        result = self.response_future.result()
+        result = self.response_future.result(self.timeout)
         if self.response_future.has_more_pages:
             self.current_response = result.current_response
         else:

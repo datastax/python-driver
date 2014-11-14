@@ -35,7 +35,7 @@ except ImportError:
     LibevConnection = None
 
 
-class ConnectionTest(object):
+class ConnectionTests(object):
 
     klass = None
 
@@ -221,17 +221,17 @@ class ConnectionTest(object):
             t.join()
 
 
-class AsyncoreConnectionTest(ConnectionTest, unittest.TestCase):
+class AsyncoreConnectionTests(ConnectionTests, unittest.TestCase):
 
     klass = AsyncoreConnection
 
     def setUp(self):
         if 'gevent.monkey' in sys.modules:
-            raise unittest.SkipTest("Can't test libev with gevent monkey patching")
-        ConnectionTest.setUp(self)
+            raise unittest.SkipTest("Can't test asyncore with gevent monkey patching")
+        ConnectionTests.setUp(self)
 
 
-class LibevConnectionTest(ConnectionTest, unittest.TestCase):
+class LibevConnectionTests(ConnectionTests, unittest.TestCase):
 
     klass = LibevConnection
 
@@ -241,4 +241,4 @@ class LibevConnectionTest(ConnectionTest, unittest.TestCase):
         if LibevConnection is None:
             raise unittest.SkipTest(
                 'libev does not appear to be installed properly')
-        ConnectionTest.setUp(self)
+        ConnectionTests.setUp(self)

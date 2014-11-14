@@ -30,7 +30,7 @@ from cassandra.policies import HostDistance
 from tests.integration import PROTOCOL_VERSION
 
 
-class QueryTest(unittest.TestCase):
+class QueryTests(unittest.TestCase):
 
     def test_query(self):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
@@ -306,7 +306,6 @@ class BatchStatementTests(unittest.TestCase):
 
 
 class SerialConsistencyTests(unittest.TestCase):
-
     def setUp(self):
         if PROTOCOL_VERSION < 2:
             raise unittest.SkipTest(
@@ -358,8 +357,7 @@ class SerialConsistencyTests(unittest.TestCase):
         self.assertRaises(ValueError, SimpleStatement, 'foo', serial_consistency_level=ConsistencyLevel.ONE)
 
 
-class LightweightTransactionsTests(unittest.TestCase):
-
+class LightweightTransactionTests(unittest.TestCase):
     def setUp(self):
         """
         Test is skipped if run with cql version < 2
@@ -423,3 +421,90 @@ class LightweightTransactionsTests(unittest.TestCase):
 
         # Make sure test passed
         self.assertTrue(received_timeout)
+
+
+class BatchStatementDefaultRoutingKeyTests(unittest.TestCase):
+    # Test for PYTHON-126: BatchStatement.add() should set the routing key of the first added prepared statement
+
+    def setUp(self):
+        if PROTOCOL_VERSION < 2:
+            raise unittest.SkipTest(
+                "Protocol 2.0+ is required for BATCH operations, currently testing against %r"
+                % (PROTOCOL_VERSION,))
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.session = self.cluster.connect()
+        query = """
+                INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
+                """
+        self.simple_statement = SimpleStatement(query, routing_key='ss_rk')
+        self.prepared = self.session.prepare(query)
+
+    def tearDown(self):
+        self.cluster.shutdown()
+
+    def test_rk_from_bound(self):
+        """
+        batch routing key is inherited from BoundStatement
+        """
+        bound = self.prepared.bind((1, None))
+        batch = BatchStatement()
+        batch.add(bound)
+        self.assertIsNotNone(batch.routing_key)
+        self.assertEqual(batch.routing_key, bound.routing_key)
+
+    def test_rk_from_simple(self):
+        """
+        batch routing key is inherited from SimpleStatement
+        """
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.session = self.cluster.connect()
+        batch = BatchStatement()
+        batch.add(self.simple_statement)
+        self.assertIsNotNone(batch.routing_key)
+        self.assertEqual(batch.routing_key, self.simple_statement.routing_key)
+
+    def test_inherit_first_rk_bound(self):
+        """
+        compound batch inherits the first routing key of the first added statement (bound statement is first)
+        """
+        bound = self.prepared.bind((100000000, None))
+        batch = BatchStatement()
+        batch.add("ss with no rk")
+        batch.add(bound)
+        batch.add(self.simple_statement)
+
+        for i in range(3):
+            batch.add(self.prepared, (i, i))
+
+        self.assertIsNotNone(batch.routing_key)
+        self.assertEqual(batch.routing_key, bound.routing_key)
+
+    def test_inherit_first_rk_simple_statement(self):
+        """
+        compound batch inherits the first routing key of the first added statement (Simplestatement is first)
+        """
+        bound = self.prepared.bind((1, None))
+        batch = BatchStatement()
+        batch.add("ss with no rk")
+        batch.add(self.simple_statement)
+        batch.add(bound)
+
+        for i in range(10):
+            batch.add(self.prepared, (i, i))
+
+        self.assertIsNotNone(batch.routing_key)
+        self.assertEqual(batch.routing_key, self.simple_statement.routing_key)
+
+    def test_inherit_first_rk_prepared_param(self):
+        """
+        compound batch inherits the first routing key of the first added statement (prepared statement is first)
+        """
+        bound = self.prepared.bind((2, None))
+        batch = BatchStatement()
+        batch.add("ss with no rk")
+        batch.add(self.prepared, (1, 0))
+        batch.add(bound)
+        batch.add(self.simple_statement)
+
+        self.assertIsNotNone(batch.routing_key)
+        self.assertEqual(batch.routing_key, self.prepared.bind((1, 0)).routing_key)

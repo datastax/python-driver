@@ -1,10 +1,41 @@
+2.1.2
+=====
+October 16, 2014
+
+Features
+--------
+* Allow DCAwareRoundRobinPolicy to be constructed without a local_dc, defaulting
+  instead to the DC of a contact_point (PYTHON-126)
+* Set routing key in BatchStatement.add() if none specified in batch (PYTHON-148)
+* Improved feedback on ValueError using named_tuple_factory with invalid column names (PYTHON-122)
+
+Bug Fixes
+---------
+* Make execute_concurrent compatible with Python 2.6 (PYTHON-159)
+* Handle Unauthorized message on schema_triggers query (PYTHON-155)
+* Make execute_concurrent compatible with Python 2.6 (github-197)
+* Pure Python sorted set in support of UDTs nested in collections (PYTON-167)
+* Support CUSTOM index metadata and string export (PYTHON-165)
+
 2.1.1
 =====
-In Progress
+September 11, 2014
+
+Features
+--------
+* Detect triggers and include them in CQL queries generated to recreate
+  the schema (github-189)
+* Support IPv6 addresses (PYTHON-144) (note: basic functionality added; Windows
+  platform not addressed (PYTHON-20))
 
 Bug Fixes
 ---------
 * Fix NetworkTopologyStrategy.export_for_schema (PYTHON-120)
+* Keep timeout for paged results (PYTHON-150)
+
+Other
+-----
+* Add frozen<> type modifier to UDTs and tuples to handle CASSANDRA-7857
 
 2.1.0
 =====

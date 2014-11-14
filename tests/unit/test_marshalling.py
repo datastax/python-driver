@@ -23,13 +23,8 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-try:
-    from blist import sortedset
-except ImportError:
-    sortedset = set
-
 from cassandra.cqltypes import lookup_casstype
-from cassandra.util import OrderedDict
+from cassandra.util import OrderedDict, sortedset
 
 marshalled_value_pairs = (
     # binary form, type, python native type
@@ -105,7 +100,7 @@ if platform.python_implementation() == 'CPython':
     marshalled_value_pairs += marshalled_value_pairs_unsafe
 
 
-class TestUnmarshal(unittest.TestCase):
+class UnmarshalTest(unittest.TestCase):
     def test_unmarshalling(self):
         for serializedval, valtype, nativeval in marshalled_value_pairs:
             unmarshaller = lookup_casstype(valtype)

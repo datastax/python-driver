@@ -114,7 +114,7 @@ examples are equivalent:
 .. code-block:: python
 
     rows = session.execute('SELECT name, age, email FROM users')
-    for row in row:
+    for row in rows:
         print row[0], row[1], row[2]
 
 If you prefer another result format, such as a ``dict`` per row, you

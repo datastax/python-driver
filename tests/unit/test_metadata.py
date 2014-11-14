@@ -26,12 +26,12 @@ from cassandra.metadata import (Murmur3Token, MD5Token,
                                 NetworkTopologyStrategy, SimpleStrategy,
                                 LocalStrategy, NoMurmur3, protect_name,
                                 protect_names, protect_value, is_valid_name,
-                                UserType, KeyspaceMetadata)
+                                UserType, KeyspaceMetadata, Metadata)
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
 
-class TestStrategies(unittest.TestCase):
+class StrategiesTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -161,7 +161,7 @@ class TestStrategies(unittest.TestCase):
         self.assertNotEqual(SimpleStrategy(1), NetworkTopologyStrategy({'dc1': 2}))
 
 
-class TestNameEscaping(unittest.TestCase):
+class NameEscapingTest(unittest.TestCase):
 
     def test_protect_name(self):
         """
@@ -221,7 +221,7 @@ class TestNameEscaping(unittest.TestCase):
             self.assertEqual(is_valid_name(keyword), False)
 
 
-class TestTokens(unittest.TestCase):
+class TokensTest(unittest.TestCase):
 
     def test_murmur3_tokens(self):
         try:
@@ -255,7 +255,7 @@ class TestTokens(unittest.TestCase):
             pass
 
 
-class TestKeyspaceMetadata(unittest.TestCase):
+class KeyspaceMetadataTest(unittest.TestCase):
 
     def test_export_as_string_user_types(self):
         keyspace_name = 'test'
@@ -297,19 +297,40 @@ CREATE TYPE test.b (
         return Mock(**{'cassname': cassname, 'typename': typename, 'cql_parameterized_type.return_value': typename})
 
 
-class TestUserTypes(unittest.TestCase):
+class UserTypesTest(unittest.TestCase):
 
     def test_as_cql_query(self):
         field_types = [IntegerType, AsciiType, TupleType.apply_parameters([IntegerType, AsciiType])]
         udt = UserType("ks1", "mytype", ["a", "b", "c"], field_types)
-        self.assertEqual("CREATE TYPE ks1.mytype (a varint, b ascii, c tuple<varint, ascii>);", udt.as_cql_query(formatted=False))
+        self.assertEqual("CREATE TYPE ks1.mytype (a varint, b ascii, c frozen<tuple<varint, ascii>>);", udt.as_cql_query(formatted=False))
 
         self.assertEqual("""CREATE TYPE ks1.mytype (
     a varint,
     b ascii,
-    c tuple<varint, ascii>
+    c frozen<tuple<varint, ascii>>
 );""", udt.as_cql_query(formatted=True))
 
     def test_as_cql_query_name_escaping(self):
         udt = UserType("MyKeyspace", "MyType", ["AbA", "keyspace"], [AsciiType, AsciiType])
         self.assertEqual('CREATE TYPE "MyKeyspace"."MyType" ("AbA" ascii, "keyspace" ascii);', udt.as_cql_query(formatted=False))
+
+
+class IndexTest(unittest.TestCase):
+
+    def test_build_index_as_cql(self):
+        column_meta = Mock()
+        column_meta.name = 'column_name_here'
+        column_meta.table.name = 'table_name_here'
+        column_meta.table.keyspace.name = 'keyspace_name_here'
+        meta_model = Metadata(Mock())
+
+        row = {'index_name': 'index_name_here', 'index_type': 'index_type_here'}
+        index_meta = meta_model._build_index_metadata(column_meta, row)
+        self.assertEqual(index_meta.as_cql_query(),
+                'CREATE INDEX index_name_here ON keyspace_name_here.table_name_here (column_name_here)')
+
+        row['index_options'] = '{ "class_name": "class_name_here" }'
+        row['index_type'] = 'CUSTOM'
+        index_meta = meta_model._build_index_metadata(column_meta, row)
+        self.assertEqual(index_meta.as_cql_query(),
+                "CREATE CUSTOM INDEX index_name_here ON keyspace_name_here.table_name_here (column_name_here) USING 'class_name_here'")

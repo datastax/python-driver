@@ -40,7 +40,7 @@ from cassandra.query import Statement
 from six.moves import xrange
 
 
-class TestLoadBalancingPolicy(unittest.TestCase):
+class LoadBalancingPolicyTest(unittest.TestCase):
     def test_non_implemented(self):
         """
         Code coverage for interface-style base class
@@ -62,7 +62,7 @@ class TestLoadBalancingPolicy(unittest.TestCase):
         self.assertRaises(TypeError, Cluster, load_balancing_policy=RoundRobinPolicy)
 
 
-class TestRoundRobinPolicy(unittest.TestCase):
+class RoundRobinPolicyTest(unittest.TestCase):
 
     def test_basic(self):
         hosts = [0, 1, 2, 3]
@@ -202,14 +202,14 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
 
         # allow all of the remote hosts to be used
         policy = DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=2)
-        policy.populate(Mock(spec=Metadata), hosts)
+        policy.populate(Mock(), hosts)
         qplan = list(policy.make_query_plan())
         self.assertEqual(set(qplan[:2]), local_hosts)
         self.assertEqual(set(qplan[2:]), remote_hosts)
 
         # allow only one of the remote hosts to be used
         policy = DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=1)
-        policy.populate(Mock(spec=Metadata), hosts)
+        policy.populate(Mock(), hosts)
         qplan = list(policy.make_query_plan())
         self.assertEqual(set(qplan[:2]), local_hosts)
 
@@ -219,7 +219,7 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
 
         # allow no remote hosts to be used
         policy = DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=0)
-        policy.populate(Mock(spec=Metadata), hosts)
+        policy.populate(Mock(), hosts)
         qplan = list(policy.make_query_plan())
         self.assertEqual(2, len(qplan))
         self.assertEqual(local_hosts, set(qplan))
@@ -228,7 +228,7 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
         policy = DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=0)
         host = Host("ip1", SimpleConvictionPolicy)
         host.set_location_info("dc1", "rack1")
-        policy.populate(Mock(spec=Metadata), [host])
+        policy.populate(Mock(), [host])
 
         self.assertEqual(policy.distance(host), HostDistance.LOCAL)
 
@@ -242,14 +242,14 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
         self.assertEqual(policy.distance(remote_host), HostDistance.IGNORED)
 
         # make sure the policy has both dcs registered
-        policy.populate(Mock(spec=Metadata), [host, remote_host])
+        policy.populate(Mock(), [host, remote_host])
         self.assertEqual(policy.distance(remote_host), HostDistance.REMOTE)
 
         # since used_hosts_per_remote_dc is set to 1, only the first
         # remote host in dc2 will be REMOTE, the rest are IGNORED
         second_remote_host = Host("ip3", SimpleConvictionPolicy)
         second_remote_host.set_location_info("dc2", "rack1")
-        policy.populate(Mock(spec=Metadata), [host, remote_host, second_remote_host])
+        policy.populate(Mock(), [host, remote_host, second_remote_host])
         distances = set([policy.distance(remote_host), policy.distance(second_remote_host)])
         self.assertEqual(distances, set([HostDistance.REMOTE, HostDistance.IGNORED]))
 
@@ -261,7 +261,7 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
             h.set_location_info("dc2", "rack1")
 
         policy = DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=1)
-        policy.populate(Mock(spec=Metadata), hosts)
+        policy.populate(Mock(), hosts)
         policy.on_down(hosts[0])
         policy.on_remove(hosts[2])
 
@@ -303,7 +303,7 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
             hosts.append(h)
 
         policy = DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=1)
-        policy.populate(Mock(spec=Metadata), hosts)
+        policy.populate(Mock(), hosts)
 
         for host in hosts:
             policy.on_down(host)
@@ -322,6 +322,45 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
         qplan = list(policy.make_query_plan())
         self.assertEqual(qplan, [])
 
+    def test_default_dc(self):
+        host_local = Host(1, SimpleConvictionPolicy, 'local')
+        host_remote = Host(2, SimpleConvictionPolicy, 'remote')
+        host_none = Host(1, SimpleConvictionPolicy)
+
+        # contact point is '1'
+        cluster = Mock(contact_points=[1])
+
+        # contact DC first
+        policy = DCAwareRoundRobinPolicy()
+        policy.populate(cluster, [host_none])
+        self.assertFalse(policy.local_dc)
+        policy.on_add(host_local)
+        policy.on_add(host_remote)
+        self.assertNotEqual(policy.local_dc, host_remote.datacenter)
+        self.assertEqual(policy.local_dc, host_local.datacenter)
+
+        # contact DC second
+        policy = DCAwareRoundRobinPolicy()
+        policy.populate(cluster, [host_none])
+        self.assertFalse(policy.local_dc)
+        policy.on_add(host_remote)
+        policy.on_add(host_local)
+        self.assertNotEqual(policy.local_dc, host_remote.datacenter)
+        self.assertEqual(policy.local_dc, host_local.datacenter)
+
+        # no DC
+        policy = DCAwareRoundRobinPolicy()
+        policy.populate(cluster, [host_none])
+        self.assertFalse(policy.local_dc)
+        policy.on_add(host_none)
+        self.assertFalse(policy.local_dc)
+
+        # only other DC
+        policy = DCAwareRoundRobinPolicy()
+        policy.populate(cluster, [host_none])
+        self.assertFalse(policy.local_dc)
+        policy.on_add(host_remote)
+        self.assertFalse(policy.local_dc)
 
 class TokenAwarePolicyTest(unittest.TestCase):
 

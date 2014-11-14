@@ -16,7 +16,7 @@ from tests.integration.datatype_utils import get_sample, DATA_TYPE_PRIMITIVES, D
 try:
     import unittest2 as unittest
 except ImportError:
-    import unittest # noqa
+    import unittest  # noqa
 
 import logging
 log = logging.getLogger(__name__)
@@ -26,16 +26,11 @@ from datetime import datetime
 import six
 from uuid import uuid1, uuid4
 
-try:
-    from blist import sortedset
-except ImportError:
-    sortedset = set  # noqa
-
 from cassandra import InvalidRequest
 from cassandra.cluster import Cluster
 from cassandra.cqltypes import Int32Type, EMPTY
 from cassandra.query import dict_factory
-from cassandra.util import OrderedDict
+from cassandra.util import OrderedDict, sortedset
 
 from tests.integration import get_server_versions, PROTOCOL_VERSION
 
@@ -420,7 +415,7 @@ class TypeTests(unittest.TestCase):
         s.execute("""CREATE KEYSPACE test_tuple_type
             WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}""")
         s.set_keyspace("test_tuple_type")
-        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b tuple<ascii, int, boolean>)")
+        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b frozen<tuple<ascii, int, boolean>>)")
 
         # test non-prepared statement
         complete = ('foo', 123, True)
@@ -480,7 +475,7 @@ class TypeTests(unittest.TestCase):
         lengths = (1, 2, 3, 384)
         value_schema = []
         for i in lengths:
-            value_schema += [' v_%s tuple<%s>' % (i, ', '.join(['int'] * i))]
+            value_schema += [' v_%s frozen<tuple<%s>>' % (i, ', '.join(['int'] * i))]
         s.execute("CREATE TABLE mytable (k int PRIMARY KEY, %s)" % (', '.join(value_schema),))
 
         # insert tuples into same key using different columns
@@ -516,7 +511,7 @@ class TypeTests(unittest.TestCase):
 
         s.execute("CREATE TABLE mytable ("
                   "k int PRIMARY KEY, "
-                  "v tuple<%s>)" % ','.join(DATA_TYPE_PRIMITIVES))
+                  "v frozen<tuple<%s>>)" % ','.join(DATA_TYPE_PRIMITIVES))
 
         for i in range(len(DATA_TYPE_PRIMITIVES)):
             # create tuples to be written and ensure they match with the expected response
@@ -554,11 +549,11 @@ class TypeTests(unittest.TestCase):
 
         # create list values
         for datatype in DATA_TYPE_PRIMITIVES:
-            values.append('v_{} tuple<list<{}>>'.format(len(values), datatype))
+            values.append('v_{} frozen<tuple<list<{}>>>'.format(len(values), datatype))
 
         # create set values
         for datatype in DATA_TYPE_PRIMITIVES:
-            values.append('v_{} tuple<set<{}>>'.format(len(values), datatype))
+            values.append('v_{} frozen<tuple<set<{}>>>'.format(len(values), datatype))
 
         # create map values
         for datatype in DATA_TYPE_PRIMITIVES:
@@ -566,7 +561,7 @@ class TypeTests(unittest.TestCase):
             if datatype == 'blob':
                 # unhashable type: 'bytearray'
                 datatype_1 = 'ascii'
-            values.append('v_{} tuple<map<{}, {}>>'.format(len(values), datatype_1, datatype_2))
+            values.append('v_{} frozen<tuple<map<{}, {}>>>'.format(len(values), datatype_1, datatype_2))
 
         # make sure we're testing all non primitive data types in the future
         if set(DATA_TYPE_NON_PRIMITIVE_NAMES) != set(['tuple', 'list', 'map', 'set']):
@@ -655,14 +650,14 @@ class TypeTests(unittest.TestCase):
         # create a table with multiple sizes of nested tuples
         s.execute("CREATE TABLE mytable ("
                   "k int PRIMARY KEY, "
-                  "v_1 %s,"
-                  "v_2 %s,"
-                  "v_3 %s,"
-                  "v_128 %s"
+                  "v_1 frozen<%s>,"
+                  "v_2 frozen<%s>,"
+                  "v_3 frozen<%s>,"
+                  "v_128 frozen<%s>"
                   ")" % (self.nested_tuples_schema_helper(1),
-                        self.nested_tuples_schema_helper(2),
-                        self.nested_tuples_schema_helper(3),
-                        self.nested_tuples_schema_helper(128)))
+                         self.nested_tuples_schema_helper(2),
+                         self.nested_tuples_schema_helper(3),
+                         self.nested_tuples_schema_helper(128)))
 
         for i in (1, 2, 3, 128):
             # create tuple
@@ -689,7 +684,7 @@ class TypeTests(unittest.TestCase):
             WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}""")
         s.set_keyspace("test_tuples_with_nulls")
 
-        s.execute("CREATE TABLE mytable (k int PRIMARY KEY, t tuple<text, int, uuid, blob>)")
+        s.execute("CREATE TABLE mytable (k int PRIMARY KEY, t frozen<tuple<text, int, uuid, blob>>)")
 
         insert = s.prepare("INSERT INTO mytable (k, t) VALUES (0, ?)")
         s.execute(insert, [(None, None, None, None)])

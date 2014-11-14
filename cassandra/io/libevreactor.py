@@ -258,13 +258,24 @@ class LibevConnection(Connection):
         self.deque = deque()
         self._deque_lock = Lock()
 
-        self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        if self.ssl_options:
-            if not ssl:
-                raise Exception("This version of Python was not compiled with SSL support")
-            self._socket = ssl.wrap_socket(self._socket, **self.ssl_options)
-        self._socket.settimeout(1.0)  # TODO potentially make this value configurable
-        self._socket.connect((self.host, self.port))
+        sockerr = None
+        addresses = socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        for (af, socktype, proto, canonname, sockaddr) in addresses:
+            try:
+                self._socket = socket.socket(af, socktype, proto)
+                if self.ssl_options:
+                    if not ssl:
+                        raise Exception("This version of Python was not compiled with SSL support")
+                    self._socket = ssl.wrap_socket(self._socket, **self.ssl_options)
+                self._socket.settimeout(1.0)  # TODO potentially make this value configurable
+                self._socket.connect(sockaddr)
+                sockerr = None
+                break
+            except socket.error as err:
+                sockerr = err
+        if sockerr:
+            raise socket.error(sockerr.errno, "Tried connecting to %s. Last error: %s" % ([a[4] for a in addresses], sockerr.strerror))
+
         self._socket.setblocking(0)
 
         if self.sockopts:

@@ -48,7 +48,7 @@ class TypeTests(unittest.TestCase):
             """)
         s.set_keyspace("udt_test_unprepared_registered")
         s.execute("CREATE TYPE user (age int, name text)")
-        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b user)")
+        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b frozen<user>)")
 
         User = namedtuple('user', ('age', 'name'))
         c.register_user_type("udt_test_unprepared_registered", "user", User)
@@ -68,7 +68,7 @@ class TypeTests(unittest.TestCase):
             """)
         s.set_keyspace("udt_test_unprepared_registered2")
         s.execute("CREATE TYPE user (state text, is_cool boolean)")
-        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b user)")
+        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b frozen<user>)")
 
         User = namedtuple('user', ('state', 'is_cool'))
         c.register_user_type("udt_test_unprepared_registered2", "user", User)
@@ -96,7 +96,7 @@ class TypeTests(unittest.TestCase):
             """)
         s.set_keyspace("udt_test_register_before_connecting")
         s.execute("CREATE TYPE user (age int, name text)")
-        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b user)")
+        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b frozen<user>)")
 
         s.execute("""
             CREATE KEYSPACE udt_test_register_before_connecting2
@@ -104,7 +104,7 @@ class TypeTests(unittest.TestCase):
             """)
         s.set_keyspace("udt_test_register_before_connecting2")
         s.execute("CREATE TYPE user (state text, is_cool boolean)")
-        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b user)")
+        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b frozen<user>)")
 
         # now that types are defined, shutdown and re-create Cluster
         c.shutdown()
@@ -145,7 +145,7 @@ class TypeTests(unittest.TestCase):
             """)
         s.set_keyspace("udt_test_prepared_unregistered")
         s.execute("CREATE TYPE user (age int, name text)")
-        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b user)")
+        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b frozen<user>)")
 
         User = namedtuple('user', ('age', 'name'))
         insert = s.prepare("INSERT INTO mytable (a, b) VALUES (?, ?)")
@@ -165,7 +165,7 @@ class TypeTests(unittest.TestCase):
             """)
         s.set_keyspace("udt_test_prepared_unregistered2")
         s.execute("CREATE TYPE user (state text, is_cool boolean)")
-        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b user)")
+        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b frozen<user>)")
 
         User = namedtuple('user', ('state', 'is_cool'))
         insert = s.prepare("INSERT INTO mytable (a, b) VALUES (?, ?)")
@@ -193,7 +193,7 @@ class TypeTests(unittest.TestCase):
         User = namedtuple('user', ('age', 'name'))
         c.register_user_type("udt_test_prepared_registered", "user", User)
 
-        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b user)")
+        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b frozen<user>)")
 
         insert = s.prepare("INSERT INTO mytable (a, b) VALUES (?, ?)")
         s.execute(insert, (0, User(42, 'bob')))
@@ -216,7 +216,7 @@ class TypeTests(unittest.TestCase):
         User = namedtuple('user', ('state', 'is_cool'))
         c.register_user_type("udt_test_prepared_registered2", "user", User)
 
-        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b user)")
+        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b frozen<user>)")
 
         insert = s.prepare("INSERT INTO mytable (a, b) VALUES (?, ?)")
         s.execute(insert, (0, User('Texas', True)))
@@ -247,7 +247,7 @@ class TypeTests(unittest.TestCase):
         User = namedtuple('user', ('a', 'b', 'c', 'd'))
         c.register_user_type("test_udts_with_nulls", "user", User)
 
-        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b user)")
+        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b frozen<user>)")
 
         insert = s.prepare("INSERT INTO mytable (a, b) VALUES (0, ?)")
         s.execute(insert, [User(None, None, None, None)])
@@ -275,6 +275,7 @@ class TypeTests(unittest.TestCase):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
         MAX_TEST_LENGTH = 16384
+        EXTENDED_QUERY_TIMEOUT = 60
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
         s = c.connect()
@@ -283,14 +284,16 @@ class TypeTests(unittest.TestCase):
             WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}""")
         s.set_keyspace("test_udt_sizes")
 
-        # create the seed udt
-        s.execute("CREATE TYPE lengthy_udt ({})".format(', '.join(['v_{} int'.format(i) for i in range(MAX_TEST_LENGTH)])))
+        # create the seed udt, increase timeout to avoid the query failure on slow systems
+        s.execute("CREATE TYPE lengthy_udt ({})"
+                  .format(', '.join(['v_{} int'.format(i)
+                                    for i in range(MAX_TEST_LENGTH)])), timeout=EXTENDED_QUERY_TIMEOUT)
 
         # create a table with multiple sizes of nested udts
         # no need for all nested types, only a spot checked few and the largest one
         s.execute("CREATE TABLE mytable ("
                   "k int PRIMARY KEY, "
-                  "v lengthy_udt)")
+                  "v frozen<lengthy_udt>)")
 
         # create and register the seed udt type
         udt = namedtuple('lengthy_udt', tuple(['v_{}'.format(i) for i in range(MAX_TEST_LENGTH)]))
@@ -305,8 +308,8 @@ class TypeTests(unittest.TestCase):
             # write udt
             s.execute("INSERT INTO mytable (k, v) VALUES (0, %s)", (created_udt,))
 
-            # verify udt was written and read correctly
-            result = s.execute("SELECT v FROM mytable WHERE k=0")[0]
+            # verify udt was written and read correctly, increase timeout to avoid the query failure on slow systems
+            result = s.execute("SELECT v FROM mytable WHERE k=0", timeout=EXTENDED_QUERY_TIMEOUT)[0]
             self.assertEqual(created_udt, result.v)
 
     def nested_udt_helper(self, udts, i):
@@ -344,17 +347,17 @@ class TypeTests(unittest.TestCase):
 
         # create the nested udts
         for i in range(MAX_NESTING_DEPTH):
-            s.execute("CREATE TYPE depth_{} (value depth_{})".format(i + 1, i))
+            s.execute("CREATE TYPE depth_{} (value frozen<depth_{}>)".format(i + 1, i))
 
         # create a table with multiple sizes of nested udts
         # no need for all nested types, only a spot checked few and the largest one
         s.execute("CREATE TABLE mytable ("
                   "k int PRIMARY KEY, "
-                  "v_0 depth_0, "
-                  "v_1 depth_1, "
-                  "v_2 depth_2, "
-                  "v_3 depth_3, "
-                  "v_{0} depth_{0})".format(MAX_NESTING_DEPTH))
+                  "v_0 frozen<depth_0>, "
+                  "v_1 frozen<depth_1>, "
+                  "v_2 frozen<depth_2>, "
+                  "v_3 frozen<depth_3>, "
+                  "v_{0} frozen<depth_{0}>)".format(MAX_NESTING_DEPTH))
 
         # create the udt container
         udts = []
@@ -406,17 +409,17 @@ class TypeTests(unittest.TestCase):
 
         # create the nested udts
         for i in range(MAX_NESTING_DEPTH):
-            s.execute("CREATE TYPE depth_{} (value depth_{})".format(i + 1, i))
+            s.execute("CREATE TYPE depth_{} (value frozen<depth_{}>)".format(i + 1, i))
 
         # create a table with multiple sizes of nested udts
         # no need for all nested types, only a spot checked few and the largest one
         s.execute("CREATE TABLE mytable ("
                   "k int PRIMARY KEY, "
-                  "v_0 depth_0, "
-                  "v_1 depth_1, "
-                  "v_2 depth_2, "
-                  "v_3 depth_3, "
-                  "v_{0} depth_{0})".format(MAX_NESTING_DEPTH))
+                  "v_0 frozen<depth_0>, "
+                  "v_1 frozen<depth_1>, "
+                  "v_2 frozen<depth_2>, "
+                  "v_3 frozen<depth_3>, "
+                  "v_{0} frozen<depth_{0}>)".format(MAX_NESTING_DEPTH))
 
         # create the udt container
         udts = []
@@ -472,17 +475,17 @@ class TypeTests(unittest.TestCase):
 
         # create the nested udts
         for i in range(MAX_NESTING_DEPTH):
-            s.execute("CREATE TYPE depth_{} (value depth_{})".format(i + 1, i))
+            s.execute("CREATE TYPE depth_{} (value frozen<depth_{}>)".format(i + 1, i))
 
         # create a table with multiple sizes of nested udts
         # no need for all nested types, only a spot checked few and the largest one
         s.execute("CREATE TABLE mytable ("
                   "k int PRIMARY KEY, "
-                  "v_0 depth_0, "
-                  "v_1 depth_1, "
-                  "v_2 depth_2, "
-                  "v_3 depth_3, "
-                  "v_{0} depth_{0})".format(MAX_NESTING_DEPTH))
+                  "v_0 frozen<depth_0>, "
+                  "v_1 frozen<depth_1>, "
+                  "v_2 frozen<depth_2>, "
+                  "v_3 frozen<depth_3>, "
+                  "v_{0} frozen<depth_{0}>)".format(MAX_NESTING_DEPTH))
 
         # create the udt container
         udts = []
@@ -542,7 +545,7 @@ class TypeTests(unittest.TestCase):
         """.format(', '.join(alpha_type_list))
         )
 
-        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b alldatatypes)")
+        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b frozen<alldatatypes>)")
 
         # register UDT
         alphabet_list = []
@@ -573,6 +576,7 @@ class TypeTests(unittest.TestCase):
         """
         Test for inserting various types of DATA_TYPE_NON_PRIMITIVE into UDT's
         """
+        raise unittest.SkipTest("Collections are not allowed in UDTs")
         c = Cluster(protocol_version=PROTOCOL_VERSION)
         s = c.connect()
 
@@ -601,7 +605,7 @@ class TypeTests(unittest.TestCase):
         """.format(', '.join(alpha_type_list))
         )
 
-        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b alldatatypes)")
+        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b frozen<alldatatypes>)")
 
         # register UDT
         alphabet_list = []

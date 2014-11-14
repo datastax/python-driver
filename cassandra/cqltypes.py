@@ -47,25 +47,16 @@ from cassandra.marshal import (int8_pack, int8_unpack, uint16_pack, uint16_unpac
                                int32_pack, int32_unpack, int64_pack, int64_unpack,
                                float_pack, float_unpack, double_pack, double_unpack,
                                varint_pack, varint_unpack)
-from cassandra.util import OrderedDict
+from cassandra.util import OrderedDict, sortedset
 
 apache_cassandra_type_prefix = 'org.apache.cassandra.db.marshal.'
+
 
 if six.PY3:
     _number_types = frozenset((int, float))
     long = int
 else:
     _number_types = frozenset((int, long, float))
-
-try:
-    from blist import sortedset
-except ImportError:
-    warnings.warn(
-        "The blist library is not available, so a normal set will "
-        "be used in place of blist.sortedset for set collection values. "
-        "You can find the blist library here: https://pypi.python.org/pypi/blist/")
-
-    sortedset = set
 
 
 def trim_if_startswith(s, prefix):
@@ -76,6 +67,7 @@ def trim_if_startswith(s, prefix):
 
 def unix_time_from_uuid1(u):
     return (u.time - 0x01B21DD213814000) / 10000000.0
+
 
 _casstypes = {}
 
@@ -824,6 +816,11 @@ class TupleType(_ParameterizedType):
                 buf.write(int32_pack(-1))
         return buf.getvalue()
 
+    @classmethod
+    def cql_parameterized_type(cls):
+        subtypes_string = ', '.join(sub.cql_parameterized_type() for sub in cls.subtypes)
+        return 'frozen<tuple<%s>>' % (subtypes_string,)
+
 
 class UserType(TupleType):
     typename = "'org.apache.cassandra.db.marshal.UserType'"
@@ -863,7 +860,7 @@ class UserType(TupleType):
 
     @classmethod
     def cql_parameterized_type(cls):
-        return cls.typename
+        return "frozen<%s>" % (cls.typename,)
 
     @classmethod
     def deserialize_safe(cls, byts, protocol_version):
