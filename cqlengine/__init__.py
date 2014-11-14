@@ -27,6 +27,7 @@ ONE = ConsistencyLevel.ONE
 TWO = ConsistencyLevel.TWO
 THREE = ConsistencyLevel.THREE
 QUORUM = ConsistencyLevel.QUORUM
+LOCAL_ONE = ConsistencyLevel.LOCAL_ONE
 LOCAL_QUORUM = ConsistencyLevel.LOCAL_QUORUM
 EACH_QUORUM = ConsistencyLevel.EACH_QUORUM
 ALL = ConsistencyLevel.ALL
