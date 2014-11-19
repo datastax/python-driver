@@ -1,26 +1,21 @@
 #http://pypi.python.org/pypi/cql/1.0.4
 #http://code.google.com/a/apache-extras.org/p/cassandra-dbapi2 /
 #http://cassandra.apache.org/doc/cql/CQL.html
-
+from __future__ import absolute_import
 from collections import namedtuple
-from cassandra.cluster import Cluster, NoHostAvailable
-from cassandra.query import SimpleStatement, Statement
-import six
-
-try:
-    import Queue as queue
-except ImportError:
-    # python 3
-    import queue
-
-import logging
-
+from cassandra.cluster import Cluster, _NOT_SET, NoHostAvailable
+from cassandra.query import SimpleStatement, Statement, dict_factory
+from cqlengine.statements import BaseCQLStatement
 from cqlengine.exceptions import CQLEngineException, UndefinedKeyspaceException
 from cassandra import ConsistencyLevel
-from cqlengine.statements import BaseCQLStatement
-from cassandra.query import dict_factory
+
+import six
+import logging
+
 
 LOG = logging.getLogger('cqlengine.cql')
+NOT_SET = _NOT_SET  # required for passing timeout to Session.execute
+
 
 class CQLConnectionError(CQLEngineException): pass
 
@@ -85,7 +80,8 @@ def setup(
         raise
     session.row_factory = dict_factory
 
-def execute(query, params=None, consistency_level=None):
+
+def execute(query, params=None, consistency_level=None, timeout=NOT_SET):
 
     handle_lazy_connect()
 
@@ -109,7 +105,7 @@ def execute(query, params=None, consistency_level=None):
     LOG.info(query.query_string)
 
     params = params or {}
-    result = session.execute(query, params)
+    result = session.execute(query, params, timeout=timeout)
 
     return result
 

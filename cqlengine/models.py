@@ -4,7 +4,7 @@ import warnings
 
 from cqlengine import columns
 from cqlengine.exceptions import ModelException, CQLEngineException, ValidationError
-from cqlengine.query import ModelQuerySet, DMLQuery, AbstractQueryableColumn
+from cqlengine.query import ModelQuerySet, DMLQuery, AbstractQueryableColumn, NOT_SET
 from cqlengine.query import DoesNotExist as _DoesNotExist
 from cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
 
@@ -342,6 +342,7 @@ class BaseModel(object):
         # that update should be used when persisting changes
         self._is_persisted = False
         self._batch = None
+        self._timeout = NOT_SET
 
 
     def __repr__(self):
@@ -564,6 +565,11 @@ class BaseModel(object):
     def get(cls, *args, **kwargs):
         return cls.objects.get(*args, **kwargs)
 
+    def timeout(self, timeout):
+        assert self._batch is None, 'Setting both timeout and batch is not supported'
+        self._timeout = timeout
+        return self
+
     def save(self):
         # handle polymorphic models
         if self._is_polymorphic:
@@ -580,7 +586,8 @@ class BaseModel(object):
                           timestamp=self._timestamp,
                           consistency=self.__consistency__,
                           if_not_exists=self._if_not_exists,
-                          transaction=self._transaction).save()
+                          transaction=self._transaction,
+                          timeout=self._timeout).save()
 
         #reset the value managers
         for v in self._values.values():
@@ -619,7 +626,8 @@ class BaseModel(object):
                           ttl=self._ttl,
                           timestamp=self._timestamp,
                           consistency=self.__consistency__,
-                          transaction=self._transaction).update()
+                          transaction=self._transaction,
+                          timeout=self._timeout).update()
 
         #reset the value managers
         for v in self._values.values():
@@ -633,7 +641,11 @@ class BaseModel(object):
 
     def delete(self):
         """ Deletes this instance """
-        self.__dmlquery__(self.__class__, self, batch=self._batch, timestamp=self._timestamp, consistency=self.__consistency__).delete()
+        self.__dmlquery__(self.__class__, self,
+                          batch=self._batch,
+                          timestamp=self._timestamp,
+                          consistency=self.__consistency__,
+                          timeout=self._timeout).delete()
 
     def get_changed_columns(self):
         """ returns a list of the columns that have been updated since instantiation or save """
@@ -644,6 +656,7 @@ class BaseModel(object):
         return cls.objects.batch(batch)
 
     def _inst_batch(self, batch):
+        assert self._timeout is NOT_SET, 'Setting both timeout and batch is not supported'
         self._batch = batch
         return self
 

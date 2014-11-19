@@ -592,6 +592,53 @@ QuerySet method reference
             Row.objects(row_id=5).update(map_column__update={1: 2, 3: 4})
 
 
+Per Query Timeouts
+===================
+
+By default all queries are executed with the timeout defined in `~cqlengine.connection.setup()`
+The examples below show how to specify a per-query timeout.
+A timeout is specified in seconds and can be an int, float or None.
+None means no timeout.
+
+
+    .. code-block:: python
+
+        class Row(Model):
+            id = columns.Integer(primary_key=True)
+            name = columns.Text()
+
+
+    Fetch all objects with a timeout of 5 seconds
+    .. code-block:: python
+
+        Row.objects().timeout(5).all()
+
+    Create a single row with a 50ms timeout
+    .. code-block:: python
+
+        Row(id=1, name='Jon').timeout(0.05).create()
+
+    Delete a single row with no timeout
+    .. code-block:: python
+
+        Row(id=1).timeout(None).delete()
+
+    Update a single row with no timeout
+    .. code-block:: python
+
+        Row(id=1).timeout(None).update(name='Blake')
+
+    Batch query timeouts
+    .. code-block:: python
+
+        with BatchQuery(timeout=10) as b:
+            Row(id=1, name='Jon').create()
+
+
+    NOTE: You cannot set both timeout and batch at the same time, batch will use the timeout defined in it's constructor.
+    Setting the timeout on the model is meaningless and will raise an AssertionError.
+
+
 Named Tables
 ===================
 

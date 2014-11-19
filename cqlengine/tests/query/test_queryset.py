@@ -1,15 +1,16 @@
+from __future__ import absolute_import
 from datetime import datetime
 import time
 from unittest import TestCase, skipUnless
 from uuid import uuid1, uuid4
 import uuid
 
+from cassandra.cluster import Session
 from cqlengine.tests.base import BaseCassEngTestCase
+from cqlengine.connection import NOT_SET
 import mock
-from cqlengine.exceptions import ModelException
 from cqlengine import functions
-from cqlengine.management import sync_table, drop_table, sync_table
-from cqlengine.management import drop_table
+from cqlengine.management import sync_table, drop_table
 from cqlengine.models import Model
 from cqlengine import columns
 from cqlengine import query
@@ -707,3 +708,51 @@ def test_paged_result_handling():
     assert len(results) == 2
 
 
+class ModelQuerySetTimeoutTestCase(BaseQuerySetUsage):
+    def test_default_timeout(self):
+        with mock.patch.object(Session, 'execute', autospec=True) as mock_execute:
+            list(TestModel.objects())
+            mock_execute.assert_called_once_with(mock.ANY, mock.ANY, mock.ANY, timeout=NOT_SET)
+
+    def test_float_timeout(self):
+        with mock.patch.object(Session, 'execute', autospec=True) as mock_execute:
+            list(TestModel.objects().timeout(0.5))
+            mock_execute.assert_called_once_with(mock.ANY, mock.ANY, mock.ANY, timeout=0.5)
+
+    def test_none_timeout(self):
+        with mock.patch.object(Session, 'execute', autospec=True) as mock_execute:
+            list(TestModel.objects().timeout(None))
+            mock_execute.assert_called_once_with(mock.ANY, mock.ANY, mock.ANY, timeout=None)
+
+
+class DMLQueryTimeoutTestCase(BaseQuerySetUsage):
+    def setUp(self):
+        self.model = TestModel(test_id=1, attempt_id=1, description='timeout test')
+        super(DMLQueryTimeoutTestCase, self).setUp()
+
+    def test_default_timeout(self):
+        with mock.patch.object(Session, 'execute', autospec=True) as mock_execute:
+            self.model.save()
+            mock_execute.assert_called_once_with(mock.ANY, mock.ANY, mock.ANY, timeout=NOT_SET)
+
+    def test_float_timeout(self):
+        with mock.patch.object(Session, 'execute', autospec=True) as mock_execute:
+            self.model.timeout(0.5).save()
+            mock_execute.assert_called_once_with(mock.ANY, mock.ANY, mock.ANY, timeout=0.5)
+
+    def test_none_timeout(self):
+        with mock.patch.object(Session, 'execute', autospec=True) as mock_execute:
+            self.model.timeout(None).save()
+            mock_execute.assert_called_once_with(mock.ANY, mock.ANY, mock.ANY, timeout=None)
+
+    def test_timeout_then_batch(self):
+        b = query.BatchQuery()
+        m = self.model.timeout(None)
+        with self.assertRaises(AssertionError):
+            m.batch(b)
+
+    def test_batch_then_timeout(self):
+        b = query.BatchQuery()
+        m = self.model.batch(b)
+        with self.assertRaises(AssertionError):
+            m.timeout(0.5)
