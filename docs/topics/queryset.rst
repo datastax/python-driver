@@ -609,26 +609,31 @@ None means no timeout.
 
 
     Fetch all objects with a timeout of 5 seconds
+
     .. code-block:: python
 
         Row.objects().timeout(5).all()
 
     Create a single row with a 50ms timeout
+
     .. code-block:: python
 
         Row(id=1, name='Jon').timeout(0.05).create()
 
     Delete a single row with no timeout
+
     .. code-block:: python
 
         Row(id=1).timeout(None).delete()
 
     Update a single row with no timeout
+
     .. code-block:: python
 
         Row(id=1).timeout(None).update(name='Blake')
 
     Batch query timeouts
+
     .. code-block:: python
 
         with BatchQuery(timeout=10) as b:
