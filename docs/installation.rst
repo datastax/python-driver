@@ -13,11 +13,13 @@ Installation through pip
 ------------------------
 `pip <https://pypi.python.org/pypi/pip>`_ is the suggested tool for installing
 packages.  It will handle installing all python dependencies for the driver at
-the same time as the driver itself.  To install the driver::
+the same time as the driver itself.  To install the driver*::
 
     pip install cassandra-driver
 
 You can use ``pip install --pre cassandra-driver`` if you need to install a beta version.
+
+***Note**: if intending to use optional extensions, install the `dependencies <#optional-non-python-dependencies>`_ first. The driver may need to be reinstalled if dependencies are added after the initial installation.
 
 OSX Installation Error
 ^^^^^^^^^^^^^^^^^^^^^^
