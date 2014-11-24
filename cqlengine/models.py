@@ -837,7 +837,7 @@ import six
 class Model(BaseModel):
     """
     the db name for the column family can be set as the attribute db_name, or
-    it will be genertaed from the class name
+    it will be generated from the class name
     """
     __abstract__ = True
     # __metaclass__ = ModelMetaClass
