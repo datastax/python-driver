@@ -123,3 +123,46 @@ class PlainTextAuthenticator(Authenticator):
 
     def evaluate_challenge(self, challenge):
         return None
+
+
+class SaslAuthProvider(AuthProvider):
+    """
+    An :class:`~.AuthProvider` that works with DSE's KerberosAuthenticator.
+
+    Example usage::
+
+        from cassandra.cluster import Cluster
+        from cassandra.auth import PlainTextAuthProvider
+
+        sasl_kwargs = {'host': 'localhost',
+                       'service': 'dse',
+                       'mechanism': 'GSSAPI',
+                       'qops': 'auth'.split(',')}
+        auth_provider = SaslAuthProvider(**sasl_kwargs)
+        cluster = Cluster(auth_provider=auth_provider)
+
+    .. versionadded:: 2.1.4
+    """
+
+    def __init__(self, **sasl_kwargs):
+        self.sasl_kwargs = sasl_kwargs
+
+    def new_authenticator(self, host):
+        return SaslAuthenticator(**self.sasl_kwargs)
+
+class SaslAuthenticator(Authenticator):
+    """
+    An :class:`~.Authenticator` that works with DSE's KerberosAuthenticator.
+
+    .. versionadded:: 2.1.4
+    """
+
+    def __init__(self, host, service, mechanism='GSSAPI', **sasl_kwargs):
+        from puresasl.client import SASLClient
+        self.sasl = SASLClient(host, service, mechanism, **sasl_kwargs)
+
+    def initial_response(self):
+        return self.sasl.process()
+
+    def evaluate_challenge(self, challenge):
+        return self.sasl.process(challenge)
