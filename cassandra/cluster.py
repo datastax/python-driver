@@ -773,6 +773,7 @@ class Cluster(object):
                 self._cleanup_failed_on_up_handling(host)
                 return
 
+            log.info("Connection pools established for node %s", host)
             # mark the host as up and notify all listeners
             host.set_up()
             for listener in self.listeners:
