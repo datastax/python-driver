@@ -1,4 +1,0 @@
-usr/lib/python2*/*-packages/cassandra/*[!_][!_].so
-usr/lib/python2*/*-packages/cassandra/*.py
-usr/lib/python2*/*-packages/cassandra/io/*[!_][!_].so
-usr/lib/python2*/*-packages/cassandra/io/*.py
