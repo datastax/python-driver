@@ -301,6 +301,13 @@ class SchemaMetadataTests(unittest.TestCase):
         self.assertIn('CREATE INDEX d_index', statement)
         self.assertIn('CREATE INDEX e_index', statement)
 
+    def test_compression_disabled(self):
+        create_statement = self.make_create_statement(["a"], ["b"], ["c"])
+        create_statement += " WITH compression = {}"
+        self.session.execute(create_statement)
+        tablemeta = self.get_table_metadata()
+        self.assertIn("compression = {}", tablemeta.export_as_string())
+
 
 class TestCodeCoverage(unittest.TestCase):
 
