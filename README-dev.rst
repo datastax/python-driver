@@ -1,13 +1,6 @@
 Releasing
 =========
 * Run the tests and ensure they all pass
-* If dependencies have changed, make sure ``debian/control``
-  is up to date
-* Make sure all patches in ``debian/patches`` still apply cleanly
-* Update the debian changelog with the new version::
-
-    dch -v '1.0.0'
-
 * Update CHANGELOG.rst
 * Update the version in ``cassandra/__init__.py``
 
