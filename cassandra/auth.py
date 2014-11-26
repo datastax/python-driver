@@ -10,7 +10,10 @@
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
-
+try:
+    from puresasl.client import SASLClient
+except ImportError:
+    SASLClient = None
 
 class AuthProvider(object):
     """
@@ -146,6 +149,8 @@ class SaslAuthProvider(AuthProvider):
 
     def __init__(self, **sasl_kwargs):
         self.sasl_kwargs = sasl_kwargs
+        if SASLClient is None:
+            raise ImportError('The puresasl library has not been installed')
 
     def new_authenticator(self, host):
         return SaslAuthenticator(**self.sasl_kwargs)
@@ -158,7 +163,6 @@ class SaslAuthenticator(Authenticator):
     """
 
     def __init__(self, host, service, mechanism='GSSAPI', **sasl_kwargs):
-        from puresasl.client import SASLClient
         self.sasl = SASLClient(host, service, mechanism, **sasl_kwargs)
 
     def initial_response(self):
