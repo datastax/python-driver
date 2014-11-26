@@ -156,6 +156,7 @@ class Metadata(object):
         old_keyspace_meta = self.keyspaces.get(keyspace, None)
         self.keyspaces[keyspace] = keyspace_meta
         if old_keyspace_meta:
+            keyspace_meta.tables = old_keyspace_meta.tables
             keyspace_meta.user_types = old_keyspace_meta.user_types
             if (keyspace_meta.replication_strategy != old_keyspace_meta.replication_strategy):
                 self._keyspace_updated(keyspace)
