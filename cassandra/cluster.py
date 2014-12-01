@@ -366,9 +366,10 @@ class Cluster(object):
 
     control_connection_timeout = 2.0
     """
-    A timeout, in seconds, for queries made by the control connection, such
-    as querying the current schema and information about nodes in the cluster.
-    If set to :const:`None`, there will be no timeout for these queries.
+    A default timeout, in seconds, for queries made by the control connection,
+    such as querying the current schema and information about nodes in the
+    cluster. If set to :const:`None`, there will be no timeout for these
+    queries. Can be overridden by passing it to __init__()
     """
 
     sessions = None
@@ -405,7 +406,7 @@ class Cluster(object):
                  protocol_version=2,
                  executor_threads=2,
                  max_schema_agreement_wait=10,
-                 control_connection_timeout=2.0):
+                 control_connection_timeout=control_connection_timeout):
         """
         Any of the mutable Cluster attributes may be set as keyword arguments
         to the constructor.
@@ -2162,6 +2163,7 @@ class ControlConnection(object):
             log.debug("[control connection] Waiting for schema agreement")
             start = self._time.time()
             elapsed = 0
+            poll_interval = 0.2
             cl = ConsistencyLevel.ONE
             total_timeout = self._cluster.max_schema_agreement_wait
             schema_mismatches = None
@@ -2169,12 +2171,13 @@ class ControlConnection(object):
                 peers_query = QueryMessage(query=self._SELECT_SCHEMA_PEERS, consistency_level=cl)
                 local_query = QueryMessage(query=self._SELECT_SCHEMA_LOCAL, consistency_level=cl)
                 try:
-                    timeout = min(2.0, total_timeout - elapsed)
+                    timeout = min(self._timeout, total_timeout - elapsed)
                     peers_result, local_result = connection.wait_for_responses(
                         peers_query, local_query, timeout=timeout)
                 except OperationTimedOut as timeout:
                     log.debug("[control connection] Timed out waiting for "
                               "response during schema agreement check: %s", timeout)
+                    self._time.sleep(poll_interval)
                     elapsed = self._time.time() - start
                     continue
                 except ConnectionShutdown:
@@ -2189,7 +2192,7 @@ class ControlConnection(object):
                     return True
 
                 log.debug("[control connection] Schemas mismatched, trying again")
-                self._time.sleep(0.2)
+                self._time.sleep(poll_interval)
                 elapsed = self._time.time() - start
 
             log.warn("Node %s is reporting a schema disagreement: %s",
