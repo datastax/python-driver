@@ -2162,7 +2162,6 @@ class ControlConnection(object):
             log.debug("[control connection] Waiting for schema agreement")
             start = self._time.time()
             elapsed = 0
-            poll_interval = 0.2
             cl = ConsistencyLevel.ONE
             total_timeout = self._cluster.max_schema_agreement_wait
             schema_mismatches = None
@@ -2176,7 +2175,6 @@ class ControlConnection(object):
                 except OperationTimedOut as timeout:
                     log.debug("[control connection] Timed out waiting for "
                               "response during schema agreement check: %s", timeout)
-                    self._time.sleep(poll_interval)
                     elapsed = self._time.time() - start
                     continue
                 except ConnectionShutdown:
@@ -2191,7 +2189,7 @@ class ControlConnection(object):
                     return True
 
                 log.debug("[control connection] Schemas mismatched, trying again")
-                self._time.sleep(poll_interval)
+                self._time.sleep(0.2)
                 elapsed = self._time.time() - start
 
             log.warn("Node %s is reporting a schema disagreement: %s",
