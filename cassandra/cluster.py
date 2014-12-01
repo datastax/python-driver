@@ -366,10 +366,9 @@ class Cluster(object):
 
     control_connection_timeout = 2.0
     """
-    A default timeout, in seconds, for queries made by the control connection,
-    such as querying the current schema and information about nodes in the
-    cluster. If set to :const:`None`, there will be no timeout for these
-    queries. Can be overridden by passing it to __init__()
+    A timeout, in seconds, for queries made by the control connection, such
+    as querying the current schema and information about nodes in the cluster.
+    If set to :const:`None`, there will be no timeout for these queries.
     """
 
     sessions = None
@@ -406,7 +405,7 @@ class Cluster(object):
                  protocol_version=2,
                  executor_threads=2,
                  max_schema_agreement_wait=10,
-                 control_connection_timeout=control_connection_timeout):
+                 control_connection_timeout=2.0):
         """
         Any of the mutable Cluster attributes may be set as keyword arguments
         to the constructor.
