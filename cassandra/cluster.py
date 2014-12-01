@@ -1427,7 +1427,7 @@ class Session(object):
         future = ResponseFuture(self, message, query=None)
         try:
             future.send_request()
-            query_id, column_metadata = future.result()
+            query_id, column_metadata = future.result(self.default_timeout)
         except Exception:
             log.exception("Error preparing query:")
             raise
@@ -1473,7 +1473,7 @@ class Session(object):
 
         for host, future in futures:
             try:
-                future.result()
+                future.result(self.default_timeout)
             except Exception:
                 log.exception("Error preparing query for host %s:", host)
 
