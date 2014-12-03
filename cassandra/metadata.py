@@ -214,6 +214,7 @@ class Metadata(object):
 
     def _build_table_metadata(self, keyspace_metadata, row, col_rows, trigger_rows):
         cfname = row["columnfamily_name"]
+        cf_col_rows = col_rows.get(cfname, [])
 
         comparator = types.lookup_casstype(row["comparator"])
         if issubclass(comparator, types.CompositeType):
@@ -228,7 +229,7 @@ class Metadata(object):
 
         column_aliases = row.get("column_aliases", None)
 
-        clustering_rows = [row for row in col_rows.get(cfname)
+        clustering_rows = [row for row in cf_col_rows
                            if row.get('type', None) == "clustering_key"]
         if len(clustering_rows) > 1:
             clustering_rows = sorted(clustering_rows, key=lambda row: row.get('component_index'))
@@ -257,7 +258,7 @@ class Metadata(object):
                 clustering_size = num_column_name_components
         else:
             is_compact = True
-            if column_aliases or not col_rows.get(cfname):
+            if column_aliases or not cf_col_rows:
                 has_value = True
                 clustering_size = num_column_name_components
             else:
@@ -268,7 +269,7 @@ class Metadata(object):
         table_meta.comparator = comparator
 
         # partition key
-        partition_rows = [row for row in col_rows.get(cfname)
+        partition_rows = [row for row in cf_col_rows
                           if row.get('type', None) == "partition_key"]
 
         if len(partition_rows) > 1:
@@ -313,7 +314,7 @@ class Metadata(object):
 
         # value alias (if present)
         if has_value:
-            value_alias_rows = [row for row in col_rows.get(cfname)
+            value_alias_rows = [row for row in cf_col_rows
                                 if row.get('type', None) == "compact_value"]
 
             if not key_aliases:  # TODO are we checking the right thing here?
@@ -336,10 +337,9 @@ class Metadata(object):
             table_meta.columns[value_alias] = col
 
         # other normal columns
-        if col_rows:
-            for col_row in col_rows[cfname]:
-                column_meta = self._build_column_metadata(table_meta, col_row)
-                table_meta.columns[column_meta.name] = column_meta
+        for col_row in cf_col_rows:
+            column_meta = self._build_column_metadata(table_meta, col_row)
+            table_meta.columns[column_meta.name] = column_meta
 
         if trigger_rows:
             for trigger_row in trigger_rows[cfname]:
