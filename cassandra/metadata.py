@@ -237,7 +237,7 @@ class Metadata(object):
         if column_aliases is not None:
             column_aliases = json.loads(column_aliases)
         else:
-            column_aliases = [row.get('column_name') for row in clustering_rows]
+            column_aliases = [r.get('column_name') for r in clustering_rows]
 
         if is_composite:
             if issubclass(last_col, types.ColumnToCollectionType):
