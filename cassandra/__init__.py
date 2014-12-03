@@ -122,6 +122,10 @@ ConsistencyLevel.name_to_value = {
 }
 
 
+def consistency_value_to_name(value):
+    return ConsistencyLevel.value_to_name[value] if value is not None else "Not Set"
+
+
 class Unavailable(Exception):
     """
     There were not enough live replicas to satisfy the requested consistency
@@ -138,11 +142,14 @@ class Unavailable(Exception):
     alive_replicas = None
     """ The number of replicas that were actually alive """
 
-    def __init__(self, message, consistency=None, required_replicas=None, alive_replicas=None):
-        Exception.__init__(self, message)
-        self.consistency = consistency
+    def __init__(self, summary_message, consistency=None, required_replicas=None, alive_replicas=None):
+        self.consistency_level = consistency
         self.required_replicas = required_replicas
         self.alive_replicas = alive_replicas
+        Exception.__init__(self, summary_message + ' info=' +
+                           repr({'consistency': consistency_value_to_name(consistency),
+                                 'required_replicas': required_replicas,
+                                 'alive_replicas': alive_replicas}))
 
 
 class Timeout(Exception):
@@ -162,11 +169,14 @@ class Timeout(Exception):
     the operation
     """
 
-    def __init__(self, message, consistency=None, required_responses=None, received_responses=None):
-        Exception.__init__(self, message)
+    def __init__(self, summary_message, consistency=None, required_responses=None, received_responses=None):
         self.consistency = consistency
         self.required_responses = required_responses
         self.received_responses = received_responses
+        Exception.__init__(self, summary_message + ' info=' +
+                           repr({'consistency': consistency_value_to_name(consistency),
+                                 'required_responses': required_responses,
+                                 'received_responses': received_responses}))
 
 
 class ReadTimeout(Timeout):
