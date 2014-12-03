@@ -149,11 +149,15 @@ class PreparedStatementTests(unittest.TestCase):
             """
             INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
             """)
-        prepared.routing_key_indexes = {0: {0: 0}, 1: {1: 1}}
-
         self.assertIsInstance(prepared, PreparedStatement)
+
+        prepared.routing_key_indexes = [0, 1]
         bound = prepared.bind((1, 2))
         self.assertEqual(bound.routing_key, b'\x00\x04\x00\x00\x00\x01\x00\x00\x04\x00\x00\x00\x02\x00')
+
+        prepared.routing_key_indexes = [1, 0]
+        bound = prepared.bind((1, 2))
+        self.assertEqual(bound.routing_key, b'\x00\x04\x00\x00\x00\x02\x00\x00\x04\x00\x00\x00\x01\x00')
 
     def test_bound_keyspace(self):
         """
