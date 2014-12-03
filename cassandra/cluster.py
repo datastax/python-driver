@@ -2215,7 +2215,7 @@ class ControlConnection(object):
 
             peer = self._cluster.metadata.get_host(addr)
             if peer and peer.is_up:
-                versions[row.get("schema_version")].add(addr)
+                versions[schema_ver].add(addr)
 
         if len(versions) == 1:
             log.debug("[control connection] Schemas match")
