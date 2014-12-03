@@ -268,15 +268,15 @@ class Metadata(object):
         table_meta.comparator = comparator
 
         # partition key
-        key_aliases = row.get("key_aliases")
         partition_rows = [row for row in col_rows.get(cfname)
-                           if row.get('type', None) == "partition_key"]
+                          if row.get('type', None) == "partition_key"]
 
         if len(partition_rows) > 1:
             partition_rows = sorted(partition_rows, key=lambda row: row.get('component_index'))
 
+        key_aliases = row.get("key_aliases")
         if key_aliases is not None:
-            json.loads(key_aliases)
+            key_aliases = json.loads(key_aliases) if key_aliases else []
         else:
             # In 2.0+, we can use the 'type' column. In 3.0+, we have to use it.
             key_aliases = [row.get('column_name') for row in partition_rows]
