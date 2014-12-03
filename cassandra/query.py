@@ -407,7 +407,7 @@ class BoundStatement(Statement):
     The :class:`PreparedStatement` instance that this was created from.
     """
 
-    values = []
+    values = None
     """
     The sequence of values that were bound to the prepared statement.
     """
@@ -422,6 +422,7 @@ class BoundStatement(Statement):
         self.consistency_level = prepared_statement.consistency_level
         self.serial_consistency_level = prepared_statement.serial_consistency_level
         self.fetch_size = prepared_statement.fetch_size
+        self.values = []
 
         meta = prepared_statement.column_metadata
         if meta:
