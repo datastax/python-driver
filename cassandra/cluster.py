@@ -2061,23 +2061,21 @@ class ControlConnection(object):
                 addr = row.get("peer")
 
             tokens = row.get("tokens")
-            peer_meta_complete = bool(tokens)
+            if not tokens:
+                log.warn("Excluding host (%s) with no tokens in system.peers table of %s." % (addr, connection.host))
+                continue
+
+            found_hosts.add(addr)
 
             host = self._cluster.metadata.get_host(addr)
             datacenter = row.get("data_center")
             rack = row.get("rack")
             if host is None:
                 log.debug("[control connection] Found new host to connect to: %s", addr)
-                host = self._cluster.add_host(addr, datacenter, rack, signal=peer_meta_complete)
-                should_rebuild_token_map |= peer_meta_complete
+                host = self._cluster.add_host(addr, datacenter, rack, signal=True)
+                should_rebuild_token_map = True
             else:
-                should_rebuild_token_map |= self._update_location_info(host, datacenter, rack) and peer_meta_complete
-
-            if not peer_meta_complete:
-              log.warn("Excluding host (%s) with no tokens in system.peers table of %s." % (addr, connection.host))
-              continue
-
-            found_hosts.add(addr)
+                should_rebuild_token_map |= self._update_location_info(host, datacenter, rack)
 
             if partitioner and tokens:
                 token_map[host] = tokens
