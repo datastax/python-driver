@@ -215,6 +215,7 @@ class Metadata(object):
 
     def _build_table_metadata(self, keyspace_metadata, row, col_rows, trigger_rows):
         cfname = row["columnfamily_name"]
+        cf_col_rows = col_rows.get(cfname, [])
 
         comparator = types.lookup_casstype(row["comparator"])
         if issubclass(comparator, types.CompositeType):
@@ -227,7 +228,18 @@ class Metadata(object):
         num_column_name_components = len(column_name_types)
         last_col = column_name_types[-1]
 
-        column_aliases = json.loads(row["column_aliases"])
+        column_aliases = row.get("column_aliases", None)
+
+        clustering_rows = [r for r in cf_col_rows
+                           if r.get('type', None) == "clustering_key"]
+        if len(clustering_rows) > 1:
+            clustering_rows = sorted(clustering_rows, key=lambda row: row.get('component_index'))
+
+        if column_aliases is not None:
+            column_aliases = json.loads(column_aliases)
+        else:
+            column_aliases = [r.get('column_name') for r in clustering_rows]
+
         if is_composite:
             if issubclass(last_col, types.ColumnToCollectionType):
                 # collections
@@ -247,7 +259,7 @@ class Metadata(object):
                 clustering_size = num_column_name_components
         else:
             is_compact = True
-            if column_aliases or not col_rows.get(cfname):
+            if column_aliases or not cf_col_rows:
                 has_value = True
                 clustering_size = num_column_name_components
             else:
@@ -258,11 +270,26 @@ class Metadata(object):
         table_meta.comparator = comparator
 
         # partition key
-        key_aliases = row.get("key_aliases")
-        key_aliases = json.loads(key_aliases) if key_aliases else []
+        partition_rows = [r for r in cf_col_rows
+                          if r.get('type', None) == "partition_key"]
 
-        key_type = types.lookup_casstype(row["key_validator"])
-        key_types = key_type.subtypes if issubclass(key_type, types.CompositeType) else [key_type]
+        if len(partition_rows) > 1:
+            partition_rows = sorted(partition_rows, key=lambda row: row.get('component_index'))
+
+        key_aliases = row.get("key_aliases")
+        if key_aliases is not None:
+            key_aliases = json.loads(key_aliases) if key_aliases else []
+        else:
+            # In 2.0+, we can use the 'type' column. In 3.0+, we have to use it.
+            key_aliases = [r.get('column_name') for r in partition_rows]
+
+        key_validator = row.get("key_validator")
+        if key_validator is not None:
+            key_type = types.lookup_casstype(key_validator)
+            key_types = key_type.subtypes if issubclass(key_type, types.CompositeType) else [key_type]
+        else:
+            key_types = [types.lookup_casstype(r.get('validator')) for r in partition_rows]
+
         for i, col_type in enumerate(key_types):
             if len(key_aliases) > i:
                 column_name = key_aliases[i]
@@ -288,20 +315,32 @@ class Metadata(object):
 
         # value alias (if present)
         if has_value:
-            validator = types.lookup_casstype(row["default_validator"])
+            value_alias_rows = [r for r in cf_col_rows
+                                if r.get('type', None) == "compact_value"]
+
             if not key_aliases:  # TODO are we checking the right thing here?
                 value_alias = "value"
             else:
-                value_alias = row["value_alias"]
+                value_alias = row.get("value_alias", None)
+                if value_alias is None:
+                    # In 2.0+, we can use the 'type' column. In 3.0+, we have to use it.
+                    assert len(value_alias_rows) == 1
+                    value_alias = value_alias_rows[0].get('column_name')
+
+            default_validator = row.get("default_validator")
+            if default_validator:
+                validator = types.lookup_casstype(default_validator)
+            else:
+                assert len(value_alias_rows) == 1
+                validator = types.lookup_casstype(value_alias_rows[0].get('validator'))
 
             col = ColumnMetadata(table_meta, value_alias, validator)
             table_meta.columns[value_alias] = col
 
         # other normal columns
-        if col_rows:
-            for col_row in col_rows[cfname]:
-                column_meta = self._build_column_metadata(table_meta, col_row)
-                table_meta.columns[column_meta.name] = column_meta
+        for col_row in cf_col_rows:
+            column_meta = self._build_column_metadata(table_meta, col_row)
+            table_meta.columns[column_meta.name] = column_meta
 
         if trigger_rows:
             for trigger_row in trigger_rows[cfname]:
