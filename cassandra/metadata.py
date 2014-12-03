@@ -226,7 +226,18 @@ class Metadata(object):
         num_column_name_components = len(column_name_types)
         last_col = column_name_types[-1]
 
-        column_aliases = json.loads(row["column_aliases"])
+        column_aliases = row.get("column_aliases", None)
+
+        clustering_rows = [row for row in col_rows.get(cfname)
+                           if row.get('type', None) == "clustering_key"]
+        if len(clustering_rows) > 1:
+            clustering_rows = sorted(clustering_rows, key=lambda row: row.get('component_index'))
+
+        if column_aliases is not None:
+            column_aliases = json.loads(column_aliases)
+        else:
+            column_aliases = [row.get('column_name') for row in clustering_rows]
+
         if is_composite:
             if issubclass(last_col, types.ColumnToCollectionType):
                 # collections
@@ -258,10 +269,25 @@ class Metadata(object):
 
         # partition key
         key_aliases = row.get("key_aliases")
-        key_aliases = json.loads(key_aliases) if key_aliases else []
+        partition_rows = [row for row in col_rows.get(cfname)
+                           if row.get('type', None) == "partition_key"]
 
-        key_type = types.lookup_casstype(row["key_validator"])
-        key_types = key_type.subtypes if issubclass(key_type, types.CompositeType) else [key_type]
+        if len(partition_rows) > 1:
+            partition_rows = sorted(partition_rows, key=lambda row: row.get('component_index'))
+
+        if key_aliases is not None:
+            json.loads(key_aliases)
+        else:
+            # In 2.0+, we can use the 'type' column. In 3.0+, we have to use it.
+            key_aliases = [row.get('column_name') for row in partition_rows]
+
+        key_validator = row.get("key_validator")
+        if key_validator is not None:
+            key_type = types.lookup_casstype(key_validator)
+            key_types = key_type.subtypes if issubclass(key_type, types.CompositeType) else [key_type]
+        else:
+            key_types = [types.lookup_casstype(row.get('validator')) for row in partition_rows]
+
         for i, col_type in enumerate(key_types):
             if len(key_aliases) > i:
                 column_name = key_aliases[i]
@@ -287,11 +313,24 @@ class Metadata(object):
 
         # value alias (if present)
         if has_value:
-            validator = types.lookup_casstype(row["default_validator"])
+            value_alias_rows = [row for row in col_rows.get(cfname)
+                                if row.get('type', None) == "compact_value"]
+
             if not key_aliases:  # TODO are we checking the right thing here?
                 value_alias = "value"
             else:
-                value_alias = row["value_alias"]
+                value_alias = row.get("value_alias", None)
+                if value_alias is None:
+                    # In 2.0+, we can use the 'type' column. In 3.0+, we have to use it.
+                    assert len(value_alias_rows) == 1
+                    value_alias = value_alias_rows[0].get('column_name')
+
+            default_validator = row.get("default_validator")
+            if default_validator:
+                validator = types.lookup_casstype(default_validator)
+            else:
+                assert len(value_alias_rows) == 1
+                validator = types.lookup_casstype(value_alias_rows[0].get('validator'))
 
             col = ColumnMetadata(table_meta, value_alias, validator)
             table_meta.columns[value_alias] = col
