@@ -59,7 +59,7 @@ class MockMetadata(object):
 
 class MockCluster(object):
 
-    max_schema_agreement_wait = Cluster.max_schema_agreement_wait
+    max_schema_agreement_wait = 5
     load_balancing_policy = RoundRobinPolicy()
     reconnection_policy = ConstantReconnectionPolicy(2)
     down_host = None
@@ -131,7 +131,7 @@ class ControlConnectionTest(unittest.TestCase):
         self.connection = MockConnection()
         self.time = FakeTime()
 
-        self.control_connection = ControlConnection(self.cluster, timeout=0.01)
+        self.control_connection = ControlConnection(self.cluster, timeout=1)
         self.control_connection._connection = self.connection
         self.control_connection._time = self.time
 
@@ -206,7 +206,7 @@ class ControlConnectionTest(unittest.TestCase):
         self.connection.peer_results[1][1][2] = 'b'
         self.assertFalse(self.control_connection.wait_for_schema_agreement())
         # the control connection should have slept until it hit the limit
-        self.assertGreaterEqual(self.time.clock, Cluster.max_schema_agreement_wait)
+        self.assertGreaterEqual(self.time.clock, self.cluster.max_schema_agreement_wait)
 
     def test_wait_for_schema_agreement_skipping(self):
         """
@@ -247,7 +247,7 @@ class ControlConnectionTest(unittest.TestCase):
         # but once we mark it up, the control connection will care
         host.is_up = True
         self.assertFalse(self.control_connection.wait_for_schema_agreement())
-        self.assertGreaterEqual(self.time.clock, Cluster.max_schema_agreement_wait)
+        self.assertGreaterEqual(self.time.clock, self.cluster.max_schema_agreement_wait)
 
     def test_refresh_nodes_and_tokens(self):
         self.control_connection.refresh_node_list_and_token_map()
@@ -332,12 +332,13 @@ class ControlConnectionTest(unittest.TestCase):
     def test_refresh_schema_timeout(self):
 
         def bad_wait_for_responses(*args, **kwargs):
-            self.assertEqual(kwargs['timeout'], self.control_connection._timeout)
+            self.time.sleep(kwargs['timeout'])
             raise OperationTimedOut()
 
-        self.connection.wait_for_responses = bad_wait_for_responses
+        self.connection.wait_for_responses = Mock(side_effect=bad_wait_for_responses)
         self.control_connection.refresh_schema()
-        self.cluster.executor.submit.assert_called_with(self.control_connection._reconnect)
+        self.assertEqual(self.connection.wait_for_responses.call_count, self.cluster.max_schema_agreement_wait/self.control_connection._timeout)
+        self.assertEqual(self.connection.wait_for_responses.call_args[1]['timeout'], self.control_connection._timeout)
 
     def test_handle_topology_change(self):
         event = {

@@ -2169,7 +2169,7 @@ class ControlConnection(object):
                 peers_query = QueryMessage(query=self._SELECT_SCHEMA_PEERS, consistency_level=cl)
                 local_query = QueryMessage(query=self._SELECT_SCHEMA_LOCAL, consistency_level=cl)
                 try:
-                    timeout = min(2.0, total_timeout - elapsed)
+                    timeout = min(self._timeout, total_timeout - elapsed)
                     peers_result, local_result = connection.wait_for_responses(
                         peers_query, local_query, timeout=timeout)
                 except OperationTimedOut as timeout:
