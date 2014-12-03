@@ -229,8 +229,8 @@ class Metadata(object):
 
         column_aliases = row.get("column_aliases", None)
 
-        clustering_rows = [row for row in cf_col_rows
-                           if row.get('type', None) == "clustering_key"]
+        clustering_rows = [r for r in cf_col_rows
+                           if r.get('type', None) == "clustering_key"]
         if len(clustering_rows) > 1:
             clustering_rows = sorted(clustering_rows, key=lambda row: row.get('component_index'))
 
@@ -269,8 +269,8 @@ class Metadata(object):
         table_meta.comparator = comparator
 
         # partition key
-        partition_rows = [row for row in cf_col_rows
-                          if row.get('type', None) == "partition_key"]
+        partition_rows = [r for r in cf_col_rows
+                          if r.get('type', None) == "partition_key"]
 
         if len(partition_rows) > 1:
             partition_rows = sorted(partition_rows, key=lambda row: row.get('component_index'))
@@ -280,14 +280,14 @@ class Metadata(object):
             key_aliases = json.loads(key_aliases) if key_aliases else []
         else:
             # In 2.0+, we can use the 'type' column. In 3.0+, we have to use it.
-            key_aliases = [row.get('column_name') for row in partition_rows]
+            key_aliases = [r.get('column_name') for r in partition_rows]
 
         key_validator = row.get("key_validator")
         if key_validator is not None:
             key_type = types.lookup_casstype(key_validator)
             key_types = key_type.subtypes if issubclass(key_type, types.CompositeType) else [key_type]
         else:
-            key_types = [types.lookup_casstype(row.get('validator')) for row in partition_rows]
+            key_types = [types.lookup_casstype(r.get('validator')) for r in partition_rows]
 
         for i, col_type in enumerate(key_types):
             if len(key_aliases) > i:
@@ -314,8 +314,8 @@ class Metadata(object):
 
         # value alias (if present)
         if has_value:
-            value_alias_rows = [row for row in cf_col_rows
-                                if row.get('type', None) == "compact_value"]
+            value_alias_rows = [r for r in cf_col_rows
+                                if r.get('type', None) == "compact_value"]
 
             if not key_aliases:  # TODO are we checking the right thing here?
                 value_alias = "value"
