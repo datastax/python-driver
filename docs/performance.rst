@@ -242,7 +242,10 @@ dramatically:
     ~/python-driver $ python benchmarks/callback_full_pipeline.py -n 100000 --hosts=127.0.0.1,127.0.0.2,127.0.0.3 --libev-only --threads=1
     Average throughput: 679.61/sec
 
-Until this is improved, you should limit the number of callback chains you run.
+When :attr:`.Cluster.protocol_version` is set to 1 or 2, you should limit the
+number of callback chains you run to rougly 100 per node in the cluster.
+When :attr:`~.Cluster.protocol_version` is 3 or higher, you can safely experiment
+with higher numbers of callback chains.
 
 For many use cases, you don't need to implement this pattern yourself.  You can
 simply use :meth:`cassandra.concurrent.execute_concurrent` and
