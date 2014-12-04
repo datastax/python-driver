@@ -977,9 +977,8 @@ class TableMetadata(object):
 
         if not options_copy.get('compression'):
             params = json.loads(options_copy.pop('compression_parameters', '{}'))
-            if params:
-                param_strings = ["'%s': '%s'" % (k, v) for k, v in params.items()]
-                ret.append('compression = {%s}' % ', '.join(param_strings))
+            param_strings = ["'%s': '%s'" % (k, v) for k, v in params.items()]
+            ret.append('compression = {%s}' % ', '.join(param_strings))
 
         for name, value in options_copy.items():
             if value is not None:
