@@ -2061,6 +2061,11 @@ class ControlConnection(object):
             if not addr or addr in ["0.0.0.0", "::"]:
                 addr = row.get("peer")
 
+            tokens = row.get("tokens")
+            if not tokens:
+                log.warn("Excluding host (%s) with no tokens in system.peers table of %s." % (addr, connection.host))
+                continue
+
             found_hosts.add(addr)
 
             host = self._cluster.metadata.get_host(addr)
@@ -2073,7 +2078,6 @@ class ControlConnection(object):
             else:
                 should_rebuild_token_map |= self._update_location_info(host, datacenter, rack)
 
-            tokens = row.get("tokens")
             if partitioner and tokens:
                 token_map[host] = tokens
 
