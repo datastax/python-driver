@@ -19,7 +19,7 @@ except ImportError:
 
 from mock import Mock, MagicMock, ANY
 
-from cassandra import ConsistencyLevel
+from cassandra import ConsistencyLevel, Unavailable
 from cassandra.cluster import Session, ResponseFuture, NoHostAvailable
 from cassandra.connection import Connection, ConnectionException
 from cassandra.protocol import (ReadTimeoutErrorMessage, WriteTimeoutErrorMessage,
@@ -365,6 +365,63 @@ class ResponseFutureTests(unittest.TestCase):
 
         # this should get called immediately now that the error is set
         rf.add_errback(self.assertIsInstance, Exception)
+
+    def test_multiple_callbacks(self):
+        session = self.make_session()
+        rf = self.make_response_future(session)
+        rf.send_request()
+
+        callback = Mock()
+        expected_result = [{'col': 'val'}]
+        arg = "positional"
+        kwargs = {'one': 1, 'two': 2}
+        rf.add_callback(callback, arg, **kwargs)
+
+        callback2 = Mock()
+        arg2 = "another"
+        kwargs2 = {'three': 3, 'four': 4}
+        rf.add_callback(callback2, arg2, **kwargs2)
+
+        rf._set_result(self.make_mock_response(expected_result))
+
+        result = rf.result()
+        self.assertEqual(result, expected_result)
+
+        callback.assert_called_once_with(expected_result, arg, **kwargs)
+        callback2.assert_called_once_with(expected_result, arg2, **kwargs2)
+
+    def test_multiple_errbacks(self):
+        session = self.make_session()
+        pool = session._pools.get.return_value
+        connection = Mock(spec=Connection)
+        pool.borrow_connection.return_value = (connection, 1)
+
+        query = SimpleStatement("INSERT INFO foo (a, b) VALUES (1, 2)")
+        query.retry_policy = Mock()
+        query.retry_policy.on_unavailable.return_value = (RetryPolicy.RETHROW, None)
+        message = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
+
+        rf = ResponseFuture(session, message, query)
+        rf.send_request()
+
+        callback = Mock()
+        arg = "positional"
+        kwargs = {'one': 1, 'two': 2}
+        rf.add_errback(callback, arg, **kwargs)
+
+        callback2 = Mock()
+        arg2 = "another"
+        kwargs2 = {'three': 3, 'four': 4}
+        rf.add_errback(callback2, arg2, **kwargs2)
+
+        expected_exception = Unavailable("message", 1, 2, 3)
+        result = Mock(spec=UnavailableErrorMessage, info={'something': 'here'})
+        result.to_exception.return_value = expected_exception
+        rf._set_result(result)
+        self.assertRaises(Exception, rf.result)
+
+        callback.assert_called_once_with(expected_exception, arg, **kwargs)
+        callback2.assert_called_once_with(expected_exception, arg2, **kwargs2)
 
     def test_add_callbacks(self):
         session = self.make_session()
