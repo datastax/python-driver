@@ -327,12 +327,18 @@ class ResponseFutureTests(unittest.TestCase):
         rf = self.make_response_future(session)
         rf.send_request()
 
-        rf.add_callback(self.assertEqual, [{'col': 'val'}])
+        callback = Mock()
+        expected_result = [{'col': 'val'}]
+        arg = "positional"
+        kwargs = {'one': 1, 'two': 2}
+        rf.add_callback(callback, arg, **kwargs)
 
-        rf._set_result(self.make_mock_response([{'col': 'val'}]))
+        rf._set_result(self.make_mock_response(expected_result))
 
         result = rf.result()
-        self.assertEqual(result, [{'col': 'val'}])
+        self.assertEqual(result, expected_result)
+
+        callback.assert_called_once_with(expected_result, arg, **kwargs)
 
         # this should get called immediately now that the result is set
         rf.add_callback(self.assertEqual, [{'col': 'val'}])
@@ -383,12 +389,18 @@ class ResponseFutureTests(unittest.TestCase):
         rf = ResponseFuture(session, message, query)
         rf.send_request()
 
+        callback = Mock()
+        expected_result = [{'col': 'val'}]
+        arg = "positional"
+        kwargs = {'one': 1, 'two': 2}
         rf.add_callbacks(
-            callback=self.assertEqual, callback_args=([{'col': 'val'}],),
+            callback=callback, callback_args=(arg,), callback_kwargs=kwargs,
             errback=self.assertIsInstance, errback_args=(Exception,))
 
-        rf._set_result(self.make_mock_response([{'col': 'val'}]))
-        self.assertEqual(rf.result(), [{'col': 'val'}])
+        rf._set_result(self.make_mock_response(expected_result))
+        self.assertEqual(rf.result(), expected_result)
+
+        callback.assert_called_once_with(expected_result, arg, **kwargs)
 
     def test_prepared_query_not_found(self):
         session = self.make_session()
