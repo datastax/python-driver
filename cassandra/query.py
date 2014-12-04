@@ -184,19 +184,33 @@ class Statement(object):
     .. versionadded:: 2.0.0
     """
 
+    keyspace = None
+    """
+    The string name of the keyspace this query acts on. This is used when
+    :class:`~.TokenAwarePolicy` is configured for
+    :attr:`.Cluster.load_balancing_policy`
+
+    It is set implicitly on :class:`.BoundStatement`, and :class:`.BatchStatement`, 
+    but must be set explicitly on :class:`.SimpleStatement`.
+
+    .. versionadded:: 2.1.3
+    """
+
     _serial_consistency_level = None
     _routing_key = None
 
     def __init__(self, retry_policy=None, consistency_level=None, routing_key=None,
-                 serial_consistency_level=None, fetch_size=FETCH_SIZE_UNSET):
+                 serial_consistency_level=None, fetch_size=FETCH_SIZE_UNSET, keyspace=None):
         self.retry_policy = retry_policy
         if consistency_level is not None:
             self.consistency_level = consistency_level
+        self._routing_key = routing_key
         if serial_consistency_level is not None:
             self.serial_consistency_level = serial_consistency_level
         if fetch_size is not FETCH_SIZE_UNSET:
             self.fetch_size = fetch_size
-        self._routing_key = routing_key
+        if keyspace is not None:
+            self.keyspace = keyspace
 
     def _get_routing_key(self):
         return self._routing_key
@@ -272,13 +286,6 @@ class Statement(object):
         .. versionadded:: 2.0.0
         """)
 
-    @property
-    def keyspace(self):
-        """
-        The string name of the keyspace this query acts on.
-        """
-        return None
-
 
 class SimpleStatement(Statement):
     """
@@ -319,14 +326,14 @@ class PreparedStatement(object):
     column_metadata = None
     query_id = None
     query_string = None
-    keyspace = None
+    keyspace = None # change to prepared_keyspace in major release
 
     routing_key_indexes = None
 
     consistency_level = None
     serial_consistency_level = None
 
-    _protocol_version = None
+    protocol_version = None
 
     fetch_size = FETCH_SIZE_UNSET
 
@@ -338,16 +345,16 @@ class PreparedStatement(object):
         self.routing_key_indexes = routing_key_indexes
         self.query_string = query
         self.keyspace = keyspace
-        self._protocol_version = protocol_version
+        self.protocol_version = protocol_version
         self.consistency_level = consistency_level
         self.serial_consistency_level = serial_consistency_level
         if fetch_size is not FETCH_SIZE_UNSET:
             self.fetch_size = fetch_size
 
     @classmethod
-    def from_message(cls, query_id, column_metadata, cluster_metadata, query, keyspace, protocol_version):
+    def from_message(cls, query_id, column_metadata, cluster_metadata, query, prepared_keyspace, protocol_version):
         if not column_metadata:
-            return PreparedStatement(column_metadata, query_id, None, query, keyspace, protocol_version)
+            return PreparedStatement(column_metadata, query_id, None, query, prepared_keyspace, protocol_version)
 
         partition_key_columns = None
         routing_key_indexes = None
@@ -370,7 +377,7 @@ class PreparedStatement(object):
                     pass          # statement; just leave routing_key_indexes as None
 
         return PreparedStatement(column_metadata, query_id, routing_key_indexes,
-                                 query, keyspace, protocol_version)
+                                 query, prepared_keyspace, protocol_version)
 
     def bind(self, values):
         """
@@ -410,11 +417,16 @@ class BoundStatement(Statement):
         `prepared_statement` should be an instance of :class:`PreparedStatement`.
         All other ``*args`` and ``**kwargs`` will be passed to :class:`.Statement`.
         """
+        self.prepared_statement = prepared_statement
+
         self.consistency_level = prepared_statement.consistency_level
         self.serial_consistency_level = prepared_statement.serial_consistency_level
         self.fetch_size = prepared_statement.fetch_size
-        self.prepared_statement = prepared_statement
         self.values = []
+
+        meta = prepared_statement.column_metadata
+        if meta:
+            self.keyspace = meta[0][0]
 
         Statement.__init__(self, *args, **kwargs)
 
@@ -429,7 +441,7 @@ class BoundStatement(Statement):
             values = ()
         col_meta = self.prepared_statement.column_metadata
 
-        proto_version = self.prepared_statement._protocol_version
+        proto_version = self.prepared_statement.protocol_version
 
         # special case for binding dicts
         if isinstance(values, dict):
@@ -470,6 +482,12 @@ class BoundStatement(Statement):
             raise ValueError(
                 "Too many arguments provided to bind() (got %d, expected %d)" %
                 (len(values), len(col_meta)))
+
+        if self.prepared_statement.routing_key_indexes and \
+           len(values) < len(self.prepared_statement.routing_key_indexes):
+            raise ValueError(
+                "Too few arguments provided to bind() (got %d, required %d for routing key)" %
+                (len(values), len(self.prepared_statement.routing_key_indexes)))
 
         self.raw_values = values
         self.values = []
@@ -513,14 +531,6 @@ class BoundStatement(Statement):
             self._routing_key = b"".join(components)
 
         return self._routing_key
-
-    @property
-    def keyspace(self):
-        meta = self.prepared_statement.column_metadata
-        if meta:
-            return meta[0][0]
-        else:
-            return None
 
     def __str__(self):
         consistency = ConsistencyLevel.value_to_name.get(self.consistency_level, 'Not Set')
@@ -620,8 +630,8 @@ class BatchStatement(Statement):
         .. code-block:: python
 
             batch = BatchStatement()
-            batch.add(SimpleStatement("INSERT INTO users (name, age) VALUES (%s, %s)", (name, age))
-            batch.add(SimpleStatement("DELETE FROM pending_users WHERE name=%s", (name,))
+            batch.add(SimpleStatement("INSERT INTO users (name, age) VALUES (%s, %s)"), (name, age))
+            batch.add(SimpleStatement("DELETE FROM pending_users WHERE name=%s"), (name,))
             session.execute(batch)
 
         .. versionadded:: 2.0.0
@@ -651,7 +661,7 @@ class BatchStatement(Statement):
         elif isinstance(statement, PreparedStatement):
             query_id = statement.query_id
             bound_statement = statement.bind(() if parameters is None else parameters)
-            self._maybe_set_routing_key(bound_statement)
+            self._maybe_set_routing_attributes(bound_statement)
             self._statements_and_parameters.append(
                 (True, query_id, bound_statement.values))
         elif isinstance(statement, BoundStatement):
@@ -659,7 +669,7 @@ class BatchStatement(Statement):
                 raise ValueError(
                     "Parameters cannot be passed with a BoundStatement "
                     "to BatchStatement.add()")
-            self._maybe_set_routing_key(statement)
+            self._maybe_set_routing_attributes(statement)
             self._statements_and_parameters.append(
                 (True, statement.prepared_statement.query_id, statement.values))
         else:
@@ -668,7 +678,7 @@ class BatchStatement(Statement):
             if parameters:
                 encoder = Encoder() if self._session is None else self._session.encoder
                 query_string = bind_params(query_string, parameters, encoder)
-            self._maybe_set_routing_key(statement)
+            self._maybe_set_routing_attributes(statement)
             self._statements_and_parameters.append((False, query_string, ()))
         return self
 
@@ -681,9 +691,11 @@ class BatchStatement(Statement):
         for statement, value in zip(statements, parameters):
             self.add(statement, parameters)
 
-    def _maybe_set_routing_key(self, statement):
-        if self.routing_key is None and statement.routing_key is not None:
-            self.routing_key = statement.routing_key
+    def _maybe_set_routing_attributes(self, statement):
+        if self.routing_key is None:
+            if statement.keyspace and statement.routing_key:
+                self.routing_key = statement.routing_key
+                self.keyspace = statement.keyspace
 
     def __str__(self):
         consistency = ConsistencyLevel.value_to_name.get(self.consistency_level, 'Not Set')

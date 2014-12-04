@@ -359,7 +359,7 @@ class TokenAwarePolicy(LoadBalancingPolicy):
                 yield host
         else:
             routing_key = query.routing_key
-            if routing_key is None:
+            if routing_key is None or keyspace is None:
                 for host in child.make_query_plan(keyspace, query):
                     yield host
             else:

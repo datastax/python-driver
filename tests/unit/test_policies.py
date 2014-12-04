@@ -381,7 +381,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
         policy.populate(cluster, hosts)
 
         for i in range(4):
-            query = Statement(routing_key=struct.pack('>i', i))
+            query = Statement(routing_key=struct.pack('>i', i), keyspace='keyspace_name')
             qplan = list(policy.make_query_plan(None, query))
 
             replicas = get_replicas(None, struct.pack('>i', i))
@@ -420,7 +420,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
         policy.populate(cluster, hosts)
 
         for i in range(4):
-            query = Statement(routing_key=struct.pack('>i', i))
+            query = Statement(routing_key=struct.pack('>i', i), keyspace='keyspace_name')
             qplan = list(policy.make_query_plan(None, query))
             replicas = get_replicas(None, struct.pack('>i', i))
 

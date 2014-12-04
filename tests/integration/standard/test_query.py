@@ -149,11 +149,15 @@ class PreparedStatementTests(unittest.TestCase):
             """
             INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
             """)
-        prepared.routing_key_indexes = {0: {0: 0}, 1: {1: 1}}
-
         self.assertIsInstance(prepared, PreparedStatement)
+
+        prepared.routing_key_indexes = [0, 1]
         bound = prepared.bind((1, 2))
-        self.assertEqual(bound.routing_key, b'\x04\x00\x00\x00\x04\x00\x00\x00')
+        self.assertEqual(bound.routing_key, b'\x00\x04\x00\x00\x00\x01\x00\x00\x04\x00\x00\x00\x02\x00')
+
+        prepared.routing_key_indexes = [1, 0]
+        bound = prepared.bind((1, 2))
+        self.assertEqual(bound.routing_key, b'\x00\x04\x00\x00\x00\x02\x00\x00\x04\x00\x00\x00\x01\x00')
 
     def test_bound_keyspace(self):
         """
@@ -171,9 +175,6 @@ class PreparedStatementTests(unittest.TestCase):
         self.assertIsInstance(prepared, PreparedStatement)
         bound = prepared.bind((1, 2))
         self.assertEqual(bound.keyspace, 'test3rf')
-
-        bound.prepared_statement.column_metadata = None
-        self.assertEqual(bound.keyspace, None)
 
 
 class PrintStatementTests(unittest.TestCase):
@@ -436,7 +437,7 @@ class BatchStatementDefaultRoutingKeyTests(unittest.TestCase):
         query = """
                 INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
                 """
-        self.simple_statement = SimpleStatement(query, routing_key='ss_rk')
+        self.simple_statement = SimpleStatement(query, routing_key='ss_rk', keyspace='keyspace_name')
         self.prepared = self.session.prepare(query)
 
     def tearDown(self):
