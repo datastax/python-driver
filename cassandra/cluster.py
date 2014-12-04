@@ -1714,7 +1714,7 @@ class ControlConnection(object):
     _SELECT_PEERS = "SELECT peer, data_center, rack, tokens, rpc_address, schema_version FROM system.peers"
     _SELECT_LOCAL = "SELECT cluster_name, data_center, rack, tokens, partitioner, schema_version FROM system.local WHERE key='local'"
 
-    _SELECT_SCHEMA_PEERS = "SELECT rpc_address, schema_version FROM system.peers"
+    _SELECT_SCHEMA_PEERS = "SELECT peer, rpc_address, schema_version FROM system.peers"
     _SELECT_SCHEMA_LOCAL = "SELECT schema_version FROM system.local WHERE key='local'"
 
     _is_shutdown = False
@@ -2210,16 +2210,17 @@ class ControlConnection(object):
                 versions[local_row.get("schema_version")].add(local_address)
 
         for row in peers_result:
-            if not row.get("rpc_address") or not row.get("schema_version"):
+            schema_ver = row.get('schema_version')
+            if not schema_ver:
                 continue
 
-            rpc = row.get("rpc_address")
-            if rpc == "0.0.0.0":  # TODO ipv6 check
-                rpc = row.get("peer")
+            addr = row.get("rpc_address")
+            if not addr or addr in ["0.0.0.0", "::"]:
+                addr = row.get("peer")
 
-            peer = self._cluster.metadata.get_host(rpc)
+            peer = self._cluster.metadata.get_host(addr)
             if peer and peer.is_up:
-                versions[row.get("schema_version")].add(rpc)
+                versions[schema_ver].add(addr)
 
         if len(versions) == 1:
             log.debug("[control connection] Schemas match")
