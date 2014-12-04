@@ -2383,8 +2383,8 @@ class ResponseFuture(object):
     _final_result = _NOT_SET
     _final_exception = None
     _query_trace = None
-    _callback = None
-    _errback = None
+    _callbacks = None
+    _errbacks = None
     _current_host = None
     _current_pool = None
     _connection = None
@@ -2407,6 +2407,8 @@ class ResponseFuture(object):
         self._make_query_plan()
         self._event = Event()
         self._errors = {}
+        self._callbacks = []
+        self._errbacks = []
 
     def _make_query_plan(self):
         # convert the list/generator/etc to an iterator so that subsequent
@@ -2706,8 +2708,10 @@ class ResponseFuture(object):
             self._final_result = response
 
         self._event.set()
-        if self._callback:
-            fn, args, kwargs = self._callback
+
+        # apply each callback
+        for callback in self._callbacks:
+            fn, args, kwargs = callback
             fn(response, *args, **kwargs)
 
     def _set_final_exception(self, response):
@@ -2717,8 +2721,9 @@ class ResponseFuture(object):
         with self._callback_lock:
             self._final_exception = response
         self._event.set()
-        if self._errback:
-            fn, args, kwargs = self._errback
+
+        for errback in self._errbacks:
+            fn, args, kwargs = errback
             fn(response, *args, **kwargs)
 
     def _retry(self, reuse_connection, consistency_level):
@@ -2846,7 +2851,7 @@ class ResponseFuture(object):
             if self._final_result is not _NOT_SET:
                 run_now = True
             else:
-                self._callback = (fn, args, kwargs)
+                self._callbacks.append((fn, args, kwargs))
         if run_now:
             fn(self._final_result, *args, **kwargs)
         return self
@@ -2862,7 +2867,7 @@ class ResponseFuture(object):
             if self._final_exception:
                 run_now = True
             else:
-                self._errback = (fn, args, kwargs)
+                self._errbacks.append((fn, args, kwargs))
         if run_now:
             fn(self._final_exception, *args, **kwargs)
         return self
@@ -2897,8 +2902,8 @@ class ResponseFuture(object):
 
     def clear_callbacks(self):
         with self._callback_lock:
-            self._callback = None
-            self._errback = None
+            self._callback = []
+            self._errback = []
 
     def __str__(self):
         result = "(no result yet)" if self._final_result is _NOT_SET else self._final_result
