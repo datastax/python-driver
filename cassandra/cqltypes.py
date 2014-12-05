@@ -36,7 +36,7 @@ import io
 import re
 import socket
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import UUID
 import warnings
 
@@ -565,7 +565,13 @@ class DateType(_CassandraType):
 
     @staticmethod
     def deserialize(byts, protocol_version):
-        return datetime.utcfromtimestamp(int64_unpack(byts) / 1000.0)
+        timestamp = int64_unpack(byts) / 1000.0
+        if timestamp >= 0:
+            dt = datetime.utcfromtimestamp(timestamp)
+        else:
+            # PYTHON-119: workaround for Windows
+            dt = datetime(1970, 1, 1) + timedelta(seconds=timestamp)
+        return dt
 
     @staticmethod
     def serialize(v, protocol_version):
