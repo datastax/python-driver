@@ -201,7 +201,7 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(DateType.deserialize(int64_pack(1000 * expected), 0), datetime.datetime.utcfromtimestamp(expected))
 
         # beyond 32b
-        expected = long(2**33)
+        expected = 2**33
         self.assertEqual(DateType.deserialize(int64_pack(1000 * expected), 0), datetime.datetime.utcfromtimestamp(expected))
 
         # less than epoc (PYTHON-119)
