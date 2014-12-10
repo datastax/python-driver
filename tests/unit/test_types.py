@@ -20,11 +20,12 @@ except ImportError:
 
 from binascii import unhexlify
 import datetime
+import time
 import cassandra
 from cassandra.cqltypes import (BooleanType, lookup_casstype_simple, lookup_casstype,
                                 LongType, DecimalType, SetType, cql_typename,
                                 CassandraType, UTF8Type, parse_casstype_args,
-                                EmptyValue, _CassandraType, DateType)
+                                EmptyValue, _CassandraType, DateType, int64_pack)
 from cassandra.query import named_tuple_factory
 from cassandra.protocol import (write_string, read_longstring, write_stringmap,
                                 read_stringmap, read_inet, write_inet,
@@ -99,11 +100,7 @@ class TypeTests(unittest.TestCase):
         # like "MapType(AsciiType, IntegerType)" and "ReversedType(AsciiType)"
         self.assertEqual(str(lookup_casstype(BooleanType(True))), str(BooleanType(True)))
 
-    def test_cassandratype(self):
-        """
-        Smoke test cass_parameterized_type_with
-        """
-
+    def test_casstype_parameterized(self):
         self.assertEqual(LongType.cass_parameterized_type_with(()), 'LongType')
         self.assertEqual(LongType.cass_parameterized_type_with((), full=True), 'org.apache.cassandra.db.marshal.LongType')
         self.assertEqual(SetType.cass_parameterized_type_with([DecimalType], full=True), 'org.apache.cassandra.db.marshal.SetType(org.apache.cassandra.db.marshal.DecimalType)')
@@ -115,11 +112,7 @@ class TypeTests(unittest.TestCase):
                 'map<text, text>',
                 cassandra.cqltypes.MapType.apply_parameters(subtypes).cql_parameterized_type())
 
-    def test_datetype(self):
-        """
-        Test cassandra.cqltypes.DateType() construction
-        """
-
+    def test_datetype_from_string(self):
         # Ensure all formats can be parsed, without exception
         for format in cassandra.cqltypes.cql_time_formats:
             date_string = str(datetime.datetime.now().strftime(format))
@@ -180,16 +173,41 @@ class TypeTests(unittest.TestCase):
     def test_empty_value(self):
         self.assertEqual(str(EmptyValue()), 'EMPTY')
 
-    def test_CassandraType(self):
+    def test_cassandratype_base(self):
         cassandra_type = _CassandraType('randomvaluetocheck')
         self.assertEqual(cassandra_type.val, 'randomvaluetocheck')
         self.assertEqual(cassandra_type.validate('randomvaluetocheck2'), 'randomvaluetocheck2')
         self.assertEqual(cassandra_type.val, 'randomvaluetocheck')
 
-    def test_DateType(self):
-        now = datetime.datetime.now()
-        date_type = DateType(now)
-        self.assertEqual(date_type.my_timestamp(), now)
+    def test_datetype(self):
+        now_timestamp = time.time()
+        now_datetime = datetime.datetime.utcfromtimestamp(now_timestamp)
+
+        # same results serialized
+        # (this could change if we follow up on the timestamp multiplication warning in DateType.serialize)
+        self.assertEqual(DateType.serialize(now_datetime, 0), DateType.serialize(now_timestamp, 0))
+
+        # from timestamp
+        date_type = DateType(now_timestamp)
+        self.assertEqual(date_type.my_timestamp(), now_timestamp)
+
+        # from datetime object
+        date_type = DateType(now_datetime)
+        self.assertEqual(date_type.my_timestamp(), now_datetime)
+
+        # deserialize
+        # epoc
+        expected = 0
+        self.assertEqual(DateType.deserialize(int64_pack(1000 * expected), 0), datetime.datetime.utcfromtimestamp(expected))
+
+        # beyond 32b
+        expected = long(2**33)
+        self.assertEqual(DateType.deserialize(int64_pack(1000 * expected), 0), datetime.datetime.utcfromtimestamp(expected))
+
+        # less than epoc (PYTHON-119)
+        expected = -770172256
+        self.assertEqual(DateType.deserialize(int64_pack(1000 * expected), 0), datetime.datetime(1945, 8, 5, 23, 15, 44))
+
         self.assertRaises(ValueError, date_type.interpret_datestring, 'fakestring')
 
     def test_write_read_string(self):

@@ -575,7 +575,6 @@ class DateType(_CassandraType):
 
     @staticmethod
     def serialize(v, protocol_version):
-        global _have_warned_about_timestamps
         try:
             converted = calendar.timegm(v.utctimetuple())
             converted = converted * 1e3 + getattr(v, 'microsecond', 0) / 1e3
@@ -584,6 +583,7 @@ class DateType(_CassandraType):
             if type(v) not in _number_types:
                 raise TypeError('DateType arguments must be a datetime or timestamp')
 
+            global _have_warned_about_timestamps
             if not _have_warned_about_timestamps:
                 _have_warned_about_timestamps = True
                 warnings.warn(
