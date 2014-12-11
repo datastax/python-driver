@@ -84,6 +84,11 @@ class ClusterTests(unittest.TestCase):
             self.assertEqual([(True, [(i,)]) for i in range(num_statements)], results)
 
     def test_execute_concurrent_paged_result(self):
+        if PROTOCOL_VERSION < 2:
+            raise unittest.SkipTest(
+                "Protocol 2+ is required for Paging, currently testing against %r"
+                % (PROTOCOL_VERSION,))
+
         num_statements = 201
         statement = SimpleStatement(
             "INSERT INTO test3rf.test (k, v) VALUES (%s, %s)",

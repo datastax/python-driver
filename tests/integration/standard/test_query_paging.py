@@ -37,7 +37,7 @@ class QueryPagingTests(unittest.TestCase):
     def setUp(self):
         if PROTOCOL_VERSION < 2:
             raise unittest.SkipTest(
-                "Protocol 2.0+ is required for BATCH operations, currently testing against %r"
+                "Protocol 2.0+ is required for Paging state, currently testing against %r"
                 % (PROTOCOL_VERSION,))
 
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
