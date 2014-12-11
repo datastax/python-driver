@@ -26,7 +26,8 @@ from cassandra.metadata import (Murmur3Token, MD5Token,
                                 NetworkTopologyStrategy, SimpleStrategy,
                                 LocalStrategy, NoMurmur3, protect_name,
                                 protect_names, protect_value, is_valid_name,
-                                UserType, KeyspaceMetadata, Metadata)
+                                UserType, KeyspaceMetadata, Metadata,
+                                _UnknownStrategy)
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
@@ -47,36 +48,25 @@ class StrategiesTest(unittest.TestCase):
 
         rs = ReplicationStrategy()
 
-        self.assertEqual(rs.create('OldNetworkTopologyStrategy', None), None)
-        self.assertEqual(rs.create('xxxxxxOldNetworkTopologyStrategy', None), None)
+        self.assertEqual(rs.create('OldNetworkTopologyStrategy', None), _UnknownStrategy('OldNetworkTopologyStrategy', None))
 
         fake_options_map = {'dc1': '3'}
         self.assertIsInstance(rs.create('NetworkTopologyStrategy', fake_options_map), NetworkTopologyStrategy)
         self.assertEqual(rs.create('NetworkTopologyStrategy', fake_options_map).dc_replication_factors,
                          NetworkTopologyStrategy(fake_options_map).dc_replication_factors)
 
-        self.assertIsInstance(rs.create('xxxxxxNetworkTopologyStrategy', fake_options_map), NetworkTopologyStrategy)
-        self.assertEqual(rs.create('xxxxxxNetworkTopologyStrategy', fake_options_map).dc_replication_factors,
-                         NetworkTopologyStrategy(fake_options_map).dc_replication_factors)
-
         fake_options_map = {'options': 'map'}
-        self.assertEqual(rs.create('SimpleStrategy', fake_options_map), None)
-        self.assertEqual(rs.create('xxxxxxSimpleStrategy', fake_options_map), None)
+        self.assertRaises(TypeError, rs.create, 'SimpleStrategy', fake_options_map)
 
         fake_options_map = {'options': 'map'}
         self.assertIsInstance(rs.create('LocalStrategy', fake_options_map), LocalStrategy)
-        self.assertIsInstance(rs.create('xxxxxxLocalStrategy', fake_options_map), LocalStrategy)
 
         fake_options_map = {'options': 'map', 'replication_factor': 3}
         self.assertIsInstance(rs.create('SimpleStrategy', fake_options_map), SimpleStrategy)
         self.assertEqual(rs.create('SimpleStrategy', fake_options_map).replication_factor,
                          SimpleStrategy(fake_options_map['replication_factor']).replication_factor)
 
-        self.assertIsInstance(rs.create('xxxxxxSimpleStrategy', fake_options_map), SimpleStrategy)
-        self.assertEqual(rs.create('xxxxxxSimpleStrategy', fake_options_map).replication_factor,
-                         SimpleStrategy(fake_options_map['replication_factor']).replication_factor)
-
-        self.assertEqual(rs.create('xxxxxxxx', fake_options_map), None)
+        self.assertEqual(rs.create('xxxxxxxx', fake_options_map), _UnknownStrategy('xxxxxxxx', fake_options_map))
 
         self.assertRaises(NotImplementedError, rs.make_token_replica_map, None, None)
         self.assertRaises(NotImplementedError, rs.export_for_schema)
