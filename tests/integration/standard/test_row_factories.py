@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests.integration import PROTOCOL_VERSION
+from tests.integration import get_server_versions, PROTOCOL_VERSION
 
 try:
     import unittest2 as unittest
@@ -143,29 +143,28 @@ class NamedTupleFactoryAndNumericColNamesTests(unittest.TestCase):
     """
     Test for PYTHON-122: Improve Error Handling/Reporting for named_tuple_factory and Numeric Column Names
     """
-    def setUp(self):
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        self.session = self.cluster.connect()
+    @classmethod
+    def setup_class(cls):
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.session = cls.cluster.connect()
 
+        cls._cass_version, cls._cql_version = get_server_versions()
         ddl = '''
-            CREATE TABLE test3rf.ToBeIndexed ( key blob PRIMARY KEY, "626972746864617465" blob )
+            CREATE TABLE test1rf.table_num_col ( key blob PRIMARY KEY, "626972746864617465" blob )
             WITH COMPACT STORAGE'''
+        cls.session.execute(ddl)
 
-        self.session.execute(ddl)
-
-    def tearDown(self):
-        """
-        Shutdown cluster
-        """
-        self.session.execute("DROP TABLE test3rf.ToBeIndexed")
-        self.cluster.shutdown()
+    @classmethod
+    def teardown_class(cls):
+        cls.session.execute("DROP TABLE test1rf.table_num_col")
+        cls.cluster.shutdown()
 
     def test_no_exception_on_select(self):
         """
         no exception on SELECT for numeric column name
         """
         try:
-            self.session.execute('SELECT * FROM test3rf.ToBeIndexed')
+            self.session.execute('SELECT * FROM test1rf.table_num_col')
         except ValueError as e:
             self.fail("Unexpected ValueError exception: %s" % e.message)
 
@@ -173,8 +172,11 @@ class NamedTupleFactoryAndNumericColNamesTests(unittest.TestCase):
         """
         can SELECT "<numeric col name>" AS aliases
         """
+        if self._cass_version < (2, 0, 0):
+            raise unittest.SkipTest("Alias in SELECT not supported before 2.0")
+
         try:
-            self.session.execute('SELECT key, "626972746864617465" AS my_col from test3rf.ToBeIndexed')
+            self.session.execute('SELECT key, "626972746864617465" AS my_col from test1rf.table_num_col')
         except ValueError as e:
             self.fail("Unexpected ValueError exception: %s" % e.message)
 
@@ -184,6 +186,6 @@ class NamedTupleFactoryAndNumericColNamesTests(unittest.TestCase):
         """
         self.session.row_factory = dict_factory
         try:
-            self.session.execute('SELECT * FROM test3rf.ToBeIndexed')
+            self.session.execute('SELECT * FROM test1rf.table_num_col')
         except ValueError as e:
             self.fail("Unexpected ValueError exception: %s" % e.message)
