@@ -565,3 +565,37 @@ class TokenMetadataTest(unittest.TestCase):
             replicas = token_map.get_replicas("ks", MD5Token(str(token.value + 1)))
             expected_host = hosts[(i + 1) % len(hosts)]
             self.assertEqual(set(replicas), set([expected_host]))
+
+
+class TableAlterMetadata(unittest.TestCase):
+    """
+    Test verifies that table metadata is preserved on keyspace alter
+    """
+    def setUp(self):
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.session = self.cluster.connect()
+        name = self._testMethodName.lower()
+        crt_ks = '''
+                CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1} AND durable_writes = true''' % name
+        self.session.execute(crt_ks)
+
+    def tearDown(self):
+        name = self._testMethodName.lower()
+        self.session.execute('DROP KEYSPACE %s' % name)
+        self.cluster.shutdown()
+
+    def test_keyspace_alter(self):
+        """
+        Table info is preserved upon keyspace alter:
+        Create table
+        Verify schema
+        Alter ks
+        Verify that table metadata is still present
+        """
+        name = self._testMethodName.lower()
+
+        self.session.execute('CREATE TABLE %s.d (d INT PRIMARY KEY)' % name)
+        self.assertTrue(self.cluster.metadata.keyspaces[name].tables)
+
+        self.session.execute('ALTER KEYSPACE %s WITH durable_writes = false' %name)
+        self.assertTrue(self.cluster.metadata.keyspaces[name].tables)
