@@ -143,7 +143,7 @@ class Unavailable(Exception):
     """ The number of replicas that were actually alive """
 
     def __init__(self, summary_message, consistency=None, required_replicas=None, alive_replicas=None):
-        self.consistency_level = consistency
+        self.consistency = consistency
         self.required_replicas = required_replicas
         self.alive_replicas = alive_replicas
         Exception.__init__(self, summary_message + ' info=' +
