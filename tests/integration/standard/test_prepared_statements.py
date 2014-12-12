@@ -13,16 +13,20 @@
 # limitations under the License.
 
 
-from tests.integration import PROTOCOL_VERSION
+from tests.integration import use_singledc, PROTOCOL_VERSION
 
 try:
     import unittest2 as unittest
 except ImportError:
-    import unittest # noqa
+    import unittest  # noqa
 from cassandra import InvalidRequest
 
 from cassandra.cluster import Cluster
 from cassandra.query import PreparedStatement
+
+
+def setup_module():
+    use_singledc()
 
 
 class PreparedStatementTests(unittest.TestCase):

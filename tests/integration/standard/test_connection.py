@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests.integration import PROTOCOL_VERSION
+from tests.integration import use_singledc, PROTOCOL_VERSION
 
 try:
     import unittest2 as unittest
 except ImportError:
-    import unittest # noqa
+    import unittest  # noqa
 
 from functools import partial
 from six.moves import range
@@ -33,6 +33,10 @@ try:
     from cassandra.io.libevreactor import LibevConnection
 except ImportError:
     LibevConnection = None
+
+
+def setup_module():
+    use_singledc()
 
 
 class ConnectionTests(object):

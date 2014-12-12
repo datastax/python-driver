@@ -17,13 +17,17 @@ import time
 try:
     import unittest2 as unittest
 except ImportError:
-    import unittest # noqa
+    import unittest  # noqa
 
 from cassandra.query import SimpleStatement
 from cassandra import ConsistencyLevel, WriteTimeout, Unavailable, ReadTimeout
 
 from cassandra.cluster import Cluster, NoHostAvailable
-from tests.integration import get_node, get_cluster, PROTOCOL_VERSION
+from tests.integration import get_cluster, get_node, use_singledc, PROTOCOL_VERSION
+
+
+def setup_module():
+    use_singledc()
 
 
 class MetricsTests(unittest.TestCase):

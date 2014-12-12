@@ -17,21 +17,33 @@ import logging
 from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.cluster import Cluster
 from cassandra.query import SimpleStatement
-from tests.integration import PROTOCOL_VERSION
+from tests.integration import use_singledc, PROTOCOL_VERSION
 
 try:
     import unittest2 as unittest
 except ImportError:
-    import unittest # noqa
+    import unittest  # noqa
 
 log = logging.getLogger(__name__)
 
 
+def setup_module():
+    use_singledc()
+
+
 class SchemaTests(unittest.TestCase):
 
+    @classmethod
+    def setup_class(cls):
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.session = cls.cluster.connect()
+
+    @classmethod
+    def teardown_class(cls):
+        cls.cluster.shutdown()
+
     def test_recreates(self):
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
+        session = self.session
         replication_factor = 3
 
         for i in range(2):
@@ -66,8 +78,7 @@ class SchemaTests(unittest.TestCase):
                 session.execute(ss)
 
     def test_for_schema_disagreements_different_keyspaces(self):
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
+        session = self.session
 
         for i in xrange(30):
             try:
@@ -90,7 +101,8 @@ class SchemaTests(unittest.TestCase):
                 session.execute('''
                     DROP KEYSPACE test_%s
                 ''' % i)
-            except OperationTimedOut: pass
+            except OperationTimedOut:
+                pass
 
     def test_for_schema_disagreements_same_keyspace(self):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
@@ -117,4 +129,5 @@ class SchemaTests(unittest.TestCase):
                 session.execute('''
                     DROP KEYSPACE test
                 ''')
-            except OperationTimedOut: pass
+            except OperationTimedOut:
+                pass

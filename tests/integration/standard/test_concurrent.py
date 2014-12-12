@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests.integration import PROTOCOL_VERSION
+from tests.integration import use_singledc, PROTOCOL_VERSION
 
 try:
     import unittest2 as unittest
@@ -27,6 +27,10 @@ from cassandra.concurrent import (execute_concurrent,
                                   execute_concurrent_with_args)
 from cassandra.policies import HostDistance
 from cassandra.query import tuple_factory, SimpleStatement
+
+
+def setup_module():
+    use_singledc()
 
 
 class ClusterTests(unittest.TestCase):
@@ -103,7 +107,7 @@ class ClusterTests(unittest.TestCase):
         statement = SimpleStatement(
             "SELECT * FROM test3rf.test LIMIT %s",
             consistency_level=ConsistencyLevel.QUORUM,
-            fetch_size=int(num_statements/2))
+            fetch_size=int(num_statements / 2))
         parameters = [(i, ) for i in range(num_statements)]
 
         results = execute_concurrent_with_args(self.session, statement, [(num_statements,)])

@@ -25,9 +25,13 @@ from collections import namedtuple
 
 from cassandra.cluster import Cluster, UserTypeDoesNotExist
 
-from tests.integration import get_server_versions, PROTOCOL_VERSION
+from tests.integration import get_server_versions, use_singledc, PROTOCOL_VERSION
 from tests.integration.datatype_utils import get_sample, get_nonprim_sample,\
     DATA_TYPE_PRIMITIVES, DATA_TYPE_NON_PRIMITIVE_NAMES
+
+
+def setup_module():
+    use_singledc()
 
 
 class TypeTests(unittest.TestCase):
@@ -330,7 +334,7 @@ class TypeTests(unittest.TestCase):
         if self._cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
-        MAX_NESTING_DEPTH = 128
+        MAX_NESTING_DEPTH = 16
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
         s = c.connect()
@@ -392,7 +396,7 @@ class TypeTests(unittest.TestCase):
         if self._cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
-        MAX_NESTING_DEPTH = 128
+        MAX_NESTING_DEPTH = 16
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
         s = c.connect()
@@ -452,13 +456,13 @@ class TypeTests(unittest.TestCase):
         created namedtuples are use names that are different the cql type.
 
         Future improvement: optimize these three related tests using a single
-        helper method to cut down on code reuse.
+        helper method to cut down on code repetition.
         """
 
         if self._cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
-        MAX_NESTING_DEPTH = 128
+        MAX_NESTING_DEPTH = 16
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
         s = c.connect()

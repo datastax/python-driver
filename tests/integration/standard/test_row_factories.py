@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests.integration import get_server_versions, PROTOCOL_VERSION
+from tests.integration import get_server_versions, use_singledc, PROTOCOL_VERSION
 
 try:
     import unittest2 as unittest
@@ -22,6 +22,10 @@ except ImportError:
 from cassandra.cluster import Cluster
 from cassandra.query import tuple_factory, named_tuple_factory, dict_factory, ordered_dict_factory
 from cassandra.util import OrderedDict
+
+
+def setup_module():
+    use_singledc()
 
 
 class RowFactoryTests(unittest.TestCase):

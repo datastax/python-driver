@@ -24,8 +24,12 @@ from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster
 from cassandra.query import dict_factory
 from cassandra.query import SimpleStatement
-from tests.integration import PROTOCOL_VERSION
+from tests.integration import use_singledc, PROTOCOL_VERSION
 from tests.integration.long.utils import create_schema
+
+
+def setup_module():
+    use_singledc()
 
 
 # Converts an integer to an string of letters

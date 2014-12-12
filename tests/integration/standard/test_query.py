@@ -27,7 +27,11 @@ from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
 from cassandra.cluster import Cluster
 from cassandra.policies import HostDistance
 
-from tests.integration import PROTOCOL_VERSION
+from tests.integration import use_singledc, PROTOCOL_VERSION
+
+
+def setup_module():
+    use_singledc()
 
 
 class QueryTests(unittest.TestCase):
@@ -396,7 +400,6 @@ class LightweightTransactionTests(unittest.TestCase):
         delete_statement = self.session.prepare("DELETE FROM test3rf.lwt WHERE k = 0 IF EXISTS")
 
         iterations = int(os.getenv("LWT_ITERATIONS", 1000))
-        print("Started test for %d iterations" % iterations)
 
         # Prepare series of parallel statements
         statements_and_params = []
@@ -414,7 +417,6 @@ class LightweightTransactionTests(unittest.TestCase):
                 self.fail("PYTHON-91: Disconnected from Cassandra: %s" % result.message)
                 break
             if type(result).__name__ == "WriteTimeout":
-                print("Timeout: %s" % result.message)
                 received_timeout = True
                 continue
             self.fail("Unexpected exception %s: %s" % (type(result).__name__, result.message))

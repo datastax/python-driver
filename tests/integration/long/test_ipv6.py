@@ -18,8 +18,7 @@ import socket
 
 from cassandra.cluster import Cluster, NoHostAvailable
 from ccmlib import common
-from ccmlib.cluster import Cluster as CCMCluster
-from tests.integration import setup_package, teardown_package, PROTOCOL_VERSION, CASSANDRA_DIR, CASSANDRA_VERSION, path
+from tests.integration import use_cluster, remove_cluster, PROTOCOL_VERSION
 from cassandra.io.asyncorereactor import AsyncoreConnection
 
 try:
@@ -40,39 +39,17 @@ log = logging.getLogger(__name__)
 IPV6_CLUSTER_NAME = 'ipv6_test_cluster'
 
 
-def setup_module(cls):
+def setup_module(module):
     validate_ccm_viable()
     validate_host_viable()
-    cls.ccm_cluster = object()
-    teardown_package()
-    try:
-        try:
-            ccm_cluster = CCMCluster.load(path, IPV6_CLUSTER_NAME)
-            log.debug("Found existing ccm test ipv6 cluster, clearing")
-            ccm_cluster.clear()
-        except Exception:
-            log.debug("Creating new ccm test ipv6 cluster")
-            if CASSANDRA_DIR:
-                ccm_cluster = CCMCluster(path, IPV6_CLUSTER_NAME, cassandra_dir=CASSANDRA_DIR)
-            else:
-                ccm_cluster = CCMCluster(path, IPV6_CLUSTER_NAME, cassandra_version=CASSANDRA_VERSION)
-            ccm_cluster.set_configuration_options({'start_native_transport': True})
-            common.switch_cluster(path, IPV6_CLUSTER_NAME)
-            ccm_cluster.populate(1, ipformat='::%d')
-
-        log.debug("Starting ccm test cluster")
-        ccm_cluster.start(wait_for_binary_proto=True)
-    except Exception:
-        log.exception("Failed to start ccm cluster:")
-        raise
-
-    log.debug("Switched to ipv6 cluster")
-    cls.ccm_cluster = ccm_cluster
+    # We use a dedicated cluster (instead of common singledc, as in other tests) because
+    # it's most likely that the test host will only have one local ipv6 address (::1)
+    # singledc has three
+    use_cluster(IPV6_CLUSTER_NAME, [1], ipformat='::%d')
 
 
-def teardown_module(cls):
-    cls.ccm_cluster.stop()
-    setup_package()
+def teardown_module():
+    remove_cluster()
 
 
 def validate_ccm_viable():

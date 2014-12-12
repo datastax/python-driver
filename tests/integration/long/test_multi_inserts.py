@@ -6,6 +6,11 @@ except ImportError:
 
 import os
 from cassandra.cluster import Cluster
+from tests.integration import use_singledc, PROTOCOL_VERSION
+
+
+def setup_module():
+    use_singledc()
 
 
 class StressInsertsTests(unittest.TestCase):
@@ -21,7 +26,7 @@ class StressInsertsTests(unittest.TestCase):
         DROP TABLE IF EXISTS race;
         CREATE TABLE race (x int PRIMARY KEY);
         """
-        self.cluster=Cluster()
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         self.session = self.cluster.connect('test1rf')
 
         ddl1 = '''
@@ -46,9 +51,9 @@ class StressInsertsTests(unittest.TestCase):
         The number of inserts can be set through INSERTS_ITERATIONS environmental variable.
         Default value is 1000000.
         """
-        prepared = self.session.prepare ("INSERT INTO race (x) VALUES (?)")
+        prepared = self.session.prepare("INSERT INTO race (x) VALUES (?)")
         iterations = int(os.getenv("INSERT_ITERATIONS", 1000000))
-        i=0
+        i = 0
         leaking_connections = False
         while i < iterations and not leaking_connections:
             bound = prepared.bind((i,))
@@ -61,6 +66,6 @@ class StressInsertsTests(unittest.TestCase):
                         print self.session.get_pool_state()
                         leaking_connections = True
                         break
-            i=i+1
+            i = i + 1
 
         self.assertFalse(leaking_connections, 'Detected leaking connection after %s iterations' % i)

@@ -16,7 +16,7 @@ import six
 try:
     import unittest2 as unittest
 except ImportError:
-    import unittest # noqa
+    import unittest  # noqa
 
 from mock import Mock
 
@@ -28,7 +28,12 @@ from cassandra.metadata import (Metadata, KeyspaceMetadata, TableMetadata,
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
-from tests.integration import get_cluster, PROTOCOL_VERSION, get_server_versions
+from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION,
+                               get_server_versions)
+
+
+def setup_module():
+    use_singledc()
 
 
 class SchemaMetadataTests(unittest.TestCase):
@@ -342,6 +347,11 @@ class TestCodeCoverage(unittest.TestCase):
         if get_server_versions()[0] < (2, 1, 0):
             raise unittest.SkipTest('UDTs were introduced in Cassandra 2.1')
 
+        if PROTOCOL_VERSION < 3:
+            raise unittest.SkipTest(
+                "Protocol 3.0+ is required for UDT change events, currently testing against %r"
+                % (PROTOCOL_VERSION,))
+
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
@@ -503,8 +513,8 @@ CREATE TABLE export_udts.users (
 
         self.assertNotEqual(list(cluster.metadata.get_replicas('test3rf', 'key')), [])
         host = list(cluster.metadata.get_replicas('test3rf', 'key'))[0]
-        self.assertEqual(host.datacenter, 'datacenter1')
-        self.assertEqual(host.rack, 'rack1')
+        self.assertEqual(host.datacenter, 'dc1')
+        self.assertEqual(host.rack, 'r1')
 
     def test_token_map(self):
         """

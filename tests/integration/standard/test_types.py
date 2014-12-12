@@ -32,7 +32,11 @@ from cassandra.cqltypes import Int32Type, EMPTY
 from cassandra.query import dict_factory
 from cassandra.util import OrderedDict, sortedset
 
-from tests.integration import get_server_versions, PROTOCOL_VERSION
+from tests.integration import get_server_versions, use_singledc, PROTOCOL_VERSION
+
+
+def setup_module():
+    use_singledc()
 
 
 class TypeTests(unittest.TestCase):

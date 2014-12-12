@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests.integration import PROTOCOL_VERSION
+from tests.integration import use_singledc, PROTOCOL_VERSION
 
 import logging
 log = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ log = logging.getLogger(__name__)
 try:
     import unittest2 as unittest
 except ImportError:
-    import unittest # noqa
+    import unittest  # noqa
 
 from itertools import cycle, count
 from six.moves import range
@@ -30,6 +30,10 @@ from cassandra.cluster import Cluster, PagedResult
 from cassandra.concurrent import execute_concurrent, execute_concurrent_with_args
 from cassandra.policies import HostDistance
 from cassandra.query import SimpleStatement
+
+
+def setup_module():
+    use_singledc()
 
 
 class QueryPagingTests(unittest.TestCase):

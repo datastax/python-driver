@@ -12,18 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests.integration import PROTOCOL_VERSION
+from tests.integration import use_singledc, PROTOCOL_VERSION
 
 try:
     import unittest2 as unittest
 except ImportError:
-    import unittest # noqa
+    import unittest  # noqa
 
 import cassandra
 from cassandra.query import SimpleStatement, TraceUnavailable
 from cassandra.policies import RoundRobinPolicy, ExponentialReconnectionPolicy, RetryPolicy, SimpleConvictionPolicy, HostDistance
 
 from cassandra.cluster import Cluster, NoHostAvailable
+
+
+def setup_module():
+    use_singledc()
 
 
 class ClusterTests(unittest.TestCase):
