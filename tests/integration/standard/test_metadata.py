@@ -577,7 +577,7 @@ class TokenMetadataTest(unittest.TestCase):
             self.assertEqual(set(replicas), set([expected_host]))
 
 
-class TableAlterMetadata(unittest.TestCase):
+class KeyspaceAlterMetadata(unittest.TestCase):
     """
     Test verifies that table metadata is preserved on keyspace alter
     """
@@ -601,11 +601,17 @@ class TableAlterMetadata(unittest.TestCase):
         Verify schema
         Alter ks
         Verify that table metadata is still present
+
+        PYTHON-173
         """
         name = self._testMethodName.lower()
 
         self.session.execute('CREATE TABLE %s.d (d INT PRIMARY KEY)' % name)
-        self.assertTrue(self.cluster.metadata.keyspaces[name].tables)
+        original_keyspace_meta = self.cluster.metadata.keyspaces[name]
+        self.assertEqual(original_keyspace_meta.durable_writes, True)
+        self.assertEqual(len(original_keyspace_meta.tables), 1)
 
         self.session.execute('ALTER KEYSPACE %s WITH durable_writes = false' %name)
-        self.assertTrue(self.cluster.metadata.keyspaces[name].tables)
+        new_keyspace_meta = self.cluster.metadata.keyspaces[name]
+        self.assertNotEqual(original_keyspace_meta, new_keyspace_meta)
+        self.assertEqual(new_keyspace_meta.durable_writes, False)
