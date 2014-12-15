@@ -520,6 +520,62 @@ class TokenAwarePolicyTest(unittest.TestCase):
         self.assertEqual(qplan, [])
 
 
+    def test_statement_keyspace(self):
+        hosts = [Host(str(i), SimpleConvictionPolicy) for i in range(4)]
+        for host in hosts:
+            host.set_up()
+
+        cluster = Mock(spec=Cluster)
+        cluster.metadata = Mock(spec=Metadata)
+        replicas = hosts[2:]
+        cluster.metadata.get_replicas.return_value = replicas
+
+        child_policy = Mock()
+        child_policy.make_query_plan.return_value = hosts
+        child_policy.distance.return_value = HostDistance.LOCAL
+
+        policy = TokenAwarePolicy(child_policy)
+        policy.populate(cluster, hosts)
+
+        # no keyspace, child policy is called
+        keyspace = None
+        routing_key = 'routing_key'
+        query = Statement(routing_key=routing_key)
+        qplan = list(policy.make_query_plan(keyspace, query))
+        self.assertEqual(hosts, qplan)
+        self.assertEqual(cluster.metadata.get_replicas.call_count, 0)
+        child_policy.make_query_plan.assert_called_once_with(keyspace, query)
+
+        # working keyspace, no statement
+        cluster.metadata.get_replicas.reset_mock()
+        keyspace = 'working_keyspace'
+        routing_key = 'routing_key'
+        query = Statement(routing_key=routing_key)
+        qplan = list(policy.make_query_plan(keyspace, query))
+        self.assertEqual(replicas + hosts[:2], qplan)
+        cluster.metadata.get_replicas.assert_called_with(keyspace, routing_key)
+
+        # statement keyspace, no working
+        cluster.metadata.get_replicas.reset_mock()
+        working_keyspace = None
+        statement_keyspace = 'statement_keyspace'
+        routing_key = 'routing_key'
+        query = Statement(routing_key=routing_key, keyspace=statement_keyspace)
+        qplan = list(policy.make_query_plan(working_keyspace, query))
+        self.assertEqual(replicas + hosts[:2], qplan)
+        cluster.metadata.get_replicas.assert_called_with(statement_keyspace, routing_key)
+
+        # both keyspaces set, statement keyspace used for routing
+        cluster.metadata.get_replicas.reset_mock()
+        working_keyspace = 'working_keyspace'
+        statement_keyspace = 'statement_keyspace'
+        routing_key = 'routing_key'
+        query = Statement(routing_key=routing_key, keyspace=statement_keyspace)
+        qplan = list(policy.make_query_plan(working_keyspace, query))
+        self.assertEqual(replicas + hosts[:2], qplan)
+        cluster.metadata.get_replicas.assert_called_with(statement_keyspace, routing_key)
+
+
 class ConvictionPolicyTest(unittest.TestCase):
     def test_not_implemented(self):
         """

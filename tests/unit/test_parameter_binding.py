@@ -128,3 +128,25 @@ class BoundStatementTestCase(unittest.TestCase):
                                                fetch_size=1234)
         bound_statement = BoundStatement(prepared_statement=prepared_statement)
         self.assertEqual(1234, bound_statement.fetch_size)
+
+    def test_too_few_parameters_for_key(self):
+        keyspace = 'keyspace1'
+        column_family = 'cf1'
+
+        column_metadata = [
+            (keyspace, column_family, 'foo1', Int32Type),
+            (keyspace, column_family, 'foo2', Int32Type)
+        ]
+
+        prepared_statement = PreparedStatement(column_metadata=column_metadata,
+                                               query_id=None,
+                                               routing_key_indexes=[0, 1],
+                                               query=None,
+                                               keyspace=keyspace,
+                                               protocol_version=2,
+                                               fetch_size=1234)
+
+        self.assertRaises(ValueError, prepared_statement.bind, (1,))
+
+        bound = prepared_statement.bind((1,2))
+        self.assertEqual(bound.keyspace, keyspace)
