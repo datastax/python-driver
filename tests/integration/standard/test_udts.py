@@ -297,7 +297,7 @@ class TypeTests(unittest.TestCase):
         # no need for all nested types, only a spot checked few and the largest one
         s.execute("CREATE TABLE mytable ("
                   "k int PRIMARY KEY, "
-                  "v frozen<lengthy_udt>)")
+                  "v frozen<lengthy_udt>)", timeout=EXTENDED_QUERY_TIMEOUT)
 
         # create and register the seed udt type
         udt = namedtuple('lengthy_udt', tuple(['v_{}'.format(i) for i in range(MAX_TEST_LENGTH)]))
