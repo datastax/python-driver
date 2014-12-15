@@ -119,10 +119,12 @@ class Metadata(object):
         current_keyspaces = set()
         for row in ks_results:
             keyspace_meta = self._build_keyspace_metadata(row)
+            keyspace_col_rows = col_def_rows.get(keyspace_meta.name, {})
+            keyspace_trigger_rows = trigger_rows.get(keyspace_meta.name, {})
             for table_row in cf_def_rows.get(keyspace_meta.name, []):
                 table_meta = self._build_table_metadata(
-                    keyspace_meta, table_row, col_def_rows[keyspace_meta.name],
-                    trigger_rows.get(keyspace_meta.name, {}))
+                    keyspace_meta, table_row, keyspace_col_rows,
+                    keyspace_trigger_rows)
                 keyspace_meta.tables[table_meta.name] = table_meta
 
             for usertype_row in usertype_rows.get(keyspace_meta.name, []):
@@ -216,6 +218,10 @@ class Metadata(object):
     def _build_table_metadata(self, keyspace_metadata, row, col_rows, trigger_rows):
         cfname = row["columnfamily_name"]
         cf_col_rows = col_rows.get(cfname, [])
+
+        if not cf_col_rows:  # CASSANDRA-8487
+            log.warning("Building table metadata with no column meta for %s.%s",
+                        keyspace_metadata.name, cfname)
 
         comparator = types.lookup_casstype(row["comparator"])
         if issubclass(comparator, types.CompositeType):
@@ -322,20 +328,20 @@ class Metadata(object):
                 value_alias = "value"
             else:
                 value_alias = row.get("value_alias", None)
-                if value_alias is None:
+                if value_alias is None and value_alias_rows:  # CASSANDRA-8487
                     # In 2.0+, we can use the 'type' column. In 3.0+, we have to use it.
-                    assert len(value_alias_rows) == 1
                     value_alias = value_alias_rows[0].get('column_name')
 
             default_validator = row.get("default_validator")
             if default_validator:
                 validator = types.lookup_casstype(default_validator)
             else:
-                assert len(value_alias_rows) == 1
-                validator = types.lookup_casstype(value_alias_rows[0].get('validator'))
+                if value_alias_rows:  # CASSANDRA-8487
+                    validator = types.lookup_casstype(value_alias_rows[0].get('validator'))
 
             col = ColumnMetadata(table_meta, value_alias, validator)
-            table_meta.columns[value_alias] = col
+            if value_alias:  # CASSANDRA-8487
+                table_meta.columns[value_alias] = col
 
         # other normal columns
         for col_row in cf_col_rows:
