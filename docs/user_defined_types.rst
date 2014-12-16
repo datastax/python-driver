@@ -85,6 +85,8 @@ for the UDT:
 
 As shown in the code example, inserting data for UDT columns without registering
 a class works fine for prepared statements.  However, **you must register a
-class to insert UDT columns with unprepared statements**.  You can still query
+class to insert UDT columns with unprepared statements** *.  You can still query
 UDT columns without registered classes using unprepared statements, they will
 simply return ``namedtuple`` instances (just like prepared statements do).
+
+\* this applies to *parameterized* unprepared statements, in which the driver will be formatting parameters -- not statements with interpolated UDT literals.
