@@ -165,6 +165,9 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True):
 
 
 def teardown_package():
+    # when multiple modules are run explicitly, this runs between them
+    # need to make sure CCM_CLUSTER is properly cleared for that case
+    remove_cluster()
     for cluster_name in [CLUSTER_NAME, MULTIDC_CLUSTER_NAME]:
         try:
             cluster = CCMClusterFactory.load(path, cluster_name)
