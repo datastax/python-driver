@@ -1,3 +1,27 @@
+2.1.3
+=====
+December 16, 2014
+
+Features
+--------
+* INFO-level log confirmation that a connection was opened to a node that was marked up (PYTHON-116)
+* Avoid connecting to peer with incomplete metadata (PYTHON-163)
+* Add SSL support to gevent reactor (PYTHON-174)
+* Use control connection timeout in wait for schema agreement (PYTHON-175)
+* Better consistency level representation in unavailable+timeout exceptions (PYTHON-180)
+* Update schema metadata processing to accommodate coming schema modernization (PYTHON-185)
+
+Bug Fixes
+---------
+* Support large negative timestamps on Windows (PYTHON-119)
+* Fix schema agreement for clusters with peer rpc_addres 0.0.0.0 (PYTHON-166)
+* Retain table metadata following keyspace meta refresh (PYTHON-173)
+* Use a timeout when preparing a statement for all nodes (PYTHON-179)
+* Make TokenAware routing tolerant of statements with no keyspace (PYTHON-181)
+* Update add_collback to store/invoke multiple callbacks (PYTHON-182)
+* Correct routing key encoding for composite keys (PYTHON-184)
+* Include compression option in schema export string when disabled (PYTHON-187)
+
 2.1.2
 =====
 October 16, 2014
