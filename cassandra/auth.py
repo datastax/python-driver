@@ -130,12 +130,12 @@ class PlainTextAuthenticator(Authenticator):
 
 class SaslAuthProvider(AuthProvider):
     """
-    An :class:`~.AuthProvider` that works with DSE's KerberosAuthenticator.
+    An :class:`~.AuthProvider` for Kerberos authenticators
 
     Example usage::
 
         from cassandra.cluster import Cluster
-        from cassandra.auth import PlainTextAuthProvider
+        from cassandra.auth import SaslAuthProvider
 
         sasl_kwargs = {'host': 'localhost',
                        'service': 'dse',
@@ -144,13 +144,13 @@ class SaslAuthProvider(AuthProvider):
         auth_provider = SaslAuthProvider(**sasl_kwargs)
         cluster = Cluster(auth_provider=auth_provider)
 
-    .. versionadded:: 2.1.4
+    .. versionadded:: 2.1.3-post
     """
 
     def __init__(self, **sasl_kwargs):
-        self.sasl_kwargs = sasl_kwargs
         if SASLClient is None:
             raise ImportError('The puresasl library has not been installed')
+        self.sasl_kwargs = sasl_kwargs
 
     def new_authenticator(self, host):
         return SaslAuthenticator(**self.sasl_kwargs)
@@ -159,10 +159,12 @@ class SaslAuthenticator(Authenticator):
     """
     An :class:`~.Authenticator` that works with DSE's KerberosAuthenticator.
 
-    .. versionadded:: 2.1.4
+    .. versionadded:: 2.1.3-post
     """
 
     def __init__(self, host, service, mechanism='GSSAPI', **sasl_kwargs):
+        if SASLClient is None:
+            raise ImportError('The puresasl library has not been installed')
         self.sasl = SASLClient(host, service, mechanism, **sasl_kwargs)
 
     def initial_response(self):
