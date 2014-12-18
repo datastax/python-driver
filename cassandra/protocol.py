@@ -382,7 +382,7 @@ class AuthChallengeMessage(_MessageType):
 
     @classmethod
     def recv_body(cls, f, protocol_version, user_type_map):
-        return cls(read_longstring(f))
+        return cls(read_binary_longstring(f))
 
 
 class AuthResponseMessage(_MessageType):
