@@ -56,7 +56,7 @@ class StrategiesTest(unittest.TestCase):
                          NetworkTopologyStrategy(fake_options_map).dc_replication_factors)
 
         fake_options_map = {'options': 'map'}
-        self.assertRaises(TypeError, rs.create, 'SimpleStrategy', fake_options_map)
+        self.assertIsNone(rs.create('SimpleStrategy', fake_options_map))
 
         fake_options_map = {'options': 'map'}
         self.assertIsInstance(rs.create('LocalStrategy', fake_options_map), LocalStrategy)
@@ -64,7 +64,7 @@ class StrategiesTest(unittest.TestCase):
         fake_options_map = {'options': 'map', 'replication_factor': 3}
         self.assertIsInstance(rs.create('SimpleStrategy', fake_options_map), SimpleStrategy)
         self.assertEqual(rs.create('SimpleStrategy', fake_options_map).replication_factor,
-                         SimpleStrategy(fake_options_map['replication_factor']).replication_factor)
+                         SimpleStrategy(fake_options_map).replication_factor)
 
         self.assertEqual(rs.create('xxxxxxxx', fake_options_map), _UnknownStrategy('xxxxxxxx', fake_options_map))
 
@@ -132,23 +132,23 @@ class StrategiesTest(unittest.TestCase):
         }
         ring = [MD5Token(0), MD5Token(100), MD5Token(200)]
 
-        rf1_replicas = SimpleStrategy(1).make_token_replica_map(token_to_host_owner, ring)
+        rf1_replicas = SimpleStrategy({'replication_factor': '1'}).make_token_replica_map(token_to_host_owner, ring)
         self.assertItemsEqual(rf1_replicas[MD5Token(0)], [host1])
         self.assertItemsEqual(rf1_replicas[MD5Token(100)], [host2])
         self.assertItemsEqual(rf1_replicas[MD5Token(200)], [host3])
 
-        rf2_replicas = SimpleStrategy(2).make_token_replica_map(token_to_host_owner, ring)
+        rf2_replicas = SimpleStrategy({'replication_factor': '2'}).make_token_replica_map(token_to_host_owner, ring)
         self.assertItemsEqual(rf2_replicas[MD5Token(0)], [host1, host2])
         self.assertItemsEqual(rf2_replicas[MD5Token(100)], [host2, host3])
         self.assertItemsEqual(rf2_replicas[MD5Token(200)], [host3, host1])
 
-        rf3_replicas = SimpleStrategy(3).make_token_replica_map(token_to_host_owner, ring)
+        rf3_replicas = SimpleStrategy({'replication_factor': '3'}).make_token_replica_map(token_to_host_owner, ring)
         self.assertItemsEqual(rf3_replicas[MD5Token(0)], [host1, host2, host3])
         self.assertItemsEqual(rf3_replicas[MD5Token(100)], [host2, host3, host1])
         self.assertItemsEqual(rf3_replicas[MD5Token(200)], [host3, host1, host2])
 
     def test_ss_equals(self):
-        self.assertNotEqual(SimpleStrategy(1), NetworkTopologyStrategy({'dc1': 2}))
+        self.assertNotEqual(SimpleStrategy({'replication_factor': '1'}), NetworkTopologyStrategy({'dc1': 2}))
 
 
 class NameEscapingTest(unittest.TestCase):

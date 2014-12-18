@@ -457,7 +457,12 @@ class _ReplicationStrategy(object):
             rs_class = _UnknownStrategyBuilder(schema_name)
             _replication_strategies[schema_name] = rs_class
 
-        rs_instance = rs_class(options_map)
+        try:
+            rs_instance = rs_class(options_map)
+        except Exception as exc:
+            log.warn("Failed creating %s with options %s: %s", schema_name, options_map, exc.message)
+            return None
+
         return rs_instance
 
     def make_token_replica_map(self, token_to_host_owner, ring):
@@ -508,10 +513,10 @@ class SimpleStrategy(ReplicationStrategy):
     """
 
     def __init__(self, options_map):
-        replication_factor = options_map.get('replication_factor', None) if isinstance(options_map, dict) else options_map
-        if not isinstance(replication_factor, int):
-            raise TypeError("replication_factor must be an int")
-        self.replication_factor = int(replication_factor)
+        try:
+            self.replication_factor = int(options_map['replication_factor'])
+        except Exception:
+            raise ValueError("SimpleStrategy requires an integer 'replication_factor' option")
 
     def make_token_replica_map(self, token_to_host_owner, ring):
         replica_map = {}
