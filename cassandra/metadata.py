@@ -425,13 +425,19 @@ class Metadata(object):
         with self._hosts_lock:
             return self._hosts.values()
 
+
 REPLICATION_STRATEGY_CLASS_PREFIX = "org.apache.cassandra.locator."
+
+
 def trim_if_startswith(s, prefix):
     if s.startswith(prefix):
         return s[len(prefix):]
     return s
 
+
 _replication_strategies = {}
+
+
 class ReplicationStrategyTypeType(type):
     def __new__(metacls, name, bases, dct):
         dct.setdefault('name', name)
@@ -460,7 +466,7 @@ class _ReplicationStrategy(object):
         try:
             rs_instance = rs_class(options_map)
         except Exception as exc:
-            log.warn("Failed creating %s with options %s: %s", schema_name, options_map, exc.message)
+            log.warn("Failed creating %s with options %s: %s", schema_name, options_map, exc)
             return None
 
         return rs_instance
@@ -472,7 +478,7 @@ class _ReplicationStrategy(object):
         raise NotImplementedError()
 
 
-ReplicationStrategy=_ReplicationStrategy
+ReplicationStrategy = _ReplicationStrategy
 
 
 class _UnknownStrategyBuilder(object):
@@ -492,8 +498,8 @@ class _UnknownStrategy(ReplicationStrategy):
 
     def __eq__(self, other):
         return (isinstance(other, _UnknownStrategy)
-            and self.name == other.name
-            and self.options_map == other.options_map)
+                and self.name == other.name
+                and self.options_map == other.options_map)
 
     def export_for_schema(self):
         """
@@ -632,7 +638,7 @@ class NetworkTopologyStrategy(ReplicationStrategy):
 
 class LocalStrategy(ReplicationStrategy):
     def __init__(self, options_map):
-        None
+        pass
 
     def make_token_replica_map(self, token_to_host_owner, ring):
         return {}
