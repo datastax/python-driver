@@ -16,7 +16,7 @@ import logging
 
 from tests.integration import use_singledc, get_cluster, remove_cluster, PROTOCOL_VERSION
 from cassandra.cluster import Cluster, NoHostAvailable
-from cassandra.auth import PlainTextAuthProvider
+from cassandra.auth import PlainTextAuthProvider, SASLClient, SaslAuthProvider
 
 
 try:
@@ -29,6 +29,13 @@ log = logging.getLogger(__name__)
 
 def setup_module():
     use_singledc(start=False)
+    ccm_cluster = get_cluster()
+    ccm_cluster.stop()
+    config_options = {'authenticator': 'PasswordAuthenticator',
+                      'authorizer': 'CassandraAuthorizer'}
+    ccm_cluster.set_configuration_options(config_options)
+    log.debug("Starting ccm test cluster with %s", config_options)
+    ccm_cluster.start(wait_for_binary_proto=True)
 
 
 def teardown_module():
@@ -40,25 +47,7 @@ class AuthenticationTests(unittest.TestCase):
     Tests to cover basic authentication functionality
     """
 
-    @staticmethod
-    def init(config_options):
-        ccm_cluster = get_cluster()
-        ccm_cluster.stop()
-        ccm_cluster.set_configuration_options(config_options)
-        log.debug("Starting ccm test cluster with %s", config_options)
-        ccm_cluster.start(wait_for_binary_proto=True)
-
-    @classmethod
-    def setup_class(cls):
-        cls.init({'authenticator': 'PasswordAuthenticator',
-                  'authorizer': 'AllowAllAuthorizer'})
-
-    @staticmethod
-    def v1_authentication_provider(username, password):
-        return dict(username=username, password=password)
-
-    @staticmethod
-    def get_authentication_provider(username, password):
+    def get_authentication_provider(self, username, password):
         """
         Return correct authentication provider based on protocol version.
         There is a difference in the semantics of authentication provider argument with protocol versions 1 and 2
@@ -74,10 +63,9 @@ class AuthenticationTests(unittest.TestCase):
         else:
             return PlainTextAuthProvider(username=username, password=password)
 
-    @staticmethod
-    def cluster_as(usr, pwd):
+    def cluster_as(self, usr, pwd):
         return Cluster(protocol_version=PROTOCOL_VERSION,
-                       auth_provider=AuthenticationTests.get_authentication_provider(username=usr, password=pwd))
+                       auth_provider=self.get_authentication_provider(username=usr, password=pwd))
 
     def test_auth_connect(self):
         user = 'u'
@@ -122,12 +110,22 @@ class AuthenticationTests(unittest.TestCase):
                                 cluster.connect)
 
 
-class AuthorizedAuthenticationTests(AuthenticationTests):
+class SaslAuthenticatorTests(AuthenticationTests):
     """
-    Same test as AuthenticationTests but enables authorization
+    Test SaslAuthProvider as PlainText
     """
 
-    @classmethod
-    def setup_class(cls):
-        cls.init({'authenticator': 'PasswordAuthenticator',
-                  'authorizer': 'CassandraAuthorizer'})
+    def setUp(self):
+        if PROTOCOL_VERSION < 2:
+            raise unittest.SkipTest('Sasl authentication not available for protocol v1')
+        if SASLClient is None:
+            raise unittest.SkipTest('pure-sasl is not installed')
+
+    def get_authentication_provider(self, username, password):
+        sasl_kwargs = {'host': 'localhost',
+                       'service': 'cassandra',
+                       'mechanism': 'PLAIN',
+                       'qops': ['auth'],
+                       'username': username,
+                       'password': password}
+        return SaslAuthProvider(**sasl_kwargs)
