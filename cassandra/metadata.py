@@ -510,6 +510,9 @@ class _UnknownStrategy(ReplicationStrategy):
             return dict((str(key), str(value)) for key, value in self.options_map.items())
         return "{'class': '%s'}" % (self.name, )
 
+    def make_token_replica_map(self, token_to_host_owner, ring):
+        return {}
+
 
 class SimpleStrategy(ReplicationStrategy):
 
@@ -1210,7 +1213,7 @@ class TokenMap(object):
         if tokens_to_hosts is None:
             self.rebuild_keyspace(keyspace, build_if_absent=True)
             tokens_to_hosts = self.tokens_to_hosts_by_ks.get(keyspace, None)
-            if tokens_to_hosts is None:
+            if not tokens_to_hosts:
                 return []
 
         # token range ownership is exclusive on the LHS (the start token), so
