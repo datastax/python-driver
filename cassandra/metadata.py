@@ -456,17 +456,17 @@ class _ReplicationStrategy(object):
         if not strategy_class:
             return None
 
-        schema_name = trim_if_startswith(strategy_class, REPLICATION_STRATEGY_CLASS_PREFIX)
+        strategy_name = trim_if_startswith(strategy_class, REPLICATION_STRATEGY_CLASS_PREFIX)
 
-        rs_class = _replication_strategies.get(schema_name, None)
+        rs_class = _replication_strategies.get(strategy_name, None)
         if rs_class is None:
-            rs_class = _UnknownStrategyBuilder(schema_name)
-            _replication_strategies[schema_name] = rs_class
+            rs_class = _UnknownStrategyBuilder(strategy_name)
+            _replication_strategies[strategy_name] = rs_class
 
         try:
             rs_instance = rs_class(options_map)
         except Exception as exc:
-            log.warn("Failed creating %s with options %s: %s", schema_name, options_map, exc)
+            log.warn("Failed creating %s with options %s: %s", strategy_name, options_map, exc)
             return None
 
         return rs_instance
