@@ -472,24 +472,50 @@ class Metadata(object):
             return self._hosts.values()
 
 
-class ReplicationStrategy(object):
+REPLICATION_STRATEGY_CLASS_PREFIX = "org.apache.cassandra.locator."
+
+
+def trim_if_startswith(s, prefix):
+    if s.startswith(prefix):
+        return s[len(prefix):]
+    return s
+
+
+_replication_strategies = {}
+
+
+class ReplicationStrategyTypeType(type):
+    def __new__(metacls, name, bases, dct):
+        dct.setdefault('name', name)
+        cls = type.__new__(metacls, name, bases, dct)
+        if not name.startswith('_'):
+            _replication_strategies[name] = cls
+        return cls
+
+
+@six.add_metaclass(ReplicationStrategyTypeType)
+class _ReplicationStrategy(object):
+    options_map = None
 
     @classmethod
     def create(cls, strategy_class, options_map):
         if not strategy_class:
             return None
 
-        if strategy_class.endswith("OldNetworkTopologyStrategy"):
+        strategy_name = trim_if_startswith(strategy_class, REPLICATION_STRATEGY_CLASS_PREFIX)
+
+        rs_class = _replication_strategies.get(strategy_name, None)
+        if rs_class is None:
+            rs_class = _UnknownStrategyBuilder(strategy_name)
+            _replication_strategies[strategy_name] = rs_class
+
+        try:
+            rs_instance = rs_class(options_map)
+        except Exception as exc:
+            log.warn("Failed creating %s with options %s: %s", strategy_name, options_map, exc)
             return None
-        elif strategy_class.endswith("NetworkTopologyStrategy"):
-            return NetworkTopologyStrategy(options_map)
-        elif strategy_class.endswith("SimpleStrategy"):
-            repl_factor = options_map.get('replication_factor', None)
-            if not repl_factor:
-                return None
-            return SimpleStrategy(repl_factor)
-        elif strategy_class.endswith("LocalStrategy"):
-            return LocalStrategy()
+
+        return rs_instance
 
     def make_token_replica_map(self, token_to_host_owner, ring):
         raise NotImplementedError()
@@ -498,17 +524,54 @@ class ReplicationStrategy(object):
         raise NotImplementedError()
 
 
-class SimpleStrategy(ReplicationStrategy):
+ReplicationStrategy = _ReplicationStrategy
 
-    name = "SimpleStrategy"
+
+class _UnknownStrategyBuilder(object):
+    def __init__(self, name):
+        self.name = name
+
+    def __call__(self, options_map):
+        strategy_instance = _UnknownStrategy(self.name, options_map)
+        return strategy_instance
+
+
+class _UnknownStrategy(ReplicationStrategy):
+    def __init__(self, name, options_map):
+        self.name = name
+        self.options_map = options_map.copy() if options_map is not None else dict()
+        self.options_map['class'] = self.name
+
+    def __eq__(self, other):
+        return (isinstance(other, _UnknownStrategy)
+                and self.name == other.name
+                and self.options_map == other.options_map)
+
+    def export_for_schema(self):
+        """
+        Returns a string version of these replication options which are
+        suitable for use in a CREATE KEYSPACE statement.
+        """
+        if self.options_map:
+            return dict((str(key), str(value)) for key, value in self.options_map.items())
+        return "{'class': '%s'}" % (self.name, )
+
+    def make_token_replica_map(self, token_to_host_owner, ring):
+        return {}
+
+
+class SimpleStrategy(ReplicationStrategy):
 
     replication_factor = None
     """
     The replication factor for this keyspace.
     """
 
-    def __init__(self, replication_factor):
-        self.replication_factor = int(replication_factor)
+    def __init__(self, options_map):
+        try:
+            self.replication_factor = int(options_map['replication_factor'])
+        except Exception:
+            raise ValueError("SimpleStrategy requires an integer 'replication_factor' option")
 
     def make_token_replica_map(self, token_to_host_owner, ring):
         replica_map = {}
@@ -540,8 +603,6 @@ class SimpleStrategy(ReplicationStrategy):
 
 
 class NetworkTopologyStrategy(ReplicationStrategy):
-
-    name = "NetworkTopologyStrategy"
 
     dc_replication_factors = None
     """
@@ -625,8 +686,8 @@ class NetworkTopologyStrategy(ReplicationStrategy):
 
 
 class LocalStrategy(ReplicationStrategy):
-
-    name = "LocalStrategy"
+    def __init__(self, options_map):
+        pass
 
     def make_token_replica_map(self, token_to_host_owner, ring):
         return {}
@@ -1197,7 +1258,7 @@ class TokenMap(object):
         if tokens_to_hosts is None:
             self.rebuild_keyspace(keyspace, build_if_absent=True)
             tokens_to_hosts = self.tokens_to_hosts_by_ks.get(keyspace, None)
-            if tokens_to_hosts is None:
+            if not tokens_to_hosts:
                 return []
 
         # token range ownership is exclusive on the LHS (the start token), so
