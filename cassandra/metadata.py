@@ -224,12 +224,13 @@ class Metadata(object):
                         keyspace_metadata.name, cfname)
 
         comparator = types.lookup_casstype(row["comparator"])
+
         if issubclass(comparator, types.CompositeType):
             column_name_types = comparator.subtypes
-            is_composite = True
+            is_composite_comparator = True
         else:
             column_name_types = (comparator,)
-            is_composite = False
+            is_composite_comparator = False
 
         num_column_name_components = len(column_name_types)
         last_col = column_name_types[-1]
@@ -246,7 +247,7 @@ class Metadata(object):
         else:
             column_aliases = [r.get('column_name') for r in clustering_rows]
 
-        if is_composite:
+        if is_composite_comparator:
             if issubclass(last_col, types.ColumnToCollectionType):
                 # collections
                 is_compact = False
@@ -261,7 +262,7 @@ class Metadata(object):
             else:
                 # compact table
                 is_compact = True
-                has_value = True
+                has_value = column_aliases or not cf_col_rows
                 clustering_size = num_column_name_components
         else:
             is_compact = True
