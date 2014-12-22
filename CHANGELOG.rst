@@ -1,3 +1,15 @@
+2.1.3-post
+==========
+
+Features
+--------
+* SaslAuthenticator for Kerberos support (PYTHON-109)
+
+Bug Fixes
+---------
+* Schema meta fix for complex thrift tables (PYTHON-191)
+* Support for 'unknown' replica placement strategies in schema meta (PYTHON-192)
+
 2.1.3
 =====
 December 16, 2014
