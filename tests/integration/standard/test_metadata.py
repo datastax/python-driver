@@ -535,6 +535,252 @@ CREATE TABLE export_udts.users (
             self.assertEqual(set(get_replicas('test2rf', token)), set([owners[(i + 1) % 3], owners[(i + 2) % 3]]))
             self.assertEqual(set(get_replicas('test1rf', token)), set([owners[(i + 1) % 3]]))
 
+    def test_legacy_tables(self):
+
+        cli_script = """CREATE KEYSPACE legacy
+WITH placement_strategy = 'SimpleStrategy'
+AND strategy_options = {replication_factor:1};
+
+USE legacy;
+
+CREATE COLUMN FAMILY simple_no_col
+ WITH comparator = UTF8Type
+ AND key_validation_class = UUIDType
+ AND default_validation_class = UTF8Type;
+
+CREATE COLUMN FAMILY simple_with_col
+ WITH comparator = UTF8Type
+ and key_validation_class = UUIDType
+ and default_validation_class = UTF8Type
+ AND column_metadata = [
+ {column_name: col_with_meta, validation_class: UTF8Type}
+ ];
+
+CREATE COLUMN FAMILY composite_partition_no_col
+ WITH comparator = UTF8Type
+ AND key_validation_class = 'CompositeType(UUIDType,UTF8Type)'
+ AND default_validation_class = UTF8Type;
+
+CREATE COLUMN FAMILY composite_partition_with_col
+ WITH comparator = UTF8Type
+ AND key_validation_class = 'CompositeType(UUIDType,UTF8Type)'
+ AND default_validation_class = UTF8Type
+ AND column_metadata = [
+ {column_name: col_with_meta, validation_class: UTF8Type}
+ ];
+
+CREATE COLUMN FAMILY nested_composite_key
+ WITH comparator = UTF8Type
+ and key_validation_class = 'CompositeType(CompositeType(UUIDType,UTF8Type), LongType)'
+ and default_validation_class = UTF8Type
+ AND column_metadata = [
+ {column_name: full_name, validation_class: UTF8Type}
+ ];
+
+create column family composite_comp_no_col
+  with column_type = 'Standard'
+  and comparator = 'DynamicCompositeType(t=>org.apache.cassandra.db.marshal.TimeUUIDType,s=>org.apache.cassandra.db.marshal.UTF8Type,b=>org.apache.cassandra.db.marshal.BytesType)'
+  and default_validation_class = 'BytesType'
+  and key_validation_class = 'BytesType'
+  and read_repair_chance = 0.0
+  and dclocal_read_repair_chance = 0.1
+  and gc_grace = 864000
+  and min_compaction_threshold = 4
+  and max_compaction_threshold = 32
+  and compaction_strategy = 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'
+  and caching = 'KEYS_ONLY'
+  and cells_per_row_to_cache = '0'
+  and default_time_to_live = 0
+  and speculative_retry = 'NONE'
+  and comment = 'Stores file meta data';
+
+create column family composite_comp_with_col
+  with column_type = 'Standard'
+  and comparator = 'DynamicCompositeType(t=>org.apache.cassandra.db.marshal.TimeUUIDType,s=>org.apache.cassandra.db.marshal.UTF8Type,b=>org.apache.cassandra.db.marshal.BytesType)'
+  and default_validation_class = 'BytesType'
+  and key_validation_class = 'BytesType'
+  and read_repair_chance = 0.0
+  and dclocal_read_repair_chance = 0.1
+  and gc_grace = 864000
+  and min_compaction_threshold = 4
+  and max_compaction_threshold = 32
+  and compaction_strategy = 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'
+  and caching = 'KEYS_ONLY'
+  and cells_per_row_to_cache = '0'
+  and default_time_to_live = 0
+  and speculative_retry = 'NONE'
+  and comment = 'Stores file meta data'
+  and column_metadata = [
+    {column_name : 'b@6d616d6d616a616d6d61',
+    validation_class : BytesType,
+    index_name : 'idx_one',
+    index_type : 0},
+    {column_name : 'b@6869746d65776974686d75736963',
+    validation_class : BytesType,
+    index_name : 'idx_two',
+    index_type : 0}]
+  and compression_options = {'sstable_compression' : 'org.apache.cassandra.io.compress.LZ4Compressor'};"""
+
+        # note: the innerlkey type for legacy.nested_composite_key 
+        # (org.apache.cassandra.db.marshal.CompositeType(org.apache.cassandra.db.marshal.UUIDType, org.apache.cassandra.db.marshal.UTF8Type))
+        # is a bit strange, but it replays in CQL with desired results
+        expected_string = """CREATE KEYSPACE legacy WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;
+
+CREATE TABLE legacy.composite_comp_with_col (
+    key blob,
+    column0 't=>org.apache.cassandra.db.marshal.TimeUUIDType',
+    column1 'b=>org.apache.cassandra.db.marshal.BytesType',
+    column2 's=>org.apache.cassandra.db.marshal.UTF8Type',
+    "b@6869746d65776974686d75736963" blob,
+    "b@6d616d6d616a616d6d61" blob,
+    PRIMARY KEY (key, column0, column1, column2)
+) WITH COMPACT STORAGE
+    AND CLUSTERING ORDER BY (column0 ASC, column1 ASC, column2 ASC)
+    AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
+    AND comment = 'Stores file meta data'
+    AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
+    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+    AND dclocal_read_repair_chance = 0.1
+    AND default_time_to_live = 0
+    AND gc_grace_seconds = 864000
+    AND max_index_interval = 2048
+    AND memtable_flush_period_in_ms = 0
+    AND min_index_interval = 128
+    AND read_repair_chance = 0.0
+    AND speculative_retry = 'NONE';
+CREATE INDEX idx_two ON legacy.composite_comp_with_col ("b@6869746d65776974686d75736963");
+CREATE INDEX idx_one ON legacy.composite_comp_with_col ("b@6d616d6d616a616d6d61");
+
+CREATE TABLE legacy.nested_composite_key (
+    key 'org.apache.cassandra.db.marshal.CompositeType(org.apache.cassandra.db.marshal.UUIDType, org.apache.cassandra.db.marshal.UTF8Type)',
+    key2 bigint,
+    full_name text,
+    PRIMARY KEY ((key, key2))
+) WITH COMPACT STORAGE
+    AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
+    AND comment = ''
+    AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
+    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+    AND dclocal_read_repair_chance = 0.1
+    AND default_time_to_live = 0
+    AND gc_grace_seconds = 864000
+    AND max_index_interval = 2048
+    AND memtable_flush_period_in_ms = 0
+    AND min_index_interval = 128
+    AND read_repair_chance = 0.0
+    AND speculative_retry = 'NONE';
+
+CREATE TABLE legacy.composite_partition_with_col (
+    key uuid,
+    key2 text,
+    col_with_meta text,
+    PRIMARY KEY ((key, key2))
+) WITH COMPACT STORAGE
+    AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
+    AND comment = ''
+    AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
+    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+    AND dclocal_read_repair_chance = 0.1
+    AND default_time_to_live = 0
+    AND gc_grace_seconds = 864000
+    AND max_index_interval = 2048
+    AND memtable_flush_period_in_ms = 0
+    AND min_index_interval = 128
+    AND read_repair_chance = 0.0
+    AND speculative_retry = 'NONE';
+
+CREATE TABLE legacy.composite_partition_no_col (
+    key uuid,
+    key2 text,
+    column1 text,
+    value text,
+    PRIMARY KEY ((key, key2), column1)
+) WITH COMPACT STORAGE
+    AND CLUSTERING ORDER BY (column1 ASC)
+    AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
+    AND comment = ''
+    AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
+    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+    AND dclocal_read_repair_chance = 0.1
+    AND default_time_to_live = 0
+    AND gc_grace_seconds = 864000
+    AND max_index_interval = 2048
+    AND memtable_flush_period_in_ms = 0
+    AND min_index_interval = 128
+    AND read_repair_chance = 0.0
+    AND speculative_retry = 'NONE';
+
+CREATE TABLE legacy.simple_with_col (
+    key uuid PRIMARY KEY,
+    col_with_meta text
+) WITH COMPACT STORAGE
+    AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
+    AND comment = ''
+    AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
+    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+    AND dclocal_read_repair_chance = 0.1
+    AND default_time_to_live = 0
+    AND gc_grace_seconds = 864000
+    AND max_index_interval = 2048
+    AND memtable_flush_period_in_ms = 0
+    AND min_index_interval = 128
+    AND read_repair_chance = 0.0
+    AND speculative_retry = 'NONE';
+
+CREATE TABLE legacy.simple_no_col (
+    key uuid,
+    column1 text,
+    value text,
+    PRIMARY KEY (key, column1)
+) WITH COMPACT STORAGE
+    AND CLUSTERING ORDER BY (column1 ASC)
+    AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
+    AND comment = ''
+    AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
+    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+    AND dclocal_read_repair_chance = 0.1
+    AND default_time_to_live = 0
+    AND gc_grace_seconds = 864000
+    AND max_index_interval = 2048
+    AND memtable_flush_period_in_ms = 0
+    AND min_index_interval = 128
+    AND read_repair_chance = 0.0
+    AND speculative_retry = 'NONE';
+
+CREATE TABLE legacy.composite_comp_no_col (
+    key blob,
+    column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(t=>org.apache.cassandra.db.marshal.TimeUUIDType, b=>org.apache.cassandra.db.marshal.BytesType, s=>org.apache.cassandra.db.marshal.UTF8Type)',
+    column2 's=>org.apache.cassandra.db.marshal.UTF8Type',
+    value blob,
+    PRIMARY KEY (key, column1, column1, column2)
+) WITH COMPACT STORAGE
+    AND CLUSTERING ORDER BY (column1 ASC, column1 ASC, column2 ASC)
+    AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
+    AND comment = 'Stores file meta data'
+    AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
+    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+    AND dclocal_read_repair_chance = 0.1
+    AND default_time_to_live = 0
+    AND gc_grace_seconds = 864000
+    AND max_index_interval = 2048
+    AND memtable_flush_period_in_ms = 0
+    AND min_index_interval = 128
+    AND read_repair_chance = 0.0
+    AND speculative_retry = 'NONE';"""
+
+        ccm = get_cluster()
+        ccm.run_cli(cli_script)
+
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        session = cluster.connect()
+
+        legacy_meta = cluster.metadata.keyspaces['legacy']
+
+        self.assertEqual(legacy_meta.export_as_string(), expected_string)
+
+        session.execute('DROP KEYSPACE legacy')
+
+        cluster.shutdown()
 
 class TokenMetadataTest(unittest.TestCase):
     """
