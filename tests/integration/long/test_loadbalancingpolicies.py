@@ -452,6 +452,19 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 2, 0)
         self.coordinator_stats.assert_query_count_equals(self, 3, 12)
 
+    def test_token_aware_with_local_table(self):
+        use_singledc()
+        cluster = Cluster(
+            load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
+            protocol_version=PROTOCOL_VERSION)
+        session = cluster.connect()
+
+        p = session.prepare("SELECT * FROM system.local WHERE key=?")
+        # this would blow up prior to 61b4fad
+        r = session.execute(p, ('local',))
+        self.assertEqual(len(r), 1)
+        self.assertEqual(r[0].key, 'local')
+
     def test_white_list(self):
         use_singledc()
         keyspace = 'test_white_list'
