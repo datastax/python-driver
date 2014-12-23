@@ -49,6 +49,10 @@ class StrategiesTest(unittest.TestCase):
         rs = ReplicationStrategy()
 
         self.assertEqual(rs.create('OldNetworkTopologyStrategy', None), _UnknownStrategy('OldNetworkTopologyStrategy', None))
+        fake_options_map = {'options': 'map'}
+        uks = rs.create('OldNetworkTopologyStrategy', fake_options_map)
+        self.assertEqual(uks, _UnknownStrategy('OldNetworkTopologyStrategy', fake_options_map))
+        self.assertEqual(uks.make_token_replica_map({}, []), {})
 
         fake_options_map = {'dc1': '3'}
         self.assertIsInstance(rs.create('NetworkTopologyStrategy', fake_options_map), NetworkTopologyStrategy)
