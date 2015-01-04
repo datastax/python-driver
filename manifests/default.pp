@@ -60,7 +60,7 @@ node cassandraengine inherits basenode {
 
   exec {"install-requirements":
     cwd => "/vagrant",
-    command => "pip install -r requirements.txt",
+    command => "pip install -r requirements-dev.txt",
     require => [Package["python-pip"], Package["python-dev"]]
   }
 }
