@@ -3,14 +3,14 @@ from cqlengine import ALL, CACHING_ALL, CACHING_NONE
 from cqlengine.connection import get_session
 from cqlengine.exceptions import CQLEngineException
 from cqlengine.management import  get_fields, sync_table, drop_table
-from cqlengine.tests.base import BaseCassEngTestCase, CASSANDRA_VERSION
+from cqlengine.tests.base import BaseCassEngTestCase
+from cqlengine.tests.base import CASSANDRA_VERSION, PROTOCOL_VERSION
 from cqlengine import management
 from cqlengine.tests.query.test_queryset import TestModel
 from cqlengine.models import Model
 from cqlengine import columns, SizeTieredCompactionStrategy, LeveledCompactionStrategy
 from unittest import skipUnless
-from cqlengine.connection import get_cluster
-cluster = get_cluster()
+
 
 class CreateKeyspaceTest(BaseCassEngTestCase):
     def test_create_succeeeds(self):
@@ -256,7 +256,7 @@ class NonModelFailureTest(BaseCassEngTestCase):
             sync_table(self.FakeModel)
 
 
-@skipUnless(cluster.protocol_version >= 2, "only runs against the cql3 protocol v2.0")
+@skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
 def test_static_columns():
     class StaticModel(Model):
         id = columns.Integer(primary_key=True)
