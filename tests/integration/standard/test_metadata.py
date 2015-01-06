@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import six
+import difflib
 
 try:
     import unittest2 as unittest
@@ -339,6 +340,14 @@ class TestCodeCoverage(unittest.TestCase):
             self.assertIsInstance(keyspace_metadata.export_as_string(), six.string_types)
             self.assertIsInstance(keyspace_metadata.as_cql_query(), six.string_types)
 
+    def assert_equal_diff(self, received, expected):
+        if received != expected:
+            diff_string = '\n'.join(difflib.unified_diff(expected.split('\n'),
+                                                         received.split('\n'),
+                                                         'EXPECTED', 'RECEIVED',
+                                                         lineterm=''))
+            self.fail(diff_string)
+
     def test_export_keyspace_schema_udts(self):
         """
         Test udt exports
@@ -415,7 +424,7 @@ CREATE TABLE export_udts.users (
     AND read_repair_chance = 0.0
     AND speculative_retry = '99.0PERCENTILE';"""
 
-        self.assertEqual(cluster.metadata.keyspaces['export_udts'].export_as_string(), expected_string)
+        self.assert_equal_diff(cluster.metadata.keyspaces['export_udts'].export_as_string(), expected_string)
 
         table_meta = cluster.metadata.keyspaces['export_udts'].tables['users']
 
@@ -436,7 +445,7 @@ CREATE TABLE export_udts.users (
     AND read_repair_chance = 0.0
     AND speculative_retry = '99.0PERCENTILE';"""
 
-        self.assertEqual(table_meta.export_as_string(), expected_string)
+        self.assert_equal_diff(table_meta.export_as_string(), expected_string)
 
     def test_case_sensitivity(self):
         """
@@ -775,8 +784,7 @@ CREATE TABLE legacy.composite_comp_no_col (
         session = cluster.connect()
 
         legacy_meta = cluster.metadata.keyspaces['legacy']
-
-        self.assertEqual(legacy_meta.export_as_string(), expected_string)
+        self.assert_equal_diff(legacy_meta.export_as_string(), expected_string)
 
         session.execute('DROP KEYSPACE legacy')
 
