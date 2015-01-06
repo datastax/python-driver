@@ -336,6 +336,7 @@ class Cluster(object):
     """
     The maximum duration (in seconds) that the driver will wait for schema
     agreement across the cluster. Defaults to ten seconds.
+    If set <= 0, the driver will bypass schema agreement waits altogether.
     """
 
     metadata = None
@@ -1810,6 +1811,9 @@ class ControlConnection(object):
 
             self._refresh_node_list_and_token_map(connection, preloaded_results=shared_results)
             self._refresh_schema(connection, preloaded_results=shared_results)
+            if not self._cluster.metadata.keyspaces:
+                log.warning("[control connection] No schema built on connect; retrying without wait for schema agreement")
+                self._refresh_schema(connection, preloaded_results=shared_results, schema_agreement_wait=0)
         except Exception:
             connection.close()
             raise
@@ -1893,13 +1897,15 @@ class ControlConnection(object):
             log.debug("[control connection] Error refreshing schema", exc_info=True)
             self._signal_error()
 
-    def _refresh_schema(self, connection, keyspace=None, table=None, usertype=None, preloaded_results=None):
+    def _refresh_schema(self, connection, keyspace=None, table=None, usertype=None, preloaded_results=None, schema_agreement_wait=None):
         if self._cluster.is_shutdown:
             return
 
         assert table is None or usertype is None
 
-        agreed = self.wait_for_schema_agreement(connection, preloaded_results=preloaded_results)
+        agreed = self.wait_for_schema_agreement(connection,
+                                                preloaded_results=preloaded_results,
+                                                wait_time=schema_agreement_wait)
         if not agreed:
             log.debug("Skipping schema refresh due to lack of schema agreement")
             return
@@ -2142,7 +2148,12 @@ class ControlConnection(object):
         usertype = event.get('type')
         self._submit(self.refresh_schema, keyspace, table, usertype)
 
-    def wait_for_schema_agreement(self, connection=None, preloaded_results=None):
+    def wait_for_schema_agreement(self, connection=None, preloaded_results=None, wait_time=None):
+
+        total_timeout = wait_time if wait_time is not None else self._cluster.max_schema_agreement_wait
+        if total_timeout <= 0:
+            return True
+
         # Each schema change typically generates two schema refreshes, one
         # from the response type and one from the pushed notification. Holding
         # a lock is just a simple way to cut down on the number of schema queries
@@ -2167,7 +2178,6 @@ class ControlConnection(object):
             start = self._time.time()
             elapsed = 0
             cl = ConsistencyLevel.ONE
-            total_timeout = self._cluster.max_schema_agreement_wait
             schema_mismatches = None
             while elapsed < total_timeout:
                 peers_query = QueryMessage(query=self._SELECT_SCHEMA_PEERS, consistency_level=cl)
