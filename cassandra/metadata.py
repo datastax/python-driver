@@ -264,6 +264,10 @@ class Metadata(object):
                 is_compact = True
                 has_value = column_aliases or not cf_col_rows
                 clustering_size = num_column_name_components
+
+                # Some thrift tables define names in composite types (see PYTHON-192)
+                if not column_aliases and hasattr(comparator, 'fieldnames'):
+                    column_aliases = comparator.fieldnames
         else:
             is_compact = True
             if column_aliases or not cf_col_rows:
@@ -356,6 +360,7 @@ class Metadata(object):
 
         table_meta.options = self._build_table_options(row)
         table_meta.is_compact_storage = is_compact
+
         return table_meta
 
     def _build_table_options(self, row):
@@ -922,6 +927,18 @@ class TableMetadata(object):
     A dict mapping trigger names to :class:`.TriggerMetadata` instances.
     """
 
+    @property
+    def is_cql_compatible(self):
+        """
+        A boolean indicating if this table can be represented as CQL in export
+        """
+        # no such thing as DCT in CQL
+        incompatible = issubclass(self.comparator, types.DynamicCompositeType)
+        # no compact storage with more than one column beyond PK
+        incompatible |= self.is_compact_storage and len(self.columns) > len(self.primary_key) + 1
+
+        return not incompatible
+
     def __init__(self, keyspace_metadata, name, partition_key=None, clustering_key=None, columns=None, triggers=None, options=None):
         self.keyspace = keyspace_metadata
         self.name = name
@@ -938,6 +955,18 @@ class TableMetadata(object):
         along with all indexes on it.  The returned string is formatted to
         be human readable.
         """
+        if self.is_cql_compatible:
+            ret = self.all_as_cql()
+        else:
+            # If we can't produce this table with CQL, comment inline
+            ret = "/*\nWarning: Table %s.%s omitted because it has constructs not compatible with CQL (was created via legacy API).\n" % \
+                  (self.keyspace.name, self.name)
+            ret += "\nApproximate structure, for reference:\n(this should not be used to reproduce this schema)\n\n%s" % self.all_as_cql()
+            ret += "\n*/"
+
+        return ret
+
+    def all_as_cql(self):
         ret = self.as_cql_query(formatted=True)
         ret += ";"
 
@@ -947,7 +976,6 @@ class TableMetadata(object):
 
         for trigger_meta in self.triggers.values():
             ret += "\n%s;" % (trigger_meta.as_cql_query(),)
-
         return ret
 
     def as_cql_query(self, formatted=False):
