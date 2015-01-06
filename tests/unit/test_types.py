@@ -183,9 +183,8 @@ class TypeTests(unittest.TestCase):
         now_timestamp = time.time()
         now_datetime = datetime.datetime.utcfromtimestamp(now_timestamp)
 
-        # same results serialized
-        # (this could change if we follow up on the timestamp multiplication warning in DateType.serialize)
-        self.assertEqual(DateType.serialize(now_datetime, 0), DateType.serialize(now_timestamp, 0))
+        # same results serialized (must scale the timestamp to milliseconds)
+        self.assertEqual(DateType.serialize(now_datetime, 0), DateType.serialize(now_timestamp * 1e3, 0))
 
         # from timestamp
         date_type = DateType(now_timestamp)

@@ -576,31 +576,16 @@ class DateType(_CassandraType):
     @staticmethod
     def serialize(v, protocol_version):
         try:
-            converted = calendar.timegm(v.utctimetuple())
-            converted = converted * 1e3 + getattr(v, 'microsecond', 0) / 1e3
+            # v is datetime
+            timestamp_seconds = calendar.timegm(v.utctimetuple())
+            timestamp = timestamp_seconds * 1e3 + getattr(v, 'microsecond', 0) / 1e3
         except AttributeError:
             # Ints and floats are valid timestamps too
             if type(v) not in _number_types:
                 raise TypeError('DateType arguments must be a datetime or timestamp')
+            timestamp = v
 
-            global _have_warned_about_timestamps
-            if not _have_warned_about_timestamps:
-                _have_warned_about_timestamps = True
-                warnings.warn(
-                    "timestamp columns in Cassandra hold a number of "
-                    "milliseconds since the unix epoch.  Currently, when executing "
-                    "prepared statements, this driver multiplies timestamp "
-                    "values by 1000 so that the result of time.time() "
-                    "can be used directly.  However, the driver cannot "
-                    "match this behavior for non-prepared statements, "
-                    "so the 2.0 version of the driver will no longer multiply "
-                    "timestamps by 1000.  It is suggested that you simply use "
-                    "datetime.datetime objects for 'timestamp' values to avoid "
-                    "any ambiguity and to guarantee a smooth upgrade of the "
-                    "driver.")
-            converted = v * 1e3
-
-        return int64_pack(long(converted))
+        return int64_pack(long(timestamp))
 
 
 class TimestampType(DateType):
