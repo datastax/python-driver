@@ -129,13 +129,13 @@ def parse_casstype_args(typestring):
         elif tok == ')':
             types, names = args.pop()
             prev_types, prev_names = args[-1]
-
             prev_types[-1] = prev_types[-1].apply_parameters(types, names)
         else:
             types, names = args[-1]
-            if ':' in tok:
-                name, tok = tok.rsplit(':', 1)
-                names.append(name)
+            parts = re.split(':|=>', tok)
+            tok = parts.pop()
+            if parts:
+                names.append(parts[0])
             else:
                 names.append(None)
 
@@ -294,7 +294,7 @@ class _CassandraType(object):
         newname = cls.cass_parameterized_type_with(subtypes)
         if six.PY2 and isinstance(newname, unicode):
             newname = newname.encode('utf-8')
-        return type(newname, (cls,), {'subtypes': subtypes, 'cassname': cls.cassname})
+        return type(newname, (cls,), {'subtypes': subtypes, 'cassname': cls.cassname, 'fieldnames': names})
 
     @classmethod
     def cql_parameterized_type(cls):
