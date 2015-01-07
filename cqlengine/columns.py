@@ -252,7 +252,7 @@ class Text(Column):
         value = super(Text, self).validate(value)
         if value is None: return
         if not isinstance(value, (six.string_types, bytearray)) and value is not None:
-            raise ValidationError('{} is not a string'.format(type(value)))
+            raise ValidationError('{} {} is not a string'.format(self.column_name, type(value)))
         if self.max_length:
             if len(value) > self.max_length:
                 raise ValidationError('{} is longer than {} characters'.format(self.column_name, self.max_length))
@@ -271,7 +271,7 @@ class Integer(Column):
         try:
             return int(val)
         except (TypeError, ValueError):
-            raise ValidationError("{} can't be converted to integral value".format(value))
+            raise ValidationError("{} {} can't be converted to integral value".format(self.column_name, value))
 
     def to_python(self, value):
         return self.validate(value)
@@ -295,7 +295,7 @@ class VarInt(Column):
             return int(val)
         except (TypeError, ValueError):
             raise ValidationError(
-                "{} can't be converted to integral value".format(value))
+                "{} {} can't be converted to integral value".format(self.column_name, value))
 
     def to_python(self, value):
         return self.validate(value)
@@ -351,7 +351,7 @@ class DateTime(Column):
             if isinstance(value, date):
                 value = datetime(value.year, value.month, value.day)
             else:
-                raise ValidationError("'{}' is not a datetime object".format(value))
+                raise ValidationError("{} '{}' is not a datetime object".format(self.column_name, value))
         epoch = datetime(1970, 1, 1, tzinfo=value.tzinfo)
         offset = epoch.tzinfo.utcoffset(epoch).total_seconds() if epoch.tzinfo else 0
 
@@ -378,7 +378,7 @@ class Date(Column):
         if isinstance(value, datetime):
             value = value.date()
         if not isinstance(value, date):
-            raise ValidationError("'{}' is not a date object".format(repr(value)))
+            raise ValidationError("{} '{}' is not a date object".format(self.column_name, repr(value)))
 
         return int((value - date(1970, 1, 1)).total_seconds() * 1000)
 
@@ -398,7 +398,7 @@ class UUID(Column):
         if isinstance(val, _UUID): return val
         if isinstance(val, six.string_types) and self.re_uuid.match(val):
             return _UUID(val)
-        raise ValidationError("{} is not a valid uuid".format(value))
+        raise ValidationError("{} {} is not a valid uuid".format(self.column_name, value))
 
     def to_python(self, value):
         return self.validate(value)
@@ -480,7 +480,7 @@ class Float(Column):
         try:
             return float(value)
         except (TypeError, ValueError):
-            raise ValidationError("{} is not a valid float".format(value))
+            raise ValidationError("{} {} is not a valid float".format(self.column_name, value))
 
     def to_python(self, value):
         return self.validate(value)
@@ -500,7 +500,7 @@ class Decimal(Column):
         try:
             return _Decimal(val)
         except InvalidOperation:
-            raise ValidationError("'{}' can't be coerced to decimal".format(val))
+            raise ValidationError("{} '{}' can't be coerced to decimal".format(self.column_name, val))
 
     def to_python(self, value):
         return self.validate(value)
@@ -542,7 +542,7 @@ class BaseContainerColumn(Column):
         # It is dangerous to let collections have more than 65535.
         # See: https://issues.apache.org/jira/browse/CASSANDRA-5428
         if value is not None and len(value) > 65535:
-            raise ValidationError("Collection can't have more than 65535 elements.")
+            raise ValidationError("{} Collection can't have more than 65535 elements.".format(self.column_name))
         return value
 
     def get_column_def(self):
@@ -593,12 +593,12 @@ class Set(BaseContainerColumn):
         types = (set,) if self.strict else (set, list, tuple)
         if not isinstance(val, types):
             if self.strict:
-                raise ValidationError('{} is not a set object'.format(val))
+                raise ValidationError('{} {} is not a set object'.format(self.column_name, val))
             else:
-                raise ValidationError('{} cannot be coerced to a set object'.format(val))
+                raise ValidationError('{} {} cannot be coerced to a set object'.format(self.column_name, val))
 
         if None in val:
-            raise ValidationError("None not allowed in a set")
+            raise ValidationError("{} None not allowed in a set".format(self.column_name))
 
         return {self.value_col.validate(v) for v in val}
 
@@ -639,9 +639,9 @@ class List(BaseContainerColumn):
         val = super(List, self).validate(value)
         if val is None: return
         if not isinstance(val, (set, list, tuple)):
-            raise ValidationError('{} is not a list object'.format(val))
+            raise ValidationError('{} {} is not a list object'.format(self.column_name, val))
         if None in val:
-            raise ValidationError("None is not allowed in a list")
+            raise ValidationError("{} None is not allowed in a list".format(self.column_name))
         return [self.value_col.validate(v) for v in val]
 
     def to_python(self, value):
@@ -714,7 +714,7 @@ class Map(BaseContainerColumn):
         val = super(Map, self).validate(value)
         if val is None: return
         if not isinstance(val, dict):
-            raise ValidationError('{} is not a dict object'.format(val))
+            raise ValidationError('{} {} is not a dict object'.format(self.column_name, val))
         return {self.key_col.validate(k):self.value_col.validate(v) for k,v in val.items()}
 
     def to_python(self, value):
