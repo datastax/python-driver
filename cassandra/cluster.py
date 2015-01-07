@@ -1045,14 +1045,26 @@ class Cluster(object):
             for pool in session._pools.values():
                 pool.ensure_core_connections()
 
-    def submit_schema_refresh(self, keyspace=None, table=None):
+    def refresh_schema(self, keyspace=None, table=None, usertype=None, schema_agreement_wait=None):
+        """
+        Synchronously refresh the schema metadata.
+        By default timeout for this operation is governed by :attr:`~.Cluster.max_schema_agreement_wait`
+        and :attr:`~.Cluster.control_connection_timeout`.
+        Passing schema_agreement_wait here overrides :attr:`~.Cluster.max_schema_agreement_wait`. Setting 
+        schema_agreement_wait <= 0 will bypass schema agreement and refresh schema immediately.
+        RuntimeWarning is raised if schema refresh fails for any reason.
+        """
+        if not self.control_connection.refresh_schema(keyspace, table, usertype, schema_agreement_wait):
+            raise RuntimeWarning("Schema was not refreshed. See log for details.")
+
+    def submit_schema_refresh(self, keyspace=None, table=None, usertype=None):
         """
         Schedule a refresh of the internal representation of the current
         schema for this cluster.  If `keyspace` is specified, only that
         keyspace will be refreshed, and likewise for `table`.
         """
         return self.executor.submit(
-            self.control_connection.refresh_schema, keyspace, table)
+            self.control_connection.refresh_schema, keyspace, table, usertype)
 
     def _prepare_all_queries(self, host):
         if not self._prepared_statements:
@@ -1887,19 +1899,23 @@ class ControlConnection(object):
             self._connection.close()
             del self._connection
 
-    def refresh_schema(self, keyspace=None, table=None, usertype=None):
+    def refresh_schema(self, keyspace=None, table=None, usertype=None,
+                       schema_agreement_wait=None):
         try:
             if self._connection:
-                self._refresh_schema(self._connection, keyspace, table, usertype)
+                return self._refresh_schema(self._connection, keyspace, table, usertype,
+                                            schema_agreement_wait=schema_agreement_wait)
         except ReferenceError:
             pass  # our weak reference to the Cluster is no good
         except Exception:
             log.debug("[control connection] Error refreshing schema", exc_info=True)
             self._signal_error()
+        return False
 
-    def _refresh_schema(self, connection, keyspace=None, table=None, usertype=None, preloaded_results=None, schema_agreement_wait=None):
+    def _refresh_schema(self, connection, keyspace=None, table=None, usertype=None,
+                        preloaded_results=None, schema_agreement_wait=None):
         if self._cluster.is_shutdown:
-            return
+            return False
 
         assert table is None or usertype is None
 
@@ -1908,7 +1924,7 @@ class ControlConnection(object):
                                                 wait_time=schema_agreement_wait)
         if not agreed:
             log.debug("Skipping schema refresh due to lack of schema agreement")
-            return
+            return False
 
         cl = ConsistencyLevel.ONE
         if table:
@@ -1924,7 +1940,7 @@ class ControlConnection(object):
             col_query = QueryMessage(query=self._SELECT_COLUMNS + where_clause, consistency_level=cl)
             triggers_query = QueryMessage(query=self._SELECT_TRIGGERS + where_clause, consistency_level=cl)
             (cf_success, cf_result), (col_success, col_result), (triggers_success, triggers_result) \
-                = connection.wait_for_responses(cf_query, col_query, triggers_query, fail_on_error=False)
+                = connection.wait_for_responses(cf_query, col_query, triggers_query, timeout=self._timeout, fail_on_error=False)
 
             log.debug("[control connection] Fetched table info for %s.%s, rebuilding metadata", keyspace, table)
             cf_result = _handle_results(cf_success, cf_result)
@@ -1963,7 +1979,7 @@ class ControlConnection(object):
                 QueryMessage(query=self._SELECT_TRIGGERS, consistency_level=cl)
             ]
 
-            responses = connection.wait_for_responses(*queries, fail_on_error=False)
+            responses = connection.wait_for_responses(*queries, timeout=self._timeout, fail_on_error=False)
             (ks_success, ks_result), (cf_success, cf_result), \
                 (col_success, col_result), (types_success, types_result), \
                 (trigger_success, triggers_result) = responses
@@ -2009,6 +2025,7 @@ class ControlConnection(object):
 
             log.debug("[control connection] Fetched schema, rebuilding metadata")
             self._cluster.metadata.rebuild_schema(ks_result, types_result, cf_result, col_result, triggers_result)
+        return True
 
     def refresh_node_list_and_token_map(self, force_token_rebuild=False):
         try:
