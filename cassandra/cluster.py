@@ -1050,8 +1050,8 @@ class Cluster(object):
         Synchronously refresh the schema metadata.
         By default timeout for this operation is governed by :attr:`~.Cluster.max_schema_agreement_wait`
         and :attr:`~.Cluster.control_connection_timeout`.
-        Passing schema_agreement_wait here overrides :attr:`~.Cluster.max_schema_agreement_wait`. Setting 
-        schema_agreement_wait <= 0 will bypass schema agreement and refresh schema immediately.
+        Passing schema_agreement_wait here overrides :attr:`~.Cluster.max_schema_agreement_wait`.
+        Setting schema_agreement_wait <= 0 will bypass schema agreement and refresh schema immediately.
         RuntimeWarning is raised if schema refresh fails for any reason.
         """
         if not self.control_connection.refresh_schema(keyspace, table, usertype, schema_agreement_wait):
@@ -2007,8 +2007,8 @@ class ControlConnection(object):
                     log.debug("[control connection] triggers table not found")
                     triggers_result = {}
                 elif isinstance(triggers_result, Unauthorized):
-                    log.warn("[control connection] this version of Cassandra does not allow access to schema_triggers metadata with authorization enabled (CASSANDRA-7967); "
-                             "The driver will operate normally, but will not reflect triggers in the local metadata model, or schema strings.")
+                    log.warning("[control connection] this version of Cassandra does not allow access to schema_triggers metadata with authorization enabled (CASSANDRA-7967); "
+                                "The driver will operate normally, but will not reflect triggers in the local metadata model, or schema strings.")
                     triggers_result = {}
                 else:
                     raise triggers_result
@@ -2086,7 +2086,7 @@ class ControlConnection(object):
 
             tokens = row.get("tokens")
             if not tokens:
-                log.warn("Excluding host (%s) with no tokens in system.peers table of %s." % (addr, connection.host))
+                log.warning("Excluding host (%s) with no tokens in system.peers table of %s." % (addr, connection.host))
                 continue
 
             found_hosts.add(addr)
@@ -2223,8 +2223,8 @@ class ControlConnection(object):
                 self._time.sleep(0.2)
                 elapsed = self._time.time() - start
 
-            log.warn("Node %s is reporting a schema disagreement: %s",
-                     connection.host, schema_mismatches)
+            log.warning("Node %s is reporting a schema disagreement: %s",
+                        connection.host, schema_mismatches)
             return False
 
     def _get_schema_mismatches(self, peers_result, local_result, local_address):

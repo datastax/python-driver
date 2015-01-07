@@ -183,7 +183,7 @@ class _ReconnectionHandler(object):
             # call on_exception for logging purposes even if next_delay is None
             if self.on_exception(exc, next_delay):
                 if next_delay is None:
-                    log.warn(
+                    log.warning(
                         "Will not continue to retry reconnection attempts "
                         "due to an exhausted retry schedule")
                 else:
