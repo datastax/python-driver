@@ -2160,8 +2160,8 @@ class ControlConnection(object):
                 self._cluster.on_down(host, is_host_addition=False)
 
     def _handle_schema_change(self, event):
-        keyspace = event['keyspace'] or None
-        table = event.get('table') or None
+        keyspace = event.get('keyspace')
+        table = event.get('table')
         usertype = event.get('type')
         self._submit(self.refresh_schema, keyspace, table, usertype)
 
