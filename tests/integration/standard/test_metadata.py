@@ -546,6 +546,9 @@ CREATE TABLE export_udts.users (
 
     def test_legacy_tables(self):
 
+        if get_server_versions()[0] < (2, 1, 0):
+            raise unittest.SkipTest('Test schema output assumes 2.1.0+ options')
+
         cli_script = """CREATE KEYSPACE legacy
 WITH placement_strategy = 'SimpleStrategy'
 AND strategy_options = {replication_factor:1};
