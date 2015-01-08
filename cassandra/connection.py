@@ -558,7 +558,7 @@ class Connection(object):
                 log.debug("Sending SASL-based auth response on %s", self)
                 initial_response = self.authenticator.initial_response()
                 initial_response = "" if initial_response is None else initial_response
-                self.send_msg(AuthResponseMessage(initial_response), 0, self._handle_auth_response)
+                self.send_msg(AuthResponseMessage(initial_response), self.get_request_id(), self._handle_auth_response)
         elif isinstance(startup_response, ErrorMessage):
             log.debug("Received ErrorMessage on new connection (%s) from %s: %s",
                       id(self), self.host, startup_response.summary_msg())
