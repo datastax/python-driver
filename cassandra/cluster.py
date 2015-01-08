@@ -1052,10 +1052,10 @@ class Cluster(object):
         and :attr:`~.Cluster.control_connection_timeout`.
         Passing schema_agreement_wait here overrides :attr:`~.Cluster.max_schema_agreement_wait`.
         Setting schema_agreement_wait <= 0 will bypass schema agreement and refresh schema immediately.
-        RuntimeWarning is raised if schema refresh fails for any reason.
+        An Exception is raised if schema refresh fails for any reason.
         """
         if not self.control_connection.refresh_schema(keyspace, table, usertype, schema_agreement_wait):
-            raise RuntimeWarning("Schema was not refreshed. See log for details.")
+            raise Exception("Schema was not refreshed. See log for details.")
 
     def submit_schema_refresh(self, keyspace=None, table=None, usertype=None):
         """
