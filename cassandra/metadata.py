@@ -513,7 +513,7 @@ class _ReplicationStrategy(object):
         try:
             rs_instance = rs_class(options_map)
         except Exception as exc:
-            log.warn("Failed creating %s with options %s: %s", strategy_name, options_map, exc)
+            log.warning("Failed creating %s with options %s: %s", strategy_name, options_map, exc)
             return None
 
         return rs_instance

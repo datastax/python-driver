@@ -103,11 +103,12 @@ def named_tuple_factory(colnames, rows):
     try:
         Row = namedtuple('Row', clean_column_names)
     except Exception:
-        log.warn("Failed creating named tuple for results with column names %s (cleaned: %s) (see Python 'namedtuple' documentation for details on name rules). "
-                 "Results will be returned with positional names. "
-                 "Avoid this by choosing different names, using SELECT \"<col name>\" AS aliases, "
-                 "or specifying a different row_factory on your Session" %
-                 (colnames, clean_column_names))
+        log.warning("Failed creating named tuple for results with column names %s (cleaned: %s) "
+                    "(see Python 'namedtuple' documentation for details on name rules). "
+                    "Results will be returned with positional names. "
+                    "Avoid this by choosing different names, using SELECT \"<col name>\" AS aliases, "
+                    "or specifying a different row_factory on your Session" %
+                    (colnames, clean_column_names))
         Row = namedtuple('Row', clean_column_names, rename=True)
 
     return [Row(*row) for row in rows]
@@ -190,7 +191,7 @@ class Statement(object):
     :class:`~.TokenAwarePolicy` is configured for
     :attr:`.Cluster.load_balancing_policy`
 
-    It is set implicitly on :class:`.BoundStatement`, and :class:`.BatchStatement`, 
+    It is set implicitly on :class:`.BoundStatement`, and :class:`.BatchStatement`,
     but must be set explicitly on :class:`.SimpleStatement`.
 
     .. versionadded:: 2.1.3
@@ -326,7 +327,7 @@ class PreparedStatement(object):
     column_metadata = None
     query_id = None
     query_string = None
-    keyspace = None # change to prepared_keyspace in major release
+    keyspace = None  # change to prepared_keyspace in major release
 
     routing_key_indexes = None
 
