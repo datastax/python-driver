@@ -638,16 +638,22 @@ create column family composite_comp_with_col
         # is a bit strange, but it replays in CQL with desired results
         expected_string = """CREATE KEYSPACE legacy WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;
 
+/*
+Warning: Table legacy.composite_comp_with_col omitted because it has constructs not compatible with CQL (was created via legacy API).
+
+Approximate structure, for reference:
+(this should not be used to reproduce this schema)
+
 CREATE TABLE legacy.composite_comp_with_col (
     key blob,
-    column0 't=>org.apache.cassandra.db.marshal.TimeUUIDType',
-    column1 'b=>org.apache.cassandra.db.marshal.BytesType',
-    column2 's=>org.apache.cassandra.db.marshal.UTF8Type',
+    t timeuuid,
+    b blob,
+    s text,
     "b@6869746d65776974686d75736963" blob,
     "b@6d616d6d616a616d6d61" blob,
-    PRIMARY KEY (key, column0, column1, column2)
+    PRIMARY KEY (key, t, b, s)
 ) WITH COMPACT STORAGE
-    AND CLUSTERING ORDER BY (column0 ASC, column1 ASC, column2 ASC)
+    AND CLUSTERING ORDER BY (t ASC, b ASC, s ASC)
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = 'Stores file meta data'
     AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
@@ -662,6 +668,7 @@ CREATE TABLE legacy.composite_comp_with_col (
     AND speculative_retry = 'NONE';
 CREATE INDEX idx_two ON legacy.composite_comp_with_col ("b@6869746d65776974686d75736963");
 CREATE INDEX idx_one ON legacy.composite_comp_with_col ("b@6d616d6d616a616d6d61");
+*/
 
 CREATE TABLE legacy.nested_composite_key (
     key 'org.apache.cassandra.db.marshal.CompositeType(org.apache.cassandra.db.marshal.UUIDType, org.apache.cassandra.db.marshal.UTF8Type)',
@@ -759,10 +766,16 @@ CREATE TABLE legacy.simple_no_col (
     AND read_repair_chance = 0.0
     AND speculative_retry = 'NONE';
 
+/*
+Warning: Table legacy.composite_comp_no_col omitted because it has constructs not compatible with CQL (was created via legacy API).
+
+Approximate structure, for reference:
+(this should not be used to reproduce this schema)
+
 CREATE TABLE legacy.composite_comp_no_col (
     key blob,
-    column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(t=>org.apache.cassandra.db.marshal.TimeUUIDType, b=>org.apache.cassandra.db.marshal.BytesType, s=>org.apache.cassandra.db.marshal.UTF8Type)',
-    column2 's=>org.apache.cassandra.db.marshal.UTF8Type',
+    column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(org.apache.cassandra.db.marshal.TimeUUIDType, org.apache.cassandra.db.marshal.BytesType, org.apache.cassandra.db.marshal.UTF8Type)',
+    column2 text,
     value blob,
     PRIMARY KEY (key, column1, column1, column2)
 ) WITH COMPACT STORAGE
@@ -778,7 +791,8 @@ CREATE TABLE legacy.composite_comp_no_col (
     AND memtable_flush_period_in_ms = 0
     AND min_index_interval = 128
     AND read_repair_chance = 0.0
-    AND speculative_retry = 'NONE';"""
+    AND speculative_retry = 'NONE';
+*/"""
 
         ccm = get_cluster()
         ccm.run_cli(cli_script)
