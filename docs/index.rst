@@ -8,7 +8,7 @@ The driver supports Python 2.6, 2.7, 3.3, and 3.4.
 
 This driver is open source under the
 `Apache v2 License <http://www.apache.org/licenses/LICENSE-2.0.html>`_.
-The source code for this driver can be found on `Github <http://github.com/datastax/python-driver>`_.
+The source code for this driver can be found on `GitHub <http://github.com/datastax/python-driver>`_.
 
 Contents
 --------
