@@ -68,7 +68,7 @@ which sets the default keyspace for all queries made through that :class:`~.Sess
     session = cluster.connect('mykeyspace')
 
 
-You can always change a Sesssion's keyspace using :meth:`~.Session.set_keyspace` or
+You can always change a Session's keyspace using :meth:`~.Session.set_keyspace` or
 by executing a ``USE <keyspace>`` query:
 
 .. code-block:: python
@@ -385,7 +385,7 @@ prepared statement:
     user2 = session.execute(user_lookup_stmt, [user_id2])[0]
 
 The second option is to create a :class:`~.BoundStatement` from the
-:class:`~.PreparedStatement` and binding paramaters and set a consistency
+:class:`~.PreparedStatement` and binding parameters and set a consistency
 level on that:
 
 .. code-block:: python

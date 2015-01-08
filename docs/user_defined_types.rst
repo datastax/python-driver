@@ -7,11 +7,11 @@ new type through ``CREATE TYPE`` statements in CQL::
 
     CREATE TYPE address (street text, zip int);
 
-Version 2.1 of the python driver adds support for user-defined types.
+Version 2.1 of the Python driver adds support for user-defined types.
 
 Registering a Class to Map to a UDT
 -----------------------------------
-You can tell the python driver to return columns of a specific UDT as
+You can tell the Python driver to return columns of a specific UDT as
 instances of a class by registering them with your :class:`~.Cluster`
 instance through :meth:`.Cluster.register_user_type`:
 

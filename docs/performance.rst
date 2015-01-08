@@ -1,6 +1,6 @@
 Performance Notes
 =================
-The python driver for Cassandra offers several methods for executing queries.
+The Python driver for Cassandra offers several methods for executing queries.
 You can synchronously block for queries to complete using
 :meth:`.Session.execute()`, you can use a future-like interface through
 :meth:`.Session.execute_async()`, or you can attach a callback to the future
@@ -13,7 +13,7 @@ Benchmark Notes
 All benchmarks were executed using the
 `benchmark scripts <https://github.com/datastax/python-driver/tree/master/benchmarks>`_
 in the driver repository.  They were executed on a laptop with 16 GiB of RAM, an SSD,
-and a 2 GHz, four core CPU with hyperthreading.  The Cassandra cluster was a three
+and a 2 GHz, four core CPU with hyper-threading.  The Cassandra cluster was a three
 node `ccm <https://github.com/pcmanus/ccm>`_ cluster running on the same laptop
 with version 1.2.13 of Cassandra. I suggest testing these benchmarks against your
 own cluster when tuning the driver for optimal throughput or latency.
@@ -25,6 +25,17 @@ by using the ``--asyncore-only`` command line option.
 
 Each benchmark completes 100,000 small inserts. The replication factor for the
 keyspace was three, so all nodes were replicas for the inserted rows.
+
+The benchmarks require the Python driver C extensions as well as a few additional 
+Python packages. Follow these steps to install the prerequisites:
+
+1. Install packages to support Python driver C extensions:
+
+   * Debian/Ubuntu: ``sudo apt-get install gcc python-dev libev4 libev-dev``
+   * RHEL/CentOS/Fedora: ``sudo yum install gcc python-dev libev4 libev-dev``
+
+2. Install Python packages: ``pip install scales twisted blist``
+3. Re-install the Cassandra driver: ``pip install --upgrade cassandra-driver``
 
 Synchronous Execution (`sync.py <https://github.com/datastax/python-driver/blob/master/benchmarks/sync.py>`_)
 -------------------------------------------------------------------------------------------------------------
@@ -173,7 +184,7 @@ Callback Chaining (`callback_full_pipeline.py <https://github.com/datastax/pytho
 -----------------------------------------------------------------------------------------------------------------------------------------------
 This pattern is very different from the previous patterns.  Here we're taking
 advantage of the :meth:`.ResponseFuture.add_callback()` function to start
-another request as soon as one finishes.  Futhermore, we're starting 120
+another request as soon as one finishes.  Furthermore, we're starting 120
 of these callback chains, so we've always got about 120 operations in
 flight at any time:
 
@@ -243,7 +254,7 @@ dramatically:
     Average throughput: 679.61/sec
 
 When :attr:`.Cluster.protocol_version` is set to 1 or 2, you should limit the
-number of callback chains you run to rougly 100 per node in the cluster.
+number of callback chains you run to roughly 100 per node in the cluster.
 When :attr:`~.Cluster.protocol_version` is 3 or higher, you can safely experiment
 with higher numbers of callback chains.
 
