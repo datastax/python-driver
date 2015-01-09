@@ -74,7 +74,8 @@ def main():
     try:
         rows = future.result()
     except Exception:
-        log.exeception()
+        log.exception("Error reading rows:")
+        return
 
     for row in rows:
         log.info('\t'.join(row))
