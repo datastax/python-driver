@@ -20,7 +20,7 @@ import io
 import logging
 import os
 import sys
-from threading import Event, RLock
+from threading import Thread, Event, RLock
 import time
 
 if 'gevent.monkey' in sys.modules:
@@ -159,7 +159,7 @@ class Connection(object):
     in_flight = 0
 
     # A set of available request IDs.  When using the v3 protocol or higher,
-    # this will no initially include all request IDs in order to save memory,
+    # this will not initially include all request IDs in order to save memory,
     # but the set will grow if it is exhausted.
     request_ids = None
 
@@ -171,6 +171,8 @@ class Connection(object):
     is_closed = False
     lock = None
     user_type_map = None
+
+    msg_received = False
 
     is_control_connection = False
     _iobuf = None
@@ -400,6 +402,8 @@ class Connection(object):
             callback = self._callbacks.pop(stream_id, None)
             with self.lock:
                 self.request_ids.append(stream_id)
+
+        self.msg_received = True
 
         body = None
         try:
@@ -673,6 +677,13 @@ class Connection(object):
 
         self.send_msg(query, request_id, process_result)
 
+    @property
+    def is_idle(self):
+        return self.in_flight == 0 and not self.msg_received
+
+    def reset_idle(self):
+        self.msg_received = False
+
     def __str__(self):
         status = ""
         if self.is_defunct:
@@ -732,3 +743,90 @@ class ResponseWaiter(object):
             raise OperationTimedOut()
         else:
             return self.responses
+
+
+class HeartbeatFuture(object):
+    def __init__(self, connection, owner):
+        self._exception = None
+        self._event = Event()
+        self.connection = connection
+        self.owner = owner
+        log.debug("Sending options message heartbeat on idle connection %s %s",
+                  id(connection), connection.host)
+        with connection.lock:
+            connection.send_msg(OptionsMessage(), connection.get_request_id(), self._options_callback)
+            connection.in_flight += 1
+
+    def wait(self, timeout):
+        if self._event.wait(timeout):
+            if self._exception:
+                raise self._exception
+        else:
+            raise OperationTimedOut()
+
+    def _options_callback(self, response):
+        if not isinstance(response, SupportedMessage):
+            if isinstance(response, ConnectionException):
+                self._exception = response
+            else:
+                self._exception = ConnectionException("Received unexpected response to OptionsMessage: %s"
+                                                      % (response,))
+
+        log.debug("Received options response on connection (%s) from %s",
+                  id(self.connection), self.connection.host)
+        self._event.set()
+
+
+class ConnectionHeartbeat(Thread):
+
+    def __init__(self, interval_sec, get_connection_holders):
+        Thread.__init__(self, name="Connection heartbeat")
+        self._interval = interval_sec
+        self._get_connection_holders = get_connection_holders
+        self._shutdown_event = Event()
+        self.daemon = True
+        self.start()
+
+    def run(self):
+        elapsed = 0
+        while not self._shutdown_event.wait(self._interval - elapsed):
+            start_time = time.time()
+
+            futures = []
+            failed_connections = []
+            try:
+                for connections, owner in [(o.get_connections(), o) for o in self._get_connection_holders()]:
+                    for connection in connections:
+                        if not (connection.is_defunct or connection.is_closed) and connection.is_idle:
+                            try:
+                                futures.append(HeartbeatFuture(connection, owner))
+                            except Exception:
+                                log.warning("Failed sending heartbeat message on connection (%s) to %s",
+                                            id(connection), connection.host, exc_info=True)
+                                failed_connections.append((connection, owner))
+                        else:
+                            connection.reset_idle()
+
+                for f in futures:
+                    connection = f.connection
+                    try:
+                        f.wait(self._interval)
+                        # TODO: move this, along with connection locks in pool, down into Connection
+                        with connection.lock:
+                            connection.in_flight -= 1
+                        connection.reset_idle()
+                    except Exception:
+                        log.warning("Heartbeat failed for connection (%s) to %s",
+                                    id(connection), connection.host, exc_info=True)
+                        failed_connections.append((f.connection, f.owner))
+
+                for connection, owner in failed_connections:
+                    connection.defunct(Exception('Connection heartbeat failure'))
+                    owner.return_connection(connection)
+            except Exception:
+                log.warning("Failed connection heartbeat", exc_info=True)
+
+            elapsed = time.time() - start_time
+
+    def stop(self):
+        self._shutdown_event.set()

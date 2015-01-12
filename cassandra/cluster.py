@@ -39,12 +39,13 @@ except ImportError:
     from cassandra.util import WeakSet  # NOQA
 
 from functools import partial, wraps
-from itertools import groupby
+from itertools import groupby, chain
 
 from cassandra import (ConsistencyLevel, AuthenticationFailed,
                        InvalidRequest, OperationTimedOut,
                        UnsupportedOperation, Unauthorized)
-from cassandra.connection import ConnectionException, ConnectionShutdown
+from cassandra.connection import (ConnectionException, ConnectionShutdown,
+                                  ConnectionHeartbeat)
 from cassandra.encoder import Encoder
 from cassandra.protocol import (QueryMessage, ResultMessage,
                                 ErrorMessage, ReadTimeoutErrorMessage,
@@ -372,6 +373,14 @@ class Cluster(object):
     If set to :const:`None`, there will be no timeout for these queries.
     """
 
+    idle_heartbeat_interval = 30
+    """
+    Interval, in seconds, on which to heartbeat idle connections. This helps
+    keep connections open through network devices that expire idle connections.
+    It also helps discover bad connections early in low-traffic scenarios.
+    Setting to zero disables heartbeats.
+    """
+
     sessions = None
     control_connection = None
     scheduler = None
@@ -380,6 +389,7 @@ class Cluster(object):
     _is_setup = False
     _prepared_statements = None
     _prepared_statement_lock = None
+    _idle_heartbeat = None
 
     _user_types = None
     """
@@ -406,7 +416,8 @@ class Cluster(object):
                  protocol_version=2,
                  executor_threads=2,
                  max_schema_agreement_wait=10,
-                 control_connection_timeout=2.0):
+                 control_connection_timeout=2.0,
+                 idle_heartbeat_interval=30):
         """
         Any of the mutable Cluster attributes may be set as keyword arguments
         to the constructor.
@@ -456,6 +467,7 @@ class Cluster(object):
         self.cql_version = cql_version
         self.max_schema_agreement_wait = max_schema_agreement_wait
         self.control_connection_timeout = control_connection_timeout
+        self.idle_heartbeat_interval = idle_heartbeat_interval
 
         self._listeners = set()
         self._listener_lock = Lock()
@@ -700,12 +712,21 @@ class Cluster(object):
 
                 self.load_balancing_policy.check_supported()
 
+                if self.idle_heartbeat_interval:
+                    self._idle_heartbeat = ConnectionHeartbeat(self.idle_heartbeat_interval, self.get_connection_holders)
                 self._is_setup = True
 
         session = self._new_session()
         if keyspace:
             session.set_keyspace(keyspace)
         return session
+
+    def get_connection_holders(self):
+        holders = []
+        for s in self.sessions:
+            holders.extend(s.get_pools())
+        holders.append(self.control_connection)
+        return holders
 
     def shutdown(self):
         """
@@ -733,6 +754,9 @@ class Cluster(object):
 
         if self.executor:
             self.executor.shutdown()
+
+        if self._idle_heartbeat:
+            self._idle_heartbeat.stop()
 
     def _new_session(self):
         session = Session(self, self.metadata.all_hosts())
@@ -1656,6 +1680,9 @@ class Session(object):
     def get_pool_state(self):
         return dict((host, pool.get_state()) for host, pool in self._pools.items())
 
+    def get_pools(self):
+        return self._pools.values()
+
 
 class UserTypeDoesNotExist(Exception):
     """
@@ -2271,11 +2298,6 @@ class ControlConnection(object):
         # manually
         self.reconnect()
 
-    @property
-    def is_open(self):
-        conn = self._connection
-        return bool(conn and conn.is_open)
-
     def on_up(self, host):
         pass
 
@@ -2294,6 +2316,14 @@ class ControlConnection(object):
 
     def on_remove(self, host):
         self.refresh_node_list_and_token_map(force_token_rebuild=True)
+
+    def get_connections(self):
+        c = getattr(self, '_connection', None)
+        return [c] if c else []
+
+    def return_connection(self, connection):
+        if connection is self._connection and (connection.is_defunct or connection.is_closed):
+            self.reconnect()
 
 
 def _stop_scheduler(scheduler, thread):
