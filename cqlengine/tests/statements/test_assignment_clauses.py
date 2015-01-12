@@ -65,6 +65,24 @@ class SetUpdateClauseTests(TestCase):
         c.update_context(ctx)
         self.assertEqual(ctx, {})
 
+    def test_update_empty_set(self):
+        """tests assigning a set to an empty set creates a nonempty
+        update statement and nonzero context size."""
+        c = SetUpdateClause(field='s', value=set())
+        c._analyze()
+        c.set_context_id(0)
+
+        self.assertEqual(c._assignments, set())
+        self.assertIsNone(c._additions)
+        self.assertIsNone(c._removals)
+
+        self.assertEqual(c.get_context_size(), 1)
+        self.assertEqual(str(c), '"s" = %(0)s')
+
+        ctx = {}
+        c.update_context(ctx)
+        self.assertEqual(ctx, {'0' : set()})
+
     def test_additions(self):
         c = SetUpdateClause('s', {1, 2, 3}, previous={1, 2})
         c._analyze()
