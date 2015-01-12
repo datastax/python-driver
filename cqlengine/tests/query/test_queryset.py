@@ -20,10 +20,8 @@ from datetime import tzinfo
 from cqlengine import statements
 from cqlengine import operators
 
-
-from cqlengine.connection import get_cluster, get_session
-
-cluster = get_cluster()
+from cqlengine.connection import get_session
+from cqlengine.tests.base import PROTOCOL_VERSION
 
 
 class TzOffset(tzinfo):
@@ -690,7 +688,7 @@ class TestObjectsProperty(BaseQuerySetUsage):
         assert TestModel.objects._result_cache is None
 
 
-@skipUnless(cluster.protocol_version >= 2, "only runs against the cql3 protocol v2.0")
+@skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
 def test_paged_result_handling():
     # addresses #225
     class PagingTest(Model):

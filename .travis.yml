@@ -29,4 +29,4 @@ install:
   - "pip install -r requirements.txt --use-mirrors"
 
 script:
-  - "bin/test.py --no-skip"
+  - "nosetests cqlengine/tests --no-skip"

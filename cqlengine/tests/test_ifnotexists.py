@@ -1,14 +1,12 @@
 from unittest import skipUnless
 from cqlengine.management import sync_table, drop_table, create_keyspace, delete_keyspace
 from cqlengine.tests.base import BaseCassEngTestCase
+from cqlengine.tests.base import PROTOCOL_VERSION
 from cqlengine.models import Model
 from cqlengine.exceptions import LWTException
 from cqlengine import columns, BatchQuery
 from uuid import uuid4
 import mock
-from cqlengine.connection import get_cluster
-
-cluster = get_cluster()
 
 
 class TestIfNotExistsModel(Model):
@@ -43,7 +41,7 @@ class BaseIfNotExistsTest(BaseCassEngTestCase):
 
 class IfNotExistsInsertTests(BaseIfNotExistsTest):
 
-    @skipUnless(cluster.protocol_version >= 2, "only runs against the cql3 protocol v2.0")
+    @skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
     def test_insert_if_not_exists_success(self):
         """ tests that insertion with if_not_exists work as expected """
 
@@ -77,7 +75,7 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
         self.assertEquals(tm.count, 9)
         self.assertEquals(tm.text, '111111111111')
 
-    @skipUnless(cluster.protocol_version >= 2, "only runs against the cql3 protocol v2.0")
+    @skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
     def test_batch_insert_if_not_exists_success(self):
         """ tests that batch insertion with if_not_exists work as expected """
 
