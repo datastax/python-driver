@@ -700,15 +700,14 @@ class Cluster(object):
                 self.load_balancing_policy.populate(
                     weakref.proxy(self), self.metadata.all_hosts())
 
-                if self.control_connection:
-                    try:
-                        self.control_connection.connect()
-                        log.debug("Control connection created")
-                    except Exception:
-                        log.exception("Control connection failed to connect, "
-                                      "shutting down Cluster:")
-                        self.shutdown()
-                        raise
+                try:
+                    self.control_connection.connect()
+                    log.debug("Control connection created")
+                except Exception:
+                    log.exception("Control connection failed to connect, "
+                                  "shutting down Cluster:")
+                    self.shutdown()
+                    raise
 
                 self.load_balancing_policy.check_supported()
 
@@ -742,18 +741,14 @@ class Cluster(object):
             else:
                 self.is_shutdown = True
 
-        if self.scheduler:
-            self.scheduler.shutdown()
+        self.scheduler.shutdown()
 
-        if self.control_connection:
-            self.control_connection.shutdown()
+        self.control_connection.shutdown()
 
-        if self.sessions:
-            for session in self.sessions:
-                session.shutdown()
+        for session in self.sessions:
+            session.shutdown()
 
-        if self.executor:
-            self.executor.shutdown()
+        self.executor.shutdown()
 
         if self._idle_heartbeat:
             self._idle_heartbeat.stop()
