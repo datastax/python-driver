@@ -8,7 +8,6 @@ from cqlengine.connection import get_session
 
 
 class TestTTLModel(Model):
-    __keyspace__ = 'test'
     id      = columns.UUID(primary_key=True, default=lambda:uuid4())
     count   = columns.Integer()
     text    = columns.Text(required=False)
@@ -28,7 +27,6 @@ class BaseTTLTest(BaseCassEngTestCase):
 
 
 class TestDefaultTTLModel(Model):
-    __keyspace__ = 'test'
     __default_ttl__ = 20
     id      = columns.UUID(primary_key=True, default=lambda:uuid4())
     count   = columns.Integer()

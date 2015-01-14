@@ -43,7 +43,7 @@ class TzOffset(tzinfo):
 
 
 class TestModel(Model):
-    __keyspace__ = 'test'
+
     test_id = columns.Integer(primary_key=True)
     attempt_id = columns.Integer(primary_key=True)
     description = columns.Text()
@@ -52,7 +52,7 @@ class TestModel(Model):
 
 
 class IndexedTestModel(Model):
-    __keyspace__ = 'test'
+
     test_id = columns.Integer(primary_key=True)
     attempt_id = columns.Integer(index=True)
     description = columns.Text()
@@ -61,7 +61,7 @@ class IndexedTestModel(Model):
 
 
 class TestMultiClusteringModel(Model):
-    __keyspace__ = 'test'
+
     one = columns.Integer(primary_key=True)
     two = columns.Integer(primary_key=True)
     three = columns.Integer(primary_key=True)
@@ -380,7 +380,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
 
 def test_non_quality_filtering():
     class NonEqualityFilteringModel(Model):
-        __keyspace__ = 'test'
+
         example_id = columns.UUID(primary_key=True, default=uuid.uuid4)
         sequence_id = columns.Integer(primary_key=True)  # sequence_id is a clustering key
         example_type = columns.Integer(index=True)
@@ -550,7 +550,7 @@ class TestQuerySetConnectionHandling(BaseQuerySetUsage):
 
 
 class TimeUUIDQueryModel(Model):
-    __keyspace__ = 'test'
+
     partition = columns.UUID(primary_key=True)
     time = columns.TimeUUID(primary_key=True)
     data = columns.Text(required=False)

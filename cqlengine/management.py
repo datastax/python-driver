@@ -18,7 +18,7 @@ from cqlengine.models import Model
 # system keyspaces
 schema_columnfamilies = NamedTable('system', 'schema_columnfamilies')
 
-def create_keyspace(name, strategy_class='SimpleStrategy', replication_factor=3, durable_writes=True, **replication_values):
+def create_keyspace(name, strategy_class, replication_factor, durable_writes=True, **replication_values):
     """
     creates a keyspace
 
@@ -62,7 +62,7 @@ def delete_keyspace(name):
 def create_table(model, create_missing_keyspace=True):
     raise CQLEngineException("create_table is deprecated, please use sync_table")
 
-def sync_table(model, create_missing_keyspace=True):
+def sync_table(model):
     """
     Inspects the model and creates / updates the corresponding table and columns.
 
@@ -86,9 +86,6 @@ def sync_table(model, create_missing_keyspace=True):
     raw_cf_name = model.column_family_name(include_keyspace=False)
 
     ks_name = model._get_keyspace()
-    #create missing keyspace
-    if create_missing_keyspace:
-        create_keyspace(ks_name)
 
     cluster = get_cluster()
 

@@ -11,14 +11,14 @@ from cqlengine.models import Model
 from cqlengine import columns
 
 class TestModel(Model):
-    __keyspace__ = 'test'
+
     id      = columns.UUID(primary_key=True, default=lambda:uuid4())
     count   = columns.Integer()
     text    = columns.Text(required=False)
     a_bool  = columns.Boolean(default=False)
 
 class TestModel(Model):
-    __keyspace__ = 'test'
+
     id      = columns.UUID(primary_key=True, default=lambda:uuid4())
     count   = columns.Integer()
     text    = columns.Text(required=False)
@@ -118,7 +118,7 @@ class TestModelIO(BaseCassEngTestCase):
 
 
 class TestMultiKeyModel(Model):
-    __keyspace__ = 'test'
+
     partition   = columns.Integer(primary_key=True)
     cluster     = columns.Integer(primary_key=True)
     count       = columns.Integer(required=False)
@@ -244,7 +244,7 @@ class TestCanUpdate(BaseCassEngTestCase):
 
 
 class IndexDefinitionModel(Model):
-    __keyspace__ = 'test'
+
     key     = columns.UUID(primary_key=True)
     val     = columns.Text(index=True)
 
@@ -255,7 +255,7 @@ class TestIndexedColumnDefinition(BaseCassEngTestCase):
         sync_table(IndexDefinitionModel)
 
 class ReservedWordModel(Model):
-    __keyspace__ = 'test'
+
     token   = columns.Text(primary_key=True)
     insert  = columns.Integer(index=True)
 
@@ -276,7 +276,7 @@ class TestQueryQuoting(BaseCassEngTestCase):
 
 
 class TestQueryModel(Model):
-    __keyspace__ = 'test'
+
     test_id = columns.UUID(primary_key=True, default=uuid4)
     date = columns.Date(primary_key=True)
     description = columns.Text()
@@ -311,7 +311,7 @@ class TestQuerying(BaseCassEngTestCase):
 
 def test_none_filter_fails():
     class NoneFilterModel(Model):
-        __keyspace__ = 'test'
+
         pk = columns.Integer(primary_key=True)
         v = columns.Integer()
     sync_table(NoneFilterModel)

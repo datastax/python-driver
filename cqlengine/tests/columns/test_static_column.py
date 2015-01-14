@@ -9,7 +9,7 @@ from cqlengine.tests.base import CASSANDRA_VERSION, PROTOCOL_VERSION
 
 
 class TestStaticModel(Model):
-    __keyspace__ = 'test'
+
     partition = columns.UUID(primary_key=True, default=uuid4)
     cluster = columns.UUID(primary_key=True, default=uuid4)
     static = columns.Text(static=True)
@@ -35,15 +35,15 @@ class TestStaticColumn(BaseCassEngTestCase):
         """ Tests that updates on both static and non-static columns work as intended """
         instance = TestStaticModel.create()
         instance.static = "it's shared"
-        instance.text = "some text" 
+        instance.text = "some text"
         instance.save()
-        
+
         u = TestStaticModel.get(partition=instance.partition)
         u.static = "it's still shared"
         u.text = "another text"
         u.update()
         actual = TestStaticModel.get(partition=u.partition)
-        
+
         assert actual.static == "it's still shared"
 
     @skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
@@ -51,12 +51,12 @@ class TestStaticColumn(BaseCassEngTestCase):
         """ Tests that updates on static only column work as intended """
         instance = TestStaticModel.create()
         instance.static = "it's shared"
-        instance.text = "some text" 
+        instance.text = "some text"
         instance.save()
-        
+
         u = TestStaticModel.get(partition=instance.partition)
         u.static = "it's still shared"
         u.update()
-        actual = TestStaticModel.get(partition=u.partition)        
+        actual = TestStaticModel.get(partition=u.partition)
         assert actual.static == "it's still shared"
 

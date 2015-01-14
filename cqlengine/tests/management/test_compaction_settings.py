@@ -9,7 +9,7 @@ from cqlengine.tests.base import BaseCassEngTestCase
 
 
 class CompactionModel(Model):
-    __keyspace__ = 'test'
+
     __compaction__ = None
     cid = columns.UUID(primary_key=True)
     name = columns.Text()
@@ -74,7 +74,7 @@ class LeveledCompactionTest(BaseCompactionTest):
 
 
 class LeveledcompactionTestTable(Model):
-    __keyspace__ = 'test'
+
     __compaction__ = LeveledCompactionStrategy
     __compaction_sstable_size_in_mb__ = 64
 
@@ -96,7 +96,7 @@ class AlterTableTest(BaseCassEngTestCase):
         from cqlengine.management import update_compaction
 
         class LeveledCompactionChangesDetectionTest(Model):
-            __keyspace__ = 'test'
+
             __compaction__ = LeveledCompactionStrategy
             __compaction_sstable_size_in_mb__ = 160
             __compaction_tombstone_threshold__ = 0.125
@@ -113,7 +113,7 @@ class AlterTableTest(BaseCassEngTestCase):
         from cqlengine.management import update_compaction
 
         class SizeTieredCompactionChangesDetectionTest(Model):
-            __keyspace__ = 'test'
+
             __compaction__ = SizeTieredCompactionStrategy
             __compaction_bucket_high__ = 20
             __compaction_bucket_low__ = 10
@@ -146,7 +146,7 @@ class AlterTableTest(BaseCassEngTestCase):
     def test_alter_options(self):
 
         class AlterTable(Model):
-            __keyspace__ = 'test'
+
             __compaction__ = LeveledCompactionStrategy
             __compaction_sstable_size_in_mb__ = 64
 
@@ -163,7 +163,7 @@ class AlterTableTest(BaseCassEngTestCase):
 class EmptyCompactionTest(BaseCassEngTestCase):
     def test_empty_compaction(self):
         class EmptyCompactionModel(Model):
-            __keyspace__ = 'test'
+
             __compaction__ = None
             cid = columns.UUID(primary_key=True)
             name = columns.Text()
@@ -173,14 +173,14 @@ class EmptyCompactionTest(BaseCassEngTestCase):
 
 
 class CompactionLeveledStrategyModel(Model):
-    __keyspace__ = 'test'
+
     __compaction__ = LeveledCompactionStrategy
     cid = columns.UUID(primary_key=True)
     name = columns.Text()
 
 
 class CompactionSizeTieredModel(Model):
-    __keyspace__ = 'test'
+
     __compaction__ = SizeTieredCompactionStrategy
     cid = columns.UUID(primary_key=True)
     name = columns.Text()
@@ -191,7 +191,7 @@ class OptionsTest(BaseCassEngTestCase):
 
     def test_all_size_tiered_options(self):
         class AllSizeTieredOptionsModel(Model):
-            __keyspace__ = 'test'
+
             __compaction__ = SizeTieredCompactionStrategy
             __compaction_bucket_low__ = .3
             __compaction_bucket_high__ = 2
@@ -220,7 +220,7 @@ class OptionsTest(BaseCassEngTestCase):
     def test_all_leveled_options(self):
 
         class AllLeveledOptionsModel(Model):
-            __keyspace__ = 'test'
+
             __compaction__ = LeveledCompactionStrategy
             __compaction_sstable_size_in_mb__ = 64
 

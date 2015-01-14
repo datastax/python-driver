@@ -11,8 +11,6 @@ import mock
 
 class TestIfNotExistsModel(Model):
 
-    __keyspace__ = 'cqlengine_test_lwt'
-
     id      = columns.UUID(primary_key=True, default=lambda:uuid4())
     count   = columns.Integer()
     text    = columns.Text(required=False)
@@ -29,14 +27,12 @@ class BaseIfNotExistsTest(BaseCassEngTestCase):
         is 3 and one node only. Therefore I have create a new keyspace with
         replica_factor:1.
         """
-        create_keyspace(TestIfNotExistsModel.__keyspace__, replication_factor=1)
         sync_table(TestIfNotExistsModel)
 
     @classmethod
     def tearDownClass(cls):
         super(BaseCassEngTestCase, cls).tearDownClass()
         drop_table(TestIfNotExistsModel)
-        delete_keyspace(TestIfNotExistsModel.__keyspace__)
 
 
 class IfNotExistsInsertTests(BaseIfNotExistsTest):
@@ -139,7 +135,7 @@ class IfNotExistsModelTest(BaseIfNotExistsTest):
         self.assertTrue(isinstance(qs, TestIfNotExistsModel.__queryset__), type(qs))
 
     def test_batch_if_not_exists(self):
-        """ ensure 'IF NOT EXISTS' exists in statement when in batch """ 
+        """ ensure 'IF NOT EXISTS' exists in statement when in batch """
         with mock.patch.object(self.session, 'execute') as m:
             with BatchQuery() as b:
                 TestIfNotExistsModel.batch(b).if_not_exists().create(count=8)

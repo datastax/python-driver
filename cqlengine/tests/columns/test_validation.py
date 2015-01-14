@@ -33,7 +33,7 @@ from cqlengine.models import Model
 
 class TestDatetime(BaseCassEngTestCase):
     class DatetimeTest(Model):
-        __keyspace__ = 'test'
+
         test_id = Integer(primary_key=True)
         created_at = DateTime()
 
@@ -82,7 +82,7 @@ class TestDatetime(BaseCassEngTestCase):
 
 class TestBoolDefault(BaseCassEngTestCase):
     class BoolDefaultValueTest(Model):
-        __keyspace__ = 'test'
+
         test_id = Integer(primary_key=True)
         stuff = Boolean(default=True)
 
@@ -99,7 +99,7 @@ class TestBoolDefault(BaseCassEngTestCase):
 
 class TestBoolValidation(BaseCassEngTestCase):
     class BoolValidationTest(Model):
-        __keyspace__ = 'test'
+
         test_id = Integer(primary_key=True)
         bool_column = Boolean()
 
@@ -116,7 +116,7 @@ class TestBoolValidation(BaseCassEngTestCase):
 
 class TestVarInt(BaseCassEngTestCase):
     class VarIntTest(Model):
-        __keyspace__ = 'test'
+
         test_id = Integer(primary_key=True)
         bignum = VarInt(primary_key=True)
 
@@ -141,7 +141,7 @@ class TestVarInt(BaseCassEngTestCase):
 
 class TestDate(BaseCassEngTestCase):
     class DateTest(Model):
-        __keyspace__ = 'test'
+
         test_id = Integer(primary_key=True)
         created_at = Date()
 
@@ -180,7 +180,7 @@ class TestDate(BaseCassEngTestCase):
 
 class TestDecimal(BaseCassEngTestCase):
     class DecimalTest(Model):
-        __keyspace__ = 'test'
+
         test_id = Integer(primary_key=True)
         dec_val = Decimal()
 
@@ -205,7 +205,7 @@ class TestDecimal(BaseCassEngTestCase):
 
 class TestUUID(BaseCassEngTestCase):
     class UUIDTest(Model):
-        __keyspace__ = 'test'
+
         test_id = Integer(primary_key=True)
         a_uuid = UUID(default=uuid4())
 
@@ -233,7 +233,7 @@ class TestUUID(BaseCassEngTestCase):
 
 class TestTimeUUID(BaseCassEngTestCase):
     class TimeUUIDTest(Model):
-        __keyspace__ = 'test'
+
         test_id = Integer(primary_key=True)
         timeuuid = TimeUUID(default=uuid1())
 
@@ -259,7 +259,7 @@ class TestTimeUUID(BaseCassEngTestCase):
 
 class TestInteger(BaseCassEngTestCase):
     class IntegerTest(Model):
-        __keyspace__ = 'test'
+
         test_id = UUID(primary_key=True, default=lambda:uuid4())
         value   = Integer(default=0, required=True)
 
@@ -270,7 +270,7 @@ class TestInteger(BaseCassEngTestCase):
 
 class TestBigInt(BaseCassEngTestCase):
     class BigIntTest(Model):
-        __keyspace__ = 'test'
+
         test_id = UUID(primary_key=True, default=lambda:uuid4())
         value   = BigInt(default=0, required=True)
 
@@ -328,7 +328,7 @@ class TestText(BaseCassEngTestCase):
 
 class TestExtraFieldsRaiseException(BaseCassEngTestCase):
     class TestModel(Model):
-        __keyspace__ = 'test'
+
         id = UUID(primary_key=True, default=uuid4)
 
     def test_extra_field(self):
@@ -337,7 +337,7 @@ class TestExtraFieldsRaiseException(BaseCassEngTestCase):
 
 class TestPythonDoesntDieWhenExtraFieldIsInCassandra(BaseCassEngTestCase):
     class TestModel(Model):
-        __keyspace__ = 'test'
+
         __table_name__ = 'alter_doesnt_break_running_app'
         id = UUID(primary_key=True, default=uuid4)
 

@@ -11,7 +11,7 @@ from cqlengine.query import BatchQuery
 from cqlengine.tests.base import BaseCassEngTestCase
 
 class TestMultiKeyModel(Model):
-    __keyspace__ = 'test'
+
     partition   = columns.Integer(primary_key=True)
     cluster     = columns.Integer(primary_key=True)
     count       = columns.Integer(required=False)

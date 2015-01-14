@@ -7,7 +7,7 @@ import mock
 from cqlengine import ALL, BatchQuery
 
 class TestConsistencyModel(Model):
-    __keyspace__ = 'test'
+
     id      = columns.UUID(primary_key=True, default=lambda:uuid4())
     count   = columns.Integer()
     text    = columns.Text(required=False)

@@ -1,6 +1,9 @@
 import os
 
+
 from cqlengine import connection
+from cqlengine.management import create_keyspace
+
 
 def setup_package():
     try:
@@ -23,3 +26,5 @@ def setup_package():
     connection.setup([CASSANDRA_TEST_HOST],
                       protocol_version=protocol_version,
                       default_keyspace='cqlengine_test')
+
+    create_keyspace("cqlengine_test", replication_factor=1, strategy_class="SimpleStrategy")
