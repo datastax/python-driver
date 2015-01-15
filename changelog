@@ -1,5 +1,17 @@
 CHANGELOG
 
+0.21.0
+
+Create keyspace no longer defaults to SimpleStrategy with 3 replicas.  It must be manually specified.
+sync_table() no longer has an option to create keyspaces automatically.
+cqlengine_test is now the default keyspace used for tests and is explicitly created
+all references hardcoded to the "test" keyspace have been removed and use the default instead
+instead of testing with bin/nose, use setup_package
+improved validation error messages to include column name
+fixed updating empty sets
+improvements to puppet download script
+per query timeouts now supported, see https://cqlengine.readthedocs.org/en/latest/topics/queryset.html?highlight=timeout#per-query-timeouts
+
 0.19.0
 
 Fixed tests with Cassandra version 1.2 and 2.1
