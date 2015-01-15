@@ -9,7 +9,7 @@ from cqlengine import columns
 
 
 class TestQueryUpdateModel(Model):
-    __keyspace__ = 'test'
+
     partition   = columns.UUID(primary_key=True, default=uuid4)
     cluster     = columns.Integer(primary_key=True)
     count       = columns.Integer(required=False)

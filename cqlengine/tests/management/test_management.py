@@ -3,18 +3,18 @@ from cqlengine import ALL, CACHING_ALL, CACHING_NONE
 from cqlengine.connection import get_session
 from cqlengine.exceptions import CQLEngineException
 from cqlengine.management import  get_fields, sync_table, drop_table
-from cqlengine.tests.base import BaseCassEngTestCase, CASSANDRA_VERSION
+from cqlengine.tests.base import BaseCassEngTestCase
+from cqlengine.tests.base import CASSANDRA_VERSION, PROTOCOL_VERSION
 from cqlengine import management
 from cqlengine.tests.query.test_queryset import TestModel
 from cqlengine.models import Model
 from cqlengine import columns, SizeTieredCompactionStrategy, LeveledCompactionStrategy
 from unittest import skipUnless
-from cqlengine.connection import get_cluster
-cluster = get_cluster()
+
 
 class CreateKeyspaceTest(BaseCassEngTestCase):
     def test_create_succeeeds(self):
-        management.create_keyspace('test_keyspace')
+        management.create_keyspace('test_keyspace', strategy_class="SimpleStrategy", replication_factor=1)
         management.delete_keyspace('test_keyspace')
 
 class DeleteTableTest(BaseCassEngTestCase):
@@ -29,19 +29,19 @@ class DeleteTableTest(BaseCassEngTestCase):
         drop_table(TestModel)
 
 class LowercaseKeyModel(Model):
-    __keyspace__ = 'test'
+
     first_key = columns.Integer(primary_key=True)
     second_key = columns.Integer(primary_key=True)
     some_data = columns.Text()
 
 class CapitalizedKeyModel(Model):
-    __keyspace__ = 'test'
+
     firstKey = columns.Integer(primary_key=True)
     secondKey = columns.Integer(primary_key=True)
     someData = columns.Text()
 
 class PrimaryKeysOnlyModel(Model):
-    __keyspace__ = 'test'
+
     __compaction__ = LeveledCompactionStrategy
 
     first_ey = columns.Integer(primary_key=True)
@@ -60,14 +60,14 @@ class CapitalizedKeyTest(BaseCassEngTestCase):
 
 
 class FirstModel(Model):
-    __keyspace__ = 'test'
+
     __table_name__ = 'first_model'
     first_key = columns.UUID(primary_key=True)
     second_key = columns.UUID()
     third_key = columns.Text()
 
 class SecondModel(Model):
-    __keyspace__ = 'test'
+
     __table_name__ = 'first_model'
     first_key = columns.UUID(primary_key=True)
     second_key = columns.UUID()
@@ -75,7 +75,7 @@ class SecondModel(Model):
     fourth_key = columns.Text()
 
 class ThirdModel(Model):
-    __keyspace__ = 'test'
+
     __table_name__ = 'first_model'
     first_key = columns.UUID(primary_key=True)
     second_key = columns.UUID()
@@ -84,7 +84,7 @@ class ThirdModel(Model):
     blah = columns.Map(columns.Text, columns.Text)
 
 class FourthModel(Model):
-    __keyspace__ = 'test'
+
     __table_name__ = 'first_model'
     first_key = columns.UUID(primary_key=True)
     second_key = columns.UUID()
@@ -118,7 +118,7 @@ class AddColumnTest(BaseCassEngTestCase):
 
 
 class ModelWithTableProperties(Model):
-    __keyspace__ = 'test'
+
     # Set random table properties
     __bloom_filter_fp_chance__ = 0.76328
     __caching__ = CACHING_ALL
@@ -256,7 +256,7 @@ class NonModelFailureTest(BaseCassEngTestCase):
             sync_table(self.FakeModel)
 
 
-@skipUnless(cluster.protocol_version >= 2, "only runs against the cql3 protocol v2.0")
+@skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
 def test_static_columns():
     class StaticModel(Model):
         id = columns.Integer(primary_key=True)

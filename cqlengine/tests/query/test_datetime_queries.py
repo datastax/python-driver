@@ -11,7 +11,7 @@ from cqlengine import columns
 from cqlengine import query
 
 class DateTimeQueryTestModel(Model):
-    __keyspace__ = 'test'
+
     user        = columns.Integer(primary_key=True)
     day         = columns.DateTime(primary_key=True)
     data        = columns.Text()

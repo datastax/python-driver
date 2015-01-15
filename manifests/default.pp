@@ -33,14 +33,14 @@ class cassandra {
   
   exec {"download-cassandra":
     cwd => "/tmp",
-    command => "wget http://download.nextag.com/apache/cassandra/1.1.6/apache-cassandra-1.1.6-bin.tar.gz",
-    creates => "/tmp/apache-cassandra-1.1.6-bin.tar.gz",
+    command => "wget http://download.nextag.com/apache/cassandra/1.2.19/apache-cassandra-1.2.19-bin.tar.gz",
+    creates => "/tmp/apache-cassandra-1.2.19-bin.tar.gz",
     require => [Package["wget"], File["/etc/init/cassandra.conf"]]
   }
 
   exec {"install-cassandra":
     cwd => "/tmp",
-    command => "tar -xzf apache-cassandra-1.1.6-bin.tar.gz; mv apache-cassandra-1.1.6 /usr/local/cassandra",
+    command => "tar -xzf apache-cassandra-1.2.19-bin.tar.gz; mv apache-cassandra-1.2.19 /usr/local/cassandra",
     require => Exec["download-cassandra"],
     creates => "/usr/local/cassandra/bin/cassandra"
   }
@@ -60,7 +60,7 @@ node cassandraengine inherits basenode {
 
   exec {"install-requirements":
     cwd => "/vagrant",
-    command => "pip install -r requirements.txt",
+    command => "pip install -r requirements-dev.txt",
     require => [Package["python-pip"], Package["python-dev"]]
   }
 }

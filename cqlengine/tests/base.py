@@ -4,7 +4,10 @@ import sys
 import six
 from cqlengine.connection import get_session
 
+
 CASSANDRA_VERSION = int(os.environ['CASSANDRA_VERSION'])
+PROTOCOL_VERSION = 1 if CASSANDRA_VERSION < 20 else 2
+
 
 class BaseCassEngTestCase(TestCase):
 

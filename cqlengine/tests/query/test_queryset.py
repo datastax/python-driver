@@ -1,15 +1,16 @@
+from __future__ import absolute_import
 from datetime import datetime
 import time
 from unittest import TestCase, skipUnless
 from uuid import uuid1, uuid4
 import uuid
 
+from cassandra.cluster import Session
 from cqlengine.tests.base import BaseCassEngTestCase
+from cqlengine.connection import NOT_SET
 import mock
-from cqlengine.exceptions import ModelException
 from cqlengine import functions
-from cqlengine.management import sync_table, drop_table, sync_table
-from cqlengine.management import drop_table
+from cqlengine.management import sync_table, drop_table
 from cqlengine.models import Model
 from cqlengine import columns
 from cqlengine import query
@@ -19,10 +20,8 @@ from datetime import tzinfo
 from cqlengine import statements
 from cqlengine import operators
 
-
-from cqlengine.connection import get_cluster, get_session
-
-cluster = get_cluster()
+from cqlengine.connection import get_session
+from cqlengine.tests.base import PROTOCOL_VERSION
 
 
 class TzOffset(tzinfo):
@@ -44,7 +43,7 @@ class TzOffset(tzinfo):
 
 
 class TestModel(Model):
-    __keyspace__ = 'test'
+
     test_id = columns.Integer(primary_key=True)
     attempt_id = columns.Integer(primary_key=True)
     description = columns.Text()
@@ -53,7 +52,7 @@ class TestModel(Model):
 
 
 class IndexedTestModel(Model):
-    __keyspace__ = 'test'
+
     test_id = columns.Integer(primary_key=True)
     attempt_id = columns.Integer(index=True)
     description = columns.Text()
@@ -62,7 +61,7 @@ class IndexedTestModel(Model):
 
 
 class TestMultiClusteringModel(Model):
-    __keyspace__ = 'test'
+
     one = columns.Integer(primary_key=True)
     two = columns.Integer(primary_key=True)
     three = columns.Integer(primary_key=True)
@@ -381,7 +380,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
 
 def test_non_quality_filtering():
     class NonEqualityFilteringModel(Model):
-        __keyspace__ = 'test'
+
         example_id = columns.UUID(primary_key=True, default=uuid.uuid4)
         sequence_id = columns.Integer(primary_key=True)  # sequence_id is a clustering key
         example_type = columns.Integer(index=True)
@@ -551,7 +550,7 @@ class TestQuerySetConnectionHandling(BaseQuerySetUsage):
 
 
 class TimeUUIDQueryModel(Model):
-    __keyspace__ = 'test'
+
     partition = columns.UUID(primary_key=True)
     time = columns.TimeUUID(primary_key=True)
     data = columns.Text(required=False)
@@ -689,7 +688,7 @@ class TestObjectsProperty(BaseQuerySetUsage):
         assert TestModel.objects._result_cache is None
 
 
-@skipUnless(cluster.protocol_version >= 2, "only runs against the cql3 protocol v2.0")
+@skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
 def test_paged_result_handling():
     # addresses #225
     class PagingTest(Model):
@@ -707,3 +706,51 @@ def test_paged_result_handling():
     assert len(results) == 2
 
 
+class ModelQuerySetTimeoutTestCase(BaseQuerySetUsage):
+    def test_default_timeout(self):
+        with mock.patch.object(Session, 'execute', autospec=True) as mock_execute:
+            list(TestModel.objects())
+            mock_execute.assert_called_once_with(mock.ANY, mock.ANY, mock.ANY, timeout=NOT_SET)
+
+    def test_float_timeout(self):
+        with mock.patch.object(Session, 'execute', autospec=True) as mock_execute:
+            list(TestModel.objects().timeout(0.5))
+            mock_execute.assert_called_once_with(mock.ANY, mock.ANY, mock.ANY, timeout=0.5)
+
+    def test_none_timeout(self):
+        with mock.patch.object(Session, 'execute', autospec=True) as mock_execute:
+            list(TestModel.objects().timeout(None))
+            mock_execute.assert_called_once_with(mock.ANY, mock.ANY, mock.ANY, timeout=None)
+
+
+class DMLQueryTimeoutTestCase(BaseQuerySetUsage):
+    def setUp(self):
+        self.model = TestModel(test_id=1, attempt_id=1, description='timeout test')
+        super(DMLQueryTimeoutTestCase, self).setUp()
+
+    def test_default_timeout(self):
+        with mock.patch.object(Session, 'execute', autospec=True) as mock_execute:
+            self.model.save()
+            mock_execute.assert_called_once_with(mock.ANY, mock.ANY, mock.ANY, timeout=NOT_SET)
+
+    def test_float_timeout(self):
+        with mock.patch.object(Session, 'execute', autospec=True) as mock_execute:
+            self.model.timeout(0.5).save()
+            mock_execute.assert_called_once_with(mock.ANY, mock.ANY, mock.ANY, timeout=0.5)
+
+    def test_none_timeout(self):
+        with mock.patch.object(Session, 'execute', autospec=True) as mock_execute:
+            self.model.timeout(None).save()
+            mock_execute.assert_called_once_with(mock.ANY, mock.ANY, mock.ANY, timeout=None)
+
+    def test_timeout_then_batch(self):
+        b = query.BatchQuery()
+        m = self.model.timeout(None)
+        with self.assertRaises(AssertionError):
+            m.batch(b)
+
+    def test_batch_then_timeout(self):
+        b = query.BatchQuery()
+        m = self.model.batch(b)
+        with self.assertRaises(AssertionError):
+            m.timeout(0.5)

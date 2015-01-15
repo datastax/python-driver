@@ -8,7 +8,7 @@ from cqlengine.tests.base import BaseCassEngTestCase
 
 
 class TestCounterModel(Model):
-    __keyspace__ = 'test'
+
     partition = columns.UUID(primary_key=True, default=uuid4)
     cluster = columns.UUID(primary_key=True, default=uuid4)
     counter = columns.Counter()

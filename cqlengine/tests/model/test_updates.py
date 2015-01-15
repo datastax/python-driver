@@ -10,7 +10,7 @@ from cqlengine.management import sync_table, drop_table
 
 
 class TestUpdateModel(Model):
-    __keyspace__ = 'test'
+
     partition   = columns.UUID(primary_key=True, default=uuid4)
     cluster     = columns.UUID(primary_key=True, default=uuid4)
     count       = columns.Integer(required=False)

@@ -12,6 +12,7 @@ python:
 before_install:
   - sudo echo "deb http://www.apache.org/dist/cassandra/debian ${CASSANDRA_VERSION}x main" | sudo tee -a /etc/apt/sources.list
   - sudo echo "deb-src http://www.apache.org/dist/cassandra/debian ${CASSANDRA_VERSION}x main" | sudo tee -a /etc/apt/sources.list
+  - sudo rm -rf ~/.gnupg
   - sudo gpg --keyserver pgp.mit.edu --recv-keys F758CE318D77295D
   - sudo gpg --export --armor F758CE318D77295D | sudo apt-key add -
   - sudo gpg --keyserver pgp.mit.edu --recv-keys 2B5C1B00
@@ -28,4 +29,4 @@ install:
   - "pip install -r requirements.txt --use-mirrors"
 
 script:
-  - "bin/test.py --no-skip"
+  - "nosetests cqlengine/tests --no-skip"

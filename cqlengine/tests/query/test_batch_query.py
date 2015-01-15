@@ -3,19 +3,23 @@ from unittest import skip
 from uuid import uuid4
 import random
 from cqlengine import Model, columns
+from cqlengine.connection import NOT_SET
 from cqlengine.management import drop_table, sync_table
 from cqlengine.query import BatchQuery, DMLQuery
 from cqlengine.tests.base import BaseCassEngTestCase
+from cassandra.cluster import Session
+import mock
+
 
 class TestMultiKeyModel(Model):
-    __keyspace__ = 'test'
+
     partition   = columns.Integer(primary_key=True)
     cluster     = columns.Integer(primary_key=True)
     count       = columns.Integer(required=False)
     text        = columns.Text(required=False)
 
 class BatchQueryLogModel(Model):
-    __keyspace__ = 'test'
+
     # simple k/v table
     k = columns.Integer(primary_key=True)
     v = columns.Integer()
@@ -166,6 +170,18 @@ class BatchQueryTests(BaseCassEngTestCase):
             pass
 
         obj = BatchQueryLogModel.objects(k=2)
-        
+
         # should be 0 because the batch should not execute
         self.assertEqual(0, len(obj))
+
+    def test_batch_execute_timeout(self):
+        with mock.patch.object(Session, 'execute', autospec=True) as mock_execute:
+            with BatchQuery(timeout=1) as b:
+                BatchQueryLogModel.batch(b).create(k=2, v=2)
+            mock_execute.assert_called_once_with(mock.ANY, mock.ANY, mock.ANY, timeout=1)
+
+    def test_batch_execute_no_timeout(self):
+        with mock.patch.object(Session, 'execute', autospec=True) as mock_execute:
+            with BatchQuery() as b:
+                BatchQueryLogModel.batch(b).create(k=2, v=2)
+            mock_execute.assert_called_once_with(mock.ANY, mock.ANY, mock.ANY, timeout=NOT_SET)

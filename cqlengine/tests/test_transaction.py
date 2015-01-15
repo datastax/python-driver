@@ -1,6 +1,9 @@
 __author__ = 'Tim Martin'
+from unittest import skipUnless
+
 from cqlengine.management import sync_table, drop_table
 from cqlengine.tests.base import BaseCassEngTestCase
+from cqlengine.tests.base import CASSANDRA_VERSION
 from cqlengine.models import Model
 from cqlengine.exceptions import LWTException
 from uuid import uuid4
@@ -12,12 +15,12 @@ import six
 
 
 class TestTransactionModel(Model):
-    __keyspace__ = 'test'
     id = columns.UUID(primary_key=True, default=lambda:uuid4())
     count = columns.Integer()
     text = columns.Text(required=False)
 
 
+@skipUnless(CASSANDRA_VERSION >= 20, "transactions only supported on cassandra 2.0 or higher")
 class TestTransaction(BaseCassEngTestCase):
 
     @classmethod
