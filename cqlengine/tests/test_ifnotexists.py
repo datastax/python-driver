@@ -3,7 +3,7 @@ from cqlengine.management import sync_table, drop_table, create_keyspace, delete
 from cqlengine.tests.base import BaseCassEngTestCase
 from cqlengine.tests.base import PROTOCOL_VERSION
 from cqlengine.models import Model
-from cqlengine.exceptions import LWTException
+from cqlengine.exceptions import LWTException, IfNotExistsWithCounterColumn
 from cqlengine import columns, BatchQuery
 from uuid import uuid4
 import mock
@@ -14,6 +14,12 @@ class TestIfNotExistsModel(Model):
     id      = columns.UUID(primary_key=True, default=lambda:uuid4())
     count   = columns.Integer()
     text    = columns.Text(required=False)
+
+
+class TestIfNotExistsWithCounterModel(Model):
+
+    id      = columns.UUID(primary_key=True, default=lambda:uuid4())
+    likes   = columns.Counter()
 
 
 class BaseIfNotExistsTest(BaseCassEngTestCase):
@@ -31,8 +37,21 @@ class BaseIfNotExistsTest(BaseCassEngTestCase):
 
     @classmethod
     def tearDownClass(cls):
-        super(BaseCassEngTestCase, cls).tearDownClass()
+        super(BaseIfNotExistsTest, cls).tearDownClass()
         drop_table(TestIfNotExistsModel)
+
+
+class BaseIfNotExistsWithCounterTest(BaseCassEngTestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super(BaseIfNotExistsWithCounterTest, cls).setUpClass()
+        sync_table(TestIfNotExistsWithCounterModel)
+
+    @classmethod
+    def tearDownClass(cls):
+        super(BaseIfNotExistsWithCounterTest, cls).tearDownClass()
+        drop_table(TestIfNotExistsWithCounterModel)
 
 
 class IfNotExistsInsertTests(BaseIfNotExistsTest):
@@ -170,3 +189,14 @@ class IfNotExistsInstanceTest(BaseIfNotExistsTest):
         self.assertNotIn("IF NOT EXIST", query)
 
 
+class IfNotExistWithCounterTest(BaseIfNotExistsWithCounterTest):
+
+    def test_instance_raise_exception(self):
+        """ make sure exception is raised when calling
+        if_not_exists on table with counter column
+        """
+        id = uuid4()
+        self.assertRaises(
+            IfNotExistsWithCounterColumn,
+            TestIfNotExistsWithCounterModel.if_not_exists
+            )
