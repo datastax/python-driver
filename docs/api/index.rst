@@ -16,6 +16,7 @@ API Documentation
    cassandra/decoder
    cassandra/concurrent
    cassandra/connection
+   cassandra/util
    cassandra/io/asyncorereactor
    cassandra/io/libevreactor
    cassandra/io/geventreactor

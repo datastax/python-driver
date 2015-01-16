@@ -563,11 +563,30 @@ from six.moves import cPickle
 
 class OrderedMap(Mapping):
     '''
-    An ordered map that accepts non-hashable types for keys.
+    An ordered map that accepts non-hashable types for keys. It also maintains the 
+    insertion order of items, behaving as OrderedDict in that regard. These maps
+    are constructed and read just as normal mapping types, exept that they may
+    contain arbitrary collections and other non-hashable items as keys::
 
-    Implemented in support of Cassandra nested collections. This class dervies from
-    the (immutable) Mapping API. Although clients may obtain references, keys in
-    the map should not be modified.
+        >>> od = OrderedMap([({'one': 1, 'two': 2}, 'value'),
+        ...                  ({'three': 3, 'four': 4}, 'value2')])
+        >>> list(od.keys())
+        [{'two': 2, 'one': 1}, {'three': 3, 'four': 4}]
+        >>> list(od.values())
+        ['value', 'value2']
+
+    These constructs are needed to support nested collections in Cassandra 2.1.3+,
+    where frozen collections can be specified as parameters to others::
+
+        CREATE TABLE example (
+            ...
+            value map<frozen<map<int, int>>, double>
+            ...
+        )
+
+    This class dervies from the (immutable) Mapping API. Objects in these maps
+    are not intended be modified.
+
     '''
     def __init__(self, *args, **kwargs):
         if len(args) > 1:
