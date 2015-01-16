@@ -59,7 +59,7 @@ class AuthenticationTests(unittest.TestCase):
         :return: authentication object suitable for Cluster.connect()
         """
         if PROTOCOL_VERSION < 2:
-            return lambda(hostname): dict(username=username, password=password)
+            return lambda hostname: dict(username=username, password=password)
         else:
             return PlainTextAuthProvider(username=username, password=password)
 
