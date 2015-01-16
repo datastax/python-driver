@@ -355,6 +355,7 @@ class HostConnection(object):
             return
 
         def connection_finished_setting_keyspace(conn, error):
+            self.return_connection(conn)
             errors = [] if not error else [error]
             callback(self, errors)
 
@@ -683,6 +684,7 @@ class HostConnectionPool(object):
             return
 
         def connection_finished_setting_keyspace(conn, error):
+            self.return_connection(conn)
             remaining_callbacks.remove(conn)
             if error:
                 errors.append(error)
