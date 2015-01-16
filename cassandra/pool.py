@@ -361,6 +361,10 @@ class HostConnection(object):
 
         self._connection.set_keyspace_async(keyspace, connection_finished_setting_keyspace)
 
+    def get_connections(self):
+        c = self._connection
+        return [c] if c else []
+
     def get_state(self):
         have_conn = self._connection is not None
         in_flight = self._connection.in_flight if have_conn else 0
@@ -694,6 +698,9 @@ class HostConnectionPool(object):
 
         for conn in self._connections:
             conn.set_keyspace_async(keyspace, connection_finished_setting_keyspace)
+
+    def get_connections(self):
+        return self._connections
 
     def get_state(self):
         in_flights = ", ".join([str(c.in_flight) for c in self._connections])
