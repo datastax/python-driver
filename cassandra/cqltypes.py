@@ -59,6 +59,18 @@ else:
     _number_types = frozenset((int, long, float))
 
 
+if six.PY3:
+    def _unhexlify(s):
+        if not isinstance(s, six.binary_type):
+            s = s.encode('ascii')
+        result = unhexlify(s)
+        if isinstance(result, six.binary_type):
+            result = result.decode('ascii')
+        return result
+else:
+    _unhexlify = unhexlify
+
+
 def trim_if_startswith(s, prefix):
     if s.startswith(prefix):
         return s[len(prefix):]
@@ -854,8 +866,8 @@ class UserType(TupleType):
     @classmethod
     def apply_parameters(cls, subtypes, names):
         keyspace = subtypes[0]
-        udt_name = unhexlify(subtypes[1].cassname)
-        field_names = [unhexlify(encoded_name) for encoded_name in names[2:]]
+        udt_name = _unhexlify(subtypes[1].cassname)
+        field_names = [_unhexlify(encoded_name) for encoded_name in names[2:]]
         assert len(field_names) == len(subtypes[2:])
         return type(udt_name, (cls,), {'subtypes': subtypes[2:],
                                        'cassname': cls.cassname,
