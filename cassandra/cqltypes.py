@@ -36,7 +36,7 @@ import io
 import re
 import socket
 import time
-from datetime import datetime, timedelta
+import datetime
 from uuid import UUID
 import warnings
 
@@ -55,8 +55,8 @@ apache_cassandra_type_prefix = 'org.apache.cassandra.db.marshal.'
 
 if six.PY3:
     _number_types = frozenset((int, float))
-    _time_types = frozenset((int))
-    _date_types = frozenset((int))
+    _time_types = frozenset((int,))
+    _date_types = frozenset((int,))
     long = int
 else:
     _number_types = frozenset((int, long, float))
@@ -72,6 +72,15 @@ def trim_if_startswith(s, prefix):
 
 def unix_time_from_uuid1(u):
     return (u.time - 0x01B21DD213814000) / 10000000.0
+
+
+def datetime_from_timestamp(timestamp):
+    if timestamp >= 0:
+        dt = datetime.datetime.utcfromtimestamp(timestamp)
+    else:
+        # PYTHON-119: workaround for Windows
+        dt = datetime.datetime(1970, 1, 1) + datetime.timedelta(seconds=timestamp)
+    return dt
 
 
 _casstypes = {}
@@ -543,26 +552,26 @@ class DateType(_CassandraType):
     typename = 'timestamp'
 
     @classmethod
-    def validate(cls, date):
-        if isinstance(date, six.string_types):
-            date = cls.interpret_datestring(date)
-        return date
+    def validate(cls, val):
+        if isinstance(val, six.string_types):
+            val = cls.interpret_datestring(val)
+        return val
 
     @staticmethod
-    def interpret_datestring(date):
-        if date[-5] in ('+', '-'):
-            offset = (int(date[-4:-2]) * 3600 + int(date[-2:]) * 60) * int(date[-5] + '1')
-            date = date[:-5]
+    def interpret_datestring(val):
+        if val[-5] in ('+', '-'):
+            offset = (int(val[-4:-2]) * 3600 + int(val[-2:]) * 60) * int(val[-5] + '1')
+            val = val[:-5]
         else:
             offset = -time.timezone
         for tformat in cql_timestamp_formats:
             try:
-                tval = time.strptime(date, tformat)
+                tval = time.strptime(val, tformat)
             except ValueError:
                 continue
             return calendar.timegm(tval) + offset
         else:
-            raise ValueError("can't interpret %r as a date" % (date,))
+            raise ValueError("can't interpret %r as a date" % (val,))
 
     def my_timestamp(self):
         return self.val
@@ -570,12 +579,7 @@ class DateType(_CassandraType):
     @staticmethod
     def deserialize(byts, protocol_version):
         timestamp = int64_unpack(byts) / 1000.0
-        if timestamp >= 0:
-            dt = datetime.utcfromtimestamp(timestamp)
-        else:
-            # PYTHON-119: workaround for Windows
-            dt = datetime(1970, 1, 1) + timedelta(seconds=timestamp)
-        return dt
+        return datetime_from_timestamp(timestamp)
 
     @staticmethod
     def serialize(v, protocol_version):
@@ -635,85 +639,87 @@ class SimpleDateType(_CassandraType):
     date_format = "%Y-%m-%d"
 
     @classmethod
-    def validate(cls, date):
-        if isinstance(date, basestring):
-            date = cls.interpret_simpledate_string(date)
-        return date
+    def validate(cls, val):
+        if isinstance(val, six.string_types):
+            val = cls.interpret_simpledate_string(val)
+        elif (not isinstance(val, datetime.date)) and (type(val) not in _date_types):
+            raise TypeError('SimpleDateType arg must be a datetime.date, unsigned integer, or string in the format YYYY-MM-DD')
+        return val
 
     @staticmethod
     def interpret_simpledate_string(v):
-        try:
-            tval = time.strptime(v, SimpleDateType.date_format)
-            # shift upward w/epoch at 2**31
-            return (calendar.timegm(tval) / SimpleDateType.seconds_per_day) + 2**31
-        except TypeError:
-            # Ints are valid dates too
-            if type(v) not in _date_types:
-                raise TypeError('Date arguments must be an unsigned integer or string in the format YYYY-MM-DD')
-            return v
+        date_time = datetime.datetime.strptime(v, SimpleDateType.date_format)
+        return datetime.date(date_time.year, date_time.month, date_time.day)
 
     @staticmethod
     def serialize(val, protocol_version):
-        date_val = SimpleDateType.interpret_simpledate_string(val)
-        return uint32_pack(date_val)
+        # Values of the 'date'` type are encoded as 32-bit unsigned integers
+        # representing a number of days with "the epoch" at the center of the
+        # range (2^31). Epoch is January 1st, 1970
+        try:
+            shifted = (calendar.timegm(val.timetuple()) // SimpleDateType.seconds_per_day) + 2 ** 31
+        except AttributeError:
+            shifted = val
+        return uint32_pack(shifted)
 
     @staticmethod
     def deserialize(byts, protocol_version):
-        Result = namedtuple('SimpleDate', 'value')
-        return Result(value=uint32_unpack(byts))
+        timestamp = SimpleDateType.seconds_per_day * (uint32_unpack(byts) - 2 ** 31)
+        dt = datetime.datetime.utcfromtimestamp(timestamp)
+        return datetime.date(dt.year, dt.month, dt.day)
 
 
 class TimeType(_CassandraType):
     typename = 'time'
-    ONE_MICRO=1000
-    ONE_MILLI=1000*ONE_MICRO
-    ONE_SECOND=1000*ONE_MILLI
-    ONE_MINUTE=60*ONE_SECOND
-    ONE_HOUR=60*ONE_MINUTE
+    ONE_MICRO = 1000
+    ONE_MILLI = 1000 * ONE_MICRO
+    ONE_SECOND = 1000 * ONE_MILLI
+    ONE_MINUTE = 60 * ONE_SECOND
+    ONE_HOUR = 60 * ONE_MINUTE
 
     @classmethod
     def validate(cls, val):
-        if isinstance(val, basestring):
-            time = cls.interpret_timestring(val)
-        return time
+        if isinstance(val, six.string_types):
+            val = cls.interpret_timestring(val)
+        elif (not isinstance(val, datetime.time)) and (type(val) not in _time_types):
+            raise TypeError('TimeType arguments must be a string or whole number')
+        return val
 
     @staticmethod
     def interpret_timestring(val):
         try:
             nano = 0
-            try:
-                base_time_str = val
-                if '.' in base_time_str:
-                    base_time_str = val[0:val.find('.')]
-                base_time = time.strptime(base_time_str, "%H:%M:%S")
-                nano = base_time.tm_hour * TimeType.ONE_HOUR
-                nano += base_time.tm_min * TimeType.ONE_MINUTE
-                nano += base_time.tm_sec * TimeType.ONE_SECOND
+            parts = val.split('.')
+            base_time = time.strptime(parts[0], "%H:%M:%S")
+            nano = (base_time.tm_hour * TimeType.ONE_HOUR +
+                    base_time.tm_min * TimeType.ONE_MINUTE +
+                    base_time.tm_sec * TimeType.ONE_SECOND)
 
-                if '.' in val:
-                    nano_time_str = val[val.find('.')+1:]
-                    # right pad to 9 digits
-                    while len(nano_time_str) < 9:
-                        nano_time_str += "0"
-                    nano += int(nano_time_str)
+            if len(parts) > 1:
+                # right pad to 9 digits
+                nano_time_str = parts[1] + "0" * (9 - len(parts[1]))
+                nano += int(nano_time_str)
 
-            except AttributeError as e:
-                if type(val) not in _time_types:
-                    raise TypeError('TimeType arguments must be a string or whole number')
-                # long / int values passed in are acceptable too
-                nano = val
             return nano
-        except ValueError as e:
+        except ValueError:
             raise ValueError("can't interpret %r as a time" % (val,))
 
     @staticmethod
     def serialize(val, protocol_version):
-        return int64_pack(TimeType.interpret_timestring(val))
+        # Values of the @time@ type are encoded as 64-bit signed integers
+        # representing the number of nanoseconds since midnight.
+        try:
+            nano = (val.hour * TimeType.ONE_HOUR +
+                    val.minute * TimeType.ONE_MINUTE +
+                    val.second * TimeType.ONE_SECOND +
+                    val.microsecond * TimeType.ONE_MICRO)
+        except AttributeError:
+            nano = val
+        return int64_pack(nano)
 
     @staticmethod
     def deserialize(byts, protocol_version):
-        Result = namedtuple('Time', 'value')
-        return Result(value=int64_unpack(byts))
+        return int64_unpack(byts)
 
 
 class UTF8Type(_CassandraType):

@@ -128,56 +128,77 @@ class TypeTests(unittest.TestCase):
         """
         Test cassandra.cqltypes.SimpleDateType() construction
         """
+        # from string
+        expected_date = datetime.date(1492, 10, 12)
+        sd = SimpleDateType('1492-10-12')
+        self.assertEqual(sd.val, expected_date)
 
-        nd = SimpleDateType.interpret_simpledate_string('2014-01-01')
-        tval = time.strptime('2014-01-01', SimpleDateType.date_format)
-        manual = calendar.timegm(tval) / SimpleDateType.seconds_per_day
-        self.assertEqual(nd, manual)
+        # date
+        sd = SimpleDateType(expected_date)
+        self.assertEqual(sd.val, expected_date)
 
-        nd = SimpleDateType.interpret_simpledate_string('1970-01-01')
-        self.assertEqual(nd, 0)
+        # int
+        expected_timestamp = calendar.timegm(expected_date.timetuple())
+        sd = SimpleDateType(expected_timestamp)
+        self.assertEqual(sd.val, expected_timestamp)
+
+        # no contruct
+        self.assertRaises(ValueError, SimpleDateType, '1999-10-10-bad-time')
+        self.assertRaises(TypeError, SimpleDateType, 1.234)
 
     def test_time(self):
         """
         Test cassandra.cqltypes.TimeType() construction
         """
-
         one_micro = 1000
-        one_milli = 1000L*one_micro
-        one_second = 1000L*one_milli
-        one_minute = 60L*one_second
-        one_hour = 60L*one_minute
+        one_milli = 1000 * one_micro
+        one_second = 1000 * one_milli
+        one_minute = 60 * one_second
+        one_hour = 60 * one_minute
 
-        nd = TimeType.interpret_timestring('00:00:00.000000001')
-        self.assertEqual(nd, 1)
-        nd = TimeType.interpret_timestring('00:00:00.000001')
-        self.assertEqual(nd, one_micro)
-        nd = TimeType.interpret_timestring('00:00:00.001')
-        self.assertEqual(nd, one_milli)
-        nd = TimeType.interpret_timestring('00:00:01')
-        self.assertEqual(nd, one_second)
-        nd = TimeType.interpret_timestring('00:01:00')
-        self.assertEqual(nd, one_minute)
-        nd = TimeType.interpret_timestring('01:00:00')
-        self.assertEqual(nd, one_hour)
+        # from strings
+        tt = TimeType('00:00:00.000000001')
+        self.assertEqual(tt.val, 1)
+        tt = TimeType('00:00:00.000001')
+        self.assertEqual(tt.val, one_micro)
+        tt = TimeType('00:00:00.001')
+        self.assertEqual(tt.val, one_milli)
+        tt = TimeType('00:00:01')
+        self.assertEqual(tt.val, one_second)
+        tt = TimeType('00:01:00')
+        self.assertEqual(tt.val, one_minute)
+        tt = TimeType('01:00:00')
+        self.assertEqual(tt.val, one_hour)
+        tt = TimeType('01:00:00.')
+        self.assertEqual(tt.val, one_hour)
 
-        nd = TimeType('23:59:59.1')
-        nd = TimeType('23:59:59.12')
-        nd = TimeType('23:59:59.123')
-        nd = TimeType('23:59:59.1234')
-        nd = TimeType('23:59:59.12345')
+        tt = TimeType('23:59:59.1')
+        tt = TimeType('23:59:59.12')
+        tt = TimeType('23:59:59.123')
+        tt = TimeType('23:59:59.1234')
+        tt = TimeType('23:59:59.12345')
 
-        nd = TimeType.interpret_timestring('23:59:59.123456')
-        self.assertEquals(nd, 23*one_hour + 59*one_minute + 59*one_second + 123*one_milli + 456*one_micro)
+        tt = TimeType('23:59:59.123456')
+        self.assertEqual(tt.val, 23*one_hour + 59*one_minute + 59*one_second + 123*one_milli + 456*one_micro)
 
-        nd = TimeType.interpret_timestring('23:59:59.1234567')
-        self.assertEquals(nd, 23*one_hour + 59*one_minute + 59*one_second + 123*one_milli + 456*one_micro + 700)
+        tt = TimeType('23:59:59.1234567')
+        self.assertEqual(tt.val, 23*one_hour + 59*one_minute + 59*one_second + 123*one_milli + 456*one_micro + 700)
 
-        nd = TimeType.interpret_timestring('23:59:59.12345678')
-        self.assertEquals(nd, 23*one_hour + 59*one_minute + 59*one_second + 123*one_milli + 456*one_micro + 780)
+        tt = TimeType('23:59:59.12345678')
+        self.assertEqual(tt.val, 23*one_hour + 59*one_minute + 59*one_second + 123*one_milli + 456*one_micro + 780)
 
-        nd = TimeType.interpret_timestring('23:59:59.123456789')
-        self.assertEquals(nd, 23*one_hour + 59*one_minute + 59*one_second + 123*one_milli + 456*one_micro + 789)
+        tt = TimeType('23:59:59.123456789')
+        self.assertEqual(tt.val, 23*one_hour + 59*one_minute + 59*one_second + 123*one_milli + 456*one_micro + 789)
+
+        # from int
+        tt = TimeType(12345678)
+        self.assertEqual(tt.val, 12345678)
+
+        # no construct
+        self.assertRaises(ValueError, TimeType, '1999-10-10 11:11:11.1234')
+        self.assertRaises(TypeError, TimeType, 1.234)
+        self.assertRaises(TypeError, TimeType, datetime.datetime(2004, 12, 23, 11, 11, 1))
+
 
     def test_cql_typename(self):
         """

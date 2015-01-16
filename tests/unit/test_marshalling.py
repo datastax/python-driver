@@ -19,7 +19,7 @@ except ImportError:
     import unittest  # noqa
 
 import platform
-from datetime import datetime
+from datetime import datetime, date
 from decimal import Decimal
 from uuid import UUID
 
@@ -79,8 +79,9 @@ marshalled_value_pairs = (
     (b'\x00\x00', 'ListType(FloatType)', []),
     (b'\x00\x00', 'SetType(IntegerType)', sortedset()),
     (b'\x00\x01\x00\x10\xafYC\xa3\xea<\x11\xe1\xabc\xc4,\x03"y\xf0', 'ListType(TimeUUIDType)', [UUID(bytes=b'\xafYC\xa3\xea<\x11\xe1\xabc\xc4,\x03"y\xf0')]),
-    (b'\x00\x00>\xc7', 'SimpleDateType', '2014-01-01'),
-    (b'\x00\x00\x00\x00\x00\x00\x00\x01', 'TimeType', '00:00:00.000000001')
+    (b'\x80\x00\x00\x01', 'SimpleDateType', date(1970,1,2)),
+    (b'\x7f\xff\xff\xff', 'SimpleDateType', date(1969,12,31)),
+    (b'\x00\x00\x00\x00\x00\x00\x00\x01', 'TimeType', 1)
 )
 
 ordered_dict_value = OrderedDict()

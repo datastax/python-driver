@@ -22,7 +22,7 @@ import logging
 log = logging.getLogger(__name__)
 
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, date, time
 import six
 from uuid import uuid1, uuid4
 
@@ -31,7 +31,6 @@ from cassandra.cluster import Cluster
 from cassandra.cqltypes import Int32Type, EMPTY
 from cassandra.query import dict_factory
 from cassandra.util import OrderedDict, sortedset
-from collections import namedtuple
 
 from tests.integration import get_server_versions, use_singledc, PROTOCOL_VERSION
 
@@ -171,6 +170,8 @@ class TypeTests(unittest.TestCase):
         v1_uuid = uuid1()
         v4_uuid = uuid4()
         mydatetime = datetime(2013, 12, 31, 23, 59, 59, 999000)
+        mydate = date(2015, 1, 15)
+        mytime = time(16, 47, 25, 7)
 
         params = [
             "sometext",
@@ -192,12 +193,9 @@ class TypeTests(unittest.TestCase):
             v1_uuid,  # timeuuid
             u"sometext\u1234",  # varchar
             123456789123456789123456789,  # varint
-            '2014-01-01', # date
-            '01:02:03.456789012' # time
+            mydate,  # date
+            mytime
         ]
-
-        SimpleDate = namedtuple('SimpleDate', 'value')
-        Time = namedtuple('Time', 'value')
 
         expected_vals = (
             "sometext",
@@ -219,8 +217,8 @@ class TypeTests(unittest.TestCase):
             v1_uuid,  # timeuuid
             u"sometext\u1234",  # varchar
             123456789123456789123456789,  # varint
-            SimpleDate(2147499719), # date
-            Time(3723456789012) # time
+            mydate,  # date
+            60445000007000  # time
         )
 
         s.execute("""
