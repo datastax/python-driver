@@ -20,7 +20,7 @@ cqlengine is a Cassandra CQL 3 Object Mapper for Python
 pip install cqlengine
 ```
 
-## Getting Started
+## Getting Started on your local machine
 
 ```python
 #first, define a model
@@ -41,6 +41,10 @@ class ExampleModel(Model):
 
 # or if you're still on cassandra 1.2
 >>> connection.setup(['127.0.0.1'], "cqlengine", protocol_version=1)
+
+# create your keyspace.  This is, in general, not what you want in production
+# see https://cassandra.apache.org/doc/cql3/CQL.html#createKeyspaceStmt for options
+>>> create_keyspace("cqlengine", "SimpleStrategy", 1)
 
 #...and create your CQL table
 >>> from cqlengine.management import sync_table
