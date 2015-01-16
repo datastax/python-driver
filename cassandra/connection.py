@@ -758,7 +758,8 @@ class HeartbeatFuture(object):
             connection.in_flight += 1
 
     def wait(self, timeout):
-        if self._event.wait(timeout):
+        self._event.wait(timeout):
+        if self._event.is_set():
             if self._exception:
                 raise self._exception
         else:
@@ -788,8 +789,8 @@ class ConnectionHeartbeat(Thread):
         self.start()
 
     def run(self):
-        elapsed = 0
-        while not self._shutdown_event.wait(self._interval - elapsed):
+        self._shutdown_event.wait(self._interval)
+        while not self._shutdown_event.is_set():
             start_time = time.time()
 
             futures = []
@@ -827,6 +828,7 @@ class ConnectionHeartbeat(Thread):
                 log.warning("Failed connection heartbeat", exc_info=True)
 
             elapsed = time.time() - start_time
+            self._shutdown_event.wait(max(self._interval - elapsed, 0.01))
 
     def stop(self):
         self._shutdown_event.set()
