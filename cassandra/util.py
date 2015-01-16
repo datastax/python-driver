@@ -560,12 +560,14 @@ from collections import Mapping
 import six
 from six.moves import cPickle
 
+
 class OrderedMap(Mapping):
     '''
     An ordered map that accepts non-hashable types for keys.
 
-    Implemented in support of Cassandra nested collections.
-
+    Implemented in support of Cassandra nested collections. This class dervies from
+    the (immutable) Mapping API. Although clients may obtain references, keys in
+    the map should not be modified.
     '''
     def __init__(self, *args, **kwargs):
         if len(args) > 1:
@@ -623,7 +625,7 @@ class OrderedMap(Mapping):
             ', '.join("(%r, %r)" % (k, v) for k, v in self._items))
 
     def __str__(self):
-        return '{%s}' % ', '.join("%r: %r" % (k, v) for k, v in self._items)
+        return '{%s}' % ', '.join("%s: %s" % (k, v) for k, v in self._items)
 
     @staticmethod
     def _serialize_key(key):
