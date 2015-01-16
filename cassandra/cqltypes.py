@@ -47,7 +47,7 @@ from cassandra.marshal import (int8_pack, int8_unpack, uint16_pack, uint16_unpac
                                int32_pack, int32_unpack, int64_pack, int64_unpack,
                                float_pack, float_unpack, double_pack, double_unpack,
                                varint_pack, varint_unpack)
-from cassandra.util import OrderedDict, sortedset
+from cassandra.util import OrderedMap, sortedset
 
 apache_cassandra_type_prefix = 'org.apache.cassandra.db.marshal.'
 
@@ -732,7 +732,7 @@ class MapType(_ParameterizedType):
             length = 2
         numelements = unpack(byts[:length])
         p = length
-        themap = OrderedDict()
+        themap = OrderedMap()
         for _ in range(numelements):
             key_len = unpack(byts[p:p + length])
             p += length
@@ -744,7 +744,7 @@ class MapType(_ParameterizedType):
             p += val_len
             key = subkeytype.from_binary(keybytes, protocol_version)
             val = subvaltype.from_binary(valbytes, protocol_version)
-            themap[key] = val
+            themap._insert(key, val)
         return themap
 
     @classmethod

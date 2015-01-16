@@ -30,7 +30,7 @@ from cassandra import InvalidRequest
 from cassandra.cluster import Cluster
 from cassandra.cqltypes import Int32Type, EMPTY
 from cassandra.query import dict_factory
-from cassandra.util import OrderedDict, sortedset
+from cassandra.util import OrderedMap, sortedset
 
 from tests.integration import get_server_versions, use_singledc, PROTOCOL_VERSION
 
@@ -279,11 +279,11 @@ class TypeTests(unittest.TestCase):
         s.execute("INSERT INTO mytable (a, b, c, o, s, l, n) VALUES ('a', 'b', %s, %s, %s, %s, %s)",
                   ('', '', '', [''], {'': 3}))
         self.assertEqual(
-            {'c': '', 'o': '', 's': '', 'l': [''], 'n': OrderedDict({'': 3})},
+            {'c': '', 'o': '', 's': '', 'l': [''], 'n': OrderedMap({'': 3})},
             s.execute("SELECT c, o, s, l, n FROM mytable WHERE a='a' AND b='b'")[0])
 
         self.assertEqual(
-            {'c': '', 'o': '', 's': '', 'l': [''], 'n': OrderedDict({'': 3})},
+            {'c': '', 'o': '', 's': '', 'l': [''], 'n': OrderedMap({'': 3})},
             s.execute(s.prepare("SELECT c, o, s, l, n FROM mytable WHERE a='a' AND b='b'"), [])[0])
 
         # non-string types shouldn't accept empty strings
