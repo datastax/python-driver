@@ -59,7 +59,7 @@ def delete_keyspace(name):
     if name in cluster.metadata.keyspaces:
         execute("DROP KEYSPACE {}".format(name))
 
-def create_table(model, create_missing_keyspace=True):
+def create_table(model):
     raise CQLEngineException("create_table is deprecated, please use sync_table")
 
 def sync_table(model):
@@ -68,10 +68,6 @@ def sync_table(model):
 
     Note that the attributes removed from the model are not deleted on the database.
     They become effectively ignored by (will not show up on) the model.
-
-    :param create_missing_keyspace: (Defaults to True) Flags to us that we need to create missing keyspace
-        mentioned in the model automatically.
-    :type create_missing_keyspace: bool
     """
 
     if not issubclass(model, Model):
