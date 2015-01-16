@@ -679,7 +679,7 @@ class Connection(object):
 
     @property
     def is_idle(self):
-        return self.in_flight == 0 and not self.msg_received
+        return not self.msg_received
 
     def reset_idle(self):
         self.msg_received = False
@@ -754,11 +754,15 @@ class HeartbeatFuture(object):
         log.debug("Sending options message heartbeat on idle connection %s %s",
                   id(connection), connection.host)
         with connection.lock:
-            connection.send_msg(OptionsMessage(), connection.get_request_id(), self._options_callback)
-            connection.in_flight += 1
+            if connection.in_flight < connection.max_request_id:
+                connection.in_flight += 1
+                connection.send_msg(OptionsMessage(), connection.get_request_id(), self._options_callback)
+            else:
+                self._exception = Exception("Failed to send heartbeat because connection 'in_flight' exceeds threshold")
+                self._event.set()
 
     def wait(self, timeout):
-        self._event.wait(timeout):
+        self._event.wait(timeout)
         if self._event.is_set():
             if self._exception:
                 raise self._exception
@@ -825,7 +829,7 @@ class ConnectionHeartbeat(Thread):
                     connection.defunct(Exception('Connection heartbeat failure'))
                     owner.return_connection(connection)
             except Exception:
-                log.warning("Failed connection heartbeat", exc_info=True)
+                log.error("Failed connection heartbeat", exc_info=True)
 
             elapsed = time.time() - start_time
             self._shutdown_event.wait(max(self._interval - elapsed, 0.01))

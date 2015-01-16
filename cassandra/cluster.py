@@ -741,6 +741,9 @@ class Cluster(object):
             else:
                 self.is_shutdown = True
 
+        if self._idle_heartbeat:
+            self._idle_heartbeat.stop()
+
         self.scheduler.shutdown()
 
         self.control_connection.shutdown()
@@ -749,9 +752,6 @@ class Cluster(object):
             session.shutdown()
 
         self.executor.shutdown()
-
-        if self._idle_heartbeat:
-            self._idle_heartbeat.stop()
 
     def _new_session(self):
         session = Session(self, self.metadata.all_hosts())
