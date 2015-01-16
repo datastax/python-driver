@@ -55,8 +55,13 @@ apache_cassandra_type_prefix = 'org.apache.cassandra.db.marshal.'
 if six.PY3:
     _number_types = frozenset((int, float))
     long = int
+
+    def _name_from_hex_string(encoded_name):
+        bin_str = unhexlify(encoded_name)
+        return bin_str.decode('ascii')
 else:
     _number_types = frozenset((int, long, float))
+    _name_from_hex_string = unhexlify
 
 
 def trim_if_startswith(s, prefix):
@@ -840,8 +845,8 @@ class UserType(TupleType):
     @classmethod
     def apply_parameters(cls, subtypes, names):
         keyspace = subtypes[0]
-        udt_name = unhexlify(subtypes[1].cassname)
-        field_names = [unhexlify(encoded_name) for encoded_name in names[2:]]
+        udt_name = _name_from_hex_string(subtypes[1].cassname)
+        field_names = [_name_from_hex_string(encoded_name) for encoded_name in names[2:]]
         assert len(field_names) == len(subtypes[2:])
         return type(udt_name, (cls,), {'subtypes': subtypes[2:],
                                        'cassname': cls.cassname,

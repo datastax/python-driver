@@ -211,7 +211,7 @@ class Metadata(object):
         return KeyspaceMetadata(name, durable_writes, strategy_class, strategy_options)
 
     def _build_usertype(self, keyspace, usertype_row):
-        type_classes = map(types.lookup_casstype, usertype_row['field_types'])
+        type_classes = list(map(types.lookup_casstype, usertype_row['field_types']))
         return UserType(usertype_row['keyspace_name'], usertype_row['type_name'],
                         usertype_row['field_names'], type_classes)
 
