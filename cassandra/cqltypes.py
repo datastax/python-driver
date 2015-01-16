@@ -556,7 +556,8 @@ class DateType(_CassandraType):
                 tval = time.strptime(date, tformat)
             except ValueError:
                 continue
-            return calendar.timegm(tval) + offset
+            # scale seconds to millis for the raw value
+            return (calendar.timegm(tval) + offset) * 1e3
         else:
             raise ValueError("can't interpret %r as a date" % (date,))
 
