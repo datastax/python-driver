@@ -69,10 +69,19 @@ from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              BatchStatement, bind_params, QueryTrace, Statement,
                              named_tuple_factory, dict_factory, FETCH_SIZE_UNSET)
 
-# default to gevent when we are monkey patched, otherwise if libev is available, use that as the
-# default because it's fastest. Otherwise, use asyncore.
+def _is_eventlet_monkey_patched():
+    if not 'eventlet.patcher' in sys.modules:
+        return False
+    import eventlet.patcher
+    return eventlet.patcher.is_monkey_patched('socket')
+
+# default to gevent when we are monkey patched with gevent, eventlet when
+# monkey patched with eventlet, otherwise if libev is available, use that as
+# the default because it's fastest. Otherwise, use asyncore.
 if 'gevent.monkey' in sys.modules:
     from cassandra.io.geventreactor import GeventConnection as DefaultConnection
+elif _is_eventlet_monkey_patched():
+    from cassandra.io.eventletreactor import EventletConnection as DefaultConnection
 else:
     try:
         from cassandra.io.libevreactor import LibevConnection as DefaultConnection  # NOQA

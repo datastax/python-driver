@@ -34,10 +34,16 @@ try:
 except ImportError:
     LibevConnection = None
 
-
 def setup_module():
     use_singledc()
 
+def is_monkey_patched():
+    if 'gevent.monkey' in sys.modules:
+        return True
+    if 'eventlet.patcher' in sys.modules:
+        import eventlet
+        return eventlet.patcher.is_monkey_patched('socket')
+    return False
 
 class ConnectionTests(object):
 
@@ -230,8 +236,8 @@ class AsyncoreConnectionTests(ConnectionTests, unittest.TestCase):
     klass = AsyncoreConnection
 
     def setUp(self):
-        if 'gevent.monkey' in sys.modules:
-            raise unittest.SkipTest("Can't test asyncore with gevent monkey patching")
+        if is_monkey_patched():
+            raise unittest.SkipTest("Can't test asyncore with monkey patching")
         ConnectionTests.setUp(self)
 
 
@@ -240,9 +246,10 @@ class LibevConnectionTests(ConnectionTests, unittest.TestCase):
     klass = LibevConnection
 
     def setUp(self):
-        if 'gevent.monkey' in sys.modules:
-            raise unittest.SkipTest("Can't test libev with gevent monkey patching")
+        if is_monkey_patched():
+            raise unittest.SkipTest("Can't test libev with monkey patching")
         if LibevConnection is None:
             raise unittest.SkipTest(
                 'libev does not appear to be installed properly')
         ConnectionTests.setUp(self)
+
