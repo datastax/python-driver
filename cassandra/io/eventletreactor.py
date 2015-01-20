@@ -13,22 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections
-import eventlet
-from eventlet.green import select
-from eventlet.green import socket
-from eventlet import queue
-import errno
-import functools
-from six import moves
-import threading
+# Originally derived from MagnetoDB source:
+#   https://github.com/stackforge/magnetodb/blob/2015.1.0b1/magnetodb/common/cassandra/io/eventletreactor.py
 
+from collections import defaultdict
+from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL
+import eventlet
+from eventlet.green import select, socket
+from eventlet.queue import Queue
+from functools import partial
 import logging
 import os
+from threading import Event
 
-import cassandra
-from cassandra import connection as cassandra_connection
-from cassandra import protocol as cassandra_protocol
+from six.moves import xrange
+
+from cassandra import OperationTimedOut
+from cassandra.connection import Connection, ConnectionShutdown
+from cassandra.protocol import RegisterMessage
 
 
 log = logging.getLogger(__name__)
@@ -36,12 +38,12 @@ log = logging.getLogger(__name__)
 
 def is_timeout(err):
     return (
-        err in (errno.EINPROGRESS, errno.EALREADY, errno.EWOULDBLOCK) or
-        (err == errno.EINVAL and os.name in ('nt', 'ce'))
+        err in (EINPROGRESS, EALREADY, EWOULDBLOCK) or
+        (err == EINVAL and os.name in ('nt', 'ce'))
     )
 
 
-class EventletConnection(cassandra_connection.Connection):
+class EventletConnection(Connection):
     """
     An implementation of :class:`.Connection` that utilizes ``eventlet``.
     """
@@ -64,18 +66,18 @@ class EventletConnection(cassandra_connection.Connection):
             raise conn.last_error
         elif not conn.connected_event.is_set():
             conn.close()
-            raise cassandra.OperationTimedOut("Timed out creating connection")
+            raise OperationTimedOut("Timed out creating connection")
         else:
             return conn
 
     def __init__(self, *args, **kwargs):
-        cassandra_connection.Connection.__init__(self, *args, **kwargs)
+        Connection.__init__(self, *args, **kwargs)
 
-        self.connected_event = threading.Event()
-        self._write_queue = queue.Queue()
+        self.connected_event = Event()
+        self._write_queue = Queue()
 
         self._callbacks = {}
-        self._push_watchers = collections.defaultdict(set)
+        self._push_watchers = defaultdict(set)
 
         sockerr = None
         addresses = socket.getaddrinfo(
@@ -125,10 +127,7 @@ class EventletConnection(cassandra_connection.Connection):
 
         if not self.is_defunct:
             self.error_all_callbacks(
-                cassandra_connection.ConnectionShutdown(
-                    "Connection to %s was closed" % self.host
-                )
-            )
+                ConnectionShutdown("Connection to %s was closed" % self.host))
             # don't leave in-progress operations hanging
             self.connected_event.set()
 
@@ -147,7 +146,7 @@ class EventletConnection(cassandra_connection.Connection):
                 return  # Leave the write loop
 
     def handle_read(self):
-        run_select = functools.partial(select.select, (self._socket,), (), ())
+        run_select = partial(select.select, (self._socket,), (), ())
         while True:
             try:
                 run_select()
@@ -177,19 +176,18 @@ class EventletConnection(cassandra_connection.Connection):
 
     def push(self, data):
         chunk_size = self.out_buffer_size
-        for i in moves.xrange(0, len(data), chunk_size):
+        for i in xrange(0, len(data), chunk_size):
             self._write_queue.put(data[i:i + chunk_size])
 
     def register_watcher(self, event_type, callback, register_timeout=None):
         self._push_watchers[event_type].add(callback)
         self.wait_for_response(
-            cassandra_protocol.RegisterMessage(event_list=[event_type]),
+            RegisterMessage(event_list=[event_type]),
             timeout=register_timeout)
 
     def register_watchers(self, type_callback_dict, register_timeout=None):
         for event_type, callback in type_callback_dict.items():
             self._push_watchers[event_type].add(callback)
         self.wait_for_response(
-            cassandra_protocol.RegisterMessage(
-                event_list=type_callback_dict.keys()),
+            RegisterMessage(event_list=type_callback_dict.keys()),
             timeout=register_timeout)
