@@ -180,11 +180,14 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(cassandra_type.val, 'randomvaluetocheck')
 
     def test_datetype(self):
-        now_timestamp = time.time()
-        now_datetime = datetime.datetime.utcfromtimestamp(now_timestamp)
+        now_time_seconds = time.time()
+        now_datetime = datetime.datetime.utcfromtimestamp(now_time_seconds)
 
-        # same results serialized (must scale the timestamp to milliseconds)
-        self.assertEqual(DateType.serialize(now_datetime, 0), DateType.serialize(now_timestamp * 1e3, 0))
+        # Cassandra timestamps in millis
+        now_timestamp = now_time_seconds * 1e3
+
+        # same results serialized
+        self.assertEqual(DateType.serialize(now_datetime, 0), DateType.serialize(now_timestamp, 0))
 
         # from timestamp
         date_type = DateType(now_timestamp)
