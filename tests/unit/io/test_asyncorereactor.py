@@ -31,20 +31,20 @@ from mock import patch, Mock
 
 from cassandra.connection import (HEADER_DIRECTION_TO_CLIENT,
                                   ConnectionException)
-
+from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.protocol import (write_stringmultimap, write_int, write_string,
                                 SupportedMessage, ReadyMessage, ServerError)
 from cassandra.marshal import uint8_pack, uint32_pack, int32_pack
 
-from cassandra.io.asyncorereactor import AsyncoreConnection
+from tests import is_monkey_patched
 
 
 class AsyncoreConnectionTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        if 'gevent.monkey' in sys.modules:
-            raise unittest.SkipTest("gevent monkey-patching detected")
+        if is_monkey_patched():
+            raise unittest.SkipTest("monkey-patching detected")
         AsyncoreConnection.initialize_reactor()
         cls.socket_patcher = patch('socket.socket', spec=socket.socket)
         cls.mock_socket = cls.socket_patcher.start()
