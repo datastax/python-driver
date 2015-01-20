@@ -18,6 +18,7 @@ API Documentation
    cassandra/connection
    cassandra/util
    cassandra/io/asyncorereactor
+   cassandra/io/eventletreactor
    cassandra/io/libevreactor
    cassandra/io/geventreactor
    cassandra/io/twistedreactor
