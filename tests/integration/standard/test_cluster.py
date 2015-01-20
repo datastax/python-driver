@@ -12,18 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests.integration import use_singledc, PROTOCOL_VERSION
-
 try:
     import unittest2 as unittest
 except ImportError:
     import unittest  # noqa
 
-import cassandra
-from cassandra.query import SimpleStatement, TraceUnavailable
-from cassandra.policies import RoundRobinPolicy, ExponentialReconnectionPolicy, RetryPolicy, SimpleConvictionPolicy, HostDistance
+import time
+from uuid import uuid4
 
+import cassandra
 from cassandra.cluster import Cluster, NoHostAvailable
+from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
+                                RetryPolicy, SimpleConvictionPolicy, HostDistance,
+                                WhiteListRoundRobinPolicy)
+from cassandra.query import SimpleStatement, TraceUnavailable
+
+from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions
 
 
 def setup_module():
@@ -201,6 +205,153 @@ class ClusterTests(unittest.TestCase):
         future.result()
 
         self.assertIn("newkeyspace", cluster.metadata.keyspaces)
+
+    def test_refresh_schema(self):
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        session = cluster.connect()
+
+        original_meta = cluster.metadata.keyspaces
+        # full schema refresh, with wait
+        cluster.refresh_schema()
+        self.assertIsNot(original_meta, cluster.metadata.keyspaces)
+        self.assertEqual(original_meta, cluster.metadata.keyspaces)
+
+        session.shutdown()
+
+    def test_refresh_schema_keyspace(self):
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        session = cluster.connect()
+
+        original_meta = cluster.metadata.keyspaces
+        original_system_meta = original_meta['system']
+
+        # only refresh one keyspace
+        cluster.refresh_schema(keyspace='system')
+        current_meta = cluster.metadata.keyspaces
+        self.assertIs(original_meta, current_meta)
+        current_system_meta = current_meta['system']
+        self.assertIsNot(original_system_meta, current_system_meta)
+        self.assertEqual(original_system_meta.as_cql_query(), current_system_meta.as_cql_query())
+        session.shutdown()
+
+    def test_refresh_schema_table(self):
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        session = cluster.connect()
+
+        original_meta = cluster.metadata.keyspaces
+        original_system_meta = original_meta['system']
+        original_system_schema_meta = original_system_meta.tables['schema_columnfamilies']
+
+        # only refresh one table
+        cluster.refresh_schema(keyspace='system', table='schema_columnfamilies')
+        current_meta = cluster.metadata.keyspaces
+        current_system_meta = current_meta['system']
+        current_system_schema_meta = current_system_meta.tables['schema_columnfamilies']
+        self.assertIs(original_meta, current_meta)
+        self.assertIs(original_system_meta, current_system_meta)
+        self.assertIsNot(original_system_schema_meta, current_system_schema_meta)
+        self.assertEqual(original_system_schema_meta.as_cql_query(), current_system_schema_meta.as_cql_query())
+        session.shutdown()
+
+    def test_refresh_schema_type(self):
+        if get_server_versions()[0] < (2, 1, 0):
+            raise unittest.SkipTest('UDTs were introduced in Cassandra 2.1')
+
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        session = cluster.connect()
+
+        keyspace_name = 'test1rf'
+        type_name = self._testMethodName
+
+        session.execute('CREATE TYPE IF NOT EXISTS %s.%s (one int, two text)' % (keyspace_name, type_name))
+        original_meta = cluster.metadata.keyspaces
+        original_test1rf_meta = original_meta[keyspace_name]
+        original_type_meta = original_test1rf_meta.user_types[type_name]
+
+        # only refresh one type
+        cluster.refresh_schema(keyspace='test1rf', usertype=type_name)
+        current_meta = cluster.metadata.keyspaces
+        current_test1rf_meta = current_meta[keyspace_name]
+        current_type_meta = current_test1rf_meta.user_types[type_name]
+        self.assertIs(original_meta, current_meta)
+        self.assertIs(original_test1rf_meta, current_test1rf_meta)
+        self.assertIsNot(original_type_meta, current_type_meta)
+        self.assertEqual(original_type_meta.as_cql_query(), current_type_meta.as_cql_query())
+        session.shutdown()
+
+    def test_refresh_schema_no_wait(self):
+
+        contact_points = ['127.0.0.1']
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=10,
+                          contact_points=contact_points, load_balancing_policy=WhiteListRoundRobinPolicy(contact_points))
+        session = cluster.connect()
+
+        schema_ver = session.execute("SELECT schema_version FROM system.local WHERE key='local'")[0][0]
+
+        # create a schema disagreement
+        session.execute("UPDATE system.local SET schema_version=%s WHERE key='local'", (uuid4(),))
+
+        try:
+            agreement_timeout = 1
+
+            # cluster agreement wait exceeded
+            c = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=agreement_timeout)
+            start_time = time.time()
+            s = c.connect()
+            end_time = time.time()
+            self.assertGreaterEqual(end_time - start_time, agreement_timeout)
+            self.assertTrue(c.metadata.keyspaces)
+
+            # cluster agreement wait used for refresh
+            original_meta = c.metadata.keyspaces
+            start_time = time.time()
+            self.assertRaisesRegexp(Exception, r"Schema was not refreshed.*", c.refresh_schema)
+            end_time = time.time()
+            self.assertGreaterEqual(end_time - start_time, agreement_timeout)
+            self.assertIs(original_meta, c.metadata.keyspaces)
+            
+            # refresh wait overrides cluster value
+            original_meta = c.metadata.keyspaces
+            start_time = time.time()
+            c.refresh_schema(max_schema_agreement_wait=0)
+            end_time = time.time()
+            self.assertLess(end_time - start_time, agreement_timeout)
+            self.assertIsNot(original_meta, c.metadata.keyspaces)
+            self.assertEqual(original_meta, c.metadata.keyspaces)
+
+            s.shutdown()
+
+            refresh_threshold = 0.5
+            # cluster agreement bypass
+            c = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=0)
+            start_time = time.time()
+            s = c.connect()
+            end_time = time.time()
+            self.assertLess(end_time - start_time, refresh_threshold)
+            self.assertTrue(c.metadata.keyspaces)
+
+            # cluster agreement wait used for refresh
+            original_meta = c.metadata.keyspaces
+            start_time = time.time()
+            c.refresh_schema()
+            end_time = time.time()
+            self.assertLess(end_time - start_time, refresh_threshold)
+            self.assertIsNot(original_meta, c.metadata.keyspaces)
+            self.assertEqual(original_meta, c.metadata.keyspaces)
+            
+            # refresh wait overrides cluster value
+            original_meta = c.metadata.keyspaces
+            start_time = time.time()
+            self.assertRaisesRegexp(Exception, r"Schema was not refreshed.*", c.refresh_schema, max_schema_agreement_wait=agreement_timeout)
+            end_time = time.time()
+            self.assertGreaterEqual(end_time - start_time, agreement_timeout)
+            self.assertIs(original_meta, c.metadata.keyspaces)
+
+            s.shutdown()
+        finally:
+            session.execute("UPDATE system.local SET schema_version=%s WHERE key='local'", (schema_ver,))
+
+        session.shutdown()
 
     def test_trace(self):
         """
