@@ -633,7 +633,7 @@ class Cluster(object):
 
     def set_max_connections_per_host(self, host_distance, max_connections):
         """
-        Gets the maximum number of connections per Session that will be opened
+        Sets the maximum number of connections per Session that will be opened
         for each host with :class:`~.HostDistance` equal to `host_distance`.
         The default is 2 for :attr:`~HostDistance.LOCAL` and 1 for
         :attr:`~HostDistance.REMOTE`.
