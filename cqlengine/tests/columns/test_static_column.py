@@ -1,6 +1,3 @@
-#import sys, nose
-#sys.path.insert(0, '/Users/andy/projects/cqlengine')
-
 from uuid import uuid4
 from unittest import skipUnless
 from cqlengine import Model
@@ -35,7 +32,7 @@ class TestStaticColumn(BaseCassEngTestCase):
     @skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
     def test_mixed_updates(self):
         """ Tests that updates on both static and non-static columns work as intended """
-        instance = TestStaticModel.create(cluster=uuid4())
+        instance = TestStaticModel.create()
         instance.static = "it's shared"
         instance.text = "some text"
         instance.save()
@@ -51,7 +48,7 @@ class TestStaticColumn(BaseCassEngTestCase):
     @skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
     def test_static_only_updates(self):
         """ Tests that updates on static only column work as intended """
-        instance = TestStaticModel.create(cluster=uuid4())
+        instance = TestStaticModel.create()
         instance.static = "it's shared"
         instance.text = "some text"
         instance.save()
@@ -73,6 +70,3 @@ class TestStaticColumn(BaseCassEngTestCase):
         u.update()
         actual = TestStaticModel.get(partition=u.partition)
         assert actual.static == "it's still shared"
-
-#if __name__ == '__main__':
-#    nose.main()
