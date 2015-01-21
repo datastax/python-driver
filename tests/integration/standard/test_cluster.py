@@ -17,11 +17,14 @@ try:
 except ImportError:
     import unittest  # noqa
 
+from collections import deque
+from mock import patch
 import time
 from uuid import uuid4
 
 import cassandra
 from cassandra.cluster import Cluster, NoHostAvailable
+from cassandra.concurrent import execute_concurrent
 from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
                                 RetryPolicy, SimpleConvictionPolicy, HostDistance,
                                 WhiteListRoundRobinPolicy)
@@ -69,6 +72,8 @@ class ClusterTests(unittest.TestCase):
 
         result = session.execute("SELECT * FROM clustertests.cf0")
         self.assertEqual([('a', 'b', 'c')], result)
+
+        session.execute("DROP KEYSPACE clustertests")
 
         cluster.shutdown()
 
@@ -206,6 +211,8 @@ class ClusterTests(unittest.TestCase):
 
         self.assertIn("newkeyspace", cluster.metadata.keyspaces)
 
+        session.execute("DROP KEYSPACE newkeyspace")
+
     def test_refresh_schema(self):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
@@ -256,6 +263,10 @@ class ClusterTests(unittest.TestCase):
     def test_refresh_schema_type(self):
         if get_server_versions()[0] < (2, 1, 0):
             raise unittest.SkipTest('UDTs were introduced in Cassandra 2.1')
+
+        if PROTOCOL_VERSION < 3:
+            raise unittest.SkipTest('UDTs are not specified in change events for protocol v2')
+            # We may want to refresh types on keyspace change events in that case(?)
 
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
@@ -422,3 +433,85 @@ class ClusterTests(unittest.TestCase):
 
         self.assertIn(query, str(future))
         self.assertIn('result', str(future))
+
+    def test_idle_heartbeat(self):
+        interval = 1
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, idle_heartbeat_interval=interval)
+        if PROTOCOL_VERSION < 3:
+            cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
+        session = cluster.connect()
+
+        # This test relies on impl details of connection req id management to see if heartbeats 
+        # are being sent. May need update if impl is changed
+        connection_request_ids = {}
+        for h in cluster.get_connection_holders():
+            for c in h.get_connections():
+                # make sure none are idle (should have startup messages)
+                self.assertFalse(c.is_idle)
+                with c.lock:
+                    connection_request_ids[id(c)] = deque(c.request_ids)  # copy of request ids
+
+        # let two heatbeat intervals pass (first one had startup messages in it)
+        time.sleep(2 * interval + interval/10.)
+
+        connections = [c for holders in cluster.get_connection_holders() for c in holders.get_connections()]
+
+        # make sure requests were sent on all connections
+        for c in connections:
+            expected_ids = connection_request_ids[id(c)]
+            expected_ids.rotate(-1)
+            with c.lock:
+                self.assertListEqual(list(c.request_ids), list(expected_ids))
+
+        # assert idle status
+        self.assertTrue(all(c.is_idle for c in connections))
+
+        # send messages on all connections
+        statements_and_params = [("SELECT release_version FROM system.local", ())] * len(cluster.metadata.all_hosts())
+        results = execute_concurrent(session, statements_and_params)
+        for success, result in results:
+            self.assertTrue(success)
+
+        # assert not idle status
+        self.assertFalse(any(c.is_idle if not c.is_control_connection else False for c in connections))
+
+        # holders include session pools and cc
+        holders = cluster.get_connection_holders()
+        self.assertIn(cluster.control_connection, holders)
+        self.assertEqual(len(holders), len(cluster.metadata.all_hosts()) + 1)  # hosts pools, 1 for cc
+
+        # include additional sessions
+        session2 = cluster.connect()
+
+        holders = cluster.get_connection_holders()
+        self.assertIn(cluster.control_connection, holders)
+        self.assertEqual(len(holders), 2 * len(cluster.metadata.all_hosts()) + 1)  # 2 sessions' hosts pools, 1 for cc
+
+        # exclude removed sessions
+        session2.shutdown()
+        del session2
+
+        holders = cluster.get_connection_holders()
+        self.assertIn(cluster.control_connection, holders)
+        self.assertEqual(len(holders), len(cluster.metadata.all_hosts()) + 1)  # hosts pools, 1 for cc
+
+        session.shutdown()
+
+    @patch('cassandra.cluster.Cluster.idle_heartbeat_interval', new=0.1)
+    def test_idle_heartbeat_disabled(self):
+        self.assertTrue(Cluster.idle_heartbeat_interval)
+
+        # heartbeat disabled with '0'
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, idle_heartbeat_interval=0)
+        self.assertEqual(cluster.idle_heartbeat_interval, 0)
+        session = cluster.connect()
+
+        # let two heatbeat intervals pass (first one had startup messages in it)
+        time.sleep(2 * Cluster.idle_heartbeat_interval)
+
+        connections = [c for holders in cluster.get_connection_holders() for c in holders.get_connections()]
+
+        # assert not idle status (should never get reset because there is not heartbeat)
+        self.assertFalse(any(c.is_idle for c in connections))
+
+        session.shutdown()
