@@ -13,7 +13,7 @@ from cqlengine.tests.base import CASSANDRA_VERSION, PROTOCOL_VERSION
 
 class TestStaticModel(Model):
     partition = columns.UUID(primary_key=True, default=uuid4)
-    cluster = columns.UUID(primary_key=True)
+    cluster = columns.UUID(primary_key=True, default=uuid4)
     static = columns.Text(static=True)
     text = columns.Text()
 
