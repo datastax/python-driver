@@ -336,6 +336,8 @@ class BaseModel(object):
             if value is not None or isinstance(column, columns.BaseContainerColumn):
                 value = column.to_python(value)
             value_mngr = column.value_manager(self, column, value)
+            if name in values:
+                value_mngr.explicit = True
             self._values[name] = value_mngr
 
         # a flag set by the deserializer to indicate
@@ -490,7 +492,10 @@ class BaseModel(object):
     def validate(self):
         """ Cleans and validates the field values """
         for name, col in self._columns.items():
-            val = col.validate(getattr(self, name))
+            v = getattr(self, name)
+            if v is None and not self._values[name].explicit and col.has_default:
+                v = col.get_default()
+            val = col.validate(v)
             setattr(self, name, val)
 
     ### Let an instance be used like a dict of its columns keys/values
