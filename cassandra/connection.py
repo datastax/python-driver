@@ -751,7 +751,7 @@ class HeartbeatFuture(object):
         self._event = Event()
         self.connection = connection
         self.owner = owner
-        log.debug("Sending options message heartbeat on idle connection %s %s",
+        log.debug("Sending options message heartbeat on idle connection (%s) %s",
                   id(connection), connection.host)
         with connection.lock:
             if connection.in_flight < connection.max_request_id:
