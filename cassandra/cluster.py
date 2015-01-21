@@ -39,7 +39,7 @@ except ImportError:
     from cassandra.util import WeakSet  # NOQA
 
 from functools import partial, wraps
-from itertools import groupby, chain
+from itertools import groupby
 
 from cassandra import (ConsistencyLevel, AuthenticationFailed,
                        InvalidRequest, OperationTimedOut,
@@ -69,8 +69,9 @@ from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              BatchStatement, bind_params, QueryTrace, Statement,
                              named_tuple_factory, dict_factory, FETCH_SIZE_UNSET)
 
+
 def _is_eventlet_monkey_patched():
-    if not 'eventlet.patcher' in sys.modules:
+    if 'eventlet.patcher' not in sys.modules:
         return False
     import eventlet.patcher
     return eventlet.patcher.is_monkey_patched('socket')
