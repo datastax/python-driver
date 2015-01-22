@@ -700,10 +700,10 @@ class TypeTests(unittest.TestCase):
         self.assertEquals((None, None, None, None), s.execute(read)[0].t)
 
         # also test empty strings where compatible
-        s.execute(insert, [('', None, None, '')])
+        s.execute(insert, [('', None, None, b'')])
         result = s.execute("SELECT * FROM mytable WHERE k=0")
-        self.assertEquals(('', None, None, ''), result[0].t)
-        self.assertEquals(('', None, None, ''), s.execute(read)[0].t)
+        self.assertEquals(('', None, None, b''), result[0].t)
+        self.assertEquals(('', None, None, b''), s.execute(read)[0].t)
 
         c.shutdown()
 
