@@ -529,4 +529,4 @@ class TestCamelMapColumn(BaseCassEngTestCase):
         drop_table(TestCamelMapModel)
 
     def test_camelcase_column(self):
-        TestCamelMapModel.create(partition=None, camelMap={'blah': 1})
+        TestCamelMapModel.create(camelMap={'blah': 1})

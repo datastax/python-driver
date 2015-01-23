@@ -26,6 +26,7 @@ class BaseValueManager(object):
         self.column = column
         self.previous_value = deepcopy(value)
         self.value = value
+        self.explicit = False
 
     @property
     def deleted(self):
@@ -140,9 +141,7 @@ class Column(object):
         if there's a problem
         """
         if value is None:
-            if self.has_default:
-                return self.get_default()
-            elif self.required:
+            if self.required:
                 raise ValidationError('{} - None values are not allowed'.format(self.column_name or self.db_field))
         return value
 
