@@ -31,6 +31,7 @@ from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
 from cassandra.query import SimpleStatement, TraceUnavailable
 
 from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions
+from tests.integration.util import assert_quiescent_pool_state
 
 
 def setup_module():
@@ -495,6 +496,10 @@ class ClusterTests(unittest.TestCase):
         self.assertIn(cluster.control_connection, holders)
         self.assertEqual(len(holders), len(cluster.metadata.all_hosts()) + 1)  # hosts pools, 1 for cc
 
+        cluster._idle_heartbeat.stop()
+        cluster._idle_heartbeat.join()
+        assert_quiescent_pool_state(self, cluster)
+
         session.shutdown()
 
     @patch('cassandra.cluster.Cluster.idle_heartbeat_interval', new=0.1)
@@ -514,4 +519,40 @@ class ClusterTests(unittest.TestCase):
         # assert not idle status (should never get reset because there is not heartbeat)
         self.assertFalse(any(c.is_idle for c in connections))
 
+        session.shutdown()
+
+    def test_pool_management(self):
+        # Ensure that in_flight and request_ids quiesce after cluster operations
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, idle_heartbeat_interval=0)  # no idle heartbeat here, pool management is tested in test_idle_heartbeat
+        session = cluster.connect()
+        session2 = cluster.connect()
+
+        # prepare
+        p = session.prepare("SELECT * FROM system.local WHERE key=?")
+        self.assertTrue(session.execute(p, ('local',)))
+
+        # simple
+        self.assertTrue(session.execute("SELECT * FROM system.local WHERE key='local'"))
+
+        # set keyspace
+        session.set_keyspace('system')
+        session.set_keyspace('system_traces')
+
+        # use keyspace
+        session.execute('USE system')
+        session.execute('USE system_traces')
+
+        # refresh schema
+        cluster.refresh_schema()
+        cluster.refresh_schema(max_schema_agreement_wait=0)
+
+        # submit schema refresh
+        future = cluster.submit_schema_refresh()
+        future.result()
+
+        assert_quiescent_pool_state(self, cluster)
+
+        session2.shutdown()
+        del session2
+        assert_quiescent_pool_state(self, cluster)
         session.shutdown()

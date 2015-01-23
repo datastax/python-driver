@@ -366,9 +366,10 @@ class HostConnection(object):
         return [c] if c else []
 
     def get_state(self):
-        have_conn = self._connection is not None
-        in_flight = self._connection.in_flight if have_conn else 0
-        return "shutdown: %s, open: %s, in_flights: %s" % (self.is_shutdown, have_conn, in_flight)
+        connection = self._connection
+        open_count = 1 if connection and not (connection.is_closed or connection.is_defunct) else 0
+        in_flights = [connection.in_flight] if connection else []
+        return {'shutdown': self.is_shutdown, 'open_count': open_count, 'in_flights': in_flights}
 
 
 _MAX_SIMULTANEOUS_CREATION = 1
@@ -703,5 +704,5 @@ class HostConnectionPool(object):
         return self._connections
 
     def get_state(self):
-        in_flights = ", ".join([str(c.in_flight) for c in self._connections])
-        return "shutdown: %s, open_count: %d, in_flights: %s" % (self.is_shutdown, self.open_count, in_flights)
+        in_flights = [c.in_flight for c in self._connections]
+        return {'shutdown': self.is_shutdown, 'open_count': self.open_count, 'in_flights': in_flights}
