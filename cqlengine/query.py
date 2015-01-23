@@ -7,7 +7,7 @@ from cqlengine.columns import Counter, List, Set
 
 from .connection import execute, NOT_SET
 
-from cqlengine.exceptions import CQLEngineException, ValidationError, LWTException
+from cqlengine.exceptions import CQLEngineException, ValidationError, LWTException, IfNotExistsWithCounterColumn
 from cqlengine.functions import Token, BaseQueryFunction, QueryValue, UnicodeMixin
 
 #CQL 3 reference:
@@ -784,6 +784,8 @@ class ModelQuerySet(AbstractQuerySet):
         return clone
 
     def if_not_exists(self):
+        if self.model._has_counter:
+            raise IfNotExistsWithCounterColumn('if_not_exists cannot be used with tables containing columns')
         clone = copy.deepcopy(self)
         clone._if_not_exists = True
         return clone

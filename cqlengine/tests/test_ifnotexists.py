@@ -3,7 +3,7 @@ from cqlengine.management import sync_table, drop_table, create_keyspace, delete
 from cqlengine.tests.base import BaseCassEngTestCase
 from cqlengine.tests.base import PROTOCOL_VERSION
 from cqlengine.models import Model
-from cqlengine.exceptions import LWTException
+from cqlengine.exceptions import LWTException, IfNotExistsWithCounterColumn
 from cqlengine import columns, BatchQuery
 from uuid import uuid4
 import mock
@@ -14,6 +14,12 @@ class TestIfNotExistsModel(Model):
     id      = columns.UUID(primary_key=True, default=lambda:uuid4())
     count   = columns.Integer()
     text    = columns.Text(required=False)
+
+
+class TestIfNotExistsWithCounterModel(Model):
+
+    id      = columns.UUID(primary_key=True, default=lambda:uuid4())
+    likes   = columns.Counter()
 
 
 class BaseIfNotExistsTest(BaseCassEngTestCase):
@@ -31,8 +37,21 @@ class BaseIfNotExistsTest(BaseCassEngTestCase):
 
     @classmethod
     def tearDownClass(cls):
-        super(BaseCassEngTestCase, cls).tearDownClass()
+        super(BaseIfNotExistsTest, cls).tearDownClass()
         drop_table(TestIfNotExistsModel)
+
+
+class BaseIfNotExistsWithCounterTest(BaseCassEngTestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super(BaseIfNotExistsWithCounterTest, cls).setUpClass()
+        sync_table(TestIfNotExistsWithCounterModel)
+
+    @classmethod
+    def tearDownClass(cls):
+        super(BaseIfNotExistsWithCounterTest, cls).tearDownClass()
+        drop_table(TestIfNotExistsWithCounterModel)
 
 
 class IfNotExistsInsertTests(BaseIfNotExistsTest):
@@ -44,10 +63,8 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
         id = uuid4()
 
         TestIfNotExistsModel.create(id=id, count=8, text='123456789')
-        self.assertRaises(
-            LWTException,
-            TestIfNotExistsModel.if_not_exists().create, id=id, count=9, text='111111111111'
-            )
+        with self.assertRaises(LWTException):
+            TestIfNotExistsModel.if_not_exists().create(id=id, count=9, text='111111111111')
 
         q = TestIfNotExistsModel.objects(id=id)
         self.assertEqual(len(q), 1)
@@ -82,7 +99,8 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
 
         b = BatchQuery()
         TestIfNotExistsModel.batch(b).if_not_exists().create(id=id, count=9, text='111111111111')
-        self.assertRaises(LWTException, b.execute)
+        with self.assertRaises(LWTException):
+            b.execute()
 
         q = TestIfNotExistsModel.objects(id=id)
         self.assertEqual(len(q), 1)
@@ -169,4 +187,14 @@ class IfNotExistsInstanceTest(BaseIfNotExistsTest):
         query = m.call_args[0][0].query_string
         self.assertNotIn("IF NOT EXIST", query)
 
+
+class IfNotExistWithCounterTest(BaseIfNotExistsWithCounterTest):
+
+    def test_instance_raise_exception(self):
+        """ make sure exception is raised when calling
+        if_not_exists on table with counter column
+        """
+        id = uuid4()
+        with self.assertRaises(IfNotExistsWithCounterColumn):
+            TestIfNotExistsWithCounterModel.if_not_exists()
 
