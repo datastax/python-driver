@@ -488,14 +488,6 @@ class ClusterTests(unittest.TestCase):
         self.assertIn(cluster.control_connection, holders)
         self.assertEqual(len(holders), 2 * len(cluster.metadata.all_hosts()) + 1)  # 2 sessions' hosts pools, 1 for cc
 
-        # exclude removed sessions
-        session2.shutdown()
-        del session2
-
-        holders = cluster.get_connection_holders()
-        self.assertIn(cluster.control_connection, holders)
-        self.assertEqual(len(holders), len(cluster.metadata.all_hosts()) + 1)  # hosts pools, 1 for cc
-
         cluster._idle_heartbeat.stop()
         cluster._idle_heartbeat.join()
         assert_quiescent_pool_state(self, cluster)
@@ -553,6 +545,4 @@ class ClusterTests(unittest.TestCase):
         assert_quiescent_pool_state(self, cluster)
 
         session2.shutdown()
-        del session2
-        assert_quiescent_pool_state(self, cluster)
         session.shutdown()

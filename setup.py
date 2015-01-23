@@ -56,16 +56,11 @@ try:
     from nose.commands import nosetests
 except ImportError:
     gevent_nosetests = None
+    eventlet_nosetests = None
 else:
     class gevent_nosetests(nosetests):
         description = "run nosetests with gevent monkey patching"
 
-
-try:
-    from nose.commands import nosetests
-except ImportError:
-    eventlet_nosetests = None
-else:
     class eventlet_nosetests(nosetests):
         description = "run nosetests with eventlet monkey patching"
 
@@ -188,6 +183,7 @@ On OSX, via homebrew:
 
 
 def run_setup(extensions):
+
     kw = {'cmdclass': {'doc': DocCommand}}
     if gevent_nosetests is not None:
         kw['cmdclass']['gevent_nosetests'] = gevent_nosetests
