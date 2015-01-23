@@ -21,8 +21,10 @@ except ImportError:
 import logging
 log = logging.getLogger(__name__)
 
+from collections import namedtuple
 from decimal import Decimal
 from datetime import datetime
+from functools import partial
 import six
 from uuid import uuid1, uuid4
 
@@ -33,6 +35,10 @@ from cassandra.query import dict_factory
 from cassandra.util import OrderedMap, sortedset
 
 from tests.integration import get_server_versions, use_singledc, PROTOCOL_VERSION
+
+# defined in module scope for pickling in OrderedMap
+nested_collection_udt = namedtuple('nested_collection_udt', ['m', 't', 'l', 's'])
+nested_collection_udt_nested = namedtuple('nested_collection_udt_nested', ['m', 't', 'l', 's', 'u'])
 
 
 def setup_module():
@@ -713,3 +719,62 @@ class TypeTests(unittest.TestCase):
 
         query = u"SELECT * FROM system.schema_columnfamilies WHERE keyspace_name = 'ef\u2052ef' AND columnfamily_name = %s"
         s.execute(query, (u"fe\u2051fe",))
+
+    def insert_select_column(self, session, table_name, column_name, value):
+        insert = session.prepare("INSERT INTO %s (k, %s) VALUES (?, ?)" % (table_name, column_name))
+        session.execute(insert, (0, value))
+        result = session.execute("SELECT %s FROM %s WHERE k=%%s" % (column_name, table_name), (0,))[0][0]
+        self.assertEqual(result, value)
+
+    def test_nested_collections(self):
+
+        if self._cass_version < (2, 1, 3):
+            raise unittest.SkipTest("Support for nested collections was introduced in Cassandra 2.1.3")
+
+        name = self._testMethodName
+
+        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        s = c.connect('test1rf')
+        s.encoder.mapping[tuple] = s.encoder.cql_encode_tuple
+
+        s.execute("""
+            CREATE TYPE %s (
+                m frozen<map<int,text>>,
+                t tuple<int,text>,
+                l frozen<list<int>>,
+                s frozen<set<int>>
+            )""" % name)
+        s.execute("""
+            CREATE TYPE %s_nested (
+                m frozen<map<int,text>>,
+                t tuple<int,text>,
+                l frozen<list<int>>,
+                s frozen<set<int>>,
+                u frozen<%s>
+            )""" % (name, name))
+        s.execute("""
+            CREATE TABLE %s (
+                k int PRIMARY KEY,
+                map_map map<frozen<map<int,int>>, frozen<map<int,int>>>,
+                map_set map<frozen<set<int>>, frozen<set<int>>>,
+                map_list map<frozen<list<int>>, frozen<list<int>>>,
+                map_tuple map<frozen<tuple<int, int>>, frozen<tuple<int>>>,
+                map_udt map<frozen<%s_nested>, frozen<%s>>,
+            )"""
+            % (name, name, name))
+
+        validate = partial(self.insert_select_column, s, name)
+        validate('map_map', OrderedMap([({1: 1, 2: 2}, {3: 3, 4: 4}), ({5: 5, 6: 6}, {7: 7, 8: 8})]))
+        validate('map_set', OrderedMap([(set((1, 2)), set((3, 4))), (set((5, 6)), set((7, 8)))]))
+        validate('map_list', OrderedMap([([1, 2], [3, 4]), ([5, 6], [7, 8])]))
+        validate('map_tuple', OrderedMap([((1, 2), (3,)), ((4, 5), (6,))]))
+
+        value = nested_collection_udt({1: 'v1', 2: 'v2'}, (3, 'v3'), [4, 5, 6, 7], set((8,9,10)))
+        key = nested_collection_udt_nested(value.m, value.t, value.l, value.s, value)
+        key2 = nested_collection_udt_nested({3: 'v3'}, value.t, value.l, value.s, value)
+        validate('map_udt', OrderedMap([(key, value), (key2, value)]))
+
+        s.execute("DROP TABLE %s" % (name))
+        s.execute("DROP TYPE %s_nested" % (name))
+        s.execute("DROP TYPE %s" % (name))
+        s.shutdown()
