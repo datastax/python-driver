@@ -39,6 +39,8 @@
 
    .. autoattribute:: control_connection_timeout
 
+   .. autoattribute:: idle_heartbeat_interval
+
    .. automethod:: connect
 
    .. automethod:: shutdown
@@ -56,6 +58,8 @@
    .. automethod:: get_max_connections_per_host
 
    .. automethod:: set_max_connections_per_host
+
+   .. automethod:: refresh_schema
 
 .. autoclass:: Session ()
 

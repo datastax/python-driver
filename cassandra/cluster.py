@@ -1077,10 +1077,14 @@ class Cluster(object):
     def refresh_schema(self, keyspace=None, table=None, usertype=None, max_schema_agreement_wait=None):
         """
         Synchronously refresh the schema metadata.
-        By default timeout for this operation is governed by :attr:`~.Cluster.max_schema_agreement_wait`
+
+        By default, the timeout for this operation is governed by :attr:`~.Cluster.max_schema_agreement_wait`
         and :attr:`~.Cluster.control_connection_timeout`.
+        
         Passing max_schema_agreement_wait here overrides :attr:`~.Cluster.max_schema_agreement_wait`.
+        
         Setting max_schema_agreement_wait <= 0 will bypass schema agreement and refresh schema immediately.
+        
         An Exception is raised if schema refresh fails for any reason.
         """
         if not self.control_connection.refresh_schema(keyspace, table, usertype, max_schema_agreement_wait):
