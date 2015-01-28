@@ -936,7 +936,7 @@ class Cluster(object):
 
         self._start_reconnector(host, is_host_addition)
 
-    def on_add(self, host):
+    def on_add(self, host, refresh_nodes=True):
         if self.is_shutdown:
             return
 
@@ -948,7 +948,7 @@ class Cluster(object):
             log.debug("Done preparing queries for new host %r", host)
 
         self.load_balancing_policy.on_add(host)
-        self.control_connection.on_add(host)
+        self.control_connection.on_add(host, refresh_nodes)
 
         if distance == HostDistance.IGNORED:
             log.debug("Not adding connection pool for new host %r because the "
@@ -1024,7 +1024,7 @@ class Cluster(object):
             self.on_down(host, is_host_addition, expect_host_to_be_down)
         return is_down
 
-    def add_host(self, address, datacenter=None, rack=None, signal=True):
+    def add_host(self, address, datacenter=None, rack=None, signal=True, refresh_nodes=True):
         """
         Called when adding initial contact points and when the control
         connection subsequently discovers a new node.  Intended for internal
@@ -1033,7 +1033,7 @@ class Cluster(object):
         new_host = self.metadata.add_host(address, datacenter, rack)
         if new_host and signal:
             log.info("New Cassandra host %r discovered", new_host)
-            self.on_add(new_host)
+            self.on_add(new_host, refresh_nodes)
 
         return new_host
 
@@ -1080,11 +1080,11 @@ class Cluster(object):
 
         By default, the timeout for this operation is governed by :attr:`~.Cluster.max_schema_agreement_wait`
         and :attr:`~.Cluster.control_connection_timeout`.
-        
+
         Passing max_schema_agreement_wait here overrides :attr:`~.Cluster.max_schema_agreement_wait`.
-        
+
         Setting max_schema_agreement_wait <= 0 will bypass schema agreement and refresh schema immediately.
-        
+
         An Exception is raised if schema refresh fails for any reason.
         """
         if not self.control_connection.refresh_schema(keyspace, table, usertype, max_schema_agreement_wait):
@@ -2132,7 +2132,7 @@ class ControlConnection(object):
             rack = row.get("rack")
             if host is None:
                 log.debug("[control connection] Found new host to connect to: %s", addr)
-                host = self._cluster.add_host(addr, datacenter, rack, signal=True)
+                host = self._cluster.add_host(addr, datacenter, rack, signal=True, refresh_nodes=False)
                 should_rebuild_token_map = True
             else:
                 should_rebuild_token_map |= self._update_location_info(host, datacenter, rack)
@@ -2320,8 +2320,9 @@ class ControlConnection(object):
             # this will result in a task being submitted to the executor to reconnect
             self.reconnect()
 
-    def on_add(self, host):
-        self.refresh_node_list_and_token_map(force_token_rebuild=True)
+    def on_add(self, host, refresh_nodes=True):
+        if refresh_nodes:
+            self.refresh_node_list_and_token_map(force_token_rebuild=True)
 
     def on_remove(self, host):
         self.refresh_node_list_and_token_map(force_token_rebuild=True)
