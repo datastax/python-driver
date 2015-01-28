@@ -1154,6 +1154,9 @@ class Cluster(object):
         This applies to both schema and node topology.
 
         Disabling this is useful to minimize refreshes during multiple changes.
+
+        Meta refresh must be enabled for the driver to become aware of any cluster
+        topology changes or schema updates.
         """
         self.control_connection.set_meta_refresh_enabled(bool(enabled))
 
