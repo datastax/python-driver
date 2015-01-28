@@ -22,6 +22,7 @@ import atexit
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 import logging
+from random import random
 import socket
 import sys
 import time
@@ -391,6 +392,40 @@ class Cluster(object):
     Setting to zero disables heartbeats.
     """
 
+    schema_event_refresh_window = 2
+    """
+    Window, in seconds, within which a schema component will be refreshed after
+    receiving a schema_change event.
+
+    The driver delays a random amount of time in the range [0.0, window)
+    before executing the refresh. This serves two purposes:
+
+    1.) Spread the refresh for deployments with large fanout from C* to client tier,
+    preventing a 'thundering herd' problem with many clients refreshing simultaneously.
+
+    2.) Remove redundant refreshes. Redundant events arriving within the delay period
+    are discarded, and only one refresh is executed.
+
+    Setting this to zero will execute refreshes immediately.
+
+    Setting this negative will disable schema refreshes in response to push events
+    (refreshes will still occur in response to schema change responses to DDL statements
+    executed by Sessions of this Cluster).
+    """
+
+    topology_event_refresh_window = 10
+    """
+    Window, in seconds, within which the node and token list will be refreshed after
+    receiving a topology_change event.
+
+    Setting this to zero will execute refreshes immediately.
+
+    Setting this negative will disable node refreshes in response to push events
+    (refreshes will still occur in response to new nodes observed on "UP" events).
+
+    See :attr:`.schema_event_refresh_window` for discussion of rationale
+    """
+
     sessions = None
     control_connection = None
     scheduler = None
@@ -427,7 +462,9 @@ class Cluster(object):
                  executor_threads=2,
                  max_schema_agreement_wait=10,
                  control_connection_timeout=2.0,
-                 idle_heartbeat_interval=30):
+                 idle_heartbeat_interval=30,
+                 schema_event_refresh_window=2,
+                 topology_event_refresh_window=10):
         """
         Any of the mutable Cluster attributes may be set as keyword arguments
         to the constructor.
@@ -478,6 +515,8 @@ class Cluster(object):
         self.max_schema_agreement_wait = max_schema_agreement_wait
         self.control_connection_timeout = control_connection_timeout
         self.idle_heartbeat_interval = idle_heartbeat_interval
+        self.schema_event_refresh_window = schema_event_refresh_window
+        self.topology_event_refresh_window = topology_event_refresh_window
 
         self._listeners = set()
         self._listener_lock = Lock()
@@ -522,7 +561,8 @@ class Cluster(object):
             self.metrics = Metrics(weakref.proxy(self))
 
         self.control_connection = ControlConnection(
-            self, self.control_connection_timeout)
+            self, self.control_connection_timeout,
+            self.schema_event_refresh_window, self.topology_event_refresh_window)
 
     def register_user_type(self, keyspace, user_type, klass):
         """
@@ -1770,15 +1810,23 @@ class ControlConnection(object):
     _timeout = None
     _protocol_version = None
 
+    _schema_event_refresh_window = None
+    _topology_event_refresh_window = None
+
     # for testing purposes
     _time = time
 
-    def __init__(self, cluster, timeout):
+    def __init__(self, cluster, timeout,
+                 schema_event_refresh_window,
+                 topology_event_refresh_window):
         # use a weak reference to allow the Cluster instance to be GC'ed (and
         # shutdown) since implementing __del__ disables the cycle detector
         self._cluster = weakref.proxy(cluster)
         self._connection = None
         self._timeout = timeout
+
+        self._schema_event_refresh_window = schema_event_refresh_window
+        self._topology_event_refresh_window = topology_event_refresh_window
 
         self._lock = RLock()
         self._schema_agreement_lock = Lock()
@@ -2167,25 +2215,25 @@ class ControlConnection(object):
     def _handle_topology_change(self, event):
         change_type = event["change_type"]
         addr, port = event["address"]
-        if change_type == "NEW_NODE":
-            self._cluster.scheduler.schedule(10, self.refresh_node_list_and_token_map)
+        if change_type == "NEW_NODE" or change_type == "MOVED_NODE":
+            if self._topology_event_refresh_window >= 0:
+                delay = random() * self._topology_event_refresh_window
+                self._cluster.scheduler.schedule_unique(delay, self.refresh_node_list_and_token_map)
         elif change_type == "REMOVED_NODE":
             host = self._cluster.metadata.get_host(addr)
-            self._cluster.scheduler.schedule(0, self._cluster.remove_host, host)
-        elif change_type == "MOVED_NODE":
-            self._cluster.scheduler.schedule(1, self.refresh_node_list_and_token_map)
+            self._cluster.scheduler.schedule_unique(0, self._cluster.remove_host, host)
 
     def _handle_status_change(self, event):
         change_type = event["change_type"]
         addr, port = event["address"]
         host = self._cluster.metadata.get_host(addr)
         if change_type == "UP":
+            delay = 1 + random() * 0.5  # randomness to avoid thundering herd problem on events
             if host is None:
                 # this is the first time we've seen the node
-                self._cluster.scheduler.schedule(2, self.refresh_node_list_and_token_map)
+                self._cluster.scheduler.schedule_unique(delay, self.refresh_node_list_and_token_map)
             else:
-                # this will be run by the scheduler
-                self._cluster.scheduler.schedule(2, self._cluster.on_up, host)
+                self._cluster.scheduler.schedule_unique(delay, self._cluster.on_up, host)
         elif change_type == "DOWN":
             # Note that there is a slight risk we can receive the event late and thus
             # mark the host down even though we already had reconnected successfully.
@@ -2196,10 +2244,14 @@ class ControlConnection(object):
                 self._cluster.on_down(host, is_host_addition=False)
 
     def _handle_schema_change(self, event):
+        if self._schema_event_refresh_window < 0:
+            return
+
         keyspace = event.get('keyspace')
         table = event.get('table')
         usertype = event.get('type')
-        self._submit(self.refresh_schema, keyspace, table, usertype)
+        delay = random() * self._schema_event_refresh_window
+        self._cluster.scheduler.schedule_unique(delay, self.refresh_schema, keyspace, table, usertype)
 
     def wait_for_schema_agreement(self, connection=None, preloaded_results=None, wait_time=None):
 
@@ -2348,12 +2400,14 @@ def _stop_scheduler(scheduler, thread):
 
 class _Scheduler(object):
 
-    _scheduled = None
+    _queue = None
+    _scheduled_tasks = None
     _executor = None
     is_shutdown = False
 
     def __init__(self, executor):
-        self._scheduled = Queue.PriorityQueue()
+        self._queue = Queue.PriorityQueue()
+        self._scheduled_tasks = set()
         self._executor = executor
 
         t = Thread(target=self.run, name="Task Scheduler")
@@ -2371,12 +2425,24 @@ class _Scheduler(object):
             # this can happen on interpreter shutdown
             pass
         self.is_shutdown = True
-        self._scheduled.put_nowait((0, None))
+        self._queue.put_nowait((0, None))
 
-    def schedule(self, delay, fn, *args, **kwargs):
+    def schedule(self, delay, fn, *args):
+        self._insert_task(delay, (fn, args))
+
+    def schedule_unique(self, delay, fn, *args):
+        task = (fn, args)
+        if task not in self._scheduled_tasks:
+            self._insert_task(delay, task)
+        else:
+            log.debug("Ignoring schedule_unique for already-scheduled task: %r", fn)
+
+
+    def _insert_task(self, delay, task):
         if not self.is_shutdown:
             run_at = time.time() + delay
-            self._scheduled.put_nowait((run_at, (fn, args, kwargs)))
+            self._scheduled_tasks.add(task)
+            self._queue.put_nowait((run_at, task))
         else:
             log.debug("Ignoring scheduled function after shutdown: %r", fn)
 
@@ -2387,16 +2453,17 @@ class _Scheduler(object):
 
             try:
                 while True:
-                    run_at, task = self._scheduled.get(block=True, timeout=None)
+                    run_at, task = self._queue.get(block=True, timeout=None)
                     if self.is_shutdown:
                         log.debug("Not executing scheduled task due to Scheduler shutdown")
                         return
                     if run_at <= time.time():
-                        fn, args, kwargs = task
-                        future = self._executor.submit(fn, *args, **kwargs)
+                        self._scheduled_tasks.remove(task)
+                        fn, args = task
+                        future = self._executor.submit(fn, *args)
                         future.add_done_callback(self._log_if_failed)
                     else:
-                        self._scheduled.put_nowait((run_at, task))
+                        self._queue.put_nowait((run_at, task))
                         break
             except Queue.Empty:
                 pass
