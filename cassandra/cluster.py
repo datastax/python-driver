@@ -1139,6 +1139,24 @@ class Cluster(object):
         return self.executor.submit(
             self.control_connection.refresh_schema, keyspace, table, usertype)
 
+    def refresh_nodes(self):
+        """
+        Synchronously refresh the node list and token metadata
+
+        An Exception is raised if node refresh fails for any reason.
+        """
+        if not self.control_connection.refresh_node_list_and_token_map():
+            raise Exception("Node list was not refreshed. See log for details.")
+
+    def set_meta_refresh_enabled(self, enabled):
+        """
+        Sets a flag to enable (True) or disable (False) all metadata refresh queries.
+        This applies to both schema and node topology.
+
+        Disabling this is useful to minimize refreshes during multiple changes.
+        """
+        self.control_connection.set_meta_refresh_enabled(bool(enabled))
+
     def _prepare_all_queries(self, host):
         if not self._prepared_statements:
             return
@@ -1813,6 +1831,8 @@ class ControlConnection(object):
     _schema_event_refresh_window = None
     _topology_event_refresh_window = None
 
+    _meta_refresh_enabled = True
+
     # for testing purposes
     _time = time
 
@@ -1985,6 +2005,10 @@ class ControlConnection(object):
 
     def refresh_schema(self, keyspace=None, table=None, usertype=None,
                        schema_agreement_wait=None):
+        if not self._meta_refresh_enabled:
+            log.debug("[control connection] Skipping schema refresh because meta refresh is disabled")
+            return False
+
         try:
             if self._connection:
                 return self._refresh_schema(self._connection, keyspace, table, usertype,
@@ -2112,14 +2136,20 @@ class ControlConnection(object):
         return True
 
     def refresh_node_list_and_token_map(self, force_token_rebuild=False):
+        if not self._meta_refresh_enabled:
+            log.debug("[control connection] Skipping node list refresh because meta refresh is disabled")
+            return False
+
         try:
             if self._connection:
                 self._refresh_node_list_and_token_map(self._connection, force_token_rebuild=force_token_rebuild)
+                return True
         except ReferenceError:
             pass  # our weak reference to the Cluster is no good
         except Exception:
             log.debug("[control connection] Error refreshing node list and token map", exc_info=True)
             self._signal_error()
+        return False
 
     def _refresh_node_list_and_token_map(self, connection, preloaded_results=None,
                                          force_token_rebuild=False):
@@ -2387,6 +2417,9 @@ class ControlConnection(object):
         if connection is self._connection and (connection.is_defunct or connection.is_closed):
             self.reconnect()
 
+    def set_meta_refresh_enabled(self, enabled):
+        self._meta_refresh_enabled = enabled
+
 
 def _stop_scheduler(scheduler, thread):
     try:
@@ -2435,8 +2468,7 @@ class _Scheduler(object):
         if task not in self._scheduled_tasks:
             self._insert_task(delay, task)
         else:
-            log.debug("Ignoring schedule_unique for already-scheduled task: %r", fn)
-
+            log.debug("Ignoring schedule_unique for already-scheduled task: %r", task)
 
     def _insert_task(self, delay, task):
         if not self.is_shutdown:
@@ -2444,7 +2476,7 @@ class _Scheduler(object):
             self._scheduled_tasks.add(task)
             self._queue.put_nowait((run_at, task))
         else:
-            log.debug("Ignoring scheduled function after shutdown: %r", fn)
+            log.debug("Ignoring scheduled task after shutdown: %r", task)
 
     def run(self):
         while True:
@@ -2480,9 +2512,13 @@ class _Scheduler(object):
 
 def refresh_schema_and_set_result(keyspace, table, usertype, control_conn, response_future):
     try:
-        log.debug("Refreshing schema in response to schema change. Keyspace: %s; Table: %s, Type: %s",
-                  keyspace, table, usertype)
-        control_conn._refresh_schema(response_future._connection, keyspace, table, usertype)
+        if control_conn._meta_refresh_enabled:
+            log.debug("Refreshing schema in response to schema change. Keyspace: %s; Table: %s, Type: %s",
+                      keyspace, table, usertype)
+            control_conn._refresh_schema(response_future._connection, keyspace, table, usertype)
+        else:
+            log.debug("Skipping schema refresh in response to schema change because meta refresh is disabled; "
+                      "Keyspace: %s; Table: %s, Type: %s", keyspace, table, usertype)
     except Exception:
         log.exception("Exception refreshing schema in response to schema change:")
         response_future.session.submit(
