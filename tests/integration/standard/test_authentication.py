@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+import time
 
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.auth import PlainTextAuthProvider, SASLClient, SaslAuthProvider
@@ -36,7 +37,10 @@ def setup_module():
                       'authorizer': 'CassandraAuthorizer'}
     ccm_cluster.set_configuration_options(config_options)
     log.debug("Starting ccm test cluster with %s", config_options)
-    ccm_cluster.start(wait_for_binary_proto=True)
+    ccm_cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
+    # there seems to be some race, with some versions of C* taking longer to 
+    # get the auth (and default user) setup. Sleep here to give it a chance
+    time.sleep(2)
 
 
 def teardown_module():
