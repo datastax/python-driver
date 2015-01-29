@@ -802,15 +802,19 @@ class ConnectionHeartbeat(Thread):
             try:
                 for connections, owner in [(o.get_connections(), o) for o in self._get_connection_holders()]:
                     for connection in connections:
-                        if not (connection.is_defunct or connection.is_closed) and connection.is_idle:
-                            try:
-                                futures.append(HeartbeatFuture(connection, owner))
-                            except Exception:
-                                log.warning("Failed sending heartbeat message on connection (%s) to %s",
-                                            id(connection), connection.host, exc_info=True)
-                                failed_connections.append((connection, owner))
+                        if not (connection.is_defunct or connection.is_closed):
+                            if connection.is_idle:
+                                try:
+                                    futures.append(HeartbeatFuture(connection, owner))
+                                except Exception:
+                                    log.warning("Failed sending heartbeat message on connection (%s) to %s",
+                                                id(connection), connection.host, exc_info=True)
+                                    failed_connections.append((connection, owner))
+                            else:
+                                connection.reset_idle()
                         else:
-                            connection.reset_idle()
+                            # make sure the owner sees this defunt/closed connection
+                            owner.return_connection(connection)
 
                 for f in futures:
                     connection = f.connection
