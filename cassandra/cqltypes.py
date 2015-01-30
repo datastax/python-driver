@@ -48,15 +48,13 @@ from cassandra.marshal import (int8_pack, int8_unpack,
                                int32_pack, int32_unpack, int64_pack, int64_unpack,
                                float_pack, float_unpack, double_pack, double_unpack,
                                varint_pack, varint_unpack)
-from cassandra.util import OrderedMap, sortedset
+from cassandra.util import OrderedMap, sortedset, Time
 
 apache_cassandra_type_prefix = 'org.apache.cassandra.db.marshal.'
 
 
 if six.PY3:
     _number_types = frozenset((int, float))
-    _time_types = frozenset((int,))
-    _date_types = frozenset((int,))
     long = int
 
     def _name_from_hex_string(encoded_name):
@@ -64,8 +62,6 @@ if six.PY3:
         return bin_str.decode('ascii')
 else:
     _number_types = frozenset((int, long, float))
-    _time_types = frozenset((int, long))
-    _date_types = frozenset((int, long))
     _name_from_hex_string = unhexlify
 
 
@@ -633,7 +629,7 @@ class SimpleDateType(_CassandraType):
     def validate(cls, val):
         if isinstance(val, six.string_types):
             val = cls.interpret_simpledate_string(val)
-        elif (not isinstance(val, datetime.date)) and (type(val) not in _date_types):
+        elif (not isinstance(val, datetime.date)) and not isinstance(val, six.integer_types):
             raise TypeError('SimpleDateType arg must be a datetime.date, unsigned integer, or string in the format YYYY-MM-DD')
         return val
 
@@ -662,55 +658,24 @@ class SimpleDateType(_CassandraType):
 
 class TimeType(_CassandraType):
     typename = 'time'
-    ONE_MICRO = 1000
-    ONE_MILLI = 1000 * ONE_MICRO
-    ONE_SECOND = 1000 * ONE_MILLI
-    ONE_MINUTE = 60 * ONE_SECOND
-    ONE_HOUR = 60 * ONE_MINUTE
 
     @classmethod
     def validate(cls, val):
-        if isinstance(val, six.string_types):
-            val = cls.interpret_timestring(val)
-        elif (not isinstance(val, datetime.time)) and (type(val) not in _time_types):
-            raise TypeError('TimeType arguments must be a string or whole number')
+        if not isinstance(val, Time):
+            val = Time(val)
         return val
 
     @staticmethod
-    def interpret_timestring(val):
-        try:
-            nano = 0
-            parts = val.split('.')
-            base_time = time.strptime(parts[0], "%H:%M:%S")
-            nano = (base_time.tm_hour * TimeType.ONE_HOUR +
-                    base_time.tm_min * TimeType.ONE_MINUTE +
-                    base_time.tm_sec * TimeType.ONE_SECOND)
-
-            if len(parts) > 1:
-                # right pad to 9 digits
-                nano_time_str = parts[1] + "0" * (9 - len(parts[1]))
-                nano += int(nano_time_str)
-
-            return nano
-        except ValueError:
-            raise ValueError("can't interpret %r as a time" % (val,))
-
-    @staticmethod
     def serialize(val, protocol_version):
-        # Values of the @time@ type are encoded as 64-bit signed integers
-        # representing the number of nanoseconds since midnight.
         try:
-            nano = (val.hour * TimeType.ONE_HOUR +
-                    val.minute * TimeType.ONE_MINUTE +
-                    val.second * TimeType.ONE_SECOND +
-                    val.microsecond * TimeType.ONE_MICRO)
+            nano = val.nanosecond_time
         except AttributeError:
-            nano = val
+            nano = Time(val).nanosecond_time
         return int64_pack(nano)
 
     @staticmethod
     def deserialize(byts, protocol_version):
-        return int64_unpack(byts)
+        return Time(int64_unpack(byts))
 
 
 class UTF8Type(_CassandraType):
