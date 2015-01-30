@@ -73,7 +73,7 @@ class MockCluster(object):
         self.scheduler = Mock(spec=_Scheduler)
         self.executor = Mock(spec=ThreadPoolExecutor)
 
-    def add_host(self, address, datacenter, rack, signal=False):
+    def add_host(self, address, datacenter, rack, signal=False, refresh_nodes=True):
         host = Host(address, SimpleConvictionPolicy, datacenter, rack)
         self.added_hosts.append(host)
         return host
@@ -131,7 +131,7 @@ class ControlConnectionTest(unittest.TestCase):
         self.connection = MockConnection()
         self.time = FakeTime()
 
-        self.control_connection = ControlConnection(self.cluster, timeout=1)
+        self.control_connection = ControlConnection(self.cluster, 1, 0, 0)
         self.control_connection._connection = self.connection
         self.control_connection._time = self.time
 
@@ -345,39 +345,44 @@ class ControlConnectionTest(unittest.TestCase):
             'change_type': 'NEW_NODE',
             'address': ('1.2.3.4', 9000)
         }
+        self.cluster.scheduler.reset_mock()
         self.control_connection._handle_topology_change(event)
-        self.cluster.scheduler.schedule.assert_called_with(ANY, self.control_connection.refresh_node_list_and_token_map)
+        self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection.refresh_node_list_and_token_map)
 
         event = {
             'change_type': 'REMOVED_NODE',
             'address': ('1.2.3.4', 9000)
         }
+        self.cluster.scheduler.reset_mock()
         self.control_connection._handle_topology_change(event)
-        self.cluster.scheduler.schedule.assert_called_with(ANY, self.cluster.remove_host, None)
+        self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.cluster.remove_host, None)
 
         event = {
             'change_type': 'MOVED_NODE',
             'address': ('1.2.3.4', 9000)
         }
+        self.cluster.scheduler.reset_mock()
         self.control_connection._handle_topology_change(event)
-        self.cluster.scheduler.schedule.assert_called_with(ANY, self.control_connection.refresh_node_list_and_token_map)
+        self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection.refresh_node_list_and_token_map)
 
     def test_handle_status_change(self):
         event = {
             'change_type': 'UP',
             'address': ('1.2.3.4', 9000)
         }
+        self.cluster.scheduler.reset_mock()
         self.control_connection._handle_status_change(event)
-        self.cluster.scheduler.schedule.assert_called_with(ANY, self.control_connection.refresh_node_list_and_token_map)
+        self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection.refresh_node_list_and_token_map)
 
         # do the same with a known Host
         event = {
             'change_type': 'UP',
             'address': ('192.168.1.0', 9000)
         }
+        self.cluster.scheduler.reset_mock()
         self.control_connection._handle_status_change(event)
         host = self.cluster.metadata.hosts['192.168.1.0']
-        self.cluster.scheduler.schedule.assert_called_with(ANY, self.cluster.on_up, host)
+        self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.cluster.on_up, host)
 
         self.cluster.scheduler.schedule.reset_mock()
         event = {
@@ -404,9 +409,11 @@ class ControlConnectionTest(unittest.TestCase):
                 'keyspace': 'ks1',
                 'table': 'table1'
             }
+            self.cluster.scheduler.reset_mock()
             self.control_connection._handle_schema_change(event)
-            self.cluster.executor.submit.assert_called_with(self.control_connection.refresh_schema, 'ks1', 'table1', None)
+            self.cluster.scheduler.schedule_unique.assert_called_once_with(0.0, self.control_connection.refresh_schema, 'ks1', 'table1', None)
 
+            self.cluster.scheduler.reset_mock()
             event['table'] = None
             self.control_connection._handle_schema_change(event)
-            self.cluster.executor.submit.assert_called_with(self.control_connection.refresh_schema, 'ks1', None, None)
+            self.cluster.scheduler.schedule_unique.assert_called_once_with(0.0, self.control_connection.refresh_schema, 'ks1', None, None)

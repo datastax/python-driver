@@ -14,3 +14,9 @@
 
 .. autoclass:: PlainTextAuthenticator
     :members:
+
+.. autoclass:: SaslAuthProvider
+    :members:
+
+.. autoclass:: SaslAuthenticator
+    :members:

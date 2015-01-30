@@ -500,13 +500,13 @@ class BoundStatement(Statement):
 
                 try:
                     self.values.append(col_type.serialize(value, proto_version))
-                except (TypeError, struct.error):
+                except (TypeError, struct.error) as exc:
                     col_name = col_spec[2]
                     expected_type = col_type
                     actual_type = type(value)
 
                     message = ('Received an argument of invalid type for column "%s". '
-                               'Expected: %s, Got: %s' % (col_name, expected_type, actual_type))
+                               'Expected: %s, Got: %s; (%s)' % (col_name, expected_type, actual_type, exc))
                     raise TypeError(message)
 
         return self

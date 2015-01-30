@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests.integration import use_singledc, PROTOCOL_VERSION
-
 try:
     import unittest2 as unittest
 except ImportError:
@@ -21,13 +19,15 @@ except ImportError:
 
 from functools import partial
 from six.moves import range
-import sys
 from threading import Thread, Event
 
 from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.cluster import NoHostAvailable
-from cassandra.protocol import QueryMessage
 from cassandra.io.asyncorereactor import AsyncoreConnection
+from cassandra.protocol import QueryMessage
+
+from tests import is_monkey_patched
+from tests.integration import use_singledc, PROTOCOL_VERSION
 
 try:
     from cassandra.io.libevreactor import LibevConnection
@@ -230,8 +230,8 @@ class AsyncoreConnectionTests(ConnectionTests, unittest.TestCase):
     klass = AsyncoreConnection
 
     def setUp(self):
-        if 'gevent.monkey' in sys.modules:
-            raise unittest.SkipTest("Can't test asyncore with gevent monkey patching")
+        if is_monkey_patched():
+            raise unittest.SkipTest("Can't test asyncore with monkey patching")
         ConnectionTests.setUp(self)
 
 
@@ -240,8 +240,8 @@ class LibevConnectionTests(ConnectionTests, unittest.TestCase):
     klass = LibevConnection
 
     def setUp(self):
-        if 'gevent.monkey' in sys.modules:
-            raise unittest.SkipTest("Can't test libev with gevent monkey patching")
+        if is_monkey_patched():
+            raise unittest.SkipTest("Can't test libev with monkey patching")
         if LibevConnection is None:
             raise unittest.SkipTest(
                 'libev does not appear to be installed properly')

@@ -28,7 +28,7 @@ import types
 from uuid import UUID
 import six
 
-from cassandra.util import OrderedDict, sortedset
+from cassandra.util import OrderedDict, OrderedMap, sortedset
 
 if six.PY3:
     long = int
@@ -77,6 +77,7 @@ class Encoder(object):
             datetime.time: self.cql_encode_time,
             dict: self.cql_encode_map_collection,
             OrderedDict: self.cql_encode_map_collection,
+            OrderedMap: self.cql_encode_map_collection,
             list: self.cql_encode_list_collection,
             tuple: self.cql_encode_list_collection,
             set: self.cql_encode_set_collection,

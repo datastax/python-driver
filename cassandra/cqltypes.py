@@ -31,14 +31,14 @@ from __future__ import absolute_import  # to enable import io from stdlib
 from binascii import unhexlify
 import calendar
 from collections import namedtuple
+import datetime
 from decimal import Decimal
 import io
 import re
 import socket
 import time
-import datetime
+import sys
 from uuid import UUID
-import warnings
 
 import six
 from six.moves import range
@@ -48,7 +48,7 @@ from cassandra.marshal import (int8_pack, int8_unpack,
                                int32_pack, int32_unpack, int64_pack, int64_unpack,
                                float_pack, float_unpack, double_pack, double_unpack,
                                varint_pack, varint_unpack)
-from cassandra.util import OrderedDict, sortedset
+from cassandra.util import OrderedMap, sortedset
 
 apache_cassandra_type_prefix = 'org.apache.cassandra.db.marshal.'
 
@@ -58,10 +58,15 @@ if six.PY3:
     _time_types = frozenset((int,))
     _date_types = frozenset((int,))
     long = int
+
+    def _name_from_hex_string(encoded_name):
+        bin_str = unhexlify(encoded_name)
+        return bin_str.decode('ascii')
 else:
     _number_types = frozenset((int, long, float))
     _time_types = frozenset((int, long))
     _date_types = frozenset((int, long))
+    _name_from_hex_string = unhexlify
 
 
 def trim_if_startswith(s, prefix):
@@ -569,7 +574,8 @@ class DateType(_CassandraType):
                 tval = time.strptime(val, tformat)
             except ValueError:
                 continue
-            return calendar.timegm(tval) + offset
+            # scale seconds to millis for the raw value
+            return (calendar.timegm(tval) + offset) * 1e3
         else:
             raise ValueError("can't interpret %r as a date" % (val,))
 
@@ -584,31 +590,16 @@ class DateType(_CassandraType):
     @staticmethod
     def serialize(v, protocol_version):
         try:
-            converted = calendar.timegm(v.utctimetuple())
-            converted = converted * 1e3 + getattr(v, 'microsecond', 0) / 1e3
+            # v is datetime
+            timestamp_seconds = calendar.timegm(v.utctimetuple())
+            timestamp = timestamp_seconds * 1e3 + getattr(v, 'microsecond', 0) / 1e3
         except AttributeError:
             # Ints and floats are valid timestamps too
             if type(v) not in _number_types:
                 raise TypeError('DateType arguments must be a datetime or timestamp')
+            timestamp = v
 
-            global _have_warned_about_timestamps
-            if not _have_warned_about_timestamps:
-                _have_warned_about_timestamps = True
-                warnings.warn(
-                    "timestamp columns in Cassandra hold a number of "
-                    "milliseconds since the unix epoch.  Currently, when executing "
-                    "prepared statements, this driver multiplies timestamp "
-                    "values by 1000 so that the result of time.time() "
-                    "can be used directly.  However, the driver cannot "
-                    "match this behavior for non-prepared statements, "
-                    "so the 2.0 version of the driver will no longer multiply "
-                    "timestamps by 1000.  It is suggested that you simply use "
-                    "datetime.datetime objects for 'timestamp' values to avoid "
-                    "any ambiguity and to guarantee a smooth upgrade of the "
-                    "driver.")
-            converted = v * 1e3
-
-        return int64_pack(long(converted))
+        return int64_pack(long(timestamp))
 
 
 class TimestampType(DateType):
@@ -838,7 +829,7 @@ class MapType(_ParameterizedType):
             length = 2
         numelements = unpack(byts[:length])
         p = length
-        themap = OrderedDict()
+        themap = OrderedMap()
         for _ in range(numelements):
             key_len = unpack(byts[p:p + length])
             p += length
@@ -850,7 +841,7 @@ class MapType(_ParameterizedType):
             p += val_len
             key = subkeytype.from_binary(keybytes, protocol_version)
             val = subvaltype.from_binary(valbytes, protocol_version)
-            themap[key] = val
+            themap._insert(key, val)
         return themap
 
     @classmethod
@@ -929,37 +920,39 @@ class UserType(TupleType):
     typename = "'org.apache.cassandra.db.marshal.UserType'"
 
     _cache = {}
+    _module = sys.modules[__name__]
 
     @classmethod
     def make_udt_class(cls, keyspace, udt_name, names_and_types, mapped_class):
         if six.PY2 and isinstance(udt_name, unicode):
             udt_name = udt_name.encode('utf-8')
-
         try:
             return cls._cache[(keyspace, udt_name)]
         except KeyError:
-            fieldnames, types = zip(*names_and_types)
+            field_names, types = zip(*names_and_types)
             instance = type(udt_name, (cls,), {'subtypes': types,
                                                'cassname': cls.cassname,
                                                'typename': udt_name,
-                                               'fieldnames': fieldnames,
+                                               'fieldnames': field_names,
                                                'keyspace': keyspace,
-                                               'mapped_class': mapped_class})
+                                               'mapped_class': mapped_class,
+                                               'tuple_type': cls._make_registered_udt_namedtuple(keyspace, udt_name, field_names)})
             cls._cache[(keyspace, udt_name)] = instance
             return instance
 
     @classmethod
     def apply_parameters(cls, subtypes, names):
         keyspace = subtypes[0]
-        udt_name = unhexlify(subtypes[1].cassname)
-        field_names = [unhexlify(encoded_name) for encoded_name in names[2:]]
+        udt_name = _name_from_hex_string(subtypes[1].cassname)
+        field_names = [_name_from_hex_string(encoded_name) for encoded_name in names[2:]]
         assert len(field_names) == len(subtypes[2:])
         return type(udt_name, (cls,), {'subtypes': subtypes[2:],
                                        'cassname': cls.cassname,
                                        'typename': udt_name,
                                        'fieldnames': field_names,
                                        'keyspace': keyspace,
-                                       'mapped_class': None})
+                                       'mapped_class': None,
+                                       'tuple_type': namedtuple(udt_name, field_names)})
 
     @classmethod
     def cql_parameterized_type(cls):
@@ -991,8 +984,7 @@ class UserType(TupleType):
         if cls.mapped_class:
             return cls.mapped_class(**dict(zip(cls.fieldnames, values)))
         else:
-            Result = namedtuple(cls.typename, cls.fieldnames)
-            return Result(*values)
+            return cls.tuple_type(*values)
 
     @classmethod
     def serialize_safe(cls, val, protocol_version):
@@ -1007,6 +999,18 @@ class UserType(TupleType):
             else:
                 buf.write(int32_pack(-1))
         return buf.getvalue()
+
+    @classmethod
+    def _make_registered_udt_namedtuple(cls, keyspace, name, field_names):
+        # this is required to make the type resolvable via this module...
+        # required when unregistered udts are pickled for use as keys in
+        # util.OrderedMap
+        qualified_name = "%s_%s" % (keyspace, name)
+        nt = getattr(cls._module, qualified_name, None)
+        if not nt:
+            nt = namedtuple(qualified_name, field_names)
+            setattr(cls._module, qualified_name, nt)
+        return nt
 
 
 class CompositeType(_ParameterizedType):

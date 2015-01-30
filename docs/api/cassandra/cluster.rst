@@ -39,6 +39,12 @@
 
    .. autoattribute:: control_connection_timeout
 
+   .. autoattribute:: idle_heartbeat_interval
+
+   .. autoattribute:: schema_event_refresh_window
+
+   .. autoattribute:: topology_event_refresh_window
+
    .. automethod:: connect
 
    .. automethod:: shutdown
@@ -56,6 +62,13 @@
    .. automethod:: get_max_connections_per_host
 
    .. automethod:: set_max_connections_per_host
+
+   .. automethod:: refresh_schema
+
+   .. automethod:: refresh_nodes
+
+   .. automethod:: set_meta_refresh_enabled
+
 
 .. autoclass:: Session ()
 

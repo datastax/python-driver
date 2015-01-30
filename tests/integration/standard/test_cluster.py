@@ -12,18 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests.integration import use_singledc, PROTOCOL_VERSION
-
 try:
     import unittest2 as unittest
 except ImportError:
     import unittest  # noqa
 
-import cassandra
-from cassandra.query import SimpleStatement, TraceUnavailable
-from cassandra.policies import RoundRobinPolicy, ExponentialReconnectionPolicy, RetryPolicy, SimpleConvictionPolicy, HostDistance
+from collections import deque
+from mock import patch
+import time
+from uuid import uuid4
 
+import cassandra
 from cassandra.cluster import Cluster, NoHostAvailable
+from cassandra.concurrent import execute_concurrent
+from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
+                                RetryPolicy, SimpleConvictionPolicy, HostDistance,
+                                WhiteListRoundRobinPolicy)
+from cassandra.query import SimpleStatement, TraceUnavailable
+
+from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions
+from tests.integration.util import assert_quiescent_pool_state
 
 
 def setup_module():
@@ -65,6 +73,8 @@ class ClusterTests(unittest.TestCase):
 
         result = session.execute("SELECT * FROM clustertests.cf0")
         self.assertEqual([('a', 'b', 'c')], result)
+
+        session.execute("DROP KEYSPACE clustertests")
 
         cluster.shutdown()
 
@@ -202,6 +212,159 @@ class ClusterTests(unittest.TestCase):
 
         self.assertIn("newkeyspace", cluster.metadata.keyspaces)
 
+        session.execute("DROP KEYSPACE newkeyspace")
+
+    def test_refresh_schema(self):
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        session = cluster.connect()
+
+        original_meta = cluster.metadata.keyspaces
+        # full schema refresh, with wait
+        cluster.refresh_schema()
+        self.assertIsNot(original_meta, cluster.metadata.keyspaces)
+        self.assertEqual(original_meta, cluster.metadata.keyspaces)
+
+        session.shutdown()
+
+    def test_refresh_schema_keyspace(self):
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        session = cluster.connect()
+
+        original_meta = cluster.metadata.keyspaces
+        original_system_meta = original_meta['system']
+
+        # only refresh one keyspace
+        cluster.refresh_schema(keyspace='system')
+        current_meta = cluster.metadata.keyspaces
+        self.assertIs(original_meta, current_meta)
+        current_system_meta = current_meta['system']
+        self.assertIsNot(original_system_meta, current_system_meta)
+        self.assertEqual(original_system_meta.as_cql_query(), current_system_meta.as_cql_query())
+        session.shutdown()
+
+    def test_refresh_schema_table(self):
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        session = cluster.connect()
+
+        original_meta = cluster.metadata.keyspaces
+        original_system_meta = original_meta['system']
+        original_system_schema_meta = original_system_meta.tables['schema_columnfamilies']
+
+        # only refresh one table
+        cluster.refresh_schema(keyspace='system', table='schema_columnfamilies')
+        current_meta = cluster.metadata.keyspaces
+        current_system_meta = current_meta['system']
+        current_system_schema_meta = current_system_meta.tables['schema_columnfamilies']
+        self.assertIs(original_meta, current_meta)
+        self.assertIs(original_system_meta, current_system_meta)
+        self.assertIsNot(original_system_schema_meta, current_system_schema_meta)
+        self.assertEqual(original_system_schema_meta.as_cql_query(), current_system_schema_meta.as_cql_query())
+        session.shutdown()
+
+    def test_refresh_schema_type(self):
+        if get_server_versions()[0] < (2, 1, 0):
+            raise unittest.SkipTest('UDTs were introduced in Cassandra 2.1')
+
+        if PROTOCOL_VERSION < 3:
+            raise unittest.SkipTest('UDTs are not specified in change events for protocol v2')
+            # We may want to refresh types on keyspace change events in that case(?)
+
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        session = cluster.connect()
+
+        keyspace_name = 'test1rf'
+        type_name = self._testMethodName
+
+        session.execute('CREATE TYPE IF NOT EXISTS %s.%s (one int, two text)' % (keyspace_name, type_name))
+        original_meta = cluster.metadata.keyspaces
+        original_test1rf_meta = original_meta[keyspace_name]
+        original_type_meta = original_test1rf_meta.user_types[type_name]
+
+        # only refresh one type
+        cluster.refresh_schema(keyspace='test1rf', usertype=type_name)
+        current_meta = cluster.metadata.keyspaces
+        current_test1rf_meta = current_meta[keyspace_name]
+        current_type_meta = current_test1rf_meta.user_types[type_name]
+        self.assertIs(original_meta, current_meta)
+        self.assertIs(original_test1rf_meta, current_test1rf_meta)
+        self.assertIsNot(original_type_meta, current_type_meta)
+        self.assertEqual(original_type_meta.as_cql_query(), current_type_meta.as_cql_query())
+        session.shutdown()
+
+    def test_refresh_schema_no_wait(self):
+
+        contact_points = ['127.0.0.1']
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=10,
+                          contact_points=contact_points, load_balancing_policy=WhiteListRoundRobinPolicy(contact_points))
+        session = cluster.connect()
+
+        schema_ver = session.execute("SELECT schema_version FROM system.local WHERE key='local'")[0][0]
+
+        # create a schema disagreement
+        session.execute("UPDATE system.local SET schema_version=%s WHERE key='local'", (uuid4(),))
+
+        try:
+            agreement_timeout = 1
+
+            # cluster agreement wait exceeded
+            c = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=agreement_timeout)
+            start_time = time.time()
+            s = c.connect()
+            end_time = time.time()
+            self.assertGreaterEqual(end_time - start_time, agreement_timeout)
+            self.assertTrue(c.metadata.keyspaces)
+
+            # cluster agreement wait used for refresh
+            original_meta = c.metadata.keyspaces
+            start_time = time.time()
+            self.assertRaisesRegexp(Exception, r"Schema was not refreshed.*", c.refresh_schema)
+            end_time = time.time()
+            self.assertGreaterEqual(end_time - start_time, agreement_timeout)
+            self.assertIs(original_meta, c.metadata.keyspaces)
+            
+            # refresh wait overrides cluster value
+            original_meta = c.metadata.keyspaces
+            start_time = time.time()
+            c.refresh_schema(max_schema_agreement_wait=0)
+            end_time = time.time()
+            self.assertLess(end_time - start_time, agreement_timeout)
+            self.assertIsNot(original_meta, c.metadata.keyspaces)
+            self.assertEqual(original_meta, c.metadata.keyspaces)
+
+            s.shutdown()
+
+            refresh_threshold = 0.5
+            # cluster agreement bypass
+            c = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=0)
+            start_time = time.time()
+            s = c.connect()
+            end_time = time.time()
+            self.assertLess(end_time - start_time, refresh_threshold)
+            self.assertTrue(c.metadata.keyspaces)
+
+            # cluster agreement wait used for refresh
+            original_meta = c.metadata.keyspaces
+            start_time = time.time()
+            c.refresh_schema()
+            end_time = time.time()
+            self.assertLess(end_time - start_time, refresh_threshold)
+            self.assertIsNot(original_meta, c.metadata.keyspaces)
+            self.assertEqual(original_meta, c.metadata.keyspaces)
+            
+            # refresh wait overrides cluster value
+            original_meta = c.metadata.keyspaces
+            start_time = time.time()
+            self.assertRaisesRegexp(Exception, r"Schema was not refreshed.*", c.refresh_schema, max_schema_agreement_wait=agreement_timeout)
+            end_time = time.time()
+            self.assertGreaterEqual(end_time - start_time, agreement_timeout)
+            self.assertIs(original_meta, c.metadata.keyspaces)
+
+            s.shutdown()
+        finally:
+            session.execute("UPDATE system.local SET schema_version=%s WHERE key='local'", (schema_ver,))
+
+        session.shutdown()
+
     def test_trace(self):
         """
         Ensure trace can be requested for async and non-async queries
@@ -271,3 +434,115 @@ class ClusterTests(unittest.TestCase):
 
         self.assertIn(query, str(future))
         self.assertIn('result', str(future))
+
+    def test_idle_heartbeat(self):
+        interval = 1
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, idle_heartbeat_interval=interval)
+        if PROTOCOL_VERSION < 3:
+            cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
+        session = cluster.connect()
+
+        # This test relies on impl details of connection req id management to see if heartbeats 
+        # are being sent. May need update if impl is changed
+        connection_request_ids = {}
+        for h in cluster.get_connection_holders():
+            for c in h.get_connections():
+                # make sure none are idle (should have startup messages)
+                self.assertFalse(c.is_idle)
+                with c.lock:
+                    connection_request_ids[id(c)] = deque(c.request_ids)  # copy of request ids
+
+        # let two heatbeat intervals pass (first one had startup messages in it)
+        time.sleep(2 * interval + interval/10.)
+
+        connections = [c for holders in cluster.get_connection_holders() for c in holders.get_connections()]
+
+        # make sure requests were sent on all connections
+        for c in connections:
+            expected_ids = connection_request_ids[id(c)]
+            expected_ids.rotate(-1)
+            with c.lock:
+                self.assertListEqual(list(c.request_ids), list(expected_ids))
+
+        # assert idle status
+        self.assertTrue(all(c.is_idle for c in connections))
+
+        # send messages on all connections
+        statements_and_params = [("SELECT release_version FROM system.local", ())] * len(cluster.metadata.all_hosts())
+        results = execute_concurrent(session, statements_and_params)
+        for success, result in results:
+            self.assertTrue(success)
+
+        # assert not idle status
+        self.assertFalse(any(c.is_idle if not c.is_control_connection else False for c in connections))
+
+        # holders include session pools and cc
+        holders = cluster.get_connection_holders()
+        self.assertIn(cluster.control_connection, holders)
+        self.assertEqual(len(holders), len(cluster.metadata.all_hosts()) + 1)  # hosts pools, 1 for cc
+
+        # include additional sessions
+        session2 = cluster.connect()
+
+        holders = cluster.get_connection_holders()
+        self.assertIn(cluster.control_connection, holders)
+        self.assertEqual(len(holders), 2 * len(cluster.metadata.all_hosts()) + 1)  # 2 sessions' hosts pools, 1 for cc
+
+        cluster._idle_heartbeat.stop()
+        cluster._idle_heartbeat.join()
+        assert_quiescent_pool_state(self, cluster)
+
+        session.shutdown()
+
+    @patch('cassandra.cluster.Cluster.idle_heartbeat_interval', new=0.1)
+    def test_idle_heartbeat_disabled(self):
+        self.assertTrue(Cluster.idle_heartbeat_interval)
+
+        # heartbeat disabled with '0'
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, idle_heartbeat_interval=0)
+        self.assertEqual(cluster.idle_heartbeat_interval, 0)
+        session = cluster.connect()
+
+        # let two heatbeat intervals pass (first one had startup messages in it)
+        time.sleep(2 * Cluster.idle_heartbeat_interval)
+
+        connections = [c for holders in cluster.get_connection_holders() for c in holders.get_connections()]
+
+        # assert not idle status (should never get reset because there is not heartbeat)
+        self.assertFalse(any(c.is_idle for c in connections))
+
+        session.shutdown()
+
+    def test_pool_management(self):
+        # Ensure that in_flight and request_ids quiesce after cluster operations
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, idle_heartbeat_interval=0)  # no idle heartbeat here, pool management is tested in test_idle_heartbeat
+        session = cluster.connect()
+        session2 = cluster.connect()
+
+        # prepare
+        p = session.prepare("SELECT * FROM system.local WHERE key=?")
+        self.assertTrue(session.execute(p, ('local',)))
+
+        # simple
+        self.assertTrue(session.execute("SELECT * FROM system.local WHERE key='local'"))
+
+        # set keyspace
+        session.set_keyspace('system')
+        session.set_keyspace('system_traces')
+
+        # use keyspace
+        session.execute('USE system')
+        session.execute('USE system_traces')
+
+        # refresh schema
+        cluster.refresh_schema()
+        cluster.refresh_schema(max_schema_agreement_wait=0)
+
+        # submit schema refresh
+        future = cluster.submit_schema_refresh()
+        future.result()
+
+        assert_quiescent_pool_state(self, cluster)
+
+        session2.shutdown()
+        session.shutdown()

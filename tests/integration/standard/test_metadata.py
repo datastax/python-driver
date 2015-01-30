@@ -11,15 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import six
-import difflib
 
 try:
     import unittest2 as unittest
 except ImportError:
     import unittest  # noqa
 
+import difflib
 from mock import Mock
+import six
+import sys
 
 from cassandra import AlreadyExists
 
@@ -361,6 +362,9 @@ class TestCodeCoverage(unittest.TestCase):
                 "Protocol 3.0+ is required for UDT change events, currently testing against %r"
                 % (PROTOCOL_VERSION,))
 
+        if sys.version_info[2:] != (2, 7):
+            raise unittest.SkipTest('This test compares static strings generated from dict items, which may change orders. Test with 2.7.')
+
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
@@ -549,6 +553,9 @@ CREATE TABLE export_udts.users (
         if get_server_versions()[0] < (2, 1, 0):
             raise unittest.SkipTest('Test schema output assumes 2.1.0+ options')
 
+        if sys.version_info[2:] != (2, 7):
+            raise unittest.SkipTest('This test compares static strings generated from dict items, which may change orders. Test with 2.7.')
+
         cli_script = """CREATE KEYSPACE legacy
 WITH placement_strategy = 'SimpleStrategy'
 AND strategy_options = {replication_factor:1};
@@ -633,7 +640,7 @@ create column family composite_comp_with_col
     index_type : 0}]
   and compression_options = {'sstable_compression' : 'org.apache.cassandra.io.compress.LZ4Compressor'};"""
 
-        # note: the innerlkey type for legacy.nested_composite_key 
+        # note: the inner key type for legacy.nested_composite_key
         # (org.apache.cassandra.db.marshal.CompositeType(org.apache.cassandra.db.marshal.UUIDType, org.apache.cassandra.db.marshal.UTF8Type))
         # is a bit strange, but it replays in CQL with desired results
         expected_string = """CREATE KEYSPACE legacy WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;
@@ -807,6 +814,7 @@ CREATE TABLE legacy.composite_comp_no_col (
 
         cluster.shutdown()
 
+
 class TokenMetadataTest(unittest.TestCase):
     """
     Test of TokenMap creation and other behavior.
@@ -882,7 +890,7 @@ class KeyspaceAlterMetadata(unittest.TestCase):
         self.assertEqual(original_keyspace_meta.durable_writes, True)
         self.assertEqual(len(original_keyspace_meta.tables), 1)
 
-        self.session.execute('ALTER KEYSPACE %s WITH durable_writes = false' %name)
+        self.session.execute('ALTER KEYSPACE %s WITH durable_writes = false' % name)
         new_keyspace_meta = self.cluster.metadata.keyspaces[name]
         self.assertNotEqual(original_keyspace_meta, new_keyspace_meta)
         self.assertEqual(new_keyspace_meta.durable_writes, False)

@@ -130,7 +130,9 @@ class PlainTextAuthenticator(Authenticator):
 
 class SaslAuthProvider(AuthProvider):
     """
-    An :class:`~.AuthProvider` for Kerberos authenticators
+    An :class:`~.AuthProvider` supporting general SASL auth mechanisms
+
+    Suitable for GSSAPI or other SASL mechanisms
 
     Example usage::
 
@@ -144,7 +146,7 @@ class SaslAuthProvider(AuthProvider):
         auth_provider = SaslAuthProvider(**sasl_kwargs)
         cluster = Cluster(auth_provider=auth_provider)
 
-    .. versionadded:: 2.1.3-post
+    .. versionadded:: 2.1.4
     """
 
     def __init__(self, **sasl_kwargs):
@@ -157,9 +159,10 @@ class SaslAuthProvider(AuthProvider):
 
 class SaslAuthenticator(Authenticator):
     """
-    An :class:`~.Authenticator` that works with DSE's KerberosAuthenticator.
+    A pass-through :class:`~.Authenticator` using the third party package
+    'pure-sasl' for authentication
 
-    .. versionadded:: 2.1.3-post
+    .. versionadded:: 2.1.4
     """
 
     def __init__(self, host, service, mechanism='GSSAPI', **sasl_kwargs):

@@ -1,14 +1,22 @@
-2.1.3-post
-==========
+2.1.4
+=====
 
 Features
 --------
 * SaslAuthenticator for Kerberos support (PYTHON-109)
+* Heartbeat for network device keepalive and detecting failures on idle connections (PYTHON-197)
+* Support nested, frozen collections for Cassandra 2.1.3+ (PYTHON-186)
+* Schema agreement wait bypass config, new call for synchronous schema refresh (PYTHON-205)
+* Add eventlet connection support (PYTHON-194)
 
 Bug Fixes
 ---------
 * Schema meta fix for complex thrift tables (PYTHON-191)
 * Support for 'unknown' replica placement strategies in schema meta (PYTHON-192)
+* Resolve stream ID leak on set_keyspace (PYTHON-195)
+* Remove implicit timestamp scaling on serialization of numeric timestamps (PYTHON-204)
+* Resolve stream id collision when using SASL auth (PYTHON-210)
+* Correct unhexlify usage for user defined type meta in Python3 (PYTHON-208)
 
 2.1.3
 =====

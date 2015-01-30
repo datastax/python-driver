@@ -555,3 +555,101 @@ except ImportError:
                     if item in other:
                         isect.add(item)
             return isect
+
+from collections import Mapping
+import six
+from six.moves import cPickle
+
+
+class OrderedMap(Mapping):
+    '''
+    An ordered map that accepts non-hashable types for keys. It also maintains the 
+    insertion order of items, behaving as OrderedDict in that regard. These maps
+    are constructed and read just as normal mapping types, exept that they may
+    contain arbitrary collections and other non-hashable items as keys::
+
+        >>> od = OrderedMap([({'one': 1, 'two': 2}, 'value'),
+        ...                  ({'three': 3, 'four': 4}, 'value2')])
+        >>> list(od.keys())
+        [{'two': 2, 'one': 1}, {'three': 3, 'four': 4}]
+        >>> list(od.values())
+        ['value', 'value2']
+
+    These constructs are needed to support nested collections in Cassandra 2.1.3+,
+    where frozen collections can be specified as parameters to others\*::
+
+        CREATE TABLE example (
+            ...
+            value map<frozen<map<int, int>>, double>
+            ...
+        )
+
+    This class dervies from the (immutable) Mapping API. Objects in these maps
+    are not intended be modified.
+
+    \* Note: Because of the way Cassandra encodes nested types, when using the
+    driver with nested collections, :attr:`~.Cluster.protocol_version` must be 3
+    or higher.
+
+    '''
+    def __init__(self, *args, **kwargs):
+        if len(args) > 1:
+            raise TypeError('expected at most 1 arguments, got %d' % len(args))
+
+        self._items = []
+        self._index = {}
+        if args:
+            e = args[0]
+            if callable(getattr(e, 'keys', None)):
+                for k in e.keys():
+                    self._items.append((k, e[k]))
+            else:
+                for k, v in e:
+                    self._insert(k, v)
+
+        for k, v in six.iteritems(kwargs):
+            self._insert(k, v)
+
+    def _insert(self, key, value):
+        flat_key = self._serialize_key(key)
+        i = self._index.get(flat_key, -1)
+        if i >= 0:
+            self._items[i] = (key, value)
+        else:
+            self._items.append((key, value))
+            self._index[flat_key] = len(self._items) - 1
+
+    def __getitem__(self, key):
+        index = self._index[self._serialize_key(key)]
+        return self._items[index][1]
+
+    def __iter__(self):
+        for i in self._items:
+            yield i[0]
+
+    def __len__(self):
+        return len(self._items)
+
+    def __eq__(self, other):
+        if isinstance(other, OrderedMap):
+            return self._items == other._items
+        try:
+            d = dict(other)
+            return len(d) == len(self._items) and all(i[1] == d[i[0]] for i in self._items)
+        except KeyError:
+            return False
+        except TypeError:
+            pass
+        return NotImplemented
+
+    def __repr__(self):
+        return '%s([%s])' % (
+            self.__class__.__name__,
+            ', '.join("(%r, %r)" % (k, v) for k, v in self._items))
+
+    def __str__(self):
+        return '{%s}' % ', '.join("%s: %s" % (k, v) for k, v in self._items)
+
+    @staticmethod
+    def _serialize_key(key):
+        return cPickle.dumps(key)

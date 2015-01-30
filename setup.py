@@ -20,6 +20,11 @@ if __name__ == '__main__' and sys.argv[1] == "gevent_nosetests":
     from gevent.monkey import patch_all
     patch_all()
 
+if __name__ == '__main__' and sys.argv[1] == "eventlet_nosetests":
+    print("Running eventlet tests")
+    from eventlet import monkey_patch
+    monkey_patch()
+
 import ez_setup
 ez_setup.use_setuptools()
 
@@ -51,9 +56,13 @@ try:
     from nose.commands import nosetests
 except ImportError:
     gevent_nosetests = None
+    eventlet_nosetests = None
 else:
     class gevent_nosetests(nosetests):
         description = "run nosetests with gevent monkey patching"
+
+    class eventlet_nosetests(nosetests):
+        description = "run nosetests with eventlet monkey patching"
 
 
 class DocCommand(Command):
@@ -174,9 +183,13 @@ On OSX, via homebrew:
 
 
 def run_setup(extensions):
+
     kw = {'cmdclass': {'doc': DocCommand}}
     if gevent_nosetests is not None:
         kw['cmdclass']['gevent_nosetests'] = gevent_nosetests
+
+    if eventlet_nosetests is not None:
+        kw['cmdclass']['eventlet_nosetests'] = eventlet_nosetests
 
     if extensions:
         kw['cmdclass']['build_ext'] = build_extensions
