@@ -602,7 +602,7 @@ class OrderedMap(Mapping):
             e = args[0]
             if callable(getattr(e, 'keys', None)):
                 for k in e.keys():
-                    self._items.append((k, e[k]))
+                    self._insert(k, e[k])
             else:
                 for k, v in e:
                     self._insert(k, v)
@@ -620,8 +620,11 @@ class OrderedMap(Mapping):
             self._index[flat_key] = len(self._items) - 1
 
     def __getitem__(self, key):
-        index = self._index[self._serialize_key(key)]
-        return self._items[index][1]
+        try:
+            index = self._index[self._serialize_key(key)]
+            return self._items[index][1]
+        except KeyError:
+            raise KeyError(str(key))
 
     def __iter__(self):
         for i in self._items:

@@ -32,6 +32,11 @@ class OrderedMapTest(unittest.TestCase):
         self.assertEqual(a, builtin)
         self.assertEqual(OrderedMap([(1, 1), (1, 2)]), {1: 2})
 
+        d = OrderedMap({'': 3}, key1='v1', key2='v2')
+        self.assertEqual(d[''], 3)
+        self.assertEqual(d['key1'], 'v1')
+        self.assertEqual(d['key2'], 'v2')
+
     def test_contains(self):
         keys = ['first', 'middle', 'last']
 
