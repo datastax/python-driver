@@ -740,6 +740,9 @@ class Time(object):
         if isinstance(other, Time):
             return self.nanosecond_time == other.nanosecond_time
 
+        if isinstance(other, six.integer_types):
+            return self.nanosecond_time == other
+
         return self.nanosecond_time % Time.MICRO == 0 and \
             datetime.time(hour=self.hour, minute=self.minute, second=self.second,
                           microsecond=self.nanosecond // Time.MICRO) == other

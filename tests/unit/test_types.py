@@ -11,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import tempfile
-
 try:
     import unittest2 as unittest
 except ImportError:
@@ -21,18 +19,20 @@ except ImportError:
 from binascii import unhexlify
 import calendar
 import datetime
+import tempfile
 import time
+
 import cassandra
 from cassandra.cqltypes import (BooleanType, lookup_casstype_simple, lookup_casstype,
                                 LongType, DecimalType, SetType, cql_typename,
                                 CassandraType, UTF8Type, parse_casstype_args,
                                 SimpleDateType, TimeType,
                                 EmptyValue, _CassandraType, DateType, int64_pack)
-from cassandra.query import named_tuple_factory
+from cassandra.encoder import cql_quote
 from cassandra.protocol import (write_string, read_longstring, write_stringmap,
                                 read_stringmap, read_inet, write_inet,
                                 read_string, write_longstring)
-from cassandra.encoder import cql_quote
+from cassandra.query import named_tuple_factory
 
 
 class TypeTests(unittest.TestCase):
