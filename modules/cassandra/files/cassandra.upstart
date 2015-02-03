@@ -1,0 +1,18 @@
+# Cassandra Upstart
+#
+
+description   "Cassandra"
+
+start on runlevel [2345]
+stop on runlevel [!2345]
+
+respawn
+
+exec /usr/local/cassandra/bin/cassandra -f
+
+
+
+pre-stop script
+  kill `cat /tmp/cassandra.pid`
+  sleep 3
+end script

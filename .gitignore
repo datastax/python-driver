@@ -1,11 +1,10 @@
-*.pyc
+*.py[co]
 *.swp
 *.swo
 *.so
 *.egg
 *.egg-info
 .tox
-.idea/
 .python-version
 build
 MANIFEST
@@ -20,3 +19,19 @@ setuptools*.egg
 
 # OSX
 .DS_Store
+
+# IDE
+.project
+.pydevproject
+.settings/
+.idea/
+*.iml
+
+.DS_Store
+
+# Unit test / coverage reports
+.coverage
+.tox
+
+#iPython
+*.ipynb

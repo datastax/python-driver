@@ -183,8 +183,7 @@ htmlhelp_basename = 'CassandraDriverdoc'
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-    ('index', 'CassandraDriver.tex', u'Cassandra Driver Documentation',
-     u'DataStax', 'manual'),
+    ('index', 'cassandra-driver.tex', u'Cassandra Driver Documentation', u'DataStax', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -216,6 +215,6 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'cassandradriver', u'Cassandra Driver Documentation',
+    ('index', 'cassandra-driver', u'Cassandra Driver Documentation',
      [u'Tyler Hobbs'], 1)
 ]

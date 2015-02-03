@@ -1,0 +1,7 @@
+Check changelog
+Ensure docs are updated
+Tests pass
+Update VERSION
+Push tag to github
+Push release to pypi
+

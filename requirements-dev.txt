@@ -1,0 +1,7 @@
+-r requirements.txt
+nose
+nose-progressive
+profilestats
+pycallgraph
+ipdbplugin==1.2
+ipdb==0.7
