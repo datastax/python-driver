@@ -251,7 +251,7 @@ class QueryPagingTests(unittest.TestCase):
 
             future.add_callbacks(callback=handle_page, callback_args=(future, counter), errback=handle_error)
             event.wait()
-            self.assertEquals(next(counter), 100)
+            self.assertEqual(next(counter), 100)
 
             # simple statement
             future = self.session.execute_async(SimpleStatement("SELECT * FROM test3rf.test"))
@@ -260,7 +260,7 @@ class QueryPagingTests(unittest.TestCase):
 
             future.add_callbacks(callback=handle_page, callback_args=(future, counter), errback=handle_error)
             event.wait()
-            self.assertEquals(next(counter), 100)
+            self.assertEqual(next(counter), 100)
 
             # prepared statement
             future = self.session.execute_async(prepared)
@@ -269,7 +269,7 @@ class QueryPagingTests(unittest.TestCase):
 
             future.add_callbacks(callback=handle_page, callback_args=(future, counter), errback=handle_error)
             event.wait()
-            self.assertEquals(next(counter), 100)
+            self.assertEqual(next(counter), 100)
 
     def test_concurrent_with_paging(self):
         statements_and_params = zip(cycle(["INSERT INTO test3rf.test (k, v) VALUES (%s, 0)"]),
@@ -281,10 +281,10 @@ class QueryPagingTests(unittest.TestCase):
         for fetch_size in (2, 3, 7, 10, 99, 100, 101, 10000):
             self.session.default_fetch_size = fetch_size
             results = execute_concurrent_with_args(self.session, prepared, [None] * 10)
-            self.assertEquals(10, len(results))
+            self.assertEqual(10, len(results))
             for (success, result) in results:
                 self.assertTrue(success)
-                self.assertEquals(100, len(list(result)))
+                self.assertEqual(100, len(list(result)))
 
     def test_fetch_size(self):
         """

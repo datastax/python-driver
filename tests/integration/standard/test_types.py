@@ -700,16 +700,16 @@ class TypeTests(unittest.TestCase):
         s.execute(insert, [(None, None, None, None)])
 
         result = s.execute("SELECT * FROM mytable WHERE k=0")
-        self.assertEquals((None, None, None, None), result[0].t)
+        self.assertEqual((None, None, None, None), result[0].t)
 
         read = s.prepare("SELECT * FROM mytable WHERE k=0")
-        self.assertEquals((None, None, None, None), s.execute(read)[0].t)
+        self.assertEqual((None, None, None, None), s.execute(read)[0].t)
 
         # also test empty strings where compatible
         s.execute(insert, [('', None, None, b'')])
         result = s.execute("SELECT * FROM mytable WHERE k=0")
-        self.assertEquals(('', None, None, b''), result[0].t)
-        self.assertEquals(('', None, None, b''), s.execute(read)[0].t)
+        self.assertEqual(('', None, None, b''), result[0].t)
+        self.assertEqual(('', None, None, b''), s.execute(read)[0].t)
 
         c.shutdown()
 
@@ -760,8 +760,7 @@ class TypeTests(unittest.TestCase):
                 map_list map<frozen<list<int>>, frozen<list<int>>>,
                 map_tuple map<frozen<tuple<int, int>>, frozen<tuple<int>>>,
                 map_udt map<frozen<%s_nested>, frozen<%s>>,
-            )"""
-            % (name, name, name))
+            )""" % (name, name, name))
 
         validate = partial(self.insert_select_column, s, name)
         validate('map_map', OrderedMap([({1: 1, 2: 2}, {3: 3, 4: 4}), ({5: 5, 6: 6}, {7: 7, 8: 8})]))
@@ -769,7 +768,7 @@ class TypeTests(unittest.TestCase):
         validate('map_list', OrderedMap([([1, 2], [3, 4]), ([5, 6], [7, 8])]))
         validate('map_tuple', OrderedMap([((1, 2), (3,)), ((4, 5), (6,))]))
 
-        value = nested_collection_udt({1: 'v1', 2: 'v2'}, (3, 'v3'), [4, 5, 6, 7], set((8,9,10)))
+        value = nested_collection_udt({1: 'v1', 2: 'v2'}, (3, 'v3'), [4, 5, 6, 7], set((8, 9, 10)))
         key = nested_collection_udt_nested(value.m, value.t, value.l, value.s, value)
         key2 = nested_collection_udt_nested({3: 'v3'}, value.t, value.l, value.s, value)
         validate('map_udt', OrderedMap([(key, value), (key2, value)]))
