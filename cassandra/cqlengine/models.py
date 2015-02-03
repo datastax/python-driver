@@ -1,12 +1,11 @@
-from collections import OrderedDict
 import re
-import warnings
 
-from cqlengine import columns
-from cqlengine.exceptions import ModelException, CQLEngineException, ValidationError
-from cqlengine.query import ModelQuerySet, DMLQuery, AbstractQueryableColumn, NOT_SET
-from cqlengine.query import DoesNotExist as _DoesNotExist
-from cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
+from cassandra.cqlengine import columns
+from cassandra.cqlengine.exceptions import ModelException, CQLEngineException, ValidationError
+from cassandra.cqlengine.query import ModelQuerySet, DMLQuery, AbstractQueryableColumn, NOT_SET
+from cassandra.cqlengine.query import DoesNotExist as _DoesNotExist
+from cassandra.cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
+from cassandra.util import OrderedDict
 
 class ModelDefinitionException(ModelException): pass
 

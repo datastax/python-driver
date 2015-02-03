@@ -1,20 +1,20 @@
-from __future__ import absolute_import
 import copy
-import time
 from datetime import datetime, timedelta
-from cqlengine import BaseContainerColumn, Map, columns
-from cqlengine.columns import Counter, List, Set
+import time
 
-from .connection import execute, NOT_SET
-
-from cqlengine.exceptions import CQLEngineException, ValidationError, LWTException, IfNotExistsWithCounterColumn
-from cqlengine.functions import Token, BaseQueryFunction, QueryValue, UnicodeMixin
-
-#CQL 3 reference:
-#http://www.datastax.com/docs/1.1/references/cql/index
-from cqlengine.operators import InOperator, EqualsOperator, GreaterThanOperator, GreaterThanOrEqualOperator
-from cqlengine.operators import LessThanOperator, LessThanOrEqualOperator, BaseWhereOperator
-from cqlengine.statements import WhereClause, SelectStatement, DeleteStatement, UpdateStatement, AssignmentClause, InsertStatement, BaseCQLStatement, MapUpdateClause, MapDeleteClause, ListUpdateClause, SetUpdateClause, CounterUpdateClause, TransactionClause
+from cassandra.cqlengine.columns import BaseContainerColumn, Map, Counter, List, Set
+from cassandra.cqlengine.connection import execute, NOT_SET
+from cassandra.cqlengine.exceptions import CQLEngineException, ValidationError, LWTException, IfNotExistsWithCounterColumn
+from cassandra.cqlengine.functions import Token, BaseQueryFunction, QueryValue, UnicodeMixin
+from cassandra.cqlengine.operators import (InOperator, EqualsOperator, GreaterThanOperator,
+                                           GreaterThanOrEqualOperator, LessThanOperator,
+                                           LessThanOrEqualOperator, BaseWhereOperator)
+# import * ?
+from cassandra.cqlengine.statements import (WhereClause, SelectStatement, DeleteStatement,
+                                            UpdateStatement, AssignmentClause, InsertStatement,
+                                            BaseCQLStatement, MapUpdateClause, MapDeleteClause,
+                                            ListUpdateClause, SetUpdateClause, CounterUpdateClause,
+                                            TransactionClause)
 
 
 class QueryException(CQLEngineException): pass

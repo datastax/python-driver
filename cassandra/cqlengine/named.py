@@ -1,8 +1,7 @@
-from cqlengine.exceptions import CQLEngineException
-from cqlengine.query import AbstractQueryableColumn, SimpleQuerySet
-
-from cqlengine.query import DoesNotExist as _DoesNotExist
-from cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
+from cassandra.cqlengine.exceptions import CQLEngineException
+from cassandra.cqlengine.query import AbstractQueryableColumn, SimpleQuerySet
+from cassandra.cqlengine.query import DoesNotExist as _DoesNotExist
+from cassandra.cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
 
 class QuerySetDescriptor(object):
     """

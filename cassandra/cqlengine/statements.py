@@ -1,15 +1,14 @@
-import time
 from datetime import datetime, timedelta
+import time
 import six
-from cqlengine.functions import QueryValue
-from cqlengine.operators import BaseWhereOperator, InOperator
+import sys
+
+from cassandra.cqlengine.functions import QueryValue
+from cassandra.cqlengine.operators import BaseWhereOperator, InOperator
 
 
 class StatementException(Exception): pass
 
-
-
-import sys
 
 class UnicodeMixin(object):
     if sys.version_info > (3, 0):

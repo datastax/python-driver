@@ -1,19 +1,18 @@
-import json
-import warnings
-import six
-from cqlengine import SizeTieredCompactionStrategy, LeveledCompactionStrategy
-from cqlengine import ONE
-from cqlengine.named import NamedTable
-
-from cqlengine.connection import execute, get_cluster
-from cqlengine.exceptions import CQLEngineException
-
-import logging
 from collections import namedtuple
+import json
+import logging
+import six
+
+from cassandra.cqlengine import SizeTieredCompactionStrategy, LeveledCompactionStrategy
+from cassandra.cqlengine.connection import execute, get_cluster
+from cassandra.cqlengine.exceptions import CQLEngineException
+from cassandra.cqlengine.models import Model
+from cassandra.cqlengine.named import NamedTable
+
+
 Field = namedtuple('Field', ['name', 'type'])
 
 logger = logging.getLogger(__name__)
-from cqlengine.models import Model
 
 # system keyspaces
 schema_columnfamilies = NamedTable('system', 'schema_columnfamilies')

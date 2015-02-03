@@ -1,8 +1,8 @@
 from datetime import datetime
-from uuid import uuid1
-import sys
 import six
-from cqlengine.exceptions import ValidationError
+import sys
+
+from cassandra.cqlengine.exceptions import ValidationError
 # move to central spot
 
 class UnicodeMixin(object):

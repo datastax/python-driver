@@ -3,13 +3,13 @@ from copy import deepcopy, copy
 from datetime import datetime
 from datetime import date
 import re
-from cassandra.cqltypes import DateType
-
-from cqlengine.exceptions import ValidationError
-from cassandra.encoder import cql_quote
 import six
-
 import sys
+
+from cassandra.cqltypes import DateType
+from cassandra.encoder import cql_quote
+from cassandra.cqlengine.exceptions import ValidationError
+
 
 # move to central spot
 class UnicodeMixin(object):

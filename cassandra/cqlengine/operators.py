@@ -1,9 +1,8 @@
 import six
+import sys
 
 
 class QueryOperatorException(Exception): pass
-
-import sys
 
 # move to central spot
 class UnicodeMixin(object):

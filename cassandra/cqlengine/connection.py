@@ -1,16 +1,12 @@
-#http://pypi.python.org/pypi/cql/1.0.4
-#http://code.google.com/a/apache-extras.org/p/cassandra-dbapi2 /
-#http://cassandra.apache.org/doc/cql/CQL.html
-from __future__ import absolute_import
 from collections import namedtuple
-from cassandra.cluster import Cluster, _NOT_SET, NoHostAvailable
-from cassandra.query import SimpleStatement, Statement, dict_factory
-from cqlengine.statements import BaseCQLStatement
-from cqlengine.exceptions import CQLEngineException, UndefinedKeyspaceException
-from cassandra import ConsistencyLevel
-
 import six
 import logging
+
+from cassandra import ConsistencyLevel
+from cassandra.cluster import Cluster, _NOT_SET, NoHostAvailable
+from cassandra.query import SimpleStatement, Statement, dict_factory
+from cassandra.cqlengine.exceptions import CQLEngineException, UndefinedKeyspaceException
+from cassandra.cqlengine.statements import BaseCQLStatement
 
 
 LOG = logging.getLogger('cqlengine.cql')
@@ -55,7 +51,7 @@ def setup(
     if not default_keyspace:
         raise UndefinedKeyspaceException()
 
-    from cqlengine import models
+    from cassandra.cqlengine import models
     models.DEFAULT_KEYSPACE = default_keyspace
 
     default_consistency_level = consistency
