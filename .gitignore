@@ -17,3 +17,6 @@ docs/_build/
 tests/integration/ccm
 setuptools*.tar.gz
 setuptools*.egg
+
+# OSX
+.DS_Store
