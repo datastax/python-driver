@@ -15,15 +15,14 @@
 try:
     import unittest2 as unittest
 except ImportError:
-    import unittest # noqa
-
-from mock import Mock, ANY
+    import unittest  # noqa
 
 from concurrent.futures import ThreadPoolExecutor
+from mock import Mock, ANY, call
 
 from cassandra import OperationTimedOut
 from cassandra.protocol import ResultMessage, RESULT_KIND_ROWS
-from cassandra.cluster import ControlConnection, Cluster, _Scheduler
+from cassandra.cluster import ControlConnection, _Scheduler
 from cassandra.pool import Host
 from cassandra.policies import (SimpleConvictionPolicy, RoundRobinPolicy,
                                 ConstantReconnectionPolicy)
@@ -337,7 +336,7 @@ class ControlConnectionTest(unittest.TestCase):
 
         self.connection.wait_for_responses = Mock(side_effect=bad_wait_for_responses)
         self.control_connection.refresh_schema()
-        self.assertEqual(self.connection.wait_for_responses.call_count, self.cluster.max_schema_agreement_wait/self.control_connection._timeout)
+        self.assertEqual(self.connection.wait_for_responses.call_count, self.cluster.max_schema_agreement_wait / self.control_connection._timeout)
         self.assertEqual(self.connection.wait_for_responses.call_args[1]['timeout'], self.control_connection._timeout)
 
     def test_handle_topology_change(self):
@@ -417,3 +416,51 @@ class ControlConnectionTest(unittest.TestCase):
             event['table'] = None
             self.control_connection._handle_schema_change(event)
             self.cluster.scheduler.schedule_unique.assert_called_once_with(0.0, self.control_connection.refresh_schema, 'ks1', None, None)
+
+    def test_refresh_disabled(self):
+        cluster = MockCluster()
+
+        schema_event = {
+            'change_type': 'CREATED',
+            'keyspace': 'ks1',
+            'table': 'table1'
+        }
+
+        status_event = {
+            'change_type': 'UP',
+            'address': ('1.2.3.4', 9000)
+        }
+
+        topo_event = {
+            'change_type': 'MOVED_NODE',
+            'address': ('1.2.3.4', 9000)
+        }
+
+        cc_no_schema_refresh = ControlConnection(cluster, 1, -1, 0)
+        cluster.scheduler.reset_mock()
+
+        # no call on schema refresh
+        cc_no_schema_refresh._handle_schema_change(schema_event)
+        self.assertFalse(cluster.scheduler.schedule.called)
+        self.assertFalse(cluster.scheduler.schedule_unique.called)
+
+        # topo and status changes as normal
+        cc_no_schema_refresh._handle_status_change(status_event)
+        cc_no_schema_refresh._handle_topology_change(topo_event)
+        cluster.scheduler.schedule_unique.assert_has_calls([call(ANY, cc_no_schema_refresh.refresh_node_list_and_token_map),
+                                                            call(ANY, cc_no_schema_refresh.refresh_node_list_and_token_map)])
+
+        cc_no_topo_refresh = ControlConnection(cluster, 1, 0, -1)
+        cluster.scheduler.reset_mock()
+
+        # no call on topo refresh
+        cc_no_topo_refresh._handle_topology_change(topo_event)
+        self.assertFalse(cluster.scheduler.schedule.called)
+        self.assertFalse(cluster.scheduler.schedule_unique.called)
+
+        # schema and status change refresh as normal
+        cc_no_topo_refresh._handle_status_change(status_event)
+        cc_no_topo_refresh._handle_schema_change(schema_event)
+        cluster.scheduler.schedule_unique.assert_has_calls([call(ANY, cc_no_topo_refresh.refresh_node_list_and_token_map),
+                                                            call(0.0, cc_no_topo_refresh.refresh_schema,
+                                                                 schema_event['keyspace'], schema_event['table'], None)])
