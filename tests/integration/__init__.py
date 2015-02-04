@@ -156,14 +156,15 @@ def is_current_cluster(cluster_name, node_counts):
 
 
 def use_cluster(cluster_name, nodes, ipformat=None, start=True):
+    global CCM_CLUSTER
     if USE_CCM_CASS_EXTERNAL:
+        log.debug("Using external cluster %s", CCM_CLUSTER.name)
         return
 
     if is_current_cluster(cluster_name, nodes):
         log.debug("Using existing cluster %s", cluster_name)
         return
 
-    global CCM_CLUSTER
     if CCM_CLUSTER:
         log.debug("Stopping cluster %s", CCM_CLUSTER.name)
         CCM_CLUSTER.stop()
