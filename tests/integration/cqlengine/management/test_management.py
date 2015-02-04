@@ -52,7 +52,7 @@ class PrimaryKeysOnlyModel(Model):
 class CapitalizedKeyTest(BaseCassEngTestCase):
 
     def test_table_definition(self):
-        """ Tests that creating a table with capitalized column names succeedso """
+        """ Tests that creating a table with capitalized column names succeeds """
         sync_table(LowercaseKeyModel)
         sync_table(CapitalizedKeyModel)
 
