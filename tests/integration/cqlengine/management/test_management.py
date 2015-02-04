@@ -156,11 +156,11 @@ class TablePropertiesTests(BaseCassEngTestCase):
                      #  TODO: due to a bug in the native driver i'm not seeing the local read repair chance show up
                      # 'local_read_repair_chance': 0.50811,
                     }
-        if CASSANDRA_VERSION >= '2.0.0':
+        if CASSANDRA_VERSION <= '2.0.0':
             expected['caching'] = CACHING_ALL
             expected['replicate_on_write'] = False
 
-        if CASSANDRA_VERSION >= '2.0.0':
+        if CASSANDRA_VERSION == '2.0.0':
             expected['populate_io_cache_on_flush'] = True
             expected['index_interval'] = 98706
 
@@ -200,11 +200,11 @@ class TablePropertiesTests(BaseCassEngTestCase):
              expected['memtable_flush_period_in_ms'] = 60210
              expected['default_time_to_live'] = 65178
 
-        if CASSANDRA_VERSION >= '2.0.0':
+        if CASSANDRA_VERSION == '2.0.0':
              expected['index_interval'] = 94207
 
         # these featuers removed in cassandra 2.1
-        if CASSANDRA_VERSION >= '2.0.0':
+        if CASSANDRA_VERSION <= '2.0.0':
             expected['caching'] = CACHING_NONE
             expected['replicate_on_write'] = True
             expected['populate_io_cache_on_flush'] = False

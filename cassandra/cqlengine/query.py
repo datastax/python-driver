@@ -2,7 +2,7 @@ import copy
 from datetime import datetime, timedelta
 import time
 
-from cassandra.cqlengine.columns import BaseContainerColumn, Map, Counter, List, Set
+from cassandra.cqlengine import columns
 from cassandra.cqlengine.connection import execute, NOT_SET
 from cassandra.cqlengine.exceptions import CQLEngineException, ValidationError, LWTException, IfNotExistsWithCounterColumn
 from cassandra.cqlengine.functions import Token, BaseQueryFunction, QueryValue, UnicodeMixin
@@ -816,15 +816,15 @@ class ModelQuerySet(AbstractQuerySet):
                 continue
 
             # add the update statements
-            if isinstance(col, Counter):
+            if isinstance(col, columns.Counter):
                 # TODO: implement counter updates
                 raise NotImplementedError
-            elif isinstance(col, (List, Set, Map)):
-                if isinstance(col, List):
+            elif isinstance(col, (columns.List, columns.Set, columns.Map)):
+                if isinstance(col, columns.List):
                     klass = ListUpdateClause
-                elif isinstance(col, Set):
+                elif isinstance(col, columns.Set):
                     klass = SetUpdateClause
-                elif isinstance(col, Map):
+                elif isinstance(col, columns.Map):
                     klass = MapUpdateClause
                 else:
                     raise RuntimeError
@@ -893,7 +893,7 @@ class DMLQuery(object):
             if v.deleted:
                 ds.add_field(col.db_field_name)
                 deleted_fields = True
-            elif isinstance(col, Map):
+            elif isinstance(col, columns.Map):
                 uc = MapDeleteClause(col.db_field_name, v.value, v.previous_value)
                 if uc.get_context_size() > 0:
                     ds.add_field(uc)
@@ -938,16 +938,16 @@ class DMLQuery(object):
                     continue
 
                 # don't update something if it hasn't changed
-                if not val_mgr.changed and not isinstance(col, Counter):
+                if not val_mgr.changed and not isinstance(col, columns.Counter):
                     continue
                 
                 static_changed_only = static_changed_only and col.static
-                if isinstance(col, (BaseContainerColumn, Counter)):
+                if isinstance(col, (columns.BaseContainerColumn, columns.Counter)):
                     # get appropriate clause
-                    if isinstance(col, List): klass = ListUpdateClause
-                    elif isinstance(col, Map): klass = MapUpdateClause
-                    elif isinstance(col, Set): klass = SetUpdateClause
-                    elif isinstance(col, Counter): klass = CounterUpdateClause
+                    if isinstance(col, columns.List): klass = ListUpdateClause
+                    elif isinstance(col, columns.Map): klass = MapUpdateClause
+                    elif isinstance(col, columns.Set): klass = SetUpdateClause
+                    elif isinstance(col, columns.Counter): klass = CounterUpdateClause
                     else: raise RuntimeError
 
                     # do the stuff

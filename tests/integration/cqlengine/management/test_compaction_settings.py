@@ -90,7 +90,7 @@ class AlterTableTest(BaseCassEngTestCase):
     def test_alter_is_called_table(self):
         drop_table(LeveledcompactionTestTable)
         sync_table(LeveledcompactionTestTable)
-        with patch('cqlengine.management.update_compaction') as mock:
+        with patch('cassandra.cqlengine.management.update_compaction') as mock:
             sync_table(LeveledcompactionTestTable)
         assert mock.called == 1
 

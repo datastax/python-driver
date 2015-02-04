@@ -56,7 +56,7 @@ class TestConsistency(BaseConsistencyTest):
     def test_batch_consistency(self):
 
         with mock.patch.object(self.session, 'execute') as m:
-            with BatchQuery(consistency=ALL) as b:
+            with BatchQuery(consistency=CL.ALL) as b:
                 TestConsistencyModel.batch(b).create(text="monkey")
 
         args = m.call_args

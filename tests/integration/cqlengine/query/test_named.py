@@ -102,7 +102,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
     def setUpClass(cls):
         super(TestQuerySetCountSelectionAndIteration, cls).setUpClass()
 
-        from cassandra.cqlengine.tests.query.test_queryset import TestModel
+        from tests.integration.cqlengine.query.test_queryset import TestModel
 
         ks,tn = TestModel.column_family_name().split('.')
         cls.keyspace = NamedKeyspace(ks)
