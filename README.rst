@@ -8,7 +8,9 @@ A Python client driver for Apache Cassandra.  This driver works exclusively
 with the Cassandra Query Language v3 (CQL3) and Cassandra's native
 protocol.  Cassandra versions 1.2 through 2.1 are supported.
 
-The driver supports Python 2.6, 2.7, 3.3, and 3.4.
+The driver supports Python 2.6, 2.7, 3.3, and 3.4*.
+
+* cqlengine component presently supports Python 2.7+
 
 Installation
 ------------
@@ -32,8 +34,9 @@ A couple of links for getting up to speed:
 
 Object Mapper
 -------------
-The recommended object mapper for CQL is `cqlengine <https://github.com/cqlengine/cqlengine>`_,
-which utilizes this driver.
+cqlengine (originally developed by Blake Eggleston and Jon Haddad, with contributions from the
+community) is now maintained as an integral part of this package. Refer to
+`documentation here <http://datastax.github.io/python-driver/cqlengine/getting_started.html>`## UPDATE LINK ##.
 
 Reporting Problems
 ------------------
@@ -54,12 +57,10 @@ you can use `freenode's web-based client <http://webchat.freenode.net/?channels=
 Features to be Added
 --------------------
 * C extension for encoding/decoding messages
-* Twisted support
-* IPv6 Support
 
 License
 -------
-Copyright 2013, 2014 DataStax
+Copyright 2013, 2014, 2015 DataStax
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

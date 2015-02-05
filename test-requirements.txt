@@ -1,3 +1,4 @@
+-r requirements.txt
 blist
 scales
 nose
@@ -6,3 +7,4 @@ ccm>=2.0
 unittest2
 PyYAML
 pytz
+sure
