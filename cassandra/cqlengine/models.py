@@ -274,14 +274,12 @@ class BaseModel(object):
 
     # _len is lazily created by __len__
 
-    # table names will be generated automatically from it's model
-    # however, you can also define them manually here
     __table_name__ = None
 
-    # the keyspace for this model
     __keyspace__ = None
 
-    # polymorphism options
+    __default_ttl__ = None
+
     __polymorphic_key__ = None
 
     # compaction options
@@ -304,8 +302,8 @@ class BaseModel(object):
     __queryset__ = ModelQuerySet
     __dmlquery__ = DMLQuery
 
-    __default_ttl__ = None # default ttl value to use
     __consistency__ = None # can be set per query
+
 
     # Additional table properties
     __bloom_filter_fp_chance__ = None
@@ -429,7 +427,9 @@ class BaseModel(object):
 
     @classmethod
     def _get_keyspace(cls):
-        """ Returns the manual keyspace, if set, otherwise the default keyspace """
+        """
+        Returns the manual keyspace, if set, otherwise the default keyspace
+        """
         return cls.__keyspace__ or DEFAULT_KEYSPACE
 
     @classmethod
@@ -489,7 +489,9 @@ class BaseModel(object):
         return '{}.{}'.format(cls._get_keyspace(), cf_name)
 
     def validate(self):
-        """ Cleans and validates the field values """
+        """
+        Cleans and validates the field values
+        """
         for name, col in self._columns.items():
             v = getattr(self, name)
             if v is None and not self._values[name].explicit and col.has_default:
@@ -521,7 +523,9 @@ class BaseModel(object):
         return setattr(self, key, val)
 
     def __len__(self):
-        """ Returns the number of columns defined on that model. """
+        """
+        Returns the number of columns defined on that model.
+        """
         try:
             return self._len
         except:
@@ -529,15 +533,15 @@ class BaseModel(object):
             return self._len
 
     def keys(self):
-        """ Returns list of column's IDs. """
+        """ Returns a list of column IDs. """
         return [k for k in self]
 
     def values(self):
-        """ Returns list of column's values. """
+        """ Returns list of column values. """
         return [self[k] for k in self]
 
     def items(self):
-        """ Returns a list of columns's IDs/values. """
+        """ Returns a list of column ID/value tuples. """
         return [(k, self[k]) for k in self]
 
     def _as_dict(self):
@@ -549,6 +553,13 @@ class BaseModel(object):
 
     @classmethod
     def create(cls, **kwargs):
+        """
+        Create an instance of this model in the database.
+
+        Takes the model column values as keyword arguments.
+
+        Returns the instance.
+        """
         extra_columns = set(kwargs.keys()) - set(cls._columns.keys())
         if extra_columns:
             raise ValidationError("Incorrect columns passed: {}".format(extra_columns))
@@ -556,25 +567,52 @@ class BaseModel(object):
 
     @classmethod
     def all(cls):
+        """
+        Returns a queryset representing all stored objects
+
+        This is a pass-through to the model objects().all()
+        """
         return cls.objects.all()
 
     @classmethod
     def filter(cls, *args, **kwargs):
-        # if kwargs.values().count(None):
-        #     raise CQLEngineException("Cannot pass None as a filter")
+        """
+        Returns a queryset based on filter parameters.
 
+        This is a pass-through to the model objects().:method:`~cqlengine.queries.filter`.
+        """
         return cls.objects.filter(*args, **kwargs)
 
     @classmethod
     def get(cls, *args, **kwargs):
+        """
+        Returns a single object based on the passed filter constraints.
+
+        This is a pass-through to the model objects().:method:`~cqlengine.queries.get`.
+        """
         return cls.objects.get(*args, **kwargs)
 
     def timeout(self, timeout):
+        """
+        Sets a timeout for use in :meth:`~.save`, :meth:`~.update`, and :meth:`~.delete`
+        operations
+        """
         assert self._batch is None, 'Setting both timeout and batch is not supported'
         self._timeout = timeout
         return self
 
     def save(self):
+        """
+        Saves an object to the database.
+
+        .. code-block:: python
+
+            #create a person instance
+            person = Person(first_name='Kimberly', last_name='Eggleston')
+            #saves it to Cassandra
+            person.save()
+        """
+
         # handle polymorphic models
         if self._is_polymorphic:
             if self._is_polymorphic_base:
@@ -604,6 +642,15 @@ class BaseModel(object):
         return self
 
     def update(self, **values):
+        """
+        Performs an update on the model instance. You can pass in values to set on the model
+        for updating, or you can call without values to execute an update against any modified
+        fields. If no fields on the model have been modified since loading, no query will be
+        performed. Model validation is performed normally.
+
+        It is possible to do a blind update, that is, to update a field without having first selected the object out of the database.
+        See :ref:`Blind Updates <blind_updates>`
+        """
         for k, v in values.items():
             col = self._columns.get(k)
 
@@ -644,7 +691,9 @@ class BaseModel(object):
         return self
 
     def delete(self):
-        """ Deletes this instance """
+        """
+        Deletes the object from the database
+        """
         self.__dmlquery__(self.__class__, self,
                           batch=self._batch,
                           timestamp=self._timestamp,
@@ -652,7 +701,9 @@ class BaseModel(object):
                           timeout=self._timeout).delete()
 
     def get_changed_columns(self):
-        """ returns a list of the columns that have been updated since instantiation or save """
+        """
+        Returns a list of the columns that have been updated since instantiation or save
+        """
         return [k for k,v in self._values.items() if v.changed]
 
     @classmethod
@@ -668,12 +719,9 @@ class BaseModel(object):
     batch = hybrid_classmethod(_class_batch, _inst_batch)
 
 
-
 class ModelMetaClass(type):
 
     def __new__(cls, name, bases, attrs):
-        """
-        """
         #move column definitions into columns dict
         #and set default column names
         column_dict = OrderedDict()
@@ -839,11 +887,30 @@ import six
 
 @six.add_metaclass(ModelMetaClass)
 class Model(BaseModel):
-    """
-    the db name for the column family can be set as the attribute db_name, or
-    it will be generated from the class name
-    """
     __abstract__ = True
-    # __metaclass__ = ModelMetaClass
+    """
+    *Optional.* Indicates that this model is only intended to be used as a base class for other models.
+    You can't create tables for abstract models, but checks around schema validity are skipped during class construction.
+    """
 
+    __table_name__ = None
+    """
+    *Optional.* Sets the name of the CQL table for this model. If left blank, the table name will be the name of the model, with it's module name as it's prefix. Manually defined table names are not inherited.
+    """
 
+    __keyspace__ = None
+    """
+    Sets the name of the keyspace used by this model.
+    """
+
+    __default_ttl__ = None
+    """
+    *Optional* The default ttl used by this model.
+    
+    This can be overridden by using the :meth:`~.ttl` method.
+    """
+
+    __polymorphic_key__ = None
+    """
+    *Optional* Specifies a value for the polymorphic key when using model inheritance.
+    """

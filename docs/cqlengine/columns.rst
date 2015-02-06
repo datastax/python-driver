@@ -2,10 +2,6 @@
 Columns
 =======
 
-**Users of versions < 0.4, please read this post before upgrading:** `Breaking Changes`_
-
-.. _Breaking Changes: https://groups.google.com/forum/?fromgroups#!topic/cqlengine-users/erkSNe1JwuU
-
 .. module:: cqlengine.columns
 
 .. class:: Bytes()

@@ -379,9 +379,9 @@ class AbstractQuerySet(object):
 
     def batch(self, batch_obj):
         """
-        Adds a batch query to the mix
-        :param batch_obj:
-        :return:
+        Set a batch object to run the query on.
+
+        Note: running a select query with a batch object will raise an exception
         """
         if batch_obj is not None and not isinstance(batch_obj, BatchQuery):
             raise CQLEngineException('batch_obj must be a BatchQuery instance or None')
@@ -396,9 +396,25 @@ class AbstractQuerySet(object):
             return None
 
     def all(self):
+        """
+        Returns a queryset matching all rows
+
+        .. code-block:: python
+
+            for user in User.objects().all():
+                print(user)
+        """
         return copy.deepcopy(self)
 
     def consistency(self, consistency):
+        """
+        Sets the consistency level for the operation. See :class:`.ConsistencyLevel`.
+
+        .. code-block:: python
+
+            for user in User.objects(id=3).consistency(CL.ONE):
+                print(user)
+        """
         clone = copy.deepcopy(self)
         clone._consistency = consistency
         return clone
@@ -464,9 +480,9 @@ class AbstractQuerySet(object):
         """
         Adds WHERE arguments to the queryset, returning a new queryset
 
-        #TODO: show examples
+        See :ref:`retrieving-objects-with-filters`
 
-        :rtype: AbstractQuerySet
+        Returns a QuerySet filtered on the keyword arguments
         """
         #add arguments to the where clause filters
         if len([x for x in kwargs.values() if x is None]):
@@ -524,8 +540,17 @@ class AbstractQuerySet(object):
         """
         Returns a single instance matching this query, optionally with additional filter kwargs.
 
-        A DoesNotExistError will be raised if there are no rows matching the query
-        A MultipleObjectsFoundError will be raised if there is more than one row matching the queyr
+        See :ref:`retrieving-objects-with-filters`
+
+        Returns a single object matching the QuerySet.
+
+        .. code-block:: python
+
+            user = User.get(id=1)
+
+        If no objects are matched, a :class:`~.DoesNotExist` exception is raised.
+
+        If more than one object is found, a :class:`~.MultipleObjectsReturned` exception is raised.
         """
         if args or kwargs:
             return self.filter(*args, **kwargs).get()
@@ -547,10 +572,34 @@ class AbstractQuerySet(object):
 
     def order_by(self, *colnames):
         """
-        orders the result set.
-        ordering can only use clustering columns.
+        Sets the column(s) to be used for ordering
 
-        Default order is ascending, prepend a '-' to the column name for descending
+        Default order is ascending, prepend a '-' to any column name for descending
+
+        *Note: column names must be a clustering key*
+
+        .. code-block:: python
+
+            from uuid import uuid1,uuid4
+
+            class Comment(Model):
+                photo_id = UUID(primary_key=True)
+                comment_id = TimeUUID(primary_key=True, default=uuid1) # second primary key component is a clustering key
+                comment = Text()
+
+            sync_table(Comment)
+
+            u = uuid4()
+            for x in range(5):
+                Comment.create(photo_id=u, comment="test %d" % x)
+
+            print("Normal")
+            for comment in Comment.objects(photo_id=u):
+                print comment.comment_id
+
+            print("Reversed")
+            for comment in Comment.objects(photo_id=u).order_by("-comment_id"):
+                print comment.comment_id
         """
         if len(colnames) == 0:
             clone = copy.deepcopy(self)
@@ -566,7 +615,9 @@ class AbstractQuerySet(object):
         return clone
 
     def count(self):
-        """ Returns the number of rows matched by this query """
+        """
+        Returns the number of rows matched by this query
+        """
         if self._batch:
             raise CQLEngineException("Only inserts, updates, and deletes are available in batch mode")
 
@@ -580,8 +631,14 @@ class AbstractQuerySet(object):
 
     def limit(self, v):
         """
-        Sets the limit on the number of results returned
-        CQL has a default limit of 10,000
+        Limits the number of results returned by Cassandra.
+
+        *Note that CQL's default limit is 10,000, so all queries without a limit set explicitly will have an implicit limit of 10,000*
+
+        .. code-block:: python
+
+            for user in User.objects().limit(100):
+                print(user)
         """
         if not (v is None or isinstance(v, six.integer_types)):
             raise TypeError
@@ -597,8 +654,7 @@ class AbstractQuerySet(object):
 
     def allow_filtering(self):
         """
-        Enables the unwise practive of querying on a clustering
-        key without also defining a partition key
+        Enables the (usually) unwise practive of querying on a clustering key without also defining a partition key
         """
         clone = copy.deepcopy(self)
         clone._allow_filtering = True
@@ -700,7 +756,6 @@ class SimpleQuerySet(AbstractQuerySet):
 
 class ModelQuerySet(AbstractQuerySet):
     """
-
     """
     def _validate_select_where(self):
         """ Checks that a filterset will not create invalid select statement """
@@ -774,11 +829,19 @@ class ModelQuerySet(AbstractQuerySet):
         return clone
 
     def ttl(self, ttl):
+        """
+        Sets the ttl (in seconds) for modified data.
+
+        *Note that running a select query with a ttl value will raise an exception*
+        """
         clone = copy.deepcopy(self)
         clone._ttl = ttl
         return clone
 
     def timestamp(self, timestamp):
+        """
+        Allows for custom timestamps to be saved with the record.
+        """
         clone = copy.deepcopy(self)
         clone._timestamp = timestamp
         return clone
@@ -791,7 +854,92 @@ class ModelQuerySet(AbstractQuerySet):
         return clone
 
     def update(self, **values):
-        """ Updates the rows in this queryset """
+        """
+        Performs an update on the row selected by the queryset. Include values to update in the
+        update like so:
+
+        .. code-block:: python
+
+            Model.objects(key=n).update(value='x')
+
+        Passing in updates for columns which are not part of the model will raise a ValidationError.
+
+        Per column validation will be performed, but instance level validation will not
+        (i.e., `Model.validate` is not called).  This is sometimes referred to as a blind update.
+
+        For example:
+
+        .. code-block:: python
+
+            class User(Model):
+                id = Integer(primary_key=True)
+                name = Text()
+
+            setup(["localhost"], "test")
+            sync_table(User)
+
+            u = User.create(id=1, name="jon")
+
+            User.objects(id=1).update(name="Steve")
+
+            # sets name to null
+            User.objects(id=1).update(name=None)
+
+
+        Also supported is blindly adding and removing elements from container columns,
+        without loading a model instance from Cassandra.
+
+        Using the syntax `.update(column_name={x, y, z})` will overwrite the contents of the container, like updating a
+        non container column. However, adding `__<operation>` to the end of the keyword arg, makes the update call add
+        or remove items from the collection, without overwriting then entire column.
+
+        Given the model below, here are the operations that can be performed on the different container columns:
+
+        .. code-block:: python
+
+            class Row(Model):
+                row_id      = columns.Integer(primary_key=True)
+                set_column  = columns.Set(Integer)
+                list_column = columns.List(Integer)
+                map_column  = columns.Map(Integer, Integer)
+
+        :class:`~cqlengine.columns.Set`
+
+        - `add`: adds the elements of the given set to the column
+        - `remove`: removes the elements of the given set to the column
+
+
+        .. code-block:: python
+
+            # add elements to a set
+            Row.objects(row_id=5).update(set_column__add={6})
+
+            # remove elements to a set
+            Row.objects(row_id=5).update(set_column__remove={4})
+
+        :class:`~cqlengine.columns.List`
+
+        - `append`: appends the elements of the given list to the end of the column
+        - `prepend`: prepends the elements of the given list to the beginning of the column
+
+        .. code-block:: python
+
+            # append items to a list
+            Row.objects(row_id=5).update(list_column__append=[6, 7])
+
+            # prepend items to a list
+            Row.objects(row_id=5).update(list_column__prepend=[1, 2])
+
+
+        :class:`~cqlengine.columns.Map`
+
+        - `update`: adds the given keys/values to the columns, creating new entries if they didn't exist, and overwriting old ones if they did
+
+        .. code-block:: python
+
+            # add items to a map
+            Row.objects(row_id=5).update(map_column__update={1: 2, 3: 4})
+        """
         if not values:
             return
 

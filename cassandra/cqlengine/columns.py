@@ -92,6 +92,57 @@ class Column(object):
 
     instance_counter = 0
 
+    primary_key = False
+    """
+    bool flag, indicates this column is a primary key. The first primary key defined
+            on a model is the partition key (unless partition keys are set), all others are cluster keys
+    """
+
+    partition_key = False
+
+    """
+    indicates that this column should be the partition key, defining
+    more than one partition key column creates a compound partition key
+    """
+
+    index = False
+    """
+    bool flag, indicates an index should be created for this column
+    """
+
+    db_field = False
+    """
+    the fieldname this field will map to in the database
+    """
+
+    default = False
+    """
+    the default value, can be a value or a callable (no args)
+    """
+
+    required = False
+    """
+    boolean, is the field required? Model validation will raise and
+            exception if required is set to True and there is a None value assigned
+    """
+
+    clustering_order = False
+    """
+    only applicable on clustering keys (primary keys that are not partition keys)
+            determines the order that the clustering keys are sorted on disk
+    """
+
+    polymorphic_key = False
+    """
+    boolean, if set to True, this column will be used for saving and loading instances
+            of polymorphic tables
+    """
+
+    static = False
+    """
+    boolean, if set to True, this is a static column, with a single value per partition
+    """
+
     def __init__(self,
                  primary_key=False,
                  partition_key=False,
@@ -102,21 +153,6 @@ class Column(object):
                  clustering_order=None,
                  polymorphic_key=False,
                  static=False):
-        """
-        :param primary_key: bool flag, indicates this column is a primary key. The first primary key defined
-            on a model is the partition key (unless partition keys are set), all others are cluster keys
-        :param partition_key: indicates that this column should be the partition key, defining
-            more than one partition key column creates a compound partition key
-        :param index: bool flag, indicates an index should be created for this column
-        :param db_field: the fieldname this field will map to in the database
-        :param default: the default value, can be a value or a callable (no args)
-        :param required: boolean, is the field required? Model validation will raise and
-            exception if required is set to True and there is a None value assigned
-        :param clustering_order: only applicable on clustering keys (primary keys that are not partition keys)
-            determines the order that the clustering keys are sorted on disk
-        :param polymorphic_key: boolean, if set to True, this column will be used for saving and loading instances
-            of polymorphic tables
-        """
         self.partition_key = partition_key
         self.primary_key = partition_key or primary_key
         self.index = index
@@ -216,6 +252,9 @@ class Column(object):
 
 
 class Blob(Column):
+    """
+    Stores a raw binary value
+    """
     db_type = 'blob'
 
     def to_database(self, value):
@@ -233,14 +272,35 @@ class Blob(Column):
 Bytes = Blob
 
 class Ascii(Column):
+    """
+    Stores a US-ASCII character string
+    """
     db_type = 'ascii'
 
 class Inet(Column):
+    """
+    Stores an IP address in IPv4 or IPv6 format
+    """
     db_type = 'inet'
 
 
 class Text(Column):
+    """
+    Stores a UTF-8 encoded string
+    """
+
     db_type = 'text'
+
+    min_length = None
+    """
+    Sets the minimum length of this string, for validation purposes.
+    Defaults to 1 if this is a ``required`` column. Otherwise, None.
+    """
+
+    max_length = None
+    """
+    Sets the maximum length of this string, for validation purposes.
+    """
 
     def __init__(self, *args, **kwargs):
         self.min_length = kwargs.pop('min_length', 1 if kwargs.get('required', False) else None)
@@ -262,6 +322,10 @@ class Text(Column):
 
 
 class Integer(Column):
+    """
+    Stores a 32-bit signed integer value
+    """
+
     db_type = 'int'
 
     def validate(self, value):
@@ -280,10 +344,16 @@ class Integer(Column):
 
 
 class BigInt(Integer):
+    """
+    Stores a 64-bit signed long value
+    """
     db_type = 'bigint'
 
 
 class VarInt(Column):
+    """
+    Stores an arbitrary-precision integer
+    """
     db_type = 'varint'
 
     def validate(self, value):
@@ -311,6 +381,9 @@ class CounterValueManager(BaseValueManager):
 
 
 class Counter(Integer):
+    """
+    Stores a counter that can be inremented and decremented
+    """
     db_type = 'counter'
 
     value_manager = CounterValueManager
@@ -330,6 +403,9 @@ class Counter(Integer):
 
 
 class DateTime(Column):
+    """
+    Stores a datetime value
+    """
     db_type = 'timestamp'
 
     def to_python(self, value):
@@ -358,6 +434,12 @@ class DateTime(Column):
 
 
 class Date(Column):
+    """
+    *Note: this type is overloaded, and will likely be changed or removed to accommodate distinct date type
+    in a future version*
+
+    Stores a date value, with no time-of-day
+    """
     db_type = 'timestamp'
 
     def to_python(self, value):
@@ -384,7 +466,7 @@ class Date(Column):
 
 class UUID(Column):
     """
-    Type 1 or 4 UUID
+    Stores a type 1 or 4 UUID
     """
     db_type = 'uuid'
 
@@ -451,6 +533,9 @@ class TimeUUID(UUID):
 
 
 class Boolean(Column):
+    """
+    Stores a boolean True or False value
+    """
     db_type = 'boolean'
 
     def validate(self, value):
@@ -467,6 +552,9 @@ class Boolean(Column):
 
 
 class Float(Column):
+    """
+    Stores a 32-bit floating point value
+    """
     db_type = 'double'
 
     def __init__(self, double_precision=True, **kwargs):
@@ -489,6 +577,9 @@ class Float(Column):
 
 
 class Decimal(Column):
+    """
+    Stores a variable precision decimal value
+    """
     db_type = 'decimal'
 
     def validate(self, value):
