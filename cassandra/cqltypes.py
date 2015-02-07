@@ -958,6 +958,21 @@ class ReversedType(_ParameterizedType):
         return subtype.to_binary(val, protocol_version)
 
 
+class FrozenType(_ParameterizedType):
+    typename = "frozen"
+    num_subtypes = 1
+
+    @classmethod
+    def deserialize_safe(cls, byts, protocol_version):
+        subtype, = cls.subtypes
+        return subtype.from_binary(byts)
+
+    @classmethod
+    def serialize_safe(cls, val, protocol_version):
+        subtype, = cls.subtypes
+        return subtype.to_binary(val, protocol_version)
+
+
 def is_counter_type(t):
     if isinstance(t, six.string_types):
         t = lookup_casstype(t)

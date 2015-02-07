@@ -308,6 +308,33 @@ class SchemaMetadataTests(unittest.TestCase):
         self.assertIn('CREATE INDEX d_index', statement)
         self.assertIn('CREATE INDEX e_index', statement)
 
+    def test_collection_indexes(self):
+        self.session.execute("CREATE TABLE %s.%s (a int PRIMARY KEY, b map<text, text>)"
+                             % (self.ksname, self.cfname))
+        self.session.execute("CREATE INDEX index1 ON %s.%s (keys(b))"
+                             % (self.ksname, self.cfname))
+
+        tablemeta = self.get_table_metadata()
+        self.assertIn('(keys(b))', tablemeta.export_as_string())
+
+        self.session.execute("DROP INDEX %s.index1" % (self.ksname,))
+        self.session.execute("CREATE INDEX index2 ON %s.%s (b)"
+                             % (self.ksname, self.cfname))
+
+        tablemeta = self.get_table_metadata()
+        self.assertIn(' (b)', tablemeta.export_as_string())
+
+        # test full indexes on frozen collections, if available
+        if get_server_versions()[0] >= (2, 1, 3):
+            self.session.execute("DROP TABLE %s.%s" % (self.ksname, self.cfname))
+            self.session.execute("CREATE TABLE %s.%s (a int PRIMARY KEY, b frozen<map<text, text>>)"
+                                 % (self.ksname, self.cfname))
+            self.session.execute("CREATE INDEX index3 ON %s.%s (full(b))"
+                                 % (self.ksname, self.cfname))
+
+            tablemeta = self.get_table_metadata()
+            self.assertIn('(full(b))', tablemeta.export_as_string())
+
     def test_compression_disabled(self):
         create_statement = self.make_create_statement(["a"], ["b"], ["c"])
         create_statement += " WITH compression = {}"

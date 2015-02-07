@@ -1210,11 +1210,30 @@ class IndexMetadata(object):
         """
         table = self.column.table
         if self.index_type != "CUSTOM":
+            index_target = protect_name(self.column.name)
+            if self.index_options is not None:
+                option_keys = self.index_options.keys()
+                if "index_keys" in option_keys:
+                    index_target = 'keys(%s)' % (index_target,)
+                elif "index_values" in option_keys:
+                    # don't use any "function" for collection values
+                    pass
+                else:
+                    # it might be a "full" index on a frozen collection, but
+                    # we need to check the data type to verify that, because
+                    # there is no special index option for full-collection
+                    # indexes.
+                    data_type = self.column.data_type
+                    collection_types = ('map', 'set', 'list')
+                    if data_type.typename == "frozen" and data_type.subtypes[0].typename in collection_types:
+                        # no index option for full-collection index
+                        index_target = 'full(%s)' % (index_target,)
+
             return "CREATE INDEX %s ON %s.%s (%s)" % (
                 self.name,  # Cassandra doesn't like quoted index names for some reason
                 protect_name(table.keyspace.name),
                 protect_name(table.name),
-                protect_name(self.column.name))
+                index_target)
         else:
             return "CREATE CUSTOM INDEX %s ON %s.%s (%s) USING '%s'" % (
                 self.name,  # Cassandra doesn't like quoted index names for some reason
