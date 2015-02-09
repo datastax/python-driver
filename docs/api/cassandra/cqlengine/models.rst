@@ -10,6 +10,7 @@ Model
     The initializer creates an instance of the model. Pass in keyword arguments for columns you've defined on the model.
 
     .. code-block:: python
+
         class Person(Model):
             id = columns.UUID(primary_key=True)
             first_name  = columns.Text()

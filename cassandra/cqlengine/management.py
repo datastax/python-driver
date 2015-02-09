@@ -19,13 +19,21 @@ schema_columnfamilies = NamedTable('system', 'schema_columnfamilies')
 
 def create_keyspace(name, strategy_class, replication_factor, durable_writes=True, **replication_values):
     """
-    creates a keyspace
+    *Deprecated - this will likely be repaced with something specialized per replication strategy.*
+    Creates a keyspace
 
-    :param name: name of keyspace to create
-    :param strategy_class: keyspace replication strategy class
-    :param replication_factor: keyspace replication factor
-    :param durable_writes: 1.2 only, write log is bypassed if set to False
-    :param **replication_values: 1.2 only, additional values to ad to the replication data map
+    If the keyspace already exists, it will not be modified.
+
+    **This function should be used with caution, especially in production environments.
+    Take care to execute schema modifications in a single context (i.e. not concurrently with other clients).**
+
+    *There are plans to guard schema-modifying functions with an environment-driven conditional.*
+
+    :param str name: name of keyspace to create
+    :param str strategy_class: keyspace replication strategy class (:attr:`~.SimpleStrategy` or :attr:`~.NetworkTopologyStrategy`
+    :param int replication_factor: keyspace replication factor, used with :attr:`~.SimpleStrategy`
+    :param bool durable_writes: Write log is bypassed if set to False
+    :param \*\*replication_values: Additional values to ad to the replication options map
     """
     cluster = get_cluster()
 
@@ -54,12 +62,19 @@ def create_keyspace(name, strategy_class, replication_factor, durable_writes=Tru
 
 
 def delete_keyspace(name):
+    """
+    *There are plans to guard schema-modifying functions with an environment-driven conditional.*
+
+    **This function should be used with caution, especially in production environments.
+    Take care to execute schema modifications in a single context (i.e. not concurrently with other clients).**
+
+    Drops a keyspace, if it exists.
+
+    :param str name: name of keyspace to delete
+    """
     cluster = get_cluster()
     if name in cluster.metadata.keyspaces:
         execute("DROP KEYSPACE {}".format(name))
-
-def create_table(model):
-    raise CQLEngineException("create_table is deprecated, please use sync_table")
 
 def sync_table(model):
     """
@@ -67,6 +82,11 @@ def sync_table(model):
 
     Note that the attributes removed from the model are not deleted on the database.
     They become effectively ignored by (will not show up on) the model.
+
+    **This function should be used with caution, especially in production environments.
+    Take care to execute schema modifications in a single context (i.e. not concurrently with other clients).**
+
+    *There are plans to guard schema-modifying functions with an environment-driven conditional.*
     """
 
     if not issubclass(model, Model):
@@ -298,11 +318,15 @@ def update_compaction(model):
     return False
 
 
-def delete_table(model):
-    raise CQLEngineException("delete_table has been deprecated in favor of drop_table()")
-
-
 def drop_table(model):
+    """
+    Drops the table indicated by the model, if it exists.
+
+    **This function should be used with caution, especially in production environments.
+    Take care to execute schema modifications in a single context (i.e. not concurrently with other clients).**
+
+    *There are plans to guard schema-modifying functions with an environment-driven conditional.*
+    """
 
     # don't try to delete non existant tables
     meta = get_cluster().metadata

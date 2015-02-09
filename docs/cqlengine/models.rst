@@ -20,8 +20,8 @@ This example defines a ``Person`` table, with the columns ``first_name`` and ``l
 
 .. code-block:: python
 
-    from cassandra.cqlengine import columns
-    from cassandra.cqlengine.models import Model
+   from cassandra.cqlengine import columns
+   from cassandra.cqlengine.models import Model
 
     class Person(Model):
         id = columns.UUID(primary_key=True)
@@ -72,7 +72,7 @@ To sync the models to the database, you may do the following*:
     sync_table(Comment)
 
 \*Note: synchronizing models causes schema changes, and should be done with caution.
-Please see the discussion in :doc:`manage_schemas` for considerations.
+Please see the discussion in :doc:`/api/cassandra/cqlengine/management` for considerations.
 
 For examples on manipulating data and creating queries, see :doc:`queryset`
 

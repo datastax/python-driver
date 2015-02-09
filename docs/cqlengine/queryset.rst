@@ -222,7 +222,7 @@ Token Function
         next_page = list(query.filter(pk__token__gt=cqlengine.Token(last.pk)))
 
 QuerySets are immutable
-======================
+=======================
 
     When calling any method that changes a queryset, the method does not actually change the queryset object it's called on, but returns a new queryset object with the attributes of the original queryset, plus the attributes added in the method call.
 

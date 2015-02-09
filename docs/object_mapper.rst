@@ -3,31 +3,24 @@ Object Mapper
 
 cqlengine is the Cassandra CQL 3 Object Mapper packaged with this driver
 
-:ref:`getting-started`
+:ref:`Jump to Getting Started <getting-started>`
 
 Contents
 --------
 :doc:`cqlengine/models`
-    Mapping objects to tables
+    Examples defining models, and mapping them to tables
 
 :doc:`cqlengine/queryset`
-    Query sets, filtering
+    Overview of query sets and filtering
 
 :doc:`cqlengine/batches`
-    Batch mutations
+    Working with batch mutations
 
-:doc:`cqlengine/connection`
-    Managing connections
-
-:doc:`cqlengine/manage_schemas`
-
-:doc:`cqlengine/external_resources`
-
-:doc:`cqlengine/related_projects`
+:ref:`API Documentation <om_api>`
+    Index of API documentation
 
 :doc:`cqlengine/third_party`
-
-:doc:`cqlengine/development`
+    High-level examples in Celery and uWSGI
 
 :doc:`cqlengine/faq`
 
@@ -37,6 +30,8 @@ Contents
     cqlengine/models
     cqlengine/queryset
     cqlengine/batches
+    cqlengine/third_party
+    cqlengine/faq
 
 .. _getting-started:
 

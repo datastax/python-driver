@@ -30,18 +30,14 @@ def setup(
         retry_connect=False,
         **kwargs):
     """
-    Records the hosts and connects to one of them
+    Setup a the driver connection used by the mapper
 
-    :param hosts: list of hosts, see http://datastax.github.io/python-driver/api/cassandra/cluster.html
-    :type hosts: list
-    :param default_keyspace: The default keyspace to use
-    :type default_keyspace: str
-    :param consistency: The global consistency level
-    :type consistency: int
-    :param lazy_connect: True if should not connect until first use
-    :type lazy_connect: bool
-    :param retry_connect: bool
-    :param retry_connect: True if we should retry to connect even if there was a connection failure initially
+    :param list hosts: list of hosts, see http://datastax.github.io/python-driver/api/cassandra/cluster.html
+    :param str default_keyspace: The default keyspace to use
+    :param int consistency: The global default :class:`~.ConsistencyLevel`
+    :param bool lazy_connect: True if should not connect until first use
+    :param bool retry_connect: True if we should retry to connect even if there was a connection failure initially
+    :param \*\*kwargs: Pass-through keyword arguments for :class:`cassandra.cluster.Cluster`
     """
     global cluster, session, default_consistency_level, lazy_connect_args
 

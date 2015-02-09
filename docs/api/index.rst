@@ -25,6 +25,8 @@ Core Driver
    cassandra/io/geventreactor
    cassandra/io/twistedreactor
 
+.. _om_api:
+
 Object Mapper
 -------------
 .. toctree::
@@ -33,3 +35,5 @@ Object Mapper
    cassandra/cqlengine/models
    cassandra/cqlengine/columns
    cassandra/cqlengine/query
+   cassandra/cqlengine/connection
+   cassandra/cqlengine/management
