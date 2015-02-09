@@ -35,7 +35,7 @@ try:
     from ccmlib.cluster_factory import ClusterFactory as CCMClusterFactory
     from ccmlib import common
 except ImportError as e:
-    raise unittest.SkipTest('ccm is a dependency for integration tests:', e)
+    CCMClusterFactory = None
 
 CLUSTER_NAME = 'test_cluster'
 SINGLE_NODE_CLUSTER_NAME = 'single_node'
@@ -81,11 +81,12 @@ def _tuple_version(version_string):
     return tuple([int(p) for p in version_string.split('.')])
 
 
-USE_CCM_CASS_EXTERNAL = bool(os.getenv('USE_CCM_CASS_EXTERNAL', False))
+USE_CASS_EXTERNAL = bool(os.getenv('USE_CASS_EXTERNAL', False))
 
 default_cassandra_version = '2.1.2'
 
-if USE_CCM_CASS_EXTERNAL:
+if USE_CASS_EXTERNAL and CCMClusterFactory:
+    # see if the external instance is running in ccm
     path = common.get_default_path()
     name = common.current_cluster_name(path)
     CCM_CLUSTER = CCMClusterFactory.load(common.get_default_path(), name)
@@ -136,7 +137,7 @@ def use_single_node(start=True):
 
 
 def remove_cluster():
-    if USE_CCM_CASS_EXTERNAL:
+    if USE_CASS_EXTERNAL:
         return
 
     global CCM_CLUSTER
@@ -157,8 +158,11 @@ def is_current_cluster(cluster_name, node_counts):
 
 def use_cluster(cluster_name, nodes, ipformat=None, start=True):
     global CCM_CLUSTER
-    if USE_CCM_CASS_EXTERNAL:
-        log.debug("Using external cluster %s", CCM_CLUSTER.name)
+    if USE_CASS_EXTERNAL:
+        if CCM_CLUSTER:
+            log.debug("Using external ccm cluster %s", CCM_CLUSTER.name)
+        else:
+            log.debug("Using unnamed external cluster")
         return
 
     if is_current_cluster(cluster_name, nodes):
@@ -194,7 +198,7 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True):
 
 
 def teardown_package():
-    if USE_CCM_CASS_EXTERNAL:
+    if USE_CASS_EXTERNAL:
         return
     # when multiple modules are run explicitly, this runs between them
     # need to make sure CCM_CLUSTER is properly cleared for that case
