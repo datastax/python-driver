@@ -20,6 +20,7 @@ except ImportError:
 
 from binascii import unhexlify
 import datetime
+import six
 import time
 import cassandra
 from cassandra.cqltypes import (BooleanType, lookup_casstype_simple, lookup_casstype,
@@ -146,7 +147,7 @@ class TypeTests(unittest.TestCase):
 
             @classmethod
             def apply_parameters(cls, subtypes, names):
-                return cls(subtypes, [unhexlify(name) if name is not None else name for name in names])
+                return cls(subtypes, [unhexlify(six.b(name)) if name is not None else name for name in names])
 
         class BarType(FooType):
             typename = 'org.apache.cassandra.db.marshal.BarType'
