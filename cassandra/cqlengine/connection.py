@@ -32,7 +32,7 @@ def setup(
     """
     Setup a the driver connection used by the mapper
 
-    :param list hosts: list of hosts, see http://datastax.github.io/python-driver/api/cassandra/cluster.html
+    :param list hosts: list of hosts, (``contact_points`` for :class:`cassandra.cluster.Cluster`)
     :param str default_keyspace: The default keyspace to use
     :param int consistency: The global default :class:`~.ConsistencyLevel`
     :param bool lazy_connect: True if should not connect until first use
