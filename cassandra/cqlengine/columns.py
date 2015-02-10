@@ -657,7 +657,7 @@ class Set(BaseContainerColumn):
     """
     Stores a set of unordered, unique values
 
-    http://www.datastax.com/docs/1.2/cql_cli/using/collections
+    http://www.datastax.com/documentation/cql/3.1/cql/cql_using/use_set_t.html
     """
     db_type = 'set<{}>'
 
@@ -709,7 +709,7 @@ class List(BaseContainerColumn):
     """
     Stores a list of ordered values
 
-    http://www.datastax.com/docs/1.2/cql_cli/using/collections_list
+    http://www.datastax.com/documentation/cql/3.1/cql/cql_using/use_list_t.html
     """
     db_type = 'list<{}>'
 
@@ -748,7 +748,7 @@ class Map(BaseContainerColumn):
     """
     Stores a key -> value map (dictionary)
 
-    http://www.datastax.com/docs/1.2/cql_cli/using/collections_map
+    http://www.datastax.com/documentation/cql/3.1/cql/cql_using/use_map_t.html
     """
 
     db_type = 'map<{}, {}>'
