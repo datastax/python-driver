@@ -1,6 +1,6 @@
 from collections import namedtuple
-import six
 import logging
+import six
 
 from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster, _NOT_SET, NoHostAvailable
@@ -9,11 +9,13 @@ from cassandra.cqlengine.exceptions import CQLEngineException, UndefinedKeyspace
 from cassandra.cqlengine.statements import BaseCQLStatement
 
 
-LOG = logging.getLogger('cqlengine.cql')
+log = logging.getLogger(__name__)
+
 NOT_SET = _NOT_SET  # required for passing timeout to Session.execute
 
 
-class CQLConnectionError(CQLEngineException): pass
+class CQLConnectionError(CQLEngineException):
+    pass
 
 Host = namedtuple('Host', ['name', 'port'])
 
@@ -21,6 +23,7 @@ cluster = None
 session = None
 lazy_connect_args = None
 default_consistency_level = None
+
 
 def setup(
         hosts,
@@ -94,20 +97,23 @@ def execute(query, params=None, consistency_level=None, timeout=NOT_SET):
     elif isinstance(query, six.string_types):
         query = SimpleStatement(query, consistency_level=consistency_level)
 
-    LOG.info(query.query_string)
+    log.debug(query.query_string)
 
     params = params or {}
     result = session.execute(query, params, timeout=timeout)
 
     return result
 
+
 def get_session():
     handle_lazy_connect()
     return session
 
+
 def get_cluster():
     handle_lazy_connect()
     return cluster
+
 
 def handle_lazy_connect():
     global lazy_connect_args

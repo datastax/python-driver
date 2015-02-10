@@ -5,11 +5,13 @@ import sys
 from cassandra.cqlengine.exceptions import ValidationError
 # move to central spot
 
+
 class UnicodeMixin(object):
     if sys.version_info > (3, 0):
         __str__ = lambda x: x.__unicode__()
     else:
         __str__ = lambda x: six.text_type(x).encode('utf-8')
+
 
 class QueryValue(UnicodeMixin):
     """
@@ -42,6 +44,8 @@ class BaseQueryFunction(QueryValue):
     be passed into .filter() and will be translated into CQL functions in
     the resulting query
     """
+    pass
+
 
 class MinTimeUUID(BaseQueryFunction):
     """
@@ -123,4 +127,3 @@ class Token(BaseQueryFunction):
     def update_context(self, ctx):
         for i, (col, val) in enumerate(zip(self._columns, self.value)):
             ctx[str(self.context_id + i)] = col.to_database(val)
-

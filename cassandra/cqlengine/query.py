@@ -1,6 +1,7 @@
 import copy
 from datetime import datetime, timedelta
 import time
+import six
 
 from cassandra.cqlengine import columns
 from cassandra.cqlengine.connection import execute, NOT_SET
@@ -17,11 +18,16 @@ from cassandra.cqlengine.statements import (WhereClause, SelectStatement, Delete
                                             TransactionClause)
 
 
-class QueryException(CQLEngineException): pass
-class DoesNotExist(QueryException): pass
-class MultipleObjectsReturned(QueryException): pass
+class QueryException(CQLEngineException):
+    pass
 
-import six
+
+class DoesNotExist(QueryException):
+    pass
+
+
+class MultipleObjectsReturned(QueryException):
+    pass
 
 
 def check_applied(result):
@@ -30,7 +36,7 @@ def check_applied(result):
     if that value is false, it means our light-weight transaction didn't
     applied to database.
     """
-    if result and '[applied]' in result[0] and result[0]['[applied]'] == False:
+    if result and '[applied]' in result[0] and not result[0]['[applied]']:
         raise LWTException('')
 
 
@@ -77,8 +83,8 @@ class AbstractQueryableColumn(UnicodeMixin):
 
 
 class BatchType(object):
-    Unlogged    = 'UNLOGGED'
-    Counter     = 'COUNTER'
+    Unlogged = 'UNLOGGED'
+    Counter = 'COUNTER'
 
 
 class BatchQuery(object):
@@ -194,8 +200,9 @@ class BatchQuery(object):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        #don't execute if there was an exception by default
-        if exc_type is not None and not self._execute_on_exception: return
+        # don't execute if there was an exception by default
+        if exc_type is not None and not self._execute_on_exception:
+            return
         self.execute()
 
 
@@ -205,29 +212,29 @@ class AbstractQuerySet(object):
         super(AbstractQuerySet, self).__init__()
         self.model = model
 
-        #Where clause filters
+        # Where clause filters
         self._where = []
 
         # Transaction clause filters
         self._transaction = []
 
-        #ordering arguments
+        # ordering arguments
         self._order = []
 
         self._allow_filtering = False
 
-        #CQL has a default limit of 10000, it's defined here
-        #because explicit is better than implicit
+        # CQL has a default limit of 10000, it's defined here
+        # because explicit is better than implicit
         self._limit = 10000
 
-        #see the defer and only methods
+        # see the defer and only methods
         self._defer_fields = []
         self._only_fields = []
 
         self._values_list = False
         self._flat_values_list = False
 
-        #results cache
+        # results cache
         self._con = None
         self._cur = None
         self._result_cache = None
@@ -265,7 +272,7 @@ class AbstractQuerySet(object):
     def __deepcopy__(self, memo):
         clone = self.__class__(self.model)
         for k, v in self.__dict__.items():
-            if k in ['_con', '_cur', '_result_cache', '_result_idx']: # don't clone these
+            if k in ['_con', '_cur', '_result_cache', '_result_idx']:  # don't clone these
                 clone.__dict__[k] = None
             elif k == '_batch':
                 # we need to keep the same batch instance across
@@ -284,7 +291,7 @@ class AbstractQuerySet(object):
         self._execute_query()
         return len(self._result_cache)
 
-    #----query generation / execution----
+    # ----query generation / execution----
 
     def _select_fields(self):
         """ returns the fields to select """
@@ -308,7 +315,7 @@ class AbstractQuerySet(object):
             allow_filtering=self._allow_filtering
         )
 
-    #----Reads------
+    # ----Reads------
 
     def _execute_query(self):
         if self._batch:
@@ -330,7 +337,7 @@ class AbstractQuerySet(object):
                 self._result_idx += 1
                 self._result_cache[self._result_idx] = self._construct_result(self._result_cache[self._result_idx])
 
-            #return the connection to the connection pool if we have all objects
+            # return the connection to the connection pool if we have all objects
             if self._result_cache and self._result_idx == (len(self._result_cache) - 1):
                 self._con = None
                 self._cur = None
@@ -350,7 +357,7 @@ class AbstractQuerySet(object):
         num_results = len(self._result_cache)
 
         if isinstance(s, slice):
-            #calculate the amount of results that need to be loaded
+            # calculate the amount of results that need to be loaded
             end = num_results if s.step is None else s.step
             if end < 0:
                 end += num_results
@@ -359,11 +366,12 @@ class AbstractQuerySet(object):
             self._fill_result_cache_to_idx(end)
             return self._result_cache[s.start:s.stop:s.step]
         else:
-            #return the object at this index
+            # return the object at this index
             s = int(s)
 
-            #handle negative indexing
-            if s < 0: s += num_results
+            # handle negative indexing
+            if s < 0:
+                s += num_results
 
             if s >= num_results:
                 raise IndexError
@@ -453,7 +461,6 @@ class AbstractQuerySet(object):
                     if not isinstance(val, Token):
                         raise QueryException("Virtual column 'pk__token' may only be compared to Token() values")
                     column = columns._PartitionKeysToken(self.model)
-                    quote_field = False
                 else:
                     raise QueryException("Can't resolve column name: '{}'".format(col_name))
 
@@ -484,7 +491,7 @@ class AbstractQuerySet(object):
 
         Returns a QuerySet filtered on the keyword arguments
         """
-        #add arguments to the where clause filters
+        # add arguments to the where clause filters
         if len([x for x in kwargs.values() if x is None]):
             raise CQLEngineException("None values on filter are not allowed")
 
@@ -497,7 +504,7 @@ class AbstractQuerySet(object):
         for arg, val in kwargs.items():
             col_name, col_op = self._parse_filter_arg(arg)
             quote_field = True
-            #resolve column and operator
+            # resolve column and operator
             try:
                 column = self.model._get_column(col_name)
             except KeyError:
@@ -519,7 +526,7 @@ class AbstractQuerySet(object):
                             len(val.value), len(partition_columns)))
                 val.set_columns(partition_columns)
 
-            #get query operator, or use equals if not supplied
+            # get query operator, or use equals if not supplied
             operator_class = BaseWhereOperator.get_operator(col_op or 'EQ')
             operator = operator_class()
 
@@ -559,8 +566,7 @@ class AbstractQuerySet(object):
         if len(self._result_cache) == 0:
             raise self.model.DoesNotExist
         elif len(self._result_cache) > 1:
-            raise self.model.MultipleObjectsReturned(
-                    '{} objects found'.format(len(self._result_cache)))
+            raise self.model.MultipleObjectsReturned('{} objects found'.format(len(self._result_cache)))
         else:
             return self[0]
 
@@ -665,7 +671,7 @@ class AbstractQuerySet(object):
         if clone._defer_fields or clone._only_fields:
             raise QueryException("QuerySet alread has only or defer fields defined")
 
-        #check for strange fields
+        # check for strange fields
         missing_fields = [f for f in fields if f not in self.model._columns.keys()]
         if missing_fields:
             raise QueryException(
@@ -698,7 +704,7 @@ class AbstractQuerySet(object):
         """
         Deletes the contents of a query
         """
-        #validate where clause
+        # validate where clause
         partition_key = [x for x in self.model._primary_keys.values()][0]
         if not any([c.field == partition_key.column_name for c in self._where]):
             raise QueryException("The partition key must be defined on delete queries")
@@ -759,14 +765,14 @@ class ModelQuerySet(AbstractQuerySet):
     """
     def _validate_select_where(self):
         """ Checks that a filterset will not create invalid select statement """
-        #check that there's either a = or IN relationship with a primary key or indexed field
+        # check that there's either a = or IN relationship with a primary key or indexed field
         equal_ops = [self.model._columns.get(w.field) for w in self._where if isinstance(w.operator, EqualsOperator)]
         token_comparison = any([w for w in self._where if isinstance(w.value, Token)])
         if not any([w.primary_key or w.index for w in equal_ops]) and not token_comparison and not self._allow_filtering:
             raise QueryException('Where clauses require either a "=" or "IN" comparison with either a primary key or indexed field')
 
         if not self._allow_filtering:
-            #if the query is not on an indexed field
+            # if the query is not on an indexed field
             if not any([w.index for w in equal_ops]):
                 if not any([w.partition_key for w in equal_ops]) and not token_comparison:
                     raise QueryException('Filtering on a clustering key without a partition key is not allowed unless allow_filtering() is called on the querset')
@@ -783,9 +789,9 @@ class ModelQuerySet(AbstractQuerySet):
 
     def _get_result_constructor(self):
         """ Returns a function that will be used to instantiate query results """
-        if not self._values_list: # we want models
+        if not self._values_list:  # we want models
             return lambda rows: self.model._construct_instance(rows)
-        elif self._flat_values_list: # the user has requested flattened list (1 value per row)
+        elif self._flat_values_list:  # the user has requested flattened list (1 value per row)
             return lambda row: row.popitem()[1]
         else:
             return lambda row: self._get_row_value_list(self._only_fields, row)
@@ -803,7 +809,7 @@ class ModelQuerySet(AbstractQuerySet):
         if column is None:
             raise QueryException("Can't resolve the column name: '{}'".format(colname))
 
-        #validate the column selection
+        # validate the column selection
         if not column.primary_key:
             raise QueryException(
                 "Can't order on '{}', can only order on (clustered) primary keys".format(colname))
@@ -958,7 +964,7 @@ class ModelQuerySet(AbstractQuerySet):
 
             # we should not provide default values in this use case.
             val = col.validate(val)
-            
+
             if val is None:
                 nulled_columns.add(col_name)
                 continue
@@ -1072,11 +1078,11 @@ class DMLQuery(object):
                                     timestamp=self._timestamp, transactions=self._transaction)
         for name, col in self.instance._clustering_keys.items():
             null_clustering_key = null_clustering_key and col._val_is_null(getattr(self.instance, name, None))
-        #get defined fields and their column names
+        # get defined fields and their column names
         for name, col in self.model._columns.items():
             # if clustering key is null, don't include non static columns
             if null_clustering_key and not col.static and not col.partition_key:
-                continue 
+                continue
             if not col.is_primary_key:
                 val = getattr(self.instance, name, None)
                 val_mgr = self.instance._values[name]
@@ -1088,19 +1094,24 @@ class DMLQuery(object):
                 # don't update something if it hasn't changed
                 if not val_mgr.changed and not isinstance(col, columns.Counter):
                     continue
-                
+
                 static_changed_only = static_changed_only and col.static
                 if isinstance(col, (columns.BaseContainerColumn, columns.Counter)):
                     # get appropriate clause
-                    if isinstance(col, columns.List): klass = ListUpdateClause
-                    elif isinstance(col, columns.Map): klass = MapUpdateClause
-                    elif isinstance(col, columns.Set): klass = SetUpdateClause
-                    elif isinstance(col, columns.Counter): klass = CounterUpdateClause
-                    else: raise RuntimeError
+                    if isinstance(col, columns.List):
+                        klass = ListUpdateClause
+                    elif isinstance(col, columns.Map):
+                        klass = MapUpdateClause
+                    elif isinstance(col, columns.Set):
+                        klass = SetUpdateClause
+                    elif isinstance(col, columns.Counter):
+                        klass = CounterUpdateClause
+                    else:
+                        raise RuntimeError
 
                     # do the stuff
                     clause = klass(col.db_field_name, val,
-                            previous=val_mgr.previous_value, column=col)
+                                   previous=val_mgr.previous_value, column=col)
                     if clause.get_context_size() > 0:
                         statement.add_assignment_clause(clause)
                 else:
@@ -1145,7 +1156,7 @@ class DMLQuery(object):
                 static_save_only = static_save_only and col._val_is_null(getattr(self.instance, name, None))
             for name, col in self.instance._columns.items():
                 if static_save_only and not col.static and not col.partition_key:
-                    continue 
+                    continue
                 val = getattr(self.instance, name, None)
                 if col._val_is_null(val):
                     if self.instance._values[name].changed:
@@ -1171,7 +1182,9 @@ class DMLQuery(object):
 
         ds = DeleteStatement(self.column_family_name, timestamp=self._timestamp)
         for name, col in self.model._primary_keys.items():
-            if (not col.partition_key) and (getattr(self.instance, name) is None): continue
+            if (not col.partition_key) and (getattr(self.instance, name) is None):
+                continue
+
             ds.add_where_clause(WhereClause(
                 col.db_field_name,
                 EqualsOperator(),

@@ -1,4 +1,5 @@
 import re
+import six
 
 from cassandra.cqlengine import columns
 from cassandra.cqlengine.exceptions import ModelException, CQLEngineException, ValidationError
@@ -7,15 +8,19 @@ from cassandra.cqlengine.query import DoesNotExist as _DoesNotExist
 from cassandra.cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
 from cassandra.util import OrderedDict
 
-class ModelDefinitionException(ModelException): pass
+
+class ModelDefinitionException(ModelException):
+    pass
 
 
-class PolyMorphicModelException(ModelException): pass
+class PolyMorphicModelException(ModelException):
+    pass
 
-DEFAULT_KEYSPACE = None
 
 class UndefinedKeyspaceWarning(Warning):
     pass
+
+DEFAULT_KEYSPACE = None
 
 
 class hybrid_classmethod(object):
@@ -106,7 +111,7 @@ class TTLDescriptor(object):
     """
     def __get__(self, instance, model):
         if instance:
-            #instance = copy.deepcopy(instance)
+            # instance = copy.deepcopy(instance)
             # instance method
             def ttl_setter(ts):
                 instance._ttl = ts
@@ -124,6 +129,7 @@ class TTLDescriptor(object):
     def __call__(self, *args, **kwargs):
         raise NotImplementedError
 
+
 class TimestampDescriptor(object):
     """
     returns a query set descriptor with a timestamp specified
@@ -138,9 +144,9 @@ class TimestampDescriptor(object):
 
         return model.objects.timestamp
 
-
     def __call__(self, *args, **kwargs):
         raise NotImplementedError
+
 
 class IfNotExistsDescriptor(object):
     """
@@ -159,13 +165,14 @@ class IfNotExistsDescriptor(object):
     def __call__(self, *args, **kwargs):
         raise NotImplementedError
 
+
 class ConsistencyDescriptor(object):
     """
     returns a query set descriptor if called on Class, instance if it was an instance call
     """
     def __get__(self, instance, model):
         if instance:
-            #instance = copy.deepcopy(instance)
+            # instance = copy.deepcopy(instance)
             def consistency_setter(consistency):
                 instance.__consistency__ = consistency
                 return instance
@@ -229,7 +236,7 @@ class ColumnDescriptor(object):
         """
         try:
             return instance._values[self.column.column_name].getval()
-        except AttributeError as e:
+        except AttributeError:
             return self.query_evaluator
 
     def __set__(self, instance, value):
@@ -258,9 +265,11 @@ class BaseModel(object):
     The base model class, don't inherit from this, inherit from Model, defined below
     """
 
-    class DoesNotExist(_DoesNotExist): pass
+    class DoesNotExist(_DoesNotExist):
+        pass
 
-    class MultipleObjectsReturned(_MultipleObjectsReturned): pass
+    class MultipleObjectsReturned(_MultipleObjectsReturned):
+        pass
 
     objects = QuerySetDescriptor()
     ttl = TTLDescriptor()
@@ -269,7 +278,7 @@ class BaseModel(object):
 
     # custom timestamps, see USING TIMESTAMP X
     timestamp = TimestampDescriptor()
-    
+
     if_not_exists = IfNotExistsDescriptor()
 
     # _len is lazily created by __len__
@@ -302,8 +311,7 @@ class BaseModel(object):
     __queryset__ = ModelQuerySet
     __dmlquery__ = DMLQuery
 
-    __consistency__ = None # can be set per query
-
+    __consistency__ = None  # can be set per query
 
     # Additional table properties
     __bloom_filter_fp_chance__ = None
@@ -318,9 +326,9 @@ class BaseModel(object):
     __read_repair_chance__ = None
     __replicate_on_write__ = None
 
-    _timestamp = None # optional timestamp to include with the operation (USING TIMESTAMP)
+    _timestamp = None  # optional timestamp to include with the operation (USING TIMESTAMP)
 
-    _if_not_exists = False # optional if_not_exists flag to check existence before insertion
+    _if_not_exists = False  # optional if_not_exists flag to check existence before insertion
 
     def __init__(self, **values):
         self._values = {}
@@ -343,21 +351,19 @@ class BaseModel(object):
         self._batch = None
         self._timeout = NOT_SET
 
-
     def __repr__(self):
         """
         Pretty printing of models by their primary key
         """
         return '{} <{}>'.format(self.__class__.__name__,
-                                ', '.join(('{}={}'.format(k, getattr(self, k)) for k,v in six.iteritems(self._primary_keys)))
+                                ', '.join(('{}={}'.format(k, getattr(self, k)) for k, v in six.iteritems(self._primary_keys)))
                                 )
-
-
 
     @classmethod
     def _discover_polymorphic_submodels(cls):
         if not cls._is_polymorphic_base:
             raise ModelException('_discover_polymorphic_submodels can only be called on polymorphic base classes')
+
         def _discover(klass):
             if not klass._is_polymorphic_base and klass.__polymorphic_key__ is not None:
                 cls._polymorphic_map[klass.__polymorphic_key__] = klass
@@ -381,7 +387,7 @@ class BaseModel(object):
         # and translate that into our local fields
         # the db_map is a db_field -> model field map
         items = values.items()
-        field_dict = dict([(cls._db_map.get(k, k),v) for k,v in items])
+        field_dict = dict([(cls._db_map.get(k, k), v) for k, v in items])
 
         if cls._is_polymorphic:
             poly_key = field_dict.get(cls._polymorphic_column_name)
@@ -421,8 +427,9 @@ class BaseModel(object):
 
         :return:
         """
-        if not self._is_persisted: return False
-        pks = self._primary_keys.keys()
+        if not self._is_persisted:
+            return False
+
         return all([not self._values[k].changed for k in self._primary_keys])
 
     @classmethod
@@ -481,11 +488,14 @@ class BaseModel(object):
             ccase = lambda s: camelcase.sub(lambda v: '{}_{}'.format(v.group(1), v.group(2).lower()), s)
 
             cf_name += ccase(cls.__name__)
-            #trim to less than 48 characters or cassandra will complain
+            # trim to less than 48 characters or cassandra will complain
             cf_name = cf_name[-48:]
             cf_name = cf_name.lower()
             cf_name = re.sub(r'^_+', '', cf_name)
-        if not include_keyspace: return cf_name
+
+        if not include_keyspace:
+            return cf_name
+
         return '{}.{}'.format(cls._get_keyspace(), cf_name)
 
     def validate(self):
@@ -499,8 +509,7 @@ class BaseModel(object):
             val = col.validate(v)
             setattr(self, name, val)
 
-    ### Let an instance be used like a dict of its columns keys/values
-
+    # Let an instance be used like a dict of its columns keys/values
     def __iter__(self):
         """ Iterate over column ids. """
         for column_id in self._columns.keys():
@@ -620,7 +629,6 @@ class BaseModel(object):
             else:
                 setattr(self, self._polymorphic_column_name, self.__polymorphic_key__)
 
-        is_new = self.pk is None
         self.validate()
         self.__dmlquery__(self.__class__, self,
                           batch=self._batch,
@@ -631,7 +639,7 @@ class BaseModel(object):
                           transaction=self._transaction,
                           timeout=self._timeout).save()
 
-        #reset the value managers
+        # reset the value managers
         for v in self._values.values():
             v.reset_previous_value()
         self._is_persisted = True
@@ -680,7 +688,7 @@ class BaseModel(object):
                           transaction=self._transaction,
                           timeout=self._timeout).update()
 
-        #reset the value managers
+        # reset the value managers
         for v in self._values.values():
             v.reset_previous_value()
         self._is_persisted = True
@@ -704,7 +712,7 @@ class BaseModel(object):
         """
         Returns a list of the columns that have been updated since instantiation or save
         """
-        return [k for k,v in self._values.items() if v.changed]
+        return [k for k, v in self._values.items() if v.changed]
 
     @classmethod
     def _class_batch(cls, batch):
@@ -715,29 +723,28 @@ class BaseModel(object):
         self._batch = batch
         return self
 
-
     batch = hybrid_classmethod(_class_batch, _inst_batch)
 
 
 class ModelMetaClass(type):
 
     def __new__(cls, name, bases, attrs):
-        #move column definitions into columns dict
-        #and set default column names
+        # move column definitions into columns dict
+        # and set default column names
         column_dict = OrderedDict()
         primary_keys = OrderedDict()
         pk_name = None
 
-        #get inherited properties
+        # get inherited properties
         inherited_columns = OrderedDict()
         for base in bases:
-            for k,v in getattr(base, '_defined_columns', {}).items():
-                inherited_columns.setdefault(k,v)
+            for k, v in getattr(base, '_defined_columns', {}).items():
+                inherited_columns.setdefault(k, v)
 
-        #short circuit __abstract__ inheritance
+        # short circuit __abstract__ inheritance
         is_abstract = attrs['__abstract__'] = attrs.get('__abstract__', False)
 
-        #short circuit __polymorphic_key__ inheritance
+        # short circuit __polymorphic_key__ inheritance
         attrs['__polymorphic_key__'] = attrs.get('__polymorphic_key__', None)
 
         def _transform_column(col_name, col_obj):
@@ -745,11 +752,10 @@ class ModelMetaClass(type):
             if col_obj.primary_key:
                 primary_keys[col_name] = col_obj
             col_obj.set_column_name(col_name)
-            #set properties
+            # set properties
             attrs[col_name] = ColumnDescriptor(col_obj)
 
-        column_definitions = [(k,v) for k,v in attrs.items() if isinstance(v, columns.Column)]
-        #column_definitions = sorted(column_definitions, lambda x,y: cmp(x[1].position, y[1].position))
+        column_definitions = [(k, v) for k, v in attrs.items() if isinstance(v, columns.Column)]
         column_definitions = sorted(column_definitions, key=lambda x: x[1].position)
 
         is_polymorphic_base = any([c[1].polymorphic_key for c in column_definitions])
@@ -780,7 +786,7 @@ class ModelMetaClass(type):
         defined_columns = OrderedDict(column_definitions)
 
         # check for primary key
-        if not is_abstract and not any([v.primary_key for k,v in column_definitions]):
+        if not is_abstract and not any([v.primary_key for k, v in column_definitions]):
             raise ModelDefinitionException("At least 1 primary key is required.")
 
         counter_columns = [c for c in defined_columns.values() if isinstance(c, columns.Counter)]
@@ -790,7 +796,7 @@ class ModelMetaClass(type):
 
         has_partition_keys = any(v.partition_key for (k, v) in column_definitions)
 
-        #transform column definitions
+        # transform column definitions
         for k, v in column_definitions:
             # don't allow a column with the same name as a built-in attribute or method
             if k in BaseModel.__dict__:
@@ -810,7 +816,7 @@ class ModelMetaClass(type):
         partition_keys = OrderedDict(k for k in primary_keys.items() if k[1].partition_key)
         clustering_keys = OrderedDict(k for k in primary_keys.items() if not k[1].partition_key)
 
-        #setup partition key shortcut
+        # setup partition key shortcut
         if len(partition_keys) == 0:
             if not is_abstract:
                 raise ModelException("at least one partition key must be defined")
@@ -835,12 +841,12 @@ class ModelMetaClass(type):
                 raise ModelException("invalid clustering order {} for column {}".format(repr(v.clustering_order), v.db_field_name))
             col_names.add(v.db_field_name)
 
-        #create db_name -> model name map for loading
+        # create db_name -> model name map for loading
         db_map = {}
         for field_name, col in column_dict.items():
             db_map[col.db_field_name] = field_name
 
-        #add management members to the class
+        # add management members to the class
         attrs['_columns'] = column_dict
         attrs['_primary_keys'] = primary_keys
         attrs['_defined_columns'] = defined_columns
@@ -862,28 +868,30 @@ class ModelMetaClass(type):
         attrs['_polymorphic_column_name'] = polymorphic_column_name
         attrs['_polymorphic_map'] = {} if is_polymorphic_base else None
 
-        #setup class exceptions
+        # setup class exceptions
         DoesNotExistBase = None
         for base in bases:
             DoesNotExistBase = getattr(base, 'DoesNotExist', None)
-            if DoesNotExistBase is not None: break
+            if DoesNotExistBase is not None:
+                break
+
         DoesNotExistBase = DoesNotExistBase or attrs.pop('DoesNotExist', BaseModel.DoesNotExist)
         attrs['DoesNotExist'] = type('DoesNotExist', (DoesNotExistBase,), {})
 
         MultipleObjectsReturnedBase = None
         for base in bases:
             MultipleObjectsReturnedBase = getattr(base, 'MultipleObjectsReturned', None)
-            if MultipleObjectsReturnedBase is not None: break
+            if MultipleObjectsReturnedBase is not None:
+                break
+
         MultipleObjectsReturnedBase = DoesNotExistBase or attrs.pop('MultipleObjectsReturned', BaseModel.MultipleObjectsReturned)
         attrs['MultipleObjectsReturned'] = type('MultipleObjectsReturned', (MultipleObjectsReturnedBase,), {})
 
-        #create the class and add a QuerySet to it
+        # create the class and add a QuerySet to it
         klass = super(ModelMetaClass, cls).__new__(cls, name, bases, attrs)
 
         return klass
 
-
-import six
 
 @six.add_metaclass(ModelMetaClass)
 class Model(BaseModel):
@@ -906,7 +914,7 @@ class Model(BaseModel):
     __default_ttl__ = None
     """
     *Optional* The default ttl used by this model.
-    
+
     This can be overridden by using the :meth:`~.ttl` method.
     """
 

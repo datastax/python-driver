@@ -3,6 +3,7 @@ from cassandra.cqlengine.query import AbstractQueryableColumn, SimpleQuerySet
 from cassandra.cqlengine.query import DoesNotExist as _DoesNotExist
 from cassandra.cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
 
+
 class QuerySetDescriptor(object):
     """
     returns a fresh queryset for the given model
@@ -63,8 +64,11 @@ class NamedTable(object):
 
     objects = QuerySetDescriptor()
 
-    class DoesNotExist(_DoesNotExist): pass
-    class MultipleObjectsReturned(_MultipleObjectsReturned): pass
+    class DoesNotExist(_DoesNotExist):
+        pass
+
+    class MultipleObjectsReturned(_MultipleObjectsReturned):
+        pass
 
     def __init__(self, keyspace, name):
         self.keyspace = keyspace
@@ -118,4 +122,3 @@ class NamedKeyspace(object):
         name that belongs to this keyspace
         """
         return NamedTable(self.name, name)
-

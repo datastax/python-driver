@@ -1,4 +1,3 @@
-#column field types
 from copy import deepcopy, copy
 from datetime import datetime
 from datetime import date
@@ -86,7 +85,7 @@ class ValueQuoter(object):
 
 class Column(object):
 
-    #the cassandra type this column maps to
+    # the cassandra type this column maps to
     db_type = None
     value_manager = BaseValueManager
 
@@ -161,13 +160,13 @@ class Column(object):
         self.required = required
         self.clustering_order = clustering_order
         self.polymorphic_key = polymorphic_key
-        #the column name in the model definition
+        # the column name in the model definition
         self.column_name = None
         self.static = static
 
         self.value = None
 
-        #keep track of instantiation order
+        # keep track of instantiation order
         self.position = Column.instance_counter
         Column.instance_counter += 1
 
@@ -266,16 +265,17 @@ class Blob(Column):
         return bytearray(val)
 
     def to_python(self, value):
-        #return value[2:].decode('hex')
         return value
 
 Bytes = Blob
+
 
 class Ascii(Column):
     """
     Stores a US-ASCII character string
     """
     db_type = 'ascii'
+
 
 class Inet(Column):
     """
@@ -309,7 +309,8 @@ class Text(Column):
 
     def validate(self, value):
         value = super(Text, self).validate(value)
-        if value is None: return
+        if value is None:
+            return
         if not isinstance(value, (six.string_types, bytearray)) and value is not None:
             raise ValidationError('{} {} is not a string'.format(self.column_name, type(value)))
         if self.max_length:
@@ -330,7 +331,8 @@ class Integer(Column):
 
     def validate(self, value):
         val = super(Integer, self).validate(value)
-        if val is None: return
+        if val is None:
+            return
         try:
             return int(val)
         except (TypeError, ValueError):
@@ -409,7 +411,8 @@ class DateTime(Column):
     db_type = 'timestamp'
 
     def to_python(self, value):
-        if value is None: return
+        if value is None:
+            return
         if isinstance(value, datetime):
             return value
         elif isinstance(value, date):
@@ -421,7 +424,8 @@ class DateTime(Column):
 
     def to_database(self, value):
         value = super(DateTime, self).to_database(value)
-        if value is None: return
+        if value is None:
+            return
         if not isinstance(value, datetime):
             if isinstance(value, date):
                 value = datetime(value.year, value.month, value.day)
@@ -443,7 +447,8 @@ class Date(Column):
     db_type = 'timestamp'
 
     def to_python(self, value):
-        if value is None: return
+        if value is None:
+            return
         if isinstance(value, datetime):
             return value.date()
         elif isinstance(value, date):
@@ -455,7 +460,8 @@ class Date(Column):
 
     def to_database(self, value):
         value = super(Date, self).to_database(value)
-        if value is None: return
+        if value is None:
+            return
         if isinstance(value, datetime):
             value = value.date()
         if not isinstance(value, date):
@@ -474,9 +480,11 @@ class UUID(Column):
 
     def validate(self, value):
         val = super(UUID, self).validate(value)
-        if val is None: return
+        if val is None:
+            return
         from uuid import UUID as _UUID
-        if isinstance(val, _UUID): return val
+        if isinstance(val, _UUID):
+            return val
         if isinstance(val, six.string_types) and self.re_uuid.match(val):
             return _UUID(val)
         raise ValidationError("{} {} is not a valid uuid".format(self.column_name, value))
@@ -510,7 +518,7 @@ class TimeUUID(UUID):
 
         epoch = datetime(1970, 1, 1, tzinfo=dt.tzinfo)
         offset = epoch.tzinfo.utcoffset(epoch).total_seconds() if epoch.tzinfo else 0
-        timestamp = (dt  - epoch).total_seconds() - offset
+        timestamp = (dt - epoch).total_seconds() - offset
 
         node = None
         clock_seq = None
@@ -529,7 +537,7 @@ class TimeUUID(UUID):
         if node is None:
             node = getnode()
         return pyUUID(fields=(time_low, time_mid, time_hi_version,
-                            clock_seq_hi_variant, clock_seq_low, node), version=1)
+                              clock_seq_hi_variant, clock_seq_low, node), version=1)
 
 
 class Boolean(Column):
@@ -563,7 +571,8 @@ class Float(Column):
 
     def validate(self, value):
         value = super(Float, self).validate(value)
-        if value is None: return
+        if value is None:
+            return
         try:
             return float(value)
         except (TypeError, ValueError):
@@ -586,7 +595,8 @@ class Decimal(Column):
         from decimal import Decimal as _Decimal
         from decimal import InvalidOperation
         val = super(Decimal, self).validate(value)
-        if val is None: return
+        if val is None:
+            return
         try:
             return _Decimal(val)
         except InvalidOperation:
@@ -679,7 +689,8 @@ class Set(BaseContainerColumn):
 
     def validate(self, value):
         val = super(Set, self).validate(value)
-        if val is None: return
+        if val is None:
+            return
         types = (set,) if self.strict else (set, list, tuple)
         if not isinstance(val, types):
             if self.strict:
@@ -693,16 +704,17 @@ class Set(BaseContainerColumn):
         return {self.value_col.validate(v) for v in val}
 
     def to_python(self, value):
-        if value is None: return set()
+        if value is None:
+            return set()
         return {self.value_col.to_python(v) for v in value}
 
     def to_database(self, value):
-        if value is None: return None
+        if value is None:
+            return None
 
-        if isinstance(value, self.Quoter): return value
+        if isinstance(value, self.Quoter):
+            return value
         return self.Quoter({self.value_col.to_database(v) for v in value})
-
-
 
 
 class List(BaseContainerColumn):
@@ -727,7 +739,8 @@ class List(BaseContainerColumn):
 
     def validate(self, value):
         val = super(List, self).validate(value)
-        if val is None: return
+        if val is None:
+            return
         if not isinstance(val, (set, list, tuple)):
             raise ValidationError('{} {} is not a list object'.format(self.column_name, val))
         if None in val:
@@ -735,12 +748,15 @@ class List(BaseContainerColumn):
         return [self.value_col.validate(v) for v in val]
 
     def to_python(self, value):
-        if value is None: return []
+        if value is None:
+            return []
         return [self.value_col.to_python(v) for v in value]
 
     def to_database(self, value):
-        if value is None: return None
-        if isinstance(value, self.Quoter): return value
+        if value is None:
+            return None
+        if isinstance(value, self.Quoter):
+            return value
         return self.Quoter([self.value_col.to_database(v) for v in value])
 
 
@@ -757,7 +773,7 @@ class Map(BaseContainerColumn):
 
         def __str__(self):
             cq = cql_quote
-            return '{' + ', '.join([cq(k) + ':' + cq(v) for k,v in self.value.items()]) + '}'
+            return '{' + ', '.join([cq(k) + ':' + cq(v) for k, v in self.value.items()]) + '}'
 
         def get(self, key):
             return self.value.get(key)
@@ -802,22 +818,24 @@ class Map(BaseContainerColumn):
 
     def validate(self, value):
         val = super(Map, self).validate(value)
-        if val is None: return
+        if val is None:
+            return
         if not isinstance(val, dict):
             raise ValidationError('{} {} is not a dict object'.format(self.column_name, val))
-        return {self.key_col.validate(k):self.value_col.validate(v) for k,v in val.items()}
+        return {self.key_col.validate(k): self.value_col.validate(v) for k, v in val.items()}
 
     def to_python(self, value):
         if value is None:
             return {}
         if value is not None:
-            return {self.key_col.to_python(k): self.value_col.to_python(v) for k,v in value.items()}
+            return {self.key_col.to_python(k): self.value_col.to_python(v) for k, v in value.items()}
 
     def to_database(self, value):
-        if value is None: return None
-        if isinstance(value, self.Quoter): return value
-        return self.Quoter({self.key_col.to_database(k):self.value_col.to_database(v) for k,v in value.items()})
-
+        if value is None:
+            return None
+        if isinstance(value, self.Quoter):
+            return value
+        return self.Quoter({self.key_col.to_database(k): self.value_col.to_database(v) for k, v in value.items()})
 
 
 class _PartitionKeysToken(Column):
@@ -842,4 +860,3 @@ class _PartitionKeysToken(Column):
 
     def get_cql(self):
         return "token({})".format(", ".join(c.cql for c in self.partition_columns))
-

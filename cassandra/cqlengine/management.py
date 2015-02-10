@@ -12,10 +12,11 @@ from cassandra.cqlengine.named import NamedTable
 
 Field = namedtuple('Field', ['name', 'type'])
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 # system keyspaces
 schema_columnfamilies = NamedTable('system', 'schema_columnfamilies')
+
 
 def create_keyspace(name, strategy_class, replication_factor, durable_writes=True, **replication_values):
     """
@@ -38,10 +39,10 @@ def create_keyspace(name, strategy_class, replication_factor, durable_writes=Tru
     cluster = get_cluster()
 
     if name not in cluster.metadata.keyspaces:
-        #try the 1.2 method
+        # try the 1.2 method
         replication_map = {
             'class': strategy_class,
-            'replication_factor':replication_factor
+            'replication_factor': replication_factor
         }
         replication_map.update(replication_values)
         if strategy_class.lower() != 'simplestrategy':
@@ -76,6 +77,7 @@ def delete_keyspace(name):
     if name in cluster.metadata.keyspaces:
         execute("DROP KEYSPACE {}".format(name))
 
+
 def sync_table(model):
     """
     Inspects the model and creates / updates the corresponding table and columns.
@@ -95,8 +97,7 @@ def sync_table(model):
     if model.__abstract__:
         raise CQLEngineException("cannot create table from abstract model")
 
-
-    #construct query string
+    # construct query string
     cf_name = model.column_family_name()
     raw_cf_name = model.column_family_name(include_keyspace=False)
 
@@ -107,7 +108,7 @@ def sync_table(model):
     keyspace = cluster.metadata.keyspaces[ks_name]
     tables = keyspace.tables
 
-    #check for an existing column family
+    # check for an existing column family
     if raw_cf_name not in tables:
         qs = get_create_table(model)
 
@@ -123,20 +124,21 @@ def sync_table(model):
         fields = get_fields(model)
         field_names = [x.name for x in fields]
         for name, col in model._columns.items():
-            if col.primary_key or col.partition_key: continue # we can't mess with the PK
-            if col.db_field_name in field_names: continue # skip columns already defined
+            if col.primary_key or col.partition_key:
+                continue  # we can't mess with the PK
+            if col.db_field_name in field_names:
+                continue  # skip columns already defined
 
             # add missing column using the column def
             query = "ALTER TABLE {} add {}".format(cf_name, col.get_column_def())
-            logger.debug(query)
+            log.debug(query)
             execute(query)
 
         update_compaction(model)
 
-
     table = cluster.metadata.keyspaces[ks_name].tables[raw_cf_name]
 
-    indexes = [c for n,c in model._columns.items() if c.index]
+    indexes = [c for n, c in model._columns.items() if c.index]
 
     for column in indexes:
         if table.columns[column.db_field_name].index:
@@ -148,20 +150,23 @@ def sync_table(model):
         qs = ' '.join(qs)
         execute(qs)
 
+
 def get_create_table(model):
     cf_name = model.column_family_name()
     qs = ['CREATE TABLE {}'.format(cf_name)]
 
-    #add column types
-    pkeys = [] # primary keys
-    ckeys = [] # clustering keys
-    qtypes = [] # field types
+    # add column types
+    pkeys = []  # primary keys
+    ckeys = []  # clustering keys
+    qtypes = []  # field types
+
     def add_column(col):
         s = col.get_column_def()
         if col.primary_key:
             keys = (pkeys if col.partition_key else ckeys)
             keys.append('"{}"'.format(col.db_field_name))
         qtypes.append(s)
+
     for name, col in model._columns.items():
         add_column(col)
 
@@ -172,9 +177,9 @@ def get_create_table(model):
     with_qs = []
 
     table_properties = ['bloom_filter_fp_chance', 'caching', 'comment',
-        'dclocal_read_repair_chance', 'default_time_to_live', 'gc_grace_seconds',
-        'index_interval', 'memtable_flush_period_in_ms', 'populate_io_cache_on_flush',
-        'read_repair_chance', 'replicate_on_write']
+                        'dclocal_read_repair_chance', 'default_time_to_live', 'gc_grace_seconds',
+                        'index_interval', 'memtable_flush_period_in_ms', 'populate_io_cache_on_flush',
+                        'read_repair_chance', 'replicate_on_write']
     for prop_name in table_properties:
         prop_value = getattr(model, '__{}__'.format(prop_name), None)
         if prop_value is not None:
@@ -211,9 +216,9 @@ def get_compaction_options(model):
     if not model.__compaction__:
         return {}
 
-    result = {'class':model.__compaction__}
+    result = {'class': model.__compaction__}
 
-    def setter(key, limited_to_strategy = None):
+    def setter(key, limited_to_strategy=None):
         """
         sets key in result, checking if the key is limited to either SizeTiered or Leveled
         :param key: one of the compaction options, like "bucket_high"
@@ -270,6 +275,7 @@ def get_table_settings(model):
     table = cluster.metadata.keyspaces[ks].tables[table]
     return table
 
+
 def update_compaction(model):
     """Updates the compaction options for the given model if necessary.
 
@@ -279,7 +285,7 @@ def update_compaction(model):
         `False` otherwise.
     :rtype: bool
     """
-    logger.debug("Checking %s for compaction differences", model)
+    log.debug("Checking %s for compaction differences", model)
     table = get_table_settings(model)
 
     existing_options = table.options.copy()
@@ -311,7 +317,7 @@ def update_compaction(model):
         options = json.dumps(options).replace('"', "'")
         cf_name = model.column_family_name()
         query = "ALTER TABLE {} with compaction = {}".format(cf_name, options)
-        logger.debug(query)
+        log.debug(query)
         execute(query)
         return True
 
@@ -339,6 +345,3 @@ def drop_table(model):
         execute('drop table {};'.format(model.column_family_name(include_keyspace=True)))
     except KeyError:
         pass
-
-
-

@@ -2,7 +2,9 @@ import six
 import sys
 
 
-class QueryOperatorException(Exception): pass
+class QueryOperatorException(Exception):
+    pass
+
 
 # move to central spot
 class UnicodeMixin(object):
@@ -31,12 +33,14 @@ class BaseQueryOperator(UnicodeMixin):
             raise QueryOperatorException("get_operator can only be called from a BaseQueryOperator subclass")
         if not hasattr(cls, 'opmap'):
             cls.opmap = {}
+
             def _recurse(klass):
                 if klass.symbol:
                     cls.opmap[klass.symbol.upper()] = klass
                 for subklass in klass.__subclasses__():
                     _recurse(subklass)
                 pass
+
             _recurse(cls)
         try:
             return cls.opmap[symbol.upper()]

@@ -7,7 +7,8 @@ from cassandra.cqlengine.functions import QueryValue
 from cassandra.cqlengine.operators import BaseWhereOperator, InOperator
 
 
-class StatementException(Exception): pass
+class StatementException(Exception):
+    pass
 
 
 class UnicodeMixin(object):
@@ -15,6 +16,7 @@ class UnicodeMixin(object):
         __str__ = lambda x: x.__unicode__()
     else:
         __str__ = lambda x: six.text_type(x).encode('utf-8')
+
 
 class ValueQuoter(UnicodeMixin):
 
@@ -28,7 +30,7 @@ class ValueQuoter(UnicodeMixin):
         elif isinstance(self.value, (list, tuple)):
             return '[' + ', '.join([cql_quote(v) for v in self.value]) + ']'
         elif isinstance(self.value, dict):
-            return '{' + ', '.join([cql_quote(k) + ':' + cql_quote(v) for k,v in self.value.items()]) + '}'
+            return '{' + ', '.join([cql_quote(k) + ':' + cql_quote(v) for k, v in self.value.items()]) + '}'
         elif isinstance(self.value, set):
             return '{' + ', '.join([cql_quote(v) for v in self.value]) + '}'
         return cql_quote(self.value)
@@ -215,7 +217,8 @@ class SetUpdateClause(ContainerUpdateClause):
         self._analyzed = True
 
     def get_context_size(self):
-        if not self._analyzed: self._analyze()
+        if not self._analyzed:
+            self._analyze()
         if (self.previous is None and
                 not self._assignments and
                 self._additions is None and
@@ -224,7 +227,8 @@ class SetUpdateClause(ContainerUpdateClause):
         return int(bool(self._assignments)) + int(bool(self._additions)) + int(bool(self._removals))
 
     def update_context(self, ctx):
-        if not self._analyzed: self._analyze()
+        if not self._analyzed:
+            self._analyze()
         ctx_id = self.context_id
         if (self.previous is None and
                 self._assignments is None and
@@ -250,7 +254,8 @@ class ListUpdateClause(ContainerUpdateClause):
         self._prepend = None
 
     def __unicode__(self):
-        if not self._analyzed: self._analyze()
+        if not self._analyzed:
+            self._analyze()
         qs = []
         ctx_id = self.context_id
         if self._assignments is not None:
@@ -267,11 +272,13 @@ class ListUpdateClause(ContainerUpdateClause):
         return ', '.join(qs)
 
     def get_context_size(self):
-        if not self._analyzed: self._analyze()
+        if not self._analyzed:
+            self._analyze()
         return int(self._assignments is not None) + int(bool(self._append)) + int(bool(self._prepend))
 
     def update_context(self, ctx):
-        if not self._analyzed: self._analyze()
+        if not self._analyzed:
+            self._analyze()
         ctx_id = self.context_id
         if self._assignments is not None:
             ctx[str(ctx_id)] = self._to_database(self._assignments)
@@ -313,13 +320,13 @@ class ListUpdateClause(ContainerUpdateClause):
         else:
 
             # the max start idx we want to compare
-            search_space = len(self.value) - max(0, len(self.previous)-1)
+            search_space = len(self.value) - max(0, len(self.previous) - 1)
 
             # the size of the sub lists we want to look at
             search_size = len(self.previous)
 
             for i in range(search_space):
-                #slice boundary
+                # slice boundary
                 j = i + search_size
                 sub = self.value[i:j]
                 idx_cmp = lambda idx: self.previous[idx] == sub[idx]
@@ -354,13 +361,15 @@ class MapUpdateClause(ContainerUpdateClause):
         self._analyzed = True
 
     def get_context_size(self):
-        if not self._analyzed: self._analyze()
+        if not self._analyzed:
+            self._analyze()
         if self.previous is None and not self._updates:
             return 1
         return len(self._updates or []) * 2
 
     def update_context(self, ctx):
-        if not self._analyzed: self._analyze()
+        if not self._analyzed:
+            self._analyze()
         ctx_id = self.context_id
         if self.previous is None and not self._updates:
             ctx[str(ctx_id)] = {}
@@ -372,7 +381,8 @@ class MapUpdateClause(ContainerUpdateClause):
                 ctx_id += 2
 
     def __unicode__(self):
-        if not self._analyzed: self._analyze()
+        if not self._analyzed:
+            self._analyze()
         qs = []
 
         ctx_id = self.context_id
@@ -439,16 +449,19 @@ class MapDeleteClause(BaseDeleteClause):
         self._analyzed = True
 
     def update_context(self, ctx):
-        if not self._analyzed: self._analyze()
+        if not self._analyzed:
+            self._analyze()
         for idx, key in enumerate(self._removals):
             ctx[str(self.context_id + idx)] = key
 
     def get_context_size(self):
-        if not self._analyzed: self._analyze()
+        if not self._analyzed:
+            self._analyze()
         return len(self._removals)
 
     def __unicode__(self):
-        if not self._analyzed: self._analyze()
+        if not self._analyzed:
+            self._analyze()
         return ', '.join(['"{}"[%({})s]'.format(self.field, self.context_id + i) for i in range(len(self._removals))])
 
 
@@ -520,7 +533,6 @@ class BaseCQLStatement(UnicodeMixin):
 
     def __unicode__(self):
         raise NotImplementedError
-
 
     def __repr__(self):
         return self.__unicode__()
@@ -645,13 +657,12 @@ class InsertStatement(AssignmentStatement):
                  ttl=None,
                  timestamp=None,
                  if_not_exists=False):
-        super(InsertStatement, self).__init__(
-                table,
-                assignments=assignments,
-                consistency=consistency,
-                where=where,
-                ttl=ttl,
-                timestamp=timestamp)
+        super(InsertStatement, self).__init__(table,
+                                              assignments=assignments,
+                                              consistency=consistency,
+                                              where=where,
+                                              ttl=ttl,
+                                              timestamp=timestamp)
 
         self.if_not_exists = if_not_exists
 
@@ -813,4 +824,3 @@ class DeleteStatement(BaseCQLStatement):
             qs += [self._where]
 
         return ' '.join(qs)
-
