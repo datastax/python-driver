@@ -17,8 +17,6 @@ Columns
 
     .. autoattribute:: primary_key
 
-    .. autoattribute:: primary_key
-
     .. autoattribute:: partition_key
 
     .. autoattribute:: index
@@ -49,6 +47,8 @@ Columns of all types are initialized by passing :class:`.Column` attributes to t
 .. autoclass:: Bytes(**kwargs)
 
 .. autoclass:: Boolean(**kwargs)
+
+.. autoclass:: Counter(**kwargs)
 
 .. autoclass:: Date(**kwargs)
 

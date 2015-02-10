@@ -108,7 +108,7 @@ class Column(object):
     primary_key = False
     """
     bool flag, indicates this column is a primary key. The first primary key defined
-            on a model is the partition key (unless partition keys are set), all others are cluster keys
+    on a model is the partition key (unless partition keys are set), all others are cluster keys
     """
 
     partition_key = False
@@ -123,12 +123,12 @@ class Column(object):
     bool flag, indicates an index should be created for this column
     """
 
-    db_field = False
+    db_field = None
     """
     the fieldname this field will map to in the database
     """
 
-    default = False
+    default = None
     """
     the default value, can be a value or a callable (no args)
     """
@@ -136,19 +136,19 @@ class Column(object):
     required = False
     """
     boolean, is the field required? Model validation will raise and
-            exception if required is set to True and there is a None value assigned
+    exception if required is set to True and there is a None value assigned
     """
 
-    clustering_order = False
+    clustering_order = None
     """
     only applicable on clustering keys (primary keys that are not partition keys)
-            determines the order that the clustering keys are sorted on disk
+    determines the order that the clustering keys are sorted on disk
     """
 
     polymorphic_key = False
     """
     boolean, if set to True, this column will be used for saving and loading instances
-            of polymorphic tables
+    of polymorphic tables
     """
 
     static = False
