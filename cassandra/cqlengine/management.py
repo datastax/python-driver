@@ -81,16 +81,16 @@ def _create_keyspace(name, durable_writes, strategy_class, strategy_options):
         log.info("Not creating keyspace %s because it already exists", name)
 
 
-def delete_keyspace(name):
+def drop_keyspace(name):
     """
+    Drops a keyspace, if it exists.
+
     *There are plans to guard schema-modifying functions with an environment-driven conditional.*
 
     **This function should be used with caution, especially in production environments.
     Take care to execute schema modifications in a single context (i.e. not concurrently with other clients).**
 
-    Drops a keyspace, if it exists.
-
-    :param str name: name of keyspace to delete
+    :param str name: name of keyspace to drop
     """
     cluster = get_cluster()
     if name in cluster.metadata.keyspaces:

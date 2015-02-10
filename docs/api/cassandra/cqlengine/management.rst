@@ -9,7 +9,7 @@ A collection of functions for managing keyspace and table schema.
 
 .. autofunction:: create_keyspace_network_topology
 
-.. autofunction:: delete_keyspace
+.. autofunction:: drop_keyspace
 
 .. autofunction:: sync_table
 
