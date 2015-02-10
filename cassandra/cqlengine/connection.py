@@ -36,7 +36,25 @@ Host = namedtuple('Host', ['name', 'port'])
 cluster = None
 session = None
 lazy_connect_args = None
-default_consistency_level = None
+default_consistency_level = ConsistencyLevel.ONE
+
+
+def default():
+    """
+    Configures the global mapper connection to localhost, using the driver defaults
+    """
+    global cluster, session
+    cluster = Cluster()
+    session = cluster.connect()
+
+
+def set_session(s):
+    """
+    Configures the global mapper connection with a preexisting :class:`cassandra.cluster.Session`
+    """
+    global cluster, session
+    session = s
+    cluster = s.cluster
 
 
 def setup(

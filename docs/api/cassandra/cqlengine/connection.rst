@@ -3,5 +3,8 @@
 
 .. module:: cassandra.cqlengine.connection
 
-.. autofunction:: setup
+.. autofunction:: default
 
+.. autofunction:: set_session
+
+.. autofunction:: setup
