@@ -42,17 +42,24 @@ default_consistency_level = ConsistencyLevel.ONE
 def default():
     """
     Configures the global mapper connection to localhost, using the driver defaults
+    (except for row_factory)
     """
     global cluster, session
     cluster = Cluster()
     session = cluster.connect()
+    session.row_factory = dict_factory
 
 
 def set_session(s):
     """
     Configures the global mapper connection with a preexisting :class:`cassandra.cluster.Session`
+
+    Note: the mapper presently requires a Session :attr:`~.row_factory` set to ``dict_factory``.
+    This may be relaxed in the future
     """
     global cluster, session
+    if s.row_factory is not dict_factory:
+        raise CQLEngineException("Failed to initialize: 'Session.row_factory' must be 'dict_factory'.")
     session = s
     cluster = s.cluster
 
