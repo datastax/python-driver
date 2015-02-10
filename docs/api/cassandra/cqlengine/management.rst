@@ -5,7 +5,9 @@
 
 A collection of functions for managing keyspace and table schema.
 
-.. autofunction:: create_keyspace
+.. autofunction:: create_keyspace_simple
+
+.. autofunction:: create_keyspace_network_topology
 
 .. autofunction:: delete_keyspace
 

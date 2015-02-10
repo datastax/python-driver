@@ -17,6 +17,7 @@ import json
 import logging
 import six
 
+from cassandra.metadata import KeyspaceMetadata
 from cassandra.cqlengine import SizeTieredCompactionStrategy, LeveledCompactionStrategy
 from cassandra.cqlengine.connection import execute, get_cluster
 from cassandra.cqlengine.exceptions import CQLEngineException
@@ -32,10 +33,9 @@ log = logging.getLogger(__name__)
 schema_columnfamilies = NamedTable('system', 'schema_columnfamilies')
 
 
-def create_keyspace(name, strategy_class, replication_factor, durable_writes=True, **replication_values):
+def create_keyspace_simple(name, replication_factor, durable_writes=True):
     """
-    *Deprecated - this will likely be repaced with something specialized per replication strategy.*
-    Creates a keyspace
+    Creates a keyspace with SimpleStrategy for replica placement
 
     If the keyspace already exists, it will not be modified.
 
@@ -45,35 +45,40 @@ def create_keyspace(name, strategy_class, replication_factor, durable_writes=Tru
     *There are plans to guard schema-modifying functions with an environment-driven conditional.*
 
     :param str name: name of keyspace to create
-    :param str strategy_class: keyspace replication strategy class (:attr:`~.SimpleStrategy` or :attr:`~.NetworkTopologyStrategy`
     :param int replication_factor: keyspace replication factor, used with :attr:`~.SimpleStrategy`
     :param bool durable_writes: Write log is bypassed if set to False
-    :param \*\*replication_values: Additional values to ad to the replication options map
     """
+    _create_keyspace(name, durable_writes, 'SimpleStrategy',
+                     {'replication_factor': replication_factor})
+
+
+def create_keyspace_network_topology(name, dc_replication_map, durable_writes=True):
+    """
+    Creates a keyspace with NetworkTopologyStrategy for replica placement
+
+    If the keyspace already exists, it will not be modified.
+
+    **This function should be used with caution, especially in production environments.
+    Take care to execute schema modifications in a single context (i.e. not concurrently with other clients).**
+
+    *There are plans to guard schema-modifying functions with an environment-driven conditional.*
+
+    :param str name: name of keyspace to create
+    :param dict dc_replication_map: map of dc_names: replication_factor
+    :param bool durable_writes: Write log is bypassed if set to False
+    """
+    _create_keyspace(name, durable_writes, 'NetworkTopologyStrategy', dc_replication_map)
+
+
+def _create_keyspace(name, durable_writes, strategy_class, strategy_options):
     cluster = get_cluster()
 
     if name not in cluster.metadata.keyspaces:
-        # try the 1.2 method
-        replication_map = {
-            'class': strategy_class,
-            'replication_factor': replication_factor
-        }
-        replication_map.update(replication_values)
-        if strategy_class.lower() != 'simplestrategy':
-            # Although the Cassandra documentation states for `replication_factor`
-            # that it is "Required if class is SimpleStrategy; otherwise,
-            # not used." we get an error if it is present.
-            replication_map.pop('replication_factor', None)
-
-        query = """
-        CREATE KEYSPACE {}
-        WITH REPLICATION = {}
-        """.format(name, json.dumps(replication_map).replace('"', "'"))
-
-        if strategy_class != 'SimpleStrategy':
-            query += " AND DURABLE_WRITES = {}".format('true' if durable_writes else 'false')
-
-        execute(query)
+        log.info("Creating keyspace %s ", name)
+        ks_meta = KeyspaceMetadata(name, durable_writes, strategy_class, strategy_options)
+        execute(ks_meta.as_cql_query())
+    else:
+        log.info("Not creating keyspace %s because it already exists", name)
 
 
 def delete_keyspace(name):
