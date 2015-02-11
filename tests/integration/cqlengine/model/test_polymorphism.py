@@ -64,11 +64,11 @@ class TestPolymorphicClassConstruction(BaseCassEngTestCase):
         assert Base._is_polymorphic_base
         assert not M1._is_polymorphic_base
 
-        assert Base._polymorphic_column is Base._columns['type1']
-        assert M1._polymorphic_column is M1._columns['type1']
+        assert Base._discriminator_column is Base._columns['type1']
+        assert M1._discriminator_column is M1._columns['type1']
 
-        assert Base._polymorphic_column_name == 'type1'
-        assert M1._polymorphic_column_name == 'type1'
+        assert Base._discriminator_column_name == 'type1'
+        assert M1._discriminator_column_name == 'type1'
 
     def test_table_names_are_inherited_from_poly_base(self):
         class Base(models.Model):

@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import re
 import six
+import warnings
 
 from cassandra.cqlengine import columns
 from cassandra.cqlengine.exceptions import ModelException, CQLEngineException, ValidationError
@@ -21,6 +23,8 @@ from cassandra.cqlengine.query import ModelQuerySet, DMLQuery, AbstractQueryable
 from cassandra.cqlengine.query import DoesNotExist as _DoesNotExist
 from cassandra.cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
 from cassandra.util import OrderedDict
+
+log = logging.getLogger(__name__)
 
 
 class ModelDefinitionException(ModelException):
@@ -71,14 +75,14 @@ class QuerySetDescriptor(object):
             raise CQLEngineException('cannot execute queries against abstract models')
         queryset = model.__queryset__(model)
 
-        # if this is a concrete polymorphic model, and the polymorphic
+        # if this is a concrete polymorphic model, and the discriminator
         # key is an indexed column, add a filter clause to only return
         # logical rows of the proper type
         if model._is_polymorphic and not model._is_polymorphic_base:
-            name, column = model._polymorphic_column_name, model._polymorphic_column
+            name, column = model._discriminator_column_name, model._discriminator_column
             if column.partition_key or column.index:
                 # look for existing poly types
-                return queryset.filter(**{name: model.__polymorphic_key__})
+                return queryset.filter(**{name: model.__discriminator_value__})
 
         return queryset
 
@@ -302,7 +306,8 @@ class BaseModel(object):
 
     __default_ttl__ = None
 
-    __polymorphic_key__ = None
+    __polymorphic_key__ = None  # DEPRECATED
+    __discriminator_value__ = None
 
     # compaction options
     __compaction__ = None
@@ -378,17 +383,17 @@ class BaseModel(object):
             raise ModelException('_discover_polymorphic_submodels can only be called on polymorphic base classes')
 
         def _discover(klass):
-            if not klass._is_polymorphic_base and klass.__polymorphic_key__ is not None:
-                cls._polymorphic_map[klass.__polymorphic_key__] = klass
+            if not klass._is_polymorphic_base and klass.__discriminator_value__ is not None:
+                cls._discriminator_map[klass.__discriminator_value__] = klass
             for subklass in klass.__subclasses__():
                 _discover(subklass)
         _discover(cls)
 
     @classmethod
-    def _get_model_by_polymorphic_key(cls, key):
+    def _get_model_by_discriminator_value(cls, key):
         if not cls._is_polymorphic_base:
-            raise ModelException('_get_model_by_polymorphic_key can only be called on polymorphic base classes')
-        return cls._polymorphic_map.get(key)
+            raise ModelException('_get_model_by_discriminator_value can only be called on polymorphic base classes')
+        return cls._discriminator_map.get(key)
 
     @classmethod
     def _construct_instance(cls, values):
@@ -403,20 +408,20 @@ class BaseModel(object):
         field_dict = dict([(cls._db_map.get(k, k), v) for k, v in items])
 
         if cls._is_polymorphic:
-            poly_key = field_dict.get(cls._polymorphic_column_name)
+            disc_key = field_dict.get(cls._discriminator_column_name)
 
-            if poly_key is None:
-                raise PolyMorphicModelException('polymorphic key was not found in values')
+            if disc_key is None:
+                raise PolyMorphicModelException('discriminator value was not found in values')
 
             poly_base = cls if cls._is_polymorphic_base else cls._polymorphic_base
 
-            klass = poly_base._get_model_by_polymorphic_key(poly_key)
+            klass = poly_base._get_model_by_discriminator_value(disc_key)
             if klass is None:
                 poly_base._discover_polymorphic_submodels()
-                klass = poly_base._get_model_by_polymorphic_key(poly_key)
+                klass = poly_base._get_model_by_discriminator_value(disc_key)
                 if klass is None:
                     raise PolyMorphicModelException(
-                        'unrecognized polymorphic key {} for class {}'.format(poly_key, poly_base.__name__)
+                        'unrecognized discriminator column {} for class {}'.format(disc_key, poly_base.__name__)
                     )
 
             if not issubclass(klass, cls):
@@ -640,7 +645,7 @@ class BaseModel(object):
             if self._is_polymorphic_base:
                 raise PolyMorphicModelException('cannot save polymorphic base model')
             else:
-                setattr(self, self._polymorphic_column_name, self.__polymorphic_key__)
+                setattr(self, self._discriminator_column_name, self.__discriminator_value__)
 
         self.validate()
         self.__dmlquery__(self.__class__, self,
@@ -690,7 +695,7 @@ class BaseModel(object):
             if self._is_polymorphic_base:
                 raise PolyMorphicModelException('cannot update polymorphic base model')
             else:
-                setattr(self, self._polymorphic_column_name, self.__polymorphic_key__)
+                setattr(self, self._discriminator_column_name, self.__disciminator_value__)
 
         self.validate()
         self.__dmlquery__(self.__class__, self,
@@ -757,8 +762,15 @@ class ModelMetaClass(type):
         # short circuit __abstract__ inheritance
         is_abstract = attrs['__abstract__'] = attrs.get('__abstract__', False)
 
-        # short circuit __polymorphic_key__ inheritance
-        attrs['__polymorphic_key__'] = attrs.get('__polymorphic_key__', None)
+        # short circuit __discriminator_value__ inheritance
+        # __polymorphic_key__ is deprecated
+        poly_key = attrs.get('__polymorphic_key__', None)
+        if poly_key:
+            msg = '__polymorphic_key__ is deprecated. Use __discriminator_value__ instead'
+            warnings.warn(msg, DeprecationWarning)
+            log.warn(msg)
+        attrs['__discriminator_value__'] = attrs.get('__discriminator_value__', poly_key)
+        attrs['__polymorphic_key__'] = attrs['__discriminator_value__']
 
         def _transform_column(col_name, col_obj):
             column_dict[col_name] = col_obj
@@ -771,18 +783,18 @@ class ModelMetaClass(type):
         column_definitions = [(k, v) for k, v in attrs.items() if isinstance(v, columns.Column)]
         column_definitions = sorted(column_definitions, key=lambda x: x[1].position)
 
-        is_polymorphic_base = any([c[1].polymorphic_key for c in column_definitions])
+        is_polymorphic_base = any([c[1].discriminator_column for c in column_definitions])
 
         column_definitions = [x for x in inherited_columns.items()] + column_definitions
-        polymorphic_columns = [c for c in column_definitions if c[1].polymorphic_key]
-        is_polymorphic = len(polymorphic_columns) > 0
-        if len(polymorphic_columns) > 1:
-            raise ModelDefinitionException('only one polymorphic_key can be defined in a model, {} found'.format(len(polymorphic_columns)))
+        discriminator_columns = [c for c in column_definitions if c[1].discriminator_column]
+        is_polymorphic = len(discriminator_columns) > 0
+        if len(discriminator_columns) > 1:
+            raise ModelDefinitionException('only one discriminator_column (polymorphic_key (deprecated)) can be defined in a model, {} found'.format(len(discriminator_columns)))
 
-        polymorphic_column_name, polymorphic_column = polymorphic_columns[0] if polymorphic_columns else (None, None)
+        discriminator_column_name, discriminator_column = discriminator_columns[0] if discriminator_columns else (None, None)
 
-        if isinstance(polymorphic_column, (columns.BaseContainerColumn, columns.Counter)):
-            raise ModelDefinitionException('counter and container columns cannot be used for polymorphic keys')
+        if isinstance(discriminator_column, (columns.BaseContainerColumn, columns.Counter)):
+            raise ModelDefinitionException('counter and container columns cannot be used as discriminator columns (polymorphic_key (deprecated)) ')
 
         # find polymorphic base class
         polymorphic_base = None
@@ -877,9 +889,9 @@ class ModelMetaClass(type):
         attrs['_is_polymorphic_base'] = is_polymorphic_base
         attrs['_is_polymorphic'] = is_polymorphic
         attrs['_polymorphic_base'] = polymorphic_base
-        attrs['_polymorphic_column'] = polymorphic_column
-        attrs['_polymorphic_column_name'] = polymorphic_column_name
-        attrs['_polymorphic_map'] = {} if is_polymorphic_base else None
+        attrs['_discriminator_column'] = discriminator_column
+        attrs['_discriminator_column_name'] = discriminator_column_name
+        attrs['_discriminator_map'] = {} if is_polymorphic_base else None
 
         # setup class exceptions
         DoesNotExistBase = None
@@ -933,5 +945,12 @@ class Model(BaseModel):
 
     __polymorphic_key__ = None
     """
-    *Optional* Specifies a value for the polymorphic key when using model inheritance.
+    *Deprecated.*
+
+    see :attr:`~.__discriminator_value__`
+    """
+
+    __discriminator_value__ = None
+    """
+    *Optional* Specifies a value for the discriminator column when using model inheritance.
     """

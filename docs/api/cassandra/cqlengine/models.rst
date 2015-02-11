@@ -35,7 +35,9 @@ Model
 
     .. autoattribute:: __polymorphic_key__
 
-        See :ref:`table_polymorphism` for usage examples.
+    .. autoattribute:: __discriminator_value__
+
+        See :ref:`model_inheritance` for usage examples.
 
     *Each table can have its own set of configuration options.
     These can be specified on a model with the following attributes:*

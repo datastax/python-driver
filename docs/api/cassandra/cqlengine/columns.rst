@@ -31,6 +31,8 @@ Columns
 
     .. autoattribute:: polymorphic_key
 
+    .. autoattribute:: discriminator_column
+
     .. autoattribute:: static
 
 Column Types

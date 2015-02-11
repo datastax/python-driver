@@ -122,10 +122,10 @@ extend the model's validation method:
 *Note*: while not required, the convention is to raise a ``ValidationError`` (``from cqlengine import ValidationError``)
 if validation fails.
 
-.. _table_polymorphism:
+.. _model_inheritance:
 
-Table Polymorphism
-==================
+Model Inheritance
+=================
 It is possible to save and load different model classes using a single CQL table.
 This is useful in situations where you have different object types that you want to store in a single cassandra row.
 
@@ -137,7 +137,7 @@ For instance, suppose you want a table that stores rows of pets owned by an owne
         __table_name__ = 'pet'
         owner_id = UUID(primary_key=True)
         pet_id = UUID(primary_key=True)
-        pet_type = Text(polymorphic_key=True)
+        pet_type = Text(discriminator_column=True)
         name = Text()
 
         def eat(self, food):
@@ -147,14 +147,14 @@ For instance, suppose you want a table that stores rows of pets owned by an owne
             pass
 
     class Cat(Pet):
-        __polymorphic_key__ = 'cat'
+        __discriminator_value__ = 'cat'
         cuteness = Float()
 
         def tear_up_couch(self):
             pass
 
     class Dog(Pet):
-        __polymorphic_key__ = 'dog'
+        __discriminator_value__ = 'dog'
         fierceness = Float()
 
         def bark_all_night(self):
@@ -164,19 +164,17 @@ After calling ``sync_table`` on each of these tables, the columns defined in eac
 ``pet`` table. Additionally, saving ``Cat`` and ``Dog`` models will save the meta data needed to identify each row
 as either a cat or dog.
 
-To setup a polymorphic model structure, follow these steps
+To setup a model structure with inheritance, follow these steps
 
-1.  Create a base model with a column set as the polymorphic_key (set ``polymorphic_key=True`` in the column definition)
-2.  Create subclass models, and define a unique ``__polymorphic_key__`` value on each
+1.  Create a base model with a column set as the distriminator (``distriminator_column=True`` in the column definition)
+2.  Create subclass models, and define a unique ``__discriminator_value__`` value on each
 3.  Run ``sync_table`` on each of the sub tables
 
-**About the polymorphic key**
+**About the discriminator value**
 
-The polymorphic key is what cqlengine uses under the covers to map logical cql rows to the appropriate model type. The
-base model maintains a map of polymorphic keys to subclasses. When a polymorphic model is saved, this value is automatically
-saved into the polymorphic key column. You can set the polymorphic key column to any column type that you like, with
-the exception of container and counter columns, although ``Integer`` columns make the most sense. Additionally, if you
-set ``index=True`` on your polymorphic key column, you can execute queries against polymorphic subclasses, and a
+The discriminator value is what cqlengine uses under the covers to map logical cql rows to the appropriate model type. The
+base model maintains a map of discriminator values to subclasses. When a specialized model is saved, its discriminator value is
+automatically saved into the discriminator column. The discriminator column may be any column type except counter and container types.
+Additionally, if you set ``index=True`` on your discriminator column, you can execute queries against specialized subclasses, and a
 ``WHERE`` clause will be automatically added to your query, returning only rows of that type. Note that you must
-define a unique ``__polymorphic_key__`` value to each subclass, and that you can only assign a single polymorphic
-key column per model
+define a unique ``__discriminator_value__`` to each subclass, and that you can only assign a single discriminator column per model.

@@ -13,15 +13,18 @@
 # limitations under the License.
 
 from copy import deepcopy, copy
-from datetime import datetime
-from datetime import date
+from datetime import date, datetime
+import logging
 import re
 import six
 import sys
+import warnings
 
 from cassandra.cqltypes import DateType
 from cassandra.encoder import cql_quote
 from cassandra.cqlengine.exceptions import ValidationError
+
+log = logging.getLogger(__name__)
 
 
 # move to central spot
@@ -147,8 +150,20 @@ class Column(object):
 
     polymorphic_key = False
     """
-    boolean, if set to True, this column will be used for saving and loading instances
-    of polymorphic tables
+    *Deprecated*
+
+    see :attr:`~.discriminator_column`
+    """
+
+    discriminator_column = False
+    """
+    boolean, if set to True, this column will be used for discriminating records
+    of inherited models.
+
+    Should only be set on a column of an abstract model being used for inheritance.
+
+    There may only be one discriminator column per model. See :attr:`~.__discriminator_value__`
+    for how to specify the value of this column on specialized models.
     """
 
     static = False
@@ -165,6 +180,7 @@ class Column(object):
                  required=False,
                  clustering_order=None,
                  polymorphic_key=False,
+                 discriminator_column=False,
                  static=False):
         self.partition_key = partition_key
         self.primary_key = partition_key or primary_key
@@ -173,7 +189,15 @@ class Column(object):
         self.default = default
         self.required = required
         self.clustering_order = clustering_order
-        self.polymorphic_key = polymorphic_key
+
+        if polymorphic_key:
+            msg = "polymorphic_key is deprecated. Use discriminator_column instead."
+            warnings.warn(msg, DeprecationWarning)
+            log.warn(msg)
+
+        self.discriminator_column = discriminator_column or polymorphic_key
+        self.polymorphic_key = self.discriminator_column
+
         # the column name in the model definition
         self.column_name = None
         self.static = static
