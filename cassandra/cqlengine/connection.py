@@ -166,6 +166,8 @@ def get_session():
 
 def get_cluster():
     handle_lazy_connect()
+    if not cluster:
+        raise CQLEngineException("%s.cluster is not configured. Call one of the setup or default functions first." % __name__)
     return cluster
 
 
