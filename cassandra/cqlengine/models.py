@@ -42,7 +42,6 @@ class hybrid_classmethod(object):
     Allows a method to behave as both a class method and
     normal instance method depending on how it's called
     """
-
     def __init__(self, clsmethod, instmethod):
         self.clsmethod = clsmethod
         self.instmethod = instmethod

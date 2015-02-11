@@ -130,11 +130,13 @@ def _create_keyspace(name, durable_writes, strategy_class, strategy_options):
     else:
         log.info("Not creating keyspace %s because it already exists", name)
 
+
 def delete_keyspace(name):
     msg = "Deprecated. Use drop_keyspace instead"
     warnings.warn(msg, DeprecationWarning)
     log.warn(msg)
     drop_keyspace(name)
+
 
 def drop_keyspace(name):
     """
@@ -155,6 +157,8 @@ def drop_keyspace(name):
 def sync_table(model):
     """
     Inspects the model and creates / updates the corresponding table and columns.
+
+    This function can only add fields that are not part of the primary key.
 
     Note that the attributes removed from the model are not deleted on the database.
     They become effectively ignored by (will not show up on) the model.
@@ -184,6 +188,7 @@ def sync_table(model):
 
     # check for an existing column family
     if raw_cf_name not in tables:
+        log.debug("sync_table creating new table %s", cf_name)
         qs = get_create_table(model)
 
         try:
@@ -194,19 +199,25 @@ def sync_table(model):
             if "Cannot add already existing column family" not in unicode(ex):
                 raise
     else:
+        log.debug("sync_table checking existing table %s", cf_name)
         # see if we're missing any columns
         fields = get_fields(model)
         field_names = [x.name for x in fields]
+        model_fields = set()
         for name, col in model._columns.items():
             if col.primary_key or col.partition_key:
                 continue  # we can't mess with the PK
+            model_fields.add(name)
             if col.db_field_name in field_names:
                 continue  # skip columns already defined
 
             # add missing column using the column def
             query = "ALTER TABLE {} add {}".format(cf_name, col.get_column_def())
-            log.debug(query)
             execute(query)
+
+        db_fields_not_in_model = model_fields.symmetric_difference(field_names)
+        if db_fields_not_in_model:
+            log.info("Table %s has fields not referenced by model: %s", cf_name, db_fields_not_in_model)
 
         update_compaction(model)
 
@@ -391,7 +402,6 @@ def update_compaction(model):
         options = json.dumps(options).replace('"', "'")
         cf_name = model.column_family_name()
         query = "ALTER TABLE {} with compaction = {}".format(cf_name, options)
-        log.debug(query)
         execute(query)
         return True
 

@@ -45,9 +45,15 @@ def default():
     (except for row_factory)
     """
     global cluster, session
+
+    if session:
+        log.warn("configuring new connection for cqlengine when one was already set")
+
     cluster = Cluster()
     session = cluster.connect()
     session.row_factory = dict_factory
+
+    log.debug("cqlengine connection initialized with default session to localhost")
 
 
 def set_session(s):
@@ -58,10 +64,16 @@ def set_session(s):
     This may be relaxed in the future
     """
     global cluster, session
+
+    if session:
+        log.warn("configuring new connection for cqlengine when one was already set")
+
     if s.row_factory is not dict_factory:
         raise CQLEngineException("Failed to initialize: 'Session.row_factory' must be 'dict_factory'.")
     session = s
     cluster = s.cluster
+
+    log.debug("cqlengine connection initialized with %s", s)
 
 
 def setup(
@@ -104,8 +116,10 @@ def setup(
     cluster = Cluster(hosts, **kwargs)
     try:
         session = cluster.connect()
+        log.debug("cqlengine connection initialized with internally created session")
     except NoHostAvailable:
         if retry_connect:
+            log.warn("connect failed, setting up for re-attempt on first use")
             kwargs['default_keyspace'] = default_keyspace
             kwargs['consistency'] = consistency
             kwargs['lazy_connect'] = False
@@ -157,6 +171,7 @@ def get_cluster():
 def handle_lazy_connect():
     global lazy_connect_args
     if lazy_connect_args:
+        log.debug("lazy connect")
         hosts, kwargs = lazy_connect_args
         lazy_connect_args = None
         setup(hosts, **kwargs)
