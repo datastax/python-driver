@@ -12,13 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import warnings
+
 from cassandra.cqlengine import connection
-from cassandra.cqlengine.management import create_keyspace
+from cassandra.cqlengine.management import create_keyspace_simple
 
 from tests.integration import use_single_node, PROTOCOL_VERSION
 
 
 def setup_package():
+    warnings.simplefilter('always')  # for testing warnings, make sure all are let through
+
     use_single_node()
 
     keyspace = 'cqlengine_test'
@@ -26,4 +30,4 @@ def setup_package():
                       protocol_version=PROTOCOL_VERSION,
                       default_keyspace=keyspace)
 
-    create_keyspace(keyspace, replication_factor=1, strategy_class="SimpleStrategy")
+    create_keyspace_simple(keyspace, 1)

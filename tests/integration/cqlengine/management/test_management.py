@@ -13,10 +13,12 @@
 # limitations under the License.
 
 import mock
+
 from unittest import skipUnless
+import warnings
 
 from cassandra.cqlengine import CACHING_ALL, CACHING_NONE
-from cassandra.cqlengine.connection import get_session
+from cassandra.cqlengine.connection import get_session, get_cluster
 from cassandra.cqlengine.exceptions import CQLEngineException
 from cassandra.cqlengine import management
 from cassandra.cqlengine.management import  get_fields, sync_table, drop_table
@@ -27,17 +29,43 @@ from tests.integration import CASSANDRA_VERSION, PROTOCOL_VERSION
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine.query.test_queryset import TestModel
 
-class CreateKeyspaceTest(BaseCassEngTestCase):
-    def test_create_succeeeds(self):
-        management.create_keyspace('test_keyspace', strategy_class="SimpleStrategy", replication_factor=1)
-        management.delete_keyspace('test_keyspace')
+class KeyspaceManagementTest(BaseCassEngTestCase):
+    def test_create_drop_succeeeds(self):
+        cluster = get_cluster()
 
-class DeleteTableTest(BaseCassEngTestCase):
+        keyspace_ss = 'test_ks_ss'
+        self.assertFalse(keyspace_ss in cluster.metadata.keyspaces)
+        management.create_keyspace_simple(keyspace_ss, 2)
+        self.assertTrue(keyspace_ss in cluster.metadata.keyspaces)
+
+        management.drop_keyspace(keyspace_ss)
+
+        self.assertFalse(keyspace_ss in cluster.metadata.keyspaces)
+        with warnings.catch_warnings(record=True) as w:
+            management.create_keyspace(keyspace_ss, strategy_class="SimpleStrategy", replication_factor=1)
+            self.assertEqual(len(w), 1)
+            self.assertEqual(w[-1].category, DeprecationWarning)
+        self.assertTrue(keyspace_ss in cluster.metadata.keyspaces)
+
+        management.drop_keyspace(keyspace_ss)
+        self.assertFalse(keyspace_ss in cluster.metadata.keyspaces)
+
+        keyspace_nts = 'test_ks_nts'
+        self.assertFalse(keyspace_nts in cluster.metadata.keyspaces)
+        management.create_keyspace_simple(keyspace_nts, 2)
+        self.assertTrue(keyspace_nts in cluster.metadata.keyspaces)
+
+        with warnings.catch_warnings(record=True) as w:
+            management.delete_keyspace(keyspace_nts)
+            self.assertEqual(len(w), 1)
+            self.assertEqual(w[-1].category, DeprecationWarning)
+
+        self.assertFalse(keyspace_nts in cluster.metadata.keyspaces)
+
+
+class DropTableTest(BaseCassEngTestCase):
 
     def test_multiple_deletes_dont_fail(self):
-        """
-
-        """
         sync_table(TestModel)
 
         drop_table(TestModel)
@@ -280,12 +308,9 @@ def test_static_columns():
 
     drop_table(StaticModel)
 
-    from mock import patch
-
-    from cassandra.cqlengine.connection import get_session
     session = get_session()
 
-    with patch.object(session, "execute", wraps=session.execute) as m:
+    with mock.patch.object(session, "execute", wraps=session.execute) as m:
         sync_table(StaticModel)
 
     assert m.call_count > 0
@@ -295,7 +320,7 @@ def test_static_columns():
     # if we sync again, we should not apply an alter w/ a static
     sync_table(StaticModel)
 
-    with patch.object(session, "execute", wraps=session.execute) as m2:
+    with mock.patch.object(session, "execute", wraps=session.execute) as m2:
         sync_table(StaticModel)
 
     assert len(m2.call_args_list) == 1
