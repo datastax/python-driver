@@ -17,8 +17,8 @@ import re
 import six
 import warnings
 
+from cassandra.cqlengine import CQLEngineException, ValidationError
 from cassandra.cqlengine import columns
-from cassandra.cqlengine.exceptions import ModelException, CQLEngineException, ValidationError
 from cassandra.cqlengine.query import ModelQuerySet, DMLQuery, AbstractQueryableColumn, NOT_SET
 from cassandra.cqlengine.query import DoesNotExist as _DoesNotExist
 from cassandra.cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
@@ -27,11 +27,15 @@ from cassandra.util import OrderedDict
 log = logging.getLogger(__name__)
 
 
+class ModelException(CQLEngineException):
+    pass
+
+
 class ModelDefinitionException(ModelException):
     pass
 
 
-class PolyMorphicModelException(ModelException):
+class PolymorphicModelException(ModelException):
     pass
 
 
@@ -411,7 +415,7 @@ class BaseModel(object):
             disc_key = field_dict.get(cls._discriminator_column_name)
 
             if disc_key is None:
-                raise PolyMorphicModelException('discriminator value was not found in values')
+                raise PolymorphicModelException('discriminator value was not found in values')
 
             poly_base = cls if cls._is_polymorphic_base else cls._polymorphic_base
 
@@ -420,12 +424,12 @@ class BaseModel(object):
                 poly_base._discover_polymorphic_submodels()
                 klass = poly_base._get_model_by_discriminator_value(disc_key)
                 if klass is None:
-                    raise PolyMorphicModelException(
+                    raise PolymorphicModelException(
                         'unrecognized discriminator column {} for class {}'.format(disc_key, poly_base.__name__)
                     )
 
             if not issubclass(klass, cls):
-                raise PolyMorphicModelException(
+                raise PolymorphicModelException(
                     '{} is not a subclass of {}'.format(klass.__name__, cls.__name__)
                 )
 
@@ -643,7 +647,7 @@ class BaseModel(object):
         # handle polymorphic models
         if self._is_polymorphic:
             if self._is_polymorphic_base:
-                raise PolyMorphicModelException('cannot save polymorphic base model')
+                raise PolymorphicModelException('cannot save polymorphic base model')
             else:
                 setattr(self, self._discriminator_column_name, self.__discriminator_value__)
 
@@ -693,7 +697,7 @@ class BaseModel(object):
         # handle polymorphic models
         if self._is_polymorphic:
             if self._is_polymorphic_base:
-                raise PolyMorphicModelException('cannot update polymorphic base model')
+                raise PolymorphicModelException('cannot update polymorphic base model')
             else:
                 setattr(self, self._discriminator_column_name, self.__disciminator_value__)
 

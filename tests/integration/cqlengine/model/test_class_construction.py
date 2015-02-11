@@ -15,9 +15,8 @@
 from uuid import uuid4
 import warnings
 
-from cassandra.cqlengine import columns
-from cassandra.cqlengine.exceptions import ModelException, CQLEngineException
-from cassandra.cqlengine.models import Model, ModelDefinitionException, ColumnQueryEvaluator
+from cassandra.cqlengine import columns, CQLEngineException
+from cassandra.cqlengine.models import Model, ModelException, ModelDefinitionException, ColumnQueryEvaluator
 from cassandra.cqlengine.query import ModelQuerySet, DMLQuery
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase

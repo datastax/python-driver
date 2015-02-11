@@ -20,8 +20,7 @@ from uuid import uuid4
 from cassandra.cqlengine import columns
 from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine.models import Model
-from cassandra.cqlengine.exceptions import LWTException
-from cassandra.cqlengine.query import BatchQuery
+from cassandra.cqlengine.query import BatchQuery, LWTException
 from cassandra.cqlengine.statements import TransactionClause
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase

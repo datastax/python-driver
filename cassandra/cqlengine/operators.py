@@ -12,20 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import six
-import sys
+from cassandra.cqlengine import UnicodeMixin
 
 
 class QueryOperatorException(Exception):
     pass
-
-
-# move to central spot
-class UnicodeMixin(object):
-    if sys.version_info > (3, 0):
-        __str__ = lambda x: x.__unicode__()
-    else:
-        __str__ = lambda x: six.text_type(x).encode('utf-8')
 
 
 class BaseQueryOperator(UnicodeMixin):

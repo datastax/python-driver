@@ -12,26 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+import warnings
 
-class CQLEngineException(Exception):
-    pass
-
-
-class ModelException(CQLEngineException):
-    pass
+import cassandra.cqlengine
 
 
-class ValidationError(CQLEngineException):
-    pass
+CQLEngineException = cassandra.cqlengine.CQLEngineException
 
-
-class UndefinedKeyspaceException(CQLEngineException):
-    pass
-
-
-class LWTException(CQLEngineException):
-    pass
-
-
-class IfNotExistsWithCounterColumn(CQLEngineException):
-    pass
+ValidationError = cassandra.cqlengine.ValidationError

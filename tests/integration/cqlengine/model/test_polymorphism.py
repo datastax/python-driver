@@ -120,7 +120,7 @@ class TestPolymorphicModel(BaseCassEngTestCase):
         management.drop_table(Poly2)
 
     def test_saving_base_model_fails(self):
-        with self.assertRaises(models.PolyMorphicModelException):
+        with self.assertRaises(models.PolymorphicModelException):
             PolyBase.create()
 
     def test_saving_subclass_saves_poly_key(self):
@@ -208,9 +208,9 @@ class TestUnindexedPolymorphicQuery(BaseCassEngTestCase):
         assert len(list(UnindexedPoly2.objects(partition=p1.partition, cluster__in=[p2.cluster, p3.cluster]))) == 2
 
     def test_conflicting_type_results(self):
-        with self.assertRaises(models.PolyMorphicModelException):
+        with self.assertRaises(models.PolymorphicModelException):
             list(UnindexedPoly1.objects(partition=self.p1.partition))
-        with self.assertRaises(models.PolyMorphicModelException):
+        with self.assertRaises(models.PolymorphicModelException):
             list(UnindexedPoly2.objects(partition=self.p1.partition))
 
 

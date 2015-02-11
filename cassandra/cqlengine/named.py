@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from cassandra.cqlengine.exceptions import CQLEngineException
+from cassandra.cqlengine import CQLEngineException
 from cassandra.cqlengine.query import AbstractQueryableColumn, SimpleQuerySet
 from cassandra.cqlengine.query import DoesNotExist as _DoesNotExist
 from cassandra.cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned

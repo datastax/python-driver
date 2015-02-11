@@ -13,18 +13,8 @@
 # limitations under the License.
 
 from datetime import datetime
-import six
-import sys
 
-from cassandra.cqlengine.exceptions import ValidationError
-# move to central spot
-
-
-class UnicodeMixin(object):
-    if sys.version_info > (3, 0):
-        __str__ = lambda x: x.__unicode__()
-    else:
-        __str__ = lambda x: six.text_type(x).encode('utf-8')
+from cassandra.cqlengine import UnicodeMixin, ValidationError
 
 
 class QueryValue(UnicodeMixin):

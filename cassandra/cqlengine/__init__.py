@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import six
+
+
 # compaction
 SizeTieredCompactionStrategy = "SizeTieredCompactionStrategy"
 LeveledCompactionStrategy = "LeveledCompactionStrategy"
@@ -21,3 +24,18 @@ CACHING_ALL = "ALL"
 CACHING_KEYS_ONLY = "KEYS_ONLY"
 CACHING_ROWS_ONLY = "ROWS_ONLY"
 CACHING_NONE = "NONE"
+
+
+class CQLEngineException(Exception):
+    pass
+
+
+class ValidationError(CQLEngineException):
+    pass
+
+
+class UnicodeMixin(object):
+    if six.PY3:
+        __str__ = lambda x: x.__unicode__()
+    else:
+        __str__ = lambda x: six.text_type(x).encode('utf-8')

@@ -19,7 +19,8 @@ import six
 from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster, _NOT_SET, NoHostAvailable
 from cassandra.query import SimpleStatement, Statement, dict_factory
-from cassandra.cqlengine.exceptions import CQLEngineException, UndefinedKeyspaceException
+
+from cassandra.cqlengine import CQLEngineException
 from cassandra.cqlengine.statements import BaseCQLStatement
 
 
@@ -27,16 +28,16 @@ log = logging.getLogger(__name__)
 
 NOT_SET = _NOT_SET  # required for passing timeout to Session.execute
 
-
-class CQLConnectionError(CQLEngineException):
-    pass
-
 Host = namedtuple('Host', ['name', 'port'])
 
 cluster = None
 session = None
 lazy_connect_args = None
 default_consistency_level = ConsistencyLevel.ONE
+
+
+class UndefinedKeyspaceException(CQLEngineException):
+    pass
 
 
 def default():

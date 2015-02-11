@@ -15,21 +15,14 @@
 from datetime import datetime, timedelta
 import time
 import six
-import sys
 
+from cassandra.cqlengine import UnicodeMixin
 from cassandra.cqlengine.functions import QueryValue
 from cassandra.cqlengine.operators import BaseWhereOperator, InOperator
 
 
 class StatementException(Exception):
     pass
-
-
-class UnicodeMixin(object):
-    if sys.version_info > (3, 0):
-        __str__ = lambda x: x.__unicode__()
-    else:
-        __str__ = lambda x: six.text_type(x).encode('utf-8')
 
 
 class ValueQuoter(UnicodeMixin):

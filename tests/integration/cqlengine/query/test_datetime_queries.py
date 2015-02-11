@@ -17,10 +17,9 @@ from uuid import uuid4
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 
-from cassandra.cqlengine.exceptions import ModelException
 from cassandra.cqlengine.management import sync_table
 from cassandra.cqlengine.management import drop_table
-from cassandra.cqlengine.models import Model
+from cassandra.cqlengine.models import Model, ModelException
 from cassandra.cqlengine import columns
 from cassandra.cqlengine import query
 

@@ -17,10 +17,9 @@ from datetime import datetime, timedelta
 import time
 import six
 
-from cassandra.cqlengine import columns
+from cassandra.cqlengine import columns, CQLEngineException, ValidationError, UnicodeMixin
 from cassandra.cqlengine.connection import execute, NOT_SET
-from cassandra.cqlengine.exceptions import CQLEngineException, ValidationError, LWTException, IfNotExistsWithCounterColumn
-from cassandra.cqlengine.functions import Token, BaseQueryFunction, QueryValue, UnicodeMixin
+from cassandra.cqlengine.functions import Token, BaseQueryFunction, QueryValue
 from cassandra.cqlengine.operators import (InOperator, EqualsOperator, GreaterThanOperator,
                                            GreaterThanOrEqualOperator, LessThanOperator,
                                            LessThanOrEqualOperator, BaseWhereOperator)
@@ -33,6 +32,14 @@ from cassandra.cqlengine.statements import (WhereClause, SelectStatement, Delete
 
 
 class QueryException(CQLEngineException):
+    pass
+
+
+class IfNotExistsWithCounterColumn(CQLEngineException):
+    pass
+
+
+class LWTException(CQLEngineException):
     pass
 
 

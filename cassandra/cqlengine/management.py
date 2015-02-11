@@ -19,9 +19,8 @@ import six
 import warnings
 
 from cassandra.metadata import KeyspaceMetadata
-from cassandra.cqlengine import SizeTieredCompactionStrategy, LeveledCompactionStrategy
+from cassandra.cqlengine import CQLEngineException, SizeTieredCompactionStrategy, LeveledCompactionStrategy
 from cassandra.cqlengine.connection import execute, get_cluster
-from cassandra.cqlengine.exceptions import CQLEngineException
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.named import NamedTable
 
