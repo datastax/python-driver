@@ -15,6 +15,7 @@
 from collections import namedtuple
 import json
 import logging
+import os
 import six
 import warnings
 
@@ -24,6 +25,7 @@ from cassandra.cqlengine.connection import execute, get_cluster
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.named import NamedTable
 
+CQLENG_ALLOW_SCHEMA_MANAGEMENT = 'CQLENG_ALLOW_SCHEMA_MANAGEMENT'
 
 Field = namedtuple('Field', ['name', 'type'])
 
@@ -52,6 +54,9 @@ def create_keyspace(name, strategy_class, replication_factor, durable_writes=Tru
     :param bool durable_writes: Write log is bypassed if set to False
     :param \*\*replication_values: Additional values to ad to the replication options map
     """
+    if not _allow_schema_modification():
+        return
+
     msg = "Deprecated. Use create_keyspace_simple or create_keyspace_network_topology instead"
     warnings.warn(msg, DeprecationWarning)
     log.warn(msg)
@@ -120,6 +125,9 @@ def create_keyspace_network_topology(name, dc_replication_map, durable_writes=Tr
 
 
 def _create_keyspace(name, durable_writes, strategy_class, strategy_options):
+    if not _allow_schema_modification():
+        return
+
     cluster = get_cluster()
 
     if name not in cluster.metadata.keyspaces:
@@ -148,6 +156,9 @@ def drop_keyspace(name):
 
     :param str name: name of keyspace to drop
     """
+    if not _allow_schema_modification():
+        return
+
     cluster = get_cluster()
     if name in cluster.metadata.keyspaces:
         execute("DROP KEYSPACE {}".format(name))
@@ -167,6 +178,8 @@ def sync_table(model):
 
     *There are plans to guard schema-modifying functions with an environment-driven conditional.*
     """
+    if not _allow_schema_modification():
+        return
 
     if not issubclass(model, Model):
         raise CQLEngineException("Models must be derived from base Model.")
@@ -416,6 +429,8 @@ def drop_table(model):
 
     *There are plans to guard schema-modifying functions with an environment-driven conditional.*
     """
+    if not _allow_schema_modification():
+        return
 
     # don't try to delete non existant tables
     meta = get_cluster().metadata
@@ -428,3 +443,11 @@ def drop_table(model):
         execute('drop table {};'.format(model.column_family_name(include_keyspace=True)))
     except KeyError:
         pass
+
+def _allow_schema_modification():
+    if not os.getenv(CQLENG_ALLOW_SCHEMA_MANAGEMENT):
+        msg = CQLENG_ALLOW_SCHEMA_MANAGEMENT + " environment variable is not set. Future versions of this package will require this variable to enable management functions."
+        warnings.warn(msg)
+        log.warn(msg)
+
+    return True
