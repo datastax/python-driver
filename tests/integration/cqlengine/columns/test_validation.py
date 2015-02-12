@@ -288,14 +288,14 @@ class TestBigInt(BaseCassEngTestCase):
 class TestText(BaseCassEngTestCase):
 
     def test_min_length(self):
-        #min len defaults to 1
+        # not required defaults to 0
         col = Text()
         col.validate('')
-
         col.validate('b')
 
-        #test not required defaults to 0
-        Text(required=False).validate('')
+        # required defaults to 1
+        with self.assertRaises(ValidationError):
+            Text(required=True).validate('')
 
         #test arbitrary lengths
         Text(min_length=0).validate('')

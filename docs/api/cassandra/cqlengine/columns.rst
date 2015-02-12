@@ -50,7 +50,7 @@ Columns of all types are initialized by passing :class:`.Column` attributes to t
 
 .. autoclass:: Boolean(**kwargs)
 
-.. autoclass:: Counter(**kwargs)
+.. autoclass:: Counter
 
 .. autoclass:: Date(**kwargs)
 
@@ -58,23 +58,17 @@ Columns of all types are initialized by passing :class:`.Column` attributes to t
 
 .. autoclass:: Decimal(**kwargs)
 
-.. autoclass:: Float(**kwargs)
+.. autoclass:: Float
 
 .. autoclass:: Integer(**kwargs)
 
-.. autoclass:: List(**kwargs)
+.. autoclass:: List
 
-.. autoclass:: Map(**kwargs)
+.. autoclass:: Map
 
-.. autoclass:: Set(**kwargs)
+.. autoclass:: Set
 
-.. autoclass:: Text(**kwargs)
-
-    In addition to the :class:Column attributes, ``Text`` columns accept the following attributes for validation:
-
-    .. autoattribute:: min_length
-
-    .. autoattribute:: max_length
+.. autoclass:: Text
 
 .. autoclass:: TimeUUID(**kwargs)
 

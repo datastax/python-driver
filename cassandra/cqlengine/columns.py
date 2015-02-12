@@ -318,24 +318,17 @@ class Text(Column):
     """
     Stores a UTF-8 encoded string
     """
-
     db_type = 'text'
 
-    min_length = None
-    """
-    Sets the minimum length of this string, for validation purposes.
-    Defaults to 1 if this is a ``required`` column. Otherwise, None.
-    """
-
-    max_length = None
-    """
-    Sets the maximum length of this string, for validation purposes.
-    """
-
-    def __init__(self, *args, **kwargs):
-        self.min_length = kwargs.pop('min_length', 1 if kwargs.get('required', False) else None)
-        self.max_length = kwargs.pop('max_length', None)
-        super(Text, self).__init__(*args, **kwargs)
+    def __init__(self, min_length=None, max_length=None, **kwargs):
+        """
+        :param int min_length: Sets the minimum length of this string, for validation purposes.
+            Defaults to 1 if this is a ``required`` column. Otherwise, None.
+        :param int max_lemgth: Sets the maximum length of this string, for validation purposes.
+        """
+        self.min_length = min_length or (1 if kwargs.get('required', False) else None)
+        self.max_length = max_length
+        super(Text, self).__init__(**kwargs)
 
     def validate(self, value):
         value = super(Text, self).validate(value)
@@ -591,7 +584,7 @@ class Boolean(Column):
 
 class Float(Column):
     """
-    Stores a 32-bit floating point value
+    Stores a floating point value
     """
     db_type = 'double'
 
@@ -765,6 +758,9 @@ class List(BaseContainerColumn):
             return bool(self.value)
 
     def __init__(self, value_type, default=list, **kwargs):
+        """
+        :param value_type: a column class indicating the types of the value
+        """
         return super(List, self).__init__(value_type=value_type, default=default, **kwargs)
 
     def validate(self, value):
