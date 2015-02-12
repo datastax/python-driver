@@ -12,9 +12,3 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-
-from cassandra.cqlengine.management import CQLENG_ALLOW_SCHEMA_MANAGEMENT
-
-def setup_package():
-    os.environ[CQLENG_ALLOW_SCHEMA_MANAGEMENT] = '1'

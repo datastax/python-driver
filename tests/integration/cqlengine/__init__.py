@@ -12,16 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import warnings
 
 from cassandra.cqlengine import connection
-from cassandra.cqlengine.management import create_keyspace_simple
+from cassandra.cqlengine.management import create_keyspace_simple, CQLENG_ALLOW_SCHEMA_MANAGEMENT
 
 from tests.integration import use_single_node, PROTOCOL_VERSION
 
 
 def setup_package():
     warnings.simplefilter('always')  # for testing warnings, make sure all are let through
+    os.environ[CQLENG_ALLOW_SCHEMA_MANAGEMENT] = '1'
 
     use_single_node()
 
