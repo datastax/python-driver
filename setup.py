@@ -14,6 +14,7 @@
 
 from __future__ import print_function
 import sys
+import warnings
 
 if __name__ == '__main__' and sys.argv[1] == "gevent_nosetests":
     print("Running gevent tests")
@@ -63,6 +64,14 @@ else:
 
     class eventlet_nosetests(nosetests):
         description = "run nosetests with eventlet monkey patching"
+
+has_cqlengine = False
+if __name__ == '__main__' and sys.argv[1] == "install":
+    try:
+        import cqlengine
+        has_cqlengine = True
+    except ImportError:
+        pass
 
 
 class DocCommand(Command):
@@ -271,3 +280,8 @@ while True:
         extensions.remove(failure.ext)
     else:
         break
+
+if has_cqlengine:
+    warnings.warn("\n#######\n'cqlengine' package is present on path: %s\n"
+                  "cqlengine is now an integrated sub-package of this driver.\n"
+                  "It is recommended to remove this package to reduce the chance for conflicting usage" % cqlengine.__file__)
