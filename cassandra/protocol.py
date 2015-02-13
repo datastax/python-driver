@@ -559,7 +559,7 @@ class ResultMessage(_MessageType):
             ksname = read_string(f)
             results = ksname
         elif kind == RESULT_KIND_PREPARED:
-            results = cls.recv_results_prepared(f, user_type_map)
+            results = cls.recv_results_prepared(f, protocol_version, user_type_map)
         elif kind == RESULT_KIND_SCHEMA_CHANGE:
             results = cls.recv_results_schema_change(f, protocol_version)
         return cls(kind, results, paging_state)
@@ -578,16 +578,17 @@ class ResultMessage(_MessageType):
         return (paging_state, (colnames, parsed_rows))
 
     @classmethod
-    def recv_results_prepared(cls, f, user_type_map):
+    def recv_results_prepared(cls, f, protocol_version, user_type_map):
         query_id = read_binary_string(f)
-        _, column_metadata = cls.recv_results_metadata(f, user_type_map)
-        return (query_id, column_metadata)
+        column_metadata, pk_indexes = cls.recv_prepared_metadata(f, protocol_version, user_type_map)
+        return (query_id, column_metadata, pk_indexes)
 
     @classmethod
     def recv_results_metadata(cls, f, user_type_map):
         flags = read_int(f)
         glob_tblspec = bool(flags & cls._FLAGS_GLOBAL_TABLES_SPEC)
         colcount = read_int(f)
+
         if flags & cls._HAS_MORE_PAGES_FLAG:
             paging_state = read_binary_longstring(f)
         else:
@@ -607,6 +608,32 @@ class ResultMessage(_MessageType):
             coltype = cls.read_type(f, user_type_map)
             column_metadata.append((colksname, colcfname, colname, coltype))
         return paging_state, column_metadata
+
+    @classmethod
+    def recv_prepared_metadata(cls, f, protocol_version, user_type_map):
+        flags = read_int(f)
+        glob_tblspec = bool(flags & cls._FLAGS_GLOBAL_TABLES_SPEC)
+        colcount = read_int(f)
+        pk_indexes = None
+        if protocol_version >= 4:
+            num_pk_indexes = read_int(f)
+            pk_indexes = [read_short(f) for _ in range(num_pk_indexes)]
+
+        if glob_tblspec:
+            ksname = read_string(f)
+            cfname = read_string(f)
+        column_metadata = []
+        for _ in range(colcount):
+            if glob_tblspec:
+                colksname = ksname
+                colcfname = cfname
+            else:
+                colksname = read_string(f)
+                colcfname = read_string(f)
+            colname = read_string(f)
+            coltype = cls.read_type(f, user_type_map)
+            column_metadata.append((colksname, colcfname, colname, coltype))
+        return column_metadata, pk_indexes
 
     @classmethod
     def recv_results_schema_change(cls, f, protocol_version):

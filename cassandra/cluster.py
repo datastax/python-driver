@@ -1534,13 +1534,13 @@ class Session(object):
         future = ResponseFuture(self, message, query=None)
         try:
             future.send_request()
-            query_id, column_metadata = future.result(self.default_timeout)
+            query_id, column_metadata, pk_indexes = future.result(self.default_timeout)
         except Exception:
             log.exception("Error preparing query:")
             raise
 
         prepared_statement = PreparedStatement.from_message(
-            query_id, column_metadata, self.cluster.metadata, query, self.keyspace,
+            query_id, column_metadata, pk_indexes, self.cluster.metadata, query, self.keyspace,
             self._protocol_version)
 
         host = future._current_host
