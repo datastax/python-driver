@@ -371,6 +371,10 @@ class HostConnection(object):
         in_flights = [connection.in_flight] if connection else []
         return {'shutdown': self.is_shutdown, 'open_count': open_count, 'in_flights': in_flights}
 
+    @property
+    def open_count(self):
+        connection = self._connection
+        return 1 if connection and not (connection.is_closed or connection.is_defunct) else 0
 
 _MAX_SIMULTANEOUS_CREATION = 1
 _MIN_TRASH_INTERVAL = 10
