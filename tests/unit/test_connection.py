@@ -16,7 +16,7 @@ try:
 except ImportError:
     import unittest  # noqa
 
-from mock import Mock, ANY, call
+from mock import Mock, ANY, call, patch
 import six
 from six import BytesIO
 import time
@@ -282,6 +282,7 @@ class ConnectionTest(unittest.TestCase):
         self.assertEqual('test', cluster.connection_class)
 
 
+@patch('cassandra.connection.ConnectionHeartbeat._raise_if_stopped')
 class ConnectionHeartbeatTest(unittest.TestCase):
 
     @staticmethod
@@ -298,10 +299,9 @@ class ConnectionHeartbeatTest(unittest.TestCase):
         ch = ConnectionHeartbeat(interval, get_holders_fun)
         time.sleep(interval * count)
         ch.stop()
-        ch.join()
         self.assertTrue(get_holders_fun.call_count)
 
-    def test_empty_connections(self):
+    def test_empty_connections(self, *args):
         count = 3
         get_holders = self.make_get_holders(1)
 
@@ -312,7 +312,7 @@ class ConnectionHeartbeatTest(unittest.TestCase):
         holder = get_holders.return_value[0]
         holder.get_connections.assert_has_calls([call()] * get_holders.call_count)
 
-    def test_idle_non_idle(self):
+    def test_idle_non_idle(self, *args):
         request_id = 999
 
         # connection.send_msg(OptionsMessage(), connection.get_request_id(), self._options_callback)
@@ -342,7 +342,7 @@ class ConnectionHeartbeatTest(unittest.TestCase):
         idle_connection.send_msg.assert_has_calls([call(ANY, request_id, ANY)] * get_holders.call_count)
         self.assertEqual(non_idle_connection.send_msg.call_count, 0)
 
-    def test_closed_defunct(self):
+    def test_closed_defunct(self, *args):
         get_holders = self.make_get_holders(1)
         closed_connection = Mock(spec=Connection, in_flight=0, is_idle=False, is_defunct=False, is_closed=True)
         defunct_connection = Mock(spec=Connection, in_flight=0, is_idle=False, is_defunct=True, is_closed=False)
@@ -358,11 +358,12 @@ class ConnectionHeartbeatTest(unittest.TestCase):
         self.assertEqual(closed_connection.send_msg.call_count, 0)
         self.assertEqual(defunct_connection.send_msg.call_count, 0)
 
-    def test_no_req_ids(self):
+    def test_no_req_ids(self, *args):
         in_flight = 3
 
         get_holders = self.make_get_holders(1)
         max_connection = Mock(spec=Connection, host='localhost',
+                              lock=Lock(),
                               max_request_id=in_flight, in_flight=in_flight,
                               is_idle=True, is_defunct=False, is_closed=False)
         holder = get_holders.return_value[0]
@@ -377,7 +378,7 @@ class ConnectionHeartbeatTest(unittest.TestCase):
         max_connection.defunct.assert_has_calls([call(ANY)] * get_holders.call_count)
         holder.return_connection.assert_has_calls([call(max_connection)] * get_holders.call_count)
 
-    def test_unexpected_response(self):
+    def test_unexpected_response(self, *args):
         request_id = 999
 
         get_holders = self.make_get_holders(1)
@@ -405,7 +406,7 @@ class ConnectionHeartbeatTest(unittest.TestCase):
         self.assertEqual(exc.args, Exception('Connection heartbeat failure').args)
         holder.return_connection.assert_has_calls([call(connection)] * get_holders.call_count)
 
-    def test_timeout(self):
+    def test_timeout(self, *args):
         request_id = 999
 
         get_holders = self.make_get_holders(1)
