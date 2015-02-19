@@ -792,6 +792,9 @@ class ConnectionHeartbeat(Thread):
         self.daemon = True
         self.start()
 
+    class ShutdownException(Exception):
+        pass
+
     def run(self):
         self._shutdown_event.wait(self._interval)
         while not self._shutdown_event.is_set():
@@ -802,6 +805,7 @@ class ConnectionHeartbeat(Thread):
             try:
                 for connections, owner in [(o.get_connections(), o) for o in self._get_connection_holders()]:
                     for connection in connections:
+                        self._raise_if_stopped()
                         if not (connection.is_defunct or connection.is_closed):
                             if connection.is_idle:
                                 try:
@@ -815,8 +819,10 @@ class ConnectionHeartbeat(Thread):
                         else:
                             # make sure the owner sees this defunt/closed connection
                             owner.return_connection(connection)
+                    self._raise_if_stopped()
 
                 for f in futures:
+                    self._raise_if_stopped()
                     connection = f.connection
                     try:
                         f.wait(self._interval)
@@ -830,8 +836,11 @@ class ConnectionHeartbeat(Thread):
                         failed_connections.append((f.connection, f.owner))
 
                 for connection, owner in failed_connections:
+                    self._raise_if_stopped()
                     connection.defunct(Exception('Connection heartbeat failure'))
                     owner.return_connection(connection)
+            except self.ShutdownException:
+                pass
             except Exception:
                 log.error("Failed connection heartbeat", exc_info=True)
 
@@ -840,3 +849,8 @@ class ConnectionHeartbeat(Thread):
 
     def stop(self):
         self._shutdown_event.set()
+        self.join()
+
+    def _raise_if_stopped(self):
+        if self._shutdown_event.is_set():
+            raise self.ShutdownException()
