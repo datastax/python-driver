@@ -668,14 +668,6 @@ class BaseContainerColumn(Column):
             raise ValidationError("{} Collection can't have more than 65535 elements.".format(self.column_name))
         return value
 
-    def get_column_def(self):
-        """
-        Returns a column definition for CQL table definition
-        """
-        static = "static" if self.static else ""
-        db_type = self.db_type.format(self.value_type.db_type)
-        return '{} {} {}'.format(self.cql, db_type, static)
-
     def _val_is_null(self, val):
         return not val
 
@@ -692,8 +684,6 @@ class Set(BaseContainerColumn):
 
     http://www.datastax.com/documentation/cql/3.1/cql/cql_using/use_set_t.html
     """
-    db_type = 'set<{}>'
-
     class Quoter(BaseContainerQuoter):
 
         def __str__(self):
@@ -707,7 +697,7 @@ class Set(BaseContainerColumn):
             type on validation, or raise a validation error, defaults to True
         """
         self.strict = strict
-
+        self.db_type = 'set<{}>'.format(value_type.db_type)
         super(Set, self).__init__(value_type, default=default, **kwargs)
 
     def validate(self, value):
@@ -746,8 +736,6 @@ class List(BaseContainerColumn):
 
     http://www.datastax.com/documentation/cql/3.1/cql/cql_using/use_list_t.html
     """
-    db_type = 'list<{}>'
-
     class Quoter(BaseContainerQuoter):
 
         def __str__(self):
@@ -761,6 +749,7 @@ class List(BaseContainerColumn):
         """
         :param value_type: a column class indicating the types of the value
         """
+        self.db_type = 'list<{}>'.format(value_type.db_type)
         return super(List, self).__init__(value_type=value_type, default=default, **kwargs)
 
     def validate(self, value):
@@ -792,9 +781,6 @@ class Map(BaseContainerColumn):
 
     http://www.datastax.com/documentation/cql/3.1/cql/cql_using/use_map_t.html
     """
-
-    db_type = 'map<{}, {}>'
-
     class Quoter(BaseContainerQuoter):
 
         def __str__(self):
@@ -815,6 +801,9 @@ class Map(BaseContainerColumn):
         :param key_type: a column class indicating the types of the key
         :param value_type: a column class indicating the types of the value
         """
+
+        self.db_type = 'map<{}, {}>'.format(key_type.db_type, value_type.db_type)
+
         inheritance_comparator = issubclass if isinstance(key_type, type) else isinstance
         if not inheritance_comparator(key_type, Column):
             raise ValidationError('key_type must be a column class')
@@ -830,17 +819,6 @@ class Map(BaseContainerColumn):
             self.key_col = key_type
             self.key_type = self.key_col.__class__
         super(Map, self).__init__(value_type, default=default, **kwargs)
-
-    def get_column_def(self):
-        """
-        Returns a column definition for CQL table definition
-        """
-        db_type = self.db_type.format(
-            self.key_type.db_type,
-            self.value_type.db_type
-        )
-        static = "static" if self.static else ""
-        return '{} {} {}'.format(self.cql, db_type, static)
 
     def validate(self, value):
         val = super(Map, self).validate(value)
