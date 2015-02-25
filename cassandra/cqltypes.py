@@ -572,11 +572,7 @@ class DateType(_CassandraType):
     @staticmethod
     def deserialize(byts, protocol_version):
         timestamp = int64_unpack(byts) / 1000.0
-        if timestamp >= 0:
-            dt = datetime.utcfromtimestamp(timestamp)
-        else:
-            # PYTHON-119: workaround for Windows
-            dt = datetime(1970, 1, 1) + timedelta(seconds=timestamp)
+        dt = datetime(1970, 1, 1) + timedelta(seconds=timestamp)
         return dt
 
     @staticmethod
