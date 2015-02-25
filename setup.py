@@ -123,6 +123,11 @@ libev_ext = Extension('cassandra.io.libevwrapper',
                       libraries=['ev'],
                       library_dirs=['/usr/local/lib', '/opt/local/lib'])
 
+ccassandra_ext = Extension('ccassandra',
+                           sources=[
+                               'ccassandra/ccassandra.cpp',
+                               'ccassandra/cql_types.cpp',
+                           ])
 
 class build_extensions(build_ext):
 
@@ -226,7 +231,7 @@ def run_setup(extensions):
         ],
         **kw)
 
-extensions = [murmur3_ext, libev_ext]
+extensions = [murmur3_ext, libev_ext, ccassandra_ext]
 if "--no-extensions" in sys.argv:
     sys.argv = [a for a in sys.argv if a != "--no-extensions"]
     extensions = []
@@ -236,6 +241,9 @@ elif "--no-murmur3" in sys.argv:
 elif "--no-libev" in sys.argv:
     sys.argv = [a for a in sys.argv if a != "--no-libev"]
     extensions.remove(libev_ext)
+elif "--no-ccassandra" in sys.argv:
+    sys.argv = [a for a in sys.argv if a != "--no-ccassandra"]
+    extensions.remove(ccassandra_ext)
 
 
 platform_unsupported_msg = \
