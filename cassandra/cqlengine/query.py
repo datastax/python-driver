@@ -256,8 +256,6 @@ class AbstractQuerySet(object):
         self._flat_values_list = False
 
         # results cache
-        self._con = None
-        self._cur = None
         self._result_cache = None
         self._result_idx = None
 
@@ -357,11 +355,6 @@ class AbstractQuerySet(object):
             for idx in range(qty):
                 self._result_idx += 1
                 self._result_cache[self._result_idx] = self._construct_result(self._result_cache[self._result_idx])
-
-            # return the connection to the connection pool if we have all objects
-            if self._result_cache and self._result_idx == (len(self._result_cache) - 1):
-                self._con = None
-                self._cur = None
 
     def __iter__(self):
         self._execute_query()
