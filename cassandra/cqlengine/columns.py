@@ -251,6 +251,11 @@ class Column(object):
         static = "static" if self.static else ""
         return '{} {} {}'.format(self.cql, self.db_type, static)
 
+    # TODO: make columns use cqltypes under the hood
+    # until then, this bridges the gap in using types along with cassandra.metadata for CQL generation
+    def cql_parameterized_type(self):
+        return self.db_type
+
     def set_column_name(self, name):
         """
         Sets the column name during document class construction
@@ -278,6 +283,10 @@ class Column(object):
     def _val_is_null(self, val):
         """ determines if the given value equates to a null value for the given column type """
         return val is None
+
+    @property
+    def sub_columns(self):
+        return []
 
 
 class Blob(Column):
@@ -671,6 +680,10 @@ class BaseContainerColumn(Column):
     def _val_is_null(self, val):
         return not val
 
+    @property
+    def sub_columns(self):
+        return [self.value_col]
+
 
 class BaseContainerQuoter(ValueQuoter):
 
@@ -840,6 +853,37 @@ class Map(BaseContainerColumn):
         if isinstance(value, self.Quoter):
             return value
         return self.Quoter({self.key_col.to_database(k): self.value_col.to_database(v) for k, v in value.items()})
+
+    @property
+    def sub_columns(self):
+        return [self.key_col, self.value_col]
+
+
+class UserDefinedType(Column):
+    """
+    User Defined Type column
+
+    http://www.datastax.com/documentation/cql/3.1/cql/cql_using/cqlUseUDT.html
+    """
+
+    def __init__(self, user_type, **kwargs):
+        """
+        :param type user_type: specifies a :class:`~.Type` model for the column
+        """
+        self.user_type = user_type
+        self.db_type = "frozen<%s>" % user_type.type_name()
+        super(UserDefinedType, self).__init__(**kwargs)
+
+    @property
+    def sub_columns(self):
+        return list(self.user_type._fields.values())
+
+
+def resolve_udts(col_def, out_list):
+    for col in col_def.sub_columns:
+        resolve_udts(col, out_list)
+    if isinstance(col_def, UserDefinedType):
+        out_list.append(col_def.user_type)
 
 
 class _PartitionKeysToken(Column):

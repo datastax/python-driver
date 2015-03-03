@@ -18,7 +18,7 @@ import time
 import six
 
 from cassandra.cqlengine import columns, CQLEngineException, ValidationError, UnicodeMixin
-from cassandra.cqlengine.connection import execute, NOT_SET
+from cassandra.cqlengine import connection
 from cassandra.cqlengine.functions import Token, BaseQueryFunction, QueryValue
 from cassandra.cqlengine.operators import (InOperator, EqualsOperator, GreaterThanOperator,
                                            GreaterThanOrEqualOperator, LessThanOperator,
@@ -117,7 +117,7 @@ class BatchQuery(object):
     _consistency = None
 
     def __init__(self, batch_type=None, timestamp=None, consistency=None, execute_on_exception=False,
-                 timeout=NOT_SET):
+                 timeout=connection.NOT_SET):
         """
         :param batch_type: (optional) One of batch type values available through BatchType enum
         :type batch_type: str or None
@@ -211,7 +211,7 @@ class BatchQuery(object):
 
         query_list.append('APPLY BATCH;')
 
-        tmp = execute('\n'.join(query_list), parameters, self._consistency, self._timeout)
+        tmp = connection.execute('\n'.join(query_list), parameters, self._consistency, self._timeout)
         check_applied(tmp)
 
         self.queries = []
@@ -264,7 +264,7 @@ class AbstractQuerySet(object):
         self._consistency = None
         self._timestamp = None
         self._if_not_exists = False
-        self._timeout = NOT_SET
+        self._timeout = connection.NOT_SET
 
     @property
     def column_family_name(self):
@@ -274,7 +274,7 @@ class AbstractQuerySet(object):
         if self._batch:
             return self._batch.add_query(q)
         else:
-            result = execute(q, consistency_level=self._consistency, timeout=self._timeout)
+            result = connection.execute(q, consistency_level=self._consistency, timeout=self._timeout)
             if self._transaction:
                 check_applied(result)
             return result
@@ -1023,7 +1023,7 @@ class DMLQuery(object):
     _if_not_exists = False
 
     def __init__(self, model, instance=None, batch=None, ttl=None, consistency=None, timestamp=None,
-                 if_not_exists=False, transaction=None, timeout=NOT_SET):
+                 if_not_exists=False, transaction=None, timeout=connection.NOT_SET):
         self.model = model
         self.column_family_name = self.model.column_family_name()
         self.instance = instance
@@ -1039,7 +1039,7 @@ class DMLQuery(object):
         if self._batch:
             return self._batch.add_query(q)
         else:
-            tmp = execute(q, consistency_level=self._consistency, timeout=self._timeout)
+            tmp = connection.execute(q, consistency_level=self._consistency, timeout=self._timeout)
             if self._if_not_exists or self._transaction:
                 check_applied(tmp)
             return tmp

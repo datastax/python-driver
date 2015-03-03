@@ -13,5 +13,7 @@ A collection of functions for managing keyspace and table schema.
 
 .. autofunction:: sync_table
 
+.. autofunction:: sync_type
+
 .. autofunction:: drop_table
 

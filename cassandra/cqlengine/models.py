@@ -19,7 +19,8 @@ import warnings
 
 from cassandra.cqlengine import CQLEngineException, ValidationError
 from cassandra.cqlengine import columns
-from cassandra.cqlengine.query import ModelQuerySet, DMLQuery, AbstractQueryableColumn, NOT_SET
+from cassandra.cqlengine import connection
+from cassandra.cqlengine import query
 from cassandra.cqlengine.query import DoesNotExist as _DoesNotExist
 from cassandra.cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
 from cassandra.util import OrderedDict
@@ -211,7 +212,7 @@ class ConsistencyDescriptor(object):
         raise NotImplementedError
 
 
-class ColumnQueryEvaluator(AbstractQueryableColumn):
+class ColumnQueryEvaluator(query.AbstractQueryableColumn):
     """
     Wraps a column and allows it to be used in comparator
     expressions, returning query operators
@@ -330,8 +331,8 @@ class BaseModel(object):
 
     # end compaction
     # the queryset class used for this class
-    __queryset__ = ModelQuerySet
-    __dmlquery__ = DMLQuery
+    __queryset__ = query.ModelQuerySet
+    __dmlquery__ = query.DMLQuery
 
     __consistency__ = None  # can be set per query
 
@@ -371,7 +372,7 @@ class BaseModel(object):
         # that update should be used when persisting changes
         self._is_persisted = False
         self._batch = None
-        self._timeout = NOT_SET
+        self._timeout = connection.NOT_SET
 
     def __repr__(self):
         """
@@ -741,7 +742,7 @@ class BaseModel(object):
         return cls.objects.batch(batch)
 
     def _inst_batch(self, batch):
-        assert self._timeout is NOT_SET, 'Setting both timeout and batch is not supported'
+        assert self._timeout is connection.NOT_SET, 'Setting both timeout and batch is not supported'
         self._batch = batch
         return self
 
@@ -918,6 +919,13 @@ class ModelMetaClass(type):
 
         # create the class and add a QuerySet to it
         klass = super(ModelMetaClass, cls).__new__(cls, name, bases, attrs)
+
+        udts = []
+        for col in column_dict.values():
+            columns.resolve_udts(col, udts)
+
+        for user_type in set(udts):
+            user_type.register_for_keyspace(klass._get_keyspace())
 
         return klass
 

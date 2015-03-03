@@ -37,3 +37,4 @@ Object Mapper
    cassandra/cqlengine/query
    cassandra/cqlengine/connection
    cassandra/cqlengine/management
+   cassandra/cqlengine/usertype

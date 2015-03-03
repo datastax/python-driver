@@ -17,7 +17,7 @@ import logging
 import six
 
 from cassandra import ConsistencyLevel
-from cassandra.cluster import Cluster, _NOT_SET, NoHostAvailable
+from cassandra.cluster import Cluster, _NOT_SET, NoHostAvailable, UserTypeDoesNotExist
 from cassandra.query import SimpleStatement, Statement, dict_factory
 
 from cassandra.cqlengine import CQLEngineException
@@ -34,6 +34,12 @@ cluster = None
 session = None
 lazy_connect_args = None
 default_consistency_level = ConsistencyLevel.ONE
+
+
+# Because type models may be registered before a connection is present,
+# and because sessions may be replaced, we must register UDTs here, in order
+# to have them registered when a new session is established.
+udt_by_keyspace = {}
 
 
 class UndefinedKeyspaceException(CQLEngineException):
@@ -54,6 +60,8 @@ def default():
     session = cluster.connect()
     session.row_factory = dict_factory
 
+    _register_known_types(cluster)
+
     log.debug("cqlengine connection initialized with default session to localhost")
 
 
@@ -73,6 +81,8 @@ def set_session(s):
         raise CQLEngineException("Failed to initialize: 'Session.row_factory' must be 'dict_factory'.")
     session = s
     cluster = s.cluster
+
+    _register_known_types(cluster)
 
     log.debug("cqlengine connection initialized with %s", s)
 
@@ -129,6 +139,8 @@ def setup(
         raise
     session.row_factory = dict_factory
 
+    _register_known_types(cluster)
+
 
 def execute(query, params=None, consistency_level=None, timeout=NOT_SET):
 
@@ -178,3 +190,23 @@ def handle_lazy_connect():
         hosts, kwargs = lazy_connect_args
         lazy_connect_args = None
         setup(hosts, **kwargs)
+
+
+def register_udt(keyspace, type_name, klass):
+    try:
+        udt_by_keyspace[keyspace][type_name] = klass
+    except KeyError:
+        udt_by_keyspace[keyspace] = {type_name: klass}
+
+    global cluster
+    if cluster:
+        cluster.register_user_type(keyspace, type_name, klass)
+
+
+def _register_known_types(cluster):
+    for ks_name, name_type_map in udt_by_keyspace.items():
+        for type_name, klass in name_type_map.items():
+            try:
+                cluster.register_user_type(ks_name, type_name, klass)
+            except UserTypeDoesNotExist:
+                pass  # new types are covered in management sync functions

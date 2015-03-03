@@ -19,11 +19,13 @@ import os
 import six
 import warnings
 
-from cassandra.metadata import KeyspaceMetadata
+from cassandra import metadata
 from cassandra.cqlengine import CQLEngineException, SizeTieredCompactionStrategy, LeveledCompactionStrategy
+from cassandra.cqlengine import columns
 from cassandra.cqlengine.connection import execute, get_cluster
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.named import NamedTable
+from cassandra.cqlengine.usertype import UserType
 
 CQLENG_ALLOW_SCHEMA_MANAGEMENT = 'CQLENG_ALLOW_SCHEMA_MANAGEMENT'
 
@@ -132,7 +134,7 @@ def _create_keyspace(name, durable_writes, strategy_class, strategy_options):
 
     if name not in cluster.metadata.keyspaces:
         log.info("Creating keyspace %s ", name)
-        ks_meta = KeyspaceMetadata(name, durable_writes, strategy_class, strategy_options)
+        ks_meta = metadata.KeyspaceMetadata(name, durable_writes, strategy_class, strategy_options)
         execute(ks_meta.as_cql_query())
     else:
         log.info("Not creating keyspace %s because it already exists", name)
@@ -168,6 +170,8 @@ def sync_table(model):
     """
     Inspects the model and creates / updates the corresponding table and columns.
 
+    Any User Defined Types used in the table are implicitly synchronized.
+
     This function can only add fields that are not part of the primary key.
 
     Note that the attributes removed from the model are not deleted on the database.
@@ -198,6 +202,13 @@ def sync_table(model):
     keyspace = cluster.metadata.keyspaces[ks_name]
     tables = keyspace.tables
 
+    syncd_types = set()
+    for col in model._columns.values():
+        udts = []
+        columns.resolve_udts(col, udts)
+        for udt in [u for u in udts if u not in syncd_types]:
+            _sync_type(ks_name, udt, syncd_types)
+
     # check for an existing column family
     if raw_cf_name not in tables:
         log.debug("sync_table creating new table %s", cf_name)
@@ -216,6 +227,7 @@ def sync_table(model):
         fields = get_fields(model)
         field_names = [x.name for x in fields]
         model_fields = set()
+        # # TODO: does this work with db_name??
         for name, col in model._columns.items():
             if col.primary_key or col.partition_key:
                 continue  # we can't mess with the PK
@@ -246,6 +258,77 @@ def sync_table(model):
         qs += ['("{}")'.format(column.db_field_name)]
         qs = ' '.join(qs)
         execute(qs)
+
+
+def sync_type(ks_name, type_model):
+    """
+    Inspects the type_model and creates / updates the corresponding type.
+
+    Note that the attributes removed from the type_model are not deleted on the database (this operation is not supported).
+    They become effectively ignored by (will not show up on) the type_model.
+
+    **This function should be used with caution, especially in production environments.
+    Take care to execute schema modifications in a single context (i.e. not concurrently with other clients).**
+
+    *There are plans to guard schema-modifying functions with an environment-driven conditional.*
+    """
+    if not _allow_schema_modification():
+        return
+
+    if not issubclass(type_model, UserType):
+        raise CQLEngineException("Types must be derived from base UserType.")
+
+    _sync_type(ks_name, type_model)
+
+
+def _sync_type(ks_name, type_model, omit_subtypes=None):
+
+    syncd_sub_types = omit_subtypes or set()
+    for field in type_model._fields.values():
+        udts = []
+        columns.resolve_udts(field, udts)
+        for udt in [u for u in udts if u not in syncd_sub_types]:
+            _sync_type(ks_name, udt, syncd_sub_types)
+            syncd_sub_types.add(udt)
+
+    type_name = type_model.type_name()
+    type_name_qualified = "%s.%s" % (ks_name, type_name)
+
+    cluster = get_cluster()
+
+    keyspace = cluster.metadata.keyspaces[ks_name]
+    defined_types = keyspace.user_types
+
+    if type_name not in defined_types:
+        log.debug("sync_type creating new type %s", type_name_qualified)
+        cql = get_create_type(type_model, ks_name)
+        execute(cql)
+        type_model.register_for_keyspace(ks_name)
+    else:
+        defined_fields = defined_types[type_name].field_names
+        model_fields = set()
+        for field in type_model._fields.values():
+            model_fields.add(field.db_field_name)
+            if field.db_field_name not in defined_fields:
+                execute("ALTER TYPE {} ADD {}".format(type_name_qualified, field.get_column_def()))
+
+        if len(defined_fields) == len(model_fields):
+            log.info("Type %s did not require synchronization", type_name_qualified)
+            return
+
+        db_fields_not_in_model = model_fields.symmetric_difference(defined_fields)
+        if db_fields_not_in_model:
+            log.info("Type %s has fields not referenced by model: %s", type_name_qualified, db_fields_not_in_model)
+
+        type_model.register_for_keyspace(ks_name)
+
+
+def get_create_type(type_model, keyspace):
+    type_meta = metadata.UserType(keyspace,
+                                  type_model.type_name(),
+                                  (f.db_field_name for f in type_model._fields.values()),
+                                  type_model._fields.values())
+    return type_meta.as_cql_query()
 
 
 def get_create_table(model):
@@ -439,10 +522,11 @@ def drop_table(model):
     raw_cf_name = model.column_family_name(include_keyspace=False)
 
     try:
-        table = meta.keyspaces[ks_name].tables[raw_cf_name]
+        meta.keyspaces[ks_name].tables[raw_cf_name]
         execute('drop table {};'.format(model.column_family_name(include_keyspace=True)))
     except KeyError:
         pass
+
 
 def _allow_schema_modification():
     if not os.getenv(CQLENG_ALLOW_SCHEMA_MANAGEMENT):
