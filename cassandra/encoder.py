@@ -28,7 +28,7 @@ import types
 from uuid import UUID
 import six
 
-from cassandra.util import OrderedDict, OrderedMap, sortedset
+from cassandra.util import OrderedDict, OrderedMap, sortedset, Time
 
 if six.PY3:
     long = int
@@ -74,6 +74,8 @@ class Encoder(object):
             UUID: self.cql_encode_object,
             datetime.datetime: self.cql_encode_datetime,
             datetime.date: self.cql_encode_date,
+            datetime.time: self.cql_encode_time,
+            Time: self.cql_encode_time,
             dict: self.cql_encode_map_collection,
             OrderedDict: self.cql_encode_map_collection,
             OrderedMap: self.cql_encode_map_collection,
@@ -147,9 +149,16 @@ class Encoder(object):
     def cql_encode_date(self, val):
         """
         Converts a :class:`datetime.date` object to a string with format
-        ``YYYY-MM-DD-0000``.
+        ``YYYY-MM-DD``.
         """
-        return "'%s'" % val.strftime('%Y-%m-%d-0000')
+        return "'%s'" % val.strftime('%Y-%m-%d')
+
+    def cql_encode_time(self, val):
+        """
+        Converts a :class:`datetime.date` object to a string with format
+        ``HH:MM:SS.mmmuuunnn``.
+        """
+        return "'%s'" % val
 
     def cql_encode_sequence(self, val):
         """

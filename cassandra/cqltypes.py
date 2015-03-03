@@ -31,7 +31,7 @@ from __future__ import absolute_import  # to enable import io from stdlib
 from binascii import unhexlify
 import calendar
 from collections import namedtuple
-from datetime import datetime, timedelta
+import datetime
 from decimal import Decimal
 import io
 import re
@@ -43,11 +43,12 @@ from uuid import UUID
 import six
 from six.moves import range
 
-from cassandra.marshal import (int8_pack, int8_unpack, uint16_pack, uint16_unpack,
+from cassandra.marshal import (int8_pack, int8_unpack,
+                               uint16_pack, uint16_unpack, uint32_pack, uint32_unpack,
                                int32_pack, int32_unpack, int64_pack, int64_unpack,
                                float_pack, float_unpack, double_pack, double_unpack,
                                varint_pack, varint_unpack)
-from cassandra.util import OrderedMap, sortedset
+from cassandra.util import OrderedMap, sortedset, Time
 
 apache_cassandra_type_prefix = 'org.apache.cassandra.db.marshal.'
 
@@ -72,6 +73,15 @@ def trim_if_startswith(s, prefix):
 
 def unix_time_from_uuid1(u):
     return (u.time - 0x01B21DD213814000) / 10000000.0
+
+
+def datetime_from_timestamp(timestamp):
+    if timestamp >= 0:
+        dt = datetime.datetime.utcfromtimestamp(timestamp)
+    else:
+        # PYTHON-119: workaround for Windows
+        dt = datetime.datetime(1970, 1, 1) + datetime.timedelta(seconds=timestamp)
+    return dt
 
 
 _casstypes = {}
@@ -528,8 +538,7 @@ class InetAddressType(_CassandraType):
 class CounterColumnType(LongType):
     typename = 'counter'
 
-
-cql_time_formats = (
+cql_timestamp_formats = (
     '%Y-%m-%d %H:%M',
     '%Y-%m-%d %H:%M:%S',
     '%Y-%m-%dT%H:%M',
@@ -544,27 +553,27 @@ class DateType(_CassandraType):
     typename = 'timestamp'
 
     @classmethod
-    def validate(cls, date):
-        if isinstance(date, six.string_types):
-            date = cls.interpret_datestring(date)
-        return date
+    def validate(cls, val):
+        if isinstance(val, six.string_types):
+            val = cls.interpret_datestring(val)
+        return val
 
     @staticmethod
-    def interpret_datestring(date):
-        if date[-5] in ('+', '-'):
-            offset = (int(date[-4:-2]) * 3600 + int(date[-2:]) * 60) * int(date[-5] + '1')
-            date = date[:-5]
+    def interpret_datestring(val):
+        if val[-5] in ('+', '-'):
+            offset = (int(val[-4:-2]) * 3600 + int(val[-2:]) * 60) * int(val[-5] + '1')
+            val = val[:-5]
         else:
             offset = -time.timezone
-        for tformat in cql_time_formats:
+        for tformat in cql_timestamp_formats:
             try:
-                tval = time.strptime(date, tformat)
+                tval = time.strptime(val, tformat)
             except ValueError:
                 continue
             # scale seconds to millis for the raw value
             return (calendar.timegm(tval) + offset) * 1e3
         else:
-            raise ValueError("can't interpret %r as a date" % (date,))
+            raise ValueError("can't interpret %r as a date" % (val,))
 
     def my_timestamp(self):
         return self.val
@@ -572,12 +581,7 @@ class DateType(_CassandraType):
     @staticmethod
     def deserialize(byts, protocol_version):
         timestamp = int64_unpack(byts) / 1000.0
-        if timestamp >= 0:
-            dt = datetime.utcfromtimestamp(timestamp)
-        else:
-            # PYTHON-119: workaround for Windows
-            dt = datetime(1970, 1, 1) + timedelta(seconds=timestamp)
-        return dt
+        return datetime_from_timestamp(timestamp)
 
     @staticmethod
     def serialize(v, protocol_version):
@@ -614,6 +618,64 @@ class TimeUUIDType(DateType):
             return timeuuid.bytes
         except AttributeError:
             raise TypeError("Got a non-UUID object for a UUID value")
+
+
+class SimpleDateType(_CassandraType):
+    typename = 'date'
+    seconds_per_day = 60 * 60 * 24
+    date_format = "%Y-%m-%d"
+
+    @classmethod
+    def validate(cls, val):
+        if isinstance(val, six.string_types):
+            val = cls.interpret_simpledate_string(val)
+        elif (not isinstance(val, datetime.date)) and not isinstance(val, six.integer_types):
+            raise TypeError('SimpleDateType arg must be a datetime.date, unsigned integer, or string in the format YYYY-MM-DD')
+        return val
+
+    @staticmethod
+    def interpret_simpledate_string(v):
+        date_time = datetime.datetime.strptime(v, SimpleDateType.date_format)
+        return datetime.date(date_time.year, date_time.month, date_time.day)
+
+    @staticmethod
+    def serialize(val, protocol_version):
+        # Values of the 'date'` type are encoded as 32-bit unsigned integers
+        # representing a number of days with "the epoch" at the center of the
+        # range (2^31). Epoch is January 1st, 1970
+        try:
+            shifted = (calendar.timegm(val.timetuple()) // SimpleDateType.seconds_per_day) + 2 ** 31
+        except AttributeError:
+            shifted = val
+        return uint32_pack(shifted)
+
+    @staticmethod
+    def deserialize(byts, protocol_version):
+        timestamp = SimpleDateType.seconds_per_day * (uint32_unpack(byts) - 2 ** 31)
+        dt = datetime.datetime.utcfromtimestamp(timestamp)
+        return datetime.date(dt.year, dt.month, dt.day)
+
+
+class TimeType(_CassandraType):
+    typename = 'time'
+
+    @classmethod
+    def validate(cls, val):
+        if not isinstance(val, Time):
+            val = Time(val)
+        return val
+
+    @staticmethod
+    def serialize(val, protocol_version):
+        try:
+            nano = val.nanosecond_time
+        except AttributeError:
+            nano = Time(val).nanosecond_time
+        return int64_pack(nano)
+
+    @staticmethod
+    def deserialize(byts, protocol_version):
+        return Time(int64_unpack(byts))
 
 
 class UTF8Type(_CassandraType):

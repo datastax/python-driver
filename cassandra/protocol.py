@@ -33,7 +33,8 @@ from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 InetAddressType, IntegerType, ListType,
                                 LongType, MapType, SetType, TimeUUIDType,
                                 UTF8Type, UUIDType, UserType,
-                                TupleType, lookup_casstype)
+                                TupleType, lookup_casstype, SimpleDateType,
+                                TimeType)
 from cassandra.policies import WriteType
 
 log = logging.getLogger(__name__)
@@ -530,6 +531,8 @@ class ResultMessage(_MessageType):
         0x000E: IntegerType,
         0x000F: TimeUUIDType,
         0x0010: InetAddressType,
+        0x0011: SimpleDateType,
+        0x0012: TimeType,
         0x0020: ListType,
         0x0021: MapType,
         0x0022: SetType,

@@ -563,7 +563,7 @@ from six.moves import cPickle
 
 class OrderedMap(Mapping):
     '''
-    An ordered map that accepts non-hashable types for keys. It also maintains the 
+    An ordered map that accepts non-hashable types for keys. It also maintains the
     insertion order of items, behaving as OrderedDict in that regard. These maps
     are constructed and read just as normal mapping types, exept that they may
     contain arbitrary collections and other non-hashable items as keys::
@@ -602,7 +602,7 @@ class OrderedMap(Mapping):
             e = args[0]
             if callable(getattr(e, 'keys', None)):
                 for k in e.keys():
-                    self._items.append((k, e[k]))
+                    self._insert(k, e[k])
             else:
                 for k, v in e:
                     self._insert(k, v)
@@ -620,8 +620,11 @@ class OrderedMap(Mapping):
             self._index[flat_key] = len(self._items) - 1
 
     def __getitem__(self, key):
-        index = self._index[self._serialize_key(key)]
-        return self._items[index][1]
+        try:
+            index = self._index[self._serialize_key(key)]
+            return self._items[index][1]
+        except KeyError:
+            raise KeyError(str(key))
 
     def __iter__(self):
         for i in self._items:
@@ -653,3 +656,100 @@ class OrderedMap(Mapping):
     @staticmethod
     def _serialize_key(key):
         return cPickle.dumps(key)
+
+
+import datetime
+import time
+
+if six.PY3:
+    long = int
+
+
+class Time(object):
+    '''
+    Idealized time, independent of day.
+
+    Up to nanosecond resolution
+    '''
+
+    MICRO = 1000
+    MILLI = 1000 * MICRO
+    SECOND = 1000 * MILLI
+    MINUTE = 60 * SECOND
+    HOUR = 60 * MINUTE
+    DAY = 24 * HOUR
+
+    nanosecond_time = 0
+
+    def __init__(self, value):
+        if isinstance(value, six.integer_types):
+            self._from_timestamp(value)
+        elif isinstance(value, datetime.time):
+            self._from_time(value)
+        elif isinstance(value, six.string_types):
+            self._from_timestring(value)
+        else:
+            raise TypeError('Time arguments must be a whole number, datetime.time, or string')
+
+    @property
+    def hour(self):
+        return self.nanosecond_time // Time.HOUR
+
+    @property
+    def minute(self):
+        minutes = self.nanosecond_time // Time.MINUTE
+        return minutes % 60
+
+    @property
+    def second(self):
+        seconds = self.nanosecond_time // Time.SECOND
+        return seconds % 60
+
+    @property
+    def nanosecond(self):
+        return self.nanosecond_time % Time.SECOND
+
+    def _from_timestamp(self, t):
+        if t >= Time.DAY:
+            raise ValueError("value must be less than number of nanoseconds in a day (%d)" % Time.DAY)
+        self.nanosecond_time = t
+
+    def _from_timestring(self, s):
+        try:
+            parts = s.split('.')
+            base_time = time.strptime(parts[0], "%H:%M:%S")
+            self.nanosecond_time = (base_time.tm_hour * Time.HOUR +
+                                    base_time.tm_min * Time.MINUTE +
+                                    base_time.tm_sec * Time.SECOND)
+
+            if len(parts) > 1:
+                # right pad to 9 digits
+                nano_time_str = parts[1] + "0" * (9 - len(parts[1]))
+                self.nanosecond_time += int(nano_time_str)
+
+        except ValueError:
+            raise ValueError("can't interpret %r as a time" % (s,))
+
+    def _from_time(self, t):
+        self.nanosecond_time = (t.hour * Time.HOUR +
+                                t.minute * Time.MINUTE +
+                                t.second * Time.SECOND +
+                                t.microsecond * Time.MICRO)
+
+    def __eq__(self, other):
+        if isinstance(other, Time):
+            return self.nanosecond_time == other.nanosecond_time
+
+        if isinstance(other, six.integer_types):
+            return self.nanosecond_time == other
+
+        return self.nanosecond_time % Time.MICRO == 0 and \
+            datetime.time(hour=self.hour, minute=self.minute, second=self.second,
+                          microsecond=self.nanosecond // Time.MICRO) == other
+
+    def __repr__(self):
+        return "Time(%s)" % self.nanosecond_time
+
+    def __str__(self):
+        return "%02d:%02d:%02d.%09d" % (self.hour, self.minute,
+                                        self.second, self.nanosecond)
