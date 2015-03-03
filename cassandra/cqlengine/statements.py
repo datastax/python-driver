@@ -291,10 +291,7 @@ class ListUpdateClause(ContainerUpdateClause):
             ctx[str(ctx_id)] = self._to_database(self._assignments)
             ctx_id += 1
         if self._prepend is not None:
-            # CQL seems to prepend element at a time, starting
-            # with the element at idx 0, we can either reverse
-            # it here, or have it inserted in reverse
-            ctx[str(ctx_id)] = self._to_database(list(reversed(self._prepend)))
+            ctx[str(ctx_id)] = self._to_database(self._prepend)
             ctx_id += 1
         if self._append is not None:
             ctx[str(ctx_id)] = self._to_database(self._append)
@@ -308,9 +305,7 @@ class ListUpdateClause(ContainerUpdateClause):
             self._append = self.value
 
         elif self._operation == "prepend":
-            # self.value is a Quoter but we reverse self._prepend later as if
-            # it's a list, so we have to set it to the underlying list
-            self._prepend = self.value.value
+            self._prepend = self.value
 
         elif self.previous is None:
             self._assignments = self.value

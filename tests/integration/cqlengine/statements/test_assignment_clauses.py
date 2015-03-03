@@ -226,8 +226,7 @@ class ListUpdateClauseTests(TestCase):
 
         ctx = {}
         c.update_context(ctx)
-        # test context list reversal
-        self.assertEqual(ctx, {'0': [2, 1]})
+        self.assertEqual(ctx, {'0': [1, 2]})
 
     def test_append_and_prepend(self):
         c = ListUpdateClause('s', [1, 2, 3, 4, 5, 6], previous=[3, 4])
@@ -243,8 +242,7 @@ class ListUpdateClauseTests(TestCase):
 
         ctx = {}
         c.update_context(ctx)
-        # test context list reversal
-        self.assertEqual(ctx, {'0': [2, 1], '1': [5, 6]})
+        self.assertEqual(ctx, {'0': [1, 2], '1': [5, 6]})
 
     def test_shrinking_list_update(self):
         """ tests that updating to a smaller list results in an insert statement """
