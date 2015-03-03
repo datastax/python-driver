@@ -75,12 +75,12 @@ def unix_time_from_uuid1(u):
     return (u.time - 0x01B21DD213814000) / 10000000.0
 
 
+DATETIME_EPOC = datetime.datetime(1970, 1, 1)
+
+
 def datetime_from_timestamp(timestamp):
-    if timestamp >= 0:
-        dt = datetime.datetime.utcfromtimestamp(timestamp)
-    else:
-        # PYTHON-119: workaround for Windows
-        dt = datetime.datetime(1970, 1, 1) + datetime.timedelta(seconds=timestamp)
+    # PYTHON-119: workaround for Windows
+    dt = DATETIME_EPOC + datetime.timedelta(seconds=timestamp)
     return dt
 
 
@@ -652,7 +652,7 @@ class SimpleDateType(_CassandraType):
     @staticmethod
     def deserialize(byts, protocol_version):
         timestamp = SimpleDateType.seconds_per_day * (uint32_unpack(byts) - 2 ** 31)
-        dt = datetime.datetime.utcfromtimestamp(timestamp)
+        dt = datetime_from_timestamp(timestamp)
         return datetime.date(dt.year, dt.month, dt.day)
 
 
