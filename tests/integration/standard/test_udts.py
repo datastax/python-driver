@@ -590,7 +590,6 @@ class TypeTests(unittest.TestCase):
         """
         Test for inserting various types of DATA_TYPE_NON_PRIMITIVE into UDT's
         """
-        raise unittest.SkipTest("Collections are not allowed in UDTs")
         c = Cluster(protocol_version=PROTOCOL_VERSION)
         s = c.connect()
 
@@ -609,6 +608,9 @@ class TypeTests(unittest.TestCase):
                 if nonprim_datatype == "map":
                     type_string = "{0}_{1} {2}<{3}, {3}>".format(chr(start_index + i), chr(start_index + j),
                                                                  nonprim_datatype, datatype)
+                elif nonprim_datatype == "tuple":
+                    type_string = "{0}_{1} frozen<{2}<{3}>>".format(chr(start_index + i), chr(start_index + j),
+                                                            nonprim_datatype, datatype)
                 else:
                     type_string = "{0}_{1} {2}<{3}>".format(chr(start_index + i), chr(start_index + j),
                                                             nonprim_datatype, datatype)
