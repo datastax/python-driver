@@ -58,6 +58,7 @@ class MetricsTests(unittest.TestCase):
             get_cluster().start(wait_for_binary_proto=True, wait_other_notice=True)
 
         self.assertGreater(cluster.metrics.stats.connection_errors, 0)
+        cluster.shutdown()
 
     def test_write_timeout(self):
         """
@@ -90,6 +91,8 @@ class MetricsTests(unittest.TestCase):
         finally:
             get_node(1).start(wait_other_notice=True, wait_for_binary_proto=True)
 
+        cluster.shutdown()
+
     def test_read_timeout(self):
         """
         Trigger and ensure read_timeouts are counted
@@ -120,6 +123,8 @@ class MetricsTests(unittest.TestCase):
 
         finally:
             get_node(1).start(wait_other_notice=True, wait_for_binary_proto=True)
+
+        cluster.shutdown()
 
     def test_unavailable(self):
         """
@@ -156,6 +161,8 @@ class MetricsTests(unittest.TestCase):
             self.assertEqual(2, cluster.metrics.stats.unavailables)
         finally:
             get_node(1).start(wait_other_notice=True, wait_for_binary_proto=True)
+
+        cluster.shutdown()
 
     def test_other_error(self):
         # TODO: Bootstrapping or Overloaded cases

@@ -147,6 +147,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 4, 3)
         self.coordinator_stats.assert_query_count_equals(self, 5, 3)
 
+        cluster.shutdown()
+
     def test_roundrobin_two_dcs_2(self):
         use_multidc([2, 2])
         keyspace = 'test_roundrobin_two_dcs_2'
@@ -185,6 +187,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 4, 3)
         self.coordinator_stats.assert_query_count_equals(self, 5, 3)
 
+        cluster.shutdown()
+
     def test_dc_aware_roundrobin_two_dcs(self):
         use_multidc([3, 2])
         keyspace = 'test_dc_aware_roundrobin_two_dcs'
@@ -208,6 +212,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 4, 0)
         self.coordinator_stats.assert_query_count_equals(self, 5, 0)
 
+        cluster.shutdown()
+
     def test_dc_aware_roundrobin_two_dcs_2(self):
         use_multidc([3, 2])
         keyspace = 'test_dc_aware_roundrobin_two_dcs_2'
@@ -230,6 +236,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 3, 0)
         self.coordinator_stats.assert_query_count_equals(self, 4, 6)
         self.coordinator_stats.assert_query_count_equals(self, 5, 6)
+
+        cluster.shutdown()
 
     def test_dc_aware_roundrobin_one_remote_host(self):
         use_multidc([2, 2])
@@ -314,6 +322,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         except NoHostAvailable:
             pass
 
+        cluster.shutdown()
+
     def test_token_aware(self):
         keyspace = 'test_token_aware'
         self.token_aware(keyspace)
@@ -394,6 +404,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.assertEqual(results, set([0, 12]))
         self.coordinator_stats.assert_query_count_equals(self, 2, 0)
 
+        cluster.shutdown()
+
     def test_token_aware_composite_key(self):
         use_singledc()
         keyspace = 'test_token_aware_composite_key'
@@ -422,6 +434,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         results = session.execute('SELECT * FROM %s WHERE k1 = 1 AND k2 = 2' % table)
         self.assertTrue(len(results) == 1)
         self.assertTrue(results[0].i)
+
+        cluster.shutdown()
 
     def test_token_aware_with_rf_2(self, use_prepared=False):
         use_singledc()
@@ -452,6 +466,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 2, 0)
         self.coordinator_stats.assert_query_count_equals(self, 3, 12)
 
+        cluster.shutdown()
+
     def test_token_aware_with_local_table(self):
         use_singledc()
         cluster = Cluster(
@@ -464,6 +480,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         r = session.execute(p, ('local',))
         self.assertEqual(len(r), 1)
         self.assertEqual(r[0].key, 'local')
+
+        cluster.shutdown()
 
     def test_white_list(self):
         use_singledc()
@@ -499,3 +517,5 @@ class LoadBalancingPolicyTests(unittest.TestCase):
             self.fail()
         except NoHostAvailable:
             pass
+
+        cluster.shutdown()

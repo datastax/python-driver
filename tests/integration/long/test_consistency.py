@@ -145,6 +145,8 @@ class ConsistencyTests(unittest.TestCase):
             start(2)
             wait_for_up(cluster, 2)
 
+        cluster.shutdown()
+
     def test_rfone_tokenaware_one_node_down(self):
         self._test_tokenaware_one_node_down(
             keyspace='test_rfone_tokenaware',
@@ -187,6 +189,8 @@ class ConsistencyTests(unittest.TestCase):
                                    SINGLE_DC_CONSISTENCY_LEVELS - set([ConsistencyLevel.ANY]),
                                    expected_reader=2)
 
+        cluster.shutdown()
+
     def _test_downgrading_cl(self, keyspace, rf, accepted):
         cluster = Cluster(
             load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
@@ -215,6 +219,8 @@ class ConsistencyTests(unittest.TestCase):
         finally:
             start(2)
             wait_for_up(cluster, 2)
+
+        cluster.shutdown()
 
     def test_rfone_downgradingcl(self):
         self._test_downgrading_cl(
@@ -282,6 +288,8 @@ class ConsistencyTests(unittest.TestCase):
         finally:
             start(2)
             wait_for_up(cluster, 2)
+
+        session.cluster.shutdown()
 
     # TODO: can't be done in this class since we reuse the ccm cluster
     #       instead we should create these elsewhere

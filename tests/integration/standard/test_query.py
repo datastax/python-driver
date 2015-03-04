@@ -52,6 +52,8 @@ class QueryTests(unittest.TestCase):
         session.execute(bound)
         self.assertEqual(bound.routing_key, b'\x00\x00\x00\x01')
 
+        cluster.shutdown()
+
     def test_trace_prints_okay(self):
         """
         Code coverage to ensure trace prints to string without error
@@ -69,6 +71,8 @@ class QueryTests(unittest.TestCase):
         for event in statement.trace.events:
             str(event)
 
+        cluster.shutdown()
+
     def test_trace_ignores_row_factory(self):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
@@ -83,18 +87,23 @@ class QueryTests(unittest.TestCase):
         for event in statement.trace.events:
             str(event)
 
+        cluster.shutdown()
+
 
 class PreparedStatementTests(unittest.TestCase):
+
+    def setUp(self):
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.session = self.cluster.connect()
+
+    def tearDown(self):
+        self.cluster.shutdown()
 
     def test_routing_key(self):
         """
         Simple code coverage to ensure routing_keys can be accessed
         """
-
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
-
-        prepared = session.prepare(
+        prepared = self.session.prepare(
             """
             INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
             """)
@@ -108,11 +117,7 @@ class PreparedStatementTests(unittest.TestCase):
         Ensure when routing_key_indexes are blank,
         the routing key should be None
         """
-
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
-
-        prepared = session.prepare(
+        prepared = self.session.prepare(
             """
             INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
             """)
@@ -127,11 +132,7 @@ class PreparedStatementTests(unittest.TestCase):
         Basic test that ensures _set_routing_key()
         overrides the current routing key
         """
-
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
-
-        prepared = session.prepare(
+        prepared = self.session.prepare(
             """
             INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
             """)
@@ -145,11 +146,7 @@ class PreparedStatementTests(unittest.TestCase):
         """
         Basic test that uses a fake routing_key_index
         """
-
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
-
-        prepared = session.prepare(
+        prepared = self.session.prepare(
             """
             INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
             """)
@@ -167,11 +164,7 @@ class PreparedStatementTests(unittest.TestCase):
         """
         Ensure that bound.keyspace works as expected
         """
-
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
-
-        prepared = session.prepare(
+        prepared = self.session.prepare(
             """
             INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
             """)
@@ -212,6 +205,8 @@ class PrintStatementTests(unittest.TestCase):
         bound = prepared.bind((1, 2))
         self.assertEqual(str(bound),
                          '<BoundStatement query="INSERT INTO test3rf.test (k, v) VALUES (?, ?)", values=(1, 2), consistency=ONE>')
+
+        cluster.shutdown()
 
 
 class BatchStatementTests(unittest.TestCase):
@@ -321,6 +316,9 @@ class SerialConsistencyTests(unittest.TestCase):
         if PROTOCOL_VERSION < 3:
             self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         self.session = self.cluster.connect()
+
+    def tearDown(self):
+        self.cluster.shutdown()
 
     def test_conditional_update(self):
         self.session.execute("INSERT INTO test3rf.test (k, v) VALUES (0, 0)")
@@ -459,8 +457,6 @@ class BatchStatementDefaultRoutingKeyTests(unittest.TestCase):
         """
         batch routing key is inherited from SimpleStatement
         """
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        self.session = self.cluster.connect()
         batch = BatchStatement()
         batch.add(self.simple_statement)
         self.assertIsNotNone(batch.routing_key)

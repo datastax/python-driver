@@ -33,6 +33,13 @@ class RowFactoryTests(unittest.TestCase):
     Test different row_factories and access code
     """
 
+    def setUp(self):
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.session = self.cluster.connect()
+
+    def tearDown(self):
+        self.cluster.shutdown()
+
     truncate = '''
         TRUNCATE test3rf.test
     '''
@@ -56,8 +63,7 @@ class RowFactoryTests(unittest.TestCase):
     '''
 
     def test_tuple_factory(self):
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
+        session = self.session
         session.row_factory = tuple_factory
 
         session.execute(self.truncate)
@@ -77,9 +83,8 @@ class RowFactoryTests(unittest.TestCase):
         self.assertEqual(result[1][0], result[1][1])
         self.assertEqual(result[1][0], 2)
 
-    def test_named_tuple_factoryy(self):
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
+    def test_named_tuple_factory(self):
+        session = self.session
         session.row_factory = named_tuple_factory
 
         session.execute(self.truncate)
@@ -99,8 +104,7 @@ class RowFactoryTests(unittest.TestCase):
         self.assertEqual(result[1].k, 2)
 
     def test_dict_factory(self):
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
+        session = self.session
         session.row_factory = dict_factory
 
         session.execute(self.truncate)
@@ -121,8 +125,7 @@ class RowFactoryTests(unittest.TestCase):
         self.assertEqual(result[1]['k'], 2)
 
     def test_ordered_dict_factory(self):
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
+        session = self.session
         session.row_factory = ordered_dict_factory
 
         session.execute(self.truncate)

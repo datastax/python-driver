@@ -316,6 +316,8 @@ class TypeTests(unittest.TestCase):
             result = s.execute("SELECT v FROM mytable WHERE k=0", timeout=EXTENDED_QUERY_TIMEOUT)[0]
             self.assertEqual(created_udt, result.v)
 
+        c.shutdown()
+
     def nested_udt_helper(self, udts, i):
         """
         Helper for creating nested udts.
@@ -389,6 +391,8 @@ class TypeTests(unittest.TestCase):
             result = s.execute("SELECT v_%s FROM mytable WHERE k=0", (i,))[0]
             self.assertEqual(udt, result['v_%s' % i])
 
+        c.shutdown()
+
     def test_nested_unregistered_udts(self):
         """
         Test for ensuring nested unregistered udts are handled correctly.
@@ -449,6 +453,8 @@ class TypeTests(unittest.TestCase):
             # verify udt was written and read correctly
             result = s.execute("SELECT v_%s FROM mytable WHERE k=0", (i,))[0]
             self.assertEqual(udt, result['v_%s' % i])
+
+        c.shutdown()
 
     def test_nested_registered_udts_with_different_namedtuples(self):
         """
@@ -517,12 +523,16 @@ class TypeTests(unittest.TestCase):
             result = s.execute("SELECT v_%s FROM mytable WHERE k=0", (i,))[0]
             self.assertEqual(udt, result['v_%s' % i])
 
+        c.shutdown()
+
     def test_non_existing_types(self):
         c = Cluster(protocol_version=PROTOCOL_VERSION)
         c.connect()
         User = namedtuple('user', ('age', 'name'))
         self.assertRaises(UserTypeDoesNotExist, c.register_user_type, "some_bad_keyspace", "user", User)
         self.assertRaises(UserTypeDoesNotExist, c.register_user_type, "system", "user", User)
+
+        c.shutdown()
 
     def test_primitive_datatypes(self):
         """

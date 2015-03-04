@@ -50,6 +50,9 @@ class QueryPagingTests(unittest.TestCase):
         self.session = self.cluster.connect()
         self.session.execute("TRUNCATE test3rf.test")
 
+    def tearDown(self):
+        self.cluster.shutdown()
+
     def test_paging(self):
         statements_and_params = zip(cycle(["INSERT INTO test3rf.test (k, v) VALUES (%s, 0)"]),
                                     [(i, ) for i in range(100)])

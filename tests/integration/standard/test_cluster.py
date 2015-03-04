@@ -98,12 +98,14 @@ class ClusterTests(unittest.TestCase):
         session2 = cluster.connect('test3rf')
         result2 = session2.execute("SELECT * FROM test")
         self.assertEqual(result, result2)
+        cluster.shutdown()
 
     def test_set_keyspace_twice(self):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
         session.execute("USE system")
         session.execute("USE system")
+        cluster.shutdown()
 
     def test_default_connections(self):
         """
@@ -122,7 +124,6 @@ class ClusterTests(unittest.TestCase):
         """
         Ensure you cannot connect to a cluster that's been shutdown
         """
-
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         cluster.shutdown()
         self.assertRaises(Exception, cluster.connect)
@@ -213,6 +214,8 @@ class ClusterTests(unittest.TestCase):
         self.assertIn("newkeyspace", cluster.metadata.keyspaces)
 
         session.execute("DROP KEYSPACE newkeyspace")
+        cluster.shutdown()
+        other_cluster.shutdown()
 
     def test_refresh_schema(self):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
@@ -224,7 +227,7 @@ class ClusterTests(unittest.TestCase):
         self.assertIsNot(original_meta, cluster.metadata.keyspaces)
         self.assertEqual(original_meta, cluster.metadata.keyspaces)
 
-        session.shutdown()
+        cluster.shutdown()
 
     def test_refresh_schema_keyspace(self):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
@@ -240,7 +243,7 @@ class ClusterTests(unittest.TestCase):
         current_system_meta = current_meta['system']
         self.assertIsNot(original_system_meta, current_system_meta)
         self.assertEqual(original_system_meta.as_cql_query(), current_system_meta.as_cql_query())
-        session.shutdown()
+        cluster.shutdown()
 
     def test_refresh_schema_table(self):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
@@ -259,7 +262,7 @@ class ClusterTests(unittest.TestCase):
         self.assertIs(original_system_meta, current_system_meta)
         self.assertIsNot(original_system_schema_meta, current_system_schema_meta)
         self.assertEqual(original_system_schema_meta.as_cql_query(), current_system_schema_meta.as_cql_query())
-        session.shutdown()
+        cluster.shutdown()
 
     def test_refresh_schema_type(self):
         if get_server_versions()[0] < (2, 1, 0):
@@ -331,7 +334,7 @@ class ClusterTests(unittest.TestCase):
             self.assertIsNot(original_meta, c.metadata.keyspaces)
             self.assertEqual(original_meta, c.metadata.keyspaces)
 
-            s.shutdown()
+            c.shutdown()
 
             refresh_threshold = 0.5
             # cluster agreement bypass
@@ -359,11 +362,11 @@ class ClusterTests(unittest.TestCase):
             self.assertGreaterEqual(end_time - start_time, agreement_timeout)
             self.assertIs(original_meta, c.metadata.keyspaces)
 
-            s.shutdown()
+            c.shutdown()
         finally:
             session.execute("UPDATE system.local SET schema_version=%s WHERE key='local'", (schema_ver,))
 
-        session.shutdown()
+        cluster.shutdown()
 
     def test_trace(self):
         """
@@ -406,6 +409,7 @@ class ClusterTests(unittest.TestCase):
         future = session.execute_async(prepared, parameters=(), trace=True)
         future.result()
         check_trace(future.get_query_trace())
+        cluster.shutdown()
 
     def test_trace_timeout(self):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
@@ -416,6 +420,7 @@ class ClusterTests(unittest.TestCase):
         future = session.execute_async(statement, trace=True)
         future.result()
         self.assertRaises(TraceUnavailable, future.get_query_trace, -1.0)
+        cluster.shutdown()
 
     def test_string_coverage(self):
         """
@@ -434,6 +439,7 @@ class ClusterTests(unittest.TestCase):
 
         self.assertIn(query, str(future))
         self.assertIn('result', str(future))
+        cluster.shutdown()
 
     def test_idle_heartbeat(self):
         interval = 1
@@ -492,7 +498,7 @@ class ClusterTests(unittest.TestCase):
         cluster._idle_heartbeat.join()
         assert_quiescent_pool_state(self, cluster)
 
-        session.shutdown()
+        cluster.shutdown()
 
     @patch('cassandra.cluster.Cluster.idle_heartbeat_interval', new=0.1)
     def test_idle_heartbeat_disabled(self):
@@ -511,7 +517,7 @@ class ClusterTests(unittest.TestCase):
         # assert not idle status (should never get reset because there is not heartbeat)
         self.assertFalse(any(c.is_idle for c in connections))
 
-        session.shutdown()
+        cluster.shutdown()
 
     def test_pool_management(self):
         # Ensure that in_flight and request_ids quiesce after cluster operations
@@ -544,5 +550,4 @@ class ClusterTests(unittest.TestCase):
 
         assert_quiescent_pool_state(self, cluster)
 
-        session2.shutdown()
-        session.shutdown()
+        cluster.shutdown()

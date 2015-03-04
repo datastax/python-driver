@@ -35,12 +35,17 @@ def setup_module():
 
 class ClusterTests(unittest.TestCase):
 
-    def setUp(self):
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+    @classmethod
+    def setUpClass(cls):
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         if PROTOCOL_VERSION < 3:
-            self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
-        self.session = self.cluster.connect()
-        self.session.row_factory = tuple_factory
+            cls.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
+        cls.session = cls.cluster.connect()
+        cls.session.row_factory = tuple_factory
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.cluster.shutdown()
 
     def test_execute_concurrent(self):
         for num_statements in (0, 1, 2, 7, 10, 99, 100, 101, 199, 200, 201):

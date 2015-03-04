@@ -81,7 +81,7 @@ class TypeTests(unittest.TestCase):
     @classmethod
     def teardown_class(cls):
         cls._session.execute("DROP KEYSPACE typetests")
-        cls._session.shutdown()
+        cls._session.cluster.shutdown()
 
     def test_blob_type_as_string(self):
         s = self._session

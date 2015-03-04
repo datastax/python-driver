@@ -367,6 +367,7 @@ class TestCodeCoverage(unittest.TestCase):
             keyspace_metadata = cluster.metadata.keyspaces[keyspace]
             self.assertIsInstance(keyspace_metadata.export_as_string(), six.string_types)
             self.assertIsInstance(keyspace_metadata.as_cql_query(), six.string_types)
+        cluster.shutdown()
 
     def assert_equal_diff(self, received, expected):
         if received != expected:
@@ -478,6 +479,8 @@ CREATE TABLE export_udts.users (
 
         self.assert_equal_diff(table_meta.export_as_string(), expected_string)
 
+        cluster.shutdown()
+
     def test_case_sensitivity(self):
         """
         Test that names that need to be escaped in CREATE statements are
@@ -516,6 +519,7 @@ CREATE TABLE export_udts.users (
         self.assertIn('PRIMARY KEY (k, "A")', schema)
         self.assertIn('WITH CLUSTERING ORDER BY ("A" DESC)', schema)
         self.assertIn('CREATE INDEX myindex ON "AnInterestingKeyspace"."AnInterestingTable" ("MyColumn")', schema)
+        cluster.shutdown()
 
     def test_already_exists_exceptions(self):
         """
@@ -538,6 +542,7 @@ CREATE TABLE export_udts.users (
                 k int PRIMARY KEY,
                 v int )'''
         self.assertRaises(AlreadyExists, session.execute, ddl % (ksname, cfname))
+        cluster.shutdown()
 
     def test_replicas(self):
         """
@@ -555,6 +560,7 @@ CREATE TABLE export_udts.users (
         host = list(cluster.metadata.get_replicas('test3rf', 'key'))[0]
         self.assertEqual(host.datacenter, 'dc1')
         self.assertEqual(host.rack, 'r1')
+        cluster.shutdown()
 
     def test_token_map(self):
         """
@@ -574,6 +580,7 @@ CREATE TABLE export_udts.users (
             self.assertEqual(set(get_replicas('test3rf', token)), set(owners))
             self.assertEqual(set(get_replicas('test2rf', token)), set([owners[(i + 1) % 3], owners[(i + 2) % 3]]))
             self.assertEqual(set(get_replicas('test1rf', token)), set([owners[(i + 1) % 3]]))
+        cluster.shutdown()
 
     def test_legacy_tables(self):
 

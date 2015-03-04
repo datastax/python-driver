@@ -100,6 +100,8 @@ class LargeDataTests(unittest.TestCase):
         for i, row in enumerate(results):
             self.assertEqual(row['i'], i)
 
+        session.cluster.shutdown()
+
     def test_wide_batch_rows(self):
         table = 'wide_batch_rows'
         session = self.make_session_and_keyspace()
@@ -120,6 +122,8 @@ class LargeDataTests(unittest.TestCase):
         for i, row in enumerate(results):
             self.assertEqual(row['i'], i)
 
+        session.cluster.shutdown()
+
     def test_wide_byte_rows(self):
         table = 'wide_byte_rows'
         session = self.make_session_and_keyspace()
@@ -137,6 +141,8 @@ class LargeDataTests(unittest.TestCase):
         bb = pack('>H', 0xCAFE)
         for row in results:
             self.assertEqual(row['v'], bb)
+
+        session.cluster.shutdown()
 
     def test_large_text(self):
         table = 'large_text'
@@ -157,6 +163,8 @@ class LargeDataTests(unittest.TestCase):
         # Verify
         for row in result:
             self.assertEqual(row['txt'], text)
+
+        session.cluster.shutdown()
 
     def test_wide_table(self):
         table = 'wide_table'
@@ -184,3 +192,5 @@ class LargeDataTests(unittest.TestCase):
         for row in result:
             for i in range(table_width):
                 self.assertEqual(row[create_column_name(i)], i)
+
+        session.cluster.shutdown()
