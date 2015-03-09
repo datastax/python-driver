@@ -263,6 +263,35 @@ class ReadTimeoutErrorMessage(RequestExecutionException):
         return ReadTimeout(self.summary_msg(), **self.info)
 
 
+class ReadFailureMessage(RequestExecutionException):
+    summary = "Replica(s) failed to execute read"
+    error_code = 0x1300
+
+    @staticmethod
+    def recv_error_info(f):
+        return {
+            'consistency': read_consistency_level(f),
+            'received_responses': read_int(f),
+            'required_responses': read_int(f),
+            'failures': read_int(f),
+            'data_retrieved': bool(read_byte(f)),
+        }
+
+
+class WriteFailureMessage(RequestExecutionException):
+    summary = "Replica(s) failed to execute write"
+    error_code = 0x1500
+
+    @staticmethod
+    def recv_error_info(f):
+        return {
+            'consistency': read_consistency_level(f),
+            'received_responses': read_int(f),
+            'required_responses': read_int(f),
+            'failures': read_int(f),
+            'write_type': WriteType.name_to_value[read_string(f)],
+        }
+
 class SyntaxException(RequestValidationException):
     summary = 'Syntax error in CQL query'
     error_code = 0x2000
