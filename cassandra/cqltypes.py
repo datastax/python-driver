@@ -990,6 +990,23 @@ class CompositeType(_ParameterizedType):
         typestring = cls.cass_parameterized_type(full=True)
         return "'%s'" % (typestring,)
 
+    @classmethod
+    def deserialize_safe(cls, byts, protocol_version):
+        result = []
+        for subtype in cls.subtypes:
+            if not byts:
+                # CompositeType can have missing elements at the end
+                break
+
+            element_length = uint16_unpack(byts[:2])
+            element = byts[2:2 + element_length]
+
+            # skip element length, element, and the EOC (one byte)
+            byts = byts[2 + element_length + 1:]
+            result.append(subtype.from_binary(element, protocol_version))
+
+        return tuple(result)
+
 
 class DynamicCompositeType(CompositeType):
     typename = "'org.apache.cassandra.db.marshal.DynamicCompositeType'"
