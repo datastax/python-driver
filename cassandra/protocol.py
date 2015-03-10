@@ -22,6 +22,7 @@ from six.moves import range
 import io
 
 from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
+                       WriteFailure, ReadFailure,
                        AlreadyExists, InvalidRequest, Unauthorized,
                        UnsupportedOperation)
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
@@ -277,6 +278,9 @@ class ReadFailureMessage(RequestExecutionException):
             'data_retrieved': bool(read_byte(f)),
         }
 
+    def to_exception(self):
+        return ReadFailure(self.summary_msg(), **self.info)
+
 
 class WriteFailureMessage(RequestExecutionException):
     summary = "Replica(s) failed to execute write"
@@ -291,6 +295,9 @@ class WriteFailureMessage(RequestExecutionException):
             'failures': read_int(f),
             'write_type': WriteType.name_to_value[read_string(f)],
         }
+
+    def to_exception(self):
+        return WriteFailure(self.summary_msg(), **self.info)
 
 class SyntaxException(RequestValidationException):
     summary = 'Syntax error in CQL query'
