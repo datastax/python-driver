@@ -780,8 +780,8 @@ class MapType(_ParameterizedType):
 
     @classmethod
     def validate(cls, val):
-        key_type, subvaltype = cls.subtypes
-        return dict((key_type.validate(k), subvaltype.validate(v)) for (k, v) in six.iteritems(val))
+        key_type, value_type = cls.subtypes
+        return dict((key_type.validate(k), value_type.validate(v)) for (k, v) in six.iteritems(val))
 
     @classmethod
     def deserialize_safe(cls, byts, protocol_version):

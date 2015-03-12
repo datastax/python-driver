@@ -15,7 +15,7 @@
 try:
     import unittest2 as unittest
 except ImportError:
-    import unittest # noqa
+    import unittest  # noqa
 
 from itertools import islice, cycle
 from mock import Mock
@@ -139,7 +139,7 @@ class RoundRobinPolicyTest(unittest.TestCase):
             threads.append(Thread(target=host_down))
 
         # make the GIL switch after every instruction, maximizing
-        # the chace of race conditions
+        # the chance of race conditions
         check = six.PY2 or '__pypy__' in sys.builtin_module_names
         if check:
             original_interval = sys.getcheckinterval()
@@ -363,6 +363,7 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
         policy.on_add(host_remote)
         self.assertFalse(policy.local_dc)
 
+
 class TokenAwarePolicyTest(unittest.TestCase):
 
     def test_wrap_round_robin(self):
@@ -520,7 +521,6 @@ class TokenAwarePolicyTest(unittest.TestCase):
         qplan = list(policy.make_query_plan())
         self.assertEqual(qplan, [])
 
-
     def test_statement_keyspace(self):
         hosts = [Host(str(i), SimpleConvictionPolicy) for i in range(4)]
         for host in hosts:
@@ -666,6 +666,7 @@ class ExponentialReconnectionPolicyTest(unittest.TestCase):
                 self.assertEqual(delay, 100)
 
 ONE = ConsistencyLevel.ONE
+
 
 class RetryPolicyTest(unittest.TestCase):
 
