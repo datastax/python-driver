@@ -294,6 +294,11 @@ class TypeTests(unittest.TestCase):
 
         self.assertRaises(ValueError, date_type.interpret_datestring, 'fakestring')
 
+        # work around rounding difference among Python versions (PYTHON-230)
+        expected = 1424817268.274
+        self.assertEqual(DateType.deserialize(int64_pack(int(1000 * expected)), 0), datetime.datetime(2015, 2, 24, 22, 34, 28, 274000))
+
+
     def test_write_read_string(self):
         with tempfile.TemporaryFile() as f:
             value = u'test'
