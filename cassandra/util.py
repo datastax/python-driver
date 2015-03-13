@@ -594,13 +594,6 @@ class OrderedMap(Mapping):
 
     '''
 
-    cass_key_type = None
-    protocol_version = None
-    '''
-    Set when deserializing a map from the server, when the key type is known.
-    This avoids re-serializing, and also helps normalize lookups on text types.
-    '''
-
     def __init__(self, *args, **kwargs):
         if len(args) > 1:
             raise TypeError('expected at most 1 arguments, got %d' % len(args))
@@ -627,18 +620,6 @@ class OrderedMap(Mapping):
         else:
             self._items.append((key, value))
             self._index[flat_key] = len(self._items) - 1
-
-    def _set_key_type(self, cass_type, protocol_version):
-        self.cass_key_type = cass_type
-        self.protocol_version = protocol_version
-
-    def _insert_unchecked(self, key, flat_key, value):
-        '''
-        Used when building from server response.
-        cass_key_type must be set in order for lookups to work later
-        '''
-        self._items.append((key, value))
-        self._index[flat_key] = len(self._items) - 1
 
     def __getitem__(self, key):
         try:
@@ -675,7 +656,22 @@ class OrderedMap(Mapping):
         return '{%s}' % ', '.join("%s: %s" % (k, v) for k, v in self._items)
 
     def _serialize_key(self, key):
-        return self.cass_key_type.serialize(key, self.protocol_version) if self.cass_key_type else cPickle.dumps(key)
+        return cPickle.dumps(key)
+
+
+class OrderedMapSerializedKey(OrderedMap):
+
+    def __init__(self, cass_type, protocol_version):
+        super(OrderedMapSerializedKey, self).__init__()
+        self.cass_key_type = cass_type
+        self.protocol_version = protocol_version
+
+    def _insert_unchecked(self, key, flat_key, value):
+        self._items.append((key, value))
+        self._index[flat_key] = len(self._items) - 1
+
+    def _serialize_key(self, key):
+        return self.cass_key_type.serialize(key, self.protocol_version)
 
 
 import datetime

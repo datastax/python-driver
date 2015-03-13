@@ -48,7 +48,7 @@ from cassandra.marshal import (int8_pack, int8_unpack,
                                int32_pack, int32_unpack, int64_pack, int64_unpack,
                                float_pack, float_unpack, double_pack, double_unpack,
                                varint_pack, varint_unpack)
-from cassandra.util import OrderedMap, sortedset, Time
+from cassandra.util import OrderedMapSerializedKey, sortedset, Time
 
 apache_cassandra_type_prefix = 'org.apache.cassandra.db.marshal.'
 
@@ -794,8 +794,7 @@ class MapType(_ParameterizedType):
             length = 2
         numelements = unpack(byts[:length])
         p = length
-        themap = OrderedMap()
-        themap._set_key_type(key_type, protocol_version)
+        themap = OrderedMapSerializedKey(key_type, protocol_version)
         for _ in range(numelements):
             key_len = unpack(byts[p:p + length])
             p += length
