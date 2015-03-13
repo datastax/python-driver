@@ -680,6 +680,7 @@ except ImportError:
                         isect.add(item)
             return isect
 
+
 from collections import Mapping
 from six.moves import cPickle
 
@@ -715,6 +716,7 @@ class OrderedMap(Mapping):
     or higher.
 
     '''
+
     def __init__(self, *args, **kwargs):
         if len(args) > 1:
             raise TypeError('expected at most 1 arguments, got %d' % len(args))
@@ -776,9 +778,23 @@ class OrderedMap(Mapping):
     def __str__(self):
         return '{%s}' % ', '.join("%s: %s" % (k, v) for k, v in self._items)
 
-    @staticmethod
-    def _serialize_key(key):
+    def _serialize_key(self, key):
         return cPickle.dumps(key)
+
+
+class OrderedMapSerializedKey(OrderedMap):
+
+    def __init__(self, cass_type, protocol_version):
+        super(OrderedMapSerializedKey, self).__init__()
+        self.cass_key_type = cass_type
+        self.protocol_version = protocol_version
+
+    def _insert_unchecked(self, key, flat_key, value):
+        self._items.append((key, value))
+        self._index[flat_key] = len(self._items) - 1
+
+    def _serialize_key(self, key):
+        return self.cass_key_type.serialize(key, self.protocol_version)
 
 
 import datetime

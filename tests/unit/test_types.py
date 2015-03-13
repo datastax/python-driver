@@ -20,6 +20,7 @@ from binascii import unhexlify
 import calendar
 import datetime
 import tempfile
+import six
 import time
 
 import cassandra
@@ -228,7 +229,7 @@ class TypeTests(unittest.TestCase):
 
             @classmethod
             def apply_parameters(cls, subtypes, names):
-                return cls(subtypes, [unhexlify(name) if name is not None else name for name in names])
+                return cls(subtypes, [unhexlify(six.b(name)) if name is not None else name for name in names])
 
         class BarType(FooType):
             typename = 'org.apache.cassandra.db.marshal.BarType'

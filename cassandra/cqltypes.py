@@ -784,12 +784,12 @@ class MapType(_ParameterizedType):
 
     @classmethod
     def validate(cls, val):
-        subkeytype, subvaltype = cls.subtypes
-        return dict((subkeytype.validate(k), subvaltype.validate(v)) for (k, v) in six.iteritems(val))
+        key_type, value_type = cls.subtypes
+        return dict((key_type.validate(k), value_type.validate(v)) for (k, v) in six.iteritems(val))
 
     @classmethod
     def deserialize_safe(cls, byts, protocol_version):
-        subkeytype, subvaltype = cls.subtypes
+        key_type, value_type = cls.subtypes
         if protocol_version >= 3:
             unpack = int32_unpack
             length = 4
@@ -798,7 +798,7 @@ class MapType(_ParameterizedType):
             length = 2
         numelements = unpack(byts[:length])
         p = length
-        themap = util.OrderedMap()
+        themap = util.OrderedMapSerializedKey(key_type, protocol_version)
         for _ in range(numelements):
             key_len = unpack(byts[p:p + length])
             p += length
@@ -808,14 +808,14 @@ class MapType(_ParameterizedType):
             p += length
             valbytes = byts[p:p + val_len]
             p += val_len
-            key = subkeytype.from_binary(keybytes, protocol_version)
-            val = subvaltype.from_binary(valbytes, protocol_version)
-            themap._insert(key, val)
+            key = key_type.from_binary(keybytes, protocol_version)
+            val = value_type.from_binary(valbytes, protocol_version)
+            themap._insert_unchecked(key, keybytes, val)
         return themap
 
     @classmethod
     def serialize_safe(cls, themap, protocol_version):
-        subkeytype, subvaltype = cls.subtypes
+        key_type, value_type = cls.subtypes
         pack = int32_pack if protocol_version >= 3 else uint16_pack
         buf = io.BytesIO()
         buf.write(pack(len(themap)))
@@ -824,8 +824,8 @@ class MapType(_ParameterizedType):
         except AttributeError:
             raise TypeError("Got a non-map object for a map value")
         for key, val in items:
-            keybytes = subkeytype.to_binary(key, protocol_version)
-            valbytes = subvaltype.to_binary(val, protocol_version)
+            keybytes = key_type.to_binary(key, protocol_version)
+            valbytes = value_type.to_binary(val, protocol_version)
             buf.write(pack(len(keybytes)))
             buf.write(keybytes)
             buf.write(pack(len(valbytes)))

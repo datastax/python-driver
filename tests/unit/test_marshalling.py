@@ -23,8 +23,8 @@ from datetime import datetime, date
 from decimal import Decimal
 from uuid import UUID
 
-from cassandra.cqltypes import lookup_casstype
-from cassandra.util import OrderedMap, sortedset, Time
+from cassandra.cqltypes import lookup_casstype, DecimalType, UTF8Type
+from cassandra.util import OrderedMap, OrderedMapSerializedKey, sortedset, Time
 
 marshalled_value_pairs = (
     # binary form, type, python native type
@@ -75,7 +75,7 @@ marshalled_value_pairs = (
     (b'', 'MapType(AsciiType, BooleanType)', None),
     (b'', 'ListType(FloatType)', None),
     (b'', 'SetType(LongType)', None),
-    (b'\x00\x00', 'MapType(DecimalType, BooleanType)', OrderedMap()),
+    (b'\x00\x00', 'MapType(DecimalType, BooleanType)', OrderedMapSerializedKey(DecimalType, 0)),
     (b'\x00\x00', 'ListType(FloatType)', []),
     (b'\x00\x00', 'SetType(IntegerType)', sortedset()),
     (b'\x00\x01\x00\x10\xafYC\xa3\xea<\x11\xe1\xabc\xc4,\x03"y\xf0', 'ListType(TimeUUIDType)', [UUID(bytes=b'\xafYC\xa3\xea<\x11\xe1\xabc\xc4,\x03"y\xf0')]),
@@ -84,9 +84,10 @@ marshalled_value_pairs = (
     (b'\x00\x00\x00\x00\x00\x00\x00\x01', 'TimeType', Time(1))
 )
 
-ordered_map_value = OrderedMap([(u'\u307fbob', 199),
-                                (u'', -1),
-                                (u'\\', 0)])
+ordered_map_value = OrderedMapSerializedKey(UTF8Type, 2)
+ordered_map_value._insert(u'\u307fbob', 199)
+ordered_map_value._insert(u'', -1)
+ordered_map_value._insert(u'\\', 0)
 
 # these following entries work for me right now, but they're dependent on
 # vagaries of internal python ordering for unordered types
