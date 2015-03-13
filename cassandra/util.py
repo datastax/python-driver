@@ -1,4 +1,128 @@
 from __future__ import with_statement
+import calendar
+import datetime
+import random
+import six
+import uuid
+
+DATETIME_EPOC = datetime.datetime(1970, 1, 1)
+
+
+def datetime_from_timestamp(timestamp):
+    """
+    Creates a timezone-agnostic datetime from timestamp (in seconds) in a consistent manner.
+    Works around a Windows issue with large negative timestamps (PYTHON-119),
+    and rounding differences in Python 3.4 (PYTHON-340).
+
+    :param timestamp: a unix timestamp, in seconds
+
+    :rtype: datetime
+    """
+    dt = DATETIME_EPOC + datetime.timedelta(seconds=timestamp)
+    return dt
+
+
+def unix_time_from_uuid1(uuid_arg):
+    """
+    Converts a version 1 :class:`uuid.UUID` to a timestamp with the same precision
+    as :meth:`time.time()` returns.  This is useful for examining the
+    results of queries returning a v1 :class:`~uuid.UUID`.
+
+    :param uuid_arg: a version 1 :class:`~uuid.UUID`
+
+    :rtype: timestamp
+
+    """
+    return (uuid_arg.time - 0x01B21DD213814000) / 1e7
+
+
+def datetime_from_uuid1(uuid_arg):
+    """
+    Creates a timezone-agnostic datetime from the timestamp in the
+    specified type-1 UUID.
+
+    :param uuid_arg: a version 1 :class:`~uuid.UUID`
+
+    :rtype: timestamp
+
+    """
+    return datetime_from_timestamp(unix_time_from_uuid1(uuid_arg))
+
+
+def min_uuid_from_time(timestamp):
+    """
+    Generates the minimum TimeUUID (type 1) for a given timestamp, as compared by Cassandra.
+
+    See :func:`uuid_from_time` for argument and return types.
+    """
+    return uuid_from_time(timestamp, 0x80, 0x808080808080)  # Cassandra does byte-wise comparison; fill with min signed bytes (0x80 = -128)
+
+
+def max_uuid_from_time(timestamp):
+    """
+    Generates the maximum TimeUUID (type 1) for a given timestamp, as compared by Cassandra.
+
+    See :func:`uuid_from_time` for argument and return types.
+    """
+    return uuid_from_time(timestamp, 0x3f7f, 0x7f7f7f7f7f7f)  # Max signed bytes (0x7f = 127)
+
+
+def uuid_from_time(time_arg, clock_seq=None, node=None):
+    """
+    Converts a datetime or timestamp to a type 1 :class:`uuid.UUID`.
+
+    :param time_arg:
+      The time to use for the timestamp portion of the UUID.
+      This can either be a :class:`datetime` object or a timestamp
+      in seconds (as returned from :meth:`time.time()`).
+    :type datetime: :class:`datetime` or timestamp
+
+    :param clock_seq:
+      Clock sequence field for the UUID (up to 14 bits). If not specified,
+      a random sequence is generated.
+    :type clock_seq: int
+
+    :param node:
+      None integer for the UUID (up to 48 bits). If not specified, this
+      field is randomized.
+    :type node: long
+
+    :rtype: :class:`uuid.UUID`
+
+    """
+    if hasattr(time_arg, 'utctimetuple'):
+        seconds = int(calendar.timegm(time_arg.utctimetuple()))
+        microseconds = (seconds * 1e6) + time_arg.time().microsecond
+    else:
+        microseconds = int(time_arg * 1e6)
+
+    # 0x01b21dd213814000 is the number of 100-ns intervals between the
+    # UUID epoch 1582-10-15 00:00:00 and the Unix epoch 1970-01-01 00:00:00.
+    intervals = int(microseconds * 10) + 0x01b21dd213814000
+
+    time_low = intervals & 0xffffffff
+    time_mid = (intervals >> 32) & 0xffff
+    time_hi_version = (intervals >> 48) & 0x0fff
+
+    if clock_seq is None:
+        clock_seq = random.getrandbits(14)
+
+    clock_seq_low = clock_seq & 0xff
+    clock_seq_hi_variant = 0x80 | ((clock_seq >> 8) & 0x3f)
+
+    if node is None:
+        node = random.getrandbits(48)
+    node &= 0xffffffffff
+
+    return uuid.UUID(fields=(time_low, time_mid, time_hi_version,
+                             clock_seq_hi_variant, clock_seq_low, node), version=1)
+
+LOWEST_TIME_UUID = uuid.UUID('00000000-0000-1000-8080-808080808080')
+""" The lowest possible TimeUUID, as sorted by Cassandra. """
+
+HIGHEST_TIME_UUID = uuid.UUID('ffffffff-ffff-1fff-bf7f-7f7f7f7f7f7f')
+""" The highest possible TimeUUID, as sorted by Cassandra. """
+
 
 try:
     from collections import OrderedDict
@@ -557,7 +681,6 @@ except ImportError:
             return isect
 
 from collections import Mapping
-import six
 from six.moves import cPickle
 
 

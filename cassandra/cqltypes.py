@@ -34,24 +34,27 @@ from collections import namedtuple
 import datetime
 from decimal import Decimal
 import io
+import logging
 import re
 import socket
 import time
-import sys
-from uuid import UUID
-
 import six
 from six.moves import range
+import sys
+from uuid import UUID
+import warnings
+
 
 from cassandra.marshal import (int8_pack, int8_unpack,
                                uint16_pack, uint16_unpack, uint32_pack, uint32_unpack,
                                int32_pack, int32_unpack, int64_pack, int64_unpack,
                                float_pack, float_unpack, double_pack, double_unpack,
                                varint_pack, varint_unpack)
-from cassandra.util import OrderedMap, sortedset, Time
+from cassandra import util
 
 apache_cassandra_type_prefix = 'org.apache.cassandra.db.marshal.'
 
+log = logging.getLogger(__name__)
 
 if six.PY3:
     _number_types = frozenset((int, float))
@@ -72,16 +75,17 @@ def trim_if_startswith(s, prefix):
 
 
 def unix_time_from_uuid1(u):
-    return (u.time - 0x01B21DD213814000) / 10000000.0
-
-
-DATETIME_EPOC = datetime.datetime(1970, 1, 1)
+    msg = "'cassandra.cqltypes.unix_time_from_uuid1' has moved to 'cassandra.util'. This entry point will be removed in the next major version."
+    warnings.warn(msg, DeprecationWarning)
+    log.warn(msg)
+    return util.unix_time_from_uuid1(u)
 
 
 def datetime_from_timestamp(timestamp):
-    # PYTHON-119: workaround for Windows
-    dt = DATETIME_EPOC + datetime.timedelta(seconds=timestamp)
-    return dt
+    msg = "'cassandra.cqltypes.datetime_from_timestamp' has moved to 'cassandra.util'. This entry point will be removed in the next major version."
+    warnings.warn(msg, DeprecationWarning)
+    log.warn(msg)
+    return util.datetime_from_timestamp(timestamp)
 
 
 _casstypes = {}
@@ -581,7 +585,7 @@ class DateType(_CassandraType):
     @staticmethod
     def deserialize(byts, protocol_version):
         timestamp = int64_unpack(byts) / 1000.0
-        return datetime_from_timestamp(timestamp)
+        return util.datetime_from_timestamp(timestamp)
 
     @staticmethod
     def serialize(v, protocol_version):
@@ -652,7 +656,7 @@ class SimpleDateType(_CassandraType):
     @staticmethod
     def deserialize(byts, protocol_version):
         timestamp = SimpleDateType.seconds_per_day * (uint32_unpack(byts) - 2 ** 31)
-        dt = datetime_from_timestamp(timestamp)
+        dt = util.datetime_from_timestamp(timestamp)
         return datetime.date(dt.year, dt.month, dt.day)
 
 
@@ -661,8 +665,8 @@ class TimeType(_CassandraType):
 
     @classmethod
     def validate(cls, val):
-        if not isinstance(val, Time):
-            val = Time(val)
+        if not isinstance(val, util.Time):
+            val = util.Time(val)
         return val
 
     @staticmethod
@@ -670,12 +674,12 @@ class TimeType(_CassandraType):
         try:
             nano = val.nanosecond_time
         except AttributeError:
-            nano = Time(val).nanosecond_time
+            nano = util.Time(val).nanosecond_time
         return int64_pack(nano)
 
     @staticmethod
     def deserialize(byts, protocol_version):
-        return Time(int64_unpack(byts))
+        return util.Time(int64_unpack(byts))
 
 
 class UTF8Type(_CassandraType):
@@ -771,7 +775,7 @@ class ListType(_SimpleParameterizedType):
 class SetType(_SimpleParameterizedType):
     typename = 'set'
     num_subtypes = 1
-    adapter = sortedset
+    adapter = util.sortedset
 
 
 class MapType(_ParameterizedType):
@@ -794,7 +798,7 @@ class MapType(_ParameterizedType):
             length = 2
         numelements = unpack(byts[:length])
         p = length
-        themap = OrderedMap()
+        themap = util.OrderedMap()
         for _ in range(numelements):
             key_len = unpack(byts[p:p + length])
             p += length
