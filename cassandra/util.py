@@ -33,7 +33,7 @@ def unix_time_from_uuid1(uuid_arg):
     :rtype: timestamp
 
     """
-    return (uuid_arg.time - 0x01B21DD213814000) / 10000000.0
+    return (uuid_arg.time - 0x01B21DD213814000) / 1e7
 
 
 def datetime_from_uuid1(uuid_arg):
