@@ -892,3 +892,74 @@ class Time(object):
     def __str__(self):
         return "%02d:%02d:%02d.%09d" % (self.hour, self.minute,
                                         self.second, self.nanosecond)
+
+
+class Date(object):
+    '''
+    Idealized naive date: year, month, day
+
+    Offers wider year range than datetime.date. Dates that cannot be represented
+    as a date (because datetime.MINYEAR, datetime.MAXYEAR), this type falls back
+    to printing days_from_epoch offset.
+    '''
+
+    MINUTE = 60
+    HOUR = 60 * MINUTE
+    DAY = 24 * HOUR
+
+    date_format = "%Y-%m-%d"
+
+    days_from_epoch = 0
+
+    def __init__(self, value):
+        if isinstance(value, six.integer_types):
+            self.days_from_epoch = value
+        elif isinstance(value, (datetime.date, datetime.datetime)):
+            self._from_timetuple(value.timetuple())
+        elif isinstance(value, six.string_types):
+            self._from_datestring(value)
+        else:
+            raise TypeError('Date arguments must be a whole number, datetime.date, or string')
+
+    @property
+    def seconds(self):
+        return self.days_from_epoch * Date.DAY
+
+    def date(self):
+        try:
+            dt = datetime_from_timestamp(self.seconds)
+            return datetime.date(dt.year, dt.month, dt.day)
+        except Exception:
+            raise ValueError("%r exceeds ranges for built-in datetime.date" % self)
+
+    def _from_timetuple(self, t):
+        self.days_from_epoch = calendar.timegm(t) // Date.DAY
+
+    def _from_datestring(self, s):
+        if s[0] == '+':
+            s = s[1:]
+        dt = datetime.datetime.strptime(s, self.date_format)
+        self._from_timetuple(dt.timetuple())
+
+    def __eq__(self, other):
+        if isinstance(other, Date):
+            return self.days_from_epoch == other.days_from_epoch
+
+        if isinstance(other, six.integer_types):
+            return self.days_from_epoch == other
+
+        try:
+            return self.date == other
+        except Exception:
+            return False
+
+    def __repr__(self):
+        return "Date(%s)" % self.days_from_epoch
+
+    def __str__(self):
+        try:
+            dt = datetime_from_timestamp(self.seconds)
+            return "%04d-%02d-%02d" % (dt.year, dt.month, dt.day)
+        except:
+            # If we overflow datetime.[MIN|M
+            return str(self.days_from_epoch)

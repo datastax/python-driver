@@ -130,7 +130,7 @@ class TypeTests(unittest.TestCase):
         Test cassandra.cqltypes.SimpleDateType() construction
         """
         # from string
-        expected_date = datetime.date(1492, 10, 12)
+        expected_date = cassandra.util.Date(datetime.date(1492, 10, 12))
         sd = SimpleDateType('1492-10-12')
         self.assertEqual(sd.val, expected_date)
 
@@ -139,7 +139,7 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(sd.val, expected_date)
 
         # int
-        expected_timestamp = calendar.timegm(expected_date.timetuple())
+        expected_timestamp = calendar.timegm(expected_date.date().timetuple())
         sd = SimpleDateType(expected_timestamp)
         self.assertEqual(sd.val, expected_timestamp)
 

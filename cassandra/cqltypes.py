@@ -31,7 +31,6 @@ from __future__ import absolute_import  # to enable import io from stdlib
 from binascii import unhexlify
 import calendar
 from collections import namedtuple
-import datetime
 from decimal import Decimal
 import io
 import logging
@@ -626,38 +625,29 @@ class TimeUUIDType(DateType):
 
 class SimpleDateType(_CassandraType):
     typename = 'date'
-    seconds_per_day = 60 * 60 * 24
     date_format = "%Y-%m-%d"
 
     @classmethod
     def validate(cls, val):
-        if isinstance(val, six.string_types):
-            val = cls.interpret_simpledate_string(val)
-        elif (not isinstance(val, datetime.date)) and not isinstance(val, six.integer_types):
-            raise TypeError('SimpleDateType arg must be a datetime.date, unsigned integer, or string in the format YYYY-MM-DD')
+        if not isinstance(val, util.Date):
+            val = util.Date(val)
         return val
-
-    @staticmethod
-    def interpret_simpledate_string(v):
-        date_time = datetime.datetime.strptime(v, SimpleDateType.date_format)
-        return datetime.date(date_time.year, date_time.month, date_time.day)
 
     @staticmethod
     def serialize(val, protocol_version):
         # Values of the 'date'` type are encoded as 32-bit unsigned integers
-        # representing a number of days with "the epoch" at the center of the
-        # range (2^31). Epoch is January 1st, 1970
+        # representing a number of days with epoch (January 1st, 1970) at the center of the
+        # range (2^31).
         try:
-            shifted = (calendar.timegm(val.timetuple()) // SimpleDateType.seconds_per_day) + 2 ** 31
+            days = val.days_from_epoch
         except AttributeError:
-            shifted = val
-        return uint32_pack(shifted)
+            days = util.Date(val).days_from_epoch
+        return uint32_pack(days + 2 ** 31)
 
     @staticmethod
     def deserialize(byts, protocol_version):
-        timestamp = SimpleDateType.seconds_per_day * (uint32_unpack(byts) - 2 ** 31)
-        dt = util.datetime_from_timestamp(timestamp)
-        return datetime.date(dt.year, dt.month, dt.day)
+        days = uint32_unpack(byts) - 2 ** 31
+        return util.Date(days)
 
 
 class TimeType(_CassandraType):
