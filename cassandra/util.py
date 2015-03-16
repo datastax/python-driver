@@ -106,6 +106,10 @@ def uuid_from_time(time_arg, node=None, clock_seq=None):
 
     if clock_seq is None:
         clock_seq = random.getrandbits(14)
+    else:
+        if clock_seq > 0x3fff:
+            raise ValueError('clock_seq is out of range (need a 14-bit value)')
+
 
     clock_seq_low = clock_seq & 0xff
     clock_seq_hi_variant = 0x80 | ((clock_seq >> 8) & 0x3f)
