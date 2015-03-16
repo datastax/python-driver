@@ -898,8 +898,8 @@ class Date(object):
     '''
     Idealized naive date: year, month, day
 
-    Offers wider year range than datetime.date. Dates that cannot be represented
-    as a date (because datetime.MINYEAR, datetime.MAXYEAR), this type falls back
+    Offers wider year range than datetime.date. For Dates that cannot be represented
+    as a datetime.date (because datetime.MINYEAR, datetime.MAXYEAR), this type falls back
     to printing days_from_epoch offset.
     '''
 
