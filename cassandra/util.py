@@ -776,7 +776,7 @@ class OrderedMap(Mapping):
             ', '.join("(%r, %r)" % (k, v) for k, v in self._items))
 
     def __str__(self):
-        return '{%s}' % ', '.join("%s: %s" % (k, v) for k, v in self._items)
+        return '{%s}' % ', '.join("%r: %r" % (k, v) for k, v in self._items)
 
     def _serialize_key(self, key):
         return cPickle.dumps(key)
