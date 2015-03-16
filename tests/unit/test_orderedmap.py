@@ -17,8 +17,8 @@ try:
 except ImportError:
     import unittest  # noqa
 
-from cassandra.util import OrderedMap
-from cassandra.cqltypes import EMPTY
+from cassandra.util import OrderedMap, OrderedMapSerializedKey
+from cassandra.cqltypes import EMPTY, UTF8Type, lookup_casstype
 import six
 
 class OrderedMapTest(unittest.TestCase):
@@ -37,90 +37,95 @@ class OrderedMapTest(unittest.TestCase):
         self.assertEqual(d['key1'], 'v1')
         self.assertEqual(d['key2'], 'v2')
 
+        with self.assertRaises(TypeError):
+            OrderedMap('too', 'many', 'args')
+
     def test_contains(self):
         keys = ['first', 'middle', 'last']
 
-        od = OrderedMap()
+        om = OrderedMap()
 
-        od = OrderedMap(zip(keys, range(len(keys))))
+        om = OrderedMap(zip(keys, range(len(keys))))
 
         for k in keys:
-            self.assertTrue(k in od)
-            self.assertFalse(k not in od)
+            self.assertTrue(k in om)
+            self.assertFalse(k not in om)
 
-        self.assertTrue('notthere' not in od)
-        self.assertFalse('notthere' in od)
+        self.assertTrue('notthere' not in om)
+        self.assertFalse('notthere' in om)
 
     def test_keys(self):
         keys = ['first', 'middle', 'last']
-        od = OrderedMap(zip(keys, range(len(keys))))
+        om = OrderedMap(zip(keys, range(len(keys))))
 
-        self.assertListEqual(list(od.keys()), keys)
+        self.assertListEqual(list(om.keys()), keys)
 
     def test_values(self):
         keys = ['first', 'middle', 'last']
         values = list(range(len(keys)))
-        od = OrderedMap(zip(keys, values))
+        om = OrderedMap(zip(keys, values))
 
-        self.assertListEqual(list(od.values()), values)
+        self.assertListEqual(list(om.values()), values)
 
     def test_items(self):
         keys = ['first', 'middle', 'last']
         items = list(zip(keys, range(len(keys))))
-        od = OrderedMap(items)
+        om = OrderedMap(items)
 
-        self.assertListEqual(list(od.items()), items)
+        self.assertListEqual(list(om.items()), items)
 
     def test_get(self):
         keys = ['first', 'middle', 'last']
-        od = OrderedMap(zip(keys, range(len(keys))))
+        om = OrderedMap(zip(keys, range(len(keys))))
 
         for v, k in enumerate(keys):
-            self.assertEqual(od.get(k), v)
+            self.assertEqual(om.get(k), v)
         
-        self.assertEqual(od.get('notthere', 'default'), 'default')
-        self.assertIsNone(od.get('notthere'))
+        self.assertEqual(om.get('notthere', 'default'), 'default')
+        self.assertIsNone(om.get('notthere'))
 
     def test_equal(self):
         d1 = {'one': 1}
         d12 = {'one': 1, 'two': 2}
-        od1 = OrderedMap({'one': 1})
-        od12 = OrderedMap([('one', 1), ('two', 2)])
-        od21 = OrderedMap([('two', 2), ('one', 1)])
+        om1 = OrderedMap({'one': 1})
+        om12 = OrderedMap([('one', 1), ('two', 2)])
+        om21 = OrderedMap([('two', 2), ('one', 1)])
 
-        self.assertEqual(od1, d1)
-        self.assertEqual(od12, d12)
-        self.assertEqual(od21, d12)
-        self.assertNotEqual(od1, od12)
-        self.assertNotEqual(od12, od1)
-        self.assertNotEqual(od12, od21)
-        self.assertNotEqual(od1, d12)
-        self.assertNotEqual(od12, d1)
-        self.assertNotEqual(od1, EMPTY)
+        self.assertEqual(om1, d1)
+        self.assertEqual(om12, d12)
+        self.assertEqual(om21, d12)
+        self.assertNotEqual(om1, om12)
+        self.assertNotEqual(om12, om1)
+        self.assertNotEqual(om12, om21)
+        self.assertNotEqual(om1, d12)
+        self.assertNotEqual(om12, d1)
+        self.assertNotEqual(om1, EMPTY)
+
+        self.assertFalse(OrderedMap([('three', 3), ('four', 4)]) == d12)
 
     def test_getitem(self):
         keys = ['first', 'middle', 'last']
-        od = OrderedMap(zip(keys, range(len(keys))))
+        om = OrderedMap(zip(keys, range(len(keys))))
 
         for v, k in enumerate(keys):
-            self.assertEqual(od[k], v)
+            self.assertEqual(om[k], v)
         
         with self.assertRaises(KeyError):
-            od['notthere']
+            om['notthere']
 
     def test_iter(self):
         keys = ['first', 'middle', 'last']
         values = list(range(len(keys)))
         items = list(zip(keys, values))
-        od = OrderedMap(items)
+        om = OrderedMap(items)
 
-        itr = iter(od)
+        itr = iter(om)
         self.assertEqual(sum([1 for _ in itr]), len(keys))
         self.assertRaises(StopIteration, six.next, itr)
 
-        self.assertEqual(list(iter(od)), keys)
-        self.assertEqual(list(six.iteritems(od)), items)
-        self.assertEqual(list(six.itervalues(od)), values)
+        self.assertEqual(list(iter(om)), keys)
+        self.assertEqual(list(six.iteritems(om)), items)
+        self.assertEqual(list(six.itervalues(om)), values)
 
     def test_len(self):
         self.assertEqual(len(OrderedMap()), 0)
@@ -129,4 +134,35 @@ class OrderedMapTest(unittest.TestCase):
     def test_mutable_keys(self):
         d = {'1': 1}
         s = set([1, 2, 3])
-        od = OrderedMap([(d, 'dict'), (s, 'set')])
+        om = OrderedMap([(d, 'dict'), (s, 'set')])
+
+    def test_strings(self):
+        # changes in 3.x
+        d = {'map': 'inner'}
+        s = set([1, 2, 3])
+        self.assertEqual(repr(OrderedMap([('two', 2), ('one', 1), (d, 'value'), (s, 'another')])),
+                         "OrderedMap([('two', 2), ('one', 1), (%r, 'value'), (%r, 'another')])" % (d, s))
+
+        self.assertEqual(str(OrderedMap([('two', 2), ('one', 1), (d, 'value'), (s, 'another')])),
+                         "{'two': 2, 'one': 1, %r: 'value', %r: 'another'}" % (d, s))
+
+
+class OrderedMapSerializedKeyTest(unittest.TestCase):
+    def test_init(self):
+        om = OrderedMapSerializedKey(UTF8Type, 2)
+        self.assertEqual(om, {})
+
+    def test_normalized_lookup(self):
+        key_type = lookup_casstype('MapType(UTF8Type, Int32Type)')
+        protocol_version = 3
+        om = OrderedMapSerializedKey(key_type, protocol_version)
+        key_ascii = {'one': 1}
+        key_unicode = {u'two': 2}
+        om._insert_unchecked(key_ascii, key_type.serialize(key_ascii, protocol_version), object())
+        om._insert_unchecked(key_unicode, key_type.serialize(key_unicode, protocol_version), object())
+
+        # type lookup is normalized by key_type
+        # PYTHON-231
+        self.assertIs(om[{'one': 1}], om[{u'one': 1}])
+        self.assertIs(om[{'two': 2}], om[{u'two': 2}])
+        self.assertIsNot(om[{'one': 1}], om[{'two': 2}])
