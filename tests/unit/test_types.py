@@ -17,7 +17,6 @@ except ImportError:
     import unittest  # noqa
 
 from binascii import unhexlify
-import calendar
 import datetime
 import tempfile
 import six
@@ -115,9 +114,8 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(LongType.cql_parameterized_type(), 'bigint')
 
         subtypes = (cassandra.cqltypes.UTF8Type, cassandra.cqltypes.UTF8Type)
-        self.assertEqual(
-                'map<text, text>',
-                cassandra.cqltypes.MapType.apply_parameters(subtypes).cql_parameterized_type())
+        self.assertEqual('map<text, text>',
+                         cassandra.cqltypes.MapType.apply_parameters(subtypes).cql_parameterized_type())
 
     def test_datetype_from_string(self):
         # Ensure all formats can be parsed, without exception
@@ -129,23 +127,60 @@ class TypeTests(unittest.TestCase):
         """
         Test cassandra.cqltypes.SimpleDateType() construction
         """
+        Date = cassandra.util.Date
+        # from datetime
+        expected_dt = datetime.datetime(1492, 10, 12, 1, 1)
+        expected_date = Date(expected_dt)
+        self.assertEqual(str(expected_date), '1492-10-12')
+
         # from string
-        expected_date = cassandra.util.Date(datetime.date(1492, 10, 12))
         sd = SimpleDateType('1492-10-12')
         self.assertEqual(sd.val, expected_date)
+        sd = SimpleDateType('+1492-10-12')
+        self.assertEqual(sd.val, expected_date)
 
-        # date
+        # Date
         sd = SimpleDateType(expected_date)
         self.assertEqual(sd.val, expected_date)
 
-        # int
-        expected_timestamp = calendar.timegm(expected_date.date().timetuple())
-        sd = SimpleDateType(expected_timestamp)
-        self.assertEqual(sd.val, expected_timestamp)
+        # date
+        sd = SimpleDateType(datetime.date(expected_dt.year, expected_dt.month, expected_dt.day))
+        self.assertEqual(sd.val, expected_date)
+
+        # days
+        sd = SimpleDateType(0)
+        self.assertEqual(sd.val, Date(datetime.date(1970, 1, 1)))
+        sd = SimpleDateType(-1)
+        self.assertEqual(sd.val, Date(datetime.date(1969, 12, 31)))
+        sd = SimpleDateType(1)
+        self.assertEqual(sd.val, Date(datetime.date(1970, 1, 2)))
+        # limits
+        min_builtin = Date(datetime.date(1, 1, 1))
+        max_builtin = Date(datetime.date(9999, 12, 31))
+        self.assertEqual(SimpleDateType(min_builtin.days_from_epoch).val, min_builtin)
+        self.assertEqual(SimpleDateType(max_builtin.days_from_epoch).val, max_builtin)
+        # just proving we can construct with on offset outside buildin range
+        self.assertEqual(SimpleDateType(min_builtin.days_from_epoch - 1).val.days_from_epoch,
+                         min_builtin.days_from_epoch - 1)
+        self.assertEqual(SimpleDateType(max_builtin.days_from_epoch + 1).val.days_from_epoch,
+                         max_builtin.days_from_epoch + 1)
 
         # no contruct
-        self.assertRaises(ValueError, SimpleDateType, '1999-10-10-bad-time')
+        self.assertRaises(ValueError, SimpleDateType, '-1999-10-10')
         self.assertRaises(TypeError, SimpleDateType, 1.234)
+
+        # str
+        date_str = '2015-03-16'
+        self.assertEqual(str(Date(date_str)), date_str)
+        # out of range
+        self.assertEqual(str(Date(2932897)), '2932897')
+        self.assertEqual(repr(Date(1)), 'Date(1)')
+
+        # eq other types
+        self.assertEqual(Date(1234), 1234)
+        self.assertEqual(Date(1), datetime.date(1970, 1, 2))
+        self.assertFalse(Date(2932897) == datetime.date(9999, 12, 31))  # date can't represent year > 9999
+        self.assertEqual(Date(2932897), 2932897)
 
     def test_time(self):
         """
@@ -180,16 +215,16 @@ class TypeTests(unittest.TestCase):
         tt = TimeType('23:59:59.12345')
 
         tt = TimeType('23:59:59.123456')
-        self.assertEqual(tt.val, 23*one_hour + 59*one_minute + 59*one_second + 123*one_milli + 456*one_micro)
+        self.assertEqual(tt.val, 23 * one_hour + 59 * one_minute + 59 * one_second + 123 * one_milli + 456 * one_micro)
 
         tt = TimeType('23:59:59.1234567')
-        self.assertEqual(tt.val, 23*one_hour + 59*one_minute + 59*one_second + 123*one_milli + 456*one_micro + 700)
+        self.assertEqual(tt.val, 23 * one_hour + 59 * one_minute + 59 * one_second + 123 * one_milli + 456 * one_micro + 700)
 
         tt = TimeType('23:59:59.12345678')
-        self.assertEqual(tt.val, 23*one_hour + 59*one_minute + 59*one_second + 123*one_milli + 456*one_micro + 780)
+        self.assertEqual(tt.val, 23 * one_hour + 59 * one_minute + 59 * one_second + 123 * one_milli + 456 * one_micro + 780)
 
         tt = TimeType('23:59:59.123456789')
-        self.assertEqual(tt.val, 23*one_hour + 59*one_minute + 59*one_second + 123*one_milli + 456*one_micro + 789)
+        self.assertEqual(tt.val, 23 * one_hour + 59 * one_minute + 59 * one_second + 123 * one_milli + 456 * one_micro + 789)
 
         # from int
         tt = TimeType(12345678)
@@ -199,7 +234,6 @@ class TypeTests(unittest.TestCase):
         self.assertRaises(ValueError, TimeType, '1999-10-10 11:11:11.1234')
         self.assertRaises(TypeError, TimeType, 1.234)
         self.assertRaises(TypeError, TimeType, datetime.datetime(2004, 12, 23, 11, 11, 1))
-
 
     def test_cql_typename(self):
         """
@@ -286,7 +320,7 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(DateType.deserialize(int64_pack(1000 * expected), 0), datetime.datetime.utcfromtimestamp(expected))
 
         # beyond 32b
-        expected = 2**33
+        expected = 2 ** 33
         self.assertEqual(DateType.deserialize(int64_pack(1000 * expected), 0), datetime.datetime.utcfromtimestamp(expected))
 
         # less than epoc (PYTHON-119)
@@ -298,7 +332,6 @@ class TypeTests(unittest.TestCase):
         # work around rounding difference among Python versions (PYTHON-230)
         expected = 1424817268.274
         self.assertEqual(DateType.deserialize(int64_pack(int(1000 * expected)), 0), datetime.datetime(2015, 2, 24, 22, 34, 28, 274000))
-
 
     def test_write_read_string(self):
         with tempfile.TemporaryFile() as f:

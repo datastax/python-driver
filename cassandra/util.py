@@ -949,7 +949,7 @@ class Date(object):
             return self.days_from_epoch == other
 
         try:
-            return self.date == other
+            return self.date() == other
         except Exception:
             return False
 
