@@ -741,3 +741,23 @@ class TypeTests(unittest.TestCase):
         s.execute("DROP TYPE %s_nested" % (name))
         s.execute("DROP TYPE %s" % (name))
         s.shutdown()
+
+    def test_reading_composite_type(self):
+        s = self._session
+        s.execute("""
+            CREATE TABLE composites (
+                a int PRIMARY KEY,
+                b 'org.apache.cassandra.db.marshal.CompositeType(AsciiType, Int32Type)'
+            )""")
+
+        # CompositeType string literals are split on ':' chars
+        s.execute("INSERT INTO composites (a, b) VALUES (0, 'abc:123')")
+        result = s.execute("SELECT * FROM composites WHERE a = 0")[0]
+        self.assertEqual(0, result.a)
+        self.assertEqual(('abc', 123), result.b)
+
+        # CompositeType values can omit elements at the end
+        s.execute("INSERT INTO composites (a, b) VALUES (0, 'abc')")
+        result = s.execute("SELECT * FROM composites WHERE a = 0")[0]
+        self.assertEqual(0, result.a)
+        self.assertEqual(('abc',), result.b)
