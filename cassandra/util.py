@@ -55,7 +55,7 @@ def min_uuid_from_time(timestamp):
 
     See :func:`uuid_from_time` for argument and return types.
     """
-    return uuid_from_time(timestamp, 0x80, 0x808080808080)  # Cassandra does byte-wise comparison; fill with min signed bytes (0x80 = -128)
+    return uuid_from_time(timestamp, 0x808080808080, 0x80)  # Cassandra does byte-wise comparison; fill with min signed bytes (0x80 = -128)
 
 
 def max_uuid_from_time(timestamp):
@@ -64,10 +64,10 @@ def max_uuid_from_time(timestamp):
 
     See :func:`uuid_from_time` for argument and return types.
     """
-    return uuid_from_time(timestamp, 0x3f7f, 0x7f7f7f7f7f7f)  # Max signed bytes (0x7f = 127)
+    return uuid_from_time(timestamp, 0x7f7f7f7f7f7f, 0x3f7f)  # Max signed bytes (0x7f = 127)
 
 
-def uuid_from_time(time_arg, clock_seq=None, node=None):
+def uuid_from_time(time_arg, node=None, clock_seq=None):
     """
     Converts a datetime or timestamp to a type 1 :class:`uuid.UUID`.
 
@@ -77,15 +77,15 @@ def uuid_from_time(time_arg, clock_seq=None, node=None):
       in seconds (as returned from :meth:`time.time()`).
     :type datetime: :class:`datetime` or timestamp
 
-    :param clock_seq:
-      Clock sequence field for the UUID (up to 14 bits). If not specified,
-      a random sequence is generated.
-    :type clock_seq: int
-
     :param node:
       None integer for the UUID (up to 48 bits). If not specified, this
       field is randomized.
     :type node: long
+
+    :param clock_seq:
+      Clock sequence field for the UUID (up to 14 bits). If not specified,
+      a random sequence is generated.
+    :type clock_seq: int
 
     :rtype: :class:`uuid.UUID`
 
@@ -112,7 +112,6 @@ def uuid_from_time(time_arg, clock_seq=None, node=None):
 
     if node is None:
         node = random.getrandbits(48)
-    node &= 0xffffffffff
 
     return uuid.UUID(fields=(time_low, time_mid, time_hi_version,
                              clock_seq_hi_variant, clock_seq_low, node), version=1)
