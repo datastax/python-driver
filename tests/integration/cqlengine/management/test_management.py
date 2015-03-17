@@ -219,7 +219,9 @@ class TablePropertiesTests(BaseCassEngTestCase):
             expected['default_time_to_live'] = 4756
             expected['memtable_flush_period_in_ms'] = 43681
 
-        self.assertDictContainsSubset(expected, management.get_table_settings(ModelWithTableProperties).options)
+        options = management.get_table_settings(ModelWithTableProperties).options
+        self.assertEqual(dict([(k, options.get(k)) for k in expected.keys()]),
+                         expected)
 
     def test_table_property_update(self):
         ModelWithTableProperties.__bloom_filter_fp_chance__ = 0.66778
@@ -260,7 +262,8 @@ class TablePropertiesTests(BaseCassEngTestCase):
             expected['replicate_on_write'] = True
             expected['populate_io_cache_on_flush'] = False
 
-        self.assertDictContainsSubset(expected, table_settings)
+        self.assertEqual(dict([(k, table_settings.get(k)) for k in expected.keys()]),
+                         expected)
 
 
 class SyncTableTests(BaseCassEngTestCase):
