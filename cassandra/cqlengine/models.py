@@ -773,7 +773,7 @@ class ModelMetaClass(type):
         if poly_key:
             msg = '__polymorphic_key__ is deprecated. Use __discriminator_value__ instead'
             warnings.warn(msg, DeprecationWarning)
-            log.warn(msg)
+            log.warning(msg)
         attrs['__discriminator_value__'] = attrs.get('__discriminator_value__', poly_key)
         attrs['__polymorphic_key__'] = attrs['__discriminator_value__']
 

@@ -185,7 +185,7 @@ class Column(object):
         if polymorphic_key:
             msg = "polymorphic_key is deprecated. Use discriminator_column instead."
             warnings.warn(msg, DeprecationWarning)
-            log.warn(msg)
+            log.warning(msg)
 
         self.discriminator_column = discriminator_column or polymorphic_key
         self.polymorphic_key = self.discriminator_column

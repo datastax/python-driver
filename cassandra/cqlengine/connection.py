@@ -54,7 +54,7 @@ def default():
     global cluster, session
 
     if session:
-        log.warn("configuring new connection for cqlengine when one was already set")
+        log.warning("configuring new connection for cqlengine when one was already set")
 
     cluster = Cluster()
     session = cluster.connect()
@@ -75,7 +75,7 @@ def set_session(s):
     global cluster, session
 
     if session:
-        log.warn("configuring new connection for cqlengine when one was already set")
+        log.warning("configuring new connection for cqlengine when one was already set")
 
     if s.row_factory is not dict_factory:
         raise CQLEngineException("Failed to initialize: 'Session.row_factory' must be 'dict_factory'.")
@@ -130,7 +130,7 @@ def setup(
         log.debug("cqlengine connection initialized with internally created session")
     except NoHostAvailable:
         if retry_connect:
-            log.warn("connect failed, setting up for re-attempt on first use")
+            log.warning("connect failed, setting up for re-attempt on first use")
             kwargs['default_keyspace'] = default_keyspace
             kwargs['consistency'] = consistency
             kwargs['lazy_connect'] = False

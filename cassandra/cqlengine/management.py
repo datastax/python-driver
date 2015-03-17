@@ -61,7 +61,7 @@ def create_keyspace(name, strategy_class, replication_factor, durable_writes=Tru
 
     msg = "Deprecated. Use create_keyspace_simple or create_keyspace_network_topology instead"
     warnings.warn(msg, DeprecationWarning)
-    log.warn(msg)
+    log.warning(msg)
 
     cluster = get_cluster()
 
@@ -143,7 +143,7 @@ def _create_keyspace(name, durable_writes, strategy_class, strategy_options):
 def delete_keyspace(name):
     msg = "Deprecated. Use drop_keyspace instead"
     warnings.warn(msg, DeprecationWarning)
-    log.warn(msg)
+    log.warning(msg)
     drop_keyspace(name)
 
 
@@ -532,6 +532,6 @@ def _allow_schema_modification():
     if not os.getenv(CQLENG_ALLOW_SCHEMA_MANAGEMENT):
         msg = CQLENG_ALLOW_SCHEMA_MANAGEMENT + " environment variable is not set. Future versions of this package will require this variable to enable management functions."
         warnings.warn(msg)
-        log.warn(msg)
+        log.warning(msg)
 
     return True
