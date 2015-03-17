@@ -76,14 +76,14 @@ def trim_if_startswith(s, prefix):
 def unix_time_from_uuid1(u):
     msg = "'cassandra.cqltypes.unix_time_from_uuid1' has moved to 'cassandra.util'. This entry point will be removed in the next major version."
     warnings.warn(msg, DeprecationWarning)
-    log.warn(msg)
+    log.warning(msg)
     return util.unix_time_from_uuid1(u)
 
 
 def datetime_from_timestamp(timestamp):
     msg = "'cassandra.cqltypes.datetime_from_timestamp' has moved to 'cassandra.util'. This entry point will be removed in the next major version."
     warnings.warn(msg, DeprecationWarning)
-    log.warn(msg)
+    log.warning(msg)
     return util.datetime_from_timestamp(timestamp)
 
 
