@@ -39,7 +39,6 @@ class BaseUserType(object):
             self._values[name] = value_mngr
 
     def __eq__(self, other):
-        print self.__class__, other.__class__
         if self.__class__ != other.__class__:
             return False
 
