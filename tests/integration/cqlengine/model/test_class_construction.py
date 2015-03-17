@@ -61,8 +61,8 @@ class TestModelClassFunction(BaseCassEngTestCase):
             numbers = columns.Integer(db_field='integers_etc')
 
         db_map = WildDBNames._db_map
-        self.assertEquals(db_map['words_and_whatnot'], 'content')
-        self.assertEquals(db_map['integers_etc'], 'numbers')
+        self.assertEqual(db_map['words_and_whatnot'], 'content')
+        self.assertEqual(db_map['integers_etc'], 'numbers')
 
     def test_attempting_to_make_duplicate_column_names_fails(self):
         """
@@ -86,7 +86,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
             content = columns.Text()
             numbers = columns.Integer()
 
-        self.assertEquals([x for x in Stuff._columns.keys()], ['id', 'words', 'content', 'numbers'])
+        self.assertEqual([x for x in Stuff._columns.keys()], ['id', 'words', 'content', 'numbers'])
 
     def test_exception_raised_when_creating_class_without_pk(self):
         with self.assertRaises(ModelDefinitionException):
@@ -109,8 +109,8 @@ class TestModelClassFunction(BaseCassEngTestCase):
         inst2 = Stuff(num=7)
 
         self.assertNotEquals(inst1.num, inst2.num)
-        self.assertEquals(inst1.num, 5)
-        self.assertEquals(inst2.num, 7)
+        self.assertEqual(inst1.num, 5)
+        self.assertEqual(inst2.num, 7)
 
     def test_superclass_fields_are_inherited(self):
         """
@@ -183,7 +183,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         self.assertTrue(cols['p2'].partition_key)
 
         obj = ModelWithPartitionKeys(p1='a', p2='b')
-        self.assertEquals(obj.pk, ('a', 'b'))
+        self.assertEqual(obj.pk, ('a', 'b'))
 
     def test_del_attribute_is_assigned_properly(self):
         """ Tests that columns that can be deleted have the del attribute """

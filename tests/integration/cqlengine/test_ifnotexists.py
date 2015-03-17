@@ -85,8 +85,8 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
         self.assertEqual(len(q), 1)
 
         tm = q.first()
-        self.assertEquals(tm.count, 8)
-        self.assertEquals(tm.text, '123456789')
+        self.assertEqual(tm.count, 8)
+        self.assertEqual(tm.text, '123456789')
 
     def test_insert_if_not_exists_failure(self):
         """ tests that insertion with if_not_exists failure """
@@ -97,11 +97,11 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
         TestIfNotExistsModel.create(id=id, count=9, text='111111111111')
 
         q = TestIfNotExistsModel.objects(id=id)
-        self.assertEquals(len(q), 1)
+        self.assertEqual(len(q), 1)
 
         tm = q.first()
-        self.assertEquals(tm.count, 9)
-        self.assertEquals(tm.text, '111111111111')
+        self.assertEqual(tm.count, 9)
+        self.assertEqual(tm.text, '111111111111')
 
     @skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
     def test_batch_insert_if_not_exists_success(self):
@@ -121,8 +121,8 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
         self.assertEqual(len(q), 1)
 
         tm = q.first()
-        self.assertEquals(tm.count, 8)
-        self.assertEquals(tm.text, '123456789')
+        self.assertEqual(tm.count, 8)
+        self.assertEqual(tm.text, '123456789')
 
     def test_batch_insert_if_not_exists_failure(self):
         """ tests that batch insertion with if_not_exists failure """
@@ -134,11 +134,11 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
             TestIfNotExistsModel.batch(b).create(id=id, count=9, text='111111111111')
 
         q = TestIfNotExistsModel.objects(id=id)
-        self.assertEquals(len(q), 1)
+        self.assertEqual(len(q), 1)
 
         tm = q.first()
-        self.assertEquals(tm.count, 9)
-        self.assertEquals(tm.text, '111111111111')
+        self.assertEqual(tm.count, 9)
+        self.assertEqual(tm.text, '111111111111')
 
 
 class IfNotExistsModelTest(BaseIfNotExistsTest):

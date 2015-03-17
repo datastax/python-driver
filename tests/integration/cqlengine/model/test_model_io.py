@@ -56,7 +56,7 @@ class TestModelIO(BaseCassEngTestCase):
         self.assertIsInstance(tm2, TestModel)
 
         for cname in tm._columns.keys():
-            self.assertEquals(getattr(tm, cname), getattr(tm2, cname))
+            self.assertEqual(getattr(tm, cname), getattr(tm2, cname))
 
     def test_model_read_as_dict(self):
         """
@@ -69,13 +69,13 @@ class TestModelIO(BaseCassEngTestCase):
             'text': tm.text,
             'a_bool': tm.a_bool,
         }
-        self.assertEquals(sorted(tm.keys()), sorted(column_dict.keys()))
+        self.assertEqual(sorted(tm.keys()), sorted(column_dict.keys()))
 
         self.assertItemsEqual(tm.values(), column_dict.values())
-        self.assertEquals(
+        self.assertEqual(
             sorted(tm.items(), key=itemgetter(0)),
             sorted(column_dict.items(), key=itemgetter(0)))
-        self.assertEquals(len(tm), len(column_dict))
+        self.assertEqual(len(tm), len(column_dict))
         for column_id in column_dict.keys():
             self.assertEqual(tm[column_id], column_dict[column_id])
 
@@ -93,8 +93,8 @@ class TestModelIO(BaseCassEngTestCase):
         tm.save()
 
         tm2 = TestModel.objects(id=tm.pk).first()
-        self.assertEquals(tm.count, tm2.count)
-        self.assertEquals(tm.a_bool, tm2.a_bool)
+        self.assertEqual(tm.count, tm2.count)
+        self.assertEqual(tm.a_bool, tm2.a_bool)
 
     def test_model_deleting_works_properly(self):
         """
