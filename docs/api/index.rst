@@ -1,6 +1,8 @@
 API Documentation
 =================
 
+Core Driver
+-----------
 .. toctree::
    :maxdepth: 2
 
@@ -22,3 +24,17 @@ API Documentation
    cassandra/io/libevreactor
    cassandra/io/geventreactor
    cassandra/io/twistedreactor
+
+.. _om_api:
+
+Object Mapper
+-------------
+.. toctree::
+   :maxdepth: 1
+
+   cassandra/cqlengine/models
+   cassandra/cqlengine/columns
+   cassandra/cqlengine/query
+   cassandra/cqlengine/connection
+   cassandra/cqlengine/management
+   cassandra/cqlengine/usertype

@@ -1,4 +1,4 @@
-# Copyright 2013-2014 DataStax, Inc.
+# Copyright 2013-2015 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
 
 from __future__ import print_function
 import sys
+import warnings
 
 if __name__ == '__main__' and sys.argv[1] == "gevent_nosetests":
     print("Running gevent tests")
@@ -63,6 +64,14 @@ else:
 
     class eventlet_nosetests(nosetests):
         description = "run nosetests with eventlet monkey patching"
+
+has_cqlengine = False
+if __name__ == '__main__' and sys.argv[1] == "install":
+    try:
+        import cqlengine
+        has_cqlengine = True
+    except ImportError:
+        pass
 
 
 class DocCommand(Command):
@@ -205,10 +214,11 @@ def run_setup(extensions):
         url='http://github.com/datastax/python-driver',
         author='Tyler Hobbs',
         author_email='tyler@datastax.com',
-        packages=['cassandra', 'cassandra.io'],
+        packages=['cassandra', 'cassandra.io', 'cassandra.cqlengine'],
+        keywords='cassandra,cql,orm',
         include_package_data=True,
         install_requires=dependencies,
-        tests_require=['nose', 'mock', 'PyYAML', 'pytz'],
+        tests_require=['nose', 'mock', 'PyYAML', 'pytz', 'sure'],
         classifiers=[
             'Development Status :: 5 - Production/Stable',
             'Intended Audience :: Developers',
@@ -270,3 +280,8 @@ while True:
         extensions.remove(failure.ext)
     else:
         break
+
+if has_cqlengine:
+    warnings.warn("\n#######\n'cqlengine' package is present on path: %s\n"
+                  "cqlengine is now an integrated sub-package of this driver.\n"
+                  "It is recommended to remove this package to reduce the chance for conflicting usage" % cqlengine.__file__)

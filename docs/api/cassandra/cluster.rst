@@ -5,6 +5,8 @@
 
 .. autoclass:: Cluster ([contact_points=('127.0.0.1',)][, port=9042][, executor_threads=2], **attr_kwargs)
 
+   Any of the mutable Cluster attributes may be set as keyword arguments to the constructor.
+
    .. autoattribute:: cql_version
 
    .. autoattribute:: protocol_version
