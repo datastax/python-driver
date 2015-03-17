@@ -13,12 +13,16 @@
 # limitations under the License.
 
 from datetime import datetime, timedelta
+import logging
 import time
 import six
+import warnings
 
 from cassandra.cqlengine import UnicodeMixin
 from cassandra.cqlengine.functions import QueryValue
 from cassandra.cqlengine.operators import BaseWhereOperator, InOperator
+
+log = logging.getLogger(__name__)
 
 
 class StatementException(Exception):
@@ -291,6 +295,11 @@ class ListUpdateClause(ContainerUpdateClause):
             ctx[str(ctx_id)] = self._to_database(self._assignments)
             ctx_id += 1
         if self._prepend is not None:
+            msg = "Previous versions of cqlengine implicitly reversed prepended lists to account for CASSANDRA-8733. " \
+                  "THIS VERSION DOES NOT. This warning will be removed in a future release."
+            warnings.warn(msg)
+            log.warning(msg)
+
             ctx[str(ctx_id)] = self._to_database(self._prepend)
             ctx_id += 1
         if self._append is not None:
