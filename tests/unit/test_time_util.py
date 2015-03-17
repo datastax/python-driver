@@ -24,6 +24,7 @@ import datetime
 import time
 import uuid
 
+
 class TimeUtilTest(unittest.TestCase):
     def test_datetime_from_timestamp(self):
         self.assertEqual(util.datetime_from_timestamp(0), datetime.datetime(1970, 1, 1))
@@ -103,8 +104,8 @@ class TimeUtilTest(unittest.TestCase):
     def test_min_uuid(self):
         u = util.min_uuid_from_time(0)
         # cassandra does a signed comparison of the remaining bytes
-        for byte in u.bytes[8:]:
-            self.assertEqual(marshal.int8_unpack(byte), -128)
+        for i in range(8, 16):
+            self.assertEqual(marshal.int8_unpack(u.bytes[i:i + 1]), -128)
 
     def test_max_uuid(self):
         u = util.max_uuid_from_time(0)
@@ -112,8 +113,6 @@ class TimeUtilTest(unittest.TestCase):
         # the first non-time byte has the variant in it
         # This byte is always negative, but should be the smallest negative
         # number with high-order bits '10'
-        print u
-        print ord(u.bytes[8])
-        self.assertEqual(marshal.int8_unpack(u.bytes[8]), -65)
-        for byte in u.bytes[9:]:
-            self.assertEqual(marshal.int8_unpack(byte), 127)
+        self.assertEqual(marshal.int8_unpack(u.bytes[8:9]), -65)
+        for i in range(9, 16):
+            self.assertEqual(marshal.int8_unpack(u.bytes[i:i + 1]), 127)
