@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from uuid import uuid4
-from cassandra.cqlengine.exceptions import ValidationError
+from cassandra.cqlengine import ValidationError
 from cassandra.cqlengine.query import QueryException
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase

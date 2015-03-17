@@ -16,7 +16,7 @@ from uuid import uuid4
 import random
 from datetime import date
 from operator import itemgetter
-from cassandra.cqlengine.exceptions import CQLEngineException
+from cassandra.cqlengine import CQLEngineException
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 
 from cassandra.cqlengine.management import sync_table
@@ -24,16 +24,10 @@ from cassandra.cqlengine.management import drop_table
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine import columns
 
-class TestModel(Model):
-
-    id      = columns.UUID(primary_key=True, default=lambda:uuid4())
-    count   = columns.Integer()
-    text    = columns.Text(required=False)
-    a_bool  = columns.Boolean(default=False)
 
 class TestModel(Model):
 
-    id      = columns.UUID(primary_key=True, default=lambda:uuid4())
+    id      = columns.UUID(primary_key=True, default=lambda: uuid4())
     count   = columns.Integer()
     text    = columns.Text(required=False)
     a_bool  = columns.Boolean(default=False)
@@ -153,7 +147,7 @@ class TestDeleting(BaseCassEngTestCase):
         drop_table(TestMultiKeyModel)
 
     def test_deleting_only_deletes_one_object(self):
-        partition = random.randint(0,1000)
+        partition = random.randint(0, 1000)
         for i in range(5):
             TestMultiKeyModel.create(partition=partition, cluster=i, count=i, text=str(i))
 
@@ -262,16 +256,19 @@ class IndexDefinitionModel(Model):
     key     = columns.UUID(primary_key=True)
     val     = columns.Text(index=True)
 
+
 class TestIndexedColumnDefinition(BaseCassEngTestCase):
 
     def test_exception_isnt_raised_if_an_index_is_defined_more_than_once(self):
         sync_table(IndexDefinitionModel)
         sync_table(IndexDefinitionModel)
 
+
 class ReservedWordModel(Model):
 
     token   = columns.Text(primary_key=True)
     insert  = columns.Integer(index=True)
+
 
 class TestQueryQuoting(BaseCassEngTestCase):
 
@@ -323,6 +320,7 @@ class TestQuerying(BaseCassEngTestCase):
         assert inst.test_id == uid
         assert inst.date == day
 
+
 def test_none_filter_fails():
     class NoneFilterModel(Model):
 
@@ -335,6 +333,3 @@ def test_none_filter_fails():
         raise Exception("fail")
     except CQLEngineException as e:
         pass
-
-
-

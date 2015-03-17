@@ -17,7 +17,7 @@ import json
 from mock import patch
 
 from cassandra.cqlengine import columns, SizeTieredCompactionStrategy, LeveledCompactionStrategy
-from cassandra.cqlengine.exceptions import CQLEngineException
+from cassandra.cqlengine import CQLEngineException
 from cassandra.cqlengine.management import get_compaction_options, drop_table, sync_table, get_table_settings
 from cassandra.cqlengine.models import Model
 
@@ -38,8 +38,7 @@ class BaseCompactionTest(BaseCassEngTestCase):
 
         key = "__compaction_{}__".format(key)
 
-        with patch.object(self.model, key, 10), \
-             self.assertRaises(CQLEngineException):
+        with patch.object(self.model, key, 10), self.assertRaises(CQLEngineException):
             get_compaction_options(self.model)
 
 
@@ -97,7 +96,6 @@ class LeveledcompactionTestTable(Model):
     user_id = columns.UUID(primary_key=True)
     name = columns.Text()
 
-from cassandra.cqlengine.management import schema_columnfamilies
 
 class AlterTableTest(BaseCassEngTestCase):
 
@@ -158,7 +156,6 @@ class AlterTableTest(BaseCassEngTestCase):
 
         self.assertRegexpMatches(table_settings.options['compaction_strategy_class'], '.*SizeTieredCompactionStrategy$')
 
-
     def test_alter_options(self):
 
         class AlterTable(Model):
@@ -173,7 +170,6 @@ class AlterTableTest(BaseCassEngTestCase):
         sync_table(AlterTable)
         AlterTable.__compaction_sstable_size_in_mb__ = 128
         sync_table(AlterTable)
-
 
 
 class EmptyCompactionTest(BaseCassEngTestCase):
@@ -200,7 +196,6 @@ class CompactionSizeTieredModel(Model):
     __compaction__ = SizeTieredCompactionStrategy
     cid = columns.UUID(primary_key=True)
     name = columns.Text()
-
 
 
 class OptionsTest(BaseCassEngTestCase):
@@ -232,7 +227,6 @@ class OptionsTest(BaseCassEngTestCase):
 
         self.assertDictEqual(options, expected)
 
-
     def test_all_leveled_options(self):
 
         class AllLeveledOptionsModel(Model):
@@ -250,4 +244,3 @@ class OptionsTest(BaseCassEngTestCase):
 
         options = json.loads(settings['compaction_strategy_options'])
         self.assertDictEqual(options, {u'sstable_size_in_mb': u'64'})
-

@@ -19,15 +19,16 @@ import warnings
 
 from cassandra.cqlengine import CACHING_ALL, CACHING_NONE
 from cassandra.cqlengine.connection import get_session, get_cluster
-from cassandra.cqlengine.exceptions import CQLEngineException
+from cassandra.cqlengine import CQLEngineException
 from cassandra.cqlengine import management
-from cassandra.cqlengine.management import  get_fields, sync_table, drop_table
+from cassandra.cqlengine.management import get_fields, sync_table, drop_table
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine import columns, SizeTieredCompactionStrategy, LeveledCompactionStrategy
 
 from tests.integration import CASSANDRA_VERSION, PROTOCOL_VERSION
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine.query.test_queryset import TestModel
+
 
 class KeyspaceManagementTest(BaseCassEngTestCase):
     def test_create_drop_succeeeds(self):
@@ -71,17 +72,20 @@ class DropTableTest(BaseCassEngTestCase):
         drop_table(TestModel)
         drop_table(TestModel)
 
+
 class LowercaseKeyModel(Model):
 
     first_key = columns.Integer(primary_key=True)
     second_key = columns.Integer(primary_key=True)
     some_data = columns.Text()
 
+
 class CapitalizedKeyModel(Model):
 
     firstKey = columns.Integer(primary_key=True)
     secondKey = columns.Integer(primary_key=True)
     someData = columns.Text()
+
 
 class PrimaryKeysOnlyModel(Model):
 
@@ -109,6 +113,7 @@ class FirstModel(Model):
     second_key = columns.UUID()
     third_key = columns.Text()
 
+
 class SecondModel(Model):
 
     __table_name__ = 'first_model'
@@ -116,6 +121,7 @@ class SecondModel(Model):
     second_key = columns.UUID()
     third_key = columns.Text()
     fourth_key = columns.Text()
+
 
 class ThirdModel(Model):
 
@@ -126,6 +132,7 @@ class ThirdModel(Model):
     # removed fourth key, but it should stay in the DB
     blah = columns.Map(columns.Text, columns.Text)
 
+
 class FourthModel(Model):
 
     __table_name__ = 'first_model'
@@ -134,6 +141,7 @@ class FourthModel(Model):
     third_key = columns.Text()
     # removed fourth key, but it should stay in the DB
     renamed = columns.Map(columns.Text, columns.Text, db_field='blah')
+
 
 class AddColumnTest(BaseCassEngTestCase):
     def setUp(self):
@@ -179,6 +187,7 @@ if CASSANDRA_VERSION >= '2.0.0':
     ModelWithTableProperties.__memtable_flush_period_in_ms__ = 43681
     ModelWithTableProperties.__index_interval__ = 98706
     ModelWithTableProperties.__default_time_to_live__ = 4756
+
 
 class TablePropertiesTests(BaseCassEngTestCase):
 
@@ -233,17 +242,17 @@ class TablePropertiesTests(BaseCassEngTestCase):
         table_settings = management.get_table_settings(ModelWithTableProperties).options
 
         expected = {'bloom_filter_fp_chance': 0.66778,
-                     'comment': 'xirAkRWZVVvsmzRvXamiEcQkshkUIDINVJZgLYSdnGHweiBrAiJdLJkVohdRy',
-                     'gc_grace_seconds': 96362,
-                     'read_repair_chance': 0.2989,
-                     #'local_read_repair_chance': 0.12732,
+                    'comment': 'xirAkRWZVVvsmzRvXamiEcQkshkUIDINVJZgLYSdnGHweiBrAiJdLJkVohdRy',
+                    'gc_grace_seconds': 96362,
+                    'read_repair_chance': 0.2989,
+                    # 'local_read_repair_chance': 0.12732,
                     }
         if CASSANDRA_VERSION >= '2.0.0':
-             expected['memtable_flush_period_in_ms'] = 60210
-             expected['default_time_to_live'] = 65178
+            expected['memtable_flush_period_in_ms'] = 60210
+            expected['default_time_to_live'] = 65178
 
         if CASSANDRA_VERSION == '2.0.0':
-             expected['index_interval'] = 94207
+            expected['index_interval'] = 94207
 
         # these featuers removed in cassandra 2.1
         if CASSANDRA_VERSION <= '2.0.0':
@@ -274,9 +283,7 @@ class SyncTableTests(BaseCassEngTestCase):
 
         assert LeveledCompactionStrategy in table_settings.options['compaction_strategy_class']
 
-
         # Now we are "updating" the table:
-
         # setting up something to change
         PrimaryKeysOnlyModel.__compaction__ = SizeTieredCompactionStrategy
 
@@ -289,6 +296,7 @@ class SyncTableTests(BaseCassEngTestCase):
 
         table_settings = management.get_table_settings(PrimaryKeysOnlyModel)
         assert SizeTieredCompactionStrategy in table_settings.options['compaction_strategy_class']
+
 
 class NonModelFailureTest(BaseCassEngTestCase):
     class FakeModel(object):
@@ -324,9 +332,4 @@ def test_static_columns():
         sync_table(StaticModel)
 
     assert len(m2.call_args_list) == 1
-    assert "ALTER" not in  m2.call_args[0][0].query_string
-
-
-
-
-
+    assert "ALTER" not in m2.call_args[0][0].query_string

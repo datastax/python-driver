@@ -15,7 +15,7 @@
 from uuid import uuid4
 
 from mock import patch
-from cassandra.cqlengine.exceptions import ValidationError
+from cassandra.cqlengine import ValidationError
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from cassandra.cqlengine.models import Model
@@ -102,4 +102,3 @@ class ModelUpdateTests(BaseCassEngTestCase):
         m0 = TestUpdateModel.create(count=5, text='monkey')
         with self.assertRaises(ValidationError):
             m0.update(partition=uuid4())
-
