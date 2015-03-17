@@ -186,6 +186,7 @@ class TypeTests(unittest.TestCase):
         """
         Test cassandra.cqltypes.TimeType() construction
         """
+        Time = cassandra.util.Time
         one_micro = 1000
         one_milli = 1000 * one_micro
         one_second = 1000 * one_milli
@@ -230,9 +231,23 @@ class TypeTests(unittest.TestCase):
         tt = TimeType(12345678)
         self.assertEqual(tt.val, 12345678)
 
+        # from time
+        expected_time = datetime.time(12, 1, 2, 3)
+        tt = TimeType(expected_time)
+        self.assertEqual(tt.val, expected_time)
+
+        # util.Time self equality
+        self.assertEqual(Time(1234), Time(1234))
+
+        # str
+        time_str = '12:13:14.123456789'
+        self.assertEqual(str(Time(time_str)), time_str)
+        self.assertEqual(repr(Time(1)), 'Time(1)')
+
         # no construct
         self.assertRaises(ValueError, TimeType, '1999-10-10 11:11:11.1234')
         self.assertRaises(TypeError, TimeType, 1.234)
+        self.assertRaises(ValueError, TimeType, 123456789000000)
         self.assertRaises(TypeError, TimeType, datetime.datetime(2004, 12, 23, 11, 11, 1))
 
     def test_cql_typename(self):
