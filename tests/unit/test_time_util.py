@@ -53,15 +53,17 @@ class TimeUtilTest(unittest.TestCase):
         seq = 0x2aa5
         node = uuid.getnode()
         u = util.uuid_from_time(t, node, seq)
-        self.assertEqual(util.unix_time_from_uuid1(u), t)
+        # using AlmostEqual because time precision is different for
+        # some platforms
+        self.assertAlmostEqual(util.unix_time_from_uuid1(u), t, 4)
         self.assertEqual(u.node, node)
         self.assertEqual(u.clock_seq, seq)
 
         # random node
         u1 = util.uuid_from_time(t, clock_seq=seq)
         u2 = util.uuid_from_time(t, clock_seq=seq)
-        self.assertEqual(util.unix_time_from_uuid1(u1), t)
-        self.assertEqual(util.unix_time_from_uuid1(u2), t)
+        self.assertAlmostEqual(util.unix_time_from_uuid1(u1), t, 4)
+        self.assertAlmostEqual(util.unix_time_from_uuid1(u2), t, 4)
         self.assertEqual(u.clock_seq, seq)
         # not impossible, but we shouldn't get the same value twice
         self.assertNotEqual(u1.node, u2.node)
@@ -69,8 +71,8 @@ class TimeUtilTest(unittest.TestCase):
         # random seq
         u1 = util.uuid_from_time(t, node=node)
         u2 = util.uuid_from_time(t, node=node)
-        self.assertEqual(util.unix_time_from_uuid1(u1), t)
-        self.assertEqual(util.unix_time_from_uuid1(u2), t)
+        self.assertAlmostEqual(util.unix_time_from_uuid1(u1), t, 4)
+        self.assertAlmostEqual(util.unix_time_from_uuid1(u2), t, 4)
         self.assertEqual(u.node, node)
         # not impossible, but we shouldn't get the same value twice
         self.assertNotEqual(u1.clock_seq, u2.clock_seq)
@@ -86,7 +88,7 @@ class TimeUtilTest(unittest.TestCase):
         # construct from datetime
         dt = util.datetime_from_timestamp(t)
         u = util.uuid_from_time(dt, node, seq)
-        self.assertEqual(util.unix_time_from_uuid1(u), t)
+        self.assertAlmostEqual(util.unix_time_from_uuid1(u), t, 4)
         self.assertEqual(u.node, node)
         self.assertEqual(u.clock_seq, seq)
 
