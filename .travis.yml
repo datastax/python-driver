@@ -1,51 +1,35 @@
 language: python
 python: 2.7
 env:
-  - TOX_ENV=py26
-  - TOX_ENV=py27
-  - TOX_ENV=pypy
-  - TOX_ENV=py33
-  - TOX_ENV=py34
+  - TOX_ENV=py26 CASSANDRA_VERSION=21
+  - TOX_ENV=py27 CASSANDRA_VERSION=12
+  - TOX_ENV=py27 CASSANDRA_VERSION=20
+  - TOX_ENV=py27 CASSANDRA_VERSION=21
+  - TOX_ENV=pypy CASSANDRA_VERSION=21
+  - TOX_ENV=py33 CASSANDRA_VERSION=21
+  - TOX_ENV=py34 CASSANDRA_VERSION=21
 
 before_install:
   - sudo apt-get update -y
   - sudo apt-get install -y build-essential python-dev
   - sudo apt-get install -y libev4 libev-dev
+  - sudo echo "deb http://www.apache.org/dist/cassandra/debian ${CASSANDRA_VERSION}x main" | sudo tee -a /etc/apt/sources.list
+  - sudo echo "deb-src http://www.apache.org/dist/cassandra/debian ${CASSANDRA_VERSION}x main" | sudo tee -a /etc/apt/sources.list
+  - sudo rm -rf ~/.gnupg
+  - sudo gpg --keyserver pgp.mit.edu --recv-keys F758CE318D77295D
+  - sudo gpg --export --armor F758CE318D77295D | sudo apt-key add -
+  - sudo gpg --keyserver pgp.mit.edu --recv-keys 2B5C1B00
+  - sudo gpg --export --armor 2B5C1B00 | sudo apt-key add -
+  - sudo gpg --keyserver pgp.mit.edu --recv-keys 0353B12C
+  - sudo gpg --export --armor 0353B12C | sudo apt-key add -
+  - sudo apt-get update
+  - sudo apt-get -o Dpkg::Options::="--force-confnew" install -y cassandra
+  - sudo rm -rf /var/lib/cassandra/*
+  - sudo sh -c "echo 'JVM_OPTS=\"\${JVM_OPTS} -Djava.net.preferIPv4Stack=false\"' >> /etc/cassandra/cassandra-env.sh"
+  - sudo service cassandra start
 
 install:
   - pip install tox
 
 script:
   - tox -e $TOX_ENV
-
-# TODO: merge cqlengine tests
-#env:
-#  - CASSANDRA_VERSION=12
-#  - CASSANDRA_VERSION=20
-#  - CASSANDRA_VERSION=21
-#
-#python:
-#  - "2.7"
-#  - "3.4"
-#
-#before_install:
-#  - sudo echo "deb http://www.apache.org/dist/cassandra/debian ${CASSANDRA_VERSION}x main" | sudo tee -a /etc/apt/sources.list
-#  - sudo echo "deb-src http://www.apache.org/dist/cassandra/debian ${CASSANDRA_VERSION}x main" | sudo tee -a /etc/apt/sources.list
-#  - sudo rm -rf ~/.gnupg
-#  - sudo gpg --keyserver pgp.mit.edu --recv-keys F758CE318D77295D
-#  - sudo gpg --export --armor F758CE318D77295D | sudo apt-key add -
-#  - sudo gpg --keyserver pgp.mit.edu --recv-keys 2B5C1B00
-#  - sudo gpg --export --armor 2B5C1B00 | sudo apt-key add -
-#  - sudo gpg --keyserver pgp.mit.edu --recv-keys 0353B12C
-#  - sudo gpg --export --armor 0353B12C | sudo apt-key add -
-#  - sudo apt-get update
-#  - sudo apt-get -o Dpkg::Options::="--force-confnew" install -y cassandra
-#  - sudo rm -rf /var/lib/cassandra/*
-#  - sudo sh -c "echo 'JVM_OPTS=\"\${JVM_OPTS} -Djava.net.preferIPv4Stack=false\"' >> /etc/cassandra/cassandra-env.sh"
-#  - sudo service cassandra start
-#
-#install:
-#  - "pip install -r requirements.txt --use-mirrors"
-#
-#script:
-#  - "nosetests cqlengine/tests --no-skip"
