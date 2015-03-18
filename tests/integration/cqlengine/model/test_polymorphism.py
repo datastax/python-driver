@@ -33,6 +33,11 @@ class TestPolymorphicClassConstruction(BaseCassEngTestCase):
                 type1 = columns.Integer(polymorphic_key=True)
                 type2 = columns.Integer(polymorphic_key=True)
 
+    def test_no_polymorphic_key_column_failure(self):
+        with self.assertRaises(models.ModelDefinitionException):
+            class M(models.Model):
+                __polymorphic_key__ = 1
+
     def test_polymorphic_key_inheritance(self):
         """ Tests that polymorphic_key attribute is not inherited """
         class Base(models.Model):
@@ -263,6 +268,11 @@ class TestInheritanceClassConstruction(BaseCassEngTestCase):
                 partition = columns.Integer(primary_key=True)
                 type1 = columns.Integer(discriminator_column=True)
                 type2 = columns.Integer(discriminator_column=True)
+
+    def test_no_discriminator_column_failure(self):
+        with self.assertRaises(models.ModelDefinitionException):
+            class M(models.Model):
+                __discriminator_value__ = 1
 
     def test_discriminator_value_inheritance(self):
         """ Tests that discriminator_column attribute is not inherited """

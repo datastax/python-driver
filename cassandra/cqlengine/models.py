@@ -796,6 +796,9 @@ class ModelMetaClass(type):
         if len(discriminator_columns) > 1:
             raise ModelDefinitionException('only one discriminator_column (polymorphic_key (deprecated)) can be defined in a model, {} found'.format(len(discriminator_columns)))
 
+        if attrs['__discriminator_value__'] and not is_polymorphic:
+            raise ModelDefinitionException('__discriminator_value__ specified, but no base columns defined with discriminator_column=True')
+
         discriminator_column_name, discriminator_column = discriminator_columns[0] if discriminator_columns else (None, None)
 
         if isinstance(discriminator_column, (columns.BaseContainerColumn, columns.Counter)):
