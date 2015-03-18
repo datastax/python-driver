@@ -1,5 +1,25 @@
+2.5.0
+=====
+March 30, 2015
+
+Features
+--------
+* Integrated cqlengine object mapping package
+* Utility functions for converting timeuuids and datetime (PYTHON-99)
+* Schema metadata fetch window randomized, config options added (PYTHON-202)
+* Support for new Date and Time Cassandra types (PYTHON-190)
+
+Bug Fixes
+---------
+* Fix index target for collection indexes (full(), keys()) (PYTHON-222)
+* Thread exception during GIL cleanup (PYTHON-229)
+* Workaround for rounding anomaly in datetime.utcfromtime (Python 3.4) (PYTHON-230)
+* Normalize text serialization for lookup in OrderedMap (PYTHON-231)
+* Support reading CompositeType data (PYTHON-234)
+
 2.1.4
 =====
+January 26, 2015
 
 Features
 --------
