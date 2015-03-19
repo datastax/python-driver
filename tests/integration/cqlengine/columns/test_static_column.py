@@ -22,6 +22,9 @@ from cassandra.cqlengine.models import Model
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration import PROTOCOL_VERSION
 
+# TODO: is this really a protocol limitation, or is it just C* version?
+# good enough proxy for now
+STATIC_SUPPORTED = PROTOCOL_VERSION >= 2
 
 class TestStaticModel(Model):
     partition = columns.UUID(primary_key=True, default=uuid4)
@@ -30,14 +33,15 @@ class TestStaticModel(Model):
     text = columns.Text()
 
 
-@skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
+@skipUnless(STATIC_SUPPORTED, "only runs against the cql3 protocol v2.0")
 class TestStaticColumn(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
         super(TestStaticColumn, cls).setUpClass()
         drop_table(TestStaticModel)
-        sync_table(TestStaticModel)
+        if STATIC_SUPPORTED:  # setup and teardown run regardless of skip
+            sync_table(TestStaticModel)
 
     @classmethod
     def tearDownClass(cls):
