@@ -200,7 +200,10 @@ def register_udt(keyspace, type_name, klass):
 
     global cluster
     if cluster:
-        cluster.register_user_type(keyspace, type_name, klass)
+        try:
+            cluster.register_user_type(keyspace, type_name, klass)
+        except UserTypeDoesNotExist:
+            pass  # new types are covered in management sync functions
 
 
 def _register_known_types(cluster):
