@@ -14,12 +14,12 @@
 
 from uuid import uuid4
 from cassandra.cqlengine import ValidationError
-from cassandra.cqlengine.query import QueryException
 
-from tests.integration.cqlengine.base import BaseCassEngTestCase
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine import columns
+from tests.integration.cqlengine import is_prepend_reversed
+from tests.integration.cqlengine.base import BaseCassEngTestCase
 
 
 class TestQueryUpdateModel(Model):
@@ -192,13 +192,16 @@ class QueryUpdateTests(BaseCassEngTestCase):
         """ Prepend two things since order is reversed by default by CQL """
         partition = uuid4()
         cluster = 1
+        original = ["foo"]
         TestQueryUpdateModel.objects.create(
-                partition=partition, cluster=cluster, text_list=["foo"])
+                partition=partition, cluster=cluster, text_list=original)
+        prepended = ['bar', 'baz']
         TestQueryUpdateModel.objects(
                 partition=partition, cluster=cluster).update(
-                text_list__prepend=['bar', 'baz'])
+                text_list__prepend=prepended)
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
-        self.assertEqual(obj.text_list, ["bar", "baz", "foo"])
+        expected = (prepended[::-1] if is_prepend_reversed() else prepended) + original
+        self.assertEqual(obj.text_list, expected)
 
     def test_map_update_updates(self):
         """ Merge a dictionary into existing value """

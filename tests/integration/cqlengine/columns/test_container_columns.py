@@ -20,6 +20,7 @@ import six
 from cassandra.cqlengine.models import Model, ValidationError
 import cassandra.cqlengine.columns as columns
 from cassandra.cqlengine.management import sync_table, drop_table
+from tests.integration.cqlengine import is_prepend_reversed
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 
 
@@ -240,15 +241,21 @@ class TestListColumn(BaseCassEngTestCase):
 
     def test_partial_updates(self):
         """ Tests that partial udpates work as expected """
-        final = list(range(10))
-        initial = final[3:7]
+        full = list(range(10))
+        initial = full[3:7]
+
         m1 = TestListModel.create(int_list=initial)
 
-        m1.int_list = final
+        m1.int_list = full
         m1.save()
 
+        if is_prepend_reversed():
+            expected = full[2::-1] + full[3:]
+        else:
+            expected = full
+
         m2 = TestListModel.get(partition=m1.partition)
-        assert list(m2.int_list) == final
+        self.assertEqual(list(m2.int_list), expected)
 
     def test_instantiation_with_column_class(self):
         """

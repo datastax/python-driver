@@ -18,7 +18,7 @@ import warnings
 from cassandra.cqlengine import connection
 from cassandra.cqlengine.management import create_keyspace_simple, CQLENG_ALLOW_SCHEMA_MANAGEMENT
 
-from tests.integration import use_single_node, PROTOCOL_VERSION
+from tests.integration import get_server_versions, use_single_node, PROTOCOL_VERSION
 
 
 def setup_package():
@@ -29,7 +29,13 @@ def setup_package():
 
     keyspace = 'cqlengine_test'
     connection.setup(['localhost'],
-                      protocol_version=PROTOCOL_VERSION,
-                      default_keyspace=keyspace)
+                     protocol_version=PROTOCOL_VERSION,
+                     default_keyspace=keyspace)
 
     create_keyspace_simple(keyspace, 1)
+
+
+def is_prepend_reversed():
+    # do we have https://issues.apache.org/jira/browse/CASSANDRA-8733 ?
+    ver, _ = get_server_versions()
+    return not (ver >= (2, 0, 13) or ver >= (2, 1, 3))
