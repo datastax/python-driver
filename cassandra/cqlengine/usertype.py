@@ -132,6 +132,26 @@ class UserTypeMetaClass(type):
 
 @six.add_metaclass(UserTypeMetaClass)
 class UserType(BaseUserType):
+    """
+    This class is used to model User Defined Types. To define a type, declare a class inheriting from this,
+    and assign field types as class attributes:
+
+    .. code-block:: python
+
+        # connect with default keyspace ...
+
+        from cassandra.cqlengine.columns import Text, Integer
+        from cassandra.cqlengine.usertype import UserType
+
+        class address(UserType):
+            street = Text()
+            zipcode = Integer()
+
+        from cassandra.cqlengine import management
+        management.sync_type(address)
+
+    Please see :ref:`user_types` for a complete example and discussion.
+    """
 
     __type_name__ = None
     """

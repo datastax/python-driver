@@ -178,3 +178,43 @@ automatically saved into the discriminator column. The discriminator column may 
 Additionally, if you set ``index=True`` on your discriminator column, you can execute queries against specialized subclasses, and a
 ``WHERE`` clause will be automatically added to your query, returning only rows of that type. Note that you must
 define a unique ``__discriminator_value__`` to each subclass, and that you can only assign a single discriminator column per model.
+
+.. _user_types:
+
+User Defined Types
+==================
+cqlengine models User Defined Types (UDTs) much like tables, with fields defined by column type attributes. However, UDT instances
+are only created, presisted, and queried via table Models. A short example to introduce the pattern::
+
+    from cassandra.cqlengine.columns import *
+    from cassandra.cqlengine.models import Model
+    from cassandra.cqlengine.usertype import UserType
+
+    class address(UserType):
+        street = Text()
+        zipcode = Integer()
+
+    class users(Model):
+        __keyspace__ = 'account'
+        name = Text(primary_key=True)
+        addr = UserDefinedType(address)
+
+    sync_table(users)
+
+    users.create(name="Joe", addr=address(street="Easy St.", zip=99999))
+    user = users.objects(name="Joe")[0]
+    print user.name, user.addr
+    # Joe {'street': Easy St., 'zipcode': None}
+
+UDTs are modeled by inheriting :class:`~.usertype.UserType`, and setting column type attributes. Types are then used in defining
+models by declaring a column of type :class:`~.columns.UserDefinedType`, with the ``UserType`` class as a parameter.
+
+``sync_table`` will implicitly
+synchronize any types contained in the table. Alternatively :func:`~.management.sync_type` can be used to create/alter types
+explicitly.
+
+Upon declaration, types are automatically registered with the driver, so query results return instances of your ``UserType``
+class*.
+
+***Note**: UDTs were not added to the native protocol until v3. When setting up the cqlengine connection, be sure to specify
+``protocol_version=3``. If using an earlier version, UDT queries will still work, but the returned type will be a namedtuple.

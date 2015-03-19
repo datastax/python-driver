@@ -864,11 +864,15 @@ class UserDefinedType(Column):
     User Defined Type column
 
     http://www.datastax.com/documentation/cql/3.1/cql/cql_using/cqlUseUDT.html
+
+    These columns are represented by a specialization of :class:`cassandra.cqlengine.usertype.UserType`.
+
+    Please see :ref:`user_types` for examples and discussion.
     """
 
     def __init__(self, user_type, **kwargs):
         """
-        :param type user_type: specifies a :class:`~.Type` model for the column
+        :param type user_type: specifies the :class:`~.UserType` model of the column
         """
         self.user_type = user_type
         self.db_type = "frozen<%s>" % user_type.type_name()

@@ -72,6 +72,8 @@ Columns of all types are initialized by passing :class:`.Column` attributes to t
 
 .. autoclass:: TimeUUID(**kwargs)
 
+.. autoclass:: UserDefinedType
+
 .. autoclass:: UUID(**kwargs)
 
 .. autoclass:: VarInt(**kwargs)
