@@ -56,6 +56,9 @@ class BaseUserType(object):
     def __ne__(self, other):
         return not self.__eq__(other)
 
+    def __str__(self):
+        return "{{{}}}".format(', '.join("'{}': {}".format(k, getattr(self, k)) for k, v in six.iteritems(self._values)))
+
     @classmethod
     def register_for_keyspace(cls, keyspace):
         connection.register_udt(keyspace, cls.type_name(), cls)
@@ -101,11 +104,6 @@ class UserTypeMetaClass(type):
 
         field_defs = [(k, v) for k, v in attrs.items() if isinstance(v, columns.Column)]
         field_defs = sorted(field_defs, key=lambda x: x[1].position)
-
-        # TODO: this plus more validation
-        #counter_columns = [c for c in defined_columns.values() if isinstance(c, columns.Counter)]
-        #if counter_columns and data_columns:
-        #    raise ModelDefinitionException('counter models may not have data columns')
 
         def _transform_column(field_name, field_obj):
             field_dict[field_name] = field_obj
