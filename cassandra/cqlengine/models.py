@@ -375,12 +375,17 @@ class BaseModel(object):
         self._timeout = connection.NOT_SET
 
     def __repr__(self):
+        return '{}({})'.format(self.__class__.__name__,
+                               ', '.join('{}={!r}'.format(k, getattr(self, k))
+                                         for k in self._defined_columns.keys()
+                                         if k != self._discriminator_column_name))
+
+    def __str__(self):
         """
         Pretty printing of models by their primary key
         """
         return '{} <{}>'.format(self.__class__.__name__,
-                                ', '.join(('{}={}'.format(k, getattr(self, k)) for k, v in six.iteritems(self._primary_keys)))
-                                )
+                                ', '.join('{}={}'.format(k, getattr(self, k)) for k in self._primary_keys.keys()))
 
     @classmethod
     def _discover_polymorphic_submodels(cls):
