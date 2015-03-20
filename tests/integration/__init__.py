@@ -85,11 +85,12 @@ USE_CASS_EXTERNAL = bool(os.getenv('USE_CASS_EXTERNAL', False))
 default_cassandra_version = '2.1.2'
 
 if USE_CASS_EXTERNAL and CCMClusterFactory:
-    # see if the external instance is running in ccm
-    path = common.get_default_path()
-    name = common.current_cluster_name(path)
-    CCM_CLUSTER = CCMClusterFactory.load(common.get_default_path(), name)
-    CCM_CLUSTER.start(wait_for_binary_proto=True, wait_other_notice=True)
+    if CCMClusterFactory:
+        # see if the external instance is running in ccm
+        path = common.get_default_path()
+        name = common.current_cluster_name(path)
+        CCM_CLUSTER = CCMClusterFactory.load(common.get_default_path(), name)
+        CCM_CLUSTER.start(wait_for_binary_proto=True, wait_other_notice=True)
 
     cass_ver, _ = get_server_versions()
     default_cassandra_version = '.'.join('%d' % i for i in cass_ver)
