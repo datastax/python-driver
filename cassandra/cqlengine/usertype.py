@@ -59,6 +59,13 @@ class BaseUserType(object):
     def __str__(self):
         return "{{{}}}".format(', '.join("'{}': {}".format(k, getattr(self, k)) for k, v in six.iteritems(self._values)))
 
+    def has_changed_fields(self):
+        return any(v.changed for v in self._values.values())
+
+    def reset_changed_fields(self):
+        for v in self._values.values():
+            v.reset_previous_value()
+
     @classmethod
     def register_for_keyspace(cls, keyspace):
         connection.register_udt(keyspace, cls.type_name(), cls)

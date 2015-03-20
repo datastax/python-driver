@@ -859,6 +859,16 @@ class Map(BaseContainerColumn):
         return [self.key_col, self.value_col]
 
 
+class UDTValueManager(BaseValueManager):
+    @property
+    def changed(self):
+        return self.value != self.previous_value or self.value.has_changed_fields()
+
+    def reset_previous_value(self):
+        self.value.reset_changed_fields()
+        self.previous_value = copy(self.value)
+
+
 class UserDefinedType(Column):
     """
     User Defined Type column
@@ -869,6 +879,8 @@ class UserDefinedType(Column):
 
     Please see :ref:`user_types` for examples and discussion.
     """
+
+    value_manager = UDTValueManager
 
     def __init__(self, user_type, **kwargs):
         """
