@@ -25,6 +25,7 @@ log = logging.getLogger(__name__)
 
 import os
 from threading import Event
+import six
 
 from itertools import groupby
 
@@ -82,7 +83,7 @@ def _tuple_version(version_string):
 
 USE_CASS_EXTERNAL = bool(os.getenv('USE_CASS_EXTERNAL', False))
 
-default_cassandra_version = '2.1.2'
+default_cassandra_version = '2.1.3'
 
 if USE_CASS_EXTERNAL:
     if CCMClusterFactory:
@@ -92,8 +93,19 @@ if USE_CASS_EXTERNAL:
         CCM_CLUSTER = CCMClusterFactory.load(common.get_default_path(), name)
         CCM_CLUSTER.start(wait_for_binary_proto=True, wait_other_notice=True)
 
-    cass_ver, _ = get_server_versions()
-    default_cassandra_version = '.'.join('%d' % i for i in cass_ver)
+    # Not sure what's going on, but the server version query
+    # hangs in python3. This appears to be related to running inside of
+    # nosetests, and only for this query that would run while loading the
+    # module.
+    # This is a hack to make it run with default cassandra version for PY3.
+    # Not happy with it, but need to move on for now.
+    if not six.PY3:
+        cass_ver, _ = get_server_versions()
+        default_cassandra_version = '.'.join('%d' % i for i in cass_ver)
+    else:
+        if not os.getenv('CASSANDRA_VERSION'):
+            log.warning("Using default C* version %s because external server cannot be queried" % default_cassandra_version)
+
 
 CASSANDRA_DIR = os.getenv('CASSANDRA_DIR', None)
 CASSANDRA_VERSION = os.getenv('CASSANDRA_VERSION', default_cassandra_version)
