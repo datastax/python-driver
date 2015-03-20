@@ -84,7 +84,7 @@ USE_CASS_EXTERNAL = bool(os.getenv('USE_CASS_EXTERNAL', False))
 
 default_cassandra_version = '2.1.2'
 
-if USE_CASS_EXTERNAL and CCMClusterFactory:
+if USE_CASS_EXTERNAL:
     if CCMClusterFactory:
         # see if the external instance is running in ccm
         path = common.get_default_path()
