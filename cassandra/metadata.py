@@ -122,10 +122,9 @@ class Metadata(object):
             keyspace_col_rows = col_def_rows.get(keyspace_meta.name, {})
             keyspace_trigger_rows = trigger_rows.get(keyspace_meta.name, {})
             for table_row in cf_def_rows.get(keyspace_meta.name, []):
-                table_meta = self._build_table_metadata(
+                self._add_table_metadata_to_ks(
                     keyspace_meta, table_row, keyspace_col_rows,
                     keyspace_trigger_rows)
-                keyspace_meta.tables[table_meta.name] = table_meta
 
             for usertype_row in usertype_rows.get(keyspace_meta.name, []):
                 usertype = self._build_usertype(keyspace_meta.name, usertype_row)
@@ -184,10 +183,12 @@ class Metadata(object):
 
         if not cf_results:
             # the table was removed
-            keyspace_meta.tables.pop(table, None)
+            table_meta = keyspace_meta.tables.pop(table, None)
+            if table_meta:
+                 self._clear_table_indexes_in_ks(keyspace_meta, table_meta.name)
         else:
             assert len(cf_results) == 1
-            keyspace_meta.tables[table] = self._build_table_metadata(
+            self._add_table_metadata_to_ks(
                 keyspace_meta, cf_results[0], {table: col_results},
                 {table: triggers_result})
 
@@ -214,6 +215,20 @@ class Metadata(object):
         type_classes = list(map(types.lookup_casstype, usertype_row['field_types']))
         return UserType(usertype_row['keyspace_name'], usertype_row['type_name'],
                         usertype_row['field_names'], type_classes)
+
+    def _add_table_metadata_to_ks(self, keyspace_metadata, row, col_rows, trigger_rows):
+        self._clear_table_indexes_in_ks(keyspace_metadata, row["columnfamily_name"])
+
+        table_metadata = self._build_table_metadata(keyspace_metadata, row, col_rows, trigger_rows)
+        keyspace_metadata.tables[table_metadata.name] = table_metadata
+        for index_name, index_metadata in table_metadata.indexes.iteritems():
+            keyspace_metadata.indexes[index_name] = index_metadata
+
+    def _clear_table_indexes_in_ks(self, keyspace_metadata, table_name):
+        if table_name in keyspace_metadata.tables:
+            table_meta = keyspace_metadata.tables[table_name]
+            for index_name in table_meta.indexes:
+                keyspace_metadata.indexes.pop(index_name, None)
 
     def _build_table_metadata(self, keyspace_metadata, row, col_rows, trigger_rows):
         cfname = row["columnfamily_name"]
@@ -385,6 +400,8 @@ class Metadata(object):
         column_meta = ColumnMetadata(table_metadata, name, data_type, is_static=is_static)
         index_meta = self._build_index_metadata(column_meta, row)
         column_meta.index = index_meta
+        if index_meta:
+            table_metadata.indexes[index_meta.name] = index_meta
         return column_meta
 
     def _build_index_metadata(self, column_metadata, row):
@@ -733,6 +750,11 @@ class KeyspaceMetadata(object):
     A map from table names to instances of :class:`~.TableMetadata`.
     """
 
+    indexes = None
+    """
+    A dict mapping index names to :class:`.IndexMetadata` instances.
+    """
+
     user_types = None
     """
     A map from user-defined type names to instances of :class:`~cassandra.metadata..UserType`.
@@ -745,6 +767,7 @@ class KeyspaceMetadata(object):
         self.durable_writes = durable_writes
         self.replication_strategy = ReplicationStrategy.create(strategy_class, strategy_options)
         self.tables = {}
+        self.indexes = {}
         self.user_types = {}
 
     def export_as_string(self):
@@ -884,6 +907,11 @@ class TableMetadata(object):
     A dict mapping column names to :class:`.ColumnMetadata` instances.
     """
 
+    indexes = None
+    """
+    A dict mapping index names to :class:`.IndexMetadata` instances.
+    """
+
     is_compact_storage = False
 
     options = None
@@ -945,6 +973,7 @@ class TableMetadata(object):
         self.partition_key = [] if partition_key is None else partition_key
         self.clustering_key = [] if clustering_key is None else clustering_key
         self.columns = OrderedDict() if columns is None else columns
+        self.indexes = {}
         self.options = options
         self.comparator = None
         self.triggers = OrderedDict() if triggers is None else triggers
@@ -1241,6 +1270,12 @@ class IndexMetadata(object):
                 protect_name(table.name),
                 protect_name(self.column.name),
                 self.index_options["class_name"])
+
+    def export_as_string(self):
+        """
+        Returns a CQL query string that can be used to recreate this index.
+        """
+        return self.as_cql_query() + ';'
 
 
 class TokenMap(object):
