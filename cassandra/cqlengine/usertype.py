@@ -1,7 +1,6 @@
 import re
 import six
 
-from cassandra.cluster import UserTypeDoesNotExist
 from cassandra.util import OrderedDict
 from cassandra.cqlengine import CQLEngineException
 from cassandra.cqlengine import columns
@@ -65,6 +64,43 @@ class BaseUserType(object):
     def reset_changed_fields(self):
         for v in self._values.values():
             v.reset_previous_value()
+
+    def __iter__(self):
+        for field in self._fields.keys():
+            yield field
+
+    def __getitem__(self, key):
+        if not isinstance(key, six.string_types):
+            raise TypeError
+        if key not in self._fields.keys():
+            raise KeyError
+        return getattr(self, key)
+
+    def __setitem__(self, key, val):
+        if not isinstance(key, six.string_types):
+            raise TypeError
+        if key not in self._fields.keys():
+            raise KeyError
+        return setattr(self, key, val)
+
+    def __len__(self):
+        try:
+            return self._len
+        except:
+            self._len = len(self._columns.keys())
+            return self._len
+
+    def keys(self):
+        """ Returns a list of column IDs. """
+        return [k for k in self]
+
+    def values(self):
+        """ Returns list of column values. """
+        return [self[k] for k in self]
+
+    def items(self):
+        """ Returns a list of column ID/value tuples. """
+        return [(k, self[k]) for k in self]
 
     @classmethod
     def register_for_keyspace(cls, keyspace):
