@@ -67,7 +67,7 @@ class Encoder(object):
 
     def __init__(self):
         self.mapping = {
-            float: self.cql_encode_object,
+            float: self.cql_encode_float,
             bytearray: self.cql_encode_bytes,
             str: self.cql_encode_str,
             int: self.cql_encode_object,
@@ -137,6 +137,12 @@ class Encoder(object):
         registered. This function simply calls :meth:`str()` on the object.
         """
         return str(val)
+
+    def cql_encode_float(self, val):
+        """
+        Encode floats using repr to preserve precision
+        """
+        return repr(val)
 
     def cql_encode_datetime(self, val):
         """
