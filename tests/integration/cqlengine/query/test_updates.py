@@ -219,10 +219,6 @@ class QueryUpdateTests(BaseCassEngTestCase):
     def test_map_update_none_deletes_key(self):
         """ The CQL behavior is if you set a key in a map to null it deletes
         that key from the map.  Test that this works with __update.
-
-        This test fails because of a bug in the cql python library not
-        converting None to null (and the cql library is no longer in active
-        developement).
         """
         partition = uuid4()
         cluster = 1
