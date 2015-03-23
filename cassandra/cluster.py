@@ -1737,7 +1737,7 @@ class Session(object):
         def encode(val):
             return '{ %s }' % ' , '.join('%s : %s' % (
                 field_name,
-                self.encoder.cql_encode_all_types(getattr(val, field_name))
+                self.encoder.cql_encode_all_types(getattr(val, field_name, None))
             ) for field_name in type_meta.field_names)
 
         self.encoder.mapping[klass] = encode
