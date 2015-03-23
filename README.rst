@@ -36,7 +36,7 @@ Object Mapper
 -------------
 cqlengine (originally developed by Blake Eggleston and Jon Haddad, with contributions from the
 community) is now maintained as an integral part of this package. Refer to
-`documentation here <http://datastax.github.io/python-driver/cqlengine/getting_started.html>`## UPDATE LINK ##.
+`documentation here <http://datastax.github.io/python-driver/object_mapper.html>`_.
 
 Reporting Problems
 ------------------
