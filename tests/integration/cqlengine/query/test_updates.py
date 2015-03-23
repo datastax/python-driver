@@ -224,13 +224,13 @@ class QueryUpdateTests(BaseCassEngTestCase):
         converting None to null (and the cql library is no longer in active
         developement).
         """
-        # partition = uuid4()
-        # cluster = 1
-        # TestQueryUpdateModel.objects.create(
-        #         partition=partition, cluster=cluster,
-        #         text_map={"foo": '1', "bar": '2'})
-        # TestQueryUpdateModel.objects(
-        #         partition=partition, cluster=cluster).update(
-        #         text_map__update={"bar": None})
-        # obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
-        # self.assertEqual(obj.text_map, {"foo": '1'})
+        partition = uuid4()
+        cluster = 1
+        TestQueryUpdateModel.objects.create(
+                partition=partition, cluster=cluster,
+                text_map={"foo": '1', "bar": '2'})
+        TestQueryUpdateModel.objects(
+                partition=partition, cluster=cluster).update(
+                text_map__update={"bar": None})
+        obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
+        self.assertEqual(obj.text_map, {"foo": '1'})

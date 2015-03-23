@@ -136,31 +136,6 @@ class TestModelClassFunction(BaseCassEngTestCase):
 
         assert TestModel.column_family_name(include_keyspace=False) == 'test_model'
 
-    def test_normal_fields_can_be_defined_between_primary_keys(self):
-        """
-        Tests tha non primary key fields can be defined between primary key fields
-        """
-
-    def test_at_least_one_non_primary_key_column_is_required(self):
-        """
-        Tests that an error is raised if a model doesn't contain at least one primary key field
-        """
-
-    def test_model_keyspace_attribute_must_be_a_string(self):
-        """
-        Tests that users can't set the keyspace to None, or something else
-        """
-
-    def test_indexes_arent_allowed_on_models_with_multiple_primary_keys(self):
-        """
-        Tests that attempting to define an index on a model with multiple primary keys fails
-        """
-
-    def test_meta_data_is_not_inherited(self):
-        """
-        Test that metadata defined in one class, is not inherited by subclasses
-        """
-
     def test_partition_keys(self):
         """
         Test compound partition key definition
@@ -378,13 +353,3 @@ class TestCachedLengthIsNotCarriedToSubclasses(BaseCassEngTestCase):
             new_field = columns.Integer()
 
         self.assertGreater(len(AlreadyLoadedTest()), length)
-
-
-
-
-
-
-
-
-
-
