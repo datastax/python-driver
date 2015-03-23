@@ -68,6 +68,10 @@ class ParamBindingTest(unittest.TestCase):
         result = bind_params("%s", ("""'ef''ef"ef""ef'""",), Encoder())
         self.assertEqual(result, """'''ef''''ef"ef""ef'''""")
 
+    def test_float_precision(self):
+        f = 3.4028234663852886e+38
+        self.assertEqual(float(bind_params("%s", (f,), Encoder())), f)
+
 
 class BoundStatementTestCase(unittest.TestCase):
 
