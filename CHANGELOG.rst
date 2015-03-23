@@ -16,6 +16,7 @@ Bug Fixes
 * Workaround for rounding anomaly in datetime.utcfromtime (Python 3.4) (PYTHON-230)
 * Normalize text serialization for lookup in OrderedMap (PYTHON-231)
 * Support reading CompositeType data (PYTHON-234)
+* Preserve float precision in CQL encoding (PYTHON-243)
 
 2.1.4
 =====
