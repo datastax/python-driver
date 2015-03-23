@@ -47,6 +47,7 @@ from cassandra import (ConsistencyLevel, AuthenticationFailed,
                        UnsupportedOperation, Unauthorized)
 from cassandra.connection import (ConnectionException, ConnectionShutdown,
                                   ConnectionHeartbeat)
+from cassandra.cqltypes import UserType
 from cassandra.encoder import Encoder
 from cassandra.protocol import (QueryMessage, ResultMessage,
                                 ErrorMessage, ReadTimeoutErrorMessage,
@@ -615,6 +616,7 @@ class Cluster(object):
         self._user_types[keyspace][user_type] = klass
         for session in self.sessions:
             session.user_type_registered(keyspace, user_type, klass)
+        UserType.evict_udt_class(keyspace, user_type)
 
     def get_min_requests_per_connection(self, host_distance):
         return self._min_requests_per_connection[host_distance]

@@ -900,6 +900,15 @@ class UserType(TupleType):
             return instance
 
     @classmethod
+    def evict_udt_class(cls, keyspace, udt_name):
+        if six.PY2 and isinstance(udt_name, unicode):
+            udt_name = udt_name.encode('utf-8')
+        try:
+            del cls._cache[(keyspace, udt_name)]
+        except KeyError:
+            pass
+
+    @classmethod
     def apply_parameters(cls, subtypes, names):
         keyspace = subtypes[0]
         udt_name = _name_from_hex_string(subtypes[1].cassname)
