@@ -14,6 +14,7 @@
 
 from datetime import date, datetime
 from decimal import Decimal
+from unittest import skipUnless
 from uuid import UUID
 
 from cassandra.cqlengine.models import Model
@@ -21,8 +22,11 @@ from cassandra.cqlengine.usertype import UserType
 from cassandra.cqlengine import columns
 from cassandra.cqlengine.management import sync_table, sync_type, create_keyspace_simple, drop_keyspace
 
+from tests.integration import get_server_versions
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 
+
+@skipUnless(get_server_versions()[0] > (2, 1, 0), "UDTs require Cassandra 2.1 or greater")
 class UserDefinedTypeTests(BaseCassEngTestCase):
 
     def test_can_create_udts(self):
