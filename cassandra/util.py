@@ -110,7 +110,6 @@ def uuid_from_time(time_arg, node=None, clock_seq=None):
         if clock_seq > 0x3fff:
             raise ValueError('clock_seq is out of range (need a 14-bit value)')
 
-
     clock_seq_low = clock_seq & 0xff
     clock_seq_hi_variant = 0x80 | ((clock_seq >> 8) & 0x3f)
 
@@ -824,6 +823,13 @@ class Time(object):
     nanosecond_time = 0
 
     def __init__(self, value):
+        """
+        Initializer value can be:
+
+            - integer_type: absolute nanoseconds in the day
+            - datetime.time: built-in time
+            - string_type: a string time of the form "HH:MM:SS[.mmmuuunnn]"
+        """
         if isinstance(value, six.integer_types):
             self._from_timestamp(value)
         elif isinstance(value, datetime.time):
@@ -835,20 +841,32 @@ class Time(object):
 
     @property
     def hour(self):
+        """
+        The hour component of this time (0-23)
+        """
         return self.nanosecond_time // Time.HOUR
 
     @property
     def minute(self):
+        """
+        The minute component of this time (0-59)
+        """
         minutes = self.nanosecond_time // Time.MINUTE
         return minutes % 60
 
     @property
     def second(self):
+        """
+        The second component of this time (0-59)
+        """
         seconds = self.nanosecond_time // Time.SECOND
         return seconds % 60
 
     @property
     def nanosecond(self):
+        """
+        The fractional seconds component of the time, in nanoseconds
+        """
         return self.nanosecond_time % Time.SECOND
 
     def _from_timestamp(self, t):
@@ -915,6 +933,13 @@ class Date(object):
     days_from_epoch = 0
 
     def __init__(self, value):
+        """
+        Initializer value can be:
+
+            - integer_type: absolute days from epoch (1970, 1, 1). Can be negative.
+            - datetime.date: built-in date
+            - string_type: a string time of the form "yyyy-mm-dd"
+        """
         if isinstance(value, six.integer_types):
             self.days_from_epoch = value
         elif isinstance(value, (datetime.date, datetime.datetime)):
@@ -926,9 +951,17 @@ class Date(object):
 
     @property
     def seconds(self):
+        """
+        Absolute seconds from epoch (can be negative)
+        """
         return self.days_from_epoch * Date.DAY
 
     def date(self):
+        """
+        Return a built-in datetime.date for Dates falling in the years [datetime.MINYEAR, datetime.MAXYEAR]
+
+        ValueError is raised for Dates outside this range.
+        """
         try:
             dt = datetime_from_timestamp(self.seconds)
             return datetime.date(dt.year, dt.month, dt.day)
