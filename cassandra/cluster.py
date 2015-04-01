@@ -1259,10 +1259,8 @@ class Session(object):
 
     Setting this to :const:`None` will cause no timeouts to be set by default.
 
-    **Important**: This timeout currently has no effect on callbacks registered
-    on a :class:`~.ResponseFuture` through :meth:`.ResponseFuture.add_callback` or
-    :meth:`.ResponseFuture.add_errback`; even if a query exceeds this default
-    timeout, neither the registered callback or errback will be called.
+    Please see :meth:`.ResponseFuture.result` for details on the scope and
+    effect of this timeout.
 
     .. versionadded:: 2.0.0
     """
@@ -1381,7 +1379,8 @@ class Session(object):
         which an :exc:`.OperationTimedOut` exception will be raised if the query
         has not completed.  If not set, the timeout defaults to
         :attr:`~.Session.default_timeout`.  If set to :const:`None`, there is
-        no timeout.
+        no timeout. Please see :meth:`.ResponseFuture.result` for details on
+        the scope and effect of this timeout.
 
         If `trace` is set to :const:`True`, an attempt will be made to
         fetch the trace details and attach them to the `query`'s
@@ -2937,8 +2936,20 @@ class ResponseFuture(object):
         You may set a timeout (in seconds) with the `timeout` parameter.
         By default, the :attr:`~.default_timeout` for the :class:`.Session`
         this was created through will be used for the timeout on this
-        operation.  If the timeout is exceeded, an
-        :exc:`cassandra.OperationTimedOut` will be raised.
+        operation.
+
+        This timeout applies to the entire request, including any retries
+        (decided internally by the :class:`.policies.RetryPolicy` used with
+        the request).
+
+        If the timeout is exceeded, an :exc:`cassandra.OperationTimedOut` will be raised.
+        This is a client-side timeout. For more information
+        about server-side coordinator timeouts, see :class:`.policies.RetryPolicy`.
+
+        **Important**: This timeout currently has no effect on callbacks registered
+        on a :class:`~.ResponseFuture` through :meth:`.ResponseFuture.add_callback` or
+        :meth:`.ResponseFuture.add_errback`; even if a query exceeds this default
+        timeout, neither the registered callback or errback will be called.
 
         Example usage::
 

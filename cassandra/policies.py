@@ -597,8 +597,13 @@ WriteType.name_to_value = {
 
 class RetryPolicy(object):
     """
-    A policy that describes whether to retry, rethrow, or ignore timeout
-    and unavailable failures.
+    A policy that describes whether to retry, rethrow, or ignore coordinator
+    timeout and unavailable failures. These are failures reported from the
+    server side. Timeouts are configured by
+    `settings in cassandra.yaml <https://github.com/apache/cassandra/blob/cassandra-2.1.4/conf/cassandra.yaml#L568-L584>`_.
+    Unavailable failures occur when the coordinator cannot acheive the consistency
+    level for a request. For further information see the method descriptions
+    below.
 
     To specify a default retry policy, set the
     :attr:`.Cluster.default_retry_policy` attribute to an instance of this
