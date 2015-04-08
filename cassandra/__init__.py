@@ -308,7 +308,7 @@ class FunctionFailure(Exception):
 
     arg_types = None
     """
-    Argument types of the function
+    List of argument type names of the function
     """
 
     def __init__(self, summary_message, keyspace, function, arg_types):

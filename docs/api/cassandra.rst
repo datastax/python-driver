@@ -26,6 +26,15 @@
 .. autoexception:: WriteTimeout()
    :members:
 
+.. autoexception:: ReadFailure()
+   :members:
+
+.. autoexception:: WriteFailure()
+   :members:
+
+.. autoexception:: FunctionFailure()
+   :members:
+
 .. autoexception:: AlreadyExists()
    :members:
 
