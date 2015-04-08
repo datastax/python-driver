@@ -221,7 +221,7 @@ class WriteTimeout(Timeout):
         self.write_type = write_type
 
 
-class Failure(Exception):
+class CoordinationFailure(Exception):
     """
     Replicas sent a failure to the coordinator.
     """
@@ -252,12 +252,12 @@ class Failure(Exception):
                            repr({'consistency': consistency_value_to_name(consistency),
                                  'required_responses': required_responses,
                                  'received_responses': received_responses,
-                                 'failures' : failures}))
+                                 'failures': failures}))
 
 
-class ReadFailure(Failure):
+class ReadFailure(CoordinationFailure):
     """
-    A subclass of :exc:`Failure` for read operations.
+    A subclass of :exc:`CoordinationFailure` for read operations.
 
     This indicates that the replicas sent a failure message to the coordinator.
     """
@@ -270,13 +270,13 @@ class ReadFailure(Failure):
     """
 
     def __init__(self, message, data_retrieved=None, **kwargs):
-        Failure.__init__(self, message, **kwargs)
+        CoordinationFailure.__init__(self, message, **kwargs)
         self.data_retrieved = data_retrieved
 
 
-class WriteFailure(Failure):
+class WriteFailure(CoordinationFailure):
     """
-    A subclass of :exc:`Failure` for write operations.
+    A subclass of :exc:`CoordinationFailure` for write operations.
 
     This indicates that the replicas sent a failure message to the coordinator.
     """
@@ -287,7 +287,7 @@ class WriteFailure(Failure):
     """
 
     def __init__(self, message, write_type=None, **kwargs):
-        Failure.__init__(self, message, **kwargs)
+        CoordinationFailure.__init__(self, message, **kwargs)
         self.write_type = write_type
 
 
