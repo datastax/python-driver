@@ -22,7 +22,7 @@ from six.moves import range
 import io
 
 from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
-                       WriteFailure, ReadFailure,
+                       WriteFailure, ReadFailure, FunctionFailure,
                        AlreadyExists, InvalidRequest, Unauthorized,
                        UnsupportedOperation)
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
@@ -282,6 +282,22 @@ class ReadFailureMessage(RequestExecutionException):
         return ReadFailure(self.summary_msg(), **self.info)
 
 
+class FunctionFailureMessage(RequestExecutionException):
+    summary = "User Defined Function failure"
+    error_code = 0x1400
+
+    @staticmethod
+    def recv_error_info(f):
+        return {
+            'keyspace': read_string(f),
+            'function': read_string(f),
+            'arg_types': [read_string(f) for _ in range(read_short(f))],
+        }
+
+    def to_exception(self):
+        return FunctionFailure(self.summary_msg(), **self.info)
+
+
 class WriteFailureMessage(RequestExecutionException):
     summary = "Replica(s) failed to execute write"
     error_code = 0x1500
@@ -298,6 +314,7 @@ class WriteFailureMessage(RequestExecutionException):
 
     def to_exception(self):
         return WriteFailure(self.summary_msg(), **self.info)
+
 
 class SyntaxException(RequestValidationException):
     summary = 'Syntax error in CQL query'

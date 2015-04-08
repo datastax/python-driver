@@ -291,6 +291,33 @@ class WriteFailure(CoordinationFailure):
         self.write_type = write_type
 
 
+class FunctionFailure(Exception):
+    """
+    User Defined Function failed during execution
+    """
+
+    keyspace = None
+    """
+    Keyspace of the function
+    """
+
+    function = None
+    """
+    Name of the function
+    """
+
+    arg_types = None
+    """
+    Argument types of the function
+    """
+
+    def __init__(self, summary_message, keyspace, function, arg_types):
+        self.keyspace = keyspace
+        self.function = function
+        self.arg_types = arg_types
+        Exception.__init__(self, summary_message)
+
+
 class AlreadyExists(Exception):
     """
     An attempt was made to create a keyspace or table that already exists.
