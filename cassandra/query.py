@@ -353,29 +353,32 @@ class PreparedStatement(object):
             self.fetch_size = fetch_size
 
     @classmethod
-    def from_message(cls, query_id, column_metadata, cluster_metadata, query, prepared_keyspace, protocol_version):
+    def from_message(cls, query_id, column_metadata, pk_indexes, cluster_metadata, query, prepared_keyspace, protocol_version):
         if not column_metadata:
             return PreparedStatement(column_metadata, query_id, None, query, prepared_keyspace, protocol_version)
 
-        partition_key_columns = None
-        routing_key_indexes = None
+        if pk_indexes:
+            routing_key_indexes = pk_indexes
+        else:
+            partition_key_columns = None
+            routing_key_indexes = None
 
-        ks_name, table_name, _, _ = column_metadata[0]
-        ks_meta = cluster_metadata.keyspaces.get(ks_name)
-        if ks_meta:
-            table_meta = ks_meta.tables.get(table_name)
-            if table_meta:
-                partition_key_columns = table_meta.partition_key
+            ks_name, table_name, _, _ = column_metadata[0]
+            ks_meta = cluster_metadata.keyspaces.get(ks_name)
+            if ks_meta:
+                table_meta = ks_meta.tables.get(table_name)
+                if table_meta:
+                    partition_key_columns = table_meta.partition_key
 
-                # make a map of {column_name: index} for each column in the statement
-                statement_indexes = dict((c[2], i) for i, c in enumerate(column_metadata))
+                    # make a map of {column_name: index} for each column in the statement
+                    statement_indexes = dict((c[2], i) for i, c in enumerate(column_metadata))
 
-                # a list of which indexes in the statement correspond to partition key items
-                try:
-                    routing_key_indexes = [statement_indexes[c.name]
-                                           for c in partition_key_columns]
-                except KeyError:  # we're missing a partition key component in the prepared
-                    pass          # statement; just leave routing_key_indexes as None
+                    # a list of which indexes in the statement correspond to partition key items
+                    try:
+                        routing_key_indexes = [statement_indexes[c.name]
+                                               for c in partition_key_columns]
+                    except KeyError:  # we're missing a partition key component in the prepared
+                        pass          # statement; just leave routing_key_indexes as None
 
         return PreparedStatement(column_metadata, query_id, routing_key_indexes,
                                  query, prepared_keyspace, protocol_version)
