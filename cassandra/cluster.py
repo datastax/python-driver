@@ -1820,6 +1820,7 @@ class ControlConnection(object):
     _SELECT_COLUMN_FAMILIES = "SELECT * FROM system.schema_columnfamilies"
     _SELECT_COLUMNS = "SELECT * FROM system.schema_columns"
     _SELECT_USERTYPES = "SELECT * FROM system.schema_usertypes"
+    _SELECT_FUNCTIONS = "SELECT * FROM system.schema_functions"
     _SELECT_TRIGGERS = "SELECT * FROM system.schema_triggers"
 
     _SELECT_PEERS = "SELECT peer, data_center, rack, tokens, rpc_address, schema_version FROM system.peers"
@@ -2088,12 +2089,14 @@ class ControlConnection(object):
                 QueryMessage(query=self._SELECT_COLUMN_FAMILIES, consistency_level=cl),
                 QueryMessage(query=self._SELECT_COLUMNS, consistency_level=cl),
                 QueryMessage(query=self._SELECT_USERTYPES, consistency_level=cl),
+                QueryMessage(query=self._SELECT_FUNCTIONS, consistency_level=cl),
                 QueryMessage(query=self._SELECT_TRIGGERS, consistency_level=cl)
             ]
 
             responses = connection.wait_for_responses(*queries, timeout=self._timeout, fail_on_error=False)
             (ks_success, ks_result), (cf_success, cf_result), \
                 (col_success, col_result), (types_success, types_result), \
+                (functions_success, functions_result), \
                 (trigger_success, triggers_result) = responses
 
             if ks_success:
@@ -2135,8 +2138,18 @@ class ControlConnection(object):
                 else:
                     raise types_result
 
+            # functions were introduced in Cassandra 3.0
+            if functions_success:
+                functions_result = dict_factory(*functions_result.results) if functions_result.results else {}
+            else:
+                if isinstance(functions_result, InvalidRequest):
+                    log.debug("[control connection] user functions table not found")
+                    functions_result = {}
+                else:
+                    raise functions_result
+
             log.debug("[control connection] Fetched schema, rebuilding metadata")
-            self._cluster.metadata.rebuild_schema(ks_result, types_result, cf_result, col_result, triggers_result)
+            self._cluster.metadata.rebuild_schema(ks_result, types_result, functions_result, cf_result, col_result, triggers_result)
         return True
 
     def refresh_node_list_and_token_map(self, force_token_rebuild=False):

@@ -19,9 +19,10 @@ from itertools import islice, cycle
 import json
 import logging
 import re
+import six
+from six.moves import zip
 from threading import RLock
 import weakref
-import six
 
 murmur3 = None
 try:
@@ -88,7 +89,8 @@ class Metadata(object):
         """
         return "\n".join(ks.export_as_string() for ks in self.keyspaces.values())
 
-    def rebuild_schema(self, ks_results, type_results, cf_results, col_results, triggers_result):
+    def rebuild_schema(self, ks_results, type_results, function_results,
+                       cf_results, col_results, triggers_result):
         """
         Rebuild the view of the current schema from a fresh set of rows from
         the system schema tables.
@@ -98,6 +100,7 @@ class Metadata(object):
         cf_def_rows = defaultdict(list)
         col_def_rows = defaultdict(lambda: defaultdict(list))
         usertype_rows = defaultdict(list)
+        fn_rows = defaultdict(list)
         trigger_rows = defaultdict(lambda: defaultdict(list))
 
         for row in cf_results:
@@ -110,6 +113,9 @@ class Metadata(object):
 
         for row in type_results:
             usertype_rows[row["keyspace_name"]].append(row)
+
+        for row in function_results:
+            fn_rows[row["keyspace_name"]].append(row)
 
         for row in triggers_result:
             ksname = row["keyspace_name"]
@@ -131,6 +137,10 @@ class Metadata(object):
                 usertype = self._build_usertype(keyspace_meta.name, usertype_row)
                 keyspace_meta.user_types[usertype.name] = usertype
 
+            for fn_row in fn_rows.get(keyspace_meta.name, []):
+                fn = self._build_function(keyspace_meta.name, fn_row)
+                keyspace_meta.functions[fn.name] = fn
+
             current_keyspaces.add(keyspace_meta.name)
             old_keyspace_meta = self.keyspaces.get(keyspace_meta.name, None)
             self.keyspaces[keyspace_meta.name] = keyspace_meta
@@ -140,7 +150,7 @@ class Metadata(object):
                 self._keyspace_added(keyspace_meta.name)
 
         # remove not-just-added keyspaces
-        removed_keyspaces = [ksname for ksname in self.keyspaces.keys()
+        removed_keyspaces = [name for name in self.keyspaces.keys()
                              if ksname not in current_keyspaces]
         self.keyspaces = dict((name, meta) for name, meta in self.keyspaces.items()
                               if name in current_keyspaces)
@@ -214,6 +224,14 @@ class Metadata(object):
         type_classes = list(map(types.lookup_casstype, usertype_row['field_types']))
         return UserType(usertype_row['keyspace_name'], usertype_row['type_name'],
                         usertype_row['field_names'], type_classes)
+
+    def _build_function(self, keyspace, function_row):
+        return_type = types.lookup_casstype(function_row['return_type'])
+        return Function(function_row['keyspace_name'], function_row['function_name'],
+                        function_row['signature'], function_row['argument_names'],
+                        return_type, function_row['language'], function_row['body'],
+                        function_row['is_deterministic'], function_row.get('called_on_null_input'))
+        # called_on_null_input is not yet merged
 
     def _build_table_metadata(self, keyspace_metadata, row, col_rows, trigger_rows):
         cfname = row["columnfamily_name"]
@@ -740,12 +758,19 @@ class KeyspaceMetadata(object):
     .. versionadded:: 2.1.0
     """
 
+    functions = None
+    """
+    A map from user-defined function names to instances of :class:`~cassandra.metadata..Function`.
+
+    .. versionadded:: 3.0.0
+    """
     def __init__(self, name, durable_writes, strategy_class, strategy_options):
         self.name = name
         self.durable_writes = durable_writes
         self.replication_strategy = ReplicationStrategy.create(strategy_class, strategy_options)
         self.tables = {}
         self.user_types = {}
+        self.functions = {}
 
     def export_as_string(self):
         """
@@ -841,6 +866,96 @@ class UserType(object):
         ret += field_join.join("%s%s" % (padding, field) for field in fields)
         ret += "\n);" if formatted else ");"
         return ret
+
+
+class Function(object):
+    """
+    A user defined function, as created by ``CREATE FUNCTION`` statements.
+
+    User-defined functions were introduced in Cassandra 3.0
+
+    .. versionadded:: 3.0.0
+    """
+
+    keyspace = None
+    """
+    The string name of the keyspace in which this function is defined
+    """
+
+    name = None
+    """
+    The name of this function
+    """
+
+    signature = None
+    """
+    An ordered list of the types for each argument to the function
+    """
+
+    arguemnt_names = None
+    """
+    An ordered list of the names of each argument to the function
+    """
+
+    return_type = None
+    """
+    Return type of the function
+    """
+
+    language = None
+    """
+    Language of the function body
+    """
+
+    body = None
+    """
+    Function body string
+    """
+
+    is_deterministic = None
+    """
+    Flag indicating whether this function is deterministic
+    (required for functional indexes)
+    """
+
+    called_on_null_input = None
+    """
+    Flag indicating whether this function should be called for rows with null values
+    (convenience function to avoid handling nulls explicitly if the result will just be null)
+    """
+
+    def __init__(self, keyspace, name, signature, argument_names,
+                 return_type, language, body, is_deterministic, called_on_null_input):
+        self.keyspace = keyspace
+        self.name = name
+        self.signature = signature
+        self.argument_names = argument_names
+        self.return_type = return_type
+        self.language = language
+        self.body = body
+        self.is_deterministic = is_deterministic
+        self.called_on_null_input = called_on_null_input
+
+    def as_cql_query(self, formatted=False):
+        """
+        Returns a CQL query that can be used to recreate this function.
+        If `formatted` is set to :const:`True`, extra whitespace will
+        be added to make the query more readable.
+        """
+        sep = '\n' if formatted else ' '
+        keyspace = protect_name(self.keyspace)
+        name = protect_name(self.name)
+        arg_list = ', '.join(["%s %s" % (protect_name(n), t)
+                             for n, t in zip(self.argument_names, self.signature)])
+        determ = '' if self.is_deterministic else 'NON DETERMINISTIC '
+        typ = self.return_type.cql_parameterized_type()
+        lang = self.language
+        body = protect_value(self.body)
+
+        return "CREATE %(determ)sFUNCTION %(keyspace)s.%(name)s(%(arg_list)s)%(sep)s" \
+               "RETURNS %(typ)s%(sep)s" \
+               "LANGUAGE %(lang)s%(sep)s" \
+               "AS %(body)s;" % locals()
 
 
 class TableMetadata(object):
