@@ -26,7 +26,7 @@ import time
 import six
 
 from cassandra import ConsistencyLevel, OperationTimedOut
-from cassandra.cqltypes import unix_time_from_uuid1
+from cassandra.util import unix_time_from_uuid1
 from cassandra.encoder import Encoder
 import cassandra.encoder
 from cassandra.util import OrderedDict
