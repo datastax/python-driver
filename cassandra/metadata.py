@@ -239,8 +239,7 @@ class Metadata(object):
         return Function(function_row['keyspace_name'], function_row['function_name'],
                         function_row['signature'], function_row['argument_names'],
                         return_type, function_row['language'], function_row['body'],
-                        function_row['is_deterministic'], function_row.get('called_on_null_input'))
-        # called_on_null_input is not yet merged
+                        function_row['is_deterministic'], function_row['called_on_null_input'])
 
     def _build_table_metadata(self, keyspace_metadata, row, col_rows, trigger_rows):
         cfname = row["columnfamily_name"]
@@ -786,7 +785,10 @@ class KeyspaceMetadata(object):
         Returns a CQL query string that can be used to recreate the entire keyspace,
         including user-defined types and tables.
         """
-        return "\n\n".join([self.as_cql_query()] + self.user_type_strings() + [t.export_as_string() for t in self.tables.values()])
+        return "\n\n".join([self.as_cql_query()]
+                           + self.user_type_strings()
+                           + [f.as_cql_query(True) for f in self.functions.values()]
+                           + [t.export_as_string() for t in self.tables.values()])
 
     def as_cql_query(self):
         """
@@ -960,8 +962,10 @@ class Function(object):
         typ = self.return_type.cql_parameterized_type()
         lang = self.language
         body = protect_value(self.body)
+        on_null = "CALLED" if self.called_on_null_input else "RETURNS NULL"
 
         return "CREATE %(determ)sFUNCTION %(keyspace)s.%(name)s(%(arg_list)s)%(sep)s" \
+               "%(on_null)s ON NULL INPUT%(sep)s" \
                "RETURNS %(typ)s%(sep)s" \
                "LANGUAGE %(lang)s%(sep)s" \
                "AS %(body)s;" % locals()
