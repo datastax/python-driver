@@ -956,6 +956,27 @@ class FunctionMetadata(unittest.TestCase):
         cls.session.execute("DROP KEYSPACE %s" % cls.keyspace_name)
         cls.cluster.shutdown()
 
+    class VerifiedFunction(object):
+        def __init__(self, test_case, **function_kwargs):
+            self.test_case = test_case
+            self.function_kwargs = function_kwargs
+
+        def __enter__(self):
+            tc = self.test_case
+            expected_meta = Function(**self.function_kwargs)
+            tc.assertNotIn(expected_meta.name, tc.keyspace_function_meta)
+            tc.session.execute(expected_meta.as_cql_query())
+            tc.assertIn(expected_meta.name, tc.keyspace_function_meta)
+
+            generated_meta = tc.keyspace_function_meta[expected_meta.name]
+            self.test_case.assertEqual(generated_meta.as_cql_query(), expected_meta.as_cql_query())
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            tc = self.test_case
+            function_name = self.function_kwargs['name']
+            tc.session.execute("DROP FUNCTION %s.%s" % (tc.keyspace_name, function_name))
+            tc.assertNotIn(function_name, tc.keyspace_function_meta)
+
     def make_function_kwargs(self, deterministic=True, called_on_null=True):
         return {'keyspace': self.keyspace_name,
                 'name': self.function_name,
@@ -968,43 +989,62 @@ class FunctionMetadata(unittest.TestCase):
                 'called_on_null_input': called_on_null}
 
     def test_create_drop_function(self):
-        self.assertNotIn(self.function_name, self.keyspace_function_meta)
+        with self.VerifiedFunction(self, **self.make_function_kwargs()):
+            pass
 
-        expected_meta = Function(**self.make_function_kwargs())
-        self.session.execute(expected_meta.as_cql_query())
-        self.assertIn(self.function_name, self.keyspace_function_meta)
-
-        generated_meta = self.keyspace_function_meta[self.function_name]
-        self.assertEqual(generated_meta.as_cql_query(), expected_meta.as_cql_query())
-
-        self.session.execute("DROP FUNCTION %s.%s" % (self.keyspace_name, self.function_name))
-        self.assertNotIn(self.function_name, self.keyspace_function_meta)
-
-    # TODO: this presently fails because C* c059a56 requires udt to be frozen to create, but does not store meta indicating frozen
-    @unittest.expectedFailure
     def test_functions_after_udt(self):
         self.assertNotIn(self.function_name, self.keyspace_function_meta)
 
         udt_name = 'udtx'
         self.session.execute("CREATE TYPE %s.%s (x int)" % (self.keyspace_name, udt_name))
 
-        # make a function that takes a udt type
+        # Ideally we would make a function that takes a udt type, but
+        # this presently fails because C* c059a56 requires udt to be frozen to create, but does not store meta indicating frozen
+        # Maybe update this after release
+        #kwargs = self.make_function_kwargs()
+        #kwargs['signature'][0] = "frozen<%s>" % udt_name
+
+        #expected_meta = Function(**kwargs)
+        #with self.VerifiedFunction(self, **kwargs):
+        with self.VerifiedFunction(self, **self.make_function_kwargs()):
+            # udts must come before functions in keyspace dump
+            keyspace_cql = self.cluster.metadata.keyspaces[self.keyspace_name].export_as_string()
+            type_idx = keyspace_cql.rfind("CREATE TYPE")
+            func_idx = keyspace_cql.find("CREATE FUNCTION")
+            self.assertNotIn(-1, (type_idx, func_idx), "TYPE or FUNCTION not found in keyspace_cql: " + keyspace_cql)
+            self.assertGreater(func_idx, type_idx)
+
+    def test_functions_follow_keyspace_alter(self):
+        with self.VerifiedFunction(self, **self.make_function_kwargs()):
+            original_keyspace_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
+            self.session.execute('ALTER KEYSPACE %s WITH durable_writes = false' % self.keyspace_name)
+            try:
+                new_keyspace_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
+                self.assertNotEqual(original_keyspace_meta, new_keyspace_meta)
+                self.assertIs(original_keyspace_meta.functions, new_keyspace_meta.functions)
+            finally:
+                self.session.execute('ALTER KEYSPACE %s WITH durable_writes = true' % self.keyspace_name)
+
+    def test_function_cql_determinism(self):
         kwargs = self.make_function_kwargs()
-        kwargs['signature'][0] = "frozen<%s>" % udt_name
+        kwargs['is_deterministic'] = True
+        with self.VerifiedFunction(self, **kwargs):
+            fn_meta = self.keyspace_function_meta[self.function_name]
+            self.assertRegexpMatches(fn_meta.as_cql_query(), "CREATE FUNCTION.*")
 
-        expected_meta = Function(**kwargs)
-        self.session.execute(expected_meta.as_cql_query())
-        self.assertIn(self.function_name, self.keyspace_function_meta)
+        kwargs['is_deterministic'] = False
+        with self.VerifiedFunction(self, **kwargs):
+            fn_meta = self.keyspace_function_meta[self.function_name]
+            self.assertRegexpMatches(fn_meta.as_cql_query(), "CREATE NON DETERMINISTIC FUNCTION.*")
 
-        generated_meta = self.keyspace_function_meta[self.function_name]
-        self.assertEqual(generated_meta.as_cql_query(), expected_meta.as_cql_query())
+    def test_function_cql_called_on_null(self):
+        kwargs = self.make_function_kwargs()
+        kwargs['called_on_null_input'] = True
+        with self.VerifiedFunction(self, **kwargs):
+            fn_meta = self.keyspace_function_meta[self.function_name]
+            self.assertRegexpMatches(fn_meta.as_cql_query(), "CREATE FUNCTION.*\) CALLED ON NULL INPUT RETURNS .*")
 
-        # udts must come before functions in keyspace dump
-        keyspace_cql = self.cluster.metadata.keyspaces[self.keyspace_name].export_as_string()
-        type_idx = keyspace_cql.rfind("CREATE TYPE")
-        func_idx = keyspace_cql.find("CREATE FUCNTION")
-        self.assertNotIn(-1, (type_idx, func_idx))
-        self.assertGreater(func_idx, type_idx)
-
-        self.session.execute("DROP FUNCTION %s.%s" % (self.keyspace_name, self.function_name))
-        self.assertNotIn(self.function_name, self.keyspace_function_meta)
+        kwargs['called_on_null_input'] = False
+        with self.VerifiedFunction(self, **kwargs):
+            fn_meta = self.keyspace_function_meta[self.function_name]
+            self.assertRegexpMatches(fn_meta.as_cql_query(), "CREATE FUNCTION.*\) NOT CALLED ON NULL INPUT RETURNS .*")
