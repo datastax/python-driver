@@ -928,3 +928,83 @@ class KeyspaceAlterMetadata(unittest.TestCase):
         new_keyspace_meta = self.cluster.metadata.keyspaces[name]
         self.assertNotEqual(original_keyspace_meta, new_keyspace_meta)
         self.assertEqual(new_keyspace_meta.durable_writes, False)
+
+from cassandra.cqltypes import DoubleType
+from cassandra.metadata import Function
+
+
+class FunctionMetadata(unittest.TestCase):
+
+    keyspace_name = "functionmetadatatest"
+
+    @property
+    def function_name(self):
+        return self._testMethodName.lower()
+
+    @classmethod
+    def setup_class(cls):
+        if PROTOCOL_VERSION < 4:
+            raise unittest.SkipTest("Function metadata requires native protocol version 4+")
+
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.session = cls.cluster.connect()
+        cls.session.execute("CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}" % cls.keyspace_name)
+        cls.keyspace_function_meta = cls.cluster.metadata.keyspaces[cls.keyspace_name].functions
+
+    @classmethod
+    def teardown_class(cls):
+        cls.session.execute("DROP KEYSPACE %s" % cls.keyspace_name)
+        cls.cluster.shutdown()
+
+    def make_function_kwargs(self, deterministic=True, called_on_null=True):
+        return {'keyspace': self.keyspace_name,
+                'name': self.function_name,
+                'signature': ['double', 'int'],
+                'argument_names': ['d', 'i'],
+                'return_type': DoubleType,
+                'language': 'java',
+                'body': 'return new Double(0.0);',
+                'is_deterministic': deterministic,
+                'called_on_null_input': called_on_null}
+
+    def test_create_drop_function(self):
+        self.assertNotIn(self.function_name, self.keyspace_function_meta)
+
+        expected_meta = Function(**self.make_function_kwargs())
+        self.session.execute(expected_meta.as_cql_query())
+        self.assertIn(self.function_name, self.keyspace_function_meta)
+
+        generated_meta = self.keyspace_function_meta[self.function_name]
+        self.assertEqual(generated_meta.as_cql_query(), expected_meta.as_cql_query())
+
+        self.session.execute("DROP FUNCTION %s.%s" % (self.keyspace_name, self.function_name))
+        self.assertNotIn(self.function_name, self.keyspace_function_meta)
+
+    # TODO: this presently fails because C* c059a56 requires udt to be frozen to create, but does not store meta indicating frozen
+    @unittest.expectedFailure
+    def test_functions_after_udt(self):
+        self.assertNotIn(self.function_name, self.keyspace_function_meta)
+
+        udt_name = 'udtx'
+        self.session.execute("CREATE TYPE %s.%s (x int)" % (self.keyspace_name, udt_name))
+
+        # make a function that takes a udt type
+        kwargs = self.make_function_kwargs()
+        kwargs['signature'][0] = "frozen<%s>" % udt_name
+
+        expected_meta = Function(**kwargs)
+        self.session.execute(expected_meta.as_cql_query())
+        self.assertIn(self.function_name, self.keyspace_function_meta)
+
+        generated_meta = self.keyspace_function_meta[self.function_name]
+        self.assertEqual(generated_meta.as_cql_query(), expected_meta.as_cql_query())
+
+        # udts must come before functions in keyspace dump
+        keyspace_cql = self.cluster.metadata.keyspaces[self.keyspace_name].export_as_string()
+        type_idx = keyspace_cql.rfind("CREATE TYPE")
+        func_idx = keyspace_cql.find("CREATE FUCNTION")
+        self.assertNotIn(-1, (type_idx, func_idx))
+        self.assertGreater(func_idx, type_idx)
+
+        self.session.execute("DROP FUNCTION %s.%s" % (self.keyspace_name, self.function_name))
+        self.assertNotIn(self.function_name, self.keyspace_function_meta)

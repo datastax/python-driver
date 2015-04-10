@@ -851,8 +851,8 @@ class EventMessage(_MessageType):
             target = read_string(f)
             keyspace = read_string(f)
             if target != "KEYSPACE":
-                table_or_type = read_string(f)
-                return {'change_type': change_type, 'keyspace': keyspace, target.lower(): table_or_type}
+                target_name = read_string(f)
+                return {'change_type': change_type, 'keyspace': keyspace, target.lower(): target_name}
             else:
                 return {'change_type': change_type, 'keyspace': keyspace}
         else:

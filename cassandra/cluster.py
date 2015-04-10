@@ -1116,7 +1116,7 @@ class Cluster(object):
             for pool in session._pools.values():
                 pool.ensure_core_connections()
 
-    def refresh_schema(self, keyspace=None, table=None, usertype=None, max_schema_agreement_wait=None):
+    def refresh_schema(self, keyspace=None, table=None, usertype=None, function=None, max_schema_agreement_wait=None):
         """
         Synchronously refresh the schema metadata.
 
@@ -1129,7 +1129,7 @@ class Cluster(object):
 
         An Exception is raised if schema refresh fails for any reason.
         """
-        if not self.control_connection.refresh_schema(keyspace, table, usertype, max_schema_agreement_wait):
+        if not self.control_connection.refresh_schema(keyspace, table, usertype, function, max_schema_agreement_wait):
             raise Exception("Schema was not refreshed. See log for details.")
 
     def submit_schema_refresh(self, keyspace=None, table=None, usertype=None):
@@ -2008,7 +2008,7 @@ class ControlConnection(object):
             self._connection.close()
             del self._connection
 
-    def refresh_schema(self, keyspace=None, table=None, usertype=None,
+    def refresh_schema(self, keyspace=None, table=None, usertype=None, function=None,
                        schema_agreement_wait=None):
         if not self._meta_refresh_enabled:
             log.debug("[control connection] Skipping schema refresh because meta refresh is disabled")
@@ -2016,7 +2016,7 @@ class ControlConnection(object):
 
         try:
             if self._connection:
-                return self._refresh_schema(self._connection, keyspace, table, usertype,
+                return self._refresh_schema(self._connection, keyspace, table, usertype, function,
                                             schema_agreement_wait=schema_agreement_wait)
         except ReferenceError:
             pass  # our weak reference to the Cluster is no good
@@ -2025,7 +2025,7 @@ class ControlConnection(object):
             self._signal_error()
         return False
 
-    def _refresh_schema(self, connection, keyspace=None, table=None, usertype=None,
+    def _refresh_schema(self, connection, keyspace=None, table=None, usertype=None, function=None,
                         preloaded_results=None, schema_agreement_wait=None):
         if self._cluster.is_shutdown:
             return False
@@ -2074,6 +2074,14 @@ class ControlConnection(object):
             log.debug("[control connection] Fetched user type info for %s.%s, rebuilding metadata", keyspace, usertype)
             types_result = dict_factory(*types_result.results) if types_result.results else {}
             self._cluster.metadata.usertype_changed(keyspace, usertype, types_result)
+        elif function:
+            # user defined function within this keyspace changed
+            where_clause = " WHERE keyspace_name = '%s' AND function_name = '%s'" % (keyspace, function)
+            functions_query = QueryMessage(query=self._SELECT_FUNCTIONS + where_clause, consistency_level=cl)
+            functions_result = connection.wait_for_response(functions_query)
+            log.debug("[control connection] Fetched user function info for %s.%s, rebuilding metadata", keyspace, function)
+            functions_result = dict_factory(*functions_result.results) if functions_result.results else {}
+            self._cluster.metadata.function_changed(keyspace, function, functions_result)
         elif keyspace:
             # only the keyspace itself changed (such as replication settings)
             where_clause = " WHERE keyspace_name = '%s'" % (keyspace,)
@@ -2297,8 +2305,9 @@ class ControlConnection(object):
         keyspace = event.get('keyspace')
         table = event.get('table')
         usertype = event.get('type')
+        function = event.get('function', event.get('aggregate'))
         delay = random() * self._schema_event_refresh_window
-        self._cluster.scheduler.schedule_unique(delay, self.refresh_schema, keyspace, table, usertype)
+        self._cluster.scheduler.schedule_unique(delay, self.refresh_schema, keyspace, table, usertype, function)
 
     def wait_for_schema_agreement(self, connection=None, preloaded_results=None, wait_time=None):
 
@@ -2527,19 +2536,19 @@ class _Scheduler(object):
                 exc_info=exc)
 
 
-def refresh_schema_and_set_result(keyspace, table, usertype, control_conn, response_future):
+def refresh_schema_and_set_result(keyspace, table, usertype, function, control_conn, response_future):
     try:
         if control_conn._meta_refresh_enabled:
-            log.debug("Refreshing schema in response to schema change. Keyspace: %s; Table: %s, Type: %s",
-                      keyspace, table, usertype)
-            control_conn._refresh_schema(response_future._connection, keyspace, table, usertype)
+            log.debug("Refreshing schema in response to schema change. Keyspace: %s; Table: %s, Type: %s, Function: %s",
+                      keyspace, table, usertype, function)
+            control_conn._refresh_schema(response_future._connection, keyspace, table, usertype, function)
         else:
             log.debug("Skipping schema refresh in response to schema change because meta refresh is disabled; "
-                      "Keyspace: %s; Table: %s, Type: %s", keyspace, table, usertype)
+                      "Keyspace: %s; Table: %s, Type: %s, Function: %s", keyspace, table, usertype, function)
     except Exception:
         log.exception("Exception refreshing schema in response to schema change:")
         response_future.session.submit(
-            control_conn.refresh_schema, keyspace, table, usertype)
+            control_conn.refresh_schema, keyspace, table, usertype, function)
     finally:
         response_future._set_final_result(None)
 
@@ -2724,6 +2733,7 @@ class ResponseFuture(object):
                         response.results['keyspace'],
                         response.results.get('table'),
                         response.results.get('type'),
+                        response.results.get('function', response.results.get('aggregate')),
                         self.session.cluster.control_connection,
                         self)
                 else:

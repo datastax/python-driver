@@ -170,6 +170,7 @@ class Metadata(object):
         if old_keyspace_meta:
             keyspace_meta.tables = old_keyspace_meta.tables
             keyspace_meta.user_types = old_keyspace_meta.user_types
+            keyspace_meta.functions = old_keyspace_meta.functions
             if (keyspace_meta.replication_strategy != old_keyspace_meta.replication_strategy):
                 self._keyspace_updated(keyspace)
         else:
@@ -182,6 +183,14 @@ class Metadata(object):
         else:
             # the type was deleted
             self.keyspaces[keyspace].user_types.pop(name, None)
+
+    def function_changed(self, keyspace, name, function_results):
+        if function_results:
+            new_function = self._build_function(keyspace, function_results[0])
+            self.keyspaces[keyspace].functions[name] = new_function
+        else:
+            # the function was deleted
+            self.keyspaces[keyspace].functions.pop(name, None)
 
     def table_changed(self, keyspace, table, cf_results, col_results, triggers_result):
         try:
