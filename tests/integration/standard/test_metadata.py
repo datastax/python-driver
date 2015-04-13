@@ -22,7 +22,7 @@ from mock import Mock
 import six
 import sys
 
-from cassandra import AlreadyExists
+from cassandra import AlreadyExists, UserFunctionDescriptor
 
 from cassandra.cluster import Cluster
 from cassandra.metadata import (Metadata, KeyspaceMetadata, TableMetadata,
@@ -959,28 +959,33 @@ class FunctionMetadata(unittest.TestCase):
     class VerifiedFunction(object):
         def __init__(self, test_case, **function_kwargs):
             self.test_case = test_case
-            self.function_kwargs = function_kwargs
+            self.function_kwargs = dict(function_kwargs)
 
         def __enter__(self):
             tc = self.test_case
             expected_meta = Function(**self.function_kwargs)
-            tc.assertNotIn(expected_meta.name, tc.keyspace_function_meta)
+            tc.assertNotIn(expected_meta.signature, tc.keyspace_function_meta)
             tc.session.execute(expected_meta.as_cql_query())
-            tc.assertIn(expected_meta.name, tc.keyspace_function_meta)
+            tc.assertIn(expected_meta.signature, tc.keyspace_function_meta)
 
-            generated_meta = tc.keyspace_function_meta[expected_meta.name]
+            generated_meta = tc.keyspace_function_meta[expected_meta.signature]
             self.test_case.assertEqual(generated_meta.as_cql_query(), expected_meta.as_cql_query())
+            return self
 
         def __exit__(self, exc_type, exc_val, exc_tb):
             tc = self.test_case
-            function_name = self.function_kwargs['name']
-            tc.session.execute("DROP FUNCTION %s.%s" % (tc.keyspace_name, function_name))
-            tc.assertNotIn(function_name, tc.keyspace_function_meta)
+            tc.session.execute("DROP FUNCTION %s.%s" % (tc.keyspace_name, self.signature))
+            tc.assertNotIn(self.signature, tc.keyspace_function_meta)
+
+        @property
+        def signature(self):
+            return UserFunctionDescriptor.format_signature(self.function_kwargs['name'],
+                                                           self.function_kwargs['type_signature'])
 
     def make_function_kwargs(self, deterministic=True, called_on_null=True):
         return {'keyspace': self.keyspace_name,
                 'name': self.function_name,
-                'signature': ['double', 'int'],
+                'type_signature': ['double', 'int'],
                 'argument_names': ['d', 'i'],
                 'return_type': DoubleType,
                 'language': 'java',
@@ -1002,7 +1007,7 @@ class FunctionMetadata(unittest.TestCase):
         # this presently fails because C* c059a56 requires udt to be frozen to create, but does not store meta indicating frozen
         # Maybe update this after release
         #kwargs = self.make_function_kwargs()
-        #kwargs['signature'][0] = "frozen<%s>" % udt_name
+        #kwargs['type_signature'][0] = "frozen<%s>" % udt_name
 
         #expected_meta = Function(**kwargs)
         #with self.VerifiedFunction(self, **kwargs):
@@ -1013,6 +1018,19 @@ class FunctionMetadata(unittest.TestCase):
             func_idx = keyspace_cql.find("CREATE FUNCTION")
             self.assertNotIn(-1, (type_idx, func_idx), "TYPE or FUNCTION not found in keyspace_cql: " + keyspace_cql)
             self.assertGreater(func_idx, type_idx)
+
+    def test_function_same_name_diff_types(self):
+        kwargs = self.make_function_kwargs()
+        with self.VerifiedFunction(self, **kwargs):
+            # another function: same name, different type sig.
+            self.assertGreater(len(kwargs['type_signature']), 1)
+            self.assertGreater(len(kwargs['argument_names']), 1)
+            kwargs['type_signature'] = kwargs['type_signature'][:1]
+            kwargs['argument_names'] = kwargs['argument_names'][:1]
+            with self.VerifiedFunction(self, **kwargs):
+                functions = [f for f in self.keyspace_function_meta.values() if f.name == self.function_name]
+                self.assertEqual(len(functions), 2)
+                self.assertNotEqual(functions[0].type_signature, functions[1].type_signature)
 
     def test_functions_follow_keyspace_alter(self):
         with self.VerifiedFunction(self, **self.make_function_kwargs()):
@@ -1028,23 +1046,23 @@ class FunctionMetadata(unittest.TestCase):
     def test_function_cql_determinism(self):
         kwargs = self.make_function_kwargs()
         kwargs['is_deterministic'] = True
-        with self.VerifiedFunction(self, **kwargs):
-            fn_meta = self.keyspace_function_meta[self.function_name]
+        with self.VerifiedFunction(self, **kwargs) as vf:
+            fn_meta = self.keyspace_function_meta[vf.signature]
             self.assertRegexpMatches(fn_meta.as_cql_query(), "CREATE FUNCTION.*")
 
         kwargs['is_deterministic'] = False
-        with self.VerifiedFunction(self, **kwargs):
-            fn_meta = self.keyspace_function_meta[self.function_name]
+        with self.VerifiedFunction(self, **kwargs) as vf:
+            fn_meta = self.keyspace_function_meta[vf.signature]
             self.assertRegexpMatches(fn_meta.as_cql_query(), "CREATE NON DETERMINISTIC FUNCTION.*")
 
     def test_function_cql_called_on_null(self):
         kwargs = self.make_function_kwargs()
         kwargs['called_on_null_input'] = True
-        with self.VerifiedFunction(self, **kwargs):
-            fn_meta = self.keyspace_function_meta[self.function_name]
+        with self.VerifiedFunction(self, **kwargs) as vf:
+            fn_meta = self.keyspace_function_meta[vf.signature]
             self.assertRegexpMatches(fn_meta.as_cql_query(), "CREATE FUNCTION.*\) CALLED ON NULL INPUT RETURNS .*")
 
         kwargs['called_on_null_input'] = False
-        with self.VerifiedFunction(self, **kwargs):
-            fn_meta = self.keyspace_function_meta[self.function_name]
-            self.assertRegexpMatches(fn_meta.as_cql_query(), "CREATE FUNCTION.*\) NOT CALLED ON NULL INPUT RETURNS .*")
+        with self.VerifiedFunction(self, **kwargs) as vf:
+            fn_meta = self.keyspace_function_meta[vf.signature]
+            self.assertRegexpMatches(fn_meta.as_cql_query(), "CREATE FUNCTION.*\) RETURNS NULL ON NULL INPUT RETURNS .*")
