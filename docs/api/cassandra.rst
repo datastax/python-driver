@@ -14,6 +14,9 @@
 .. autoclass:: ConsistencyLevel
    :members:
 
+.. autoclass:: UserFunctionDescriptor
+   :members:
+
 .. autoexception:: Unavailable()
    :members:
 

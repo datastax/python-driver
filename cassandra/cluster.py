@@ -1116,9 +1116,27 @@ class Cluster(object):
             for pool in session._pools.values():
                 pool.ensure_core_connections()
 
+    def _validate_refresh_schema(self, keyspace, table, usertype, function):
+        if any((table, usertype, function)):
+            if not keyspace:
+                raise ValueError("keyspace is required to refresh specific sub-entity {table, usertype, function}")
+            if sum(1 for e in (table, usertype, function) if e) > 1:
+                raise ValueError("{table, usertype, function} are mutually exclusive")
+
     def refresh_schema(self, keyspace=None, table=None, usertype=None, function=None, max_schema_agreement_wait=None):
         """
-        Synchronously refresh the schema metadata.
+        Synchronously refresh all schema metadata.
+
+        {keyspace, table, usertype} are string names of the respective entities.
+        ``function`` is a :class:`cassandra.UserFunctionDescriptor`.
+
+        If none of ``{keyspace, table, usertype, function}`` are specified, the entire schema is refreshed.
+
+        If any of ``{keyspace, table, usertype, function}`` are specified, ``keyspace`` is required.
+
+        If only ``keyspace`` is specified, just the top-level keyspace metadata is refreshed (e.g. replication).
+
+        The remaining arguments ``{table, usertype, function}`` are mutually exclusive -- only one may be specified.
 
         By default, the timeout for this operation is governed by :attr:`~.Cluster.max_schema_agreement_wait`
         and :attr:`~.Cluster.control_connection_timeout`.
@@ -1129,17 +1147,18 @@ class Cluster(object):
 
         An Exception is raised if schema refresh fails for any reason.
         """
+        self._validate_refresh_schema(keyspace, table, usertype, function)
         if not self.control_connection.refresh_schema(keyspace, table, usertype, function, max_schema_agreement_wait):
             raise Exception("Schema was not refreshed. See log for details.")
 
-    def submit_schema_refresh(self, keyspace=None, table=None, usertype=None):
+    def submit_schema_refresh(self, keyspace=None, table=None, usertype=None, function=None):
         """
         Schedule a refresh of the internal representation of the current
-        schema for this cluster.  If `keyspace` is specified, only that
-        keyspace will be refreshed, and likewise for `table`.
+        schema for this cluster.  See :meth:`~.refresh_schema` for description of parameters.
         """
+        self._validate_refresh_schema(keyspace, table, usertype, function)
         return self.executor.submit(
-            self.control_connection.refresh_schema, keyspace, table, usertype)
+            self.control_connection.refresh_schema, keyspace, table, usertype, function)
 
     def refresh_nodes(self):
         """
@@ -2030,7 +2049,7 @@ class ControlConnection(object):
         if self._cluster.is_shutdown:
             return False
 
-        assert table is None or usertype is None
+        assert sum(1 for arg in (table, usertype, function) if arg) <= 1
 
         agreed = self.wait_for_schema_agreement(connection,
                                                 preloaded_results=preloaded_results,
