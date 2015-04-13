@@ -30,6 +30,7 @@ try:
 except ImportError as e:
     pass
 
+from cassandra import UserFunctionDescriptor
 import cassandra.cqltypes as types
 from cassandra.marshal import varint_unpack
 from cassandra.pool import Host
@@ -139,7 +140,7 @@ class Metadata(object):
 
             for fn_row in fn_rows.get(keyspace_meta.name, []):
                 fn = self._build_function(keyspace_meta.name, fn_row)
-                keyspace_meta.functions[fn.name] = fn
+                keyspace_meta.functions[fn.signature] = fn
 
             current_keyspaces.add(keyspace_meta.name)
             old_keyspace_meta = self.keyspaces.get(keyspace_meta.name, None)
@@ -184,13 +185,13 @@ class Metadata(object):
             # the type was deleted
             self.keyspaces[keyspace].user_types.pop(name, None)
 
-    def function_changed(self, keyspace, name, function_results):
+    def function_changed(self, keyspace, function, function_results):
         if function_results:
             new_function = self._build_function(keyspace, function_results[0])
-            self.keyspaces[keyspace].functions[name] = new_function
+            self.keyspaces[keyspace].functions[function.signature] = new_function
         else:
             # the function was deleted
-            self.keyspaces[keyspace].functions.pop(name, None)
+            self.keyspaces[keyspace].functions.pop(function.signature, None)
 
     def table_changed(self, keyspace, table, cf_results, col_results, triggers_result):
         try:
@@ -898,7 +899,7 @@ class Function(object):
     The name of this function
     """
 
-    signature = None
+    type_signature = None
     """
     An ordered list of the types for each argument to the function
     """
@@ -935,11 +936,11 @@ class Function(object):
     (convenience function to avoid handling nulls explicitly if the result will just be null)
     """
 
-    def __init__(self, keyspace, name, signature, argument_names,
+    def __init__(self, keyspace, name, type_signature, argument_names,
                  return_type, language, body, is_deterministic, called_on_null_input):
         self.keyspace = keyspace
         self.name = name
-        self.signature = signature
+        self.type_signature = type_signature
         self.argument_names = argument_names
         self.return_type = return_type
         self.language = language
@@ -957,7 +958,7 @@ class Function(object):
         keyspace = protect_name(self.keyspace)
         name = protect_name(self.name)
         arg_list = ', '.join(["%s %s" % (protect_name(n), t)
-                             for n, t in zip(self.argument_names, self.signature)])
+                             for n, t in zip(self.argument_names, self.type_signature)])
         determ = '' if self.is_deterministic else 'NON DETERMINISTIC '
         typ = self.return_type.cql_parameterized_type()
         lang = self.language
@@ -969,6 +970,10 @@ class Function(object):
                "RETURNS %(typ)s%(sep)s" \
                "LANGUAGE %(lang)s%(sep)s" \
                "AS %(body)s;" % locals()
+
+    @property
+    def signature(self):
+        return UserFunctionDescriptor.format_signature(self.name, self.type_signature)
 
 
 class TableMetadata(object):

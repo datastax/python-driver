@@ -302,3 +302,28 @@ class UnsupportedOperation(Exception):
     for more details.
     """
     pass
+
+
+class UserFunctionDescriptor(object):
+    """
+    Describes a User function or aggregate by name and argument signature
+    """
+
+    name = None
+
+    type_signature = None
+    """
+    Ordered list of CQL argument types
+    """
+
+    def __init__(self, name, type_signature):
+        self.name = name
+        self.type_signature = type_signature
+
+    @property
+    def signature(self):
+        return self.format_signature(self.name, self.type_signature)
+
+    @staticmethod
+    def format_signature(name, type_signature):
+        return "%s(%s)" % (name, ','.join(t for t in type_signature))

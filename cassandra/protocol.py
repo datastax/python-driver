@@ -23,7 +23,7 @@ import io
 
 from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
                        AlreadyExists, InvalidRequest, Unauthorized,
-                       UnsupportedOperation)
+                       UnsupportedOperation, UserFunctionDescriptor)
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
                                int8_pack, int8_unpack, uint64_pack, header_pack,
                                v3_header_pack)
@@ -850,15 +850,18 @@ class EventMessage(_MessageType):
         if protocol_version >= 3:
             target = read_string(f)
             keyspace = read_string(f)
+            event = {'change_type': change_type, 'keyspace': keyspace}
             if target != "KEYSPACE":
                 target_name = read_string(f)
-                return {'change_type': change_type, 'keyspace': keyspace, target.lower(): target_name}
-            else:
-                return {'change_type': change_type, 'keyspace': keyspace}
+                if target in ('FUNCTION', 'AGGREGATE'):
+                    event['function'] = UserFunctionDescriptor(target_name, [read_string(f) for _ in range(read_short(f))])
+                else:
+                    event[target.lower()] = target_name
         else:
             keyspace = read_string(f)
             table = read_string(f)
-            return {'change_type': change_type, 'keyspace': keyspace, 'table': table}
+            event = {'change_type': change_type, 'keyspace': keyspace, 'table': table}
+        return event
 
 
 def write_header(f, version, flags, stream_id, opcode, length):
