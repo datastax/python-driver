@@ -23,7 +23,8 @@ import io
 
 from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
                        AlreadyExists, InvalidRequest, Unauthorized,
-                       UnsupportedOperation, UserFunctionDescriptor)
+                       UnsupportedOperation, UserFunctionDescriptor,
+                       UserAggregateDescriptor)
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
                                int8_pack, int8_unpack, uint64_pack, header_pack,
                                v3_header_pack)
@@ -853,8 +854,10 @@ class EventMessage(_MessageType):
             event = {'change_type': change_type, 'keyspace': keyspace}
             if target != "KEYSPACE":
                 target_name = read_string(f)
-                if target in ('FUNCTION', 'AGGREGATE'):
+                if target == 'FUNCTION':
                     event['function'] = UserFunctionDescriptor(target_name, [read_string(f) for _ in range(read_short(f))])
+                elif target == 'AGGREGATE':
+                    event['aggregate'] = UserAggregateDescriptor(target_name, [read_string(f) for _ in range(read_short(f))])
                 else:
                     event[target.lower()] = target_name
         else:

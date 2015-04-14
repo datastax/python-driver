@@ -126,20 +126,7 @@ def consistency_value_to_name(value):
     return ConsistencyLevel.value_to_name[value] if value is not None else "Not Set"
 
 
-class UserFunctionDescriptor(object):
-    """
-    Describes a User function or aggregate by name and argument signature
-    """
-
-    name = None
-    """
-    name of the function
-    """
-
-    type_signature = None
-    """
-    Ordered list of CQL argument type name comprising the type signature
-    """
+class SignatureDescriptor(object):
 
     def __init__(self, name, type_signature):
         self.name = name
@@ -157,6 +144,38 @@ class UserFunctionDescriptor(object):
     @staticmethod
     def format_signature(name, type_signature):
         return "%s(%s)" % (name, ','.join(t for t in type_signature))
+
+
+class UserFunctionDescriptor(SignatureDescriptor):
+    """
+    Describes a User function by name and argument signature
+    """
+
+    name = None
+    """
+    name of the function
+    """
+
+    type_signature = None
+    """
+    Ordered list of CQL argument type name comprising the type signature
+    """
+
+
+class UserAggregateDescriptor(SignatureDescriptor):
+    """
+    Describes a User aggregate function by name and argument signature
+    """
+
+    name = None
+    """
+    name of the aggregate
+    """
+
+    type_signature = None
+    """
+    Ordered list of CQL argument type name comprising the type signature
+    """
 
 
 class Unavailable(Exception):

@@ -30,8 +30,9 @@ try:
 except ImportError as e:
     pass
 
-from cassandra import UserFunctionDescriptor
+from cassandra import SignatureDescriptor
 import cassandra.cqltypes as types
+from cassandra.encoder import Encoder
 from cassandra.marshal import varint_unpack
 from cassandra.pool import Host
 from cassandra.util import OrderedDict
@@ -91,7 +92,7 @@ class Metadata(object):
         return "\n".join(ks.export_as_string() for ks in self.keyspaces.values())
 
     def rebuild_schema(self, ks_results, type_results, function_results,
-                       cf_results, col_results, triggers_result):
+                       aggregate_results, cf_results, col_results, triggers_result):
         """
         Rebuild the view of the current schema from a fresh set of rows from
         the system schema tables.
@@ -102,6 +103,7 @@ class Metadata(object):
         col_def_rows = defaultdict(lambda: defaultdict(list))
         usertype_rows = defaultdict(list)
         fn_rows = defaultdict(list)
+        agg_rows = defaultdict(list)
         trigger_rows = defaultdict(lambda: defaultdict(list))
 
         for row in cf_results:
@@ -117,6 +119,9 @@ class Metadata(object):
 
         for row in function_results:
             fn_rows[row["keyspace_name"]].append(row)
+
+        for row in aggregate_results:
+            agg_rows[row["keyspace_name"]].append(row)
 
         for row in triggers_result:
             ksname = row["keyspace_name"]
@@ -141,6 +146,10 @@ class Metadata(object):
             for fn_row in fn_rows.get(keyspace_meta.name, []):
                 fn = self._build_function(keyspace_meta.name, fn_row)
                 keyspace_meta.functions[fn.signature] = fn
+
+            for agg_row in agg_rows.get(keyspace_meta.name, []):
+                agg = self._build_aggregate(keyspace_meta.name, agg_row)
+                keyspace_meta.aggregates[agg.signature] = agg
 
             current_keyspaces.add(keyspace_meta.name)
             old_keyspace_meta = self.keyspaces.get(keyspace_meta.name, None)
@@ -172,6 +181,7 @@ class Metadata(object):
             keyspace_meta.tables = old_keyspace_meta.tables
             keyspace_meta.user_types = old_keyspace_meta.user_types
             keyspace_meta.functions = old_keyspace_meta.functions
+            keyspace_meta.aggregates = old_keyspace_meta.aggregates
             if (keyspace_meta.replication_strategy != old_keyspace_meta.replication_strategy):
                 self._keyspace_updated(keyspace)
         else:
@@ -192,6 +202,14 @@ class Metadata(object):
         else:
             # the function was deleted
             self.keyspaces[keyspace].functions.pop(function.signature, None)
+
+    def aggregate_changed(self, keyspace, aggregate, aggregate_results):
+        if aggregate_results:
+            new_aggregate = self._build_aggregate(keyspace, aggregate_results[0])
+            self.keyspaces[keyspace].aggregates[aggregate.signature] = new_aggregate
+        else:
+            # the aggregate was deleted
+            self.keyspaces[keyspace].aggregates.pop(aggregate.signature, None)
 
     def table_changed(self, keyspace, table, cf_results, col_results, triggers_result):
         try:
@@ -241,6 +259,16 @@ class Metadata(object):
                         function_row['signature'], function_row['argument_names'],
                         return_type, function_row['language'], function_row['body'],
                         function_row['is_deterministic'], function_row['called_on_null_input'])
+
+    def _build_aggregate(self, keyspace, aggregate_row):
+        state_type = types.lookup_casstype(aggregate_row['state_type'])
+        initial_condition = aggregate_row['initcond']
+        if initial_condition is not None:
+            initial_condition = state_type.deserialize(initial_condition, 3)
+        return_type = types.lookup_casstype(aggregate_row['return_type'])
+        return Aggregate(aggregate_row['keyspace_name'], aggregate_row['aggregate_name'],
+                         aggregate_row['signature'], aggregate_row['final_func'], initial_condition,
+                         return_type, aggregate_row['state_func'], state_type)
 
     def _build_table_metadata(self, keyspace_metadata, row, col_rows, trigger_rows):
         cfname = row["columnfamily_name"]
@@ -762,14 +790,21 @@ class KeyspaceMetadata(object):
 
     user_types = None
     """
-    A map from user-defined type names to instances of :class:`~cassandra.metadata..UserType`.
+    A map from user-defined type names to instances of :class:`~cassandra.metadata.UserType`.
 
     .. versionadded:: 2.1.0
     """
 
     functions = None
     """
-    A map from user-defined function names to instances of :class:`~cassandra.metadata..Function`.
+    A map from user-defined function signatures to instances of :class:`~cassandra.metadata.Function`.
+
+    .. versionadded:: 3.0.0
+    """
+
+    aggregates = None
+    """
+    A map from user-defined aggregate signatures to instances of :class:`~cassandra.metadata.Aggregate`.
 
     .. versionadded:: 3.0.0
     """
@@ -780,6 +815,7 @@ class KeyspaceMetadata(object):
         self.tables = {}
         self.user_types = {}
         self.functions = {}
+        self.aggregates = {}
 
     def export_as_string(self):
         """
@@ -789,6 +825,7 @@ class KeyspaceMetadata(object):
         return "\n\n".join([self.as_cql_query()]
                            + self.user_type_strings()
                            + [f.as_cql_query(True) for f in self.functions.values()]
+                           + [a.as_cql_query(True) for a in self.aggregates.values()]
                            + [t.export_as_string() for t in self.tables.values()])
 
     def as_cql_query(self):
@@ -878,6 +915,95 @@ class UserType(object):
         ret += field_join.join("%s%s" % (padding, field) for field in fields)
         ret += "\n);" if formatted else ");"
         return ret
+
+
+class Aggregate(object):
+    """
+    A user defined aggregate function, as created by ``CREATE AGGREGATE`` statements.
+
+    Aggregate functions were introduced in Cassandra 3.0
+
+    .. versionadded:: 3.0.0
+    """
+
+    keyspace = None
+    """
+    The string name of the keyspace in which this aggregate is defined
+    """
+
+    name = None
+    """
+    The name of this aggregate
+    """
+
+    type_signature = None
+    """
+    An ordered list of the types for each argument to the aggregate
+    """
+
+    final_func = None
+    """
+    Name of a final function
+    """
+
+    initial_condition = None
+    """
+    Initial condition of the aggregate
+    """
+
+    return_type = None
+    """
+    Return type of the aggregate
+    """
+
+    state_func = None
+    """
+    Name of a state function
+    """
+
+    state_type = None
+    """
+    Flag indicating whether this function is deterministic
+    (required for functional indexes)
+    """
+
+    def __init__(self, keyspace, name, type_signature, final_func,
+                 initial_condition, return_type, state_func, state_type):
+        self.keyspace = keyspace
+        self.name = name
+        self.type_signature = type_signature
+        self.final_func = final_func
+        self.initial_condition = initial_condition
+        self.return_type = return_type
+        self.state_func = state_func
+        self.state_type = state_type
+
+    def as_cql_query(self, formatted=False):
+        """
+        Returns a CQL query that can be used to recreate this aggregate.
+        If `formatted` is set to :const:`True`, extra whitespace will
+        be added to make the query more readable.
+        """
+        sep = '\n' if formatted else ' '
+        keyspace = protect_name(self.keyspace)
+        name = protect_name(self.name)
+        arg_list = ', '.join(self.type_signature)
+        state_func = protect_name(self.state_func)
+        state_type = self.state_type.cql_parameterized_type()
+
+        ret = "CREATE AGGREGATE %(keyspace)s.%(name)s(%(arg_list)s)%(sep)s" \
+              "SFUNC %(state_func)s%(sep)s" \
+              "STYPE %(state_type)s" % locals()
+
+        ret += ''.join((sep, 'FINALFUNC ', protect_name(self.final_func))) if self.final_func else ''
+        ret += ''.join((sep, 'INITCOND ', Encoder().cql_encode_all_types(self.initial_condition)))\
+               if self.initial_condition is not None else ''
+
+        return ret
+
+    @property
+    def signature(self):
+        return SignatureDescriptor.format_signature(self.name, self.type_signature)
 
 
 class Function(object):
@@ -973,7 +1099,7 @@ class Function(object):
 
     @property
     def signature(self):
-        return UserFunctionDescriptor.format_signature(self.name, self.type_signature)
+        return SignatureDescriptor.format_signature(self.name, self.type_signature)
 
 
 class TableMetadata(object):
