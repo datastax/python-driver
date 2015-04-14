@@ -16,6 +16,11 @@
 
 .. autoclass:: UserFunctionDescriptor
    :members:
+   :inherited-members:
+
+.. autoclass:: UserAggregateDescriptor
+   :members:
+   :inherited-members:
 
 .. autoexception:: Unavailable()
    :members:
