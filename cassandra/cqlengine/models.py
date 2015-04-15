@@ -705,7 +705,7 @@ class BaseModel(object):
             if self._is_polymorphic_base:
                 raise PolymorphicModelException('cannot update polymorphic base model')
             else:
-                setattr(self, self._discriminator_column_name, self.__disciminator_value__)
+                setattr(self, self._discriminator_column_name, self.__discriminator_value__)
 
         self.validate()
         self.__dmlquery__(self.__class__, self,
