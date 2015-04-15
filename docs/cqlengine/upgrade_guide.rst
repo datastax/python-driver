@@ -41,7 +41,7 @@ Package-Level Aliases
 Legacy cqlengine defined a number of aliases at the package level, which became redundant
 when the package was integrated for a driver. These have been removed in favor of absolute
 imports, and referring to cannonical definitions. For example, ``cqlengine.ONE`` was an alias
-of ``cassandra.ConsistencyLevel.ONE``. In the integrated package, only the 
+of ``cassandra.ConsistencyLevel.ONE``. In the integrated package, only the
 :class:`cassandra.ConsistencyLevel` remains.
 
 Additionally, submodule aliases are removed from cqlengine in favor of absolute imports.
@@ -70,7 +70,7 @@ IfNotExistsWithCounterColumn  cassandra.cqlengine.query
 UnicodeMixin Consolidation
 --------------------------
 ``class UnicodeMixin`` was defined in several cqlengine modules. This has been consolidated
-to a single definition in the cqlengine package init file. This is not technically part of 
+to a single definition in the cqlengine package init file. This is not technically part of
 the API, but noted here for completeness.
 
 API Deprecations
@@ -95,9 +95,9 @@ Model Inheritance
 The names for class attributes controlling model inheritance are changing. Changes are as follows:
 
 - Replace 'polymorphic_key' in the base class Column definition with :attr:`~.discriminator_column`
-- Replace the '__polymporphic_key__' class attribute the derived classes with :attr:`~.__discriminator_value__`
+- Replace the '__polymorphic_key__' class attribute the derived classes with :attr:`~.__discriminator_value__`
 
-The functionality is unchanged -- the intent here is to make the names and language around these attributes more precise. 
+The functionality is unchanged -- the intent here is to make the names and language around these attributes more precise.
 For now, the old names are just deprecated, and the mapper will emit warnings if they are used. The old names
 will be removed in a future version.
 
@@ -117,7 +117,7 @@ Before::
 
     class Dog(Pet):
         __polymorphic_key__ = 'dog'
-        
+
 After::
 
     class Pet(models.Model):
