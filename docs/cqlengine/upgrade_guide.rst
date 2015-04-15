@@ -95,7 +95,7 @@ Model Inheritance
 The names for class attributes controlling model inheritance are changing. Changes are as follows:
 
 - Replace 'polymorphic_key' in the base class Column definition with :attr:`~.discriminator_column`
-- Replace the '__polymporphic_key__' class attribute the derived classes with :attr:`~.__discriminator_value__`
+- Replace the '__polymorphic_key__' class attribute the derived classes with :attr:`~.__discriminator_value__`
 
 The functionality is unchanged -- the intent here is to make the names and language around these attributes more precise. 
 For now, the old names are just deprecated, and the mapper will emit warnings if they are used. The old names
