@@ -267,8 +267,8 @@ class Metadata(object):
             initial_condition = state_type.deserialize(initial_condition, 3)
         return_type = types.lookup_casstype(aggregate_row['return_type'])
         return Aggregate(aggregate_row['keyspace_name'], aggregate_row['aggregate_name'],
-                         aggregate_row['signature'], aggregate_row['final_func'], initial_condition,
-                         return_type, aggregate_row['state_func'], state_type)
+                         aggregate_row['signature'], aggregate_row['state_func'], state_type,
+                         aggregate_row['final_func'], initial_condition, return_type)
 
     def _build_table_metadata(self, keyspace_metadata, row, col_rows, trigger_rows):
         cfname = row["columnfamily_name"]
@@ -967,16 +967,16 @@ class Aggregate(object):
     (required for functional indexes)
     """
 
-    def __init__(self, keyspace, name, type_signature, final_func,
-                 initial_condition, return_type, state_func, state_type):
+    def __init__(self, keyspace, name, type_signature, state_func,
+                 state_type, final_func, initial_condition, return_type):
         self.keyspace = keyspace
         self.name = name
         self.type_signature = type_signature
+        self.state_func = state_func
+        self.state_type = state_type
         self.final_func = final_func
         self.initial_condition = initial_condition
         self.return_type = return_type
-        self.state_func = state_func
-        self.state_type = state_type
 
     def as_cql_query(self, formatted=False):
         """
@@ -987,11 +987,11 @@ class Aggregate(object):
         sep = '\n' if formatted else ' '
         keyspace = protect_name(self.keyspace)
         name = protect_name(self.name)
-        arg_list = ', '.join(self.type_signature)
+        type_list = ', '.join(self.type_signature)
         state_func = protect_name(self.state_func)
         state_type = self.state_type.cql_parameterized_type()
 
-        ret = "CREATE AGGREGATE %(keyspace)s.%(name)s(%(arg_list)s)%(sep)s" \
+        ret = "CREATE AGGREGATE %(keyspace)s.%(name)s(%(type_list)s)%(sep)s" \
               "SFUNC %(state_func)s%(sep)s" \
               "STYPE %(state_type)s" % locals()
 
