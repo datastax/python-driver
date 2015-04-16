@@ -338,19 +338,14 @@ class PreparedStatement(object):
 
     fetch_size = FETCH_SIZE_UNSET
 
-    def __init__(self, column_metadata, query_id, routing_key_indexes, query, keyspace,
-                 protocol_version, consistency_level=None, serial_consistency_level=None,
-                 fetch_size=FETCH_SIZE_UNSET):
+    def __init__(self, column_metadata, query_id, routing_key_indexes, query,
+                 keyspace, protocol_version):
         self.column_metadata = column_metadata
         self.query_id = query_id
         self.routing_key_indexes = routing_key_indexes
         self.query_string = query
         self.keyspace = keyspace
         self.protocol_version = protocol_version
-        self.consistency_level = consistency_level
-        self.serial_consistency_level = serial_consistency_level
-        if fetch_size is not FETCH_SIZE_UNSET:
-            self.fetch_size = fetch_size
 
     @classmethod
     def from_message(cls, query_id, column_metadata, pk_indexes, cluster_metadata, query, prepared_keyspace, protocol_version):

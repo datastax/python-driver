@@ -128,8 +128,8 @@ class BoundStatementTestCase(unittest.TestCase):
                                                routing_key_indexes=[],
                                                query=None,
                                                keyspace=keyspace,
-                                               protocol_version=2,
-                                               fetch_size=1234)
+                                               protocol_version=2)
+        prepared_statement.fetch_size = 1234
         bound_statement = BoundStatement(prepared_statement=prepared_statement)
         self.assertEqual(1234, bound_statement.fetch_size)
 
@@ -147,10 +147,9 @@ class BoundStatementTestCase(unittest.TestCase):
                                                routing_key_indexes=[0, 1],
                                                query=None,
                                                keyspace=keyspace,
-                                               protocol_version=2,
-                                               fetch_size=1234)
+                                               protocol_version=2)
 
         self.assertRaises(ValueError, prepared_statement.bind, (1,))
 
-        bound = prepared_statement.bind((1,2))
+        bound = prepared_statement.bind((1, 2))
         self.assertEqual(bound.keyspace, keyspace)
