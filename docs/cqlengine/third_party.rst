@@ -31,9 +31,6 @@ Here's how, in substance, CQLengine can be plugged to `Celery
 
     app = Celery()
 
-For more details, see `issue #237
-<https://github.com/cqlengine/cqlengine/issues/237>`_.
-
 
 uWSGI
 -----
