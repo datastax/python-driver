@@ -46,47 +46,16 @@ class SchemaMetadataTests(unittest.TestCase):
     def cfname(self):
         return self._testMethodName.lower()
 
-    @classmethod
-    def setup_class(cls):
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
-        try:
-            results = session.execute("SELECT keyspace_name FROM system.schema_keyspaces")
-            existing_keyspaces = [row[0] for row in results]
-            if cls.ksname in existing_keyspaces:
-                session.execute("DROP KEYSPACE %s" % cls.ksname)
-
-            session.execute(
-                """
-                CREATE KEYSPACE %s
-                WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'};
-                """ % cls.ksname)
-        finally:
-            cluster.shutdown()
-
-    @classmethod
-    def teardown_class(cls):
-        cluster = Cluster(['127.0.0.1'],
-                          protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
-        try:
-            session.execute("DROP KEYSPACE %s" % cls.ksname)
-        finally:
-            cluster.shutdown()
-
     def setUp(self):
-        self.cluster = Cluster(['127.0.0.1'],
-                               protocol_version=PROTOCOL_VERSION)
+        self._cass_version, self._cql_version = get_server_versions()
+
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         self.session = self.cluster.connect()
+        self.session.execute("CREATE KEYSPACE schemametadatatest WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}")
 
     def tearDown(self):
-        try:
-            self.session.execute(
-                """
-                DROP TABLE {ksname}.{cfname}
-                """.format(ksname=self.ksname, cfname=self.cfname))
-        finally:
-            self.cluster.shutdown()
+        self.session.execute("DROP KEYSPACE schemametadatatest")
+        self.cluster.shutdown()
 
     def make_create_statement(self, partition_cols, clustering_cols=None, other_cols=None, compact=False):
         clustering_cols = clustering_cols or []
@@ -309,6 +278,9 @@ class SchemaMetadataTests(unittest.TestCase):
         self.assertIn('CREATE INDEX e_index', statement)
 
     def test_collection_indexes(self):
+        if get_server_versions()[0] < (2, 1, 0):
+            raise unittest.SkipTest("Secondary index on collections were introduced in Cassandra 2.1")
+
         self.session.execute("CREATE TABLE %s.%s (a int PRIMARY KEY, b map<text, text>)"
                              % (self.ksname, self.cfname))
         self.session.execute("CREATE INDEX index1 ON %s.%s (keys(b))"
