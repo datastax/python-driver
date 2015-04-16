@@ -57,7 +57,7 @@ class TypeTests(unittest.TestCase):
 
     def test_can_insert_blob_type_as_string(self):
         """
-        Tests that blob type in Cassandra does not map to string in Python
+        Tests that byte strings in Python maps to blob type in Cassandra
         """
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
@@ -68,9 +68,7 @@ class TypeTests(unittest.TestCase):
         params = ['key1', b'blobyblob']
         query = "INSERT INTO blobstring (a, b) VALUES (%s, %s)"
 
-        # In python 3, the 'bytes' type is treated as a blob, so we can
-        # correctly encode it with hex notation.
-        # In python2, we don't treat the 'str' type as a blob, so we'll encode it
+        # In python2, with Cassandra > 2.0, we don't treat the 'byte str' type as a blob, so we'll encode it
         # as a string literal and have the following failure.
         if six.PY2 and self._cql_version >= (3, 1, 0):
             # Blob values can't be specified using string notation in CQL 3.1.0 and
@@ -81,10 +79,14 @@ class TypeTests(unittest.TestCase):
                 msg = r'.*Invalid STRING constant \(.*?\) for b of type blob.*'
             self.assertRaisesRegexp(InvalidRequest, msg, s.execute, query, params)
             return
-        elif six.PY2:
-            params[1] = params[1].encode('hex')
 
-        s.execute(query, params)
+        # In python2, with Cassandra < 2.0, we can manually encode the 'byte str' type as hex for insertion in a blob.
+        if six.PY2:
+            cass_params = [params[0], params[1].encode('hex')]
+            s.execute(query, cass_params)
+        # In python 3, the 'bytes' type is treated as a blob, so we can correctly encode it with hex notation.
+        else:
+            s.execute(query, params)
 
         results = s.execute("SELECT * FROM blobstring")[0]
         for expected, actual in zip(params, results):
