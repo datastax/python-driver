@@ -11,22 +11,26 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 from decimal import Decimal
-import datetime
-from uuid import UUID
-import pytz
+from datetime import datetime, date, time
+from uuid import uuid1, uuid4
 
 try:
     from blist import sortedset
 except ImportError:
     sortedset = set  # noqa
 
-DATA_TYPE_PRIMITIVES = [
+from cassandra.util import OrderedMap
+
+from tests.integration import get_server_versions
+
+
+PRIMITIVE_DATATYPES = [
     'ascii',
     'bigint',
     'blob',
     'boolean',
-    # 'counter', counters are not allowed inside tuples
     'decimal',
     'double',
     'float',
@@ -40,22 +44,28 @@ DATA_TYPE_PRIMITIVES = [
     'varint',
 ]
 
-DATA_TYPE_NON_PRIMITIVE_NAMES = [
+COLLECTION_TYPES = [
     'list',
     'set',
     'map',
-    'tuple'
 ]
 
 
-def get_sample_data():
-    """
-    Create a standard set of sample inputs for testing.
-    """
+def update_datatypes():
+    _cass_version, _cql_version = get_server_versions()
 
+    if _cass_version >= (2, 1, 0):
+        COLLECTION_TYPES.append('tuple')
+
+    if _cass_version >= (2, 1, 5):
+        PRIMITIVE_DATATYPES.append('date')
+        PRIMITIVE_DATATYPES.append('time')
+
+
+def get_sample_data():
     sample_data = {}
 
-    for datatype in DATA_TYPE_PRIMITIVES:
+    for datatype in PRIMITIVE_DATATYPES:
         if datatype == 'ascii':
             sample_data[datatype] = 'ascii'
 
@@ -67,10 +77,6 @@ def get_sample_data():
 
         elif datatype == 'boolean':
             sample_data[datatype] = True
-
-        elif datatype == 'counter':
-            # Not supported in an insert statement
-            pass
 
         elif datatype == 'decimal':
             sample_data[datatype] = Decimal('12.3E+7')
@@ -91,13 +97,13 @@ def get_sample_data():
             sample_data[datatype] = 'text'
 
         elif datatype == 'timestamp':
-            sample_data[datatype] = datetime.datetime.fromtimestamp(872835240, tz=pytz.timezone('America/New_York')).astimezone(pytz.UTC).replace(tzinfo=None)
+            sample_data[datatype] = datetime(2013, 12, 31, 23, 59, 59, 999000)
 
         elif datatype == 'timeuuid':
-            sample_data[datatype] = UUID('FE2B4360-28C6-11E2-81C1-0800200C9A66')
+            sample_data[datatype] = uuid1()
 
         elif datatype == 'uuid':
-            sample_data[datatype] = UUID('067e6162-3b6f-4ae2-a171-2470b63dff00')
+            sample_data[datatype] = uuid4()
 
         elif datatype == 'varchar':
             sample_data[datatype] = 'varchar'
@@ -105,35 +111,40 @@ def get_sample_data():
         elif datatype == 'varint':
             sample_data[datatype] = int(str(2147483647) + '000')
 
+        elif datatype == 'date':
+            sample_data[datatype] = date(2015, 1, 15)
+
+        elif datatype == 'time':
+            sample_data[datatype] = time(16, 47, 25, 7)
+
         else:
-            raise Exception('Missing handling of %s.'  % datatype)
+            raise Exception("Missing handling of {0}".format(datatype))
 
     return sample_data
 
 SAMPLE_DATA = get_sample_data()
 
+
 def get_sample(datatype):
     """
-    Helper method to access created sample data
+    Helper method to access created sample data for primitive types
     """
 
     return SAMPLE_DATA[datatype]
 
-def get_nonprim_sample(non_prim_type, datatype):
+
+def get_collection_sample(collection_type, datatype):
     """
-    Helper method to access created sample data for non-primitives
+    Helper method to access created sample data for collection types
     """
 
-    if non_prim_type == 'list':
+    if collection_type == 'list':
         return [get_sample(datatype), get_sample(datatype)]
-    elif non_prim_type == 'set':
+    elif collection_type == 'set':
         return sortedset([get_sample(datatype)])
-    elif non_prim_type == 'map':
-        if datatype == 'blob':
-            return {get_sample('ascii'): get_sample(datatype)}
-        else:
-            return {get_sample(datatype): get_sample(datatype)}
-    elif non_prim_type == 'tuple':
+    elif collection_type == 'map':
+        return OrderedMap([(get_sample(datatype), get_sample(datatype))])
+    elif collection_type == 'tuple':
         return (get_sample(datatype),)
     else:
-        raise Exception('Missing handling of non-primitive type {0}.'.format(non_prim_type))
+        raise Exception('Missing handling of non-primitive type {0}.'.format(collection_type))
