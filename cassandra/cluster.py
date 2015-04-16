@@ -1154,7 +1154,7 @@ class Cluster(object):
                                                       aggregate, max_schema_agreement_wait):
             raise Exception("Schema was not refreshed. See log for details.")
 
-    def submit_schema_refresh(self, keyspace=None, table=None, usertype=None, function=None):
+    def submit_schema_refresh(self, keyspace=None, table=None, usertype=None, function=None, aggregate=None):
         """
         Schedule a refresh of the internal representation of the current
         schema for this cluster.  See :meth:`~.refresh_schema` for description of parameters.
