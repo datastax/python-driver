@@ -54,6 +54,7 @@ HEADER_DIRECTION_MASK = 0x80
 
 COMPRESSED_FLAG = 0x01
 TRACING_FLAG = 0x02
+CUSTOM_PAYLOAD_FLAG = 0x04
 
 _message_types_by_name = {}
 _message_types_by_opcode = {}
@@ -70,13 +71,19 @@ class _RegisterMessageType(type):
 class _MessageType(object):
 
     tracing = False
+    custom_payload = None
 
     def to_binary(self, stream_id, protocol_version, compression=None):
+        flags = 0
         body = io.BytesIO()
+        if self.custom_payload:
+            if protocol_version < 4:
+                raise UnsupportedOperation("Custom key/value payloads can only be used with protocol version 4 or higher")
+            flags |= CUSTOM_PAYLOAD_FLAG
+            write_bytesmap(body, self.custom_payload)
         self.send_body(body, protocol_version)
         body = body.getvalue()
 
-        flags = 0
         if compression and len(body) > 0:
             body = compression(body)
             flags |= COMPRESSED_FLAG
@@ -88,6 +95,12 @@ class _MessageType(object):
         msg.write(body)
 
         return msg.getvalue()
+
+    def update_custom_payload(self, other):
+        if other:
+            if not self.custom_payload:
+                self.custom_payload = {}
+            self.custom_payload.update(other)
 
     def __repr__(self):
         return '<%s(%s)>' % (self.__class__.__name__, ', '.join('%s=%r' % i for i in _get_params(self)))
@@ -116,6 +129,12 @@ def decode_response(protocol_version, user_type_map, stream_id, flags, opcode, b
     else:
         trace_id = None
 
+    if flags & CUSTOM_PAYLOAD_FLAG:
+        custom_payload = read_bytesmap(body)
+        flags ^= CUSTOM_PAYLOAD_FLAG
+    else:
+        custom_payload = None
+
     if flags:
         log.warning("Unknown protocol flags set: %02x. May cause problems.", flags)
 
@@ -123,6 +142,7 @@ def decode_response(protocol_version, user_type_map, stream_id, flags, opcode, b
     msg = msg_class.recv_body(body, protocol_version, user_type_map)
     msg.stream_id = stream_id
     msg.trace_id = trace_id
+    msg.custom_payload = custom_payload
     return msg
 
 
@@ -918,6 +938,11 @@ def read_binary_string(f):
     return contents
 
 
+def write_binary_string(f, s):
+    write_short(f, len(s))
+    f.write(s)
+
+
 def write_string(f, s):
     if isinstance(s, six.text_type):
         s = s.encode('utf8')
@@ -967,6 +992,22 @@ def write_stringmap(f, strmap):
     for k, v in strmap.items():
         write_string(f, k)
         write_string(f, v)
+
+
+def read_bytesmap(f):
+    numpairs = read_short(f)
+    bytesmap = {}
+    for _ in range(numpairs):
+        k = read_string(f)
+        bytesmap[k] = read_binary_string(f)
+    return bytesmap
+
+
+def write_bytesmap(f, bytesmap):
+    write_short(f, len(bytesmap))
+    for k, v in bytesmap.items():
+        write_string(f, k)
+        write_binary_string(f, v)
 
 
 def read_stringmultimap(f):

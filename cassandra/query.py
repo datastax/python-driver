@@ -197,11 +197,25 @@ class Statement(object):
     .. versionadded:: 2.1.3
     """
 
+    custom_payload = None
+    """
+    TODO: refer to custom proto doc section
+    A string:binary_type dict holding custom key/value pairs to be passed
+    in the frame to a custom QueryHandler on the server side.
+
+    By default these values are ignored by the server.
+
+    These are only allowed when using protocol version 4 or higher.
+
+    .. versionadded:: 3.0.0
+    """
+
     _serial_consistency_level = None
     _routing_key = None
 
     def __init__(self, retry_policy=None, consistency_level=None, routing_key=None,
-                 serial_consistency_level=None, fetch_size=FETCH_SIZE_UNSET, keyspace=None):
+                 serial_consistency_level=None, fetch_size=FETCH_SIZE_UNSET, keyspace=None,
+                 custom_payload=None):
         self.retry_policy = retry_policy
         if consistency_level is not None:
             self.consistency_level = consistency_level
@@ -212,6 +226,8 @@ class Statement(object):
             self.fetch_size = fetch_size
         if keyspace is not None:
             self.keyspace = keyspace
+        if custom_payload is not None:
+            self.custom_payload = custom_payload
 
     def _get_routing_key(self):
         return self._routing_key
@@ -290,8 +306,7 @@ class Statement(object):
 
 class SimpleStatement(Statement):
     """
-    A simple, un-prepared query.  All attributes of :class:`Statement` apply
-    to this class as well.
+    A simple, un-prepared query.
     """
 
     def __init__(self, query_string, *args, **kwargs):
@@ -299,6 +314,8 @@ class SimpleStatement(Statement):
         `query_string` should be a literal CQL statement with the exception
         of parameter placeholders that will be filled through the
         `parameters` argument of :meth:`.Session.execute()`.
+
+        All arguments to :class:`Statement` apply to this class as well
         """
         Statement.__init__(self, *args, **kwargs)
         self._query_string = query_string
@@ -337,6 +354,8 @@ class PreparedStatement(object):
     protocol_version = None
 
     fetch_size = FETCH_SIZE_UNSET
+
+    custom_payload = None
 
     def __init__(self, column_metadata, query_id, routing_key_indexes, query,
                  keyspace, protocol_version):
@@ -397,8 +416,6 @@ class BoundStatement(Statement):
     """
     A prepared statement that has been bound to a particular set of values.
     These may be created directly or through :meth:`.PreparedStatement.bind()`.
-
-    All attributes of :class:`Statement` apply to this class as well.
     """
 
     prepared_statement = None
@@ -414,13 +431,15 @@ class BoundStatement(Statement):
     def __init__(self, prepared_statement, *args, **kwargs):
         """
         `prepared_statement` should be an instance of :class:`PreparedStatement`.
-        All other ``*args`` and ``**kwargs`` will be passed to :class:`.Statement`.
+
+        All arguments to :class:`Statement` apply to this class as well
         """
         self.prepared_statement = prepared_statement
 
         self.consistency_level = prepared_statement.consistency_level
         self.serial_consistency_level = prepared_statement.serial_consistency_level
         self.fetch_size = prepared_statement.fetch_size
+        self.custom_payload = prepared_statement.custom_payload
         self.values = []
 
         meta = prepared_statement.column_metadata
@@ -601,7 +620,8 @@ class BatchStatement(Statement):
     _session = None
 
     def __init__(self, batch_type=BatchType.LOGGED, retry_policy=None,
-                 consistency_level=None, serial_consistency_level=None, session=None):
+                 consistency_level=None, serial_consistency_level=None,
+                 session=None, custom_payload=None):
         """
         `batch_type` specifies The :class:`.BatchType` for the batch operation.
         Defaults to :attr:`.BatchType.LOGGED`.
@@ -611,6 +631,10 @@ class BatchStatement(Statement):
 
         `consistency_level` should be a :class:`~.ConsistencyLevel` value
         to be used for all operations in the batch.
+
+        `custom_payload` is a key-value map TODO: refer to doc section
+        Note: as Statement objects are added to the batch, this map is
+        updated with values from their custom payloads.
 
         Example usage:
 
@@ -637,12 +661,15 @@ class BatchStatement(Statement):
 
         .. versionchanged:: 2.1.0
             Added `serial_consistency_level` as a parameter
+
+        .. versionchanged:: 3.0.0
+            Added `custom_payload` as a parameter
         """
         self.batch_type = batch_type
         self._statements_and_parameters = []
         self._session = session
         Statement.__init__(self, retry_policy=retry_policy, consistency_level=consistency_level,
-                           serial_consistency_level=serial_consistency_level)
+                           serial_consistency_level=serial_consistency_level, custom_payload=custom_payload)
 
     def add(self, statement, parameters=None):
         """
@@ -660,7 +687,7 @@ class BatchStatement(Statement):
         elif isinstance(statement, PreparedStatement):
             query_id = statement.query_id
             bound_statement = statement.bind(() if parameters is None else parameters)
-            self._maybe_set_routing_attributes(bound_statement)
+            self._update_state(bound_statement)
             self._statements_and_parameters.append(
                 (True, query_id, bound_statement.values))
         elif isinstance(statement, BoundStatement):
@@ -668,7 +695,7 @@ class BatchStatement(Statement):
                 raise ValueError(
                     "Parameters cannot be passed with a BoundStatement "
                     "to BatchStatement.add()")
-            self._maybe_set_routing_attributes(statement)
+            self._update_state(statement)
             self._statements_and_parameters.append(
                 (True, statement.prepared_statement.query_id, statement.values))
         else:
@@ -677,7 +704,7 @@ class BatchStatement(Statement):
             if parameters:
                 encoder = Encoder() if self._session is None else self._session.encoder
                 query_string = bind_params(query_string, parameters, encoder)
-            self._maybe_set_routing_attributes(statement)
+            self._update_state(statement)
             self._statements_and_parameters.append((False, query_string, ()))
         return self
 
@@ -695,6 +722,16 @@ class BatchStatement(Statement):
             if statement.keyspace and statement.routing_key:
                 self.routing_key = statement.routing_key
                 self.keyspace = statement.keyspace
+
+    def _update_custom_payload(self, statement):
+        if statement.custom_payload:
+            if self.custom_payload is None:
+                self.custom_payload = {}
+            self.custom_payload.update(statement.custom_payload)
+
+    def _update_state(self, statement):
+        self._maybe_set_routing_attributes(statement)
+        self._update_custom_payload(statement)
 
     def __str__(self):
         consistency = ConsistencyLevel.value_to_name.get(self.consistency_level, 'Not Set')
@@ -836,7 +873,7 @@ class QueryTrace(object):
 
     def _execute(self, query, parameters, time_spent, max_wait):
         # in case the user switched the row factory, set it to namedtuple for this query
-        future = self._session._create_response_future(query, parameters, trace=False)
+        future = self._session._create_response_future(query, parameters, trace=False, custom_payload=None)
         future.row_factory = named_tuple_factory
         future.send_request()
 
