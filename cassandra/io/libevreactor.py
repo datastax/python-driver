@@ -39,8 +39,10 @@ except ImportError:
 
 try:
     import ssl
+    from ssl import match_hostname
 except ImportError:
     ssl = None # NOQA
+    match_hostname = None
 
 log = logging.getLogger(__name__)
 
@@ -263,13 +265,27 @@ class LibevConnection(Connection):
         for (af, socktype, proto, canonname, sockaddr) in addresses:
             try:
                 self._socket = socket.socket(af, socktype, proto)
+                check_hostname = False
+
                 if self.ssl_options:
                     if not ssl:
                         raise Exception("This version of Python was not compiled with SSL support")
-                    self._socket = ssl.wrap_socket(self._socket, **self.ssl_options)
+
+                    opts = dict(self.ssl_options)
+                    if opts.has_key('check_hostname'):
+                        check_hostname = opts.pop('check_hostname')
+                    self._socket = ssl.wrap_socket(self._socket, **opts)
+
                 self._socket.settimeout(1.0)  # TODO potentially make this value configurable
                 self._socket.connect(sockaddr)
                 sockerr = None
+
+                if check_hostname:
+                    if not match_hostname:
+                        raise Exception("This version of Python does not provide ssl.match_hostname for host verification")
+                    cert = self._socket.getpeercert()
+                    match_hostname(cert, self.host)
+
                 break
             except socket.error as err:
                 sockerr = err
