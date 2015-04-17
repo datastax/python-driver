@@ -204,7 +204,7 @@ def run_setup(extensions):
         kw['cmdclass']['build_ext'] = build_extensions
         kw['ext_modules'] = extensions
 
-    dependencies = ['futures', 'six >=1.6']
+    dependencies = ['futures', 'six >=1.6','pandas']
 
     setup(
         name='cassandra-driver',

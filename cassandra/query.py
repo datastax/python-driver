@@ -24,7 +24,7 @@ import re
 import struct
 import time
 import six
-
+from pandas import DataFrame
 from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.util import unix_time_from_uuid1
 from cassandra.encoder import Encoder
@@ -50,6 +50,23 @@ def _clean_column_name(name):
         _clean_name_cache[name] = clean
         return clean
 
+def panda_factory(colnames, rows):
+    """
+    Returns all the rows as a singular panda DataFrame
+
+    Example::
+
+        >>> from cassandra.query import panda_factory
+        >>> session = cluster.connect("mykeyspace")
+        >>> session.row_factory = tuple_factory
+        >>> df = session.execute("SELECT name, age FROM users LIMIT 2")
+        >>>print df
+            name    age
+        0   Bob     42
+
+    """
+    clean_column_names = map(_clean_column_name, colnames)
+    return DataFrame(rows, columns=clean_column_names)
 
 def tuple_factory(colnames, rows):
     """
