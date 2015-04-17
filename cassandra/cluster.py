@@ -1390,9 +1390,9 @@ class Session(object):
         trace details, the :attr:`~.Statement.trace` attribute will be left as
         :const:`None`.
 
-        `custom_payload` is a dict as described in TODO section. If `query` is a Statement
-        with its own custom_payload. the message will be a union of the two,
-        with the values specified here taking precedence.
+        `custom_payload` is a :ref:`custom_payload` dict to be passed to the server.
+        If `query` is a Statement with its own custom_payload. The message payload
+        will be a union of the two, with the values specified here taking precedence.
         """
         if timeout is _NOT_SET:
             timeout = self.default_timeout
@@ -1426,12 +1426,13 @@ class Session(object):
         :meth:`.ResponseFuture.get_query_trace()` after the request
         completes to retrieve a :class:`.QueryTrace` instance.
 
-        `custom_payload` is a dict as described in TODO section. If `query` is
-        a Statement with a custom_payload specified. the message will be a
-        union of the two, with the values specified here taking precedence.
+        `custom_payload` is a :ref:`custom_payload` dict to be passed to the server.
+        If `query` is a Statement with its own custom_payload. The message payload
+        will be a union of the two, with the values specified here taking precedence.
 
         If the server sends a custom payload in the response message,
-        the dict can be obtained via :attr:`.ResponseFuture.custom_payload`
+        the dict can be obtained following :meth:`.ResponseFuture.result` via
+        :attr:`.ResponseFuture.custom_payload`
 
         Example usage::
 
@@ -1546,7 +1547,7 @@ class Session(object):
         Preparing the same query more than once will likely affect performance.
 
         `custom_payload` is a key value map to be passed along with the prepare
-        message. See TODO: refer to doc section
+        message. See :ref:`custom_payload`.
         """
         message = PrepareMessage(query=query)
         message.custom_payload = custom_payload

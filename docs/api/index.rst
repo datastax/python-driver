@@ -14,6 +14,7 @@ Core Driver
    cassandra/metrics
    cassandra/query
    cassandra/pool
+   cassandra/protocol
    cassandra/encoder
    cassandra/decoder
    cassandra/concurrent

@@ -199,11 +199,7 @@ class Statement(object):
 
     custom_payload = None
     """
-    TODO: refer to custom proto doc section
-    A string:binary_type dict holding custom key/value pairs to be passed
-    in the frame to a custom QueryHandler on the server side.
-
-    By default these values are ignored by the server.
+    :ref:`custom_payload` to be passed to the server.
 
     These are only allowed when using protocol version 4 or higher.
 
@@ -632,9 +628,10 @@ class BatchStatement(Statement):
         `consistency_level` should be a :class:`~.ConsistencyLevel` value
         to be used for all operations in the batch.
 
-        `custom_payload` is a key-value map TODO: refer to doc section
+        `custom_payload` is a :ref:`custom_payload` passed to the server.
         Note: as Statement objects are added to the batch, this map is
-        updated with values from their custom payloads.
+        updated with any values found in their custom payloads. These are
+        only allowed when using protocol version 4 or higher.
 
         Example usage:
 
