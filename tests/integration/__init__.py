@@ -26,6 +26,7 @@ log = logging.getLogger(__name__)
 import os
 from threading import Event
 import six
+from subprocess import call
 
 from itertools import groupby
 
@@ -201,11 +202,13 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True):
         if start:
             log.debug("Starting ccm %s cluster", cluster_name)
             cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
-            setup_test_keyspace()
+            setup_test_keyspace(ipformat=ipformat)
 
         CCM_CLUSTER = cluster
     except Exception:
-        log.exception("Failed to start ccm cluster:")
+        log.exception("Failed to start ccm cluster. Removing cluster.")
+        remove_cluster()
+        call(["pkill", "-9", "-f", ".ccm"])
         raise
 
 
@@ -228,11 +231,14 @@ def teardown_package():
             log.warn('Did not find cluster: %s' % cluster_name)
 
 
-def setup_test_keyspace():
+def setup_test_keyspace(ipformat=None):
     # wait for nodes to startup
     time.sleep(10)
 
-    cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+    if not ipformat:
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+    else:
+        cluster = Cluster(contact_points=["::1"], protocol_version=PROTOCOL_VERSION)
     session = cluster.connect()
 
     try:
