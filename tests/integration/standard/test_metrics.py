@@ -86,7 +86,7 @@ class MetricsTests(unittest.TestCase):
             # Test write
             query = SimpleStatement("INSERT INTO test (k, v) VALUES (2, 2)", consistency_level=ConsistencyLevel.ALL)
             with self.assertRaises(WriteTimeout):
-                session.execute(query)
+                session.execute(query, timeout=None)
             self.assertEqual(1, cluster.metrics.stats.write_timeouts)
 
         finally:

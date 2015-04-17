@@ -40,7 +40,7 @@ def setup_module():
     ccm_cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
     # there seems to be some race, with some versions of C* taking longer to 
     # get the auth (and default user) setup. Sleep here to give it a chance
-    time.sleep(2)
+    time.sleep(10)
 
 
 def teardown_module():
