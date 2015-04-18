@@ -11,6 +11,8 @@
 
 .. autofunction:: ordered_dict_factory
 
+.. autofunction:: panda_factory
+
 .. autoclass:: Statement
    :members:
 
