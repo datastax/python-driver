@@ -161,7 +161,7 @@ class Metadata(object):
 
         # remove not-just-added keyspaces
         removed_keyspaces = [name for name in self.keyspaces.keys()
-                             if ksname not in current_keyspaces]
+                             if name not in current_keyspaces]
         self.keyspaces = dict((name, meta) for name, meta in self.keyspaces.items()
                               if name in current_keyspaces)
         for ksname in removed_keyspaces:
