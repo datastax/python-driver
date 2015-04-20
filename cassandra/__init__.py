@@ -221,6 +221,103 @@ class WriteTimeout(Timeout):
         self.write_type = write_type
 
 
+class CoordinationFailure(Exception):
+    """
+    Replicas sent a failure to the coordinator.
+    """
+
+    consistency = None
+    """ The requested :class:`ConsistencyLevel` """
+
+    required_responses = None
+    """ The number of required replica responses """
+
+    received_responses = None
+    """
+    The number of replicas that responded before the coordinator timed out
+    the operation
+    """
+
+    failures = None
+    """
+    The number of replicas that sent a failure message
+    """
+
+    def __init__(self, summary_message, consistency=None, required_responses=None, received_responses=None, failures=None):
+        self.consistency = consistency
+        self.required_responses = required_responses
+        self.received_responses = received_responses
+        self.failures = failures
+        Exception.__init__(self, summary_message + ' info=' +
+                           repr({'consistency': consistency_value_to_name(consistency),
+                                 'required_responses': required_responses,
+                                 'received_responses': received_responses,
+                                 'failures': failures}))
+
+
+class ReadFailure(CoordinationFailure):
+    """
+    A subclass of :exc:`CoordinationFailure` for read operations.
+
+    This indicates that the replicas sent a failure message to the coordinator.
+    """
+
+    data_retrieved = None
+    """
+    A boolean indicating whether the requested data was retrieved
+    by the coordinator from any replicas before it timed out the
+    operation
+    """
+
+    def __init__(self, message, data_retrieved=None, **kwargs):
+        CoordinationFailure.__init__(self, message, **kwargs)
+        self.data_retrieved = data_retrieved
+
+
+class WriteFailure(CoordinationFailure):
+    """
+    A subclass of :exc:`CoordinationFailure` for write operations.
+
+    This indicates that the replicas sent a failure message to the coordinator.
+    """
+
+    write_type = None
+    """
+    The type of write operation, enum on :class:`~cassandra.policies.WriteType`
+    """
+
+    def __init__(self, message, write_type=None, **kwargs):
+        CoordinationFailure.__init__(self, message, **kwargs)
+        self.write_type = write_type
+
+
+class FunctionFailure(Exception):
+    """
+    User Defined Function failed during execution
+    """
+
+    keyspace = None
+    """
+    Keyspace of the function
+    """
+
+    function = None
+    """
+    Name of the function
+    """
+
+    arg_types = None
+    """
+    List of argument type names of the function
+    """
+
+    def __init__(self, summary_message, keyspace, function, arg_types):
+        self.keyspace = keyspace
+        self.function = function
+        self.arg_types = arg_types
+        Exception.__init__(self, summary_message)
+
+
 class AlreadyExists(Exception):
     """
     An attempt was made to create a keyspace or table that already exists.

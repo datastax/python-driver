@@ -22,6 +22,7 @@ from six.moves import range
 import io
 
 from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
+                       WriteFailure, ReadFailure, FunctionFailure,
                        AlreadyExists, InvalidRequest, Unauthorized,
                        UnsupportedOperation)
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
@@ -261,6 +262,58 @@ class ReadTimeoutErrorMessage(RequestExecutionException):
 
     def to_exception(self):
         return ReadTimeout(self.summary_msg(), **self.info)
+
+
+class ReadFailureMessage(RequestExecutionException):
+    summary = "Replica(s) failed to execute read"
+    error_code = 0x1300
+
+    @staticmethod
+    def recv_error_info(f):
+        return {
+            'consistency': read_consistency_level(f),
+            'received_responses': read_int(f),
+            'required_responses': read_int(f),
+            'failures': read_int(f),
+            'data_retrieved': bool(read_byte(f)),
+        }
+
+    def to_exception(self):
+        return ReadFailure(self.summary_msg(), **self.info)
+
+
+class FunctionFailureMessage(RequestExecutionException):
+    summary = "User Defined Function failure"
+    error_code = 0x1400
+
+    @staticmethod
+    def recv_error_info(f):
+        return {
+            'keyspace': read_string(f),
+            'function': read_string(f),
+            'arg_types': [read_string(f) for _ in range(read_short(f))],
+        }
+
+    def to_exception(self):
+        return FunctionFailure(self.summary_msg(), **self.info)
+
+
+class WriteFailureMessage(RequestExecutionException):
+    summary = "Replica(s) failed to execute write"
+    error_code = 0x1500
+
+    @staticmethod
+    def recv_error_info(f):
+        return {
+            'consistency': read_consistency_level(f),
+            'received_responses': read_int(f),
+            'required_responses': read_int(f),
+            'failures': read_int(f),
+            'write_type': WriteType.name_to_value[read_string(f)],
+        }
+
+    def to_exception(self):
+        return WriteFailure(self.summary_msg(), **self.info)
 
 
 class SyntaxException(RequestValidationException):
