@@ -13,6 +13,15 @@ Schemas
 .. autoclass:: KeyspaceMetadata ()
    :members:
 
+.. autoclass:: UserType ()
+   :members:
+
+.. autoclass:: Function ()
+   :members:
+
+.. autoclass:: Aggregate ()
+   :members:
+
 .. autoclass:: TableMetadata ()
    :members:
 
