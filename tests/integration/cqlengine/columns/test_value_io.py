@@ -50,8 +50,9 @@ class BaseColumnIOTest(BaseCassEngTestCase):
     def setUpClass(cls):
         super(BaseColumnIOTest, cls).setUpClass()
 
-        #if the test column hasn't been defined, bail out
-        if not cls.column: return
+        # if the test column hasn't been defined, bail out
+        if not cls.column:
+            return
 
         # create a table with the given column
         class IOTestModel(Model):
@@ -62,7 +63,7 @@ class BaseColumnIOTest(BaseCassEngTestCase):
         cls._generated_model = IOTestModel
         sync_table(cls._generated_model)
 
-        #tupleify the tested values
+        # tupleify the tested values
         if not isinstance(cls.pkey_val, tuple):
             cls.pkey_val = cls.pkey_val,
         if not isinstance(cls.data_val, tuple):
@@ -71,7 +72,8 @@ class BaseColumnIOTest(BaseCassEngTestCase):
     @classmethod
     def tearDownClass(cls):
         super(BaseColumnIOTest, cls).tearDownClass()
-        if not cls.column: return
+        if not cls.column:
+            return
         drop_table(cls._generated_model)
 
     def comparator_converter(self, val):
@@ -80,18 +82,20 @@ class BaseColumnIOTest(BaseCassEngTestCase):
 
     def test_column_io(self):
         """ Tests the given models class creates and retrieves values as expected """
-        if not self.column: return
+        if not self.column:
+            return
         for pkey, data in zip(self.pkey_val, self.data_val):
-            #create
+            # create
             m1 = self._generated_model.create(pkey=pkey, data=data)
 
-            #get
+            # get
             m2 = self._generated_model.get(pkey=pkey)
             assert m1.pkey == m2.pkey == self.comparator_converter(pkey), self.column
             assert m1.data == m2.data == self.comparator_converter(data), self.column
 
-            #delete
+            # delete
             self._generated_model.filter(pkey=pkey).delete()
+
 
 class TestBlobIO(BaseColumnIOTest):
 
@@ -99,11 +103,13 @@ class TestBlobIO(BaseColumnIOTest):
     pkey_val = six.b('blake'), uuid4().bytes
     data_val = six.b('eggleston'), uuid4().bytes
 
+
 class TestBlobIO2(BaseColumnIOTest):
 
     column = columns.Blob
     pkey_val = bytearray(six.b('blake')), uuid4().bytes
     data_val = bytearray(six.b('eggleston')), uuid4().bytes
+
 
 class TestTextIO(BaseColumnIOTest):
 
@@ -118,17 +124,20 @@ class TestNonBinaryTextIO(BaseColumnIOTest):
     pkey_val = 'bacon'
     data_val = '0xmonkey'
 
+
 class TestInteger(BaseColumnIOTest):
 
     column = columns.Integer
     pkey_val = 5
     data_val = 6
 
+
 class TestBigInt(BaseColumnIOTest):
 
     column = columns.BigInt
     pkey_val = 6
     data_val = pow(2, 63) - 1
+
 
 class TestDateTime(BaseColumnIOTest):
 
@@ -138,6 +147,7 @@ class TestDateTime(BaseColumnIOTest):
     pkey_val = now
     data_val = now + timedelta(days=1)
 
+
 class TestDate(BaseColumnIOTest):
 
     column = columns.Date
@@ -145,6 +155,7 @@ class TestDate(BaseColumnIOTest):
     now = datetime.now().date()
     pkey_val = now
     data_val = now + timedelta(days=1)
+
 
 class TestUUID(BaseColumnIOTest):
 
@@ -156,6 +167,7 @@ class TestUUID(BaseColumnIOTest):
     def comparator_converter(self, val):
         return val if isinstance(val, UUID) else UUID(val)
 
+
 class TestTimeUUID(BaseColumnIOTest):
 
     column = columns.TimeUUID
@@ -166,12 +178,28 @@ class TestTimeUUID(BaseColumnIOTest):
     def comparator_converter(self, val):
         return val if isinstance(val, UUID) else UUID(val)
 
+
+# until Floats are implicitly single:
+class FloatSingle(columns.Float):
+    def __init__(self, **kwargs):
+        super(FloatSingle, self).__init__(double_precision=False, **kwargs)
+
+
 class TestFloatIO(BaseColumnIOTest):
 
-    column = columns.Float
+    column = FloatSingle
+
+    pkey_val = 4.75
+    data_val = -1.5
+
+
+class TestDoubleIO(BaseColumnIOTest):
+
+    column = columns.Double
 
     pkey_val = 3.14
     data_val = -1982.11
+
 
 class TestDecimalIO(BaseColumnIOTest):
 
@@ -182,6 +210,7 @@ class TestDecimalIO(BaseColumnIOTest):
 
     def comparator_converter(self, val):
         return Decimal(val)
+
 
 class TestQuoter(unittest.TestCase):
 

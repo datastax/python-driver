@@ -591,18 +591,9 @@ class Boolean(Column):
         return self.validate(value)
 
 
-class Float(Column):
-    """
-    Stores a floating point value
-    """
-    db_type = 'double'
-
-    def __init__(self, double_precision=True, **kwargs):
-        self.db_type = 'double' if double_precision else 'float'
-        super(Float, self).__init__(**kwargs)
-
+class BaseFloat(Column):
     def validate(self, value):
-        value = super(Float, self).validate(value)
+        value = super(BaseFloat, self).validate(value)
         if value is None:
             return
         try:
@@ -615,6 +606,31 @@ class Float(Column):
 
     def to_database(self, value):
         return self.validate(value)
+
+
+class Float(BaseFloat):
+    """
+    Stores a single-precision floating-point value
+    """
+    db_type = 'float'
+
+    def __init__(self, double_precision=None, **kwargs):
+        if double_precision is None or bool(double_precision):
+            msg = "Float(double_precision=True) is deprecated. Use Double() type instead."
+            double_precision = True
+            warnings.warn(msg, DeprecationWarning)
+            log.warning(msg)
+
+        self.db_type = 'double' if double_precision else 'float'
+
+        super(Float, self).__init__(**kwargs)
+
+
+class Double(BaseFloat):
+    """
+    Stores a double-precision floating-point value
+    """
+    db_type = 'double'
 
 
 class Decimal(Column):

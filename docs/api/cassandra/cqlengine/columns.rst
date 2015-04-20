@@ -58,6 +58,8 @@ Columns of all types are initialized by passing :class:`.Column` attributes to t
 
 .. autoclass:: Decimal(**kwargs)
 
+.. autoclass:: Double
+
 .. autoclass:: Float
 
 .. autoclass:: Integer(**kwargs)
