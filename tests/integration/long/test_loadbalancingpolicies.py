@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import struct
-import time
-from cassandra import ConsistencyLevel, Unavailable
+import struct, time, logging, sys, traceback
+
+from cassandra import ConsistencyLevel, Unavailable, OperationTimedOut, ReadTimeout
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.policies import (RoundRobinPolicy, DCAwareRoundRobinPolicy,
@@ -31,6 +31,8 @@ try:
     import unittest2 as unittest
 except ImportError:
     import unittest  # noqa
+
+log = logging.getLogger(__name__)
 
 
 class LoadBalancingPolicyTests(unittest.TestCase):
@@ -59,14 +61,28 @@ class LoadBalancingPolicyTests(unittest.TestCase):
                 self.prepared = session.prepare(query_string)
 
             for i in range(count):
-                self.coordinator_stats.add_coordinator(session.execute_async(self.prepared.bind((0,))))
+                while True:
+                    try:
+                        self.coordinator_stats.add_coordinator(session.execute_async(self.prepared.bind((0,))))
+                        break
+                    except (OperationTimedOut, ReadTimeout):
+                        ex_type, ex, tb = sys.exc_info()
+                        log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                        del tb
         else:
             routing_key = struct.pack('>i', 0)
             for i in range(count):
                 ss = SimpleStatement('SELECT * FROM %s.cf WHERE k = 0' % keyspace,
                                      consistency_level=consistency_level,
                                      routing_key=routing_key)
-                self.coordinator_stats.add_coordinator(session.execute_async(ss))
+                while True:
+                    try:
+                        self.coordinator_stats.add_coordinator(session.execute_async(ss))
+                        break
+                    except (OperationTimedOut, ReadTimeout):
+                        ex_type, ex, tb = sys.exc_info()
+                        log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                        del tb
 
     def test_roundrobin(self):
         use_singledc()
