@@ -236,19 +236,6 @@ class LibevConnection(Connection):
             cls._libevloop._cleanup()
             cls._libevloop = None
 
-    @classmethod
-    def factory(cls, *args, **kwargs):
-        timeout = kwargs.pop('timeout', 5.0)
-        conn = cls(*args, **kwargs)
-        conn.connected_event.wait(timeout)
-        if conn.last_error:
-            raise conn.last_error
-        elif not conn.connected_event.is_set():
-            conn.close()
-            raise OperationTimedOut("Timed out creating new connection")
-        else:
-            return conn
-
     def __init__(self, *args, **kwargs):
         Connection.__init__(self, *args, **kwargs)
 
