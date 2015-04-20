@@ -761,6 +761,13 @@ class QueryTrace(object):
     A :class:`datetime.timedelta` measure of the duration of the query.
     """
 
+    client = None
+    """
+    The IP address of the client that issued this request
+
+    This is only available when using Cassandra 3.0+
+    """
+
     coordinator = None
     """
     The IP address of the host that acted as coordinator for this request.
@@ -829,6 +836,8 @@ class QueryTrace(object):
             self.started_at = session_row.started_at
             self.coordinator = session_row.coordinator
             self.parameters = session_row.parameters
+            # since C* 3.0
+            self.client = getattr(session_row, 'client', None)
 
             log.debug("Attempting to fetch trace events for trace ID: %s", self.trace_id)
             time_spent = time.time() - start
