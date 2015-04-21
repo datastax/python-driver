@@ -9,3 +9,4 @@ PyYAML
 pytz
 sure
 pure-sasl
+twisted
