@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import struct, logging, sys, traceback
+import struct, logging, sys, traceback, time
 
 from cassandra import ConsistencyLevel, OperationTimedOut, ReadTimeout, WriteTimeout, Unavailable
 from cassandra.cluster import Cluster
@@ -65,7 +65,15 @@ class ConsistencyTests(unittest.TestCase):
         for i in range(count):
             ss = SimpleStatement('INSERT INTO cf(k, i) VALUES (0, 0)',
                                  consistency_level=consistency_level)
-            session.execute(ss)
+            while True:
+                try:
+                    session.execute(ss)
+                    break
+                except (OperationTimedOut, WriteTimeout):
+                    ex_type, ex, tb = sys.exc_info()
+                    log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                    del tb
+                    time.sleep(1)
 
     def _query(self, session, keyspace, count, consistency_level=ConsistencyLevel.ONE):
         routing_key = struct.pack('>i', 0)
@@ -81,6 +89,7 @@ class ConsistencyTests(unittest.TestCase):
                     ex_type, ex, tb = sys.exc_info()
                     log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                     del tb
+                    time.sleep(1)
 
     def _assert_writes_succeed(self, session, keyspace, consistency_levels):
         for cl in consistency_levels:
