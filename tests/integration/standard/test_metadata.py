@@ -362,7 +362,7 @@ class TestCodeCoverage(unittest.TestCase):
                 "Protocol 3.0+ is required for UDT change events, currently testing against %r"
                 % (PROTOCOL_VERSION,))
 
-        if sys.version_info[2:] != (2, 7):
+        if sys.version_info[0:2] != (2, 7):
             raise unittest.SkipTest('This test compares static strings generated from dict items, which may change orders. Test with 2.7.')
 
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
@@ -559,7 +559,7 @@ CREATE TABLE export_udts.users (
         if get_server_versions()[0] < (2, 1, 0):
             raise unittest.SkipTest('Test schema output assumes 2.1.0+ options')
 
-        if sys.version_info[2:] != (2, 7):
+        if sys.version_info[0:2] != (2, 7):
             raise unittest.SkipTest('This test compares static strings generated from dict items, which may change orders. Test with 2.7.')
 
         cli_script = """CREATE KEYSPACE legacy
