@@ -35,9 +35,10 @@ from distutils.core import Extension
 from distutils.errors import (CCompilerError, DistutilsPlatformError,
                               DistutilsExecError)
 from distutils.cmd import Command
-
+from subprocess import check_output
 
 import os
+import shlex
 import warnings
 
 try:
@@ -191,7 +192,7 @@ On OSX, via homebrew:
             raise BuildFailed(ext)
 
 
-def run_setup(extensions):
+def run_setup(extensions, options):
 
     kw = {'cmdclass': {'doc': DocCommand}}
     if gevent_nosetests is not None:
@@ -234,8 +235,10 @@ def run_setup(extensions):
             'Programming Language :: Python :: Implementation :: PyPy',
             'Topic :: Software Development :: Libraries :: Python Modules'
         ],
+        options = options,
         **kw)
 
+options = {}
 extensions = [murmur3_ext, libev_ext]
 if "--no-extensions" in sys.argv:
     sys.argv = [a for a in sys.argv if a != "--no-extensions"]
@@ -246,7 +249,10 @@ elif "--no-murmur3" in sys.argv:
 elif "--no-libev" in sys.argv:
     sys.argv = [a for a in sys.argv if a != "--no-libev"]
     extensions.remove(libev_ext)
-
+elif "--tag-build" in sys.argv:
+    sys.argv = [a for a in sys.argv if a != "--tag-build"]
+    GIT_HEAD_REV = check_output(shlex.split('git rev-parse --short HEAD')).strip()
+    options['egg_info'] = dict(tag_build = "." + GIT_HEAD_REV)
 
 platform_unsupported_msg = \
 """
@@ -275,7 +281,7 @@ if extensions:
 while True:
     # try to build as many of the extensions as we can
     try:
-        run_setup(extensions)
+        run_setup(extensions, options)
     except BuildFailed as failure:
         extensions.remove(failure.ext)
     else:
