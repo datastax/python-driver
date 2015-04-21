@@ -122,9 +122,8 @@ class Metadata(object):
             keyspace_col_rows = col_def_rows.get(keyspace_meta.name, {})
             keyspace_trigger_rows = trigger_rows.get(keyspace_meta.name, {})
             for table_row in cf_def_rows.get(keyspace_meta.name, []):
-                self._add_table_metadata_to_ks(
-                    keyspace_meta, table_row, keyspace_col_rows,
-                    keyspace_trigger_rows)
+                table_meta = self._build_table_metadata(keyspace_meta, table_row, keyspace_col_rows, keyspace_trigger_rows)
+                keyspace_meta._add_table_metadata(table_meta)
 
             for usertype_row in usertype_rows.get(keyspace_meta.name, []):
                 usertype = self._build_usertype(keyspace_meta.name, usertype_row)
@@ -185,12 +184,11 @@ class Metadata(object):
             # the table was removed
             table_meta = keyspace_meta.tables.pop(table, None)
             if table_meta:
-                 self._clear_table_indexes_in_ks(keyspace_meta, table_meta.name)
+                 keyspace_meta._clear_table_indexes(table_meta.name)
         else:
             assert len(cf_results) == 1
-            self._add_table_metadata_to_ks(
-                keyspace_meta, cf_results[0], {table: col_results},
-                {table: triggers_result})
+            table_meta = self._build_table_metadata(keyspace_meta, cf_results[0], {table: col_results}, {table: triggers_result})
+            keyspace_meta._add_table_metadata(ctable_meta)
 
     def _keyspace_added(self, ksname):
         if self.token_map:
@@ -215,20 +213,6 @@ class Metadata(object):
         type_classes = list(map(types.lookup_casstype, usertype_row['field_types']))
         return UserType(usertype_row['keyspace_name'], usertype_row['type_name'],
                         usertype_row['field_names'], type_classes)
-
-    def _add_table_metadata_to_ks(self, keyspace_metadata, row, col_rows, trigger_rows):
-        self._clear_table_indexes_in_ks(keyspace_metadata, row["columnfamily_name"])
-
-        table_metadata = self._build_table_metadata(keyspace_metadata, row, col_rows, trigger_rows)
-        keyspace_metadata.tables[table_metadata.name] = table_metadata
-        for index_name, index_metadata in table_metadata.indexes.iteritems():
-            keyspace_metadata.indexes[index_name] = index_metadata
-
-    def _clear_table_indexes_in_ks(self, keyspace_metadata, table_name):
-        if table_name in keyspace_metadata.tables:
-            table_meta = keyspace_metadata.tables[table_name]
-            for index_name in table_meta.indexes:
-                keyspace_metadata.indexes.pop(index_name, None)
 
     def _build_table_metadata(self, keyspace_metadata, row, col_rows, trigger_rows):
         cfname = row["columnfamily_name"]
@@ -803,6 +787,18 @@ class KeyspaceMetadata(object):
                 self.resolve_user_types(field_type.typename, types, user_type_strings)
         user_type_strings.append(user_type.as_cql_query(formatted=True))
 
+    def _add_table_metadata(self, table_metadata):
+        self._clear_table_indexes(table_metadata.name)
+
+        self.tables[table_metadata.name] = table_metadata
+        for index_name, index_metadata in table_metadata.indexes.iteritems():
+            self.indexes[index_name] = index_metadata
+
+    def _clear_table_indexes(self, table_name):
+        if table_name in self.tables:
+            table_meta = self.tables[table_name]
+            for index_name in table_meta.indexes:
+                self.indexes.pop(index_name, None)
 
 class UserType(object):
     """
