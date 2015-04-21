@@ -158,6 +158,7 @@ class Metadata(object):
         if old_keyspace_meta:
             keyspace_meta.tables = old_keyspace_meta.tables
             keyspace_meta.user_types = old_keyspace_meta.user_types
+            keyspace_meta.indexes = old_keyspace_meta.indexes
             if (keyspace_meta.replication_strategy != old_keyspace_meta.replication_strategy):
                 self._keyspace_updated(keyspace)
         else:
@@ -182,13 +183,11 @@ class Metadata(object):
 
         if not cf_results:
             # the table was removed
-            table_meta = keyspace_meta.tables.pop(table, None)
-            if table_meta:
-                 keyspace_meta._clear_table_indexes(table_meta.name)
+            keyspace_meta._drop_table_metadata(table)
         else:
             assert len(cf_results) == 1
             table_meta = self._build_table_metadata(keyspace_meta, cf_results[0], {table: col_results}, {table: triggers_result})
-            keyspace_meta._add_table_metadata(ctable_meta)
+            keyspace_meta._add_table_metadata(table_meta)
 
     def _keyspace_added(self, ksname):
         if self.token_map:
@@ -788,15 +787,15 @@ class KeyspaceMetadata(object):
         user_type_strings.append(user_type.as_cql_query(formatted=True))
 
     def _add_table_metadata(self, table_metadata):
-        self._clear_table_indexes(table_metadata.name)
+        self._drop_table_metadata(table_metadata.name)
 
         self.tables[table_metadata.name] = table_metadata
         for index_name, index_metadata in table_metadata.indexes.iteritems():
             self.indexes[index_name] = index_metadata
 
-    def _clear_table_indexes(self, table_name):
-        if table_name in self.tables:
-            table_meta = self.tables[table_name]
+    def _drop_table_metadata(self, table_name):
+        table_meta = self.tables.pop(table_name, None)
+        if table_meta:
             for index_name in table_meta.indexes:
                 self.indexes.pop(index_name, None)
 
