@@ -58,7 +58,7 @@ class ConnectionTests(object):
         e = None
         for i in range(5):
             try:
-                conn = self.klass.factory(protocol_version=PROTOCOL_VERSION)
+                conn = self.klass.factory(host='127.0.0.1', timeout=5, protocol_version=PROTOCOL_VERSION)
                 break
             except (OperationTimedOut, NoHostAvailable) as e:
                 continue

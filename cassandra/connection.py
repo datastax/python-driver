@@ -240,20 +240,19 @@ class Connection(object):
         pass
 
     @classmethod
-    def factory(cls, *args, **kwargs):
+    def factory(cls, host, timeout, *args, **kwargs):
         """
         A factory function which returns connections which have
         succeeded in connecting and are ready for service (or
         raises an exception otherwise).
         """
-        timeout = kwargs.pop('timeout', 5.0)
-        conn = cls(*args, **kwargs)
+        conn = cls(host, *args, **kwargs)
         conn.connected_event.wait(timeout)
         if conn.last_error:
             raise conn.last_error
         elif not conn.connected_event.is_set():
             conn.close()
-            raise OperationTimedOut("Timed out creating connection")
+            raise OperationTimedOut("Timed out creating connection (%s seconds)" % timeout)
         else:
             return conn
 
