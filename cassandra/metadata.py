@@ -790,7 +790,7 @@ class KeyspaceMetadata(object):
         self._drop_table_metadata(table_metadata.name)
 
         self.tables[table_metadata.name] = table_metadata
-        for index_name, index_metadata in table_metadata.indexes.iteritems():
+        for index_name, index_metadata in six.iteritems(table_metadata.indexes):
             self.indexes[index_name] = index_metadata
 
     def _drop_table_metadata(self, table_name):
