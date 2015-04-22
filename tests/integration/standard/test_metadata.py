@@ -25,7 +25,7 @@ import sys
 from cassandra import AlreadyExists
 
 from cassandra.cluster import Cluster
-from cassandra.metadata import (Metadata, KeyspaceMetadata, TableMetadata,
+from cassandra.metadata import (Metadata, KeyspaceMetadata, TableMetadata, IndexMetadata,
                                 Token, MD5Token, TokenMap, murmur3)
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
@@ -900,3 +900,98 @@ class KeyspaceAlterMetadata(unittest.TestCase):
         new_keyspace_meta = self.cluster.metadata.keyspaces[name]
         self.assertNotEqual(original_keyspace_meta, new_keyspace_meta)
         self.assertEqual(new_keyspace_meta.durable_writes, False)
+
+
+class IndexMapTests(unittest.TestCase):
+
+    keyspace_name = 'index_map_tests'
+
+    @property
+    def table_name(self):
+        return self._testMethodName.lower()
+
+    @classmethod
+    def setup_class(cls):
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.session = cls.cluster.connect()
+        try:
+            if cls.keyspace_name in cls.cluster.metadata.keyspaces:
+                cls.session.execute("DROP KEYSPACE %s" % cls.keyspace_name)
+
+            cls.session.execute(
+                """
+                CREATE KEYSPACE %s
+                WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'};
+                """ % cls.keyspace_name)
+            cls.session.set_keyspace(cls.keyspace_name)
+        except Exception:
+            cls.cluster.shutdown()
+            raise
+
+    @classmethod
+    def teardown_class(cls):
+        try:
+            cls.session.execute("DROP KEYSPACE %s" % cls.keyspace_name)
+        finally:
+            cls.cluster.shutdown()
+
+    def create_basic_table(self):
+        self.session.execute("CREATE TABLE %s (k int PRIMARY KEY, a int)" % self.table_name)
+
+    def drop_basic_table(self):
+        self.session.execute("DROP TABLE %s" % self.table_name)
+
+    def test_index_updates(self):
+        self.create_basic_table()
+
+        ks_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
+        table_meta = ks_meta.tables[self.table_name]
+        self.assertNotIn('a_idx', ks_meta.indexes)
+        self.assertNotIn('b_idx', ks_meta.indexes)
+        self.assertNotIn('a_idx', table_meta.indexes)
+        self.assertNotIn('b_idx', table_meta.indexes)
+
+        self.session.execute("CREATE INDEX a_idx ON %s (a)" % self.table_name)
+        self.session.execute("ALTER TABLE %s ADD b int" % self.table_name)
+        self.session.execute("CREATE INDEX b_idx ON %s (b)" % self.table_name)
+
+        ks_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
+        table_meta = ks_meta.tables[self.table_name]
+        self.assertIsInstance(ks_meta.indexes['a_idx'], IndexMetadata)
+        self.assertIsInstance(ks_meta.indexes['b_idx'], IndexMetadata)
+        self.assertIsInstance(table_meta.indexes['a_idx'], IndexMetadata)
+        self.assertIsInstance(table_meta.indexes['b_idx'], IndexMetadata)
+
+        # both indexes updated when index dropped
+        self.session.execute("DROP INDEX a_idx")
+        ks_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
+        table_meta = ks_meta.tables[self.table_name]
+        self.assertNotIn('a_idx', ks_meta.indexes)
+        self.assertIsInstance(ks_meta.indexes['b_idx'], IndexMetadata)
+        self.assertNotIn('a_idx', table_meta.indexes)
+        self.assertIsInstance(table_meta.indexes['b_idx'], IndexMetadata)
+
+        # keyspace index updated when table dropped
+        self.drop_basic_table()
+        ks_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
+        self.assertNotIn(self.table_name, ks_meta.tables)
+        self.assertNotIn('a_idx', ks_meta.indexes)
+        self.assertNotIn('b_idx', ks_meta.indexes)
+
+    def test_index_follows_alter(self):
+        self.create_basic_table()
+
+        idx = self.table_name + '_idx'
+        self.session.execute("CREATE INDEX %s ON %s (a)" % (idx, self.table_name))
+        ks_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
+        table_meta = ks_meta.tables[self.table_name]
+        self.assertIsInstance(ks_meta.indexes[idx], IndexMetadata)
+        self.assertIsInstance(table_meta.indexes[idx], IndexMetadata)
+        self.session.execute('ALTER KEYSPACE %s WITH durable_writes = false' % self.keyspace_name)
+        old_meta = ks_meta
+        ks_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
+        self.assertIsNot(ks_meta, old_meta)
+        table_meta = ks_meta.tables[self.table_name]
+        self.assertIsInstance(ks_meta.indexes[idx], IndexMetadata)
+        self.assertIsInstance(table_meta.indexes[idx], IndexMetadata)
+        self.drop_basic_table()
