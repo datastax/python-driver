@@ -316,7 +316,7 @@ class IndexTest(unittest.TestCase):
         column_meta.name = 'column_name_here'
         column_meta.table.name = 'table_name_here'
         column_meta.table.keyspace.name = 'keyspace_name_here'
-        meta_model = Metadata(Mock())
+        meta_model = Metadata()
 
         row = {'index_name': 'index_name_here', 'index_type': 'index_type_here'}
         index_meta = meta_model._build_index_metadata(column_meta, row)
