@@ -143,7 +143,6 @@ class SchemaMetadataTests(unittest.TestCase):
         self.cluster.control_connection.refresh_schema()
 
         meta = self.cluster.metadata
-        self.assertNotEqual(meta.cluster_ref, None)
         self.assertNotEqual(meta.cluster_name, None)
         self.assertTrue(self.ksname in meta.keyspaces)
         ksmeta = meta.keyspaces[self.ksname]

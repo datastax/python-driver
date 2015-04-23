@@ -20,7 +20,6 @@ import json
 import logging
 import re
 from threading import RLock
-import weakref
 import six
 
 murmur3 = None
@@ -31,7 +30,6 @@ except ImportError as e:
 
 import cassandra.cqltypes as types
 from cassandra.marshal import varint_unpack
-from cassandra.pool import Host
 from cassandra.util import OrderedDict
 
 log = logging.getLogger(__name__)
@@ -72,11 +70,7 @@ class Metadata(object):
     token_map = None
     """ A :class:`~.TokenMap` instance describing the ring topology. """
 
-    def __init__(self, cluster):
-        # use a weak reference so that the Cluster object can be GC'ed.
-        # Normally the cycle detector would handle this, but implementing
-        # __del__ disables that.
-        self.cluster_ref = weakref.ref(cluster)
+    def __init__(self):
         self.keyspaces = {}
         self._hosts = {}
         self._hosts_lock = RLock()
@@ -451,17 +445,19 @@ class Metadata(object):
         else:
             return True
 
-    def add_host(self, address, datacenter, rack):
-        cluster = self.cluster_ref()
+    def add_or_return_host(self, host):
+        """
+        Returns a tuple (host, new), where ``host`` is a Host
+        instance, and ``new`` is a bool indicating whether
+        the host was newly added.
+        """
         with self._hosts_lock:
-            if address not in self._hosts:
-                new_host = Host(
-                    address, cluster.conviction_policy_factory, datacenter, rack)
-                self._hosts[address] = new_host
-            else:
-                return None
+            try:
+                return self._hosts[host.address], False
+            except KeyError:
+                self._hosts[host.address] = host
+                return host, True
 
-        return new_host
 
     def remove_host(self, host):
         with self._hosts_lock:
