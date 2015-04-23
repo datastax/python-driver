@@ -248,6 +248,7 @@ class Statement(object):
             raise ValueError(
                 "serial_consistency_level must be either ConsistencyLevel.SERIAL "
                 "or ConsistencyLevel.LOCAL_SERIAL")
+        self._serial_consistency_level = serial_consistency_level
 
     def _del_serial_consistency_level(self):
         self._serial_consistency_level = None
