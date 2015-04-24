@@ -2677,6 +2677,17 @@ class ResponseFuture(object):
 
     @property
     def custom_payload(self):
+        """
+        The custom payload returned from the server, if any. This will only be
+        set by Cassandra servers implementing a custom QueryHandler, and only
+        for protocol_version 4+.
+
+        Ensure the future is complete before trying to access this property
+        (call :meth:`.result()`, or after callback is invoked).
+        Otherwise it may throw if the response has not been received.
+
+        :return: :ref:`custom_payload`.
+        """
         if not self._event.is_set():
             raise Exception("custom_payload cannot be retrieved before ResponseFuture is finalized")
         return self._custom_payload
