@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
+import logging, sys, traceback
 
 from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.cluster import Cluster
+from cassandra.protocol import ConfigurationException
 from cassandra.query import SimpleStatement
 from tests.integration import use_singledc, PROTOCOL_VERSION
 
@@ -43,91 +44,87 @@ class SchemaTests(unittest.TestCase):
         cls.cluster.shutdown()
 
     def test_recreates(self):
+        """
+        Basic test for repeated schema creation and use, using many different keyspaces
+        """
+
         session = self.session
-        replication_factor = 3
 
         for i in range(2):
-            for keyspace in range(5):
-                keyspace = 'ks_%s' % keyspace
-                results = session.execute('SELECT keyspace_name FROM system.schema_keyspaces')
+            for keyspace_number in range(5):
+                keyspace = "ks_{0}".format(keyspace_number)
+
+                results = session.execute("SELECT keyspace_name FROM system.schema_keyspaces")
                 existing_keyspaces = [row[0] for row in results]
                 if keyspace in existing_keyspaces:
-                    ddl = 'DROP KEYSPACE %s' % keyspace
-                    log.debug(ddl)
-                    session.execute(ddl)
+                    drop = "DROP KEYSPACE {0}".format(keyspace)
+                    log.debug(drop)
+                    session.execute(drop)
 
-                ddl = """
-                    CREATE KEYSPACE %s
-                    WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '%s'}
-                    """ % (keyspace, str(replication_factor))
-                log.debug(ddl)
-                session.execute(ddl)
+                create = "CREATE KEYSPACE {0} WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': 3}}".format(keyspace)
+                log.debug(create)
+                session.execute(create)
 
-                ddl = 'CREATE TABLE %s.cf (k int PRIMARY KEY, i int)' % keyspace
-                log.debug(ddl)
-                session.execute(ddl)
+                create = "CREATE TABLE {0}.cf (k int PRIMARY KEY, i int)".format(keyspace)
+                log.debug(create)
+                session.execute(create)
 
-                statement = 'USE %s' % keyspace
-                log.debug(ddl)
-                session.execute(statement)
+                use = "USE {0}".format(keyspace)
+                log.debug(use)
+                session.execute(use)
 
-                statement = 'INSERT INTO %s(k, i) VALUES (0, 0)' % 'cf'
-                log.debug(statement)
-                ss = SimpleStatement(statement,
-                                     consistency_level=ConsistencyLevel.QUORUM)
+                insert = "INSERT INTO cf (k, i) VALUES (0, 0)"
+                log.debug(insert)
+                ss = SimpleStatement(insert, consistency_level=ConsistencyLevel.QUORUM)
                 session.execute(ss)
 
     def test_for_schema_disagreements_different_keyspaces(self):
+        """
+        Tests for any schema disagreements using many different keyspaces
+        """
+
         session = self.session
 
         for i in xrange(30):
             try:
-                session.execute('''
-                    CREATE KEYSPACE test_%s
-                    WITH replication = {'class': 'SimpleStrategy',
-                                        'replication_factor': 1}
-                ''' % i)
-
-                session.execute('''
-                    CREATE TABLE test_%s.cf (
-                        key int,
-                        value int,
-                        PRIMARY KEY (key))
-                ''' % i)
+                session.execute("CREATE KEYSPACE test_{0} WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': 1}}".format(i))
+                session.execute("CREATE TABLE test_{0}.cf (key int PRIMARY KEY, value int)".format(i))
 
                 for j in xrange(100):
-                    session.execute('INSERT INTO test_%s.cf (key, value) VALUES (%s, %s)' % (i, j, j))
-
-                session.execute('''
-                    DROP KEYSPACE test_%s
-                ''' % i)
+                    session.execute("INSERT INTO test_{0}.cf (key, value) VALUES ({1}, {1})".format(i, j))
             except OperationTimedOut:
-                pass
+                ex_type, ex, tb = sys.exc_info()
+                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                del tb
+            finally:
+                try:
+                    session.execute("DROP KEYSPACE test_{0}".format(i))
+                except ConfigurationException:
+                    # We're good, the keyspace was never created due to OperationTimedOut
+                    pass
 
     def test_for_schema_disagreements_same_keyspace(self):
+        """
+        Tests for any schema disagreements using the same keyspace multiple times
+        """
+
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         for i in xrange(30):
             try:
-                session.execute('''
-                    CREATE KEYSPACE test
-                    WITH replication = {'class': 'SimpleStrategy',
-                                        'replication_factor': 1}
-                ''')
-
-                session.execute('''
-                    CREATE TABLE test.cf (
-                        key int,
-                        value int,
-                        PRIMARY KEY (key))
-                ''')
+                session.execute("CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
+                session.execute("CREATE TABLE test.cf (key int PRIMARY KEY, value int)")
 
                 for j in xrange(100):
-                    session.execute('INSERT INTO test.cf (key, value) VALUES (%s, %s)' % (j, j))
-
-                session.execute('''
-                    DROP KEYSPACE test
-                ''')
+                    session.execute("INSERT INTO test.cf (key, value) VALUES ({0}, {0})".format(j))
             except OperationTimedOut:
-                pass
+                ex_type, ex, tb = sys.exc_info()
+                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                del tb
+            finally:
+                try:
+                    session.execute("DROP KEYSPACE test")
+                except ConfigurationException:
+                    # We're good, the keyspace was never created due to OperationTimedOut
+                    pass
