@@ -18,14 +18,21 @@ except ImportError:
     from queue import Queue, Empty  # noqa
 
 from struct import pack
-import unittest
+import logging, sys, traceback, time
 
-from cassandra import ConsistencyLevel
+from cassandra import ConsistencyLevel, OperationTimedOut, WriteTimeout
 from cassandra.cluster import Cluster
 from cassandra.query import dict_factory
 from cassandra.query import SimpleStatement
 from tests.integration import use_singledc, PROTOCOL_VERSION
 from tests.integration.long.utils import create_schema
+
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
+
+log = logging.getLogger(__name__)
 
 
 def setup_module():
@@ -71,6 +78,11 @@ class LargeDataTests(unittest.TestCase):
                 while True:
                     try:
                         futures.get_nowait().result()
+                    except (OperationTimedOut, WriteTimeout):
+                        ex_type, ex, tb = sys.exc_info()
+                        log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                        del tb
+                        time.sleep(1)
                     except Empty:
                         break
 
@@ -80,6 +92,11 @@ class LargeDataTests(unittest.TestCase):
         while True:
             try:
                 futures.get_nowait().result()
+            except (OperationTimedOut, WriteTimeout):
+                ex_type, ex, tb = sys.exc_info()
+                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                del tb
+                time.sleep(1)
             except Empty:
                 break
 
