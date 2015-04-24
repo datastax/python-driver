@@ -426,6 +426,14 @@ class Cluster(object):
     See :attr:`.schema_event_refresh_window` for discussion of rationale
     """
 
+    connect_timeout = 5
+    """
+    Timeout, in seconds, for creating new connections.
+
+    This timeout covers the entire connection negotiation, including TCP
+    establishment, options passing, and authentication.
+    """
+
     sessions = None
     control_connection = None
     scheduler = None
@@ -464,7 +472,8 @@ class Cluster(object):
                  control_connection_timeout=2.0,
                  idle_heartbeat_interval=30,
                  schema_event_refresh_window=2,
-                 topology_event_refresh_window=10):
+                 topology_event_refresh_window=10,
+                 connect_timeout=5):
         """
         Any of the mutable Cluster attributes may be set as keyword arguments
         to the constructor.
@@ -517,6 +526,7 @@ class Cluster(object):
         self.idle_heartbeat_interval = idle_heartbeat_interval
         self.schema_event_refresh_window = schema_event_refresh_window
         self.topology_event_refresh_window = topology_event_refresh_window
+        self.connect_timeout = connect_timeout
 
         self._listeners = set()
         self._listener_lock = Lock()
@@ -706,11 +716,11 @@ class Cluster(object):
         Intended for internal use only.
         """
         kwargs = self._make_connection_kwargs(address, kwargs)
-        return self.connection_class.factory(address, *args, **kwargs)
+        return self.connection_class.factory(address, self.connect_timeout, *args, **kwargs)
 
     def _make_connection_factory(self, host, *args, **kwargs):
         kwargs = self._make_connection_kwargs(host.address, kwargs)
-        return partial(self.connection_class.factory, host.address, *args, **kwargs)
+        return partial(self.connection_class.factory, host.address, self.connect_timeout, *args, **kwargs)
 
     def _make_connection_kwargs(self, address, kwargs_dict):
         if self._auth_provider_callable:
