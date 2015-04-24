@@ -442,15 +442,16 @@ class LightweightTransactionTests(unittest.TestCase):
         for (success, result) in results:
             if success:
                 continue
-            # In this case result is an exception
-            if type(result).__name__ == "NoHostAvailable":
-                self.fail("PYTHON-91: Disconnected from Cassandra: %s" % result.message)
-                break
-            if type(result).__name__ == "WriteTimeout":
-                received_timeout = True
-                continue
-            self.fail("Unexpected exception %s: %s" % (type(result).__name__, result.message))
-            break
+            else:
+                # In this case result is an exception
+                if type(result).__name__ == "NoHostAvailable":
+                    self.fail("PYTHON-91: Disconnected from Cassandra: %s" % result.message)
+                if type(result).__name__ == "WriteTimeout":
+                    received_timeout = True
+                    continue
+                if type(result).__name__ == "ReadTimeout":
+                    continue
+                self.fail("Unexpected exception %s: %s" % (type(result).__name__, result.message))
 
         # Make sure test passed
         self.assertTrue(received_timeout)
