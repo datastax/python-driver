@@ -267,11 +267,11 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
         for host in islice(cycle(local_live), pos, pos + len(local_live)):
             yield host
 
-        for dc, current_dc_hosts in six.iteritems(self._dc_live_hosts):
-            if dc == self.local_dc:
-                continue
-
-            for host in current_dc_hosts[:self.used_hosts_per_remote_dc]:
+        # the dict can change, so get candidate DCs iterating over keys of a copy
+        other_dcs = [dc for dc in self._dc_live_hosts.copy().keys() if dc != self.local_dc]
+        for dc in other_dcs:
+            remote_live = self._dc_live_hosts.get(dc, ())
+            for host in remote_live[:self.used_hosts_per_remote_dc]:
                 yield host
 
     def on_up(self, host):

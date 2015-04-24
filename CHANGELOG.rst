@@ -1,3 +1,13 @@
+2.5.1
+=====
+April 23, 2015
+
+Bug Fixes
+---------
+* Fix thread safety in DC-aware load balancing policy (PYTHON-297)
+* Fix race condition in node/token rebuild (PYTHON-298)
+* Set and send serial consistency parameter (PYTHON-299)
+
 2.5.0
 =====
 March 30, 2015

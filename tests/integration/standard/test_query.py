@@ -325,14 +325,22 @@ class SerialConsistencyTests(unittest.TestCase):
         statement = SimpleStatement(
             "UPDATE test3rf.test SET v=1 WHERE k=0 IF v=1",
             serial_consistency_level=ConsistencyLevel.SERIAL)
-        result = self.session.execute(statement)
+        # crazy test, but PYTHON-299
+        # TODO: expand to check more parameters get passed to statement, and on to messages
+        self.assertEqual(statement.serial_consistency_level, ConsistencyLevel.SERIAL)
+        future = self.session.execute_async(statement)
+        result = future.result()
+        self.assertEqual(future.message.serial_consistency_level, ConsistencyLevel.SERIAL)
         self.assertEqual(1, len(result))
         self.assertFalse(result[0].applied)
 
         statement = SimpleStatement(
             "UPDATE test3rf.test SET v=1 WHERE k=0 IF v=0",
-            serial_consistency_level=ConsistencyLevel.SERIAL)
-        result = self.session.execute(statement)
+            serial_consistency_level=ConsistencyLevel.LOCAL_SERIAL)
+        self.assertEqual(statement.serial_consistency_level, ConsistencyLevel.LOCAL_SERIAL)
+        future = self.session.execute_async(statement)
+        result = future.result()
+        self.assertEqual(future.message.serial_consistency_level, ConsistencyLevel.LOCAL_SERIAL)
         self.assertEqual(1, len(result))
         self.assertTrue(result[0].applied)
 
@@ -342,15 +350,39 @@ class SerialConsistencyTests(unittest.TestCase):
             "UPDATE test3rf.test SET v=1 WHERE k=0 IF v=2")
 
         statement.serial_consistency_level = ConsistencyLevel.SERIAL
-        result = self.session.execute(statement)
+        future = self.session.execute_async(statement)
+        result = future.result()
+        self.assertEqual(future.message.serial_consistency_level, ConsistencyLevel.SERIAL)
         self.assertEqual(1, len(result))
         self.assertFalse(result[0].applied)
 
         statement = self.session.prepare(
             "UPDATE test3rf.test SET v=1 WHERE k=0 IF v=0")
         bound = statement.bind(())
-        bound.serial_consistency_level = ConsistencyLevel.SERIAL
-        result = self.session.execute(statement)
+        bound.serial_consistency_level = ConsistencyLevel.LOCAL_SERIAL
+        future = self.session.execute_async(bound)
+        result = future.result()
+        self.assertEqual(future.message.serial_consistency_level, ConsistencyLevel.LOCAL_SERIAL)
+        self.assertEqual(1, len(result))
+        self.assertTrue(result[0].applied)
+
+    def test_conditional_update_with_batch_statements(self):
+        self.session.execute("INSERT INTO test3rf.test (k, v) VALUES (0, 0)")
+        statement = BatchStatement(serial_consistency_level=ConsistencyLevel.SERIAL)
+        statement.add("UPDATE test3rf.test SET v=1 WHERE k=0 IF v=1")
+        self.assertEqual(statement.serial_consistency_level, ConsistencyLevel.SERIAL)
+        future = self.session.execute_async(statement)
+        result = future.result()
+        self.assertEqual(future.message.serial_consistency_level, ConsistencyLevel.SERIAL)
+        self.assertEqual(1, len(result))
+        self.assertFalse(result[0].applied)
+
+        statement = BatchStatement(serial_consistency_level=ConsistencyLevel.LOCAL_SERIAL)
+        statement.add("UPDATE test3rf.test SET v=1 WHERE k=0 IF v=0")
+        self.assertEqual(statement.serial_consistency_level, ConsistencyLevel.LOCAL_SERIAL)
+        future = self.session.execute_async(statement)
+        result = future.result()
+        self.assertEqual(future.message.serial_consistency_level, ConsistencyLevel.LOCAL_SERIAL)
         self.assertEqual(1, len(result))
         self.assertTrue(result[0].applied)
 

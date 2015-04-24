@@ -64,13 +64,12 @@ from cassandra.metadata import Metadata, protect_name
 from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy)
-from cassandra.pool import (_ReconnectionHandler, _HostReconnectionHandler,
+from cassandra.pool import (Host, _ReconnectionHandler, _HostReconnectionHandler,
                             HostConnectionPool, HostConnection,
                             NoConnectionsAvailable)
 from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              BatchStatement, bind_params, QueryTrace, Statement,
                              named_tuple_factory, dict_factory, FETCH_SIZE_UNSET)
-
 
 def _is_eventlet_monkey_patched():
     if 'eventlet.patcher' not in sys.modules:
@@ -525,7 +524,7 @@ class Cluster(object):
         # let Session objects be GC'ed (and shutdown) when the user no longer
         # holds a reference.
         self.sessions = WeakSet()
-        self.metadata = Metadata(self)
+        self.metadata = Metadata()
         self.control_connection = None
         self._prepared_statements = WeakValueDictionary()
         self._prepared_statement_lock = Lock()
@@ -743,8 +742,8 @@ class Cluster(object):
                 self.connection_class.initialize_reactor()
                 atexit.register(partial(_shutdown_cluster, self))
                 for address in self.contact_points:
-                    host = self.add_host(address, signal=False)
-                    if host:
+                    host, new = self.add_host(address, signal=False)
+                    if new:
                         host.set_up()
                         for listener in self.listeners:
                             listener.on_add(host)
@@ -1069,15 +1068,17 @@ class Cluster(object):
     def add_host(self, address, datacenter=None, rack=None, signal=True, refresh_nodes=True):
         """
         Called when adding initial contact points and when the control
-        connection subsequently discovers a new node.  Intended for internal
-        use only.
+        connection subsequently discovers a new node.
+        Returns a Host instance, and a flag indicating whether it was new in
+        the metadata.
+        Intended for internal use only.
         """
-        new_host = self.metadata.add_host(address, datacenter, rack)
-        if new_host and signal:
-            log.info("New Cassandra host %r discovered", new_host)
-            self.on_add(new_host, refresh_nodes)
+        host, new = self.metadata.add_or_return_host(Host(address, self.conviction_policy_factory, datacenter, rack))
+        if new and signal:
+            log.info("New Cassandra host %r discovered", host)
+            self.on_add(host, refresh_nodes)
 
-        return new_host
+        return host, new
 
     def remove_host(self, host):
         """
@@ -2157,6 +2158,7 @@ class ControlConnection(object):
 
     def _refresh_node_list_and_token_map(self, connection, preloaded_results=None,
                                          force_token_rebuild=False):
+
         if preloaded_results:
             log.debug("[control connection] Refreshing node list and token map using preloaded results")
             peers_result = preloaded_results[0]
@@ -2214,7 +2216,7 @@ class ControlConnection(object):
             rack = row.get("rack")
             if host is None:
                 log.debug("[control connection] Found new host to connect to: %s", addr)
-                host = self._cluster.add_host(addr, datacenter, rack, signal=True, refresh_nodes=False)
+                host, _ = self._cluster.add_host(addr, datacenter, rack, signal=True, refresh_nodes=False)
                 should_rebuild_token_map = True
             else:
                 should_rebuild_token_map |= self._update_location_info(host, datacenter, rack)
