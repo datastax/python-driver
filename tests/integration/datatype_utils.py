@@ -57,7 +57,7 @@ def update_datatypes():
     if _cass_version >= (2, 1, 0):
         COLLECTION_TYPES.append('tuple')
 
-    if _cass_version >= (2, 1, 5):
+    if _cass_version >= (3, 0, 0):
         PRIMITIVE_DATATYPES.append('date')
         PRIMITIVE_DATATYPES.append('time')
 
