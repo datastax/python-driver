@@ -97,11 +97,17 @@ class SchemaTests(unittest.TestCase):
                 log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                 del tb
             finally:
-                try:
-                    session.execute("DROP KEYSPACE test_{0}".format(i))
-                except ConfigurationException:
-                    # We're good, the keyspace was never created due to OperationTimedOut
-                    pass
+                while True:
+                    try:
+                        session.execute("DROP KEYSPACE test_{0}".format(i))
+                        break
+                    except OperationTimedOut:
+                        ex_type, ex, tb = sys.exc_info()
+                        log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                        del tb
+                    except ConfigurationException:
+                        # We're good, the keyspace was never created due to OperationTimedOut
+                        break
 
     def test_for_schema_disagreements_same_keyspace(self):
         """
@@ -123,8 +129,14 @@ class SchemaTests(unittest.TestCase):
                 log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                 del tb
             finally:
-                try:
-                    session.execute("DROP KEYSPACE test")
-                except ConfigurationException:
-                    # We're good, the keyspace was never created due to OperationTimedOut
-                    pass
+                while True:
+                    try:
+                        session.execute("DROP KEYSPACE test")
+                        break
+                    except OperationTimedOut:
+                        ex_type, ex, tb = sys.exc_info()
+                        log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                        del tb
+                    except ConfigurationException:
+                        # We're good, the keyspace was never created due to OperationTimedOut
+                        break
