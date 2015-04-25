@@ -19,10 +19,9 @@ except ImportError:
 
 import difflib
 from mock import Mock
-import six
-import sys
+import six, logging, sys, traceback
 
-from cassandra import AlreadyExists
+from cassandra import AlreadyExists, OperationTimedOut
 
 from cassandra.cluster import Cluster
 from cassandra.metadata import (Metadata, KeyspaceMetadata, TableMetadata, IndexMetadata,
@@ -32,6 +31,8 @@ from cassandra.pool import Host
 
 from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION,
                                get_server_versions)
+
+log = logging.getLogger(__name__)
 
 
 def setup_module():
@@ -54,8 +55,15 @@ class SchemaMetadataTests(unittest.TestCase):
         self.session.execute("CREATE KEYSPACE schemametadatatest WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}")
 
     def tearDown(self):
-        self.session.execute("DROP KEYSPACE schemametadatatest")
-        self.cluster.shutdown()
+        while True:
+            try:
+                self.session.execute("DROP KEYSPACE schemametadatatest")
+                self.cluster.shutdown()
+                break
+            except OperationTimedOut:
+                ex_type, ex, tb = sys.exc_info()
+                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                del tb
 
     def make_create_statement(self, partition_cols, clustering_cols=None, other_cols=None, compact=False):
         clustering_cols = clustering_cols or []
