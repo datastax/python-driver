@@ -167,6 +167,12 @@ class Statement(object):
     this will be set to a :class:`.QueryTrace` instance.
     """
 
+    trace_id = None
+    """
+    If :meth:`.Session.execute()` is run with `trace` set to :const:`True`,
+    this will be set to the tracing ID from the server.
+    """
+
     consistency_level = None
     """
     The :class:`.ConsistencyLevel` to be used for this operation.  Defaults
