@@ -199,12 +199,10 @@ are only created, presisted, and queried via table Models. A short example to in
         name = Text(primary_key=True)
         addr = UserDefinedType(address)
 
-    sync_table(users)
-
-    users.create(name="Joe", addr=address(street="Easy St.", zip=99999))
+    users.create(name="Joe", addr=address(street="Easy St.", zipcode=99999))
     user = users.objects(name="Joe")[0]
     print user.name, user.addr
-    # Joe {'street': Easy St., 'zipcode': None}
+    # Joe address(street=u'Easy St.', zipcode=99999)
 
 UDTs are modeled by inheriting :class:`~.usertype.UserType`, and setting column type attributes. Types are then used in defining
 models by declaring a column of type :class:`~.columns.UserDefinedType`, with the ``UserType`` class as a parameter.
