@@ -20,10 +20,10 @@ import socket
 from threading import Event, Lock, Thread
 import weakref
 
-from six.moves import xrange
+from six.moves import range
 
-from cassandra import OperationTimedOut
-from cassandra.connection import Connection, ConnectionShutdown, NONBLOCKING
+from cassandra.connection import (Connection, ConnectionShutdown,
+                                  NONBLOCKING, Timer, TimerManager)
 from cassandra.protocol import RegisterMessage
 try:
     import cassandra.io.libevwrapper as libev
@@ -40,7 +40,7 @@ except ImportError:
 try:
     import ssl
 except ImportError:
-    ssl = None # NOQA
+    ssl = None  # NOQA
 
 log = logging.getLogger(__name__)
 
@@ -50,7 +50,6 @@ def _cleanup(loop_weakref):
         loop = loop_weakref()
     except ReferenceError:
         return
-
     loop._cleanup()
 
 
@@ -85,10 +84,10 @@ class LibevLoop(object):
         self._loop.unref()
         self._preparer.start()
 
-        atexit.register(partial(_cleanup, weakref.ref(self)))
+        self._timers = TimerManager()
+        self._loop_timer = libev.Timer(self._loop, self._on_loop_timer)
 
-    def notify(self):
-        self._notifier.send()
+        atexit.register(partial(_cleanup, weakref.ref(self)))
 
     def maybe_start(self):
         should_start = False
@@ -133,6 +132,7 @@ class LibevLoop(object):
                 conn._read_watcher.stop()
                 del conn._read_watcher
 
+        self.notify()  # wake the timer watcher
         log.debug("Waiting for event loop thread to join...")
         self._thread.join(timeout=1.0)
         if self._thread.is_alive():
@@ -142,6 +142,23 @@ class LibevLoop(object):
 
         log.debug("Event loop thread was joined")
         self._loop = None
+
+    def add_timer(self, timer):
+        self._timers.add_timer(timer)
+        self._notifier.send()  # wake up in case this timer is earlier
+
+    def _update_timer(self):
+        if not self._shutdown:
+            offset = self._timers.next_offset or 100000  # none pending; will be updated again when something new happens
+            self._loop_timer.start(offset)
+        else:
+            self._loop_timer.stop()
+
+    def _on_loop_timer(self):
+        self._timers.service_timeouts()
+
+    def notify(self):
+        self._notifier.send()
 
     def connection_created(self, conn):
         with self._conn_set_lock:
@@ -205,6 +222,9 @@ class LibevLoop(object):
 
             changed = True
 
+        # TODO: update to do connection management, timer updates through dedicaterd async 'notifier' callbacks
+        self._update_timer()
+
         if changed:
             self._notifier.send()
 
@@ -235,6 +255,12 @@ class LibevConnection(Connection):
         if cls._libevloop:
             cls._libevloop._cleanup()
             cls._libevloop = None
+
+    @classmethod
+    def create_timer(self, timeout, callback):
+        timer = Timer(timeout, callback)
+        self._libevloop.add_timer(timer)
+        return timer
 
     def __init__(self, *args, **kwargs):
         Connection.__init__(self, *args, **kwargs)
@@ -361,7 +387,7 @@ class LibevConnection(Connection):
         sabs = self.out_buffer_size
         if len(data) > sabs:
             chunks = []
-            for i in xrange(0, len(data), sabs):
+            for i in range(0, len(data), sabs):
                 chunks.append(data[i:i + sabs])
         else:
             chunks = [data]
