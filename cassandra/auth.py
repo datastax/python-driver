@@ -15,6 +15,7 @@ try:
 except ImportError:
     SASLClient = None
 
+
 class AuthProvider(object):
     """
     An abstract class that defines the interface that will be used for
@@ -156,6 +157,7 @@ class SaslAuthProvider(AuthProvider):
 
     def new_authenticator(self, host):
         return SaslAuthenticator(**self.sasl_kwargs)
+
 
 class SaslAuthenticator(Authenticator):
     """

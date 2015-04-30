@@ -1383,7 +1383,7 @@ class Session(object):
         for future in futures:
             future.result()
 
-    def execute(self, query, parameters=None, timeout=_NOT_SET, trace=False):
+    def execute(self, query, parameters=None, timeout=_NOT_SET, trace=False, custom_payload=None):
         """
         Execute the given query and synchronously wait for the response.
 
@@ -1411,6 +1411,10 @@ class Session(object):
         instance and not just a string.  If there is an error fetching the
         trace details, the :attr:`~.Statement.trace` attribute will be left as
         :const:`None`.
+
+        `custom_payload` is a :ref:`custom_payload` dict to be passed to the server.
+        If `query` is a Statement with its own custom_payload. The message payload
+        will be a union of the two, with the values specified here taking precedence.
         """
         if timeout is _NOT_SET:
             timeout = self.default_timeout
@@ -1420,7 +1424,7 @@ class Session(object):
                 "The query argument must be an instance of a subclass of "
                 "cassandra.query.Statement when trace=True")
 
-        future = self.execute_async(query, parameters, trace)
+        future = self.execute_async(query, parameters, trace, custom_payload)
         try:
             result = future.result(timeout)
         finally:
@@ -1432,7 +1436,7 @@ class Session(object):
 
         return result
 
-    def execute_async(self, query, parameters=None, trace=False):
+    def execute_async(self, query, parameters=None, trace=False, custom_payload=None):
         """
         Execute the given query and return a :class:`~.ResponseFuture` object
         which callbacks may be attached to for asynchronous response
@@ -1443,6 +1447,14 @@ class Session(object):
         If `trace` is set to :const:`True`, you may call
         :meth:`.ResponseFuture.get_query_trace()` after the request
         completes to retrieve a :class:`.QueryTrace` instance.
+
+        `custom_payload` is a :ref:`custom_payload` dict to be passed to the server.
+        If `query` is a Statement with its own custom_payload. The message payload
+        will be a union of the two, with the values specified here taking precedence.
+
+        If the server sends a custom payload in the response message,
+        the dict can be obtained following :meth:`.ResponseFuture.result` via
+        :attr:`.ResponseFuture.custom_payload`
 
         Example usage::
 
@@ -1469,11 +1481,11 @@ class Session(object):
             ...     log.exception("Operation failed:")
 
         """
-        future = self._create_response_future(query, parameters, trace)
+        future = self._create_response_future(query, parameters, trace, custom_payload)
         future.send_request()
         return future
 
-    def _create_response_future(self, query, parameters, trace):
+    def _create_response_future(self, query, parameters, trace, custom_payload):
         """ Returns the ResponseFuture before calling send_request() on it """
 
         prepared_statement = None
@@ -1523,13 +1535,16 @@ class Session(object):
         if trace:
             message.tracing = True
 
+        message.update_custom_payload(query.custom_payload)
+        message.update_custom_payload(custom_payload)
+
         return ResponseFuture(
             self, message, query, self.default_timeout, metrics=self._metrics,
             prepared_statement=prepared_statement)
 
-    def prepare(self, query):
+    def prepare(self, query, custom_payload=None):
         """
-        Prepares a query string, returing a :class:`~cassandra.query.PreparedStatement`
+        Prepares a query string, returning a :class:`~cassandra.query.PreparedStatement`
         instance which can be used as follows::
 
             >>> session = cluster.connect("mykeyspace")
@@ -1552,8 +1567,12 @@ class Session(object):
 
         **Important**: PreparedStatements should be prepared only once.
         Preparing the same query more than once will likely affect performance.
+
+        `custom_payload` is a key value map to be passed along with the prepare
+        message. See :ref:`custom_payload`.
         """
         message = PrepareMessage(query=query)
+        message.custom_payload = custom_payload
         future = ResponseFuture(self, message, query=None)
         try:
             future.send_request()
@@ -1565,6 +1584,7 @@ class Session(object):
         prepared_statement = PreparedStatement.from_message(
             query_id, column_metadata, pk_indexes, self.cluster.metadata, query, self.keyspace,
             self._protocol_version)
+        prepared_statement.custom_payload = future.custom_payload
 
         host = future._current_host
         try:
@@ -2636,6 +2656,7 @@ class ResponseFuture(object):
     _start_time = None
     _metrics = None
     _paging_state = None
+    _custom_payload = None
 
     def __init__(self, session, message, query, default_timeout=None, metrics=None, prepared_statement=None):
         self.session = session
@@ -2723,6 +2744,23 @@ class ResponseFuture(object):
         """
         return self._paging_state is not None
 
+    @property
+    def custom_payload(self):
+        """
+        The custom payload returned from the server, if any. This will only be
+        set by Cassandra servers implementing a custom QueryHandler, and only
+        for protocol_version 4+.
+
+        Ensure the future is complete before trying to access this property
+        (call :meth:`.result()`, or after callback is invoked).
+        Otherwise it may throw if the response has not been received.
+
+        :return: :ref:`custom_payload`.
+        """
+        if not self._event.is_set():
+            raise Exception("custom_payload cannot be retrieved before ResponseFuture is finalized")
+        return self._custom_payload
+
     def start_fetching_next_page(self):
         """
         If there are more pages left in the query result, this asynchronously
@@ -2758,6 +2796,8 @@ class ResponseFuture(object):
             trace_id = getattr(response, 'trace_id', None)
             if trace_id:
                 self._query_trace = QueryTrace(trace_id, self.session)
+
+            self._custom_payload = getattr(response, 'custom_payload', None)
 
             if isinstance(response, ResultMessage):
                 if response.kind == RESULT_KIND_SET_KEYSPACE:

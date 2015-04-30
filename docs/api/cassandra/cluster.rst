@@ -102,6 +102,8 @@
 
    .. automethod:: get_query_trace()
 
+   .. autoattribute:: custom_payload()
+
    .. autoattribute:: has_more_pages
 
    .. automethod:: start_fetching_next_page()
