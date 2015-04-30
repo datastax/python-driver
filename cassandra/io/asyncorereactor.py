@@ -19,11 +19,12 @@ import os
 import socket
 import sys
 from threading import Event, Lock, Thread
+import time
 import weakref
 
 from six.moves import range
 
-from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL, EISCONN, errorcode
+from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL, EISCONN
 try:
     from weakref import WeakSet
 except ImportError:
@@ -36,9 +37,9 @@ try:
 except ImportError:
     ssl = None  # NOQA
 
-from cassandra import OperationTimedOut
 from cassandra.connection import (Connection, ConnectionShutdown,
-                                  ConnectionException, NONBLOCKING)
+                                  ConnectionException, NONBLOCKING,
+                                  Timer, TimerManager)
 from cassandra.protocol import RegisterMessage
 
 log = logging.getLogger(__name__)
@@ -55,15 +56,17 @@ def _cleanup(loop_weakref):
 
 class AsyncoreLoop(object):
 
+
     def __init__(self):
         self._pid = os.getpid()
         self._loop_lock = Lock()
         self._started = False
         self._shutdown = False
 
-        self._conns_lock = Lock()
-        self._conns = WeakSet()
         self._thread = None
+
+        self._timers = TimerManager()
+
         atexit.register(partial(_cleanup, weakref.ref(self)))
 
     def maybe_start(self):
@@ -86,23 +89,21 @@ class AsyncoreLoop(object):
     def _run_loop(self):
         log.debug("Starting asyncore event loop")
         with self._loop_lock:
-            while True:
+            while not self._shutdown:
                 try:
-                    asyncore.loop(timeout=0.001, use_poll=True, count=1000)
+                    asyncore.loop(timeout=0.001, use_poll=True, count=100)
+                    self._timers.service_timeouts()
+                    if not asyncore.socket_map:
+                        time.sleep(0.005)
                 except Exception:
                     log.debug("Asyncore event loop stopped unexepectedly", exc_info=True)
                     break
-
-                if self._shutdown:
-                    break
-
-                with self._conns_lock:
-                    if len(self._conns) == 0:
-                        break
-
             self._started = False
 
         log.debug("Asyncore event loop ended")
+
+    def add_timer(self, timer):
+        self._timers.add_timer(timer)
 
     def _cleanup(self):
         self._shutdown = True
@@ -117,14 +118,6 @@ class AsyncoreLoop(object):
                 "Please call Cluster.shutdown() to avoid this.")
 
         log.debug("Event loop thread was joined")
-
-    def connection_created(self, connection):
-        with self._conns_lock:
-            self._conns.add(connection)
-
-    def connection_destroyed(self, connection):
-        with self._conns_lock:
-            self._conns.discard(connection)
 
 
 class AsyncoreConnection(Connection, asyncore.dispatcher):
@@ -156,6 +149,12 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
             cls._loop._cleanup()
             cls._loop = None
 
+    @classmethod
+    def create_timer(self, timeout, callback):
+        timer = Timer(timeout, callback)
+        self._loop.add_timer(timer)
+        return timer
+
     def __init__(self, *args, **kwargs):
         Connection.__init__(self, *args, **kwargs)
         asyncore.dispatcher.__init__(self)
@@ -165,8 +164,6 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         self._callbacks = {}
         self.deque = deque()
         self.deque_lock = Lock()
-
-        self._loop.connection_created(self)
 
         sockerr = None
         addresses = socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM)
@@ -239,8 +236,6 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         self._readable = False
         asyncore.dispatcher.close(self)
         log.debug("Closed socket to %s", self.host)
-
-        self._loop.connection_destroyed(self)
 
         if not self.is_defunct:
             self.error_all_callbacks(

@@ -29,6 +29,7 @@ else:
     from six.moves.queue import Queue, Empty  # noqa
 
 import six
+from six.moves import queue
 from six.moves import range
 
 from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut
@@ -255,6 +256,10 @@ class Connection(object):
             raise OperationTimedOut("Timed out creating connection (%s seconds)" % timeout)
         else:
             return conn
+
+    @classmethod
+    def create_timer(cls, timeout, callback):
+        raise NotImplementedError()
 
     def close(self):
         raise NotImplementedError()
@@ -871,3 +876,61 @@ class ConnectionHeartbeat(Thread):
     def _raise_if_stopped(self):
         if self._shutdown_event.is_set():
             raise self.ShutdownException()
+
+
+class Timer(object):
+
+    cancelled = False
+
+    def __init__(self, timeout, callback):
+        self.end = time.time() + timeout
+        self.callback = callback
+        if timeout < 0:
+            self.on_timeout()
+
+    def __lt__(self, other):
+        return self.end < other.end
+
+    def cancel(self):
+        self.callback = self._noop
+        self.cancelled = True
+
+    def on_timeout(self):
+        self.callback()
+
+    def _noop(self):
+        pass
+
+
+class TimerManager(object):
+
+    def __init__(self):
+        self._timers = queue.PriorityQueue()
+
+    def add_timer(self, timer):
+        self._timers.put_nowait(timer)
+
+    def service_timeouts(self):
+        now = time.time()
+        while not self._timers.empty():
+            timer = self._timers.get_nowait()
+            if timer.end < now:
+                timer.on_timeout()
+            else:
+                self._timers.put_nowait(timer)
+                break
+
+    @property
+    def next_timeout(self):
+        try:
+            return self._timers.queue[0].end
+        except IndexError:
+            pass
+
+    @property
+    def next_offset(self):
+        try:
+            next_end = self._timers.queue[0].end
+            return next_end - time.time()
+        except IndexError:
+            pass
