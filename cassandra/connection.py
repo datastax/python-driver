@@ -925,6 +925,10 @@ class TimerManager(object):
         self._timers.put_nowait(timer)
 
     def service_timeouts(self):
+        """
+        run callbacks on all expired timers
+        :return: next end time, or None
+        """
         now = time.time()
         while not self._timers.empty():
             timer = self._timers.get_nowait()
@@ -932,7 +936,7 @@ class TimerManager(object):
                 timer.on_timeout()
             else:
                 self._timers.put_nowait(timer)
-                break
+                return timer.end
 
     @property
     def next_timeout(self):

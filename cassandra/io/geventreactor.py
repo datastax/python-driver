@@ -20,12 +20,13 @@ from collections import defaultdict
 from functools import partial
 import logging
 import os
+import time
 
-from six.moves import xrange
+from six.moves import range
 
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL
 
-from cassandra.connection import Connection, ConnectionShutdown
+from cassandra.connection import Connection, ConnectionShutdown, Timer, TimerManager
 
 
 log = logging.getLogger(__name__)
@@ -47,6 +48,34 @@ class GeventConnection(Connection):
     _read_watcher = None
     _write_watcher = None
     _socket = None
+
+    _timers = None
+    _timeout_watcher = None
+    _new_timer = None
+
+    @classmethod
+    def initialize_reactor(cls):
+        if not cls._timers:
+            cls._timers = TimerManager()
+            cls._timeout_watcher = gevent.spawn(cls.service_timeouts)
+            cls._new_timer = Event()
+
+    @classmethod
+    def create_timer(cls, timeout, callback):
+        timer = Timer(timeout, callback)
+        cls._timers.add_timer(timer)
+        cls._new_timer.set()
+        return timer
+
+    @classmethod
+    def service_timeouts(cls):
+        timer_manager = cls._timers
+        timer_event = cls._new_timer
+        while True:
+            next_end = timer_manager.service_timeouts()
+            sleep_time = next_end - time.time() if next_end else 10000
+            timer_event.wait(sleep_time)
+            timer_event.clear()
 
     def __init__(self, *args, **kwargs):
         Connection.__init__(self, *args, **kwargs)
@@ -157,5 +186,5 @@ class GeventConnection(Connection):
 
     def push(self, data):
         chunk_size = self.out_buffer_size
-        for i in xrange(0, len(data), chunk_size):
+        for i in range(0, len(data), chunk_size):
             self._write_queue.put(data[i:i + chunk_size])
