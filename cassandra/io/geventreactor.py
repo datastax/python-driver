@@ -13,7 +13,7 @@
 # limitations under the License.
 import gevent
 from gevent import select, socket, ssl
-from gevent.event import Event
+import gevent.event
 from gevent.queue import Queue
 
 from collections import defaultdict
@@ -58,7 +58,7 @@ class GeventConnection(Connection):
         if not cls._timers:
             cls._timers = TimerManager()
             cls._timeout_watcher = gevent.spawn(cls.service_timeouts)
-            cls._new_timer = Event()
+            cls._new_timer = gevent.event.Event()
 
     @classmethod
     def create_timer(cls, timeout, callback):
@@ -73,14 +73,13 @@ class GeventConnection(Connection):
         timer_event = cls._new_timer
         while True:
             next_end = timer_manager.service_timeouts()
-            sleep_time = next_end - time.time() if next_end else 10000
+            sleep_time = max(next_end - time.time(), 0) if next_end else 10000
             timer_event.wait(sleep_time)
             timer_event.clear()
 
     def __init__(self, *args, **kwargs):
         Connection.__init__(self, *args, **kwargs)
 
-        self.connected_event = Event()
         self._write_queue = Queue()
 
         self._callbacks = {}

@@ -224,6 +224,7 @@ class Connection(object):
         self._full_header_length = self._header_length + 4
 
         self.lock = RLock()
+        self.connected_event = Event()
 
     @classmethod
     def initialize_reactor(self):

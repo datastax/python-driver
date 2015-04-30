@@ -157,7 +157,6 @@ class TwistedConnection(Connection):
         """
         Connection.__init__(self, *args, **kwargs)
 
-        self.connected_event = Event()
         self.is_closed = True
         self.connector = None
 
