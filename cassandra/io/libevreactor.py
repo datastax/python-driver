@@ -24,7 +24,6 @@ from six.moves import range
 
 from cassandra.connection import (Connection, ConnectionShutdown,
                                   NONBLOCKING, Timer, TimerManager)
-from cassandra.protocol import RegisterMessage
 try:
     import cassandra.io.libevwrapper as libev
 except ImportError:
@@ -395,14 +394,3 @@ class LibevConnection(Connection):
         with self._deque_lock:
             self.deque.extend(chunks)
             self._libevloop.notify()
-
-    def register_watcher(self, event_type, callback, register_timeout=None):
-        self._push_watchers[event_type].add(callback)
-        self.wait_for_response(
-            RegisterMessage(event_list=[event_type]), timeout=register_timeout)
-
-    def register_watchers(self, type_callback_dict, register_timeout=None):
-        for event_type, callback in type_callback_dict.items():
-            self._push_watchers[event_type].add(callback)
-        self.wait_for_response(
-            RegisterMessage(event_list=type_callback_dict.keys()), timeout=register_timeout)

@@ -39,7 +39,8 @@ from cassandra.protocol import (ReadyMessage, AuthenticateMessage, OptionsMessag
                                 QueryMessage, ResultMessage, decode_response,
                                 InvalidRequestException, SupportedMessage,
                                 AuthResponseMessage, AuthChallengeMessage,
-                                AuthSuccessMessage, ProtocolException)
+                                AuthSuccessMessage, ProtocolException,
+                                RegisterMessage)
 from cassandra.util import OrderedDict
 
 
@@ -372,11 +373,24 @@ class Connection(object):
             self.defunct(exc)
             raise
 
-    def register_watcher(self, event_type, callback):
-        raise NotImplementedError()
+    def register_watcher(self, event_type, callback, register_timeout=None):
+        """
+        Register a callback for a given event type.
+        """
+        self._push_watchers[event_type].add(callback)
+        self.wait_for_response(
+            RegisterMessage(event_list=[event_type]),
+            timeout=register_timeout)
 
-    def register_watchers(self, type_callback_dict):
-        raise NotImplementedError()
+    def register_watchers(self, type_callback_dict, register_timeout=None):
+        """
+        Register multiple callback/event type pairs, expressed as a dict.
+        """
+        for event_type, callback in type_callback_dict.items():
+            self._push_watchers[event_type].add(callback)
+        self.wait_for_response(
+            RegisterMessage(event_list=type_callback_dict.keys()),
+            timeout=register_timeout)
 
     def control_conn_disposed(self):
         self.is_control_connection = False

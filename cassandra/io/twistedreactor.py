@@ -22,9 +22,7 @@ import logging
 import weakref
 import atexit
 
-from cassandra import OperationTimedOut
 from cassandra.connection import Connection, ConnectionShutdown
-from cassandra.protocol import RegisterMessage
 
 
 log = logging.getLogger(__name__)
@@ -220,22 +218,3 @@ class TwistedConnection(Connection):
         the event loop when it gets the chance.
         """
         reactor.callFromThread(self.connector.transport.write, data)
-
-    def register_watcher(self, event_type, callback, register_timeout=None):
-        """
-        Register a callback for a given event type.
-        """
-        self._push_watchers[event_type].add(callback)
-        self.wait_for_response(
-            RegisterMessage(event_list=[event_type]),
-            timeout=register_timeout)
-
-    def register_watchers(self, type_callback_dict, register_timeout=None):
-        """
-        Register multiple callback/event type pairs, expressed as a dict.
-        """
-        for event_type, callback in type_callback_dict.items():
-            self._push_watchers[event_type].add(callback)
-        self.wait_for_response(
-            RegisterMessage(event_list=type_callback_dict.keys()),
-            timeout=register_timeout)

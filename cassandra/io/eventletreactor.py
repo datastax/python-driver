@@ -28,9 +28,7 @@ from threading import Event
 
 from six.moves import xrange
 
-from cassandra import OperationTimedOut
 from cassandra.connection import Connection, ConnectionShutdown
-from cassandra.protocol import RegisterMessage
 
 
 log = logging.getLogger(__name__)
@@ -165,16 +163,3 @@ class EventletConnection(Connection):
         chunk_size = self.out_buffer_size
         for i in xrange(0, len(data), chunk_size):
             self._write_queue.put(data[i:i + chunk_size])
-
-    def register_watcher(self, event_type, callback, register_timeout=None):
-        self._push_watchers[event_type].add(callback)
-        self.wait_for_response(
-            RegisterMessage(event_list=[event_type]),
-            timeout=register_timeout)
-
-    def register_watchers(self, type_callback_dict, register_timeout=None):
-        for event_type, callback in type_callback_dict.items():
-            self._push_watchers[event_type].add(callback)
-        self.wait_for_response(
-            RegisterMessage(event_list=type_callback_dict.keys()),
-            timeout=register_timeout)
