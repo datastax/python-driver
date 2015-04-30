@@ -47,7 +47,7 @@ class ResponseFutureTests(unittest.TestCase):
     def make_response_future(self, session):
         query = SimpleStatement("SELECT * FROM foo")
         message = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
-        return ResponseFuture(session, message, query)
+        return ResponseFuture(session, message, query, 1)
 
     def make_mock_response(self, results):
         return Mock(spec=ResultMessage, kind=RESULT_KIND_ROWS, results=results, paging_state=None)
@@ -122,7 +122,7 @@ class ResponseFutureTests(unittest.TestCase):
         query.retry_policy.on_read_timeout.return_value = (RetryPolicy.RETHROW, None)
         message = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
 
-        rf = ResponseFuture(session, message, query)
+        rf = ResponseFuture(session, message, query, 1)
         rf.send_request()
 
         result = Mock(spec=ReadTimeoutErrorMessage, info={})
@@ -137,7 +137,7 @@ class ResponseFutureTests(unittest.TestCase):
         query.retry_policy.on_write_timeout.return_value = (RetryPolicy.RETHROW, None)
         message = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
 
-        rf = ResponseFuture(session, message, query)
+        rf = ResponseFuture(session, message, query, 1)
         rf.send_request()
 
         result = Mock(spec=WriteTimeoutErrorMessage, info={})
@@ -151,7 +151,7 @@ class ResponseFutureTests(unittest.TestCase):
         query.retry_policy.on_unavailable.return_value = (RetryPolicy.RETHROW, None)
         message = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
 
-        rf = ResponseFuture(session, message, query)
+        rf = ResponseFuture(session, message, query, 1)
         rf.send_request()
 
         result = Mock(spec=UnavailableErrorMessage, info={})
@@ -165,7 +165,7 @@ class ResponseFutureTests(unittest.TestCase):
         query.retry_policy.on_unavailable.return_value = (RetryPolicy.IGNORE, None)
         message = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
 
-        rf = ResponseFuture(session, message, query)
+        rf = ResponseFuture(session, message, query, 1)
         rf.send_request()
 
         result = Mock(spec=UnavailableErrorMessage, info={})
@@ -184,7 +184,7 @@ class ResponseFutureTests(unittest.TestCase):
         connection = Mock(spec=Connection)
         pool.borrow_connection.return_value = (connection, 1)
 
-        rf = ResponseFuture(session, message, query)
+        rf = ResponseFuture(session, message, query, 1)
         rf.send_request()
 
         rf.session._pools.get.assert_called_once_with('ip1')
@@ -279,7 +279,7 @@ class ResponseFutureTests(unittest.TestCase):
         session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
         session._pools.get.return_value.is_shutdown = True
 
-        rf = ResponseFuture(session, Mock(), Mock())
+        rf = ResponseFuture(session, Mock(), Mock(), 1)
         rf.send_request()
         self.assertRaises(NoHostAvailable, rf.result)
 
@@ -354,7 +354,7 @@ class ResponseFutureTests(unittest.TestCase):
         query.retry_policy.on_unavailable.return_value = (RetryPolicy.RETHROW, None)
         message = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
 
-        rf = ResponseFuture(session, message, query)
+        rf = ResponseFuture(session, message, query, 1)
         rf.send_request()
 
         rf.add_errback(self.assertIsInstance, Exception)
@@ -401,7 +401,7 @@ class ResponseFutureTests(unittest.TestCase):
         query.retry_policy.on_unavailable.return_value = (RetryPolicy.RETHROW, None)
         message = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
 
-        rf = ResponseFuture(session, message, query)
+        rf = ResponseFuture(session, message, query, 1)
         rf.send_request()
 
         callback = Mock()
@@ -431,7 +431,7 @@ class ResponseFutureTests(unittest.TestCase):
         message = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
 
         # test errback
-        rf = ResponseFuture(session, message, query)
+        rf = ResponseFuture(session, message, query, 1)
         rf.send_request()
 
         rf.add_callbacks(
@@ -443,7 +443,7 @@ class ResponseFutureTests(unittest.TestCase):
         self.assertRaises(Exception, rf.result)
 
         # test callback
-        rf = ResponseFuture(session, message, query)
+        rf = ResponseFuture(session, message, query, 1)
         rf.send_request()
 
         callback = Mock()

@@ -1401,17 +1401,14 @@ class Session(object):
         trace details, the :attr:`~.Statement.trace` attribute will be left as
         :const:`None`.
         """
-        if timeout is _NOT_SET:
-            timeout = self.default_timeout
-
         if trace and not isinstance(query, Statement):
             raise TypeError(
                 "The query argument must be an instance of a subclass of "
                 "cassandra.query.Statement when trace=True")
 
-        future = self.execute_async(query, parameters, trace)
+        future = self.execute_async(query, parameters, trace, timeout)
         try:
-            result = future.result(timeout)
+            result = future.result()
         finally:
             if trace:
                 try:
@@ -1421,7 +1418,7 @@ class Session(object):
 
         return result
 
-    def execute_async(self, query, parameters=None, trace=False):
+    def execute_async(self, query, parameters=None, trace=False, timeout=_NOT_SET):
         """
         Execute the given query and return a :class:`~.ResponseFuture` object
         which callbacks may be attached to for asynchronous response
@@ -1458,11 +1455,14 @@ class Session(object):
             ...     log.exception("Operation failed:")
 
         """
-        future = self._create_response_future(query, parameters, trace)
+        if timeout is _NOT_SET:
+            timeout = self.default_timeout
+
+        future = self._create_response_future(query, parameters, trace, timeout)
         future.send_request()
         return future
 
-    def _create_response_future(self, query, parameters, trace):
+    def _create_response_future(self, query, parameters, trace, timeout):
         """ Returns the ResponseFuture before calling send_request() on it """
 
         prepared_statement = None
@@ -1513,7 +1513,7 @@ class Session(object):
             message.tracing = True
 
         return ResponseFuture(
-            self, message, query, self.default_timeout, metrics=self._metrics,
+            self, message, query, timeout, metrics=self._metrics,
             prepared_statement=prepared_statement)
 
     def prepare(self, query):
@@ -1543,10 +1543,10 @@ class Session(object):
         Preparing the same query more than once will likely affect performance.
         """
         message = PrepareMessage(query=query)
-        future = ResponseFuture(self, message, query=None)
+        future = ResponseFuture(self, message, query=None, timeout=self.default_timeout)
         try:
             future.send_request()
-            query_id, column_metadata = future.result(self.default_timeout)
+            query_id, column_metadata = future.result()
         except Exception:
             log.exception("Error preparing query:")
             raise
@@ -1571,7 +1571,7 @@ class Session(object):
         futures = []
         for host in self._pools.keys():
             if host != excluded_host and host.is_up:
-                future = ResponseFuture(self, PrepareMessage(query=query), None)
+                future = ResponseFuture(self, PrepareMessage(query=query), None, self.default_timeout)
 
                 # we don't care about errors preparing against specific hosts,
                 # since we can always prepare them as needed when the prepared
@@ -1592,7 +1592,7 @@ class Session(object):
 
         for host, future in futures:
             try:
-                future.result(self.default_timeout)
+                future.result()
             except Exception:
                 log.exception("Error preparing query for host %s:", host)
 
@@ -2579,13 +2579,14 @@ class ResponseFuture(object):
     _start_time = None
     _metrics = None
     _paging_state = None
+    _timer = None
 
-    def __init__(self, session, message, query, default_timeout=None, metrics=None, prepared_statement=None):
+    def __init__(self, session, message, query, timeout, metrics=None, prepared_statement=None):
         self.session = session
         self.row_factory = session.row_factory
         self.message = message
         self.query = query
-        self.default_timeout = default_timeout
+        self.timeout = timeout
         self._metrics = metrics
         self.prepared_statement = prepared_statement
         self._callback_lock = Lock()
@@ -2596,6 +2597,17 @@ class ResponseFuture(object):
         self._errors = {}
         self._callbacks = []
         self._errbacks = []
+        self._start_timer()
+
+    def _start_timer(self):
+        self._timer = self.session.cluster.connection_class.create_timer(self.timeout, self._on_timeout)
+
+    def _cancel_timer(self):
+        if self._timer:
+            self._timer.cancel()
+
+    def _on_timeout(self):
+        self._set_final_exception(OperationTimedOut())
 
     def _make_query_plan(self):
         # convert the list/generator/etc to an iterator so that subsequent
@@ -2684,6 +2696,7 @@ class ResponseFuture(object):
         self._event.clear()
         self._final_result = _NOT_SET
         self._final_exception = None
+        self._start_timer()
         self.send_request()
 
     def _reprepare(self, prepare_message):
@@ -2888,6 +2901,7 @@ class ResponseFuture(object):
                 "statement on host %s: %s" % (self._current_host, response)))
 
     def _set_final_result(self, response):
+        self._cancel_timer()
         if self._metrics is not None:
             self._metrics.request_timer.addValue(time.time() - self._start_time)
 
@@ -2902,6 +2916,7 @@ class ResponseFuture(object):
             fn(response, *args, **kwargs)
 
     def _set_final_exception(self, response):
+        self._cancel_timer()
         if self._metrics is not None:
             self._metrics.request_timer.addValue(time.time() - self._start_time)
 
@@ -2976,27 +2991,18 @@ class ResponseFuture(object):
             ...     log.exception("Operation failed:")
 
         """
-        if timeout is _NOT_SET:
-            timeout = self.default_timeout
+        if timeout is not _NOT_SET:
+            # TODO: warn deprecated
+            pass
 
+        self._event.wait()
         if self._final_result is not _NOT_SET:
             if self._paging_state is None:
                 return self._final_result
             else:
                 return PagedResult(self, self._final_result, timeout)
-        elif self._final_exception:
-            raise self._final_exception
         else:
-            self._event.wait(timeout=timeout)
-            if self._final_result is not _NOT_SET:
-                if self._paging_state is None:
-                    return self._final_result
-                else:
-                    return PagedResult(self, self._final_result, timeout)
-            elif self._final_exception:
-                raise self._final_exception
-            else:
-                raise OperationTimedOut(errors=self._errors, last_host=self._current_host)
+            raise self._final_exception
 
     def get_query_trace(self, max_wait=None):
         """
@@ -3162,7 +3168,7 @@ class PagedResult(object):
                 raise
 
         self.response_future.start_fetching_next_page()
-        result = self.response_future.result(self.timeout)
+        result = self.response_future.result()
         if self.response_future.has_more_pages:
             self.current_response = result.current_response
         else:
