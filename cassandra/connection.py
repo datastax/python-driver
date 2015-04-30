@@ -933,7 +933,10 @@ class TimerManager(object):
         while not self._timers.empty():
             timer = self._timers.get_nowait()
             if timer.end < now:
-                timer.on_timeout()
+                try:
+                    timer.on_timeout()
+                except Exception:
+                    log.exception("Exception while servicing timeout callback: ")
             else:
                 self._timers.put_nowait(timer)
                 return timer.end
