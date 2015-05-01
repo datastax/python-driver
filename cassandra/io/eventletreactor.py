@@ -18,13 +18,13 @@
 
 from collections import defaultdict
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL
-import eventlet.event
+import eventlet
 from eventlet.green import select, socket
 from eventlet.queue import Queue
-from eventlet.timeout import Timeout
 from functools import partial
 import logging
 import os
+from threading import Event
 import time
 
 from six.moves import xrange
@@ -62,13 +62,13 @@ class EventletConnection(Connection):
         if not cls._timers:
             cls._timers = TimerManager()
             cls._timeout_watcher = eventlet.spawn(cls.service_timeouts)
-            cls._new_timer = eventlet.event.Event()
+            cls._new_timer = Event()
 
     @classmethod
     def create_timer(cls, timeout, callback):
         timer = Timer(timeout, callback)
         cls._timers.add_timer(timer)
-        cls._new_timer.send(eventlet.event.NOT_USED)
+        cls._new_timer.set()
         return timer
 
     @classmethod
@@ -77,9 +77,8 @@ class EventletConnection(Connection):
         while True:
             next_end = timer_manager.service_timeouts()
             sleep_time = max(next_end - time.time(), 0) if next_end else 10000
-            with Timeout(sleep_time, False):
-                cls._new_timer.wait()
-                cls._new_timer = eventlet.event.Event()
+            cls._new_timer.wait(sleep_time)
+            cls._new_timer.clear()
 
     def __init__(self, *args, **kwargs):
         Connection.__init__(self, *args, **kwargs)
