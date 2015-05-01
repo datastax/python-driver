@@ -18,17 +18,18 @@
 
 from collections import defaultdict
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL
-import eventlet
+import eventlet.event
 from eventlet.green import select, socket
 from eventlet.queue import Queue
+from eventlet.timeout import Timeout
 from functools import partial
 import logging
 import os
-from threading import Event
+import time
 
 from six.moves import xrange
 
-from cassandra.connection import Connection, ConnectionShutdown
+from cassandra.connection import Connection, ConnectionShutdown, Timer, TimerManager
 
 
 log = logging.getLogger(__name__)
@@ -51,14 +52,38 @@ class EventletConnection(Connection):
     _write_watcher = None
     _socket = None
 
+    _timers = None
+    _timeout_watcher = None
+    _new_timer = None
+
     @classmethod
     def initialize_reactor(cls):
         eventlet.monkey_patch()
+        if not cls._timers:
+            cls._timers = TimerManager()
+            cls._timeout_watcher = eventlet.spawn(cls.service_timeouts)
+            cls._new_timer = eventlet.event.Event()
+
+    @classmethod
+    def create_timer(cls, timeout, callback):
+        timer = Timer(timeout, callback)
+        cls._timers.add_timer(timer)
+        cls._new_timer.send(eventlet.event.NOT_USED)
+        return timer
+
+    @classmethod
+    def service_timeouts(cls):
+        timer_manager = cls._timers
+        while True:
+            next_end = timer_manager.service_timeouts()
+            sleep_time = max(next_end - time.time(), 0) if next_end else 10000
+            with Timeout(sleep_time, False):
+                cls._new_timer.wait()
+                cls._new_timer = eventlet.event.Event()
 
     def __init__(self, *args, **kwargs):
         Connection.__init__(self, *args, **kwargs)
 
-        self.connected_event = Event()
         self._write_queue = Queue()
 
         self._callbacks = {}
