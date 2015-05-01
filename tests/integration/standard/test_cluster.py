@@ -30,7 +30,7 @@ from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
                                 WhiteListRoundRobinPolicy)
 from cassandra.query import SimpleStatement, TraceUnavailable
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions
+from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, get_node
 from tests.integration.util import assert_quiescent_pool_state
 
 
@@ -39,6 +39,31 @@ def setup_module():
 
 
 class ClusterTests(unittest.TestCase):
+
+    def test_raise_error_on_control_connection_timeout(self):
+        """
+        Test for initial control connection timeout
+
+        test_raise_error_on_control_connection_timeout tests that the driver times out after the set initial connection
+        timeout. It first pauses node1, essentially making it unreachable. It then attempts to create a Cluster object
+        via connecting to node1 with a timeout of 1 second, and ensures that a NoHostAvailable is raised, along with
+        an OperationTimedOut for 1 second.
+
+        @expected_errors NoHostAvailable When node1 is paused, and a connection attempt is made.
+        @since 2.6.0
+        @jira_ticket PYTHON-206
+        @expected_result NoHostAvailable exception should be raised after 1 second.
+
+        @test_category connection
+        """
+
+        get_node(1).pause()
+        cluster = Cluster(contact_points=['127.0.0.1'], protocol_version=PROTOCOL_VERSION, connect_timeout=1)
+
+        with self.assertRaisesRegexp(NoHostAvailable, "OperationTimedOut\('errors=Timed out creating connection \(1 seconds\)"):
+            cluster.connect()
+
+        get_node(1).resume()
 
     def test_basic(self):
         """
