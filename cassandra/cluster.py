@@ -2600,7 +2600,8 @@ class ResponseFuture(object):
         self._start_timer()
 
     def _start_timer(self):
-        self._timer = self.session.cluster.connection_class.create_timer(self.timeout, self._on_timeout)
+        if self.timeout is not None:
+            self._timer = self.session.cluster.connection_class.create_timer(self.timeout, self._on_timeout)
 
     def _cancel_timer(self):
         if self._timer:
