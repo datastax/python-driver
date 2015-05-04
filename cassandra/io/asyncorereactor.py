@@ -158,7 +158,6 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         Connection.__init__(self, *args, **kwargs)
         asyncore.dispatcher.__init__(self)
 
-        self._callbacks = {}
         self.deque = deque()
         self.deque_lock = Lock()
 

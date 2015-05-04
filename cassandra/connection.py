@@ -194,6 +194,7 @@ class Connection(object):
         self.is_control_connection = is_control_connection
         self.user_type_map = user_type_map
         self._push_watchers = defaultdict(set)
+        self._callbacks = {}
         self._iobuf = io.BytesIO()
         if protocol_version >= 3:
             self._header_unpack = v3_header_unpack

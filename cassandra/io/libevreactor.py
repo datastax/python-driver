@@ -264,7 +264,6 @@ class LibevConnection(Connection):
     def __init__(self, *args, **kwargs):
         Connection.__init__(self, *args, **kwargs)
 
-        self._callbacks = {}
         self.deque = deque()
         self._deque_lock = Lock()
 

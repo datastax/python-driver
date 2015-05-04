@@ -189,7 +189,6 @@ class TwistedConnection(Connection):
         self.is_closed = True
         self.connector = None
 
-        self._callbacks = {}
         reactor.callFromThread(self.add_connection)
         self._loop.maybe_start()
 

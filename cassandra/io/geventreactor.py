@@ -82,9 +82,6 @@ class GeventConnection(Connection):
 
         self._write_queue = Queue()
 
-        self._callbacks = {}
-        self._push_watchers = defaultdict(set)
-
         sockerr = None
         addresses = socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM)
         for (af, socktype, proto, canonname, sockaddr) in addresses:
