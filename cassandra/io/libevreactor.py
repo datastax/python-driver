@@ -256,9 +256,9 @@ class LibevConnection(Connection):
             cls._libevloop = None
 
     @classmethod
-    def create_timer(self, timeout, callback):
+    def create_timer(cls, timeout, callback):
         timer = Timer(timeout, callback)
-        self._libevloop.add_timer(timer)
+        cls._libevloop.add_timer(timer)
         return timer
 
     def __init__(self, *args, **kwargs):

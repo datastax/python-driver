@@ -149,9 +149,9 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
             cls._loop = None
 
     @classmethod
-    def create_timer(self, timeout, callback):
+    def create_timer(cls, timeout, callback):
         timer = Timer(timeout, callback)
-        self._loop.add_timer(timer)
+        cls._loop.add_timer(timer)
         return timer
 
     def __init__(self, *args, **kwargs):
