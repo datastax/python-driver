@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from uuid import uuid4
+from uuid import uuid4, UUID
 import random
-from datetime import date
+from datetime import date, datetime
+from decimal import Decimal
 from operator import itemgetter
 from cassandra.cqlengine import CQLEngineException
 from tests.integration.cqlengine.base import BaseCassEngTestCase
@@ -123,6 +124,102 @@ class TestModelIO(BaseCassEngTestCase):
         """
         sync_table(TestModel)
         sync_table(TestModel)
+
+    def test_can_insert_model_with_all_column_types(self):
+        """
+        Test for inserting all column types into a Model
+
+        test_can_insert_model_with_all_column_types tests that each cqlengine column type can be inserted into a Model.
+        It first creates a Model that has each cqlengine column type. It then creates a Model instance where all the fields
+        have corresponding data, which performs the insert into the Cassandra table.
+        Finally, it verifies that each column read from the Model from Cassandra is the same as the input parameters.
+
+        @since 2.6.0
+        @jira_ticket PYTHON-246
+        @expected_result The Model is inserted with each column type, and the resulting read yields proper data for each column.
+
+        @test_category data_types:primitive
+        """
+
+        class AllDatatypesModel(Model):
+            id = columns.Integer(primary_key=True)
+            a = columns.Ascii()
+            b = columns.BigInt()
+            c = columns.Blob()
+            d = columns.Boolean()
+            e = columns.Date()
+            f = columns.DateTime()
+            g = columns.Decimal()
+            h = columns.Double()
+            i = columns.Float(double_precision=False)
+            j = columns.Inet()
+            k = columns.Integer()
+            l = columns.Text()
+            m = columns.TimeUUID()
+            n = columns.UUID()
+            o = columns.VarInt()
+
+        sync_table(AllDatatypesModel)
+
+        input = ['ascii', 2 ** 63 - 1, bytearray(b'hello world'), True, date(1970, 1, 1),
+                 datetime.utcfromtimestamp(872835240), Decimal('12.3E+7'), 2.39,
+                 3.4028234663852886e+38, '123.123.123.123', 2147483647, 'text',
+                 UUID('FE2B4360-28C6-11E2-81C1-0800200C9A66'), UUID('067e6162-3b6f-4ae2-a171-2470b63dff00'),
+                 int(str(2147483647) + '000')]
+
+        AllDatatypesModel.create(id=0, a='ascii', b=2 ** 63 - 1, c=bytearray(b'hello world'), d=True, e=date(1970, 1, 1),
+                                 f=datetime.utcfromtimestamp(872835240), g=Decimal('12.3E+7'), h=2.39,
+                                 i=3.4028234663852886e+38, j='123.123.123.123', k=2147483647, l='text',
+                                 m=UUID('FE2B4360-28C6-11E2-81C1-0800200C9A66'), n=UUID('067e6162-3b6f-4ae2-a171-2470b63dff00'),
+                                 o=int(str(2147483647) + '000'))
+
+        self.assertEqual(1, AllDatatypesModel.objects.count())
+        output = AllDatatypesModel.objects().first()
+
+        for i, i_char in enumerate(range(ord('a'), ord('a') + 15)):
+            self.assertEqual(input[i], output[chr(i_char)])
+
+    def test_can_insert_double_and_float(self):
+        """
+        Test for inserting single-precision and double-precision values into a Float and Double columns
+
+        test_can_insert_double_and_float tests a Float can only hold a single-precision value, unless
+        "double_precision" attribute is specified as True or is unspecified. This test first tests that an AttributeError
+        is raised when attempting to input a double-precision value into a single-precision Float. It then verifies that
+        Double, Float(double_precision=True) and Float() can hold double-precision values by default. It also verifies that
+        columns.Float(double_precision=False) can hold a single-precision value, and a Double can hold a single-precision value.
+
+        @since 2.6.0
+        @jira_ticket PYTHON-246
+        @expected_result Each floating point column type is able to hold their respective precision values.
+
+        @test_category data_types:primitive
+        """
+
+        class FloatingPointModel(Model):
+            id = columns.Integer(primary_key=True)
+            a = columns.Float(double_precision=False)
+            b = columns.Float(double_precision=True)
+            c = columns.Float()
+            d = columns.Double()
+
+        sync_table(FloatingPointModel)
+
+        FloatingPointModel.create(id=0, a=2.39)
+        output = FloatingPointModel.objects().first()
+        self.assertEqual(2.390000104904175, output.a)
+
+        FloatingPointModel.create(id=0, a=3.4028234663852886e+38, b=2.39, c=2.39, d=2.39)
+        output = FloatingPointModel.objects().first()
+
+        self.assertEqual(3.4028234663852886e+38, output.a)
+        self.assertEqual(2.39, output.b)
+        self.assertEqual(2.39, output.c)
+        self.assertEqual(2.39, output.d)
+
+        FloatingPointModel.create(id=0, d=3.4028234663852886e+38)
+        output = FloatingPointModel.objects().first()
+        self.assertEqual(3.4028234663852886e+38, output.d)
 
 
 class TestMultiKeyModel(Model):

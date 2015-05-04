@@ -187,7 +187,22 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         self.assertEqual(udts[2], output.v_2)
         self.assertEqual(udts[3], output.v_3)
 
-    def test_can_insert_udts_with_nulls(self):
+    def test_can_insert_udts_with_nones(self):
+        """
+        Test for inserting all column types as empty into a UserType as None's
+
+        test_can_insert_udts_with_nones tests that each cqlengine column type can be inserted into a UserType as None's.
+        It first creates a UserType that has each cqlengine column type, and a corresponding table/Model. It then creates
+        a UserType instance where all the fields are None's and inserts the UserType as an instance of the Model. Finally,
+        it verifies that each column read from the UserType from Cassandra is None.
+
+        @since 2.5.0
+        @jira_ticket PYTHON-251
+        @expected_result The UserType is inserted with each column type, and the resulting read yields None's for each column.
+
+        @test_category data_types:udt
+        """
+
         class AllDatatypes(UserType):
             a = columns.Ascii()
             b = columns.BigInt()
@@ -196,13 +211,14 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
             e = columns.Date()
             f = columns.DateTime()
             g = columns.Decimal()
-            h = columns.Float(double_precision=False)
-            i = columns.Inet()
-            j = columns.Integer()
-            k = columns.Text()
-            l = columns.TimeUUID()
-            m = columns.UUID()
-            n = columns.VarInt()
+            h = columns.Double()
+            i = columns.Float(double_precision=False)
+            j = columns.Inet()
+            k = columns.Integer()
+            l = columns.Text()
+            m = columns.TimeUUID()
+            n = columns.UUID()
+            o = columns.VarInt()
 
         class AllDatatypesModel(Model):
             id = columns.Integer(primary_key=True)
@@ -219,6 +235,21 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         self.assertEqual(input, output)
 
     def test_can_insert_udts_with_all_datatypes(self):
+        """
+        Test for inserting all column types into a UserType
+
+        test_can_insert_udts_with_all_datatypes tests that each cqlengine column type can be inserted into a UserType.
+        It first creates a UserType that has each cqlengine column type, and a corresponding table/Model. It then creates
+        a UserType instance where all the fields have corresponding data, and inserts the UserType as an instance of the Model.
+        Finally, it verifies that each column read from the UserType from Cassandra is the same as the input parameters.
+
+        @since 2.5.0
+        @jira_ticket PYTHON-251
+        @expected_result The UserType is inserted with each column type, and the resulting read yields proper data for each column.
+
+        @test_category data_types:udt
+        """
+
         class AllDatatypes(UserType):
             a = columns.Ascii()
             b = columns.BigInt()
@@ -228,12 +259,13 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
             f = columns.DateTime()
             g = columns.Decimal()
             h = columns.Double()
-            i = columns.Inet()
-            j = columns.Integer()
-            k = columns.Text()
-            l = columns.TimeUUID()
-            m = columns.UUID()
-            n = columns.VarInt()
+            i = columns.Float(double_precision=False)
+            j = columns.Inet()
+            k = columns.Integer()
+            l = columns.Text()
+            m = columns.TimeUUID()
+            n = columns.UUID()
+            o = columns.VarInt()
 
         class AllDatatypesModel(Model):
             id = columns.Integer(primary_key=True)
@@ -242,14 +274,14 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         sync_table(AllDatatypesModel)
 
         input = AllDatatypes(a='ascii', b=2 ** 63 - 1, c=bytearray(b'hello world'), d=True, e=date(1970, 1, 1),
-                             f=datetime.utcfromtimestamp(872835240),
-                             g=Decimal('12.3E+7'), h=3.4028234663852886e+38, i='123.123.123.123', j=2147483647,
-                             k='text', l= UUID('FE2B4360-28C6-11E2-81C1-0800200C9A66'),
-                             m=UUID('067e6162-3b6f-4ae2-a171-2470b63dff00'), n=int(str(2147483647) + '000'))
-        alldata = AllDatatypesModel.create(id=0, data=input)
+                             f=datetime.utcfromtimestamp(872835240), g=Decimal('12.3E+7'), h=2.39,
+                             i=3.4028234663852886e+38, j='123.123.123.123', k=2147483647, l='text',
+                             m=UUID('FE2B4360-28C6-11E2-81C1-0800200C9A66'), n=UUID('067e6162-3b6f-4ae2-a171-2470b63dff00'),
+                             o=int(str(2147483647) + '000'))
+        AllDatatypesModel.create(id=0, data=input)
 
         self.assertEqual(1, AllDatatypesModel.objects.count())
         output = AllDatatypesModel.objects().first().data
 
-        for i in range(ord('a'), ord('a') + 14):
+        for i in range(ord('a'), ord('a') + 15):
             self.assertEqual(input[chr(i)], output[chr(i)])
