@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-
+import socket
 from cassandra.concurrent import execute_concurrent
 
 
@@ -86,6 +86,44 @@ class QueryTests(unittest.TestCase):
         str(statement.trace)
         for event in statement.trace.events:
             str(event)
+
+        cluster.shutdown()
+
+    def test_trace_client_ip(self):
+        """
++       Test to validate that client trace contains client ip information.
++
++       creates a simple query and ensures that the client trace information is present. This will
+        only be the case if the CQL version is 4 or greater./
+
++
++       @since 3.0
++       @jira_ticket PYTHON-235
++       @expected_result client address should be present in CQL > 4, otherwise should be none.
++
++       @test_category trace
++       """
+        if PROTOCOL_VERSION < 4:
+            raise unittest.SkipTest(
+                "Protocol 4+ is required for client ip tracing, currently testing against %r"
+                % (PROTOCOL_VERSION,))
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        session = cluster.connect()
+
+        query = "SELECT * FROM system.local"
+        statement = SimpleStatement(query)
+        session.execute(statement, trace=True)
+
+        # Fetch the client_ip from the trace.
+        client_ip=statement.trace.client
+        # Ensure that ip is set for CQL >4
+        self.assertIsNotNone(client_ip,"Client IP was not set in trace with CQL >=4.0")
+        # TODO we might want validate that client_ip actually matches our local ip rather than just validate that it
+        # is a valid ip.
+        try:
+            socket.inet_aton(client_ip)
+        except socket.error:
+            self.fail("Client IP retrieved from trace was not valid :{0}".format(client_ip))
 
         cluster.shutdown()
 
