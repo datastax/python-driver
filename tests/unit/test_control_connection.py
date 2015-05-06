@@ -410,12 +410,12 @@ class ControlConnectionTest(unittest.TestCase):
             }
             self.cluster.scheduler.reset_mock()
             self.control_connection._handle_schema_change(event)
-            self.cluster.scheduler.schedule_unique.assert_called_once_with(0.0, self.control_connection.refresh_schema, 'ks1', 'table1', None)
+            self.cluster.scheduler.schedule_unique.assert_called_once_with(0.0, self.control_connection.refresh_schema, 'ks1', 'table1', None, None, None)
 
             self.cluster.scheduler.reset_mock()
             event['table'] = None
             self.control_connection._handle_schema_change(event)
-            self.cluster.scheduler.schedule_unique.assert_called_once_with(0.0, self.control_connection.refresh_schema, 'ks1', None, None)
+            self.cluster.scheduler.schedule_unique.assert_called_once_with(0.0, self.control_connection.refresh_schema, 'ks1', None, None, None, None)
 
     def test_refresh_disabled(self):
         cluster = MockCluster()
@@ -463,4 +463,4 @@ class ControlConnectionTest(unittest.TestCase):
         cc_no_topo_refresh._handle_schema_change(schema_event)
         cluster.scheduler.schedule_unique.assert_has_calls([call(ANY, cc_no_topo_refresh.refresh_node_list_and_token_map),
                                                             call(0.0, cc_no_topo_refresh.refresh_schema,
-                                                                 schema_event['keyspace'], schema_event['table'], None)])
+                                                                 schema_event['keyspace'], schema_event['table'], None, None, None)])

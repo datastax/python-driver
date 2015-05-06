@@ -105,7 +105,7 @@ class ResponseFutureTests(unittest.TestCase):
                       kind=RESULT_KIND_SCHEMA_CHANGE,
                       results={'keyspace': "keyspace1", "table": "table1"})
         rf._set_result(result)
-        session.submit.assert_called_once_with(ANY, 'keyspace1', 'table1', None, ANY, rf)
+        session.submit.assert_called_once_with(ANY, 'keyspace1', 'table1', None, None, None, ANY, rf)
 
     def test_other_result_message_kind(self):
         session = self.make_session()
