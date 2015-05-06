@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-import socket
 from cassandra.concurrent import execute_concurrent
 
 
@@ -99,7 +98,7 @@ class QueryTests(unittest.TestCase):
 
         @since 3.0
         @jira_ticket PYTHON-235
-        @expected_result client address should be present in C* > 3, otherwise should be none.
+        @expected_result client address should be present in C* >= 3, otherwise should be none.
 
         @test_category tracing
 +       """
