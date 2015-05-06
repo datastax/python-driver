@@ -911,8 +911,11 @@ class Timer(object):
         self.callback = self._noop
         self.cancelled = True
 
-    def on_timeout(self):
-        self.callback()
+    def finish(self, time_now):
+        if self.callback is self._noop or time_now >= self.end:
+            self.callback()
+            return True
+        return False
 
     def _noop(self):
         pass
@@ -934,14 +937,12 @@ class TimerManager(object):
         now = time.time()
         while not self._timers.empty():
             timer = self._timers.get_nowait()
-            if timer.end < now:
-                try:
-                    timer.on_timeout()
-                except Exception:
-                    log.exception("Exception while servicing timeout callback: ")
-            else:
-                self._timers.put_nowait(timer)
-                return timer.end
+            try:
+                if not timer.finish(now):
+                    self._timers.put_nowait(timer)
+                    return timer.end
+            except Exception:
+                log.exception("Exception while servicing timeout callback: ")
 
     @property
     def next_timeout(self):
