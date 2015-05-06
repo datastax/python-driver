@@ -3010,7 +3010,7 @@ class ResponseFuture(object):
             if self._paging_state is None:
                 return self._final_result
             else:
-                return PagedResult(self, self._final_result, timeout)
+                return PagedResult(self, self._final_result)
         else:
             raise self._final_exception
 
@@ -3162,10 +3162,9 @@ class PagedResult(object):
 
     response_future = None
 
-    def __init__(self, response_future, initial_response, timeout=_NOT_SET):
+    def __init__(self, response_future, initial_response):
         self.response_future = response_future
         self.current_response = iter(initial_response)
-        self.timeout = timeout
 
     def __iter__(self):
         return self
