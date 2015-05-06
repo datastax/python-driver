@@ -27,6 +27,7 @@ import socket
 import sys
 import time
 from threading import Lock, RLock, Thread, Event
+import warnings
 
 import six
 from six.moves import range
@@ -70,6 +71,7 @@ from cassandra.pool import (Host, _ReconnectionHandler, _HostReconnectionHandler
 from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              BatchStatement, bind_params, QueryTrace, Statement,
                              named_tuple_factory, dict_factory, FETCH_SIZE_UNSET)
+
 
 def _is_eventlet_monkey_patched():
     if 'eventlet.patcher' not in sys.modules:
@@ -1265,8 +1267,7 @@ class Session(object):
     """
     A default timeout, measured in seconds, for queries executed through
     :meth:`.execute()` or :meth:`.execute_async()`.  This default may be
-    overridden with the `timeout` parameter for either of those methods
-    or the `timeout` parameter for :meth:`.ResponseFuture.result()`.
+    overridden with the `timeout` parameter for either of those methods.
 
     Setting this to :const:`None` will cause no timeouts to be set by default.
 
@@ -2961,6 +2962,11 @@ class ResponseFuture(object):
         encountered.  If the final result or error has not been set
         yet, this method will block until that time.
 
+        .. versionchanged:: 2.6.0
+
+        **`timeout` is deprecated. Use timeout in the Session execute functions instead.
+        The following description applies to deprecated behavior:**
+
         You may set a timeout (in seconds) with the `timeout` parameter.
         By default, the :attr:`~.default_timeout` for the :class:`.Session`
         this was created through will be used for the timeout on this
@@ -2993,10 +2999,13 @@ class ResponseFuture(object):
 
         """
         if timeout is not _NOT_SET:
-            # TODO: warn deprecated
-            pass
+            msg = "ResponseFuture.result timeout argument is deprecated. Specify the request timeout via Session.execute[_async]."
+            warnings.warn(msg, DeprecationWarning)
+            log.warning(msg)
+        else:
+            timeout = None
 
-        self._event.wait()
+        self._event.wait(timeout)
         if self._final_result is not _NOT_SET:
             if self._paging_state is None:
                 return self._final_result
