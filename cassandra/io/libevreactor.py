@@ -148,6 +148,7 @@ class LibevLoop(object):
 
     def _update_timer(self):
         if not self._shutdown:
+            self._timers.service_timeouts()
             offset = self._timers.next_offset or 100000  # none pending; will be updated again when something new happens
             self._loop_timer.start(offset)
         else:

@@ -517,7 +517,9 @@ Timer_start(libevwrapper_Timer *self, PyObject *args) {
     if (!PyArg_ParseTuple(args, "d", &timeout)) {
         return NULL;
     }
-    self->timer.repeat = fmax(timeout, 0.0);
+    /* some tiny non-zero number to avoid zero, and
+     make it run immediately for negative timeouts */
+    self->timer.repeat = fmax(timeout, 0.000000001);
     ev_timer_again(self->loop->loop, &self->timer);
     Py_RETURN_NONE;
 }
