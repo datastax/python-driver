@@ -27,7 +27,7 @@ from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
 from cassandra.cluster import Cluster
 from cassandra.policies import HostDistance
 
-from tests.integration import use_singledc, PROTOCOL_VERSION
+from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions
 
 
 def setup_module():
@@ -89,42 +89,45 @@ class QueryTests(unittest.TestCase):
 
         cluster.shutdown()
 
-    def test_trace_client_ip(self):
+    def test_client_ip_in_trace(self):
         """
-+       Test to validate that client trace contains client ip information.
-+
-+       creates a simple query and ensures that the client trace information is present. This will
-        only be the case if the CQL version is 4 or greater./
+        Test to validate that client trace contains client ip information.
 
-+
-+       @since 3.0
-+       @jira_ticket PYTHON-235
-+       @expected_result client address should be present in CQL > 4, otherwise should be none.
-+
-+       @test_category trace
+        creates a simple query and ensures that the client trace information is present. This will
+        only be the case if the c* version is 3.0 or greater
+
+
+        @since 3.0
+        @jira_ticket PYTHON-235
+        @expected_result client address should be present in C* > 3, otherwise should be none.
+
+        @test_category tracing
 +       """
+        #The current version on the trunk doesn't have the version set to 3.0 yet.
+        #For now we will use the protocol version. Once they update the version on C* trunk
+        #we can use the C*. See below
+        #self._cass_version, self._cql_version = get_server_versions()
+        #if self._cass_version < (3, 0):
+        #   raise unittest.SkipTest("Client IP was not present in trace until C* 3.0")
         if PROTOCOL_VERSION < 4:
-            raise unittest.SkipTest(
-                "Protocol 4+ is required for client ip tracing, currently testing against %r"
-                % (PROTOCOL_VERSION,))
+             raise unittest.SkipTest(
+                 "Protocol 4+ is required for client ip tracing, currently testing against %r"
+                 % (PROTOCOL_VERSION,))
+
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         query = "SELECT * FROM system.local"
         statement = SimpleStatement(query)
-        session.execute(statement, trace=True)
-
+        response_future = session.execute_async(statement, trace=True)
+        response_future.result(10.0)
+        current_host = response_future._current_host.address
         # Fetch the client_ip from the trace.
-        client_ip=statement.trace.client
-        # Ensure that ip is set for CQL >4
-        self.assertIsNotNone(client_ip,"Client IP was not set in trace with CQL >=4.0")
-        # TODO we might want validate that client_ip actually matches our local ip rather than just validate that it
-        # is a valid ip.
-        try:
-            socket.inet_aton(client_ip)
-        except socket.error:
-            self.fail("Client IP retrieved from trace was not valid :{0}".format(client_ip))
-
+        trace = response_future.get_query_trace(2.0)
+        client_ip = trace.client
+        # Ensure that ip is set for c* >3
+        self.assertIsNotNone(client_ip,"Client IP was not set in trace with C* > 3.0")
+        self.assertEqual(client_ip,current_host,"Client IP from trace did not match the expected value")
         cluster.shutdown()
 
 
