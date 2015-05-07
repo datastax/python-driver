@@ -2009,14 +2009,14 @@ class ControlConnection(object):
             else:
                 self._is_shutdown = True
 
-        log.debug("Shutting down control connection")
-        # stop trying to reconnect (if we are)
-        if self._reconnection_handler:
-            self._reconnection_handler.cancel()
+            log.debug("Shutting down control connection")
+            # stop trying to reconnect (if we are)
+            if self._reconnection_handler:
+                self._reconnection_handler.cancel()
 
-        if self._connection:
-            self._connection.close()
-            del self._connection
+            if self._connection:
+                self._connection.close()
+                del self._connection
 
     def refresh_schema(self, keyspace=None, table=None, usertype=None,
                        schema_agreement_wait=None):
@@ -2390,16 +2390,20 @@ class ControlConnection(object):
         return dict((version, list(nodes)) for version, nodes in six.iteritems(versions))
 
     def _signal_error(self):
-        # try just signaling the cluster, as this will trigger a reconnect
-        # as part of marking the host down
-        if self._connection and self._connection.is_defunct:
-            host = self._cluster.metadata.get_host(self._connection.host)
-            # host may be None if it's already been removed, but that indicates
-            # that errors have already been reported, so we're fine
-            if host:
-                self._cluster.signal_connection_failure(
-                    host, self._connection.last_error, is_host_addition=False)
+        with self._lock:
+            if self._is_shutdown:
                 return
+
+            # try just signaling the cluster, as this will trigger a reconnect
+            # as part of marking the host down
+            if self._connection and self._connection.is_defunct:
+                host = self._cluster.metadata.get_host(self._connection.host)
+                # host may be None if it's already been removed, but that indicates
+                # that errors have already been reported, so we're fine
+                if host:
+                    self._cluster.signal_connection_failure(
+                        host, self._connection.last_error, is_host_addition=False)
+                    return
 
         # if the connection is not defunct or the host already left, reconnect
         # manually

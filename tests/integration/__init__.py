@@ -228,7 +228,7 @@ def teardown_package():
                 log.exception('Failed to remove cluster: %s' % cluster_name)
 
         except Exception:
-            log.warn('Did not find cluster: %s' % cluster_name)
+            log.warning('Did not find cluster: %s' % cluster_name)
 
 
 def setup_test_keyspace(ipformat=None):
