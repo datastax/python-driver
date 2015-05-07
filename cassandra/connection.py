@@ -896,29 +896,29 @@ class ConnectionHeartbeat(Thread):
 
 class Timer(object):
 
-    cancelled = False
+    canceled = False
 
     def __init__(self, timeout, callback):
         self.end = time.time() + timeout
         self.callback = callback
         if timeout < 0:
-            self.on_timeout()
+            self.callback()
 
     def __lt__(self, other):
         return self.end < other.end
 
     def cancel(self):
-        self.callback = self._noop
-        self.cancelled = True
+        self.canceled = True
 
     def finish(self, time_now):
-        if self.callback is self._noop or time_now >= self.end:
+        if self.canceled:
+            return True
+
+        if time_now >= self.end:
             self.callback()
             return True
-        return False
 
-    def _noop(self):
-        pass
+        return False
 
 
 class TimerManager(object):
