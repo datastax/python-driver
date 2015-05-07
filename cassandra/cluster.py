@@ -61,7 +61,7 @@ from cassandra.protocol import (QueryMessage, ResultMessage,
                                 RESULT_KIND_SET_KEYSPACE, RESULT_KIND_ROWS,
                                 RESULT_KIND_SCHEMA_CHANGE)
 from cassandra.metadata import Metadata, protect_name
-from cassandra.policies import (RoundRobinPolicy, SimpleConvictionPolicy,
+from cassandra.policies import (TokenAwarePolicy, DCAwareRoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy)
 from cassandra.pool import (Host, _ReconnectionHandler, _HostReconnectionHandler,
@@ -161,6 +161,16 @@ def _shutdown_cluster(cluster):
         cluster.shutdown()
 
 
+# murmur3 implementation required for TokenAware is only available for CPython
+import platform
+if platform.python_implementation() == 'CPython':
+    def default_lbp_factory():
+        return TokenAwarePolicy(DCAwareRoundRobinPolicy())
+else:
+    def default_lbp_factory():
+        return DCAwareRoundRobinPolicy()
+
+
 class Cluster(object):
     """
     The main class to use when interacting with a Cassandra cluster.
@@ -185,9 +195,9 @@ class Cluster(object):
     Defaults to loopback interface.
 
     Note: When using :class:`.DCAwareLoadBalancingPolicy` with no explicit
-    local_dc set, the DC is chosen from an arbitrary host in contact_points.
-    In this case, contact_points should contain only nodes from a single,
-    local DC.
+    local_dc set (as is the default), the DC is chosen from an arbitrary
+    host in contact_points. In this case, contact_points should contain
+    only nodes from a single, local DC.
     """
 
     port = 9042
@@ -281,7 +291,16 @@ class Cluster(object):
     load_balancing_policy = None
     """
     An instance of :class:`.policies.LoadBalancingPolicy` or
-    one of its subclasses.  Defaults to :class:`~.RoundRobinPolicy`.
+    one of its subclasses.
+
+    .. versionchanged:: 2.6.0
+
+    Defaults to :class:`~.TokenAwarePolicy` (:class:`~.DCAwareRoundRobinPolicy`).
+    when using CPython (where the murmur3 extension is available). :class:`~.DCAwareRoundRobinPolicy`
+    otherwise. Default local DC will be chosen from contact points.
+
+    **Please see** :class:`~.DCAwareRoundRobinPolicy` **for a discussion on default behavior with respect to
+    DC locality and remote nodes.**
     """
 
     reconnection_policy = ExponentialReconnectionPolicy(1.0, 600.0)
@@ -310,6 +329,8 @@ class Cluster(object):
     If left as :const:`True`, hosts that are considered :attr:`~.HostDistance.REMOTE`
     by the :attr:`~.Cluster.load_balancing_policy` will have a connection
     opened to them.  Otherwise, they will not have a connection opened to them.
+
+    Note that the default load balancing policy ignores remote hosts by default.
 
     .. versionadded:: 2.1.0
     """
@@ -495,7 +516,7 @@ class Cluster(object):
 
             self.load_balancing_policy = load_balancing_policy
         else:
-            self.load_balancing_policy = RoundRobinPolicy()
+            self.load_balancing_policy = default_lbp_factory()
 
         if reconnection_policy is not None:
             if isinstance(reconnection_policy, type):
