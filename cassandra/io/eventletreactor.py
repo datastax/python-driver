@@ -16,7 +16,6 @@
 # Originally derived from MagnetoDB source:
 #   https://github.com/stackforge/magnetodb/blob/2015.1.0b1/magnetodb/common/cassandra/io/eventletreactor.py
 
-from collections import defaultdict
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL
 import eventlet
 from eventlet.green import select, socket
@@ -73,6 +72,12 @@ class EventletConnection(Connection):
 
     @classmethod
     def service_timeouts(cls):
+        """
+        cls._timeout_watcher runs in this loop forever.
+        It is usually waiting for the next timeout on the cls._new_timer Event.
+        When new timers are added, that event is set so that the watcher can
+        wake up and possibly set an earlier timeout.
+        """
         timer_manager = cls._timers
         while True:
             next_end = timer_manager.service_timeouts()
