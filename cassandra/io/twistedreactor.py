@@ -137,6 +137,8 @@ class TwistedLoop(object):
 
     def add_timer(self, timer):
         self._timers.add_timer(timer)
+        # callFromThread to schedule from the loop thread, where
+        # the timeout task can safely be modified
         reactor.callFromThread(self._schedule_timeout, timer.end)
 
     def _schedule_timeout(self, next_timeout):
