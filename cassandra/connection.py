@@ -925,29 +925,35 @@ class TimerManager(object):
 
     def __init__(self):
         self._queue = []
-        self._lock = Lock()
+        self._new_timers = []
 
     def add_timer(self, timer):
-        with self._lock:
-            heappush(self._queue, timer)
+        """
+        called from client thread with a Timer object
+        """
+        self._new_timers.append(timer)
 
     def service_timeouts(self):
         """
         run callbacks on all expired timers
+        Called from the event thread
         :return: next end time, or None
         """
-        now = time.time()
         queue = self._queue
-        with self._lock:
-            while queue:
-                try:
-                    timer = queue[0]
-                    if timer.finish(now):
-                        heappop(queue)
-                    else:
-                        return timer.end
-                except Exception:
-                    log.exception("Exception while servicing timeout callback: ")
+        new_timers = self._new_timers
+        while self._new_timers:
+            t = new_timers.pop()
+            heappush(queue, t)
+        now = time.time()
+        while queue:
+            try:
+                timer = queue[0]
+                if timer.finish(now):
+                    heappop(queue)
+                else:
+                    return timer.end
+            except Exception:
+                log.exception("Exception while servicing timeout callback: ")
 
     @property
     def next_timeout(self):
