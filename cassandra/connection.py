@@ -16,11 +16,12 @@ from __future__ import absolute_import  # to enable import io from stdlib
 from collections import defaultdict, deque
 import errno
 from functools import wraps, partial
+from heapq import heappush, heappop
 import io
 import logging
 import os
 import sys
-from threading import Thread, Event, RLock
+from threading import Thread, Event, RLock, Lock
 import time
 
 if 'gevent.monkey' in sys.modules:
@@ -29,7 +30,6 @@ else:
     from six.moves.queue import Queue, Empty  # noqa
 
 import six
-from six.moves import queue
 from six.moves import range
 
 from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut
@@ -924,10 +924,12 @@ class Timer(object):
 class TimerManager(object):
 
     def __init__(self):
-        self._timers = queue.PriorityQueue()
+        self._queue = []
+        self._lock = Lock()
 
     def add_timer(self, timer):
-        self._timers.put_nowait(timer)
+        with self._lock:
+            heappush(self._queue, timer)
 
     def service_timeouts(self):
         """
@@ -935,26 +937,29 @@ class TimerManager(object):
         :return: next end time, or None
         """
         now = time.time()
-        while not self._timers.empty():
-            timer = self._timers.get_nowait()
-            try:
-                if not timer.finish(now):
-                    self._timers.put_nowait(timer)
-                    return timer.end
-            except Exception:
-                log.exception("Exception while servicing timeout callback: ")
+        queue = self._queue
+        with self._lock:
+            while queue:
+                try:
+                    timer = queue[0]
+                    if timer.finish(now):
+                        heappop(queue)
+                    else:
+                        return timer.end
+                except Exception:
+                    log.exception("Exception while servicing timeout callback: ")
 
     @property
     def next_timeout(self):
         try:
-            return self._timers.queue[0].end
+            return self._queue[0].end
         except IndexError:
             pass
 
     @property
     def next_offset(self):
         try:
-            next_end = self._timers.queue[0].end
+            next_end = self._queue[0].end
             return next_end - time.time()
         except IndexError:
             pass
