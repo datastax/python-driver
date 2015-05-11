@@ -2980,11 +2980,6 @@ class ResponseFuture(object):
         This is a client-side timeout. For more information
         about server-side coordinator timeouts, see :class:`.policies.RetryPolicy`.
 
-        **Important**: This timeout currently has no effect on callbacks registered
-        on a :class:`~.ResponseFuture` through :meth:`.ResponseFuture.add_callback` or
-        :meth:`.ResponseFuture.add_errback`; even if a query exceeds this default
-        timeout, neither the registered callback or errback will be called.
-
         Example usage::
 
             >>> future = session.execute_async("SELECT * FROM mycf")
@@ -3006,6 +3001,9 @@ class ResponseFuture(object):
             timeout = None
 
         self._event.wait(timeout)
+        # TODO: remove this conditional when deprecated timeout parameter is removed
+        if not self._event.is_set():
+            self._on_timeout()
         if self._final_result is not _NOT_SET:
             if self._paging_state is None:
                 return self._final_result
