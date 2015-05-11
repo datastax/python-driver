@@ -2609,7 +2609,7 @@ class ResponseFuture(object):
             self._timer.cancel()
 
     def _on_timeout(self):
-        self._set_final_exception(OperationTimedOut())
+        self._set_final_exception(OperationTimedOut(self._errors, self._current_host))
 
     def _make_query_plan(self):
         # convert the list/generator/etc to an iterator so that subsequent
