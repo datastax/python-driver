@@ -2875,7 +2875,10 @@ class ResponseFuture(object):
                     "Got unexpected response when preparing statement "
                     "on host %s: %s" % (self._current_host, response)))
         elif isinstance(response, ErrorMessage):
-            self._set_final_exception(response)
+            if hasattr(response, 'to_exception'):
+                self._set_final_exception(response.to_exception())
+            else:
+                self._set_final_exception(response)
         elif isinstance(response, ConnectionException):
             log.debug("Connection error when preparing statement on host %s: %s",
                       self._current_host, response)
