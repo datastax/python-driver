@@ -904,9 +904,6 @@ class Timer(object):
         if timeout < 0:
             self.callback()
 
-    def __lt__(self, other):
-        return self.end < other.end
-
     def cancel(self):
         self.canceled = True
 
@@ -931,7 +928,7 @@ class TimerManager(object):
         """
         called from client thread with a Timer object
         """
-        self._new_timers.append(timer)
+        self._new_timers.append((timer.end, timer))
 
     def service_timeouts(self):
         """
@@ -942,12 +939,11 @@ class TimerManager(object):
         queue = self._queue
         new_timers = self._new_timers
         while self._new_timers:
-            t = new_timers.pop()
-            heappush(queue, t)
+            heappush(queue, new_timers.pop())
         now = time.time()
         while queue:
             try:
-                timer = queue[0]
+                timer = queue[0][1]
                 if timer.finish(now):
                     heappop(queue)
                 else:
@@ -958,14 +954,14 @@ class TimerManager(object):
     @property
     def next_timeout(self):
         try:
-            return self._queue[0].end
+            return self._queue[0][0]
         except IndexError:
             pass
 
     @property
     def next_offset(self):
         try:
-            next_end = self._queue[0].end
+            next_end = self._queue[0][0]
             return next_end - time.time()
         except IndexError:
             pass
