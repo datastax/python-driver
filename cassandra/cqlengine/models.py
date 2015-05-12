@@ -23,6 +23,7 @@ from cassandra.cqlengine import connection
 from cassandra.cqlengine import query
 from cassandra.cqlengine.query import DoesNotExist as _DoesNotExist
 from cassandra.cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
+from cassandra.metadata import protect_name
 from cassandra.util import OrderedDict
 
 log = logging.getLogger(__name__)
@@ -353,6 +354,8 @@ class BaseModel(object):
 
     _if_not_exists = False  # optional if_not_exists flag to check existence before insertion
 
+    _table_name = None  # used internally to cache a derived table name
+
     def __init__(self, **values):
         self._values = {}
         self._ttl = self.__default_ttl__
@@ -504,27 +507,33 @@ class BaseModel(object):
         Returns the column family name if it's been defined
         otherwise, it creates it from the module and class name
         """
-        cf_name = ''
-        if cls.__table_name__:
-            cf_name = cls.__table_name__.lower()
-        else:
-            # get polymorphic base table names if model is polymorphic
-            if cls._is_polymorphic and not cls._is_polymorphic_base:
-                return cls._polymorphic_base.column_family_name(include_keyspace=include_keyspace)
+        cf_name = protect_name(cls._raw_column_family_name())
+        if include_keyspace:
+            return '{}.{}'.format(protect_name(cls._get_keyspace()), cf_name)
 
-            camelcase = re.compile(r'([a-z])([A-Z])')
-            ccase = lambda s: camelcase.sub(lambda v: '{}_{}'.format(v.group(1), v.group(2).lower()), s)
+        return cf_name
 
-            cf_name += ccase(cls.__name__)
-            # trim to less than 48 characters or cassandra will complain
-            cf_name = cf_name[-48:]
-            cf_name = cf_name.lower()
-            cf_name = re.sub(r'^_+', '', cf_name)
 
-        if not include_keyspace:
-            return cf_name
+    @classmethod
+    def _raw_column_family_name(cls):
+        if not cls._table_name:
+            if cls.__table_name__:
+                cls._table_name = cls.__table_name__.lower()
+            else:
+                if cls._is_polymorphic and not cls._is_polymorphic_base:
+                    cls._table_name = cls._polymorphic_base._raw_column_family_name()
+                else:
+                    camelcase = re.compile(r'([a-z])([A-Z])')
+                    ccase = lambda s: camelcase.sub(lambda v: '{}_{}'.format(v.group(1), v.group(2).lower()), s)
 
-        return '{}.{}'.format(cls._get_keyspace(), cf_name)
+                    cf_name = ccase(cls.__name__)
+                    # trim to less than 48 characters or cassandra will complain
+                    cf_name = cf_name[-48:]
+                    cf_name = cf_name.lower()
+                    cf_name = re.sub(r'^_+', '', cf_name)
+                    cls._table_name = cf_name
+
+        return cls._table_name
 
     def validate(self):
         """
