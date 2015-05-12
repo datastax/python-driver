@@ -103,6 +103,8 @@ class _MessageType(object):
             if not self.custom_payload:
                 self.custom_payload = {}
             self.custom_payload.update(other)
+            if len(self.custom_payload) > 65535:
+                raise ValueError("Custom payload map exceeds max count allowed by protocol (65535)")
 
     def __repr__(self):
         return '<%s(%s)>' % (self.__class__.__name__, ', '.join('%s=%r' % i for i in _get_params(self)))
