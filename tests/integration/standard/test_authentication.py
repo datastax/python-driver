@@ -138,10 +138,22 @@ class SaslAuthenticatorTests(AuthenticationTests):
             raise unittest.SkipTest('pure-sasl is not installed')
 
     def get_authentication_provider(self, username, password):
-        sasl_kwargs = {'host': 'localhost',
-                       'service': 'cassandra',
+        sasl_kwargs = {'service': 'cassandra',
                        'mechanism': 'PLAIN',
                        'qops': ['auth'],
                        'username': username,
                        'password': password}
         return SaslAuthProvider(**sasl_kwargs)
+
+    # these could equally be unit tests
+    def test_host_passthrough(self):
+        sasl_kwargs = {'service': 'cassandra',
+                       'mechanism': 'PLAIN'}
+        provider = SaslAuthProvider(**sasl_kwargs)
+        host = 'thehostname'
+        authenticator = provider.new_authenticator(host)
+        self.assertEqual(authenticator.sasl.host, host)
+
+    def test_host_rejected(self):
+        sasl_kwargs = {'host': 'something'}
+        self.assertRaises(ValueError, SaslAuthProvider, **sasl_kwargs)
