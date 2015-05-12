@@ -73,6 +73,21 @@ class QueryTests(unittest.TestCase):
 
         cluster.shutdown()
 
+    def test_trace_id_to_query(self):
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        session = cluster.connect()
+
+        query = "SELECT * FROM system.local"
+        statement = SimpleStatement(query)
+        self.assertIsNone(statement.trace_id)
+        future = session.execute_async(statement, trace=True)
+
+        # query should have trace_id, even before trace is obtained
+        future.result()
+        self.assertIsNotNone(statement.trace_id)
+
+        cluster.shutdown()
+
     def test_trace_ignores_row_factory(self):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
