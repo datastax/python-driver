@@ -26,7 +26,7 @@ from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
 from cassandra.cluster import Cluster
 from cassandra.policies import HostDistance
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions
+from tests.integration import use_singledc, PROTOCOL_VERSION
 
 
 def setup_module():
@@ -93,40 +93,44 @@ class QueryTests(unittest.TestCase):
         Test to validate that client trace contains client ip information.
 
         creates a simple query and ensures that the client trace information is present. This will
-        only be the case if the c* version is 3.0 or greater
+        only be the case if the c* version is 2.2 or greater
 
-
-        @since 3.0
+        @since 2.2
         @jira_ticket PYTHON-235
-        @expected_result client address should be present in C* >= 3, otherwise should be none.
+        @expected_result client address should be present in C* >= 2.2, otherwise should be none.
 
         @test_category tracing
-+       """
-        #The current version on the trunk doesn't have the version set to 3.0 yet.
-        #For now we will use the protocol version. Once they update the version on C* trunk
-        #we can use the C*. See below
-        #self._cass_version, self._cql_version = get_server_versions()
-        #if self._cass_version < (3, 0):
-        #   raise unittest.SkipTest("Client IP was not present in trace until C* 3.0")
+        """
+
+        # The current version on the trunk doesn't have the version set to 2.2 yet.
+        # For now we will use the protocol version. Once they update the version on C* trunk
+        # we can use the C*. See below
+        # self._cass_version, self._cql_version = get_server_versions()
+        # if self._cass_version < (2, 2):
+        #   raise unittest.SkipTest("Client IP was not present in trace until C* 2.2")
         if PROTOCOL_VERSION < 4:
-             raise unittest.SkipTest(
-                 "Protocol 4+ is required for client ip tracing, currently testing against %r"
-                 % (PROTOCOL_VERSION,))
+            raise unittest.SkipTest(
+                "Protocol 4+ is required for client ip tracing, currently testing against %r"
+                % (PROTOCOL_VERSION,))
 
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
+        # Make simple query with trace enabled
         query = "SELECT * FROM system.local"
         statement = SimpleStatement(query)
         response_future = session.execute_async(statement, trace=True)
-        response_future.result(10.0)
+        response_future.result(timeout=10.0)
         current_host = response_future._current_host.address
+
         # Fetch the client_ip from the trace.
-        trace = response_future.get_query_trace(2.0)
+        trace = response_future.get_query_trace(max_wait=2.0)
         client_ip = trace.client
-        # Ensure that ip is set for c* >3
-        self.assertIsNotNone(client_ip,"Client IP was not set in trace with C* > 3.0")
+
+        # Ensure that ip is set for c* >2.2
+        self.assertIsNotNone(client_ip,"Client IP was not set in trace with C* > 2.2")
         self.assertEqual(client_ip,current_host,"Client IP from trace did not match the expected value")
+
         cluster.shutdown()
 
 
@@ -547,3 +551,4 @@ class BatchStatementDefaultRoutingKeyTests(unittest.TestCase):
 
         self.assertIsNotNone(batch.routing_key)
         self.assertEqual(batch.routing_key, self.prepared.bind((1, 0)).routing_key)
+
