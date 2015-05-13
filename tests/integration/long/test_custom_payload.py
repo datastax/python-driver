@@ -155,7 +155,7 @@ class CustomPayloadTests(unittest.TestCase):
         to submit the statement with various custom payloads. It will
         validate that the custom payloads are sent and received correctly.
 
-        :param statement: to validate the custom queries in conjunction with
+        @param statement: to validate the custom queries in conjunction with
         """
 
         # Simple key value
@@ -189,8 +189,8 @@ class CustomPayloadTests(unittest.TestCase):
         """
         This is just a simple method that submits a statement with a payload, and validates
         that the custom payload we submitted matches the one that we got back
-        :param statement: to execute
-        :param custom_payload: to submit with
+        @param statement: to execute
+        @param custom_payload: to submit with
         """
 
         # Submit the statement with our custom payload. Validate the one
