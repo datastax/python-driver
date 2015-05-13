@@ -93,21 +93,21 @@ class QueryTests(unittest.TestCase):
         Test to validate that client trace contains client ip information.
 
         creates a simple query and ensures that the client trace information is present. This will
-        only be the case if the c* version is 2.2 or greater
+        only be the case if the c* version is 3.0 or greater
 
-        @since 2.2
+        @since 3.0
         @jira_ticket PYTHON-235
-        @expected_result client address should be present in C* >= 2.2, otherwise should be none.
+        @expected_result client address should be present in C* >= 3.0, otherwise should be none.
 
         @test_category tracing
         """
 
-        # The current version on the trunk doesn't have the version set to 2.2 yet.
+        # The current version on the trunk doesn't have the version set to 3.0 yet.
         # For now we will use the protocol version. Once they update the version on C* trunk
         # we can use the C*. See below
         # self._cass_version, self._cql_version = get_server_versions()
-        # if self._cass_version < (2, 2):
-        #   raise unittest.SkipTest("Client IP was not present in trace until C* 2.2")
+        # if self._cass_version < (3, 0):
+        #   raise unittest.SkipTest("Client IP was not present in trace until C* 3.0")
         if PROTOCOL_VERSION < 4:
             raise unittest.SkipTest(
                 "Protocol 4+ is required for client ip tracing, currently testing against %r"
@@ -127,9 +127,9 @@ class QueryTests(unittest.TestCase):
         trace = response_future.get_query_trace(max_wait=2.0)
         client_ip = trace.client
 
-        # Ensure that ip is set for c* >2.2
-        self.assertIsNotNone(client_ip,"Client IP was not set in trace with C* > 2.2")
-        self.assertEqual(client_ip,current_host,"Client IP from trace did not match the expected value")
+        # Ensure that ip is set for c* >3.0
+        self.assertIsNotNone(client_ip, "Client IP was not set in trace with C* > 3.0")
+        self.assertEqual(client_ip, current_host, "Client IP from trace did not match the expected value")
 
         cluster.shutdown()
 

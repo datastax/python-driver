@@ -13,65 +13,60 @@
 # limitations under the License.
 
 
-
-
 try:
     import unittest2 as unittest
 except ImportError:
     import unittest
 
-from cassandra.query import ( SimpleStatement, BatchStatement, BatchType)
+from cassandra.query import (SimpleStatement, BatchStatement, BatchType)
 from cassandra.cluster import Cluster
-from cassandra.cluster import NoHostAvailable
 
 from tests.integration import use_singledc, PROTOCOL_VERSION, get_cluster, setup_keyspace
+
 
 def setup_module():
     """
     We need some custom setup for this module. All unit tests in this module
     require protocol >=4. We won't bother going through the setup required unless that is the
     protocol version we are using.
-    :return:
     """
 
     # If we aren't at protocol v 4 or greater don't waste time setting anything up, all tests will be skipped
     if PROTOCOL_VERSION >= 4:
         # Don't start the ccm cluster until we get the custom jvm argument specified
         use_singledc(start=False)
-        ccm_cluster=get_cluster()
+        ccm_cluster = get_cluster()
         # if needed stop CCM cluster
         ccm_cluster.stop()
         # This will enable the Mirroring query handler which will echo our custom payload k,v pairs back to us
-        jmv_args=[" -Dcassandra.custom_query_handler_class=org.apache.cassandra.cql3.CustomPayloadMirroringQueryHandler"]
-        ccm_cluster.start(wait_for_binary_proto=True, wait_other_notice=True,jvm_args=jmv_args)
+        jmv_args = [
+            " -Dcassandra.custom_query_handler_class=org.apache.cassandra.cql3.CustomPayloadMirroringQueryHandler"]
+        ccm_cluster.start(wait_for_binary_proto=True, wait_other_notice=True, jvm_args=jmv_args)
         # wait for nodes to startup
         setup_keyspace()
 
 
-
-
-
-def tearDownModule():
+def teardown_module():
     """
     The rests of the tests don't need our custom payload query handle so stop the cluster so we
     don't impact other tests
-    :return:
     """
 
     ccm_cluster = get_cluster()
     if ccm_cluster is not None:
         ccm_cluster.stop()
 
+
 class CustomPayloadTests(unittest.TestCase):
 
     def setUp(self):
         """
         Test is skipped if run with cql version <4
-
         """
+
         if PROTOCOL_VERSION < 4:
             raise unittest.SkipTest(
-                "Protocol 4,0+ is required for custom payloads %r"
+                "Native protocol 4,0+ is required for custom payloads, currently using %r"
                 % (PROTOCOL_VERSION,))
 
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
@@ -90,11 +85,11 @@ class CustomPayloadTests(unittest.TestCase):
         with the results
 
 
-        @since 2.2
+        @since 3.0
         @jira_ticket PYTHON-280
         @expected_result valid custom payloads should be sent and received
 
-        @test_category queries:basic
+        @test_category queries:custom_payload
         """
 
         # Create a simple query statement a
@@ -112,11 +107,11 @@ class CustomPayloadTests(unittest.TestCase):
         with the results
 
 
-        @since 2.2
+        @since 3.0
         @jira_ticket PYTHON-280
         @expected_result valid custom payloads should be sent and received
 
-        @test_category queries:batch
+        @test_category queries:custom_payload
         """
 
         # Construct Batch Statement
@@ -127,9 +122,6 @@ class CustomPayloadTests(unittest.TestCase):
         # Validate that various types of custom payloads are sent and received okay
         self.validate_various_custom_payloads(statement=batch)
 
-
-
-
     def test_custom_query_prepared(self):
         """
         Test to validate that custom payloads work with prepared queries
@@ -139,11 +131,11 @@ class CustomPayloadTests(unittest.TestCase):
         with the results
 
 
-        @since 2.2
+        @since 3.0
         @jira_ticket PYTHON-280
         @expected_result valid custom payloads should be sent and received
 
-        @test_category queries:binding
+        @test_category queries:custom_payload
         """
 
         # Construct prepared statement
@@ -164,53 +156,46 @@ class CustomPayloadTests(unittest.TestCase):
         validate that the custom payloads are sent and received correctly.
 
         :param statement: to validate the custom queries in conjunction with
-
-        :return:
         """
 
         # Simple key value
-        custom_payload={'test':'test_return'}
-        self.execute_async_validate_custom_payload(statement=statement,custom_payload=custom_payload)
+        custom_payload = {'test': 'test_return'}
+        self.execute_async_validate_custom_payload(statement=statement, custom_payload=custom_payload)
 
         # no key value
-        custom_payload={'':''}
-        self.execute_async_validate_custom_payload(statement=statement,custom_payload=custom_payload)
+        custom_payload = {'': ''}
+        self.execute_async_validate_custom_payload(statement=statement, custom_payload=custom_payload)
 
         # Space value
-        custom_payload={' ':' '}
-        self.execute_async_validate_custom_payload(statement=statement,custom_payload=custom_payload)
+        custom_payload = {' ': ' '}
+        self.execute_async_validate_custom_payload(statement=statement, custom_payload=custom_payload)
 
-        # 100 kev/value pair validation
-        custom_payload={}
-        for i in range(100):
-            custom_payload[str(i)]=str(i)
-        self.execute_async_validate_custom_payload(statement=statement,custom_payload=custom_payload)
+        # Long key value pair
+        key_value = "x" * 10000
+        custom_payload = {key_value: key_value}
+        self.execute_async_validate_custom_payload(statement=statement, custom_payload=custom_payload)
 
         # Max supported value key pairs according C* binary protocol v4 should be 65534 (unsigned short max value)
         for i in range(65534):
-            custom_payload[str(i)]=str(i)
-        self.execute_async_validate_custom_payload(statement=statement,custom_payload=custom_payload)
+            custom_payload[str(i)] = str(i)
+        self.execute_async_validate_custom_payload(statement=statement, custom_payload=custom_payload)
 
-        #This is too many key value pairs and should fail
-        for i in range(65535):
-            custom_payload[str(i)]=str(i)
-        self.assertRaises(NoHostAvailable,self.execute_async_validate_custom_payload(statement=statement,custom_payload=custom_payload))
+        # Add one custom payload to this is too many key value pairs and should fail
+        custom_payload[str(65535)] = str(65535)
+        with self.assertRaises(ValueError):
+            self.execute_async_validate_custom_payload(statement=statement, custom_payload=custom_payload)
 
-
-
-
-    def execute_async_validate_custom_payload(self,statement,custom_payload):
+    def execute_async_validate_custom_payload(self, statement, custom_payload):
         """
         This is just a simple method that submits a statement with a payload, and validates
         that the custom payload we submitted matches the one that we got back
         :param statement: to execute
         :param custom_payload: to submit with
-        :return:
         """
 
         # Submit the statement with our custom payload. Validate the one
         # we receive from the server matches
-        response_future = self.session.execute_async(statement,custom_payload=custom_payload)
-        response_future.result(10.0)
-        returned_custom_payload=response_future.custom_payload
-        self.assertEqual(custom_payload,returned_custom_payload)
+        response_future = self.session.execute_async(statement, custom_payload=custom_payload)
+        response_future.result(timeout=10.0)
+        returned_custom_payload = response_future.custom_payload
+        self.assertEqual(custom_payload, returned_custom_payload)
