@@ -139,8 +139,7 @@ class SaslAuthProvider(AuthProvider):
         from cassandra.cluster import Cluster
         from cassandra.auth import SaslAuthProvider
 
-        sasl_kwargs = {'host': 'localhost',
-                       'service': 'dse',
+        sasl_kwargs = {'service': 'dse',
                        'mechanism': 'GSSAPI',
                        'qops': 'auth'.split(',')}
         auth_provider = SaslAuthProvider(**sasl_kwargs)
@@ -152,10 +151,12 @@ class SaslAuthProvider(AuthProvider):
     def __init__(self, **sasl_kwargs):
         if SASLClient is None:
             raise ImportError('The puresasl library has not been installed')
+        if 'host' in sasl_kwargs:
+            raise ValueError("kwargs should not contain 'host' since it is passed dynamically to new_authenticator")
         self.sasl_kwargs = sasl_kwargs
 
     def new_authenticator(self, host):
-        return SaslAuthenticator(**self.sasl_kwargs)
+        return SaslAuthenticator(host, **self.sasl_kwargs)
 
 class SaslAuthenticator(Authenticator):
     """
