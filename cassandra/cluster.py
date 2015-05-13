@@ -2024,6 +2024,11 @@ class ControlConnection(object):
         return None
 
     def shutdown(self):
+        # stop trying to reconnect (if we are)
+        with self._reconnection_lock:
+            if self._reconnection_handler:
+                self._reconnection_handler.cancel()
+
         with self._lock:
             if self._is_shutdown:
                 return
@@ -2031,10 +2036,6 @@ class ControlConnection(object):
                 self._is_shutdown = True
 
             log.debug("Shutting down control connection")
-            # stop trying to reconnect (if we are)
-            if self._reconnection_handler:
-                self._reconnection_handler.cancel()
-
             if self._connection:
                 self._connection.close()
                 del self._connection
