@@ -658,7 +658,7 @@ class AssignmentStatement(BaseCQLStatement):
 
 
 class InsertStatement(AssignmentStatement):
-    """ an cql insert select statement """
+    """ an cql insert statement """
 
     def __init__(self,
                  table,

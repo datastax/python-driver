@@ -73,25 +73,6 @@ class BaseValueManager(object):
             return property(_get, _set)
 
 
-class ValueQuoter(object):
-    """
-    contains a single value, which will quote itself for CQL insertion statements
-    """
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        raise NotImplementedError
-
-    def __repr__(self):
-        return self.__str__()
-
-    def __eq__(self, other):
-        if isinstance(other, self.__class__):
-            return self.value == other.value
-        return False
-
-
 class Column(object):
 
     # the cassandra type this column maps to
@@ -701,24 +682,12 @@ class BaseContainerColumn(Column):
         return [self.value_col]
 
 
-class BaseContainerQuoter(ValueQuoter):
-
-    def __nonzero__(self):
-        return bool(self.value)
-
-
 class Set(BaseContainerColumn):
     """
     Stores a set of unordered, unique values
 
     http://www.datastax.com/documentation/cql/3.1/cql/cql_using/use_set_t.html
     """
-    class Quoter(BaseContainerQuoter):
-
-        def __str__(self):
-            cq = cql_quote
-            return '{' + ', '.join([cq(v) for v in self.value]) + '}'
-
     def __init__(self, value_type, strict=True, default=set, **kwargs):
         """
         :param value_type: a column class indicating the types of the value
@@ -753,10 +722,7 @@ class Set(BaseContainerColumn):
     def to_database(self, value):
         if value is None:
             return None
-
-        if isinstance(value, self.Quoter):
-            return value
-        return self.Quoter({self.value_col.to_database(v) for v in value})
+        return {self.value_col.to_database(v) for v in value}
 
 
 class List(BaseContainerColumn):
@@ -765,15 +731,6 @@ class List(BaseContainerColumn):
 
     http://www.datastax.com/documentation/cql/3.1/cql/cql_using/use_list_t.html
     """
-    class Quoter(BaseContainerQuoter):
-
-        def __str__(self):
-            cq = cql_quote
-            return '[' + ', '.join([cq(v) for v in self.value]) + ']'
-
-        def __nonzero__(self):
-            return bool(self.value)
-
     def __init__(self, value_type, default=list, **kwargs):
         """
         :param value_type: a column class indicating the types of the value
@@ -799,9 +756,7 @@ class List(BaseContainerColumn):
     def to_database(self, value):
         if value is None:
             return None
-        if isinstance(value, self.Quoter):
-            return value
-        return self.Quoter([self.value_col.to_database(v) for v in value])
+        return [self.value_col.to_database(v) for v in value]
 
 
 class Map(BaseContainerColumn):
@@ -810,21 +765,6 @@ class Map(BaseContainerColumn):
 
     http://www.datastax.com/documentation/cql/3.1/cql/cql_using/use_map_t.html
     """
-    class Quoter(BaseContainerQuoter):
-
-        def __str__(self):
-            cq = cql_quote
-            return '{' + ', '.join([cq(k) + ':' + cq(v) for k, v in self.value.items()]) + '}'
-
-        def get(self, key):
-            return self.value.get(key)
-
-        def keys(self):
-            return self.value.keys()
-
-        def items(self):
-            return self.value.items()
-
     def __init__(self, key_type, value_type, default=dict, **kwargs):
         """
         :param key_type: a column class indicating the types of the key
@@ -866,9 +806,7 @@ class Map(BaseContainerColumn):
     def to_database(self, value):
         if value is None:
             return None
-        if isinstance(value, self.Quoter):
-            return value
-        return self.Quoter({self.key_col.to_database(k): self.value_col.to_database(v) for k, v in value.items()})
+        return {self.key_col.to_database(k): self.value_col.to_database(v) for k, v in value.items()}
 
     @property
     def sub_columns(self):

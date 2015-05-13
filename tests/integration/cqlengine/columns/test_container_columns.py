@@ -161,8 +161,8 @@ class TestSetColumn(BaseCassEngTestCase):
         column = columns.Set(JsonTestColumn)
         val = {1, 2, 3}
         db_val = column.to_database(val)
-        assert db_val.value == {json.dumps(v) for v in val}
-        py_val = column.to_python(db_val.value)
+        assert db_val == {json.dumps(v) for v in val}
+        py_val = column.to_python(db_val)
         assert py_val == val
 
     def test_default_empty_container_saving(self):
@@ -277,8 +277,8 @@ class TestListColumn(BaseCassEngTestCase):
         column = columns.List(JsonTestColumn)
         val = [1, 2, 3]
         db_val = column.to_database(val)
-        assert db_val.value == [json.dumps(v) for v in val]
-        py_val = column.to_python(db_val.value)
+        assert db_val == [json.dumps(v) for v in val]
+        py_val = column.to_python(db_val)
         assert py_val == val
 
     def test_default_empty_container_saving(self):
@@ -495,8 +495,8 @@ class TestMapColumn(BaseCassEngTestCase):
         column = columns.Map(JsonTestColumn, JsonTestColumn)
         val = {1: 2, 3: 4, 5: 6}
         db_val = column.to_database(val)
-        assert db_val.value == {json.dumps(k):json.dumps(v) for k,v in val.items()}
-        py_val = column.to_python(db_val.value)
+        assert db_val == {json.dumps(k):json.dumps(v) for k,v in val.items()}
+        py_val = column.to_python(db_val)
         assert py_val == val
 
     def test_default_empty_container_saving(self):

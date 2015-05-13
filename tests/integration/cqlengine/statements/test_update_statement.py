@@ -60,25 +60,25 @@ class UpdateStatementTests(TestCase):
 
     def test_update_set_add(self):
         us = UpdateStatement('table')
-        us.add_assignment_clause(SetUpdateClause('a', Set.Quoter({1}), operation='add'))
+        us.add_assignment_clause(SetUpdateClause('a', {1}, operation='add'))
         self.assertEqual(six.text_type(us), 'UPDATE table SET "a" = "a" + %(0)s')
 
     def test_update_empty_set_add_does_not_assign(self):
         us = UpdateStatement('table')
-        us.add_assignment_clause(SetUpdateClause('a', Set.Quoter(set()), operation='add'))
+        us.add_assignment_clause(SetUpdateClause('a', set(), operation='add'))
         self.assertEqual(six.text_type(us), 'UPDATE table SET "a" = "a" + %(0)s')
 
     def test_update_empty_set_removal_does_not_assign(self):
         us = UpdateStatement('table')
-        us.add_assignment_clause(SetUpdateClause('a', Set.Quoter(set()), operation='remove'))
+        us.add_assignment_clause(SetUpdateClause('a', set(), operation='remove'))
         self.assertEqual(six.text_type(us), 'UPDATE table SET "a" = "a" - %(0)s')
 
     def test_update_list_prepend_with_empty_list(self):
         us = UpdateStatement('table')
-        us.add_assignment_clause(ListUpdateClause('a', List.Quoter([]), operation='prepend'))
+        us.add_assignment_clause(ListUpdateClause('a', [], operation='prepend'))
         self.assertEqual(six.text_type(us), 'UPDATE table SET "a" = %(0)s + "a"')
 
     def test_update_list_append_with_empty_list(self):
         us = UpdateStatement('table')
-        us.add_assignment_clause(ListUpdateClause('a', List.Quoter([]), operation='append'))
+        us.add_assignment_clause(ListUpdateClause('a', [], operation='append'))
         self.assertEqual(six.text_type(us), 'UPDATE table SET "a" = "a" + %(0)s')
