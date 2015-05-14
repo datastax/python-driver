@@ -79,10 +79,16 @@ def _is_eventlet_monkey_patched():
     import eventlet.patcher
     return eventlet.patcher.is_monkey_patched('socket')
 
+def _is_gevent_monkey_patched():
+    if 'gevent.monkey' not in sys.modules:
+        return False
+    import gevent.socket
+    return socket.socket is gevent.socket.socket
+
 # default to gevent when we are monkey patched with gevent, eventlet when
 # monkey patched with eventlet, otherwise if libev is available, use that as
 # the default because it's fastest. Otherwise, use asyncore.
-if 'gevent.monkey' in sys.modules:
+if _is_gevent_monkey_patched():
     from cassandra.io.geventreactor import GeventConnection as DefaultConnection
 elif _is_eventlet_monkey_patched():
     from cassandra.io.eventletreactor import EventletConnection as DefaultConnection
