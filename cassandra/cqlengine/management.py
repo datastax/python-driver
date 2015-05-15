@@ -523,7 +523,7 @@ def drop_table(model):
 
     try:
         meta.keyspaces[ks_name].tables[raw_cf_name]
-        execute('drop table {};'.format(model.column_family_name()))
+        execute('DROP TABLE {};'.format(model.column_family_name()))
     except KeyError:
         pass
 
