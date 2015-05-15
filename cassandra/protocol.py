@@ -22,8 +22,10 @@ from six.moves import range
 import io
 
 from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
+                       WriteFailure, ReadFailure, FunctionFailure,
                        AlreadyExists, InvalidRequest, Unauthorized,
-                       UnsupportedOperation)
+                       UnsupportedOperation, UserFunctionDescriptor,
+                       UserAggregateDescriptor)
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
                                int8_pack, int8_unpack, uint64_pack, header_pack,
                                v3_header_pack)
@@ -54,6 +56,7 @@ HEADER_DIRECTION_MASK = 0x80
 
 COMPRESSED_FLAG = 0x01
 TRACING_FLAG = 0x02
+CUSTOM_PAYLOAD_FLAG = 0x04
 
 _message_types_by_name = {}
 _message_types_by_opcode = {}
@@ -70,13 +73,19 @@ class _RegisterMessageType(type):
 class _MessageType(object):
 
     tracing = False
+    custom_payload = None
 
     def to_binary(self, stream_id, protocol_version, compression=None):
+        flags = 0
         body = io.BytesIO()
+        if self.custom_payload:
+            if protocol_version < 4:
+                raise UnsupportedOperation("Custom key/value payloads can only be used with protocol version 4 or higher")
+            flags |= CUSTOM_PAYLOAD_FLAG
+            write_bytesmap(body, self.custom_payload)
         self.send_body(body, protocol_version)
         body = body.getvalue()
 
-        flags = 0
         if compression and len(body) > 0:
             body = compression(body)
             flags |= COMPRESSED_FLAG
@@ -88,6 +97,14 @@ class _MessageType(object):
         msg.write(body)
 
         return msg.getvalue()
+
+    def update_custom_payload(self, other):
+        if other:
+            if not self.custom_payload:
+                self.custom_payload = {}
+            self.custom_payload.update(other)
+            if len(self.custom_payload) > 65535:
+                raise ValueError("Custom payload map exceeds max count allowed by protocol (65535)")
 
     def __repr__(self):
         return '<%s(%s)>' % (self.__class__.__name__, ', '.join('%s=%r' % i for i in _get_params(self)))
@@ -116,6 +133,12 @@ def decode_response(protocol_version, user_type_map, stream_id, flags, opcode, b
     else:
         trace_id = None
 
+    if flags & CUSTOM_PAYLOAD_FLAG:
+        custom_payload = read_bytesmap(body)
+        flags ^= CUSTOM_PAYLOAD_FLAG
+    else:
+        custom_payload = None
+
     if flags:
         log.warning("Unknown protocol flags set: %02x. May cause problems.", flags)
 
@@ -123,6 +146,7 @@ def decode_response(protocol_version, user_type_map, stream_id, flags, opcode, b
     msg = msg_class.recv_body(body, protocol_version, user_type_map)
     msg.stream_id = stream_id
     msg.trace_id = trace_id
+    msg.custom_payload = custom_payload
     return msg
 
 
@@ -261,6 +285,58 @@ class ReadTimeoutErrorMessage(RequestExecutionException):
 
     def to_exception(self):
         return ReadTimeout(self.summary_msg(), **self.info)
+
+
+class ReadFailureMessage(RequestExecutionException):
+    summary = "Replica(s) failed to execute read"
+    error_code = 0x1300
+
+    @staticmethod
+    def recv_error_info(f):
+        return {
+            'consistency': read_consistency_level(f),
+            'received_responses': read_int(f),
+            'required_responses': read_int(f),
+            'failures': read_int(f),
+            'data_retrieved': bool(read_byte(f)),
+        }
+
+    def to_exception(self):
+        return ReadFailure(self.summary_msg(), **self.info)
+
+
+class FunctionFailureMessage(RequestExecutionException):
+    summary = "User Defined Function failure"
+    error_code = 0x1400
+
+    @staticmethod
+    def recv_error_info(f):
+        return {
+            'keyspace': read_string(f),
+            'function': read_string(f),
+            'arg_types': [read_string(f) for _ in range(read_short(f))],
+        }
+
+    def to_exception(self):
+        return FunctionFailure(self.summary_msg(), **self.info)
+
+
+class WriteFailureMessage(RequestExecutionException):
+    summary = "Replica(s) failed to execute write"
+    error_code = 0x1500
+
+    @staticmethod
+    def recv_error_info(f):
+        return {
+            'consistency': read_consistency_level(f),
+            'received_responses': read_int(f),
+            'required_responses': read_int(f),
+            'failures': read_int(f),
+            'write_type': WriteType.name_to_value[read_string(f)],
+        }
+
+    def to_exception(self):
+        return WriteFailure(self.summary_msg(), **self.info)
 
 
 class SyntaxException(RequestValidationException):
@@ -562,7 +638,7 @@ class ResultMessage(_MessageType):
             ksname = read_string(f)
             results = ksname
         elif kind == RESULT_KIND_PREPARED:
-            results = cls.recv_results_prepared(f, user_type_map)
+            results = cls.recv_results_prepared(f, protocol_version, user_type_map)
         elif kind == RESULT_KIND_SCHEMA_CHANGE:
             results = cls.recv_results_schema_change(f, protocol_version)
         return cls(kind, results, paging_state)
@@ -581,16 +657,17 @@ class ResultMessage(_MessageType):
         return (paging_state, (colnames, parsed_rows))
 
     @classmethod
-    def recv_results_prepared(cls, f, user_type_map):
+    def recv_results_prepared(cls, f, protocol_version, user_type_map):
         query_id = read_binary_string(f)
-        _, column_metadata = cls.recv_results_metadata(f, user_type_map)
-        return (query_id, column_metadata)
+        column_metadata, pk_indexes = cls.recv_prepared_metadata(f, protocol_version, user_type_map)
+        return (query_id, column_metadata, pk_indexes)
 
     @classmethod
     def recv_results_metadata(cls, f, user_type_map):
         flags = read_int(f)
         glob_tblspec = bool(flags & cls._FLAGS_GLOBAL_TABLES_SPEC)
         colcount = read_int(f)
+
         if flags & cls._HAS_MORE_PAGES_FLAG:
             paging_state = read_binary_longstring(f)
         else:
@@ -610,6 +687,32 @@ class ResultMessage(_MessageType):
             coltype = cls.read_type(f, user_type_map)
             column_metadata.append((colksname, colcfname, colname, coltype))
         return paging_state, column_metadata
+
+    @classmethod
+    def recv_prepared_metadata(cls, f, protocol_version, user_type_map):
+        flags = read_int(f)
+        glob_tblspec = bool(flags & cls._FLAGS_GLOBAL_TABLES_SPEC)
+        colcount = read_int(f)
+        pk_indexes = None
+        if protocol_version >= 4:
+            num_pk_indexes = read_int(f)
+            pk_indexes = [read_short(f) for _ in range(num_pk_indexes)]
+
+        if glob_tblspec:
+            ksname = read_string(f)
+            cfname = read_string(f)
+        column_metadata = []
+        for _ in range(colcount):
+            if glob_tblspec:
+                colksname = ksname
+                colcfname = cfname
+            else:
+                colksname = read_string(f)
+                colcfname = read_string(f)
+            colname = read_string(f)
+            coltype = cls.read_type(f, user_type_map)
+            column_metadata.append((colksname, colcfname, colname, coltype))
+        return column_metadata, pk_indexes
 
     @classmethod
     def recv_results_schema_change(cls, f, protocol_version):
@@ -823,15 +926,20 @@ class EventMessage(_MessageType):
         if protocol_version >= 3:
             target = read_string(f)
             keyspace = read_string(f)
+            event = {'change_type': change_type, 'keyspace': keyspace}
             if target != "KEYSPACE":
-                table_or_type = read_string(f)
-                return {'change_type': change_type, 'keyspace': keyspace, target.lower(): table_or_type}
-            else:
-                return {'change_type': change_type, 'keyspace': keyspace}
+                target_name = read_string(f)
+                if target == 'FUNCTION':
+                    event['function'] = UserFunctionDescriptor(target_name, [read_string(f) for _ in range(read_short(f))])
+                elif target == 'AGGREGATE':
+                    event['aggregate'] = UserAggregateDescriptor(target_name, [read_string(f) for _ in range(read_short(f))])
+                else:
+                    event[target.lower()] = target_name
         else:
             keyspace = read_string(f)
             table = read_string(f)
-            return {'change_type': change_type, 'keyspace': keyspace, 'table': table}
+            event = {'change_type': change_type, 'keyspace': keyspace, 'table': table}
+        return event
 
 
 def write_header(f, version, flags, stream_id, opcode, length):
@@ -891,6 +999,11 @@ def read_binary_string(f):
     return contents
 
 
+def write_binary_string(f, s):
+    write_short(f, len(s))
+    f.write(s)
+
+
 def write_string(f, s):
     if isinstance(s, six.text_type):
         s = s.encode('utf8')
@@ -940,6 +1053,22 @@ def write_stringmap(f, strmap):
     for k, v in strmap.items():
         write_string(f, k)
         write_string(f, v)
+
+
+def read_bytesmap(f):
+    numpairs = read_short(f)
+    bytesmap = {}
+    for _ in range(numpairs):
+        k = read_string(f)
+        bytesmap[k] = read_binary_string(f)
+    return bytesmap
+
+
+def write_bytesmap(f, bytesmap):
+    write_short(f, len(bytesmap))
+    for k, v in bytesmap.items():
+        write_string(f, k)
+        write_binary_string(f, v)
 
 
 def read_stringmultimap(f):

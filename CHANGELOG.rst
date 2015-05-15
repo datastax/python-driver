@@ -88,7 +88,6 @@ Bug Fixes
 ---------
 * Make execute_concurrent compatible with Python 2.6 (PYTHON-159)
 * Handle Unauthorized message on schema_triggers query (PYTHON-155)
-* Make execute_concurrent compatible with Python 2.6 (github-197)
 * Pure Python sorted set in support of UDTs nested in collections (PYTON-167)
 * Support CUSTOM index metadata and string export (PYTHON-165)
 

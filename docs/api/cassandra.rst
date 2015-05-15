@@ -14,6 +14,14 @@
 .. autoclass:: ConsistencyLevel
    :members:
 
+.. autoclass:: UserFunctionDescriptor
+   :members:
+   :inherited-members:
+
+.. autoclass:: UserAggregateDescriptor
+   :members:
+   :inherited-members:
+
 .. autoexception:: Unavailable()
    :members:
 
@@ -24,6 +32,15 @@
    :members:
 
 .. autoexception:: WriteTimeout()
+   :members:
+
+.. autoexception:: ReadFailure()
+   :members:
+
+.. autoexception:: WriteFailure()
+   :members:
+
+.. autoexception:: FunctionFailure()
    :members:
 
 .. autoexception:: AlreadyExists()

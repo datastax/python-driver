@@ -213,6 +213,31 @@ class PreparedStatementTests(unittest.TestCase):
 
         cluster.shutdown()
 
+    def test_no_meta(self):
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        session = cluster.connect()
+
+        prepared = session.prepare(
+            """
+            INSERT INTO test3rf.test (k, v) VALUES  (0, 0)
+            """)
+
+        self.assertIsInstance(prepared, PreparedStatement)
+        bound = prepared.bind(None)
+        session.execute(bound)
+
+        prepared = session.prepare(
+           """
+           SELECT * FROM test3rf.test WHERE k=0
+           """)
+        self.assertIsInstance(prepared, PreparedStatement)
+
+        bound = prepared.bind(None)
+        results = session.execute(bound)
+        self.assertEqual(results[0].v, 0)
+
+        cluster.shutdown()
+
     def test_none_values_dicts(self):
         """
         Ensure binding None is handled correctly with dict bindings

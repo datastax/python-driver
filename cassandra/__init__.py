@@ -126,6 +126,58 @@ def consistency_value_to_name(value):
     return ConsistencyLevel.value_to_name[value] if value is not None else "Not Set"
 
 
+class SignatureDescriptor(object):
+
+    def __init__(self, name, type_signature):
+        self.name = name
+        self.type_signature = type_signature
+
+    @property
+    def signature(self):
+        """
+        function signatue string in the form 'name([type0[,type1[...]]])'
+
+        can be used to uniquely identify overloaded function names within a keyspace
+        """
+        return self.format_signature(self.name, self.type_signature)
+
+    @staticmethod
+    def format_signature(name, type_signature):
+        return "%s(%s)" % (name, ','.join(t for t in type_signature))
+
+
+class UserFunctionDescriptor(SignatureDescriptor):
+    """
+    Describes a User function by name and argument signature
+    """
+
+    name = None
+    """
+    name of the function
+    """
+
+    type_signature = None
+    """
+    Ordered list of CQL argument type name comprising the type signature
+    """
+
+
+class UserAggregateDescriptor(SignatureDescriptor):
+    """
+    Describes a User aggregate function by name and argument signature
+    """
+
+    name = None
+    """
+    name of the aggregate
+    """
+
+    type_signature = None
+    """
+    Ordered list of CQL argument type name comprising the type signature
+    """
+
+
 class Unavailable(Exception):
     """
     There were not enough live replicas to satisfy the requested consistency
@@ -219,6 +271,103 @@ class WriteTimeout(Timeout):
     def __init__(self, message, write_type=None, **kwargs):
         Timeout.__init__(self, message, **kwargs)
         self.write_type = write_type
+
+
+class CoordinationFailure(Exception):
+    """
+    Replicas sent a failure to the coordinator.
+    """
+
+    consistency = None
+    """ The requested :class:`ConsistencyLevel` """
+
+    required_responses = None
+    """ The number of required replica responses """
+
+    received_responses = None
+    """
+    The number of replicas that responded before the coordinator timed out
+    the operation
+    """
+
+    failures = None
+    """
+    The number of replicas that sent a failure message
+    """
+
+    def __init__(self, summary_message, consistency=None, required_responses=None, received_responses=None, failures=None):
+        self.consistency = consistency
+        self.required_responses = required_responses
+        self.received_responses = received_responses
+        self.failures = failures
+        Exception.__init__(self, summary_message + ' info=' +
+                           repr({'consistency': consistency_value_to_name(consistency),
+                                 'required_responses': required_responses,
+                                 'received_responses': received_responses,
+                                 'failures': failures}))
+
+
+class ReadFailure(CoordinationFailure):
+    """
+    A subclass of :exc:`CoordinationFailure` for read operations.
+
+    This indicates that the replicas sent a failure message to the coordinator.
+    """
+
+    data_retrieved = None
+    """
+    A boolean indicating whether the requested data was retrieved
+    by the coordinator from any replicas before it timed out the
+    operation
+    """
+
+    def __init__(self, message, data_retrieved=None, **kwargs):
+        CoordinationFailure.__init__(self, message, **kwargs)
+        self.data_retrieved = data_retrieved
+
+
+class WriteFailure(CoordinationFailure):
+    """
+    A subclass of :exc:`CoordinationFailure` for write operations.
+
+    This indicates that the replicas sent a failure message to the coordinator.
+    """
+
+    write_type = None
+    """
+    The type of write operation, enum on :class:`~cassandra.policies.WriteType`
+    """
+
+    def __init__(self, message, write_type=None, **kwargs):
+        CoordinationFailure.__init__(self, message, **kwargs)
+        self.write_type = write_type
+
+
+class FunctionFailure(Exception):
+    """
+    User Defined Function failed during execution
+    """
+
+    keyspace = None
+    """
+    Keyspace of the function
+    """
+
+    function = None
+    """
+    Name of the function
+    """
+
+    arg_types = None
+    """
+    List of argument type names of the function
+    """
+
+    def __init__(self, summary_message, keyspace, function, arg_types):
+        self.keyspace = keyspace
+        self.function = function
+        self.arg_types = arg_types
+        Exception.__init__(self, summary_message)
 
 
 class AlreadyExists(Exception):
