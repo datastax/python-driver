@@ -250,7 +250,7 @@ class Metadata(object):
         return Function(function_row['keyspace_name'], function_row['function_name'],
                         function_row['signature'], function_row['argument_names'],
                         return_type, function_row['language'], function_row['body'],
-                        function_row['is_deterministic'], function_row['called_on_null_input'])
+                        function_row['called_on_null_input'])
 
     def _build_aggregate(self, keyspace, aggregate_row):
         state_type = types.lookup_casstype(aggregate_row['state_type'])
@@ -977,8 +977,7 @@ class Aggregate(object):
 
     state_type = None
     """
-    Flag indicating whether this function is deterministic
-    (required for functional indexes)
+    Type of the aggregate state
     """
 
     def __init__(self, keyspace, name, type_signature, state_func,
@@ -1064,12 +1063,6 @@ class Function(object):
     Function body string
     """
 
-    is_deterministic = None
-    """
-    Flag indicating whether this function is deterministic
-    (required for functional indexes)
-    """
-
     called_on_null_input = None
     """
     Flag indicating whether this function should be called for rows with null values
@@ -1077,7 +1070,7 @@ class Function(object):
     """
 
     def __init__(self, keyspace, name, type_signature, argument_names,
-                 return_type, language, body, is_deterministic, called_on_null_input):
+                 return_type, language, body, called_on_null_input):
         self.keyspace = keyspace
         self.name = name
         self.type_signature = type_signature
@@ -1085,7 +1078,6 @@ class Function(object):
         self.return_type = return_type
         self.language = language
         self.body = body
-        self.is_deterministic = is_deterministic
         self.called_on_null_input = called_on_null_input
 
     def as_cql_query(self, formatted=False):
@@ -1099,13 +1091,12 @@ class Function(object):
         name = protect_name(self.name)
         arg_list = ', '.join(["%s %s" % (protect_name(n), t)
                              for n, t in zip(self.argument_names, self.type_signature)])
-        determ = '' if self.is_deterministic else 'NON DETERMINISTIC '
         typ = self.return_type.cql_parameterized_type()
         lang = self.language
         body = protect_value(self.body)
         on_null = "CALLED" if self.called_on_null_input else "RETURNS NULL"
 
-        return "CREATE %(determ)sFUNCTION %(keyspace)s.%(name)s(%(arg_list)s)%(sep)s" \
+        return "CREATE FUNCTION %(keyspace)s.%(name)s(%(arg_list)s)%(sep)s" \
                "%(on_null)s ON NULL INPUT%(sep)s" \
                "RETURNS %(typ)s%(sep)s" \
                "LANGUAGE %(lang)s%(sep)s" \

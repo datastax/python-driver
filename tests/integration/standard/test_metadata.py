@@ -568,8 +568,13 @@ CREATE TABLE export_udts.users (
 
     def test_legacy_tables(self):
 
-        if get_server_versions()[0] < (2, 1, 0):
+        cass_ver = get_server_versions()[0]
+        print cass_ver
+        if cass_ver < (2, 1, 0):
             raise unittest.SkipTest('Test schema output assumes 2.1.0+ options')
+
+        if cass_ver >= (2, 2, 0):
+            raise unittest.SkipTest('Cannot test cli script on Cassandra 2.2.0+')
 
         if sys.version_info[0:2] != (2, 7):
             raise unittest.SkipTest('This test compares static strings generated from dict items, which may change orders. Test with 2.7.')
@@ -1075,7 +1080,7 @@ class FunctionTest(unittest.TestCase):
 
 class FunctionMetadata(FunctionTest):
 
-    def make_function_kwargs(self, deterministic=True, called_on_null=True):
+    def make_function_kwargs(self, called_on_null=True):
         return {'keyspace': self.keyspace_name,
                 'name': self.function_name,
                 'type_signature': ['double', 'int'],
@@ -1083,7 +1088,6 @@ class FunctionMetadata(FunctionTest):
                 'return_type': DoubleType,
                 'language': 'java',
                 'body': 'return new Double(0.0);',
-                'is_deterministic': deterministic,
                 'called_on_null_input': called_on_null}
 
     def test_functions_after_udt(self):
@@ -1132,18 +1136,6 @@ class FunctionMetadata(FunctionTest):
                 self.assertIs(original_keyspace_meta.functions, new_keyspace_meta.functions)
             finally:
                 self.session.execute('ALTER KEYSPACE %s WITH durable_writes = true' % self.keyspace_name)
-
-    def test_function_cql_determinism(self):
-        kwargs = self.make_function_kwargs()
-        kwargs['is_deterministic'] = True
-        with self.VerifiedFunction(self, **kwargs) as vf:
-            fn_meta = self.keyspace_function_meta[vf.signature]
-            self.assertRegexpMatches(fn_meta.as_cql_query(), "CREATE FUNCTION.*")
-
-        kwargs['is_deterministic'] = False
-        with self.VerifiedFunction(self, **kwargs) as vf:
-            fn_meta = self.keyspace_function_meta[vf.signature]
-            self.assertRegexpMatches(fn_meta.as_cql_query(), "CREATE NON DETERMINISTIC FUNCTION.*")
 
     def test_function_cql_called_on_null(self):
         kwargs = self.make_function_kwargs()
