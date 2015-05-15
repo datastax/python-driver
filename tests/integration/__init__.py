@@ -197,8 +197,9 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True):
         except Exception:
             log.debug("Creating new ccm %s cluster with %s", cluster_name, CCM_KWARGS)
             cluster = CCMCluster(path, cluster_name, **CCM_KWARGS)
-            cluster.set_configuration_options({'start_native_transport': True,
-                                               'enable_user_defined_functions': True})
+            cluster.set_configuration_options({'start_native_transport': True})
+            if CASSANDRA_VERSION >= '2.2':
+                cluster.set_configuration_options({'enable_user_defined_functions': True})
             common.switch_cluster(path, cluster_name)
             cluster.populate(nodes, ipformat=ipformat)
 
