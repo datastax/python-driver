@@ -71,7 +71,7 @@
 
    .. automethod:: refresh_table_metadata
 
-   .. automethod:: refresh_type_metadata
+   .. automethod:: refresh_user_type_metadata
 
    .. automethod:: refresh_schema
 

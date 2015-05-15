@@ -1202,7 +1202,7 @@ class Cluster(object):
         if not self.control_connection.refresh_schema(keyspace, table, schema_agreement_wait=max_schema_agreement_wait):
             raise Exception("Table metadata was not refreshed. See log for details.")
 
-    def refresh_type_metadata(self, keyspace, user_type, max_schema_agreement_wait=None):
+    def refresh_user_type_metadata(self, keyspace, user_type, max_schema_agreement_wait=None):
         """
         Synchronously refresh user defined type metadata.
 
