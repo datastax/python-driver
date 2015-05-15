@@ -209,7 +209,7 @@ class Statement(object):
 
     These are only allowed when using protocol version 4 or higher.
 
-    .. versionadded:: 3.0.0
+    .. versionadded:: 2.6.0
     """
 
     _serial_consistency_level = None
@@ -666,7 +666,7 @@ class BatchStatement(Statement):
         .. versionchanged:: 2.1.0
             Added `serial_consistency_level` as a parameter
 
-        .. versionchanged:: 3.0.0
+        .. versionchanged:: 2.6.0
             Added `custom_payload` as a parameter
         """
         self.batch_type = batch_type
@@ -801,7 +801,7 @@ class QueryTrace(object):
     """
     The IP address of the client that issued this request
 
-    This is only available when using Cassandra 3.0+
+    This is only available when using Cassandra 2.2+
     """
 
     coordinator = None
@@ -872,7 +872,7 @@ class QueryTrace(object):
             self.started_at = session_row.started_at
             self.coordinator = session_row.coordinator
             self.parameters = session_row.parameters
-            # since C* 3.0
+            # since C* 2.2
             self.client = getattr(session_row, 'client', None)
 
             log.debug("Attempting to fetch trace events for trace ID: %s", self.trace_id)

@@ -800,14 +800,14 @@ class KeyspaceMetadata(object):
     """
     A map from user-defined function signatures to instances of :class:`~cassandra.metadata.Function`.
 
-    .. versionadded:: 3.0.0
+    .. versionadded:: 2.6.0
     """
 
     aggregates = None
     """
     A map from user-defined aggregate signatures to instances of :class:`~cassandra.metadata.Aggregate`.
 
-    .. versionadded:: 3.0.0
+    .. versionadded:: 2.6.0
     """
     def __init__(self, name, durable_writes, strategy_class, strategy_options):
         self.name = name
@@ -935,9 +935,9 @@ class Aggregate(object):
     """
     A user defined aggregate function, as created by ``CREATE AGGREGATE`` statements.
 
-    Aggregate functions were introduced in Cassandra 3.0
+    Aggregate functions were introduced in Cassandra 2.2
 
-    .. versionadded:: 3.0.0
+    .. versionadded:: 2.6.0
     """
 
     keyspace = None
@@ -1024,9 +1024,9 @@ class Function(object):
     """
     A user defined function, as created by ``CREATE FUNCTION`` statements.
 
-    User-defined functions were introduced in Cassandra 3.0
+    User-defined functions were introduced in Cassandra 2.2
 
-    .. versionadded:: 3.0.0
+    .. versionadded:: 2.6.0
     """
 
     keyspace = None

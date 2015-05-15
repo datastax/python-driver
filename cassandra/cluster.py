@@ -2212,7 +2212,7 @@ class ControlConnection(object):
                 else:
                     raise types_result
 
-            # functions were introduced in Cassandra 3.0
+            # functions were introduced in Cassandra 2.2
             if functions_success:
                 functions_result = dict_factory(*functions_result.results) if functions_result.results else {}
             else:
@@ -2222,7 +2222,7 @@ class ControlConnection(object):
                 else:
                     raise functions_result
 
-            # aggregates were introduced in Cassandra 3.0
+            # aggregates were introduced in Cassandra 2.2
             if aggregates_success:
                 aggregates_result = dict_factory(*aggregates_result.results) if aggregates_result.results else {}
             else:

@@ -119,7 +119,7 @@ else:
     log.info('Using Cassandra version: %s', CASSANDRA_VERSION)
     CCM_KWARGS['version'] = CASSANDRA_VERSION
 
-if CASSANDRA_VERSION >= '3.0':
+if CASSANDRA_VERSION >= '2.2':
     default_protocol_version = 4
 elif CASSANDRA_VERSION >= '2.1':
     default_protocol_version = 3
