@@ -15,15 +15,16 @@
 Module that implements an event loop based on twisted
 ( https://twistedmatrix.com ).
 """
-import atexit
+from twisted.internet import reactor, protocol
+from threading import Event, Thread, Lock
 from functools import partial
 import logging
-from threading import Event, Thread, Lock
-import time
-from twisted.internet import reactor, protocol
 import weakref
+import atexit
 
-from cassandra.connection import Connection, ConnectionShutdown, Timer, TimerManager
+from cassandra import OperationTimedOut
+from cassandra.connection import Connection, ConnectionShutdown
+from cassandra.protocol import RegisterMessage
 
 
 log = logging.getLogger(__name__)
@@ -108,12 +109,9 @@ class TwistedLoop(object):
 
     _lock = None
     _thread = None
-    _timeout_task = None
-    _timeout = None
 
     def __init__(self):
         self._lock = Lock()
-        self._timers = TimerManager()
 
     def maybe_start(self):
         with self._lock:
@@ -135,27 +133,6 @@ class TwistedLoop(object):
                             "Cluster.shutdown() to avoid this.")
             log.debug("Event loop thread was joined")
 
-    def add_timer(self, timer):
-        self._timers.add_timer(timer)
-        # callFromThread to schedule from the loop thread, where
-        # the timeout task can safely be modified
-        reactor.callFromThread(self._schedule_timeout, timer.end)
-
-    def _schedule_timeout(self, next_timeout):
-        if next_timeout:
-            delay = max(next_timeout - time.time(), 0)
-            if self._timeout_task and self._timeout_task.active():
-                if next_timeout < self._timeout:
-                    self._timeout_task.reset(delay)
-                    self._timeout = next_timeout
-            else:
-                self._timeout_task = reactor.callLater(delay, self._on_loop_timer)
-                self._timeout = next_timeout
-
-    def _on_loop_timer(self):
-        self._timers.service_timeouts()
-        self._schedule_timeout(self._timers.next_timeout)
-
 
 class TwistedConnection(Connection):
     """
@@ -171,12 +148,6 @@ class TwistedConnection(Connection):
         if not cls._loop:
             cls._loop = TwistedLoop()
 
-    @classmethod
-    def create_timer(cls, timeout, callback):
-        timer = Timer(timeout, callback)
-        cls._loop.add_timer(timer)
-        return timer
-
     def __init__(self, *args, **kwargs):
         """
         Initialization method.
@@ -188,9 +159,11 @@ class TwistedConnection(Connection):
         """
         Connection.__init__(self, *args, **kwargs)
 
+        self.connected_event = Event()
         self.is_closed = True
         self.connector = None
 
+        self._callbacks = {}
         reactor.callFromThread(self.add_connection)
         self._loop.maybe_start()
 
@@ -247,3 +220,22 @@ class TwistedConnection(Connection):
         the event loop when it gets the chance.
         """
         reactor.callFromThread(self.connector.transport.write, data)
+
+    def register_watcher(self, event_type, callback, register_timeout=None):
+        """
+        Register a callback for a given event type.
+        """
+        self._push_watchers[event_type].add(callback)
+        self.wait_for_response(
+            RegisterMessage(event_list=[event_type]),
+            timeout=register_timeout)
+
+    def register_watchers(self, type_callback_dict, register_timeout=None):
+        """
+        Register multiple callback/event type pairs, expressed as a dict.
+        """
+        for event_type, callback in type_callback_dict.items():
+            self._push_watchers[event_type].add(callback)
+        self.wait_for_response(
+            RegisterMessage(event_list=type_callback_dict.keys()),
+            timeout=register_timeout)

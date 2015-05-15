@@ -16,12 +16,11 @@ from __future__ import absolute_import  # to enable import io from stdlib
 from collections import defaultdict, deque
 import errno
 from functools import wraps, partial
-from heapq import heappush, heappop
 import io
 import logging
 import os
 import sys
-from threading import Thread, Event, RLock, Lock
+from threading import Thread, Event, RLock
 import time
 
 if 'gevent.monkey' in sys.modules:
@@ -39,8 +38,7 @@ from cassandra.protocol import (ReadyMessage, AuthenticateMessage, OptionsMessag
                                 QueryMessage, ResultMessage, decode_response,
                                 InvalidRequestException, SupportedMessage,
                                 AuthResponseMessage, AuthChallengeMessage,
-                                AuthSuccessMessage, ProtocolException,
-                                RegisterMessage)
+                                AuthSuccessMessage, ProtocolException)
 from cassandra.util import OrderedDict
 
 
@@ -194,7 +192,6 @@ class Connection(object):
         self.is_control_connection = is_control_connection
         self.user_type_map = user_type_map
         self._push_watchers = defaultdict(set)
-        self._callbacks = {}
         self._iobuf = io.BytesIO()
         if protocol_version >= 3:
             self._header_unpack = v3_header_unpack
@@ -225,7 +222,6 @@ class Connection(object):
         self._full_header_length = self._header_length + 4
 
         self.lock = RLock()
-        self.connected_event = Event()
 
     @classmethod
     def initialize_reactor(self):
@@ -259,10 +255,6 @@ class Connection(object):
             raise OperationTimedOut("Timed out creating connection (%s seconds)" % timeout)
         else:
             return conn
-
-    @classmethod
-    def create_timer(cls, timeout, callback):
-        raise NotImplementedError()
 
     def close(self):
         raise NotImplementedError()
@@ -375,24 +367,11 @@ class Connection(object):
             self.defunct(exc)
             raise
 
-    def register_watcher(self, event_type, callback, register_timeout=None):
-        """
-        Register a callback for a given event type.
-        """
-        self._push_watchers[event_type].add(callback)
-        self.wait_for_response(
-            RegisterMessage(event_list=[event_type]),
-            timeout=register_timeout)
+    def register_watcher(self, event_type, callback):
+        raise NotImplementedError()
 
-    def register_watchers(self, type_callback_dict, register_timeout=None):
-        """
-        Register multiple callback/event type pairs, expressed as a dict.
-        """
-        for event_type, callback in type_callback_dict.items():
-            self._push_watchers[event_type].add(callback)
-        self.wait_for_response(
-            RegisterMessage(event_list=type_callback_dict.keys()),
-            timeout=register_timeout)
+    def register_watchers(self, type_callback_dict):
+        raise NotImplementedError()
 
     def control_conn_disposed(self):
         self.is_control_connection = False
@@ -892,76 +871,3 @@ class ConnectionHeartbeat(Thread):
     def _raise_if_stopped(self):
         if self._shutdown_event.is_set():
             raise self.ShutdownException()
-
-
-class Timer(object):
-
-    canceled = False
-
-    def __init__(self, timeout, callback):
-        self.end = time.time() + timeout
-        self.callback = callback
-        if timeout < 0:
-            self.callback()
-
-    def cancel(self):
-        self.canceled = True
-
-    def finish(self, time_now):
-        if self.canceled:
-            return True
-
-        if time_now >= self.end:
-            self.callback()
-            return True
-
-        return False
-
-
-class TimerManager(object):
-
-    def __init__(self):
-        self._queue = []
-        self._new_timers = []
-
-    def add_timer(self, timer):
-        """
-        called from client thread with a Timer object
-        """
-        self._new_timers.append((timer.end, timer))
-
-    def service_timeouts(self):
-        """
-        run callbacks on all expired timers
-        Called from the event thread
-        :return: next end time, or None
-        """
-        queue = self._queue
-        new_timers = self._new_timers
-        while self._new_timers:
-            heappush(queue, new_timers.pop())
-        now = time.time()
-        while queue:
-            try:
-                timer = queue[0][1]
-                if timer.finish(now):
-                    heappop(queue)
-                else:
-                    return timer.end
-            except Exception:
-                log.exception("Exception while servicing timeout callback: ")
-
-    @property
-    def next_timeout(self):
-        try:
-            return self._queue[0][0]
-        except IndexError:
-            pass
-
-    @property
-    def next_offset(self):
-        try:
-            next_end = self._queue[0][0]
-            return next_end - time.time()
-        except IndexError:
-            pass
