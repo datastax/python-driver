@@ -981,6 +981,10 @@ class IndexMapTests(unittest.TestCase):
 
         # both indexes updated when index dropped
         self.session.execute("DROP INDEX a_idx")
+
+        # temporarily synchronously refresh the schema metadata, until CASSANDRA-9391 is merged in
+        self.cluster.refresh_schema(self.keyspace_name, self.table_name)
+
         ks_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
         table_meta = ks_meta.tables[self.table_name]
         self.assertNotIn('a_idx', ks_meta.indexes)
