@@ -569,7 +569,6 @@ CREATE TABLE export_udts.users (
     def test_legacy_tables(self):
 
         cass_ver = get_server_versions()[0]
-        print cass_ver
         if cass_ver < (2, 1, 0):
             raise unittest.SkipTest('Test schema output assumes 2.1.0+ options')
 
