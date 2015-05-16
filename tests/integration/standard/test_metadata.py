@@ -1022,27 +1022,35 @@ class FunctionTest(unittest.TestCase):
     """
     Base functionality for Function and Aggregate metadata test classes
     """
+
+    def setUp(self):
+        """
+        Tests are skipped if run with native protocol version < 4
+        """
+
+        if PROTOCOL_VERSION < 4:
+            raise unittest.SkipTest("Function metadata requires native protocol version 4+")
+
     @property
     def function_name(self):
         return self._testMethodName.lower()
 
     @classmethod
     def setup_class(cls):
-        if PROTOCOL_VERSION < 4:
-            raise unittest.SkipTest("Function metadata requires native protocol version 4+")
-
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        cls.keyspace_name = cls.__name__.lower()
-        cls.session = cls.cluster.connect()
-        cls.session.execute("CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}" % cls.keyspace_name)
-        cls.session.set_keyspace(cls.keyspace_name)
-        cls.keyspace_function_meta = cls.cluster.metadata.keyspaces[cls.keyspace_name].functions
-        cls.keyspace_aggregate_meta = cls.cluster.metadata.keyspaces[cls.keyspace_name].aggregates
+        if PROTOCOL_VERSION >= 4:
+            cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+            cls.keyspace_name = cls.__name__.lower()
+            cls.session = cls.cluster.connect()
+            cls.session.execute("CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}" % cls.keyspace_name)
+            cls.session.set_keyspace(cls.keyspace_name)
+            cls.keyspace_function_meta = cls.cluster.metadata.keyspaces[cls.keyspace_name].functions
+            cls.keyspace_aggregate_meta = cls.cluster.metadata.keyspaces[cls.keyspace_name].aggregates
 
     @classmethod
     def teardown_class(cls):
-        cls.session.execute("DROP KEYSPACE IF EXISTS %s" % cls.keyspace_name)
-        cls.cluster.shutdown()
+        if PROTOCOL_VERSION >= 4:
+            cls.session.execute("DROP KEYSPACE IF EXISTS %s" % cls.keyspace_name)
+            cls.cluster.shutdown()
 
     class Verified(object):
 
@@ -1158,33 +1166,34 @@ class AggregateMetadata(FunctionTest):
 
     @classmethod
     def setup_class(cls):
-        super(AggregateMetadata, cls).setup_class()
+        if PROTOCOL_VERSION >= 4:
+            super(AggregateMetadata, cls).setup_class()
 
-        cls.session.execute("""CREATE OR REPLACE FUNCTION sum_int(s int, i int)
-                               RETURNS NULL ON NULL INPUT
-                               RETURNS int
-                               LANGUAGE javascript AS 's + i';""")
-        cls.session.execute("""CREATE OR REPLACE FUNCTION sum_int_two(s int, i int, j int)
-                               RETURNS NULL ON NULL INPUT
-                               RETURNS int
-                               LANGUAGE javascript AS 's + i + j';""")
-        cls.session.execute("""CREATE OR REPLACE FUNCTION "List_As_String"(l list<text>)
-                               RETURNS NULL ON NULL INPUT
-                               RETURNS int
-                               LANGUAGE javascript AS ''''' + l';""")
-        cls.session.execute("""CREATE OR REPLACE FUNCTION extend_list(s list<text>, i int)
-                               CALLED ON NULL INPUT
-                               RETURNS list<text>
-                               LANGUAGE java AS 'if (i != null) s.add(i.toString()); return s;';""")
-        cls.session.execute("""CREATE OR REPLACE FUNCTION update_map(s map<int, int>, i int)
-                               RETURNS NULL ON NULL INPUT
-                               RETURNS map<int, int>
-                               LANGUAGE java AS 's.put(new Integer(i), new Integer(i)); return s;';""")
-        cls.session.execute("""CREATE TABLE IF NOT EXISTS t
-                               (k int PRIMARY KEY, v int)""")
-        for x in range(4):
-            cls.session.execute("INSERT INTO t (k,v) VALUES (%s, %s)", (x, x))
-        cls.session.execute("INSERT INTO t (k) VALUES (%s)", (4,))
+            cls.session.execute("""CREATE OR REPLACE FUNCTION sum_int(s int, i int)
+                                   RETURNS NULL ON NULL INPUT
+                                   RETURNS int
+                                   LANGUAGE javascript AS 's + i';""")
+            cls.session.execute("""CREATE OR REPLACE FUNCTION sum_int_two(s int, i int, j int)
+                                   RETURNS NULL ON NULL INPUT
+                                   RETURNS int
+                                   LANGUAGE javascript AS 's + i + j';""")
+            cls.session.execute("""CREATE OR REPLACE FUNCTION "List_As_String"(l list<text>)
+                                   RETURNS NULL ON NULL INPUT
+                                   RETURNS int
+                                   LANGUAGE javascript AS ''''' + l';""")
+            cls.session.execute("""CREATE OR REPLACE FUNCTION extend_list(s list<text>, i int)
+                                   CALLED ON NULL INPUT
+                                   RETURNS list<text>
+                                   LANGUAGE java AS 'if (i != null) s.add(i.toString()); return s;';""")
+            cls.session.execute("""CREATE OR REPLACE FUNCTION update_map(s map<int, int>, i int)
+                                   RETURNS NULL ON NULL INPUT
+                                   RETURNS map<int, int>
+                                   LANGUAGE java AS 's.put(new Integer(i), new Integer(i)); return s;';""")
+            cls.session.execute("""CREATE TABLE IF NOT EXISTS t
+                                   (k int PRIMARY KEY, v int)""")
+            for x in range(4):
+                cls.session.execute("INSERT INTO t (k,v) VALUES (%s, %s)", (x, x))
+            cls.session.execute("INSERT INTO t (k) VALUES (%s)", (4,))
 
     def make_aggregate_kwargs(self, state_func, state_type, final_func=None, init_cond=None):
         return {'keyspace': self.keyspace_name,
