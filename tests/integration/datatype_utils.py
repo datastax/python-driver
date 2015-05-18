@@ -60,6 +60,8 @@ def update_datatypes():
     if _cass_version >= (3, 0, 0):
         PRIMITIVE_DATATYPES.append('date')
         PRIMITIVE_DATATYPES.append('time')
+        PRIMITIVE_DATATYPES.append('tinyint')
+        PRIMITIVE_DATATYPES.append('smallint')
 
 
 def get_sample_data():
@@ -116,6 +118,12 @@ def get_sample_data():
 
         elif datatype == 'time':
             sample_data[datatype] = time(16, 47, 25, 7)
+
+        elif datatype == 'tinyint':
+            sample_data[datatype] = 123
+
+        elif datatype == 'smallint':
+            sample_data[datatype] = 32523
 
         else:
             raise Exception("Missing handling of {0}".format(datatype))

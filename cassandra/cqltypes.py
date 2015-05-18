@@ -44,7 +44,7 @@ from uuid import UUID
 import warnings
 
 
-from cassandra.marshal import (int8_pack, int8_unpack,
+from cassandra.marshal import (int8_pack, int8_unpack, int16_pack, int16_unpack,
                                uint16_pack, uint16_unpack, uint32_pack, uint32_unpack,
                                int32_pack, int32_unpack, int64_pack, int64_unpack,
                                float_pack, float_unpack, double_pack, double_unpack,
@@ -424,6 +424,17 @@ class BooleanType(_CassandraType):
     def serialize(truth, protocol_version):
         return int8_pack(truth)
 
+class TinyIntType(_CassandraType):
+    typename = 'tinyint'
+
+    @staticmethod
+    def deserialize(byts, protocol_version):
+        return int8_unpack(byts)
+
+    @staticmethod
+    def serialize(byts, protocol_version):
+        return int8_pack(byts)
+
 
 if six.PY2:
     class AsciiType(_CassandraType):
@@ -648,6 +659,18 @@ class SimpleDateType(_CassandraType):
     def deserialize(byts, protocol_version):
         days = uint32_unpack(byts) - 2 ** 31
         return util.Date(days)
+
+
+class SmallIntType(_CassandraType):
+    typename = 'smallint'
+
+    @staticmethod
+    def deserialize(byts, protocol_version):
+        return int16_unpack(byts)
+
+    @staticmethod
+    def serialize(byts, protocol_version):
+        return int16_pack(byts)
 
 
 class TimeType(_CassandraType):
