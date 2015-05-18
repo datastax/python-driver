@@ -27,6 +27,7 @@ import socket
 import sys
 import time
 from threading import Lock, RLock, Thread, Event
+import warnings
 
 import six
 from six.moves import range
@@ -70,6 +71,7 @@ from cassandra.pool import (Host, _ReconnectionHandler, _HostReconnectionHandler
 from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              BatchStatement, bind_params, QueryTrace, Statement,
                              named_tuple_factory, dict_factory, FETCH_SIZE_UNSET)
+
 
 def _is_eventlet_monkey_patched():
     if 'eventlet.patcher' not in sys.modules:
@@ -1136,6 +1138,9 @@ class Cluster(object):
 
     def refresh_schema(self, keyspace=None, table=None, usertype=None, function=None, aggregate=None, max_schema_agreement_wait=None):
         """
+        .. deprecated:: 2.6.0
+            Use refresh_*_metadata instead
+
         Synchronously refresh schema metadata.
 
         {keyspace, table, usertype} are string names of the respective entities.
@@ -1160,6 +1165,10 @@ class Cluster(object):
 
         An Exception is raised if schema refresh fails for any reason.
         """
+        msg = "refresh_schema is deprecated. Use Cluster.refresh_*_metadata instead."
+        warnings.warn(msg, DeprecationWarning)
+        log.warning(msg)
+
         self._validate_refresh_schema(keyspace, table, usertype, function, aggregate)
         if not self.control_connection.refresh_schema(keyspace, table, usertype, function,
                                                       aggregate, max_schema_agreement_wait):
@@ -1167,12 +1176,64 @@ class Cluster(object):
 
     def submit_schema_refresh(self, keyspace=None, table=None, usertype=None, function=None, aggregate=None):
         """
+        .. deprecated:: 2.6.0
+            Use refresh_*_metadata instead
+
         Schedule a refresh of the internal representation of the current
         schema for this cluster.  See :meth:`~.refresh_schema` for description of parameters.
         """
+        msg = "submit_schema_refresh is deprecated. Use Cluster.refresh_*_metadata instead."
+        warnings.warn(msg, DeprecationWarning)
+        log.warning(msg)
+
         self._validate_refresh_schema(keyspace, table, usertype, function, aggregate)
         return self.executor.submit(
             self.control_connection.refresh_schema, keyspace, table, usertype, function, aggregate)
+
+    def refresh_schema_metadata(self, max_schema_agreement_wait=None):
+        """
+        Synchronously refresh all schema metadata.
+
+        By default, the timeout for this operation is governed by :attr:`~.Cluster.max_schema_agreement_wait`
+        and :attr:`~.Cluster.control_connection_timeout`.
+
+        Passing max_schema_agreement_wait here overrides :attr:`~.Cluster.max_schema_agreement_wait`.
+
+        Setting max_schema_agreement_wait <= 0 will bypass schema agreement and refresh schema immediately.
+
+        An Exception is raised if schema refresh fails for any reason.
+        """
+        if not self.control_connection.refresh_schema(schema_agreement_wait=max_schema_agreement_wait):
+            raise Exception("Schema metadata was not refreshed. See log for details.")
+
+    def refresh_keyspace_metadata(self, keyspace, max_schema_agreement_wait=None):
+        """
+        Synchronously refresh keyspace metadata. This applies to keyspace-level information such as replication
+        and durability settings. It does not refresh tables, types, etc. contained in the keyspace.
+
+        See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
+        """
+        if not self.control_connection.refresh_schema(keyspace, schema_agreement_wait=max_schema_agreement_wait):
+            raise Exception("Keyspace metadata was not refreshed. See log for details.")
+
+    def refresh_table_metadata(self, keyspace, table, max_schema_agreement_wait=None):
+        """
+        Synchronously refresh table metadata. This applies to a table, and any triggers or indexes attached
+        to the table.
+
+        See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
+        """
+        if not self.control_connection.refresh_schema(keyspace, table, schema_agreement_wait=max_schema_agreement_wait):
+            raise Exception("Table metadata was not refreshed. See log for details.")
+
+    def refresh_type_metadata(self, keyspace, user_type, max_schema_agreement_wait=None):
+        """
+        Synchronously refresh user defined type metadata.
+
+        See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
+        """
+        if not self.control_connection.refresh_schema(keyspace, usertype=user_type, schema_agreement_wait=max_schema_agreement_wait):
+            raise Exception("User Type metadata was not refreshed. See log for details.")
 
     def refresh_nodes(self):
         """
