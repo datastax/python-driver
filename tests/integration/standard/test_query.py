@@ -95,7 +95,7 @@ class QueryTests(unittest.TestCase):
         creates a simple query and ensures that the client trace information is present. This will
         only be the case if the c* version is 2.2 or greater
 
-        @since 2.2
+        @since 2.6
         @jira_ticket PYTHON-235
         @expected_result client address should be present in C* >= 2.2, otherwise should be none.
 
