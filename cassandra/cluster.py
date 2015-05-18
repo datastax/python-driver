@@ -1438,8 +1438,6 @@ class Session(object):
         future = self.execute_async(query, parameters, trace, custom_payload)
         try:
             result = future.result(timeout)
-            if future.warnings:
-                log.warning("Query returned warnings from the server. See cassandra.protocol log for details.")
         finally:
             if trace:
                 try:
