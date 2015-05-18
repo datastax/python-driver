@@ -57,6 +57,7 @@ HEADER_DIRECTION_MASK = 0x80
 COMPRESSED_FLAG = 0x01
 TRACING_FLAG = 0x02
 CUSTOM_PAYLOAD_FLAG = 0x04
+WARNING_FLAG = 0x08
 
 _message_types_by_name = {}
 _message_types_by_opcode = {}
@@ -74,6 +75,7 @@ class _MessageType(object):
 
     tracing = False
     custom_payload = None
+    warnings = None
 
     def to_binary(self, stream_id, protocol_version, compression=None):
         flags = 0
@@ -133,6 +135,12 @@ def decode_response(protocol_version, user_type_map, stream_id, flags, opcode, b
     else:
         trace_id = None
 
+    if flags & WARNING_FLAG:
+        warnings = read_stringlist(body)
+        flags ^= WARNING_FLAG
+    else:
+        warnings = None
+
     if flags & CUSTOM_PAYLOAD_FLAG:
         custom_payload = read_bytesmap(body)
         flags ^= CUSTOM_PAYLOAD_FLAG
@@ -147,6 +155,12 @@ def decode_response(protocol_version, user_type_map, stream_id, flags, opcode, b
     msg.stream_id = stream_id
     msg.trace_id = trace_id
     msg.custom_payload = custom_payload
+    msg.warnings = warnings
+
+    if msg.warnings:
+        for w in msg.warnings:
+            log.warning("Server warning: %s", w)
+
     return msg
 
 

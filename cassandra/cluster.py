@@ -2730,6 +2730,7 @@ class ResponseFuture(object):
     _metrics = None
     _paging_state = None
     _custom_payload = None
+    _warnings = None
 
     def __init__(self, session, message, query, default_timeout=None, metrics=None, prepared_statement=None):
         self.session = session
@@ -2818,6 +2819,24 @@ class ResponseFuture(object):
         return self._paging_state is not None
 
     @property
+    def warnings(self):
+        """
+        Warnings returned from the server, if any. This will only be
+        set for protocol_version 4+.
+
+        Warnings may be returned for such things as oversized batches,
+        or too many tombstones in slice queries.
+
+        Ensure the future is complete before trying to access this property
+        (call :meth:`.result()`, or after callback is invoked).
+        Otherwise it may throw if the response has not been received.
+        """
+        # TODO: When timers are introduced, just make this wait
+        if not self._event.is_set():
+            raise Exception("warnings cannot be retrieved before ResponseFuture is finalized")
+        return self._warnings
+
+    @property
     def custom_payload(self):
         """
         The custom payload returned from the server, if any. This will only be
@@ -2830,6 +2849,7 @@ class ResponseFuture(object):
 
         :return: :ref:`custom_payload`.
         """
+        # TODO: When timers are introduced, just make this wait
         if not self._event.is_set():
             raise Exception("custom_payload cannot be retrieved before ResponseFuture is finalized")
         return self._custom_payload
@@ -2872,6 +2892,7 @@ class ResponseFuture(object):
                     self.query.trace_id = trace_id
                 self._query_trace = QueryTrace(trace_id, self.session)
 
+            self._warnings = getattr(response, 'warnings', None)
             self._custom_payload = getattr(response, 'custom_payload', None)
 
             if isinstance(response, ResultMessage):
