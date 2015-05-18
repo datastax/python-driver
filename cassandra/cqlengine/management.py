@@ -81,7 +81,7 @@ def create_keyspace(name, strategy_class, replication_factor, durable_writes=Tru
         query = """
         CREATE KEYSPACE {}
         WITH REPLICATION = {}
-        """.format(name, json.dumps(replication_map).replace('"', "'"))
+        """.format(metadata.protect_name(name), json.dumps(replication_map).replace('"', "'"))
 
         if strategy_class != 'SimpleStrategy':
             query += " AND DURABLE_WRITES = {}".format('true' if durable_writes else 'false')
@@ -163,7 +163,7 @@ def drop_keyspace(name):
 
     cluster = get_cluster()
     if name in cluster.metadata.keyspaces:
-        execute("DROP KEYSPACE {}".format(name))
+        execute("DROP KEYSPACE {}".format(metadata.protect_name(name)))
 
 
 def sync_table(model):
@@ -191,9 +191,8 @@ def sync_table(model):
     if model.__abstract__:
         raise CQLEngineException("cannot create table from abstract model")
 
-    # construct query string
     cf_name = model.column_family_name()
-    raw_cf_name = model.column_family_name(include_keyspace=False)
+    raw_cf_name = model._raw_column_family_name()
 
     ks_name = model._get_keyspace()
 
@@ -433,7 +432,7 @@ def get_compaction_options(model):
 def get_fields(model):
     # returns all fields that aren't part of the PK
     ks_name = model._get_keyspace()
-    col_family = model.column_family_name(include_keyspace=False)
+    col_family = model._raw_column_family_name()
     field_types = ['regular', 'static']
     query = "select * from system.schema_columns where keyspace_name = %s and columnfamily_name = %s"
     tmp = execute(query, [ks_name, col_family])
@@ -452,7 +451,7 @@ def get_table_settings(model):
     # returns the table as provided by the native driver for a given model
     cluster = get_cluster()
     ks = model._get_keyspace()
-    table = model.column_family_name(include_keyspace=False)
+    table = model._raw_column_family_name()
     table = cluster.metadata.keyspaces[ks].tables[table]
     return table
 
@@ -520,11 +519,11 @@ def drop_table(model):
     meta = get_cluster().metadata
 
     ks_name = model._get_keyspace()
-    raw_cf_name = model.column_family_name(include_keyspace=False)
+    raw_cf_name = model._raw_column_family_name()
 
     try:
         meta.keyspaces[ks_name].tables[raw_cf_name]
-        execute('drop table {};'.format(model.column_family_name(include_keyspace=True)))
+        execute('DROP TABLE {};'.format(model.column_family_name()))
     except KeyError:
         pass
 
