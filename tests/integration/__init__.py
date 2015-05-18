@@ -206,7 +206,7 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True):
         if start:
             log.debug("Starting ccm %s cluster", cluster_name)
             cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
-            setup_test_keyspace(ipformat=ipformat)
+            setup_keyspace(ipformat=ipformat)
 
         CCM_CLUSTER = cluster
     except Exception:
@@ -235,7 +235,7 @@ def teardown_package():
             log.warn('Did not find cluster: %s' % cluster_name)
 
 
-def setup_test_keyspace(ipformat=None):
+def setup_keyspace(ipformat=None):
     # wait for nodes to startup
     time.sleep(10)
 
