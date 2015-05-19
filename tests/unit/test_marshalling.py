@@ -82,10 +82,10 @@ marshalled_value_pairs = (
     (b'\x80\x00\x00\x01', 'SimpleDateType', Date(1)),
     (b'\x7f\xff\xff\xff', 'SimpleDateType', Date('1969-12-31')),
     (b'\x00\x00\x00\x00\x00\x00\x00\x01', 'TimeType', Time(1)),
-    (b'\x7f', 'TinyIntType', 127),
-    (b'\x80', 'TinyIntType', -128),
-    (b'\x7f\xff', 'SmallIntType', 32767),
-    (b'\x80\x00', 'SmallIntType', -32768)
+    (b'\x7f', 'ByteType', 127),
+    (b'\x80', 'ByteType', -128),
+    (b'\x7f\xff', 'ShortType', 32767),
+    (b'\x80\x00', 'ShortType', -32768)
 )
 
 ordered_map_value = OrderedMapSerializedKey(UTF8Type, 2)
