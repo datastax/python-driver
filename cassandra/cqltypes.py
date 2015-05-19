@@ -424,7 +424,7 @@ class BooleanType(_CassandraType):
     def serialize(truth, protocol_version):
         return int8_pack(truth)
 
-class TinyIntType(_CassandraType):
+class ByteType(_CassandraType):
     typename = 'tinyint'
 
     @staticmethod
@@ -661,7 +661,7 @@ class SimpleDateType(_CassandraType):
         return util.Date(days)
 
 
-class SmallIntType(_CassandraType):
+class ShortType(_CassandraType):
     typename = 'smallint'
 
     @staticmethod

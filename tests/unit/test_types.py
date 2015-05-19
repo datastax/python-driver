@@ -26,7 +26,7 @@ import cassandra
 from cassandra.cqltypes import (BooleanType, lookup_casstype_simple, lookup_casstype,
                                 LongType, DecimalType, SetType, cql_typename,
                                 CassandraType, UTF8Type, parse_casstype_args,
-                                SimpleDateType, TimeType, TinyIntType, SmallIntType,
+                                SimpleDateType, TimeType, ByteType, ShortType,
                                 EmptyValue, _CassandraType, DateType, int64_pack)
 from cassandra.encoder import cql_quote
 from cassandra.protocol import (write_string, read_longstring, write_stringmap,
@@ -55,8 +55,8 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(lookup_casstype_simple('UTF8Type'), cassandra.cqltypes.UTF8Type)
         self.assertEqual(lookup_casstype_simple('DateType'), cassandra.cqltypes.DateType)
         self.assertEqual(lookup_casstype_simple('SimpleDateType'), cassandra.cqltypes.SimpleDateType)
-        self.assertEqual(lookup_casstype_simple('TinyIntType'), cassandra.cqltypes.TinyIntType)
-        self.assertEqual(lookup_casstype_simple('SmallIntType'), cassandra.cqltypes.SmallIntType)
+        self.assertEqual(lookup_casstype_simple('ByteType'), cassandra.cqltypes.ByteType)
+        self.assertEqual(lookup_casstype_simple('ShortType'), cassandra.cqltypes.ShortType)
         self.assertEqual(lookup_casstype_simple('TimeUUIDType'), cassandra.cqltypes.TimeUUIDType)
         self.assertEqual(lookup_casstype_simple('TimeType'), cassandra.cqltypes.TimeType)
         self.assertEqual(lookup_casstype_simple('UUIDType'), cassandra.cqltypes.UUIDType)
@@ -89,8 +89,8 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(lookup_casstype('UTF8Type'), cassandra.cqltypes.UTF8Type)
         self.assertEqual(lookup_casstype('DateType'), cassandra.cqltypes.DateType)
         self.assertEqual(lookup_casstype('TimeType'), cassandra.cqltypes.TimeType)
-        self.assertEqual(lookup_casstype('TinyIntType'), cassandra.cqltypes.TinyIntType)
-        self.assertEqual(lookup_casstype('SmallIntType'), cassandra.cqltypes.SmallIntType)
+        self.assertEqual(lookup_casstype('ByteType'), cassandra.cqltypes.ByteType)
+        self.assertEqual(lookup_casstype('ShortType'), cassandra.cqltypes.ShortType)
         self.assertEqual(lookup_casstype('TimeUUIDType'), cassandra.cqltypes.TimeUUIDType)
         self.assertEqual(lookup_casstype('UUIDType'), cassandra.cqltypes.UUIDType)
         self.assertEqual(lookup_casstype('IntegerType'), cassandra.cqltypes.IntegerType)

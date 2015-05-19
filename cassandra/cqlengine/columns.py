@@ -377,9 +377,23 @@ class Integer(Column):
         return self.validate(value)
 
 
+class TinyInt(Integer):
+    """
+    Stores an 8-bit signed integer value
+    """
+    db_type = 'tinyint'
+
+
+class SmallInt(Integer):
+    """
+    Stores a 16-bit signed integer value
+    """
+    db_type = 'smallint'
+
+
 class BigInt(Integer):
     """
-    Stores a 64-bit signed long value
+    Stores a 64-bit signed integer value
     """
     db_type = 'bigint'
 
