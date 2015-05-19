@@ -52,7 +52,7 @@ Columns of all types are initialized by passing :class:`.Column` attributes to t
 
 .. autoclass:: Counter
 
-.. autoclass:: Date(**kwargs)
+.. autoclass:: Date
 
 .. autoclass:: DateTime(**kwargs)
 
@@ -70,9 +70,15 @@ Columns of all types are initialized by passing :class:`.Column` attributes to t
 
 .. autoclass:: Set
 
+.. autoclass:: SmallInt
+
 .. autoclass:: Text
 
+.. autoclass:: Time
+
 .. autoclass:: TimeUUID(**kwargs)
+
+.. autoclass:: TinyInt
 
 .. autoclass:: UserDefinedType
 

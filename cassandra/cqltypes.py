@@ -638,6 +638,11 @@ class SimpleDateType(_CassandraType):
     typename = 'date'
     date_format = "%Y-%m-%d"
 
+    # Values of the 'date'` type are encoded as 32-bit unsigned integers
+    # representing a number of days with epoch (January 1st, 1970) at the center of the
+    # range (2^31).
+    EPOCH_OFFSET_DAYS = 2 ** 31
+
     @classmethod
     def validate(cls, val):
         if not isinstance(val, util.Date):
@@ -645,20 +650,17 @@ class SimpleDateType(_CassandraType):
         return val
 
     @staticmethod
+    def deserialize(byts, protocol_version):
+        days = uint32_unpack(byts) - SimpleDateType.EPOCH_OFFSET_DAYS
+        return util.Date(days)
+
+    @staticmethod
     def serialize(val, protocol_version):
-        # Values of the 'date'` type are encoded as 32-bit unsigned integers
-        # representing a number of days with epoch (January 1st, 1970) at the center of the
-        # range (2^31).
         try:
             days = val.days_from_epoch
         except AttributeError:
             days = util.Date(val).days_from_epoch
-        return uint32_pack(days + 2 ** 31)
-
-    @staticmethod
-    def deserialize(byts, protocol_version):
-        days = uint32_unpack(byts) - 2 ** 31
-        return util.Date(days)
+        return uint32_pack(days + SimpleDateType.EPOCH_OFFSET_DAYS)
 
 
 class ShortType(_CassandraType):
@@ -683,16 +685,16 @@ class TimeType(_CassandraType):
         return val
 
     @staticmethod
+    def deserialize(byts, protocol_version):
+        return util.Time(int64_unpack(byts))
+
+    @staticmethod
     def serialize(val, protocol_version):
         try:
             nano = val.nanosecond_time
         except AttributeError:
             nano = util.Time(val).nanosecond_time
         return int64_pack(nano)
-
-    @staticmethod
-    def deserialize(byts, protocol_version):
-        return util.Time(int64_unpack(byts))
 
 
 class UTF8Type(_CassandraType):

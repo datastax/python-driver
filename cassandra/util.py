@@ -917,7 +917,7 @@ class Time(object):
 
 class Date(object):
     '''
-    Idealized naive date: year, month, day
+    Idealized date: year, month, day
 
     Offers wider year range than datetime.date. For Dates that cannot be represented
     as a datetime.date (because datetime.MINYEAR, datetime.MAXYEAR), this type falls back
@@ -997,5 +997,5 @@ class Date(object):
             dt = datetime_from_timestamp(self.seconds)
             return "%04d-%02d-%02d" % (dt.year, dt.month, dt.day)
         except:
-            # If we overflow datetime.[MIN|M
+            # If we overflow datetime.[MIN|MAX]
             return str(self.days_from_epoch)

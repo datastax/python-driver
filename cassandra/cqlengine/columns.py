@@ -19,9 +19,8 @@ import re
 import six
 import warnings
 
-from cassandra.cqltypes import DateType
-from cassandra.encoder import cql_quote
-
+from cassandra import util
+from cassandra.cqltypes import DateType, SimpleDateType
 from cassandra.cqlengine import ValidationError
 
 log = logging.getLogger(__name__)
@@ -361,6 +360,10 @@ class Integer(Column):
 class TinyInt(Integer):
     """
     Stores an 8-bit signed integer value
+
+    .. versionadded:: 2.6.0
+
+    requires C* 2.2+ and protocol v4+
     """
     db_type = 'tinyint'
 
@@ -368,6 +371,10 @@ class TinyInt(Integer):
 class SmallInt(Integer):
     """
     Stores a 16-bit signed integer value
+
+    .. versionadded:: 2.6.0
+
+    requires C* 2.2+ and protocol v4+
     """
     db_type = 'smallint'
 
@@ -466,35 +473,43 @@ class DateTime(Column):
 
 class Date(Column):
     """
-    *Note: this type is overloaded, and will likely be changed or removed to accommodate distinct date type
-    in a future version*
+    Stores a simple date, with no time-of-day
 
-    Stores a date value, with no time-of-day
+    .. versionchanged:: 2.6.0
+
+        removed overload of Date and DateTime. DateTime is a drop-in replacement for legacy models
+
+    requires C* 2.2+ and protocol v4+
     """
-    db_type = 'timestamp'
-
-    def to_python(self, value):
-        if value is None:
-            return
-        if isinstance(value, datetime):
-            return value.date()
-        elif isinstance(value, date):
-            return value
-        try:
-            return datetime.utcfromtimestamp(value).date()
-        except TypeError:
-            return datetime.utcfromtimestamp(DateType.deserialize(value)).date()
+    db_type = 'date'
 
     def to_database(self, value):
         value = super(Date, self).to_database(value)
         if value is None:
             return
-        if isinstance(value, datetime):
-            value = value.date()
-        if not isinstance(value, date):
-            raise ValidationError("{} '{}' is not a date object".format(self.column_name, repr(value)))
 
-        return int((value - date(1970, 1, 1)).total_seconds() * 1000)
+        # need to translate to int version because some dates are not representable in
+        # string form (datetime limitation)
+        d = value if isinstance(value, util.Date) else util.Date(value)
+        return d.days_from_epoch + SimpleDateType.EPOCH_OFFSET_DAYS
+
+
+class Time(Column):
+    """
+    Stores a timezone-naive time-of-day, with nanosecond precision
+
+    .. versionadded:: 2.6.0
+
+    requires C* 2.2+ and protocol v4+
+    """
+    db_type = 'time'
+
+    def to_database(self, value):
+        value = super(Time, self).to_database(value)
+        if value is None:
+            return
+        # str(util.Time) yields desired CQL encoding
+        return value if isinstance(value, util.Time) else util.Time(value)
 
 
 class UUID(Column):
@@ -852,7 +867,7 @@ class UserDefinedType(Column):
 
     def __init__(self, user_type, **kwargs):
         """
-        :param type user_type: specifies the :class:`~.UserType` model of the column
+        :param type user_type: specifies the :class:`~.cqlengine.usertype.UserType` model of the column
         """
         self.user_type = user_type
         self.db_type = "frozen<%s>" % user_type.type_name()
