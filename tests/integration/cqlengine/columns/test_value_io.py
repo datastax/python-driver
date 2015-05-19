@@ -22,7 +22,6 @@ from tests.integration.cqlengine.base import BaseCassEngTestCase
 from cassandra.cqlengine.management import sync_table
 from cassandra.cqlengine.management import drop_table
 from cassandra.cqlengine.models import Model
-from cassandra.cqlengine.columns import ValueQuoter
 from cassandra.cqlengine import columns
 import unittest
 
@@ -211,11 +210,3 @@ class TestDecimalIO(BaseColumnIOTest):
     def comparator_converter(self, val):
         return Decimal(val)
 
-
-class TestQuoter(unittest.TestCase):
-
-    def test_equals(self):
-        assert ValueQuoter(False) == ValueQuoter(False)
-        assert ValueQuoter(1) == ValueQuoter(1)
-        assert ValueQuoter("foo") == ValueQuoter("foo")
-        assert ValueQuoter(1.55) == ValueQuoter(1.55)

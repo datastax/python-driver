@@ -312,6 +312,8 @@ def _sync_type(ks_name, type_model, omit_subtypes=None):
             if field.db_field_name not in defined_fields:
                 execute("ALTER TYPE {} ADD {}".format(type_name_qualified, field.get_column_def()))
 
+        type_model.register_for_keyspace(ks_name)
+
         if len(defined_fields) == len(model_fields):
             log.info("Type %s did not require synchronization", type_name_qualified)
             return
@@ -319,8 +321,6 @@ def _sync_type(ks_name, type_model, omit_subtypes=None):
         db_fields_not_in_model = model_fields.symmetric_difference(defined_fields)
         if db_fields_not_in_model:
             log.info("Type %s has fields not referenced by model: %s", type_name_qualified, db_fields_not_in_model)
-
-        type_model.register_for_keyspace(ks_name)
 
 
 def get_create_type(type_model, keyspace):
