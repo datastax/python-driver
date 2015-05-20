@@ -380,15 +380,15 @@ class PreparedStatement(object):
             partition_key_columns = None
             routing_key_indexes = None
 
-            ks_name, table_name, _, _ = column_metadata[0]
-            ks_meta = cluster_metadata.keyspaces.get(ks_name)
+            first_col = column_metadata[0]
+            ks_meta = cluster_metadata.keyspaces.get(first_col.keyspace_name)
             if ks_meta:
-                table_meta = ks_meta.tables.get(table_name)
+                table_meta = ks_meta.tables.get(first_col.table_name)
                 if table_meta:
                     partition_key_columns = table_meta.partition_key
 
                     # make a map of {column_name: index} for each column in the statement
-                    statement_indexes = dict((c[2], i) for i, c in enumerate(column_metadata))
+                    statement_indexes = dict((c.name, i) for i, c in enumerate(column_metadata))
 
                     # a list of which indexes in the statement correspond to partition key items
                     try:
@@ -447,7 +447,7 @@ class BoundStatement(Statement):
 
         meta = prepared_statement.column_metadata
         if meta:
-            self.keyspace = meta[0][0]
+            self.keyspace = meta[0].keyspace_name
 
         Statement.__init__(self, *args, **kwargs)
 
@@ -472,18 +472,16 @@ class BoundStatement(Statement):
             # sort values accordingly
             for col in col_meta:
                 try:
-                    values.append(dict_values[col[2]])
+                    values.append(dict_values[col.name])
                 except KeyError:
                     raise KeyError(
                         'Column name `%s` not found in bound dict.' %
-                        (col[2]))
+                        (col.name))
 
             # ensure a 1-to-1 dict keys to columns relationship
             if len(dict_values) != len(col_meta):
                 # find expected columns
-                columns = set()
-                for col in col_meta:
-                    columns.add(col[2])
+                columns = set(col.name for col in col_meta)
 
                 # generate error message
                 if len(dict_values) > len(col_meta):
@@ -516,17 +514,12 @@ class BoundStatement(Statement):
             if value is None:
                 self.values.append(None)
             else:
-                col_type = col_spec[-1]
-
                 try:
-                    self.values.append(col_type.serialize(value, proto_version))
+                    self.values.append(col_spec.type.serialize(value, proto_version))
                 except (TypeError, struct.error) as exc:
-                    col_name = col_spec[2]
-                    expected_type = col_type
                     actual_type = type(value)
-
                     message = ('Received an argument of invalid type for column "%s". '
-                               'Expected: %s, Got: %s; (%s)' % (col_name, expected_type, actual_type, exc))
+                               'Expected: %s, Got: %s; (%s)' % (col_spec.name, col_spec.type, actual_type, exc))
                     raise TypeError(message)
 
         return self

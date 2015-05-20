@@ -18,8 +18,9 @@ except ImportError:
     import unittest # noqa
 
 from cassandra.encoder import Encoder
-from cassandra.query import bind_params, ValueSequence
-from cassandra.query import PreparedStatement, BoundStatement
+from cassandra.protocol import ColumnMetadata
+from cassandra.query import (bind_params, ValueSequence, PreparedStatement,
+                             BoundStatement)
 from cassandra.cqltypes import Int32Type
 from cassandra.util import OrderedDict
 
@@ -80,8 +81,8 @@ class BoundStatementTestCase(unittest.TestCase):
         column_family = 'cf1'
 
         column_metadata = [
-            (keyspace, column_family, 'foo1', Int32Type),
-            (keyspace, column_family, 'foo2', Int32Type)
+            ColumnMetadata(keyspace, column_family, 'foo1', Int32Type),
+            ColumnMetadata(keyspace, column_family, 'foo2', Int32Type)
         ]
 
         prepared_statement = PreparedStatement(column_metadata=column_metadata,
@@ -119,8 +120,8 @@ class BoundStatementTestCase(unittest.TestCase):
         column_family = 'cf1'
 
         column_metadata = [
-            (keyspace, column_family, 'foo1', Int32Type),
-            (keyspace, column_family, 'foo2', Int32Type)
+            ColumnMetadata(keyspace, column_family, 'foo1', Int32Type),
+            ColumnMetadata(keyspace, column_family, 'foo2', Int32Type)
         ]
 
         prepared_statement = PreparedStatement(column_metadata=column_metadata,
@@ -138,8 +139,8 @@ class BoundStatementTestCase(unittest.TestCase):
         column_family = 'cf1'
 
         column_metadata = [
-            (keyspace, column_family, 'foo1', Int32Type),
-            (keyspace, column_family, 'foo2', Int32Type)
+            ColumnMetadata(keyspace, column_family, 'foo1', Int32Type),
+            ColumnMetadata(keyspace, column_family, 'foo2', Int32Type)
         ]
 
         prepared_statement = PreparedStatement(column_metadata=column_metadata,

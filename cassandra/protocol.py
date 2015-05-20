@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from __future__ import absolute_import  # to enable import io from stdlib
+from collections import namedtuple
 import logging
 import socket
 from uuid import UUID
@@ -49,6 +50,7 @@ class NotSupportedError(Exception):
 class InternalError(Exception):
     pass
 
+ColumnMetadata = namedtuple("ColumnMetadata", ['keyspace_name', 'table_name', 'name', 'type'])
 
 HEADER_DIRECTION_FROM_CLIENT = 0x00
 HEADER_DIRECTION_TO_CLIENT = 0x80
@@ -727,7 +729,7 @@ class ResultMessage(_MessageType):
                 colcfname = read_string(f)
             colname = read_string(f)
             coltype = cls.read_type(f, user_type_map)
-            column_metadata.append((colksname, colcfname, colname, coltype))
+            column_metadata.append(ColumnMetadata(colksname, colcfname, colname, coltype))
         return column_metadata, pk_indexes
 
     @classmethod
