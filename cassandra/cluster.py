@@ -1482,7 +1482,7 @@ class Session(object):
         for future in futures:
             future.result()
 
-    def execute(self, query, parameters=None, timeout=_NOT_SET, trace=False, custom_payload=None):
+    def execute(self, query, parameters=None, timeout=_NOT_SET, trace=False, custom_payload=None, warnings=False):
         """
         Execute the given query and synchronously wait for the response.
 
@@ -1518,14 +1518,22 @@ class Session(object):
         if timeout is _NOT_SET:
             timeout = self.default_timeout
 
-        if trace and not isinstance(query, Statement):
-            raise TypeError(
-                "The query argument must be an instance of a subclass of "
-                "cassandra.query.Statement when trace=True")
+        if not isinstance(query, Statement):
+            if trace:
+                raise TypeError(
+                    "The query argument must be an instance of a subclass of "
+                    "cassandra.query.Statement when trace=True")
+
+            if warnings:
+                raise TypeError(
+                    "The query argument must be an instance of a subclass of "
+                    "cassandra.query.Statement when warnings=True")
 
         future = self.execute_async(query, parameters, trace, custom_payload)
         try:
             result = future.result(timeout)
+            if warnings:
+                query.warnings = future.warnings
         finally:
             if trace:
                 try:
