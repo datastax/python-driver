@@ -51,6 +51,23 @@ class TestModel(TestCase):
         self.assertNotEqual(m0, m1)
 
     def test_keywords_as_names(self):
+        """
+        Test for CQL keywords as names
+
+        test_keywords_as_names tests that CQL keywords are properly and automatically quoted in cqlengine. It creates
+        a keyspace, keyspace, which should be automatically quoted to "keyspace" in CQL. It then creates a table, table,
+        which should also be automatically quoted to "table". It then verfies that operations can be done on the
+        "keyspace"."table" which has been created. It also verifies that table alternations work and operations can be
+        performed on the altered table.
+
+        @since 2.6.0
+        @jira_ticket PYTHON-244
+        @expected_result Cqlengine should quote CQL keywords properly when creating keyspaces and tables.
+
+        @test_category schema:generation
+        """
+
+        # If the keyspace exists, it will not be re-created
         create_keyspace_simple('keyspace', 1)
 
         class table(Model):
@@ -58,8 +75,10 @@ class TestModel(TestCase):
             select = columns.Integer(primary_key=True)
             table = columns.Text()
 
-        # create should work
+        # In case the table already exists in keyspace
         drop_table(table)
+
+        # Create should work
         sync_table(table)
 
         created = table.create(select=0, table='table')
@@ -67,7 +86,7 @@ class TestModel(TestCase):
         self.assertEqual(created.select, selected.select)
         self.assertEqual(created.table, selected.table)
 
-        # alter should work
+        # Alter should work
         class table(Model):
             __keyspace__ = 'keyspace'
             select = columns.Integer(primary_key=True)
