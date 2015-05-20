@@ -167,6 +167,12 @@ class Statement(object):
     this will be set to a :class:`.QueryTrace` instance.
     """
 
+    warnings = None
+    """
+    If :meth:`.Session.execute()` is run with `warnings` set to :const:`True`,
+    this will be set to a list of warnings, if any were returned by the server.
+    """
+
     trace_id = None
     """
     If :meth:`.Session.execute()` is run with `trace` set to :const:`True`,
