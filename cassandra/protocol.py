@@ -64,6 +64,7 @@ WARNING_FLAG = 0x08
 _message_types_by_name = {}
 _message_types_by_opcode = {}
 
+_UNSET_VALUE = object()
 
 class _RegisterMessageType(type):
     def __init__(cls, name, bases, dct):
@@ -1115,6 +1116,8 @@ def read_value(f):
 def write_value(f, v):
     if v is None:
         write_int(f, -1)
+    elif v is _UNSET_VALUE:
+        write_int(f, -2)
     else:
         write_int(f, len(v))
         f.write(v)

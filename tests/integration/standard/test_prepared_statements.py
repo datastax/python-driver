@@ -172,15 +172,24 @@ class PreparedStatementTests(unittest.TestCase):
 
         prepared = session.prepare(
             """
-            INSERT INTO test3rf.test (v) VALUES  (?)
+            INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
             """)
 
         self.assertIsInstance(prepared, PreparedStatement)
-        self.assertRaises(ValueError, prepared.bind, {'k': 1, 'v': 2})
+
+        # too many values
+        self.assertRaises(ValueError, prepared.bind, {'k': 1, 'v': 2, 'v2': 3})
+
+        # right number, but one does not belong
+        self.assertRaises(ValueError, prepared.bind, {'k': 1, 'v2': 3})
 
         # also catch too few variables with dicts
         self.assertIsInstance(prepared, PreparedStatement)
-        self.assertRaises(KeyError, prepared.bind, {})
+        if PROTOCOL_VERSION < 4:
+            self.assertRaises(KeyError, prepared.bind, {})
+        else:
+            # post v4, the driver attempts to use UNSET_VALUE for unspecified keys
+            self.assertRaises(ValueError, prepared.bind, {})
 
         cluster.shutdown()
 

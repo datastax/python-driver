@@ -23,6 +23,9 @@
 .. autoclass:: BoundStatement
    :members:
 
+.. autodata:: UNSET_VALUE
+   :annotation:
+
 .. autoclass:: BatchStatement (batch_type=BatchType.LOGGED, retry_policy=None, consistency_level=None)
    :members:
 
