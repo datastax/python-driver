@@ -660,6 +660,13 @@ class Cluster(object):
         return self._min_requests_per_connection[host_distance]
 
     def set_min_requests_per_connection(self, host_distance, min_requests):
+        """
+        Sets a threshold for concurrent requests per connection, below which
+        connections will be considered for disposal (down to core connections;
+        see :meth:`~Cluster.set_core_connections_per_host`).
+
+        Pertains to connection pool management in protocol versions {1,2}.
+        """
         if self.protocol_version >= 3:
             raise UnsupportedOperation(
                 "Cluster.set_min_requests_per_connection() only has an effect "
@@ -670,6 +677,13 @@ class Cluster(object):
         return self._max_requests_per_connection[host_distance]
 
     def set_max_requests_per_connection(self, host_distance, max_requests):
+        """
+        Sets a threshold for concurrent requests per connection, above which new
+        connections will be created to a host (up to max connections;
+        see :meth:`~Cluster.set_max_connections_per_host`).
+
+        Pertains to connection pool management in protocol versions {1,2}.
+        """
         if self.protocol_version >= 3:
             raise UnsupportedOperation(
                 "Cluster.set_max_requests_per_connection() only has an effect "
@@ -694,6 +708,10 @@ class Cluster(object):
         for each host with :class:`~.HostDistance` equal to `host_distance`.
         The default is 2 for :attr:`~HostDistance.LOCAL` and 1 for
         :attr:`~HostDistance.REMOTE`.
+
+        Protocol version 1 and 2 are limited in the number of concurrent
+        requests they can send per connection. The driver implements connection
+        pooling to support higher levels of concurrency.
 
         If :attr:`~.Cluster.protocol_version` is set to 3 or higher, this
         is not supported (there is always one connection per host, unless

@@ -57,6 +57,14 @@
 
    .. automethod:: unregister_listener
 
+   .. automethod:: set_max_requests_per_connection
+
+   .. automethod:: get_max_requests_per_connection
+
+   .. automethod:: set_min_requests_per_connection
+
+   .. automethod:: get_min_requests_per_connection
+
    .. automethod:: get_core_connections_per_host
 
    .. automethod:: set_core_connections_per_host
