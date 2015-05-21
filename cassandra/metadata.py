@@ -1043,7 +1043,7 @@ class Function(object):
     An ordered list of the types for each argument to the function
     """
 
-    arguemnt_names = None
+    argument_names = None
     """
     An ordered list of the names of each argument to the function
     """
