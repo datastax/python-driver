@@ -248,7 +248,7 @@ class ClusterTests(unittest.TestCase):
 
         original_meta = cluster.metadata.keyspaces
         # full schema refresh, with wait
-        cluster.refresh_schema()
+        cluster.refresh_schema_metadata()
         self.assertIsNot(original_meta, cluster.metadata.keyspaces)
         self.assertEqual(original_meta, cluster.metadata.keyspaces)
 
@@ -262,7 +262,7 @@ class ClusterTests(unittest.TestCase):
         original_system_meta = original_meta['system']
 
         # only refresh one keyspace
-        cluster.refresh_schema(keyspace='system')
+        cluster.refresh_keyspace_metadata('system')
         current_meta = cluster.metadata.keyspaces
         self.assertIs(original_meta, current_meta)
         current_system_meta = current_meta['system']
@@ -279,7 +279,7 @@ class ClusterTests(unittest.TestCase):
         original_system_schema_meta = original_system_meta.tables['schema_columnfamilies']
 
         # only refresh one table
-        cluster.refresh_schema(keyspace='system', table='schema_columnfamilies')
+        cluster.refresh_table_metadata('system', 'schema_columnfamilies')
         current_meta = cluster.metadata.keyspaces
         current_system_meta = current_meta['system']
         current_system_schema_meta = current_system_meta.tables['schema_columnfamilies']
@@ -309,7 +309,7 @@ class ClusterTests(unittest.TestCase):
         original_type_meta = original_test1rf_meta.user_types[type_name]
 
         # only refresh one type
-        cluster.refresh_schema(keyspace='test1rf', usertype=type_name)
+        cluster.refresh_user_type_metadata('test1rf', type_name)
         current_meta = cluster.metadata.keyspaces
         current_test1rf_meta = current_meta[keyspace_name]
         current_type_meta = current_test1rf_meta.user_types[type_name]
@@ -345,7 +345,7 @@ class ClusterTests(unittest.TestCase):
             # cluster agreement wait used for refresh
             original_meta = c.metadata.keyspaces
             start_time = time.time()
-            self.assertRaisesRegexp(Exception, r"Schema was not refreshed.*", c.refresh_schema)
+            self.assertRaisesRegexp(Exception, r"Schema metadata was not refreshed.*", c.refresh_schema_metadata)
             end_time = time.time()
             self.assertGreaterEqual(end_time - start_time, agreement_timeout)
             self.assertIs(original_meta, c.metadata.keyspaces)
@@ -353,7 +353,7 @@ class ClusterTests(unittest.TestCase):
             # refresh wait overrides cluster value
             original_meta = c.metadata.keyspaces
             start_time = time.time()
-            c.refresh_schema(max_schema_agreement_wait=0)
+            c.refresh_schema_metadata(max_schema_agreement_wait=0)
             end_time = time.time()
             self.assertLess(end_time - start_time, agreement_timeout)
             self.assertIsNot(original_meta, c.metadata.keyspaces)
@@ -373,7 +373,7 @@ class ClusterTests(unittest.TestCase):
             # cluster agreement wait used for refresh
             original_meta = c.metadata.keyspaces
             start_time = time.time()
-            c.refresh_schema()
+            c.refresh_schema_metadata()
             end_time = time.time()
             self.assertLess(end_time - start_time, refresh_threshold)
             self.assertIsNot(original_meta, c.metadata.keyspaces)
@@ -382,7 +382,8 @@ class ClusterTests(unittest.TestCase):
             # refresh wait overrides cluster value
             original_meta = c.metadata.keyspaces
             start_time = time.time()
-            self.assertRaisesRegexp(Exception, r"Schema was not refreshed.*", c.refresh_schema, max_schema_agreement_wait=agreement_timeout)
+            self.assertRaisesRegexp(Exception, r"Schema metadata was not refreshed.*", c.refresh_schema_metadata,
+                                    max_schema_agreement_wait=agreement_timeout)
             end_time = time.time()
             self.assertGreaterEqual(end_time - start_time, agreement_timeout)
             self.assertIs(original_meta, c.metadata.keyspaces)
@@ -566,8 +567,8 @@ class ClusterTests(unittest.TestCase):
         session.execute('USE system_traces')
 
         # refresh schema
-        cluster.refresh_schema()
-        cluster.refresh_schema(max_schema_agreement_wait=0)
+        cluster.refresh_schema_metadata()
+        cluster.refresh_schema_metadata(max_schema_agreement_wait=0)
 
         # submit schema refresh
         future = cluster.submit_schema_refresh()
