@@ -73,6 +73,10 @@
 
    .. automethod:: refresh_user_type_metadata
 
+   .. automethod:: refresh_user_function_metadata
+
+   .. automethod:: refresh_user_aggregate_metadata
+
    .. automethod:: refresh_schema
 
    .. automethod:: refresh_nodes

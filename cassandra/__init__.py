@@ -135,7 +135,7 @@ class SignatureDescriptor(object):
     @property
     def signature(self):
         """
-        function signatue string in the form 'name([type0[,type1[...]]])'
+        function signature string in the form 'name([type0[,type1[...]]])'
 
         can be used to uniquely identify overloaded function names within a keyspace
         """
@@ -158,7 +158,7 @@ class UserFunctionDescriptor(SignatureDescriptor):
 
     type_signature = None
     """
-    Ordered list of CQL argument type name comprising the type signature
+    Ordered list of CQL argument type names comprising the type signature
     """
 
 
@@ -174,7 +174,7 @@ class UserAggregateDescriptor(SignatureDescriptor):
 
     type_signature = None
     """
-    Ordered list of CQL argument type name comprising the type signature
+    Ordered list of CQL argument type names comprising the type signature
     """
 
 

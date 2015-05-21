@@ -1262,6 +1262,28 @@ class Cluster(object):
         if not self.control_connection.refresh_schema(keyspace, usertype=user_type, schema_agreement_wait=max_schema_agreement_wait):
             raise Exception("User Type metadata was not refreshed. See log for details.")
 
+    def refresh_user_function_metadata(self, keyspace, function, max_schema_agreement_wait=None):
+        """
+        Synchronously refresh user defined function metadata.
+
+        ``function`` is a :class:`cassandra.UserFunctionDescriptor`.
+
+        See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
+        """
+        if not self.control_connection.refresh_schema(keyspace, function=function, schema_agreement_wait=max_schema_agreement_wait):
+            raise Exception("User Function metadata was not refreshed. See log for details.")
+
+    def refresh_user_aggregate_metadata(self, keyspace, aggregate, max_schema_agreement_wait=None):
+        """
+        Synchronously refresh user defined aggregate metadata.
+
+        ``aggregate`` is a :class:`cassandra.UserAggregateDescriptor`.
+
+        See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
+        """
+        if not self.control_connection.refresh_schema(keyspace, aggregate=aggregate, schema_agreement_wait=max_schema_agreement_wait):
+            raise Exception("User Aggregate metadata was not refreshed. See log for details.")
+
     def refresh_nodes(self):
         """
         Synchronously refresh the node list and token metadata
