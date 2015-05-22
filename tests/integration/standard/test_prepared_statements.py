@@ -22,7 +22,7 @@ except ImportError:
 from cassandra import InvalidRequest
 
 from cassandra.cluster import Cluster
-from cassandra.query import PreparedStatement
+from cassandra.query import PreparedStatement, UNSET_VALUE
 
 
 def setup_module():
@@ -219,6 +219,54 @@ class PreparedStatementTests(unittest.TestCase):
         bound = prepared.bind((1,))
         results = session.execute(bound)
         self.assertEqual(results[0].v, None)
+
+        cluster.shutdown()
+
+    def test_unset_values(self):
+        """
+        Test to validate that UNSET_VALUEs are bound, and have the expected effect
+
+        Prepare a statement and insert all values. Then follow with execute excluding
+        parameters. Verify that the original values are unaffected.
+
+        @since 2.6.0
+
+        @jira_ticket PYTHON-317
+        @expected_result UNSET_VALUE is implicitly added to bind parameters, and properly encoded, leving unset values unaffected.
+
+        @test_category prepared_statements:binding
+        """
+        if PROTOCOL_VERSION < 4:
+            raise unittest.SkipTest("Binding UNSET values is not supported in protocol version < 4")
+
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        session = cluster.connect()
+
+        # table with at least two values so one can be used as a marker
+        session.execute("CREATE TABLE IF NOT EXISTS test1rf.test_unset_values (k int PRIMARY KEY, v0 int, v1 int)")
+        insert = session.prepare( "INSERT INTO test1rf.test_unset_values (k, v0, v1) VALUES  (?, ?, ?)")
+        select = session.prepare( "SELECT * FROM test1rf.test_unset_values WHERE k=?")
+
+        bind_expected = [
+            # initial condition
+            ((0, 0, 0),                            (0, 0, 0)),
+            # unset implicit
+            ((0, 1,),                              (0, 1, 0)),
+            ({'k': 0, 'v0': 2},                    (0, 2, 0)),
+            ({'k': 0, 'v1': 1},                    (0, 2, 1)),
+            # unset explicit
+            ((0, 3, UNSET_VALUE),                  (0, 3, 1)),
+            ((0, UNSET_VALUE, 2),                  (0, 3, 2)),
+            ({'k': 0, 'v0': 4, 'v1': UNSET_VALUE}, (0, 4, 2)),
+            ({'k': 0, 'v0': UNSET_VALUE, 'v1': 3}, (0, 4, 3)),
+            # nulls still work
+            ((0, None, None),                      (0, None, None)),
+        ]
+
+        for params, expected in bind_expected:
+            session.execute(insert, params)
+            results = session.execute(select, (0,))
+            self.assertEqual(results[0], expected)
 
         cluster.shutdown()
 
