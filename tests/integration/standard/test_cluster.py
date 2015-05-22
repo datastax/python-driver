@@ -29,6 +29,7 @@ from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
                                 RetryPolicy, SimpleConvictionPolicy, HostDistance,
                                 WhiteListRoundRobinPolicy)
 from cassandra.query import SimpleStatement, TraceUnavailable
+from cassandra import InvalidRequest
 
 from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, get_node
 from tests.integration.util import assert_quiescent_pool_state
@@ -577,3 +578,49 @@ class ClusterTests(unittest.TestCase):
         assert_quiescent_pool_state(self, cluster)
 
         cluster.shutdown()
+
+    def test_exception_translation_repreperation(self):
+        """
+        Test to validate that the correct exception type is returned for prepared errors.
+
+        test_exception_translation_repreperation, Tests that underlying exceptions are
+        correctly translated to exceptions we wish to surface. We generate the underlying exception by
+        creating a prepared statement for a table, dropping that table, then executing the prepared statement.
+
+
+        @since 2.6.0
+        @jira_ticket PYTHON-207
+        @expected_result a cassandra.InvalidRequest Exception is returned.
+        @test_category error_codes
+        """
+
+        # Setup session
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        session = cluster.connect()
+        session.set_keyspace("test3rf")
+
+        # Create a table to drop
+        session.execute(
+            """
+            CREATE TABLE todrop (
+                k int PRIMARY KEY,
+                v int )""")
+
+        # Create prepared statement and bind it
+        prepared = session.prepare(
+            """
+            INSERT INTO todrop (k, v) VALUES  (?, ?)
+            """)
+
+        bound = prepared.bind((0, 1))
+
+        # Drop table
+        session.execute(
+            """
+            DROP TABLE todrop;
+            """
+        )
+
+        # Execute prepared statement and check to see if the correct exception was thrown.
+        with self.assertRaises(InvalidRequest):
+            session.execute(bound)
