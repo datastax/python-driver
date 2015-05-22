@@ -2,15 +2,15 @@
 Frequently Asked Questions
 ==========================
 
-Q: Why don't updates work correctly on models instantiated as Model(field=value, field2=value2)?
+Why don't updates work correctly on models instantiated as Model(field=value, field2=value2)?
 ------------------------------------------------------------------------------------------------
 
-A: The recommended way to create new rows is with the models .create method. The values passed into a model's init method are interpreted by the model as the values as they were read from a row. This allows the model to "know" which rows have changed since the row was read out of cassandra, and create suitable update statements.
+The recommended way to create new rows is with the models .create method. The values passed into a model's init method are interpreted by the model as the values as they were read from a row. This allows the model to "know" which rows have changed since the row was read out of cassandra, and create suitable update statements.
 
-Q: How to preserve ordering in batch query?
+How to preserve ordering in batch query?
 -------------------------------------------
 
-A: Statement Ordering is not supported by CQL3 batches. Therefore,
+Statement Ordering is not supported by CQL3 batches. Therefore,
 once cassandra needs resolving conflict(Updating the same column in one batch),
 The algorithm below would be used.
 

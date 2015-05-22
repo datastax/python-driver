@@ -39,6 +39,9 @@ Contents
 :doc:`security`
     An overview of the security features of the driver.
 
+:doc:`faq`
+    A collection of Frequently Asked Questions
+
 .. toctree::
    :hidden:
 
@@ -51,9 +54,12 @@ Contents
    security
    user_defined_types
    object_mapper
+   faq
 
 Getting Help
 ------------
+Visit the :doc:`FAQ section <faq>` in this documentation.
+
 Please send questions to the `mailing list <https://groups.google.com/a/lists.datastax.com/forum/#!forum/python-driver-user>`_.
 
 Alternatively, you can use IRC.  Connect to the #datastax-drivers channel on irc.freenode.net.
