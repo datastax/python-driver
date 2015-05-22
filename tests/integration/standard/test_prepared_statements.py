@@ -325,3 +325,31 @@ class PreparedStatementTests(unittest.TestCase):
         self.assertEqual(results[0].v, None)
 
         cluster.shutdown()
+
+    def test_raise_error_on_prepared_statement_execution_dropped_table(self):
+        """
+        test for error in executing prepared statement on a dropped table
+
+        test_raise_error_on_execute_prepared_statement_dropped_table tests that an InvalidRequest is raised when a
+        prepared statement is executed after its corresponding table is dropped. This happens because if a prepared
+        statement is invalid, the driver attempts to automatically re-prepare it on a non-existing table.
+
+        @expected_errors InvalidRequest If a prepared statement is executed on a dropped table
+
+        @since 2.6.0
+        @jira_ticket PYTHON-207
+        @expected_result InvalidRequest error should be raised upon prepared statement execution.
+
+        @test_category prepared_statements
+        """
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        session = cluster.connect("test3rf")
+
+        session.execute("CREATE TABLE error_test (k int PRIMARY KEY, v int)")
+        prepared = session.prepare("SELECT * FROM error_test WHERE k=?")
+        session.execute("DROP TABLE error_test")
+
+        with self.assertRaises(InvalidRequest):
+            session.execute(prepared, [0])
+
+        cluster.shutdown()
