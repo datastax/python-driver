@@ -21,54 +21,21 @@ except ImportError:
 from cassandra.query import (SimpleStatement, BatchStatement, BatchType)
 from cassandra.cluster import Cluster
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, get_cluster, setup_keyspace
-
+from tests.integration import use_singledc, PROTOCOL_VERSION
 
 def setup_module():
-    """
-    We need some custom setup for this module. All unit tests in this module
-    require protocol >=4. We won't bother going through the setup required unless that is the
-    protocol version we are using.
-    """
-
-    # If we aren't at protocol v 4 or greater don't waste time setting anything up, all tests will be skipped
-    if PROTOCOL_VERSION >= 4:
-        # Don't start the ccm cluster until we get the custom jvm argument specified
-        use_singledc(start=False)
-        ccm_cluster = get_cluster()
-        # if needed stop CCM cluster
-        ccm_cluster.stop()
-        # This will enable the Mirroring query handler which will echo our custom payload k,v pairs back to us
-        jmv_args = [
-            " -Dcassandra.custom_query_handler_class=org.apache.cassandra.cql3.CustomPayloadMirroringQueryHandler"]
-        ccm_cluster.start(wait_for_binary_proto=True, wait_other_notice=True, jvm_args=jmv_args)
-        # wait for nodes to startup
-        setup_keyspace()
-
-
-def teardown_module():
-    """
-    The rests of the tests don't need our custom payload query handle so stop the cluster so we
-    don't impact other tests
-    """
-
-    ccm_cluster = get_cluster()
-    if ccm_cluster is not None:
-        ccm_cluster.stop()
-
+    use_singledc()
 
 class CustomPayloadTests(unittest.TestCase):
 
-    def setUp(self):
-        """
-        Test is skipped if run with cql version <4
-        """
-
+    @classmethod
+    def setUpClass(cls):
         if PROTOCOL_VERSION < 4:
             raise unittest.SkipTest(
                 "Native protocol 4,0+ is required for custom payloads, currently using %r"
                 % (PROTOCOL_VERSION,))
 
+    def setUp(self):
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         self.session = self.cluster.connect()
 

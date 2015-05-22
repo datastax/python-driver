@@ -203,9 +203,14 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True):
             common.switch_cluster(path, cluster_name)
             cluster.populate(nodes, ipformat=ipformat)
 
+        jvm_args = []
+        # This will enable the Mirroring query handler which will echo our custom payload k,v pairs back
+        if PROTOCOL_VERSION >= 4:
+            jvm_args = [" -Dcassandra.custom_query_handler_class=org.apache.cassandra.cql3.CustomPayloadMirroringQueryHandler"]
+
         if start:
             log.debug("Starting ccm %s cluster", cluster_name)
-            cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
+            cluster.start(wait_for_binary_proto=True, wait_other_notice=True, jvm_args=jvm_args)
             setup_keyspace(ipformat=ipformat)
 
         CCM_CLUSTER = cluster
