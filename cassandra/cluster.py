@@ -651,6 +651,11 @@ class Cluster(object):
             print row.id, row.location.street, row.location.zipcode
 
         """
+        if self.protocol_version < 3:
+            log.warning("User Type serialization is only supported in native protocol version 3+ (%d in use). "
+                        "CQL encoding for simple statements will still work, but named tuples will "
+                        "be returned when reading type %s.%s.", self.protocol_version, keyspace, user_type)
+
         self._user_types[keyspace][user_type] = klass
         for session in self.sessions:
             session.user_type_registered(keyspace, user_type, klass)
