@@ -392,7 +392,6 @@ class PreparedStatement(object):
         if pk_indexes:
             routing_key_indexes = pk_indexes
         else:
-            partition_key_columns = None
             routing_key_indexes = None
 
             first_col = column_metadata[0]
@@ -512,16 +511,10 @@ class BoundStatement(Statement):
                             'Column name `%s` not found in bound dict.' %
                             (col.name))
 
-            if unbound_values:
-                raise ValueError("Unexpected arguments provided to bind(): %s" % unbound_values.keys())
-
             value_len = len(values)
 
-            if value_len < col_meta_len:
-                columns = set(col.name for col in col_meta)
-                difference = set(columns).difference(dict_values.keys())
-                raise ValueError("Too few arguments provided to bind() (got %d, expected %d). "
-                                 "Missing keys %s." % (value_len, col_meta_len, difference))
+            if unbound_values:
+                raise ValueError("Unexpected arguments provided to bind(): %s" % unbound_values.keys())
 
         if value_len > col_meta_len:
             raise ValueError(
