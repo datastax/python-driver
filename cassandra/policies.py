@@ -509,14 +509,16 @@ class ConstantReconnectionPolicy(ReconnectionPolicy):
         """
         if delay < 0:
             raise ValueError("delay must not be negative")
-        if max_attempts < 0:
+        if max_attempts is not None and max_attempts < 0:
             raise ValueError("max_attempts must not be negative")
 
         self.delay = delay
         self.max_attempts = max_attempts
 
     def new_schedule(self):
-        return repeat(self.delay, self.max_attempts)
+        if self.max_attempts:
+            return repeat(self.delay, self.max_attempts)
+        return repeat(self.delay)
 
 
 class ExponentialReconnectionPolicy(ReconnectionPolicy):
