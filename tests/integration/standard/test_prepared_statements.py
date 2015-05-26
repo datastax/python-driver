@@ -22,11 +22,12 @@ except ImportError:
 from cassandra import InvalidRequest
 
 from cassandra.cluster import Cluster
-from cassandra.query import PreparedStatement
+from cassandra.query import PreparedStatement, UNSET_VALUE
 
 
 def setup_module():
     use_singledc()
+
 
 class PreparedStatementTests(unittest.TestCase):
 
@@ -65,9 +66,9 @@ class PreparedStatementTests(unittest.TestCase):
         session.execute(bound)
 
         prepared = session.prepare(
-           """
-           SELECT * FROM cf0 WHERE a=?
-           """)
+            """
+            SELECT * FROM cf0 WHERE a=?
+            """)
         self.assertIsInstance(prepared, PreparedStatement)
 
         bound = prepared.bind(('a'))
@@ -90,9 +91,9 @@ class PreparedStatementTests(unittest.TestCase):
         session.execute(bound)
 
         prepared = session.prepare(
-           """
-           SELECT * FROM cf0 WHERE a=?
-           """)
+            """
+            SELECT * FROM cf0 WHERE a=?
+            """)
 
         self.assertIsInstance(prepared, PreparedStatement)
 
@@ -163,7 +164,7 @@ class PreparedStatementTests(unittest.TestCase):
 
     def test_too_many_bind_values_dicts(self):
         """
-        Ensure a ValueError is thrown when attempting to bind too many variables
+        Ensure an error is thrown when attempting to bind the wrong values
         with dict bindings
         """
 
@@ -172,15 +173,29 @@ class PreparedStatementTests(unittest.TestCase):
 
         prepared = session.prepare(
             """
-            INSERT INTO test3rf.test (v) VALUES  (?)
+            INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
             """)
 
         self.assertIsInstance(prepared, PreparedStatement)
-        self.assertRaises(ValueError, prepared.bind, {'k': 1, 'v': 2})
+
+        # too many values
+        self.assertRaises(ValueError, prepared.bind, {'k': 1, 'v': 2, 'v2': 3})
+
+        # right number, but one does not belong
+        if PROTOCOL_VERSION < 4:
+            # pre v4, the driver bails with key error when 'v' is found missing
+            self.assertRaises(KeyError, prepared.bind, {'k': 1, 'v2': 3})
+        else:
+            # post v4, the driver uses UNSET_VALUE for 'v' and bails when 'v2' is unbound
+            self.assertRaises(ValueError, prepared.bind, {'k': 1, 'v2': 3})
 
         # also catch too few variables with dicts
         self.assertIsInstance(prepared, PreparedStatement)
-        self.assertRaises(KeyError, prepared.bind, {})
+        if PROTOCOL_VERSION < 4:
+            self.assertRaises(KeyError, prepared.bind, {})
+        else:
+            # post v4, the driver attempts to use UNSET_VALUE for unspecified keys
+            self.assertRaises(ValueError, prepared.bind, {})
 
         cluster.shutdown()
 
@@ -202,14 +217,64 @@ class PreparedStatementTests(unittest.TestCase):
         session.execute(bound)
 
         prepared = session.prepare(
-           """
-           SELECT * FROM test3rf.test WHERE k=?
-           """)
+            """
+            SELECT * FROM test3rf.test WHERE k=?
+            """)
         self.assertIsInstance(prepared, PreparedStatement)
 
         bound = prepared.bind((1,))
         results = session.execute(bound)
         self.assertEqual(results[0].v, None)
+
+        cluster.shutdown()
+
+    def test_unset_values(self):
+        """
+        Test to validate that UNSET_VALUEs are bound, and have the expected effect
+
+        Prepare a statement and insert all values. Then follow with execute excluding
+        parameters. Verify that the original values are unaffected.
+
+        @since 2.6.0
+
+        @jira_ticket PYTHON-317
+        @expected_result UNSET_VALUE is implicitly added to bind parameters, and properly encoded, leving unset values unaffected.
+
+        @test_category prepared_statements:binding
+        """
+        if PROTOCOL_VERSION < 4:
+            raise unittest.SkipTest("Binding UNSET values is not supported in protocol version < 4")
+
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        session = cluster.connect()
+
+        # table with at least two values so one can be used as a marker
+        session.execute("CREATE TABLE IF NOT EXISTS test1rf.test_unset_values (k int PRIMARY KEY, v0 int, v1 int)")
+        insert = session.prepare("INSERT INTO test1rf.test_unset_values (k, v0, v1) VALUES  (?, ?, ?)")
+        select = session.prepare("SELECT * FROM test1rf.test_unset_values WHERE k=?")
+
+        bind_expected = [
+            # initial condition
+            ((0, 0, 0),                            (0, 0, 0)),
+            # unset implicit
+            ((0, 1,),                              (0, 1, 0)),
+            ({'k': 0, 'v0': 2},                    (0, 2, 0)),
+            ({'k': 0, 'v1': 1},                    (0, 2, 1)),
+            # unset explicit
+            ((0, 3, UNSET_VALUE),                  (0, 3, 1)),
+            ((0, UNSET_VALUE, 2),                  (0, 3, 2)),
+            ({'k': 0, 'v0': 4, 'v1': UNSET_VALUE}, (0, 4, 2)),
+            ({'k': 0, 'v0': UNSET_VALUE, 'v1': 3}, (0, 4, 3)),
+            # nulls still work
+            ((0, None, None),                      (0, None, None)),
+        ]
+
+        for params, expected in bind_expected:
+            session.execute(insert, params)
+            results = session.execute(select, (0,))
+            self.assertEqual(results[0], expected)
+
+        self.assertRaises(ValueError, session.execute, select, (UNSET_VALUE, 0, 0))
 
         cluster.shutdown()
 
@@ -227,9 +292,9 @@ class PreparedStatementTests(unittest.TestCase):
         session.execute(bound)
 
         prepared = session.prepare(
-           """
-           SELECT * FROM test3rf.test WHERE k=0
-           """)
+            """
+            SELECT * FROM test3rf.test WHERE k=0
+            """)
         self.assertIsInstance(prepared, PreparedStatement)
 
         bound = prepared.bind(None)
@@ -257,9 +322,9 @@ class PreparedStatementTests(unittest.TestCase):
         session.execute(bound)
 
         prepared = session.prepare(
-           """
-           SELECT * FROM test3rf.test WHERE k=?
-           """)
+            """
+            SELECT * FROM test3rf.test WHERE k=?
+            """)
         self.assertIsInstance(prepared, PreparedStatement)
 
         bound = prepared.bind({'k': 1})
@@ -286,9 +351,9 @@ class PreparedStatementTests(unittest.TestCase):
         future.result()
 
         prepared = session.prepare(
-           """
-           SELECT * FROM test3rf.test WHERE k=?
-           """)
+            """
+            SELECT * FROM test3rf.test WHERE k=?
+            """)
         self.assertIsInstance(prepared, PreparedStatement)
 
         future = session.execute_async(prepared, (873,))
@@ -315,9 +380,9 @@ class PreparedStatementTests(unittest.TestCase):
         future.result()
 
         prepared = session.prepare(
-           """
-           SELECT * FROM test3rf.test WHERE k=?
-           """)
+            """
+            SELECT * FROM test3rf.test WHERE k=?
+            """)
         self.assertIsInstance(prepared, PreparedStatement)
 
         future = session.execute_async(prepared, {'k': 873})

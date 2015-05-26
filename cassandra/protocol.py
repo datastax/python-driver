@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from __future__ import absolute_import  # to enable import io from stdlib
+from collections import namedtuple
 import logging
 import socket
 from uuid import UUID
@@ -49,6 +50,7 @@ class NotSupportedError(Exception):
 class InternalError(Exception):
     pass
 
+ColumnMetadata = namedtuple("ColumnMetadata", ['keyspace_name', 'table_name', 'name', 'type'])
 
 HEADER_DIRECTION_FROM_CLIENT = 0x00
 HEADER_DIRECTION_TO_CLIENT = 0x80
@@ -62,6 +64,7 @@ WARNING_FLAG = 0x08
 _message_types_by_name = {}
 _message_types_by_opcode = {}
 
+_UNSET_VALUE = object()
 
 class _RegisterMessageType(type):
     def __init__(cls, name, bases, dct):
@@ -727,7 +730,7 @@ class ResultMessage(_MessageType):
                 colcfname = read_string(f)
             colname = read_string(f)
             coltype = cls.read_type(f, user_type_map)
-            column_metadata.append((colksname, colcfname, colname, coltype))
+            column_metadata.append(ColumnMetadata(colksname, colcfname, colname, coltype))
         return column_metadata, pk_indexes
 
     @classmethod
@@ -1113,6 +1116,8 @@ def read_value(f):
 def write_value(f, v):
     if v is None:
         write_int(f, -1)
+    elif v is _UNSET_VALUE:
+        write_int(f, -2)
     else:
         write_int(f, len(v))
         f.write(v)
