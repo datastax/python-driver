@@ -17,6 +17,7 @@ import struct, time, logging, sys, traceback
 from cassandra import ConsistencyLevel, Unavailable, OperationTimedOut, ReadTimeout
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.concurrent import execute_concurrent_with_args
+from cassandra.metadata import murmur3
 from cassandra.policies import (RoundRobinPolicy, DCAwareRoundRobinPolicy,
                                 TokenAwarePolicy, WhiteListRoundRobinPolicy)
 from cassandra.query import SimpleStatement
@@ -83,6 +84,30 @@ class LoadBalancingPolicyTests(unittest.TestCase):
                         ex_type, ex, tb = sys.exc_info()
                         log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                         del tb
+
+    def test_token_aware_is_used_by_default(self):
+        """
+        Test for default loadbalacing policy
+
+        test_token_aware_is_used_by_default tests that the default loadbalancing policy is policies.TokenAwarePolicy.
+        It creates a simple Cluster and verifies that the default loadbalancing policy is TokenAwarePolicy if the
+        murmur3 C extension is found. Otherwise, the default loadbalancing policy is DCAwareRoundRobinPolicy.
+
+        @since 2.6.0
+        @jira_ticket PYTHON-160
+        @expected_result TokenAwarePolicy should be the default loadbalancing policy.
+
+        @test_category load_balancing:token_aware
+        """
+
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+
+        if murmur3 is not None:
+            self.assertTrue(isinstance(cluster.load_balancing_policy, TokenAwarePolicy))
+        else:
+            self.assertTrue(isinstance(cluster.load_balancing_policy, DCAwareRoundRobinPolicy))
+
+        cluster.shutdown()
 
     def test_roundrobin(self):
         use_singledc()
