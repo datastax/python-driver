@@ -896,6 +896,9 @@ class Time(object):
                                 t.second * Time.SECOND +
                                 t.microsecond * Time.MICRO)
 
+    def __hash__(self):
+        return self.nanosecond_time
+
     def __eq__(self, other):
         if isinstance(other, Time):
             return self.nanosecond_time == other.nanosecond_time
@@ -906,6 +909,9 @@ class Time(object):
         return self.nanosecond_time % Time.MICRO == 0 and \
             datetime.time(hour=self.hour, minute=self.minute, second=self.second,
                           microsecond=self.nanosecond // Time.MICRO) == other
+
+    def __lt__(self, other):
+        return self.nanosecond_time < other.nanosecond_time
 
     def __repr__(self):
         return "Time(%s)" % self.nanosecond_time
@@ -977,6 +983,9 @@ class Date(object):
         dt = datetime.datetime.strptime(s, self.date_format)
         self._from_timetuple(dt.timetuple())
 
+    def __hash__(self):
+        return self.days_from_epoch
+
     def __eq__(self, other):
         if isinstance(other, Date):
             return self.days_from_epoch == other.days_from_epoch
@@ -988,6 +997,9 @@ class Date(object):
             return self.date() == other
         except Exception:
             return False
+
+    def __lt__(self, other):
+        return self.days_from_epoch < other.days_from_epoch
 
     def __repr__(self):
         return "Date(%s)" % self.days_from_epoch
