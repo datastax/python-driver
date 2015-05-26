@@ -28,6 +28,8 @@ from cassandra.policies import HostDistance
 
 from tests.integration import use_singledc, PROTOCOL_VERSION
 
+import re
+
 
 def setup_module():
     use_singledc()
@@ -136,15 +138,17 @@ class QueryTests(unittest.TestCase):
         statement = SimpleStatement(query)
         response_future = session.execute_async(statement, trace=True)
         response_future.result(timeout=10.0)
-        current_host = response_future._current_host.address
 
         # Fetch the client_ip from the trace.
         trace = response_future.get_query_trace(max_wait=2.0)
         client_ip = trace.client
 
+        # Ip address should be in the local_host range
+        pat = re.compile("127.0.0.\d{1,3}")
+
         # Ensure that ip is set
         self.assertIsNotNone(client_ip, "Client IP was not set in trace with C* >= 2.2")
-        self.assertEqual(client_ip, current_host, "Client IP from trace did not match the expected value")
+        self.assertTrue(pat.match(client_ip), "Client IP from trace did not match the expected value")
 
         cluster.shutdown()
 
