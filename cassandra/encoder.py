@@ -29,7 +29,7 @@ from uuid import UUID
 import six
 
 from cassandra.util import (OrderedDict, OrderedMap, OrderedMapSerializedKey,
-                            sortedset, Time)
+                            sortedset, Time, Date)
 
 if six.PY3:
     long = int
@@ -76,6 +76,7 @@ class Encoder(object):
             datetime.datetime: self.cql_encode_datetime,
             datetime.date: self.cql_encode_date,
             datetime.time: self.cql_encode_time,
+            Date: self.cql_encode_date_ext,
             Time: self.cql_encode_time,
             dict: self.cql_encode_map_collection,
             OrderedDict: self.cql_encode_map_collection,
@@ -163,10 +164,17 @@ class Encoder(object):
 
     def cql_encode_time(self, val):
         """
-        Converts a :class:`datetime.date` object to a string with format
+        Converts a :class:`cassandra.util.Time` object to a string with format
         ``HH:MM:SS.mmmuuunnn``.
         """
         return "'%s'" % val
+
+    def cql_encode_date_ext(self, val):
+        """
+        Encodes a :class:`cassandra.util.Date` object as an integer
+        """
+        # using the int form in case the Date exceeds datetime.[MIN|MAX]YEAR
+        return str(val.days_from_epoch + 2 ** 31)
 
     def cql_encode_sequence(self, val):
         """

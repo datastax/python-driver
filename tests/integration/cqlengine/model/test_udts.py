@@ -21,6 +21,7 @@ from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.usertype import UserType
 from cassandra.cqlengine import columns
 from cassandra.cqlengine.management import sync_table, sync_type, create_keyspace_simple, drop_keyspace
+from cassandra.util import Date
 
 from tests.integration import get_server_versions
 from tests.integration.cqlengine.base import BaseCassEngTestCase
@@ -273,7 +274,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
         sync_table(AllDatatypesModel)
 
-        input = AllDatatypes(a='ascii', b=2 ** 63 - 1, c=bytearray(b'hello world'), d=True, e=date(1970, 1, 1),
+        input = AllDatatypes(a='ascii', b=2 ** 63 - 1, c=bytearray(b'hello world'), d=True, e=Date(date(1970, 1, 1)),
                              f=datetime.utcfromtimestamp(872835240), g=Decimal('12.3E+7'), h=2.39,
                              i=3.4028234663852886e+38, j='123.123.123.123', k=2147483647, l='text',
                              m=UUID('FE2B4360-28C6-11E2-81C1-0800200C9A66'), n=UUID('067e6162-3b6f-4ae2-a171-2470b63dff00'),
