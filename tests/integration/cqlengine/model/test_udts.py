@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from datetime import date, datetime
+from datetime import datetime, date, time
 from decimal import Decimal
 import unittest
 from uuid import UUID, uuid4
@@ -21,7 +21,7 @@ from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.usertype import UserType
 from cassandra.cqlengine import columns
 from cassandra.cqlengine.management import sync_table, sync_type, create_keyspace_simple, drop_keyspace
-from cassandra.util import Date
+from cassandra.util import Date, Time
 
 from tests.integration import get_server_versions
 from tests.integration.cqlengine.base import BaseCassEngTestCase
@@ -216,10 +216,13 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
             i = columns.Float(double_precision=False)
             j = columns.Inet()
             k = columns.Integer()
-            l = columns.Text()
-            m = columns.TimeUUID()
-            n = columns.UUID()
-            o = columns.VarInt()
+            l = columns.SmallInt()
+            m = columns.Text()
+            n = columns.Time()
+            o = columns.TimeUUID()
+            p = columns.TinyInt()
+            q = columns.UUID()
+            r = columns.VarInt()
 
         class AllDatatypesModel(Model):
             id = columns.Integer(primary_key=True)
@@ -227,7 +230,8 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
         sync_table(AllDatatypesModel)
 
-        input = AllDatatypes(a=None, b=None, c=None, d=None, e=None, f=None, g=None, h=None, i=None, j=None, k=None, l=None, m=None, n=None)
+        input = AllDatatypes(a=None, b=None, c=None, d=None, e=None, f=None, g=None, h=None, i=None, j=None, k=None,
+                             l=None, m=None, n=None, o=None, p=None, q=None, r=None)
         AllDatatypesModel.create(id=0, data=input)
 
         self.assertEqual(1, AllDatatypesModel.objects.count())
@@ -263,10 +267,13 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
             i = columns.Float(double_precision=False)
             j = columns.Inet()
             k = columns.Integer()
-            l = columns.Text()
-            m = columns.TimeUUID()
-            n = columns.UUID()
-            o = columns.VarInt()
+            l = columns.SmallInt()
+            m = columns.Text()
+            n = columns.Time()
+            o = columns.TimeUUID()
+            p = columns.TinyInt()
+            q = columns.UUID()
+            r = columns.VarInt()
 
         class AllDatatypesModel(Model):
             id = columns.Integer(primary_key=True)
@@ -276,9 +283,10 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
         input = AllDatatypes(a='ascii', b=2 ** 63 - 1, c=bytearray(b'hello world'), d=True, e=Date(date(1970, 1, 1)),
                              f=datetime.utcfromtimestamp(872835240), g=Decimal('12.3E+7'), h=2.39,
-                             i=3.4028234663852886e+38, j='123.123.123.123', k=2147483647, l='text',
-                             m=UUID('FE2B4360-28C6-11E2-81C1-0800200C9A66'), n=UUID('067e6162-3b6f-4ae2-a171-2470b63dff00'),
-                             o=int(str(2147483647) + '000'))
+                             i=3.4028234663852886e+38, j='123.123.123.123', k=2147483647, l=32523, m='text',
+                             n=Time(time(16, 47, 25, 7)), o=UUID('FE2B4360-28C6-11E2-81C1-0800200C9A66'),
+                             p=123, q=UUID('067e6162-3b6f-4ae2-a171-2470b63dff00'),
+                             r=int(str(2147483647) + '000'))
         AllDatatypesModel.create(id=0, data=input)
 
         self.assertEqual(1, AllDatatypesModel.objects.count())
