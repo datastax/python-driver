@@ -146,8 +146,6 @@ class BoundStatementTestV1(unittest.TestCase):
 
     def test_missing_value(self):
         self.assertRaises(KeyError, self.bound.bind, {'rk0': 0, 'rk1': 0, 'ck0': 0})
-        # legacy behavior: short parameters are allowed through, errored by server
-        #self.assertRaises(ValueError, self.bound.bind, (0, 0, 0))
 
     def test_dict_extra_value(self):
         self.assertRaises(ValueError, self.bound.bind, {'rk0': 0, 'rk1': 0, 'ck0': 0, 'v0': 0, 'should_not_be_here': 123})

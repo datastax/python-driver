@@ -28,6 +28,7 @@ from cassandra.query import PreparedStatement, UNSET_VALUE
 def setup_module():
     use_singledc()
 
+
 class PreparedStatementTests(unittest.TestCase):
 
     def test_basic(self):
@@ -65,9 +66,9 @@ class PreparedStatementTests(unittest.TestCase):
         session.execute(bound)
 
         prepared = session.prepare(
-           """
-           SELECT * FROM cf0 WHERE a=?
-           """)
+            """
+            SELECT * FROM cf0 WHERE a=?
+            """)
         self.assertIsInstance(prepared, PreparedStatement)
 
         bound = prepared.bind(('a'))
@@ -90,9 +91,9 @@ class PreparedStatementTests(unittest.TestCase):
         session.execute(bound)
 
         prepared = session.prepare(
-           """
-           SELECT * FROM cf0 WHERE a=?
-           """)
+            """
+            SELECT * FROM cf0 WHERE a=?
+            """)
 
         self.assertIsInstance(prepared, PreparedStatement)
 
@@ -216,9 +217,9 @@ class PreparedStatementTests(unittest.TestCase):
         session.execute(bound)
 
         prepared = session.prepare(
-           """
-           SELECT * FROM test3rf.test WHERE k=?
-           """)
+            """
+            SELECT * FROM test3rf.test WHERE k=?
+            """)
         self.assertIsInstance(prepared, PreparedStatement)
 
         bound = prepared.bind((1,))
@@ -249,8 +250,8 @@ class PreparedStatementTests(unittest.TestCase):
 
         # table with at least two values so one can be used as a marker
         session.execute("CREATE TABLE IF NOT EXISTS test1rf.test_unset_values (k int PRIMARY KEY, v0 int, v1 int)")
-        insert = session.prepare( "INSERT INTO test1rf.test_unset_values (k, v0, v1) VALUES  (?, ?, ?)")
-        select = session.prepare( "SELECT * FROM test1rf.test_unset_values WHERE k=?")
+        insert = session.prepare("INSERT INTO test1rf.test_unset_values (k, v0, v1) VALUES  (?, ?, ?)")
+        select = session.prepare("SELECT * FROM test1rf.test_unset_values WHERE k=?")
 
         bind_expected = [
             # initial condition
@@ -273,6 +274,8 @@ class PreparedStatementTests(unittest.TestCase):
             results = session.execute(select, (0,))
             self.assertEqual(results[0], expected)
 
+        self.assertRaises(ValueError, session.execute, select, (UNSET_VALUE, 0, 0))
+
         cluster.shutdown()
 
     def test_no_meta(self):
@@ -289,9 +292,9 @@ class PreparedStatementTests(unittest.TestCase):
         session.execute(bound)
 
         prepared = session.prepare(
-           """
-           SELECT * FROM test3rf.test WHERE k=0
-           """)
+            """
+            SELECT * FROM test3rf.test WHERE k=0
+            """)
         self.assertIsInstance(prepared, PreparedStatement)
 
         bound = prepared.bind(None)
@@ -319,9 +322,9 @@ class PreparedStatementTests(unittest.TestCase):
         session.execute(bound)
 
         prepared = session.prepare(
-           """
-           SELECT * FROM test3rf.test WHERE k=?
-           """)
+            """
+            SELECT * FROM test3rf.test WHERE k=?
+            """)
         self.assertIsInstance(prepared, PreparedStatement)
 
         bound = prepared.bind({'k': 1})
@@ -348,9 +351,9 @@ class PreparedStatementTests(unittest.TestCase):
         future.result()
 
         prepared = session.prepare(
-           """
-           SELECT * FROM test3rf.test WHERE k=?
-           """)
+            """
+            SELECT * FROM test3rf.test WHERE k=?
+            """)
         self.assertIsInstance(prepared, PreparedStatement)
 
         future = session.execute_async(prepared, (873,))
@@ -377,9 +380,9 @@ class PreparedStatementTests(unittest.TestCase):
         future.result()
 
         prepared = session.prepare(
-           """
-           SELECT * FROM test3rf.test WHERE k=?
-           """)
+            """
+            SELECT * FROM test3rf.test WHERE k=?
+            """)
         self.assertIsInstance(prepared, PreparedStatement)
 
         future = session.execute_async(prepared, {'k': 873})
