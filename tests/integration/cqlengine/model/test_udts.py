@@ -15,7 +15,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 import unittest
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.usertype import UserType
@@ -286,3 +286,43 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
         for i in range(ord('a'), ord('a') + 15):
             self.assertEqual(input[chr(i)], output[chr(i)])
+
+    def test_nested_udts_inserts(self):
+        """
+        Test for inserting collections of user types using cql engine.
+
+        test_nested_udts_inserts Constructs a model that contains a list of usertypes. It will then attempt to insert
+        them. The expectation is that no exception is thrown during insert. For sanity sake we also validate that our
+        input and output values match. This combination of model, and UT produces a syntax error in 2.5.1 due to
+        improper quoting around the names collection.
+
+        @since 2.6.0
+        @jira_ticket PYTHON-311
+        @expected_result No syntax exception thrown
+
+        @test_category data_types:udt
+        """
+
+        class Name(UserType):
+            type_name__ = "header"
+
+            name = columns.Text()
+            value = columns.Text()
+
+        class Container(Model):
+            id = columns.UUID(primary_key=True, default=uuid4)
+            names = columns.List(columns.UserDefinedType(Name()))
+
+        # Construct the objects and insert them
+        names = []
+        for i in range(0, 10):
+            names.append(Name(name="name{0}".format(i), value="value{0}".format(i)))
+
+        # Create table, insert data
+        sync_table(Container)
+        Container.create(id=UUID('FE2B4360-28C6-11E2-81C1-0800200C9A66'), names=names)
+
+        # Validate input and output matches
+        self.assertEqual(1, Container.objects.count())
+        names_output = Container.objects().first().names
+        self.assertEqual(names_output, names)
