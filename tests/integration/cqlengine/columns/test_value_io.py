@@ -17,13 +17,13 @@ from decimal import Decimal
 from uuid import uuid1, uuid4, UUID
 import six
 
-from tests.integration.cqlengine.base import BaseCassEngTestCase
-
+from cassandra.cqlengine import columns
 from cassandra.cqlengine.management import sync_table
 from cassandra.cqlengine.management import drop_table
 from cassandra.cqlengine.models import Model
-from cassandra.cqlengine import columns
-import unittest
+from cassandra import util
+
+from tests.integration.cqlengine.base import BaseCassEngTestCase
 
 
 class BaseColumnIOTest(BaseCassEngTestCase):
@@ -151,9 +151,9 @@ class TestDate(BaseColumnIOTest):
 
     column = columns.Date
 
-    now = datetime.now().date()
+    now = util.Date(datetime.now().date())
     pkey_val = now
-    data_val = now + timedelta(days=1)
+    data_val = util.Date(now.days_from_epoch + 1)
 
 
 class TestUUID(BaseColumnIOTest):

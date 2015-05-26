@@ -17,14 +17,15 @@ import random
 from datetime import date, datetime
 from decimal import Decimal
 from operator import itemgetter
-from cassandra.cqlengine import CQLEngineException
-from tests.integration.cqlengine.base import BaseCassEngTestCase
 
+from cassandra.cqlengine import columns
+from cassandra.cqlengine import CQLEngineException
 from cassandra.cqlengine.management import sync_table
 from cassandra.cqlengine.management import drop_table
 from cassandra.cqlengine.models import Model
-from cassandra.cqlengine import columns
+from cassandra.util import Date
 
+from tests.integration.cqlengine.base import BaseCassEngTestCase
 
 class TestModel(Model):
 
@@ -161,7 +162,7 @@ class TestModelIO(BaseCassEngTestCase):
 
         sync_table(AllDatatypesModel)
 
-        input = ['ascii', 2 ** 63 - 1, bytearray(b'hello world'), True, date(1970, 1, 1),
+        input = ['ascii', 2 ** 63 - 1, bytearray(b'hello world'), True, Date(date(1970, 1, 1)),
                  datetime.utcfromtimestamp(872835240), Decimal('12.3E+7'), 2.39,
                  3.4028234663852886e+38, '123.123.123.123', 2147483647, 'text',
                  UUID('FE2B4360-28C6-11E2-81C1-0800200C9A66'), UUID('067e6162-3b6f-4ae2-a171-2470b63dff00'),

@@ -18,10 +18,6 @@ from unittest import TestCase
 from uuid import uuid4, uuid1
 
 from cassandra import InvalidRequest
-from cassandra.cqlengine.management import sync_table, drop_table
-from cassandra.cqlengine.models import Model, ValidationError
-from cassandra.cqlengine.connection import execute
-
 from cassandra.cqlengine.columns import TimeUUID
 from cassandra.cqlengine.columns import Text
 from cassandra.cqlengine.columns import Integer
@@ -33,6 +29,10 @@ from cassandra.cqlengine.columns import UUID
 from cassandra.cqlengine.columns import Boolean
 from cassandra.cqlengine.columns import Decimal
 from cassandra.cqlengine.columns import Inet
+from cassandra.cqlengine.connection import execute
+from cassandra.cqlengine.management import sync_table, drop_table
+from cassandra.cqlengine.models import Model, ValidationError
+from cassandra import util
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 
@@ -55,7 +55,7 @@ class TestDatetime(BaseCassEngTestCase):
 
     def test_datetime_io(self):
         now = datetime.now()
-        dt = self.DatetimeTest.objects.create(test_id=0, created_at=now)
+        self.DatetimeTest.objects.create(test_id=0, created_at=now)
         dt2 = self.DatetimeTest.objects(test_id=0).first()
         assert dt2.created_at.timetuple()[:6] == now.timetuple()[:6]
 
@@ -164,16 +164,15 @@ class TestDate(BaseCassEngTestCase):
     def test_date_io(self):
         today = date.today()
         self.DateTest.objects.create(test_id=0, created_at=today)
-        dt2 = self.DateTest.objects(test_id=0).first()
-        assert dt2.created_at.isoformat() == today.isoformat()
+        result = self.DateTest.objects(test_id=0).first()
+        self.assertEqual(result.created_at, util.Date(today))
 
     def test_date_io_using_datetime(self):
         now = datetime.utcnow()
         self.DateTest.objects.create(test_id=0, created_at=now)
-        dt2 = self.DateTest.objects(test_id=0).first()
-        assert not isinstance(dt2.created_at, datetime)
-        assert isinstance(dt2.created_at, date)
-        assert dt2.created_at.isoformat() == now.date().isoformat()
+        result = self.DateTest.objects(test_id=0).first()
+        self.assertIsInstance(result.created_at, util.Date)
+        self.assertEqual(result.created_at, util.Date(now))
 
     def test_date_none(self):
         self.DateTest.objects.create(test_id=1, created_at=None)
