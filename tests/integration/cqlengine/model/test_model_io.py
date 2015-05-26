@@ -14,7 +14,7 @@
 
 from uuid import uuid4, UUID
 import random
-from datetime import date, datetime
+from datetime import datetime, date, time
 from decimal import Decimal
 from operator import itemgetter
 
@@ -23,7 +23,7 @@ from cassandra.cqlengine import CQLEngineException
 from cassandra.cqlengine.management import sync_table
 from cassandra.cqlengine.management import drop_table
 from cassandra.cqlengine.models import Model
-from cassandra.util import Date
+from cassandra.util import Date, Time
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 
@@ -155,24 +155,28 @@ class TestModelIO(BaseCassEngTestCase):
             i = columns.Float(double_precision=False)
             j = columns.Inet()
             k = columns.Integer()
-            l = columns.Text()
-            m = columns.TimeUUID()
-            n = columns.UUID()
-            o = columns.VarInt()
+            l = columns.SmallInt()
+            m = columns.Text()
+            n = columns.Time()
+            o = columns.TimeUUID()
+            p = columns.TinyInt()
+            q = columns.UUID()
+            r = columns.VarInt()
 
         sync_table(AllDatatypesModel)
 
         input = ['ascii', 2 ** 63 - 1, bytearray(b'hello world'), True, Date(date(1970, 1, 1)),
                  datetime.utcfromtimestamp(872835240), Decimal('12.3E+7'), 2.39,
-                 3.4028234663852886e+38, '123.123.123.123', 2147483647, 'text',
-                 UUID('FE2B4360-28C6-11E2-81C1-0800200C9A66'), UUID('067e6162-3b6f-4ae2-a171-2470b63dff00'),
+                 3.4028234663852886e+38, '123.123.123.123', 2147483647, 32523, 'text', Time(time(16, 47, 25, 7)),
+                 UUID('FE2B4360-28C6-11E2-81C1-0800200C9A66'), 123, UUID('067e6162-3b6f-4ae2-a171-2470b63dff00'),
                  int(str(2147483647) + '000')]
 
         AllDatatypesModel.create(id=0, a='ascii', b=2 ** 63 - 1, c=bytearray(b'hello world'), d=True, e=date(1970, 1, 1),
                                  f=datetime.utcfromtimestamp(872835240), g=Decimal('12.3E+7'), h=2.39,
-                                 i=3.4028234663852886e+38, j='123.123.123.123', k=2147483647, l='text',
-                                 m=UUID('FE2B4360-28C6-11E2-81C1-0800200C9A66'), n=UUID('067e6162-3b6f-4ae2-a171-2470b63dff00'),
-                                 o=int(str(2147483647) + '000'))
+                                 i=3.4028234663852886e+38, j='123.123.123.123', k=2147483647, l=32523, m='text',
+                                 n=time(16, 47, 25, 7), o=UUID('FE2B4360-28C6-11E2-81C1-0800200C9A66'),
+                                 p=123, q=UUID('067e6162-3b6f-4ae2-a171-2470b63dff00'),
+                                 r=int(str(2147483647) + '000'))
 
         self.assertEqual(1, AllDatatypesModel.objects.count())
         output = AllDatatypesModel.objects().first()
