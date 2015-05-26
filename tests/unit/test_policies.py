@@ -799,6 +799,14 @@ class ConstantReconnectionPolicyTest(unittest.TestCase):
         except ValueError:
             pass
 
+    def test_schedule_infinite_attempts(self):
+        delay = 2
+        max_attempts = None
+        crp = ConstantReconnectionPolicy(delay=delay, max_attempts=max_attempts)
+        # this is infinite. we'll just verify one more than default
+        for _, d in zip(range(65), crp.new_schedule()):
+            self.assertEqual(d, delay)
+
 
 class ExponentialReconnectionPolicyTest(unittest.TestCase):
 
