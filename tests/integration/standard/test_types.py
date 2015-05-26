@@ -41,31 +41,28 @@ def setup_module():
 
 class TypeTests(unittest.TestCase):
 
-    def setUp(self):
-        self._cass_version, self._cql_version = get_server_versions()
+    @classmethod
+    def setUpClass(cls):
+        cls._cass_version, cls._cql_version = get_server_versions()
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.session = cls.cluster.connect()
+        cls.session.execute("CREATE KEYSPACE typetests WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}")
+        cls.session.set_keyspace("typetests")
 
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        self.session = self.cluster.connect()
-        self.session.execute("CREATE KEYSPACE typetests WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}")
-        self.cluster.shutdown()
-
-    def tearDown(self):
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        self.session = self.cluster.connect()
-        self.session.execute("DROP KEYSPACE typetests")
-        self.cluster.shutdown()
+    @classmethod
+    def tearDownClass(cls):
+        cls.session.execute("DROP KEYSPACE typetests")
+        cls.cluster.shutdown()
 
     def test_can_insert_blob_type_as_string(self):
         """
         Tests that byte strings in Python maps to blob type in Cassandra
         """
-
-        c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("typetests")
+        s = self.session
 
         s.execute("CREATE TABLE blobstring (a ascii PRIMARY KEY, b blob)")
 
-        params = ['key1', b'blobyblob']
+        params = ['key1', b'blobbyblob']
         query = "INSERT INTO blobstring (a, b) VALUES (%s, %s)"
 
         # In python2, with Cassandra > 2.0, we don't treat the 'byte str' type as a blob, so we'll encode it
@@ -98,9 +95,7 @@ class TypeTests(unittest.TestCase):
         """
         Tests that blob type in Cassandra maps to bytearray in Python
         """
-
-        c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("typetests")
+        s = self.session
 
         s.execute("CREATE TABLE blobbytes (a ascii PRIMARY KEY, b blob)")
 
@@ -111,13 +106,10 @@ class TypeTests(unittest.TestCase):
         for expected, actual in zip(params, results):
             self.assertEqual(expected, actual)
 
-        c.shutdown()
-
     def test_can_insert_primitive_datatypes(self):
         """
         Test insertion of all datatype primitives
         """
-
         c = Cluster(protocol_version=PROTOCOL_VERSION)
         s = c.connect("typetests")
 
@@ -254,54 +246,62 @@ class TypeTests(unittest.TestCase):
         """
         Test insertion of empty strings and null values
         """
-
-        c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("typetests")
+        s = self.session
 
         # create table
         alpha_type_list = ["zz int PRIMARY KEY"]
         col_names = []
+        string_types = set(('ascii', 'text', 'varchar'))
+        string_columns = set((''))
+        # this is just a list of types to try with empty strings
+        non_string_types = PRIMITIVE_DATATYPES - string_types - set(('blob', 'date', 'inet', 'time', 'timestamp'))
+        non_string_columns = set()
         start_index = ord('a')
         for i, datatype in enumerate(PRIMITIVE_DATATYPES):
-            alpha_type_list.append("{0} {1}".format(chr(start_index + i), datatype))
-            col_names.append(chr(start_index + i))
+            col_name = chr(start_index + i)
+            alpha_type_list.append("{0} {1}".format(col_name, datatype))
+            col_names.append(col_name)
+            if datatype in non_string_types:
+                non_string_columns.add(col_name)
+            if datatype in string_types:
+                string_columns.add(col_name)
 
-        s.execute("CREATE TABLE alltypes ({0})".format(', '.join(alpha_type_list)))
+        s.execute("CREATE TABLE all_empty ({0})".format(', '.join(alpha_type_list)))
 
         # verify all types initially null with simple statement
         columns_string = ','.join(col_names)
-        s.execute("INSERT INTO alltypes (zz) VALUES (2)")
-        results = s.execute("SELECT {0} FROM alltypes WHERE zz=2".format(columns_string))[0]
+        s.execute("INSERT INTO all_empty (zz) VALUES (2)")
+        results = s.execute("SELECT {0} FROM all_empty WHERE zz=2".format(columns_string))[0]
         self.assertTrue(all(x is None for x in results))
 
         # verify all types initially null with prepared statement
-        select = s.prepare("SELECT {0} FROM alltypes WHERE zz=?".format(columns_string))
+        select = s.prepare("SELECT {0} FROM all_empty WHERE zz=?".format(columns_string))
         results = s.execute(select.bind([2]))[0]
         self.assertTrue(all(x is None for x in results))
 
         # insert empty strings for string-like fields
-        expected_values = {'j': '', 'a': '', 'n': ''}
-        columns_string = ','.join(expected_values.keys())
-        placeholders = ','.join(["%s"] * len(expected_values))
-        s.execute("INSERT INTO alltypes (zz, {0}) VALUES (3, {1})".format(columns_string, placeholders), expected_values.values())
+        expected_values = dict((col, '') for col in string_columns)
+        columns_string = ','.join(string_columns)
+        placeholders = ','.join(["%s"] * len(string_columns))
+        s.execute("INSERT INTO all_empty (zz, {0}) VALUES (3, {1})".format(columns_string, placeholders), expected_values.values())
 
         # verify string types empty with simple statement
-        results = s.execute("SELECT {0} FROM alltypes WHERE zz=3".format(columns_string))[0]
+        results = s.execute("SELECT {0} FROM all_empty WHERE zz=3".format(columns_string))[0]
         for expected, actual in zip(expected_values.values(), results):
             self.assertEqual(actual, expected)
 
         # verify string types empty with prepared statement
-        results = s.execute(s.prepare("SELECT {0} FROM alltypes WHERE zz=?".format(columns_string)), [3])[0]
+        results = s.execute(s.prepare("SELECT {0} FROM all_empty WHERE zz=?".format(columns_string)), [3])[0]
         for expected, actual in zip(expected_values.values(), results):
             self.assertEqual(actual, expected)
 
         # non-string types shouldn't accept empty strings
-        for col in ('b', 'd', 'e', 'f', 'g', 'i', 'l', 'm', 'o'):
-            query = "INSERT INTO alltypes (zz, {0}) VALUES (4, %s)".format(col)
+        for col in non_string_columns:
+            query = "INSERT INTO all_empty (zz, {0}) VALUES (4, %s)".format(col)
             with self.assertRaises(InvalidRequest):
                 s.execute(query, [''])
 
-            insert = s.prepare("INSERT INTO alltypes (zz, {0}) VALUES (4, ?)".format(col))
+            insert = s.prepare("INSERT INTO all_empty (zz, {0}) VALUES (4, ?)".format(col))
             with self.assertRaises(TypeError):
                 s.execute(insert, [''])
 
@@ -314,7 +314,7 @@ class TypeTests(unittest.TestCase):
         # insert the data
         columns_string = ','.join(col_names)
         placeholders = ','.join(["%s"] * len(col_names))
-        simple_insert = "INSERT INTO alltypes (zz, {0}) VALUES (5, {1})".format(columns_string, placeholders)
+        simple_insert = "INSERT INTO all_empty (zz, {0}) VALUES (5, {1})".format(columns_string, placeholders)
         s.execute(simple_insert, params)
 
         # then insert None, which should null them out
@@ -322,13 +322,13 @@ class TypeTests(unittest.TestCase):
         s.execute(simple_insert, null_values)
 
         # check via simple statement
-        query = "SELECT {0} FROM alltypes WHERE zz=5".format(columns_string)
+        query = "SELECT {0} FROM all_empty WHERE zz=5".format(columns_string)
         results = s.execute(query)[0]
         for col in results:
             self.assertEqual(None, col)
 
         # check via prepared statement
-        select = s.prepare("SELECT {0} FROM alltypes WHERE zz=?".format(columns_string))
+        select = s.prepare("SELECT {0} FROM all_empty WHERE zz=?".format(columns_string))
         results = s.execute(select.bind([5]))[0]
         for col in results:
             self.assertEqual(None, col)
@@ -337,7 +337,7 @@ class TypeTests(unittest.TestCase):
         s.execute(simple_insert, params)
 
         placeholders = ','.join(["?"] * len(col_names))
-        insert = s.prepare("INSERT INTO alltypes (zz, {0}) VALUES (5, {1})".format(columns_string, placeholders))
+        insert = s.prepare("INSERT INTO all_empty (zz, {0}) VALUES (5, {1})".format(columns_string, placeholders))
         s.execute(insert, null_values)
 
         results = s.execute(query)[0]
@@ -348,15 +348,11 @@ class TypeTests(unittest.TestCase):
         for col in results:
             self.assertEqual(None, col)
 
-        s.shutdown()
-
     def test_can_insert_empty_values_for_int32(self):
         """
         Ensure Int32Type supports empty values
         """
-
-        c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("typetests")
+        s = self.session
 
         s.execute("CREATE TABLE empty_values (a text PRIMARY KEY, b int)")
         s.execute("INSERT INTO empty_values (a, b) VALUES ('a', blobAsInt(0x))")
@@ -366,8 +362,6 @@ class TypeTests(unittest.TestCase):
             self.assertIs(EMPTY, results.b)
         finally:
             Int32Type.support_empty_values = False
-
-        c.shutdown()
 
     def test_timezone_aware_datetimes_are_timestamps(self):
         """
@@ -383,8 +377,7 @@ class TypeTests(unittest.TestCase):
         eastern_tz = pytz.timezone('US/Eastern')
         eastern_tz.localize(dt)
 
-        c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("typetests")
+        s = self.session
 
         s.execute("CREATE TABLE tz_aware (a ascii PRIMARY KEY, b timestamp)")
 
@@ -398,8 +391,6 @@ class TypeTests(unittest.TestCase):
         s.execute(insert.bind([dt]))
         result = s.execute("SELECT b FROM tz_aware WHERE a='key2'")[0].b
         self.assertEqual(dt.utctimetuple(), result.utctimetuple())
-
-        c.shutdown()
 
     def test_can_insert_tuples(self):
         """
@@ -508,17 +499,16 @@ class TypeTests(unittest.TestCase):
                   "k int PRIMARY KEY, "
                   "v frozen<tuple<%s>>)" % ','.join(PRIMITIVE_DATATYPES))
 
-        for i in range(len(PRIMITIVE_DATATYPES)):
+        values = []
+        type_count = len(PRIMITIVE_DATATYPES)
+        for i, data_type in enumerate(PRIMITIVE_DATATYPES):
             # create tuples to be written and ensure they match with the expected response
             # responses have trailing None values for every element that has not been written
-            created_tuple = [get_sample(PRIMITIVE_DATATYPES[j]) for j in range(i + 1)]
-            response_tuple = tuple(created_tuple + [None for j in range(len(PRIMITIVE_DATATYPES) - i - 1)])
-            written_tuple = tuple(created_tuple)
-
-            s.execute("INSERT INTO tuple_primitive (k, v) VALUES (%s, %s)", (i, written_tuple))
-
+            values.append(get_sample(data_type))
+            expected = tuple(values + [None] * (type_count - len(values)))
+            s.execute("INSERT INTO tuple_primitive (k, v) VALUES (%s, %s)", (i, tuple(values)))
             result = s.execute("SELECT v FROM tuple_primitive WHERE k=%s", (i,))[0]
-            self.assertEqual(response_tuple, result.v)
+            self.assertEqual(result.v, expected)
         c.shutdown()
 
     def test_can_insert_tuples_all_collection_datatypes(self):
@@ -668,8 +658,7 @@ class TypeTests(unittest.TestCase):
         if self._cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
-        c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("typetests")
+        s = self.session
 
         s.execute("CREATE TABLE tuples_nulls (k int PRIMARY KEY, t frozen<tuple<text, int, uuid, blob>>)")
 
@@ -688,28 +677,20 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(('', None, None, b''), result[0].t)
         self.assertEqual(('', None, None, b''), s.execute(read)[0].t)
 
-        c.shutdown()
-
     def test_can_insert_unicode_query_string(self):
         """
         Test to ensure unicode strings can be used in a query
         """
-
-        c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("typetests")
+        s = self.session
 
         query = u"SELECT * FROM system.schema_columnfamilies WHERE keyspace_name = 'ef\u2052ef' AND columnfamily_name = %s"
         s.execute(query, (u"fe\u2051fe",))
-
-        c.shutdown()
 
     def test_can_read_composite_type(self):
         """
         Test to ensure that CompositeTypes can be used in a query
         """
-
-        c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("typetests")
+        s = self.session
 
         s.execute("""
             CREATE TABLE composites (
@@ -728,5 +709,3 @@ class TypeTests(unittest.TestCase):
         result = s.execute("SELECT * FROM composites WHERE a = 0")[0]
         self.assertEqual(0, result.a)
         self.assertEqual(('abc',), result.b)
-
-        c.shutdown()

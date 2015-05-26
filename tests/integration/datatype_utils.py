@@ -16,17 +16,12 @@ from decimal import Decimal
 from datetime import datetime, date, time
 from uuid import uuid1, uuid4
 
-try:
-    from blist import sortedset
-except ImportError:
-    sortedset = set  # noqa
-
-from cassandra.util import OrderedMap
+from cassandra.util import OrderedMap, Date, Time, sortedset
 
 from tests.integration import get_server_versions
 
 
-PRIMITIVE_DATATYPES = [
+PRIMITIVE_DATATYPES = sortedset([
     'ascii',
     'bigint',
     'blob',
@@ -42,26 +37,26 @@ PRIMITIVE_DATATYPES = [
     'uuid',
     'varchar',
     'varint',
-]
+])
 
-COLLECTION_TYPES = [
+COLLECTION_TYPES = sortedset([
     'list',
     'set',
     'map',
-]
+])
 
 
 def update_datatypes():
     _cass_version, _cql_version = get_server_versions()
 
     if _cass_version >= (2, 1, 0):
-        COLLECTION_TYPES.append('tuple')
+        COLLECTION_TYPES.add('tuple')
 
-    if _cass_version >= (3, 0, 0):
-        PRIMITIVE_DATATYPES.append('date')
-        PRIMITIVE_DATATYPES.append('time')
-        PRIMITIVE_DATATYPES.append('tinyint')
-        PRIMITIVE_DATATYPES.append('smallint')
+    if _cass_version >= (2, 2, 0):
+        PRIMITIVE_DATATYPES.update(['date', 'time', 'smallint', 'tinyint'])
+
+    global SAMPLE_DATA
+    SAMPLE_DATA = get_sample_data()
 
 
 def get_sample_data():
@@ -114,10 +109,10 @@ def get_sample_data():
             sample_data[datatype] = int(str(2147483647) + '000')
 
         elif datatype == 'date':
-            sample_data[datatype] = date(2015, 1, 15)
+            sample_data[datatype] = Date(date(2015, 1, 15))
 
         elif datatype == 'time':
-            sample_data[datatype] = time(16, 47, 25, 7)
+            sample_data[datatype] = Time(time(16, 47, 25, 7))
 
         elif datatype == 'tinyint':
             sample_data[datatype] = 123
