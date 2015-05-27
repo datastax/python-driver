@@ -14,7 +14,7 @@
 
 from datetime import datetime, timedelta, date, tzinfo
 from decimal import Decimal as D
-from unittest import TestCase
+from unittest import TestCase, SkipTest
 from uuid import uuid4, uuid1
 
 from cassandra import InvalidRequest
@@ -34,6 +34,7 @@ from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine.models import Model, ValidationError
 from cassandra import util
 
+from tests.integration import PROTOCOL_VERSION
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 
 
@@ -153,6 +154,9 @@ class TestDate(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
+        if PROTOCOL_VERSION < 4:
+            raise SkipTest("Protocol v4 datatypes require native protocol 4+, currently using: {0}".format(PROTOCOL_VERSION))
+
         super(TestDate, cls).setUpClass()
         sync_table(cls.DateTest)
 

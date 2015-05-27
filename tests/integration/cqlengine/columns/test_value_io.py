@@ -12,17 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from decimal import Decimal
 from uuid import uuid1, uuid4, UUID
 import six
+import unittest
 
 from cassandra.cqlengine import columns
 from cassandra.cqlengine.management import sync_table
 from cassandra.cqlengine.management import drop_table
 from cassandra.cqlengine.models import Model
-from cassandra import util
 
+from cassandra.util import Date, Time
+
+from tests.integration import PROTOCOL_VERSION
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 
 
@@ -55,10 +58,10 @@ class BaseColumnIOTest(BaseCassEngTestCase):
 
         # create a table with the given column
         class IOTestModel(Model):
-
             table_name = cls.column.db_type + "_io_test_model_{}".format(uuid4().hex[:8])
             pkey = cls.column(primary_key=True)
             data = cls.column()
+
         cls._generated_model = IOTestModel
         sync_table(cls._generated_model)
 
@@ -149,11 +152,18 @@ class TestDateTime(BaseColumnIOTest):
 
 class TestDate(BaseColumnIOTest):
 
+    @classmethod
+    def setUpClass(cls):
+        if PROTOCOL_VERSION < 4:
+            raise unittest.SkipTest("Protocol v4 datatypes require native protocol 4+, currently using: {0}".format(PROTOCOL_VERSION))
+
+        super(TestDate, cls).setUpClass()
+
     column = columns.Date
 
-    now = util.Date(datetime.now().date())
+    now = Date(datetime.now().date())
     pkey_val = now
-    data_val = util.Date(now.days_from_epoch + 1)
+    data_val = Date(now.days_from_epoch + 1)
 
 
 class TestUUID(BaseColumnIOTest):
@@ -210,3 +220,46 @@ class TestDecimalIO(BaseColumnIOTest):
     def comparator_converter(self, val):
         return Decimal(val)
 
+class TestTime(BaseColumnIOTest):
+
+    @classmethod
+    def setUpClass(cls):
+        if PROTOCOL_VERSION < 4:
+            raise unittest.SkipTest("Protocol v4 datatypes require native protocol 4+, currently using: {0}".format(PROTOCOL_VERSION))
+
+        super(TestTime, cls).setUpClass()
+
+    column = columns.Time
+
+    pkey_val = Time(time(2, 12, 7, 48))
+    data_val = Time(time(16, 47, 25, 7))
+
+
+class TestSmallInt(BaseColumnIOTest):
+
+    @classmethod
+    def setUpClass(cls):
+        if PROTOCOL_VERSION < 4:
+            raise unittest.SkipTest("Protocol v4 datatypes require native protocol 4+, currently using: {0}".format(PROTOCOL_VERSION))
+
+        super(TestSmallInt, cls).setUpClass()
+
+    column = columns.SmallInt
+
+    pkey_val = 16768
+    data_val = 32523
+
+
+class TestTinyInt(BaseColumnIOTest):
+
+    @classmethod
+    def setUpClass(cls):
+        if PROTOCOL_VERSION < 4:
+            raise unittest.SkipTest("Protocol v4 datatypes require native protocol 4+, currently using: {0}".format(PROTOCOL_VERSION))
+
+        super(TestTinyInt, cls).setUpClass()
+
+    column = columns.TinyInt
+
+    pkey_val = 1
+    data_val = 123

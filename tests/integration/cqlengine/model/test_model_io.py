@@ -14,6 +14,7 @@
 
 from uuid import uuid4, UUID
 import random
+import unittest
 from datetime import datetime, date, time
 from decimal import Decimal
 from operator import itemgetter
@@ -25,6 +26,7 @@ from cassandra.cqlengine.management import drop_table
 from cassandra.cqlengine.models import Model
 from cassandra.util import Date, Time
 
+from tests.integration import PROTOCOL_VERSION
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 
 class TestModel(Model):
@@ -148,40 +150,72 @@ class TestModelIO(BaseCassEngTestCase):
             b = columns.BigInt()
             c = columns.Blob()
             d = columns.Boolean()
-            e = columns.Date()
-            f = columns.DateTime()
-            g = columns.Decimal()
-            h = columns.Double()
-            i = columns.Float(double_precision=False)
-            j = columns.Inet()
-            k = columns.Integer()
-            l = columns.SmallInt()
-            m = columns.Text()
-            n = columns.Time()
-            o = columns.TimeUUID()
-            p = columns.TinyInt()
-            q = columns.UUID()
-            r = columns.VarInt()
+            e = columns.DateTime()
+            f = columns.Decimal()
+            g = columns.Double()
+            h = columns.Float(double_precision=False)
+            i = columns.Inet()
+            j = columns.Integer()
+            k = columns.Text()
+            l = columns.TimeUUID()
+            m = columns.UUID()
+            n = columns.VarInt()
 
         sync_table(AllDatatypesModel)
 
-        input = ['ascii', 2 ** 63 - 1, bytearray(b'hello world'), True, Date(date(1970, 1, 1)),
-                 datetime.utcfromtimestamp(872835240), Decimal('12.3E+7'), 2.39,
-                 3.4028234663852886e+38, '123.123.123.123', 2147483647, 32523, 'text', Time(time(16, 47, 25, 7)),
-                 UUID('FE2B4360-28C6-11E2-81C1-0800200C9A66'), 123, UUID('067e6162-3b6f-4ae2-a171-2470b63dff00'),
+        input = ['ascii', 2 ** 63 - 1, bytearray(b'hello world'), True, datetime.utcfromtimestamp(872835240),
+                 Decimal('12.3E+7'), 2.39, 3.4028234663852886e+38, '123.123.123.123', 2147483647, 'text',
+                 UUID('FE2B4360-28C6-11E2-81C1-0800200C9A66'), UUID('067e6162-3b6f-4ae2-a171-2470b63dff00'),
                  int(str(2147483647) + '000')]
 
-        AllDatatypesModel.create(id=0, a='ascii', b=2 ** 63 - 1, c=bytearray(b'hello world'), d=True, e=date(1970, 1, 1),
-                                 f=datetime.utcfromtimestamp(872835240), g=Decimal('12.3E+7'), h=2.39,
-                                 i=3.4028234663852886e+38, j='123.123.123.123', k=2147483647, l=32523, m='text',
-                                 n=time(16, 47, 25, 7), o=UUID('FE2B4360-28C6-11E2-81C1-0800200C9A66'),
-                                 p=123, q=UUID('067e6162-3b6f-4ae2-a171-2470b63dff00'),
-                                 r=int(str(2147483647) + '000'))
+        AllDatatypesModel.create(id=0, a='ascii', b=2 ** 63 - 1, c=bytearray(b'hello world'), d=True,
+                                 e=datetime.utcfromtimestamp(872835240), f=Decimal('12.3E+7'), g=2.39,
+                                 h=3.4028234663852886e+38, i='123.123.123.123', j=2147483647, k='text',
+                                 l=UUID('FE2B4360-28C6-11E2-81C1-0800200C9A66'),
+                                 m=UUID('067e6162-3b6f-4ae2-a171-2470b63dff00'), n=int(str(2147483647) + '000'))
 
         self.assertEqual(1, AllDatatypesModel.objects.count())
         output = AllDatatypesModel.objects().first()
 
-        for i, i_char in enumerate(range(ord('a'), ord('a') + 15)):
+        for i, i_char in enumerate(range(ord('a'), ord('a') + 14)):
+            self.assertEqual(input[i], output[chr(i_char)])
+
+    def test_can_insert_model_with_all_protocol_v4_column_types(self):
+        """
+        Test for inserting all protocol v4 column types into a Model
+
+        test_can_insert_model_with_all_protocol_v4_column_types tests that each cqlengine protocol v4 column type can be
+        inserted into a Model. It first creates a Model that has each cqlengine protocol v4 column type. It then creates
+        a Model instance where all the fields have corresponding data, which performs the insert into the Cassandra table.
+        Finally, it verifies that each column read from the Model from Cassandra is the same as the input parameters.
+
+        @since 2.6.0
+        @jira_ticket PYTHON-245
+        @expected_result The Model is inserted with each protocol v4 column type, and the resulting read yields proper data for each column.
+
+        @test_category data_types:primitive
+        """
+
+        if PROTOCOL_VERSION < 4:
+            raise unittest.SkipTest("Protocol v4 datatypes require native protocol 4+, currently using: {0}".format(PROTOCOL_VERSION))
+
+        class AllDatatypesModel(Model):
+            id = columns.Integer(primary_key=True)
+            a = columns.Date()
+            b = columns.SmallInt()
+            c = columns.Time()
+            d = columns.TinyInt()
+
+        sync_table(AllDatatypesModel)
+
+        input = [Date(date(1970, 1, 1)), 32523, Time(time(16, 47, 25, 7)), 123]
+
+        AllDatatypesModel.create(id=0, a=date(1970, 1, 1), b=32523, c=time(16, 47, 25, 7), d=123)
+
+        self.assertEqual(1, AllDatatypesModel.objects.count())
+        output = AllDatatypesModel.objects().first()
+
+        for i, i_char in enumerate(range(ord('a'), ord('a') + 3)):
             self.assertEqual(input[i], output[chr(i_char)])
 
     def test_can_insert_double_and_float(self):
@@ -399,6 +433,9 @@ class TestQuerying(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
+        if PROTOCOL_VERSION < 4:
+            raise unittest.SkipTest("Date query tests require native protocol 4+, currently using: {0}".format(PROTOCOL_VERSION))
+
         super(TestQuerying, cls).setUpClass()
         drop_table(TestQueryModel)
         sync_table(TestQueryModel)
