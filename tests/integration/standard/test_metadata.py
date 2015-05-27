@@ -1357,20 +1357,31 @@ class FunctionMetadata(FunctionTest):
                 'called_on_null_input': called_on_null}
 
     def test_functions_after_udt(self):
+        """
+        Test to to ensure udt's come after functions in in keyspace dump
+
+        test_functions_after_udt creates a basic function. Then queries that function and  make sure that in the results
+        that UDT's are listed before any corresponding functions, when we dump the keyspace
+        Ideally we would make a function that takes a udt type, but this presently fails because C* c059a56 requires
+        udt to be frozen to create, but does not store meta indicating frozen
+        SEE https://issues.apache.org/jira/browse/CASSANDRA-9186
+        Maybe update this after release
+        kwargs = self.make_function_kwargs()
+        kwargs['type_signature'][0] = "frozen<%s>" % udt_name
+        expected_meta = Function(**kwargs)
+        with self.VerifiedFunction(self, **kwargs):
+
+        @since 2.6.0
+        @jira_ticket PYTHON-211
+        @expected_result UDT's should come before any functions
+        @test_category function
+        """
+
         self.assertNotIn(self.function_name, self.keyspace_function_meta)
 
         udt_name = 'udtx'
         self.session.execute("CREATE TYPE %s (x int)" % udt_name)
 
-        # Ideally we would make a function that takes a udt type, but
-        # this presently fails because C* c059a56 requires udt to be frozen to create, but does not store meta indicating frozen
-        # https://issues.apache.org/jira/browse/CASSANDRA-9186
-        # Maybe update this after release
-        #kwargs = self.make_function_kwargs()
-        #kwargs['type_signature'][0] = "frozen<%s>" % udt_name
-
-        #expected_meta = Function(**kwargs)
-        #with self.VerifiedFunction(self, **kwargs):
         with self.VerifiedFunction(self, **self.make_function_kwargs()):
             # udts must come before functions in keyspace dump
             keyspace_cql = self.cluster.metadata.keyspaces[self.keyspace_name].export_as_string()
@@ -1380,22 +1391,54 @@ class FunctionMetadata(FunctionTest):
             self.assertGreater(func_idx, type_idx)
 
     def test_function_same_name_diff_types(self):
+        """
+        Test to verify to that functions with different signatures are differentiated in metadata
+
+        test_function_same_name_diff_types Creates two functions. One with the same name but a slightly different
+        signature. Then ensures that both are surfaced separately in our metadata.
+
+        @since 2.6.0
+        @jira_ticket PYTHON-211
+        @expected_result function with the same name but different signatures should be surfaced separately
+        @test_category function
+        """
+
+        # Create a function
         kwargs = self.make_function_kwargs()
         with self.VerifiedFunction(self, **kwargs):
+
             # another function: same name, different type sig.
             self.assertGreater(len(kwargs['type_signature']), 1)
             self.assertGreater(len(kwargs['argument_names']), 1)
             kwargs['type_signature'] = kwargs['type_signature'][:1]
             kwargs['argument_names'] = kwargs['argument_names'][:1]
+
+            # Ensure they are surfaced separately
             with self.VerifiedFunction(self, **kwargs):
                 functions = [f for f in self.keyspace_function_meta.values() if f.name == self.function_name]
                 self.assertEqual(len(functions), 2)
                 self.assertNotEqual(functions[0].type_signature, functions[1].type_signature)
 
     def test_functions_follow_keyspace_alter(self):
+        """
+        Test to verify to that functions maintain equality after a keyspace is altered
+
+        test_functions_follow_keyspace_alter creates a function then alters a the keyspace associated with that function.
+        After the alter we validate that the function maintains the same metadata
+
+
+        @since 2.6.0
+        @jira_ticket PYTHON-211
+        @expected_result functions are the same after parent keyspace is altered
+        @test_category function
+        """
+
+        # Create function
         with self.VerifiedFunction(self, **self.make_function_kwargs()):
             original_keyspace_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
             self.session.execute('ALTER KEYSPACE %s WITH durable_writes = false' % self.keyspace_name)
+
+            # After keyspace alter ensure that we maintain function equality.
             try:
                 new_keyspace_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
                 self.assertNotEqual(original_keyspace_meta, new_keyspace_meta)
@@ -1404,6 +1447,20 @@ class FunctionMetadata(FunctionTest):
                 self.session.execute('ALTER KEYSPACE %s WITH durable_writes = true' % self.keyspace_name)
 
     def test_function_cql_called_on_null(self):
+        """
+        Test to verify to that that called on null argument is honored on function creation.
+
+        test_functions_follow_keyspace_alter create two functions. One with the called_on_null_input set to true,
+        the other with it set to false. We then verify that the metadata constructed from those function is correctly
+        reflected
+
+
+        @since 2.6.0
+        @jira_ticket PYTHON-211
+        @expected_result functions metadata correctly reflects called_on_null_input flag.
+        @test_category function
+        """
+
         kwargs = self.make_function_kwargs()
         kwargs['called_on_null_input'] = True
         with self.VerifiedFunction(self, **kwargs) as vf:
@@ -1460,10 +1517,36 @@ class AggregateMetadata(FunctionTest):
                 'return_type': "does not matter for creation"}
 
     def test_return_type_meta(self):
+        """
+        Test to verify to that the return type of a an aggregate is honored in the metadata
+
+        test_return_type_meta creates an aggregate then ensures the return type of the created
+        aggregate is correctly surfaced in the metadata
+
+
+        @since 2.6.0
+        @jira_ticket PYTHON-211
+        @expected_result aggregate has the correct return typ in the metadata
+        @test_category aggregate
+        """
+
         with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('sum_int', Int32Type, init_cond=1)) as va:
             self.assertIs(self.keyspace_aggregate_meta[va.signature].return_type, Int32Type)
 
     def test_init_cond(self):
+        """
+        Test to verify that various initial conditions are correctly surfaced in various aggregate functions
+
+        test_init_cond creates several different types of aggregates, and given various initial conditions it verifies that
+        they correctly impact the aggregate's execution
+
+
+        @since 2.6.0
+        @jira_ticket PYTHON-211
+        @expected_result initial conditions are correctly evaluated as part of the aggregates
+        @test_category aggregate
+        """
+
         # This is required until the java driver bundled with C* is updated to support v4
         c = Cluster(protocol_version=3)
         s = c.connect(self.keyspace_name)
@@ -1496,6 +1579,19 @@ class AggregateMetadata(FunctionTest):
         c.shutdown()
 
     def test_aggregates_after_functions(self):
+        """
+        Test to verify that aggregates are listed after function in metadata
+
+        test_aggregates_after_functions creates an aggregate, and then verifies that they are listed
+        after any function creations when the keypspace dump is preformed
+
+
+        @since 2.6.0
+        @jira_ticket PYTHON-211
+        @expected_result aggregates are declared after any functions
+        @test_category aggregate
+        """
+
         # functions must come before functions in keyspace dump
         with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('extend_list', ListType.apply_parameters([UTF8Type]))):
             keyspace_cql = self.cluster.metadata.keyspaces[self.keyspace_name].export_as_string()
@@ -1505,6 +1601,18 @@ class AggregateMetadata(FunctionTest):
             self.assertGreater(aggregate_idx, func_idx)
 
     def test_same_name_diff_types(self):
+        """
+        Test to verify to that aggregates with different signatures are differentiated in metadata
+
+        test_same_name_diff_types Creates two Aggregates. One with the same name but a slightly different
+        signature. Then ensures that both are surfaced separately in our metadata.
+
+        @since 2.6.0
+        @jira_ticket PYTHON-211
+        @expected_result aggregates with the same name but different signatures should be surfaced separately
+        @test_category function
+        """
+
         kwargs = self.make_aggregate_kwargs('sum_int', Int32Type, init_cond=0)
         with self.VerifiedAggregate(self, **kwargs):
             kwargs['state_func'] = 'sum_int_two'
@@ -1515,6 +1623,19 @@ class AggregateMetadata(FunctionTest):
                 self.assertNotEqual(aggregates[0].type_signature, aggregates[1].type_signature)
 
     def test_aggregates_follow_keyspace_alter(self):
+        """
+        Test to verify to that aggregates maintain equality after a keyspace is altered
+
+        test_aggregates_follow_keyspace_alter creates a function then alters a the keyspace associated with that
+        function. After the alter we validate that the function maintains the same metadata
+
+
+        @since 2.6.0
+        @jira_ticket PYTHON-211
+        @expected_result aggregates are the same after parent keyspace is altered
+        @test_category function
+        """
+
         with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('sum_int', Int32Type, init_cond=0)):
             original_keyspace_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
             self.session.execute('ALTER KEYSPACE %s WITH durable_writes = false' % self.keyspace_name)
@@ -1526,6 +1647,19 @@ class AggregateMetadata(FunctionTest):
                 self.session.execute('ALTER KEYSPACE %s WITH durable_writes = true' % self.keyspace_name)
 
     def test_cql_optional_params(self):
+        """
+        Test to verify that the initial_cond and final_func parameters are correctly honored
+
+        test_cql_optional_params creates various aggregates with different combinations of initial_condition,
+        and final_func parameters set. It then ensures they are correctly honored.
+
+
+        @since 2.6.0
+        @jira_ticket PYTHON-211
+        @expected_result initial_condition and final_func parameters are honored correctly
+        @test_category function
+        """
+
         kwargs = self.make_aggregate_kwargs('extend_list', ListType.apply_parameters([UTF8Type]))
 
         # no initial condition, final func
