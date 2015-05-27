@@ -1011,3 +1011,86 @@ class Date(object):
         except:
             # If we overflow datetime.[MIN|MAX]
             return str(self.days_from_epoch)
+
+import socket
+if hasattr(socket, 'inet_pton'):
+    inet_pton = socket.inet_pton
+    inet_ntop = socket.inet_ntop
+else:
+    """
+    Windows doesn't have socket.inet_pton and socket.inet_ntop until Python 3.4
+    This is an alternative impl using ctypes, based on this win_inet_pton project:
+    https://github.com/hickeroar/win_inet_pton
+    """
+    import ctypes
+
+
+    class sockaddr(ctypes.Structure):
+        _fields_ = [("sa_family", ctypes.c_short),
+                    ("__pad1", ctypes.c_ushort),
+                    ("ipv4_addr", ctypes.c_byte * 4),
+                    ("ipv6_addr", ctypes.c_byte * 16),
+                    ("__pad2", ctypes.c_ulong)]
+
+
+    if hasattr(ctypes, 'windll'):
+        WSAStringToAddressA = ctypes.windll.ws2_32.WSAStringToAddressA
+        WSAAddressToStringA = ctypes.windll.ws2_32.WSAAddressToStringA
+    else:
+        def not_windows(*args):
+            raise Exception("IPv6 addresses cannot be handled on Windows. "
+                            "Missing ctypes.windll")
+        WSAStringToAddressA = not_windows
+        WSAAddressToStringA = not_windows
+
+
+    def inet_pton(address_family, ip_string):
+        if address_family == socket.AF_INET:
+            return socket.inet_aton(ip_string)
+
+        addr = sockaddr()
+        addr.sa_family = address_family
+        addr_size = ctypes.c_int(ctypes.sizeof(addr))
+
+        if WSAStringToAddressA(
+                ip_string,
+                address_family,
+                None,
+                ctypes.byref(addr),
+                ctypes.byref(addr_size)
+        ) != 0:
+            raise socket.error(ctypes.FormatError())
+
+        if address_family == socket.AF_INET6:
+            return ctypes.string_at(addr.ipv6_addr, 16)
+
+        raise socket.error('unknown address family')
+
+
+    def inet_ntop(address_family, packed_ip):
+        if address_family == socket.AF_INET:
+            return socket.inet_ntoa(packed_ip)
+
+        addr = sockaddr()
+        addr.sa_family = address_family
+        addr_size = ctypes.c_int(ctypes.sizeof(addr))
+        ip_string = ctypes.create_string_buffer(128)
+        ip_string_size = ctypes.c_int(ctypes.sizeof(ip_string))
+
+        if address_family == socket.AF_INET6:
+            if len(packed_ip) != ctypes.sizeof(addr.ipv6_addr):
+                raise socket.error('packed IP wrong length for inet_ntoa')
+            ctypes.memmove(addr.ipv6_addr, packed_ip, 16)
+        else:
+            raise socket.error('unknown address family')
+
+        if WSAAddressToStringA(
+                ctypes.byref(addr),
+                addr_size,
+                None,
+                ip_string,
+                ctypes.byref(ip_string_size)
+        ) != 0:
+            raise socket.error(ctypes.FormatError())
+
+        return ip_string[:ip_string_size.value - 1]
