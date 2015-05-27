@@ -89,8 +89,6 @@ class TypeTests(unittest.TestCase):
         for expected, actual in zip(params, results):
             self.assertEqual(expected, actual)
 
-        c.shutdown()
-
     def test_can_insert_blob_type_as_bytearray(self):
         """
         Tests that blob type in Cassandra maps to bytearray in Python
