@@ -28,14 +28,11 @@ def setup_module():
 
 class CustomPayloadTests(unittest.TestCase):
 
-    @classmethod
-    def setUpClass(cls):
+    def setUp(self):
         if PROTOCOL_VERSION < 4:
             raise unittest.SkipTest(
                 "Native protocol 4,0+ is required for custom payloads, currently using %r"
                 % (PROTOCOL_VERSION,))
-
-    def setUp(self):
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         self.session = self.cluster.connect()
 

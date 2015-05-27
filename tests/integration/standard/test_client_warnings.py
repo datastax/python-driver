@@ -33,9 +33,8 @@ class ClientWarningTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         if PROTOCOL_VERSION < 4:
-            raise unittest.SkipTest(
-                "Native protocol 4,0+ is required for client warnings, currently using %r"
-                % (PROTOCOL_VERSION,))
+            return
+
         cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         cls.session = cls.cluster.connect()
 
@@ -51,7 +50,16 @@ class ClientWarningTests(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        if PROTOCOL_VERSION < 4:
+            return
+
         cls.cluster.shutdown()
+
+    def setUp(self):
+        if PROTOCOL_VERSION < 4:
+            raise unittest.SkipTest(
+                "Native protocol 4,0+ is required for client warnings, currently using %r"
+                % (PROTOCOL_VERSION,))
 
     def test_warning_basic(self):
         """
