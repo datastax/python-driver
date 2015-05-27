@@ -23,7 +23,7 @@ from cassandra.cqlengine import columns
 from cassandra.cqlengine.management import sync_table, sync_type, create_keyspace_simple, drop_keyspace
 from cassandra.util import Date, Time
 
-from tests.integration import get_server_versions
+from tests.integration import get_server_versions, PROTOCOL_VERSION
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 
 
@@ -31,8 +31,8 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(self):
-        if get_server_versions()[0] < (2, 1, 0):
-            raise unittest.SkipTest("UDTs require Cassandra 2.1 or greater")
+        if PROTOCOL_VERSION < 3:
+            raise unittest.SkipTest("UDTs require native protocol 3+, currently using: {0}".format(PROTOCOL_VERSION))
 
     def test_can_create_udts(self):
         class User(UserType):
@@ -209,20 +209,16 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
             b = columns.BigInt()
             c = columns.Blob()
             d = columns.Boolean()
-            e = columns.Date()
-            f = columns.DateTime()
-            g = columns.Decimal()
-            h = columns.Double()
-            i = columns.Float(double_precision=False)
-            j = columns.Inet()
-            k = columns.Integer()
-            l = columns.SmallInt()
-            m = columns.Text()
-            n = columns.Time()
-            o = columns.TimeUUID()
-            p = columns.TinyInt()
-            q = columns.UUID()
-            r = columns.VarInt()
+            e = columns.DateTime()
+            f = columns.Decimal()
+            g = columns.Double()
+            h = columns.Float(double_precision=False)
+            i = columns.Inet()
+            j = columns.Integer()
+            k = columns.Text()
+            l = columns.TimeUUID()
+            m = columns.UUID()
+            n = columns.VarInt()
 
         class AllDatatypesModel(Model):
             id = columns.Integer(primary_key=True)
@@ -231,7 +227,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         sync_table(AllDatatypesModel)
 
         input = AllDatatypes(a=None, b=None, c=None, d=None, e=None, f=None, g=None, h=None, i=None, j=None, k=None,
-                             l=None, m=None, n=None, o=None, p=None, q=None, r=None)
+                             l=None, m=None, n=None)
         AllDatatypesModel.create(id=0, data=input)
 
         self.assertEqual(1, AllDatatypesModel.objects.count())
@@ -260,20 +256,16 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
             b = columns.BigInt()
             c = columns.Blob()
             d = columns.Boolean()
-            e = columns.Date()
-            f = columns.DateTime()
-            g = columns.Decimal()
-            h = columns.Double()
-            i = columns.Float(double_precision=False)
-            j = columns.Inet()
-            k = columns.Integer()
-            l = columns.SmallInt()
-            m = columns.Text()
-            n = columns.Time()
-            o = columns.TimeUUID()
-            p = columns.TinyInt()
-            q = columns.UUID()
-            r = columns.VarInt()
+            e = columns.DateTime()
+            f = columns.Decimal()
+            g = columns.Double()
+            h = columns.Float(double_precision=False)
+            i = columns.Inet()
+            j = columns.Integer()
+            k = columns.Text()
+            l = columns.TimeUUID()
+            m = columns.UUID()
+            n = columns.VarInt()
 
         class AllDatatypesModel(Model):
             id = columns.Integer(primary_key=True)
@@ -281,18 +273,58 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
         sync_table(AllDatatypesModel)
 
-        input = AllDatatypes(a='ascii', b=2 ** 63 - 1, c=bytearray(b'hello world'), d=True, e=Date(date(1970, 1, 1)),
-                             f=datetime.utcfromtimestamp(872835240), g=Decimal('12.3E+7'), h=2.39,
-                             i=3.4028234663852886e+38, j='123.123.123.123', k=2147483647, l=32523, m='text',
-                             n=Time(time(16, 47, 25, 7)), o=UUID('FE2B4360-28C6-11E2-81C1-0800200C9A66'),
-                             p=123, q=UUID('067e6162-3b6f-4ae2-a171-2470b63dff00'),
-                             r=int(str(2147483647) + '000'))
+        input = AllDatatypes(a='ascii', b=2 ** 63 - 1, c=bytearray(b'hello world'), d=True,
+                             e=datetime.utcfromtimestamp(872835240), f=Decimal('12.3E+7'), g=2.39,
+                             h=3.4028234663852886e+38, i='123.123.123.123', j=2147483647, k='text',
+                             l=UUID('FE2B4360-28C6-11E2-81C1-0800200C9A66'),
+                             m=UUID('067e6162-3b6f-4ae2-a171-2470b63dff00'), n=int(str(2147483647) + '000'))
         AllDatatypesModel.create(id=0, data=input)
 
         self.assertEqual(1, AllDatatypesModel.objects.count())
         output = AllDatatypesModel.objects().first().data
 
-        for i in range(ord('a'), ord('a') + 15):
+        for i in range(ord('a'), ord('a') + 14):
+            self.assertEqual(input[chr(i)], output[chr(i)])
+
+    def test_can_insert_udts_protocol_v4_datatypes(self):
+        """
+        Test for inserting all protocol v4 column types into a UserType
+
+        test_can_insert_udts_protocol_v4_datatypes tests that each protocol v4 cqlengine column type can be inserted
+        into a UserType. It first creates a UserType that has each protocol v4 cqlengine column type, and a corresponding
+        table/Model. It then creates a UserType instance where all the fields have corresponding data, and inserts the
+        UserType as an instance of the Model. Finally, it verifies that each column read from the UserType from Cassandra
+        is the same as the input parameters.
+
+        @since 2.6.0
+        @jira_ticket PYTHON-245
+        @expected_result The UserType is inserted with each protocol v4 column type, and the resulting read yields proper data for each column.
+
+        @test_category data_types:udt
+        """
+
+        if PROTOCOL_VERSION < 4:
+            raise unittest.SkipTest("Protocol v4 datatypes in UDTs require native protocol 4+, currently using: {0}".format(PROTOCOL_VERSION))
+
+        class AllDatatypes(UserType):
+            a = columns.Date()
+            b = columns.SmallInt()
+            c = columns.Time()
+            d = columns.TinyInt()
+
+        class AllDatatypesModel(Model):
+            id = columns.Integer(primary_key=True)
+            data = columns.UserDefinedType(AllDatatypes)
+
+        sync_table(AllDatatypesModel)
+
+        input = AllDatatypes(a=Date(date(1970, 1, 1)), b=32523, c=Time(time(16, 47, 25, 7)), d=123)
+        AllDatatypesModel.create(id=0, data=input)
+
+        self.assertEqual(1, AllDatatypesModel.objects.count())
+        output = AllDatatypesModel.objects().first().data
+
+        for i in range(ord('a'), ord('a') + 3):
             self.assertEqual(input[chr(i)], output[chr(i)])
 
     def test_nested_udts_inserts(self):
@@ -319,7 +351,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
         class Container(Model):
             id = columns.UUID(primary_key=True, default=uuid4)
-            names = columns.List(columns.UserDefinedType(Name()))
+            names = columns.List(columns.UserDefinedType(Name))
 
         # Construct the objects and insert them
         names = []
