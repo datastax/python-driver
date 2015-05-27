@@ -13,9 +13,10 @@
 # limitations under the License.
 
 from datetime import datetime, timedelta
-import json
+import json, six, sys, traceback, logging
 from uuid import uuid4
-import six
+
+from cassandra import WriteTimeout
 
 from cassandra.cqlengine.models import Model, ValidationError
 import cassandra.cqlengine.columns as columns
@@ -23,10 +24,10 @@ from cassandra.cqlengine.management import sync_table, drop_table
 from tests.integration.cqlengine import is_prepend_reversed
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 
+log = logging.getLogger(__name__)
+
 
 class TestSetModel(Model):
-
-
     partition = columns.UUID(primary_key=True, default=uuid4)
     int_set = columns.Set(columns.Integer, required=False)
     text_set = columns.Set(columns.Text, required=False)
@@ -124,7 +125,14 @@ class TestSetColumn(BaseCassEngTestCase):
         """
         Tests that big collections are detected and raise an exception.
         """
-        TestSetModel.create(text_set={str(uuid4()) for i in range(65535)})
+        while True:
+            try:
+                TestSetModel.create(text_set={str(uuid4()) for i in range(65535)})
+                break
+            except WriteTimeout:
+                ex_type, ex, tb = sys.exc_info()
+                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                del tb
         with self.assertRaises(ValidationError):
             TestSetModel.create(text_set={str(uuid4()) for i in range(65536)})
 
@@ -235,7 +243,14 @@ class TestListColumn(BaseCassEngTestCase):
         """
         Tests that big collections are detected and raise an exception.
         """
-        TestListModel.create(text_list=[str(uuid4()) for i in range(65535)])
+        while True:
+            try:
+                TestListModel.create(text_list=[str(uuid4()) for i in range(65535)])
+                break
+            except WriteTimeout:
+                ex_type, ex, tb = sys.exc_info()
+                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                del tb
         with self.assertRaises(ValidationError):
             TestListModel.create(text_list=[str(uuid4()) for i in range(65536)])
 
@@ -410,7 +425,14 @@ class TestMapColumn(BaseCassEngTestCase):
         """
         Tests that big collections are detected and raise an exception.
         """
-        TestMapModel.create(text_map={str(uuid4()): i for i in range(65535)})
+        while True:
+            try:
+                TestMapModel.create(text_map={str(uuid4()): i for i in range(65535)})
+                break
+            except WriteTimeout:
+                ex_type, ex, tb = sys.exc_info()
+                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                del tb
         with self.assertRaises(ValidationError):
             TestMapModel.create(text_map={str(uuid4()): i for i in range(65536)})
 

@@ -306,23 +306,23 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         if PROTOCOL_VERSION < 4:
             raise unittest.SkipTest("Protocol v4 datatypes in UDTs require native protocol 4+, currently using: {0}".format(PROTOCOL_VERSION))
 
-        class AllDatatypes(UserType):
+        class Allv4Datatypes(UserType):
             a = columns.Date()
             b = columns.SmallInt()
             c = columns.Time()
             d = columns.TinyInt()
 
-        class AllDatatypesModel(Model):
+        class Allv4DatatypesModel(Model):
             id = columns.Integer(primary_key=True)
-            data = columns.UserDefinedType(AllDatatypes)
+            data = columns.UserDefinedType(Allv4Datatypes)
 
-        sync_table(AllDatatypesModel)
+        sync_table(Allv4DatatypesModel)
 
-        input = AllDatatypes(a=Date(date(1970, 1, 1)), b=32523, c=Time(time(16, 47, 25, 7)), d=123)
-        AllDatatypesModel.create(id=0, data=input)
+        input = Allv4Datatypes(a=Date(date(1970, 1, 1)), b=32523, c=Time(time(16, 47, 25, 7)), d=123)
+        Allv4DatatypesModel.create(id=0, data=input)
 
-        self.assertEqual(1, AllDatatypesModel.objects.count())
-        output = AllDatatypesModel.objects().first().data
+        self.assertEqual(1, Allv4DatatypesModel.objects.count())
+        output = Allv4DatatypesModel.objects().first().data
 
         for i in range(ord('a'), ord('a') + 3):
             self.assertEqual(input[chr(i)], output[chr(i)])
