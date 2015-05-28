@@ -302,7 +302,7 @@ def _sync_type(ks_name, type_model, omit_subtypes=None):
         log.debug("sync_type creating new type %s", type_name_qualified)
         cql = get_create_type(type_model, ks_name)
         execute(cql)
-        cluster.refresh_schema(keyspace=ks_name, usertype=type_name)
+        cluster.refresh_user_type_metadata(ks_name, type_name)
         type_model.register_for_keyspace(ks_name)
     else:
         defined_fields = defined_types[type_name].field_names
