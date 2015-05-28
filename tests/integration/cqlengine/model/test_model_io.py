@@ -199,21 +199,21 @@ class TestModelIO(BaseCassEngTestCase):
         if PROTOCOL_VERSION < 4:
             raise unittest.SkipTest("Protocol v4 datatypes require native protocol 4+, currently using: {0}".format(PROTOCOL_VERSION))
 
-        class AllDatatypesModel(Model):
+        class v4DatatypesModel(Model):
             id = columns.Integer(primary_key=True)
             a = columns.Date()
             b = columns.SmallInt()
             c = columns.Time()
             d = columns.TinyInt()
 
-        sync_table(AllDatatypesModel)
+        sync_table(v4DatatypesModel)
 
         input = [Date(date(1970, 1, 1)), 32523, Time(time(16, 47, 25, 7)), 123]
 
-        AllDatatypesModel.create(id=0, a=date(1970, 1, 1), b=32523, c=time(16, 47, 25, 7), d=123)
+        v4DatatypesModel.create(id=0, a=date(1970, 1, 1), b=32523, c=time(16, 47, 25, 7), d=123)
 
-        self.assertEqual(1, AllDatatypesModel.objects.count())
-        output = AllDatatypesModel.objects().first()
+        self.assertEqual(1, v4DatatypesModel.objects.count())
+        output = v4DatatypesModel.objects().first()
 
         for i, i_char in enumerate(range(ord('a'), ord('a') + 3)):
             self.assertEqual(input[i], output[chr(i_char)])
