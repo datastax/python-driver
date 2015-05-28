@@ -3,6 +3,15 @@
 
 .. module:: cassandra.metadata
 
+.. autodata:: cql_keywords
+   :annotation:
+
+.. autodata:: cql_keywords_unreserved
+   :annotation:
+
+.. autodata:: cql_keywords_reserved
+   :annotation:
+
 .. autoclass:: Metadata ()
    :members:
    :exclude-members: rebuild_schema, rebuild_token_map, add_host, remove_host, get_host
