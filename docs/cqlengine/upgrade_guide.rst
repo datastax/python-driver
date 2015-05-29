@@ -79,6 +79,12 @@ This upgrade served as a good juncture to deprecate certain API features and inv
 to new ones. The first released version does not change functionality -- only introduces deprecation
 warnings. Future releases will remove these features in favor of the alternatives.
 
+Float/Double Overload
+---------------------
+Previously there was no ``Double`` column type. Doubles were modeled by specifying ``Float(double_precision=True)``.
+This inititializer parameter is now deprecated. Applications should use :class:`~.columns.Double` for CQL ``double``, and :class:`~.columns.Float`
+for CQL ``float``.
+
 Schema Management
 -----------------
 ``cassandra.cqlengine.management.create_keyspace`` is deprecated. Instead, use the new replication-strategy-specific
