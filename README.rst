@@ -12,6 +12,8 @@ The driver supports Python 2.6, 2.7, 3.3, and 3.4*.
 
 * cqlengine component presently supports Python 2.7+
 
+**Help us focus our efforts!** Provide your input on the `Platform and Runtime Survey <https://docs.google.com/a/datastax.com/forms/d/10wkbKLqmqs91gvhFW5u43y60pg_geZDolVNrxfO5_48/viewform>`_.
+
 Installation
 ------------
 Installation through pip is recommended::
