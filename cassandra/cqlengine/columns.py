@@ -15,7 +15,6 @@
 from copy import deepcopy, copy
 from datetime import date, datetime
 import logging
-import re
 import six
 import warnings
 
@@ -518,8 +517,6 @@ class UUID(Column):
     """
     db_type = 'uuid'
 
-    re_uuid = re.compile(r'[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}')
-
     def validate(self, value):
         val = super(UUID, self).validate(value)
         if val is None:
@@ -527,9 +524,12 @@ class UUID(Column):
         from uuid import UUID as _UUID
         if isinstance(val, _UUID):
             return val
-        if isinstance(val, six.string_types) and self.re_uuid.match(val):
-            return _UUID(val)
-        raise ValidationError("{} {} is not a valid uuid".format(self.column_name, value))
+        if isinstance(val, six.string_types):
+            try:
+                return _UUID(val)
+            except ValueError:
+                raise ValidationError("{} {} is not a valid uuid".format(
+                    self.column_name, value))
 
     def to_python(self, value):
         return self.validate(value)
