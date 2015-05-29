@@ -240,6 +240,13 @@ class TestUUID(BaseCassEngTestCase):
         t1 = self.UUIDTest.get(test_id=1)
         assert a_uuid == t1.a_uuid
 
+    def test_uuid_with_upcase(self):
+        a_uuid = uuid4()
+        val = str(a_uuid).upper()
+        t0 = self.UUIDTest.create(test_id=0, a_uuid=val)
+        t1 = self.UUIDTest.get(test_id=0)
+        assert a_uuid == t1.a_uuid
+
 class TestTimeUUID(BaseCassEngTestCase):
     class TimeUUIDTest(Model):
 
