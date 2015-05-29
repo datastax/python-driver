@@ -528,8 +528,10 @@ class UUID(Column):
             try:
                 return _UUID(val)
             except ValueError:
-                raise ValidationError("{} {} is not a valid uuid".format(
-                    self.column_name, value))
+                # fall-through to error
+                pass
+        raise ValidationError("{} {} is not a valid uuid".format(
+            self.column_name, value))
 
     def to_python(self, value):
         return self.validate(value)
@@ -824,6 +826,8 @@ class Map(BaseContainerColumn):
             return
         if not isinstance(val, dict):
             raise ValidationError('{} {} is not a dict object'.format(self.column_name, val))
+        if None in val:
+            raise ValidationError("{} None is not allowed in a map".format(self.column_name))
         return {self.key_col.validate(k): self.value_col.validate(v) for k, v in val.items()}
 
     def to_python(self, value):

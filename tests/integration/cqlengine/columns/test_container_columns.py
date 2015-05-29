@@ -345,8 +345,6 @@ class TestListColumn(BaseCassEngTestCase):
         assert m3.int_list == []
 
 class TestMapModel(Model):
-
-
     partition = columns.UUID(primary_key=True, default=uuid4)
     int_map = columns.Map(columns.Integer, columns.UUID, required=False)
     text_map = columns.Map(columns.Text, columns.DateTime, required=False)
@@ -371,11 +369,7 @@ class TestMapColumn(BaseCassEngTestCase):
 
     def test_add_none_as_map_key(self):
         with self.assertRaises(ValidationError):
-            TestMapModel.create(int_map={None:1})
-
-    def test_add_none_as_map_value(self):
-        with self.assertRaises(ValidationError):
-            TestMapModel.create(int_map={None:1})
+            TestMapModel.create(int_map={None: uuid4()})
 
     def test_empty_retrieve(self):
         tmp = TestMapModel.create()
