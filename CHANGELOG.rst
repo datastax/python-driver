@@ -1,3 +1,41 @@
+2.6.0
+=====
+
+This release adds support for Cassandra 2.2 features, including version
+4 of the native protocol.
+
+Features
+--------
+* Default load balancing policy to TokenAware(DCAware) (PYTHON-160)
+* Configuration option for connection timeout (PYTHON-206)
+* Support User Defined Function and Aggregate metadata in C* 2.2 (PYTHON-211)
+* Surface request client in QueryTrace for C* 2.2+ (PYTHON-235)
+* Implement new request failure messages in protocol v4+ (PYTHON-238)
+* Metadata model now maps index meta by index name (PYTHON-241)
+* Support new types in C* 2.2: date, time, smallint, tinyint (PYTHON-245, 295)
+* cqle: add Double column type and remove Float overload (PYTHON-246)
+* Use partition key column information in prepared response for protocol v4+ (PYTHON-277)
+* Support message custom payloads in protocol v4+ (PYTHON-280)
+* Deprecate refresh_schema and replace with functions for specific entities (PYTHON-291)
+* Save trace id even when trace complete times out (PYTHON-302)
+* Warn when registering client UDT class for protocol < v3 (PYTHON-305)
+* Support client warnings returned with messages in protocol v4+ (PYTHON-315)
+* Ability to distinguish between NULL and UNSET values in protocol v4+ (PYTHON-317)
+* Expose CQL keywords in API (PYTHON-324)
+
+Bug Fixes
+---------
+* IPv6 address support on Windows (PYTHON-20)
+* Convert exceptions during automatic re-preparation to nice exceptions (PYTHON-207)
+* cqle: Quote keywords properly in table management functions (PYTHON-244)
+* Don't default to GeventConnection when gevent is loaded, but not monkey-patched (PYTHON-289)
+* Pass dynamic host from SaslAuthProvider to SaslAuthenticator (PYTHON-300)
+* Make protocol read_inet work for Windows (PYTHON-309)
+* cqle: Correct encoding for nested types (PYTHON-311)
+* Update list of CQL keywords used quoting identifiers (PYTHON-319)
+* Make ConstantReconnectionPolicy work with infinite retries (github #327, PYTHON-325)
+* Accept UUIDs with uppercase hex as valid in cqlengine (github #335)
+
 2.5.1
 =====
 April 23, 2015
