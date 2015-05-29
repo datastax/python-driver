@@ -8,12 +8,22 @@ conversion to this package will still require certain minimal updates (namely, i
 
 **THERE IS ONE FUNCTIONAL CHANGE**, described in the first section below.
 
-Functional Change
-=================
+Functional Changes
+==================
+List Prepend Reversing
+----------------------
 Legacy cqlengine included a workaround for a Cassandra bug in which prepended list segments were
 reversed (`CASSANDRA-8733 <https://issues.apache.org/jira/browse/CASSANDRA-8733>`_). As of
 this integration, this workaround is removed. The first released integrated version emits
 a warning when prepend is used. Subsequent versions will have this warning removed.
+
+Date Column Type
+----------------
+The Date column type in legacy cqlengine used a ``timestamp`` CQL type and truncated the time.
+Going forward, the :class:`~.columns.Date` type represents a ``date`` for Cassandra 2.2+
+(`PYTHON-245 <https://datastax-oss.atlassian.net/browse/PYTHON-245>`_).
+Users of the legacy functionality should convert models to use :class:`~.columns.DateTime` (which
+uses ``timestamp`` internally), and use the build-in ``datetime.date`` for input values.
 
 Remove cqlengine
 ================
