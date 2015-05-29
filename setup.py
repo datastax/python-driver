@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from __future__ import print_function
+import os
 import sys
 import warnings
 
@@ -36,9 +37,6 @@ from distutils.errors import (CCompilerError, DistutilsPlatformError,
                               DistutilsExecError)
 from distutils.cmd import Command
 
-
-import os
-import warnings
 
 try:
     import subprocess
@@ -247,6 +245,26 @@ elif "--no-libev" in sys.argv:
     sys.argv = [a for a in sys.argv if a != "--no-libev"]
     extensions.remove(libev_ext)
 
+is_windows = os.name == 'nt'
+if is_windows:
+    # libev is difficult to build, and uses select in Windows.
+    try:
+        extensions.remove(libev_ext)
+    except ValueError:
+        pass
+    build_extensions.error_message = """
+===============================================================================
+WARNING: could not compile %s.
+
+The C extensions are not required for the driver to run, but they add support
+for token-aware routing with the Murmur3Partitioner.
+
+On Windows, make sure Visual Studio or an SDK is installed, and your environment
+is configured to build for the appropriate architecture (matching your Python runtime).
+This is often a matter of using vcvarsall.bat from your install directory, or running
+from a command prompt in the Visual Studio Tools Start Menu.
+===============================================================================
+"""
 
 platform_unsupported_msg = \
 """
