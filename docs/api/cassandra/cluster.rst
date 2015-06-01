@@ -47,6 +47,8 @@
 
    .. autoattribute:: topology_event_refresh_window
 
+   .. autoattribute:: connect_timeout
+
    .. automethod:: connect
 
    .. automethod:: shutdown
