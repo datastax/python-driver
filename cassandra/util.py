@@ -1024,14 +1024,22 @@ else:
     """
     import ctypes
 
-
     class sockaddr(ctypes.Structure):
+        """
+        Shared struct for ipv4 and ipv6.
+
+        https://msdn.microsoft.com/en-us/library/windows/desktop/ms740496(v=vs.85).aspx
+
+        ``__pad1`` always covers the port.
+
+        When being used for ``sockaddr_in6``, ``ipv4_addr`` actually covers ``sin6_flowinfo``, resulting
+        in proper alignment for ``ipv6_addr``.
+        """
         _fields_ = [("sa_family", ctypes.c_short),
                     ("__pad1", ctypes.c_ushort),
                     ("ipv4_addr", ctypes.c_byte * 4),
                     ("ipv6_addr", ctypes.c_byte * 16),
                     ("__pad2", ctypes.c_ulong)]
-
 
     if hasattr(ctypes, 'windll'):
         WSAStringToAddressA = ctypes.windll.ws2_32.WSAStringToAddressA
@@ -1042,7 +1050,6 @@ else:
                             "Missing ctypes.windll")
         WSAStringToAddressA = not_windows
         WSAAddressToStringA = not_windows
-
 
     def inet_pton(address_family, ip_string):
         if address_family == socket.AF_INET:
@@ -1065,7 +1072,6 @@ else:
             return ctypes.string_at(addr.ipv6_addr, 16)
 
         raise socket.error('unknown address family')
-
 
     def inet_ntop(address_family, packed_ip):
         if address_family == socket.AF_INET:
