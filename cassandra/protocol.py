@@ -39,6 +39,7 @@ from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 TupleType, lookup_casstype, SimpleDateType,
                                 TimeType, ByteType, ShortType)
 from cassandra.policies import WriteType
+from cassandra import util
 
 log = logging.getLogger(__name__)
 
@@ -1133,7 +1134,7 @@ def read_inet(f):
         addrfam = socket.AF_INET6
     else:
         raise InternalError("bad inet address: %r" % (addrbytes,))
-    return (socket.inet_ntop(addrfam, addrbytes), port)
+    return (util.inet_ntop(addrfam, addrbytes), port)
 
 
 def write_inet(f, addrtuple):
@@ -1142,7 +1143,7 @@ def write_inet(f, addrtuple):
         addrfam = socket.AF_INET6
     else:
         addrfam = socket.AF_INET
-    addrbytes = socket.inet_pton(addrfam, addr)
+    addrbytes = util.inet_pton(addrfam, addr)
     write_byte(f, len(addrbytes))
     f.write(addrbytes)
     write_int(f, port)

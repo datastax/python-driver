@@ -517,35 +517,25 @@ class IntegerType(_CassandraType):
         return varint_pack(byts)
 
 
-have_ipv6_packing = hasattr(socket, 'inet_ntop')
-
-
 class InetAddressType(_CassandraType):
     typename = 'inet'
-
-    # TODO: implement basic ipv6 support for Windows?
-    # inet_ntop and inet_pton aren't available on Windows
 
     @staticmethod
     def deserialize(byts, protocol_version):
         if len(byts) == 16:
-            if not have_ipv6_packing:
-                raise Exception(
-                    "IPv6 addresses cannot currently be handled on Windows")
-            return socket.inet_ntop(socket.AF_INET6, byts)
+            return util.inet_ntop(socket.AF_INET6, byts)
         else:
+            # util.inet_pton could also handle, but this is faster
+            # since we've already determined the AF
             return socket.inet_ntoa(byts)
 
     @staticmethod
     def serialize(addr, protocol_version):
         if ':' in addr:
-            fam = socket.AF_INET6
-            if not have_ipv6_packing:
-                raise Exception(
-                    "IPv6 addresses cannot currently be handled on Windows")
-            return socket.inet_pton(fam, addr)
+            return util.inet_pton(socket.AF_INET6, addr)
         else:
-            fam = socket.AF_INET
+            # util.inet_pton could also handle, but this is faster
+            # since we've already determined the AF
             return socket.inet_aton(addr)
 
 
