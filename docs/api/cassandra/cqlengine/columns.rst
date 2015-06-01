@@ -70,15 +70,15 @@ Columns of all types are initialized by passing :class:`.Column` attributes to t
 
 .. autoclass:: Set
 
-.. autoclass:: SmallInt
+.. autoclass:: SmallInt(**kwargs)
 
 .. autoclass:: Text
 
-.. autoclass:: Time
+.. autoclass:: Time(**kwargs)
 
 .. autoclass:: TimeUUID(**kwargs)
 
-.. autoclass:: TinyInt
+.. autoclass:: TinyInt(**kwargs)
 
 .. autoclass:: UserDefinedType
 
