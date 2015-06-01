@@ -128,6 +128,8 @@
 
    .. autoattribute:: has_more_pages
 
+   .. autoattribute:: warnings
+
    .. automethod:: start_fetching_next_page()
 
    .. automethod:: add_callback(fn, *args, **kwargs)
