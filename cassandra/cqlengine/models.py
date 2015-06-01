@@ -434,7 +434,7 @@ class BaseModel(object):
                 klass = poly_base._get_model_by_discriminator_value(disc_key)
                 if klass is None:
                     raise PolyMorphicModelException(
-                        'unrecognized polymorphic key {0} for class {1}'.format(poly_key, poly_base.__name__)
+                        'unrecognized discriminator column {0} for class {1}'.format(poly_key, poly_base.__name__)
                     )
 
             if not issubclass(klass, cls):
@@ -442,7 +442,7 @@ class BaseModel(object):
                     '{0} is not a subclass of {1}'.format(klass.__name__, cls.__name__)
                 )
 
-            field_dict = dict((k, v) for (k, v) in field_dict.items() if k in klass._columns.keys())
+            field_dict = dict((k, v) for k, v in field_dict.items() if k in klass._columns.keys())
 
         else:
             klass = cls

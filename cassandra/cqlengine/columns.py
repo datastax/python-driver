@@ -563,7 +563,7 @@ class TimeUUID(UUID):
 
         epoch = datetime(1970, 1, 1, tzinfo=dt.tzinfo)
         offset = get_total_seconds(epoch.tzinfo.utcoffset(epoch)) if epoch.tzinfo else 0
-        timestamp = get_total_seconds(dt  - epoch) - offset
+        timestamp = get_total_seconds(dt - epoch) - offset
 
         node = None
         clock_seq = None
