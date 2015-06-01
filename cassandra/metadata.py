@@ -37,19 +37,44 @@ from cassandra.util import OrderedDict
 
 log = logging.getLogger(__name__)
 
-_keywords = set((
-    'select', 'from', 'where', 'and', 'key', 'insert', 'update', 'with',
-    'limit', 'using', 'use', 'count', 'set',
-    'begin', 'apply', 'batch', 'truncate', 'delete', 'in', 'create',
-    'keyspace', 'schema', 'columnfamily', 'table', 'index', 'on', 'drop',
-    'primary', 'into', 'values', 'timestamp', 'ttl', 'alter', 'add', 'type',
-    'compact', 'storage', 'order', 'by', 'asc', 'desc', 'clustering',
-    'token', 'writetime', 'map', 'list', 'to'
+cql_keywords = set((
+    'add', 'aggregate', 'all', 'allow', 'alter', 'and', 'apply', 'as', 'asc', 'ascii', 'authorize', 'batch', 'begin',
+    'bigint', 'blob', 'boolean', 'by', 'called', 'clustering', 'columnfamily', 'compact', 'contains', 'count',
+    'counter', 'create', 'custom', 'date', 'decimal', 'delete', 'desc', 'describe', 'distinct', 'double', 'drop',
+    'entries', 'execute', 'exists', 'filtering', 'finalfunc', 'float', 'from', 'frozen', 'full', 'function',
+    'functions', 'grant', 'if', 'in', 'index', 'inet', 'infinity', 'initcond', 'input', 'insert', 'int', 'into', 'json',
+    'key', 'keys', 'keyspace', 'keyspaces', 'language', 'limit', 'list', 'login', 'map', 'modify', 'nan', 'nologin',
+    'norecursive', 'nosuperuser', 'not', 'null', 'of', 'on', 'options', 'or', 'order', 'password', 'permission',
+    'permissions', 'primary', 'rename', 'replace', 'returns', 'revoke', 'role', 'roles', 'schema', 'select', 'set',
+    'sfunc', 'smallint', 'static', 'storage', 'stype', 'superuser', 'table', 'text', 'time', 'timestamp', 'timeuuid',
+    'tinyint', 'to', 'token', 'trigger', 'truncate', 'ttl', 'tuple', 'type', 'unlogged', 'update', 'use', 'user',
+    'users', 'using', 'uuid', 'values', 'varchar', 'varint', 'where', 'with', 'writetime'
 ))
+"""
+Set of keywords in CQL.
 
-_unreserved_keywords = set((
-    'key', 'clustering', 'ttl', 'compact', 'storage', 'type', 'values'
+Derived from .../cassandra/src/java/org/apache/cassandra/cql3/Cql.g
+"""
+
+cql_keywords_unreserved = set((
+    'aggregate', 'all', 'as', 'ascii', 'bigint', 'blob', 'boolean', 'called', 'clustering', 'compact', 'contains',
+    'count', 'counter', 'custom', 'date', 'decimal', 'distinct', 'double', 'exists', 'filtering', 'finalfunc', 'float',
+    'frozen', 'function', 'functions', 'inet', 'initcond', 'input', 'int', 'json', 'key', 'keys', 'keyspaces',
+    'language', 'list', 'login', 'map', 'nologin', 'nosuperuser', 'options', 'password', 'permission', 'permissions',
+    'returns', 'role', 'roles', 'sfunc', 'smallint', 'static', 'storage', 'stype', 'superuser', 'text', 'time',
+    'timestamp', 'timeuuid', 'tinyint', 'trigger', 'ttl', 'tuple', 'type', 'user', 'users', 'uuid', 'values', 'varchar',
+    'varint', 'writetime'
 ))
+"""
+Set of unreserved keywords in CQL.
+
+Derived from .../cassandra/src/java/org/apache/cassandra/cql3/Cql.g
+"""
+
+cql_keywords_reserved = cql_keywords - cql_keywords_unreserved
+"""
+Set of reserved keywords in CQL.
+"""
 
 
 class Metadata(object):
@@ -1383,7 +1408,7 @@ valid_cql3_word_re = re.compile(r'^[a-z][0-9a-z_]*$')
 def is_valid_name(name):
     if name is None:
         return False
-    if name.lower() in _keywords - _unreserved_keywords:
+    if name.lower() in cql_keywords_reserved:
         return False
     return valid_cql3_word_re.match(name) is not None
 

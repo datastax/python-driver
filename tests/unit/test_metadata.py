@@ -210,8 +210,8 @@ class NameEscapingTest(unittest.TestCase):
         self.assertEqual(is_valid_name('test1'), True)
         self.assertEqual(is_valid_name('1test1'), False)
 
-        non_valid_keywords = cassandra.metadata._keywords - cassandra.metadata._unreserved_keywords
-        for keyword in non_valid_keywords:
+        invalid_keywords = cassandra.metadata.cql_keywords - cassandra.metadata.cql_keywords_unreserved
+        for keyword in invalid_keywords:
             self.assertEqual(is_valid_name(keyword), False)
 
 
