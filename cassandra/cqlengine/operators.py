@@ -50,7 +50,7 @@ class BaseQueryOperator(UnicodeMixin):
         try:
             return cls.opmap[symbol.upper()]
         except KeyError:
-            raise QueryOperatorException("{} doesn't map to a QueryOperator".format(symbol))
+            raise QueryOperatorException("{0} doesn't map to a QueryOperator".format(symbol))
 
 
 class BaseWhereOperator(BaseQueryOperator):

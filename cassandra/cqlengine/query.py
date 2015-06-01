@@ -174,7 +174,7 @@ class BatchQuery(object):
         :param **kwargs: Named arguments to be passed to the callback at the time of execution
         """
         if not callable(fn):
-            raise ValueError("Value for argument 'fn' is {} and is not a callable object.".format(type(fn)))
+            raise ValueError("Value for argument 'fn' is {0} and is not a callable object.".format(type(fn)))
         self._callbacks.append((fn, args, kwargs))
 
     def execute(self):
@@ -197,7 +197,7 @@ class BatchQuery(object):
             else:
                 raise ValueError("Batch expects a long, a timedelta, or a datetime")
 
-            opener += ' USING TIMESTAMP {}'.format(ts)
+            opener += ' USING TIMESTAMP {0}'.format(ts)
 
         query_list = [opener]
         parameters = {}
@@ -453,7 +453,7 @@ class AbstractQuerySet(object):
         elif len(statement) == 2:
             return statement[0], statement[1]
         else:
-            raise QueryException("Can't parse '{}'".format(arg))
+            raise QueryException("Can't parse '{0}'".format(arg))
 
     def iff(self, *args, **kwargs):
         """Adds IF statements to queryset"""
@@ -463,7 +463,7 @@ class AbstractQuerySet(object):
         clone = copy.deepcopy(self)
         for operator in args:
             if not isinstance(operator, TransactionClause):
-                raise QueryException('{} is not a valid query operator'.format(operator))
+                raise QueryException('{0} is not a valid query operator'.format(operator))
             clone._transaction.append(operator)
 
         for col_name, val in kwargs.items():
@@ -476,7 +476,7 @@ class AbstractQuerySet(object):
                         raise QueryException("Virtual column 'pk__token' may only be compared to Token() values")
                     column = columns._PartitionKeysToken(self.model)
                 else:
-                    raise QueryException("Can't resolve column name: '{}'".format(col_name))
+                    raise QueryException("Can't resolve column name: '{0}'".format(col_name))
 
             if isinstance(val, Token):
                 if col_name != 'pk__token':
@@ -484,7 +484,7 @@ class AbstractQuerySet(object):
                 partition_columns = column.partition_columns
                 if len(partition_columns) != len(val.value):
                     raise QueryException(
-                        'Token() received {} arguments but model has {} partition keys'.format(
+                        'Token() received {0} arguments but model has {1} partition keys'.format(
                             len(val.value), len(partition_columns)))
                 val.set_columns(partition_columns)
 
@@ -512,7 +512,7 @@ class AbstractQuerySet(object):
         clone = copy.deepcopy(self)
         for operator in args:
             if not isinstance(operator, WhereClause):
-                raise QueryException('{} is not a valid query operator'.format(operator))
+                raise QueryException('{0} is not a valid query operator'.format(operator))
             clone._where.append(operator)
 
         for arg, val in kwargs.items():
@@ -528,7 +528,7 @@ class AbstractQuerySet(object):
                     column = columns._PartitionKeysToken(self.model)
                     quote_field = False
                 else:
-                    raise QueryException("Can't resolve column name: '{}'".format(col_name))
+                    raise QueryException("Can't resolve column name: '{0}'".format(col_name))
 
             if isinstance(val, Token):
                 if col_name != 'pk__token':
@@ -536,7 +536,7 @@ class AbstractQuerySet(object):
                 partition_columns = column.partition_columns
                 if len(partition_columns) != len(val.value):
                     raise QueryException(
-                        'Token() received {} arguments but model has {} partition keys'.format(
+                        'Token() received {0} arguments but model has {1} partition keys'.format(
                             len(val.value), len(partition_columns)))
                 val.set_columns(partition_columns)
 
@@ -580,7 +580,7 @@ class AbstractQuerySet(object):
         if len(self._result_cache) == 0:
             raise self.model.DoesNotExist
         elif len(self._result_cache) > 1:
-            raise self.model.MultipleObjectsReturned('{} objects found'.format(len(self._result_cache)))
+            raise self.model.MultipleObjectsReturned('{0} objects found'.format(len(self._result_cache)))
         else:
             return self[0]
 
@@ -628,7 +628,7 @@ class AbstractQuerySet(object):
 
         conditions = []
         for colname in colnames:
-            conditions.append('"{}" {}'.format(*self._get_ordering_condition(colname)))
+            conditions.append('"{0}" {1}'.format(*self._get_ordering_condition(colname)))
 
         clone = copy.deepcopy(self)
         clone._order.extend(conditions)
@@ -689,7 +689,7 @@ class AbstractQuerySet(object):
         missing_fields = [f for f in fields if f not in self.model._columns.keys()]
         if missing_fields:
             raise QueryException(
-                "Can't resolve fields {} in {}".format(
+                "Can't resolve fields {0} in {1}".format(
                     ', '.join(missing_fields), self.model.__name__))
 
         if action == 'defer':
@@ -821,12 +821,12 @@ class ModelQuerySet(AbstractQuerySet):
 
         column = self.model._columns.get(colname)
         if column is None:
-            raise QueryException("Can't resolve the column name: '{}'".format(colname))
+            raise QueryException("Can't resolve the column name: '{0}'".format(colname))
 
         # validate the column selection
         if not column.primary_key:
             raise QueryException(
-                "Can't order on '{}', can only order on (clustered) primary keys".format(colname))
+                "Can't order on '{0}', can only order on (clustered) primary keys".format(colname))
 
         pks = [v for k, v in self.model._columns.items() if v.primary_key]
         if column == pks[0]:
@@ -971,10 +971,10 @@ class ModelQuerySet(AbstractQuerySet):
             col = self.model._columns.get(col_name)
             # check for nonexistant columns
             if col is None:
-                raise ValidationError("{}.{} has no column named: {}".format(self.__module__, self.model.__name__, col_name))
+                raise ValidationError("{0}.{1} has no column named: {2}".format(self.__module__, self.model.__name__, col_name))
             # check for primary key update attempts
             if col.is_primary_key:
-                raise ValidationError("Cannot apply update to primary key '{}' for {}.{}".format(col_name, self.__module__, self.model.__name__))
+                raise ValidationError("Cannot apply update to primary key '{0}' for {1}.{2}".format(col_name, self.__module__, self.model.__name__))
 
             # we should not provide default values in this use case.
             val = col.validate(val)

@@ -16,6 +16,14 @@ from datetime import datetime
 
 from cassandra.cqlengine import UnicodeMixin, ValidationError
 
+import sys
+
+if sys.version_info >= (2, 7):
+    def get_total_seconds(td):
+        return td.total_seconds()
+else:
+    def get_total_seconds(td):
+        return 86400*td.days + td.seconds + td.microseconds/1e6
 
 class QueryValue(UnicodeMixin):
     """
@@ -23,7 +31,7 @@ class QueryValue(UnicodeMixin):
     be passed into .filter() keyword args
     """
 
-    format_string = '%({})s'
+    format_string = '%({0})s'
 
     def __init__(self, value):
         self.value = value
@@ -58,7 +66,7 @@ class MinTimeUUID(BaseQueryFunction):
     http://cassandra.apache.org/doc/cql3/CQL.html#timeuuidFun
     """
 
-    format_string = 'MinTimeUUID(%({})s)'
+    format_string = 'MinTimeUUID(%({0})s)'
 
     def __init__(self, value):
         """
@@ -71,8 +79,8 @@ class MinTimeUUID(BaseQueryFunction):
 
     def to_database(self, val):
         epoch = datetime(1970, 1, 1, tzinfo=val.tzinfo)
-        offset = epoch.tzinfo.utcoffset(epoch).total_seconds() if epoch.tzinfo else 0
-        return int(((val - epoch).total_seconds() - offset) * 1000)
+        offset = get_total_seconds(epoch.tzinfo.utcoffset(epoch)) if epoch.tzinfo else 0
+        return int((get_total_seconds(val - epoch) - offset) * 1000)
 
     def update_context(self, ctx):
         ctx[str(self.context_id)] = self.to_database(self.value)
@@ -85,7 +93,7 @@ class MaxTimeUUID(BaseQueryFunction):
     http://cassandra.apache.org/doc/cql3/CQL.html#timeuuidFun
     """
 
-    format_string = 'MaxTimeUUID(%({})s)'
+    format_string = 'MaxTimeUUID(%({0})s)'
 
     def __init__(self, value):
         """
@@ -125,8 +133,8 @@ class Token(BaseQueryFunction):
         return len(self.value)
 
     def __unicode__(self):
-        token_args = ', '.join('%({})s'.format(self.context_id + i) for i in range(self.get_context_size()))
-        return "token({})".format(token_args)
+        token_args = ', '.join('%({0})s'.format(self.context_id + i) for i in range(self.get_context_size()))
+        return "token({0})".format(token_args)
 
     def update_context(self, ctx):
         for i, (col, val) in enumerate(zip(self._columns, self.value)):

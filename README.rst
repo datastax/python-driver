@@ -8,7 +8,7 @@ A modern, `feature-rich <https://github.com/datastax/python-driver#features>`_ a
 
 The driver supports Python 2.6, 2.7, 3.3, and 3.4*.
 
-\* cqlengine component presently supports Python 2.7+
+\* cqlengine component presently supports Python 2.6+
 
 Feedback Requested
 ------------------
