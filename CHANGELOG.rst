@@ -1,4 +1,4 @@
-2.6.0
+2.6.0rc1
 =====
 
 This release adds support for Cassandra 2.2 features, including version
