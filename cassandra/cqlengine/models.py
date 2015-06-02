@@ -433,12 +433,12 @@ class BaseModel(object):
                 poly_base._discover_polymorphic_submodels()
                 klass = poly_base._get_model_by_discriminator_value(disc_key)
                 if klass is None:
-                    raise PolyMorphicModelException(
-                        'unrecognized discriminator column {0} for class {1}'.format(poly_key, poly_base.__name__)
+                    raise PolymorphicModelException(
+                        'unrecognized discriminator column {0} for class {1}'.format(disc_key, poly_base.__name__)
                     )
 
             if not issubclass(klass, cls):
-                raise PolyMorphicModelException(
+                raise PolymorphicModelException(
                     '{0} is not a subclass of {1}'.format(klass.__name__, cls.__name__)
                 )
 
