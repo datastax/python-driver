@@ -68,7 +68,7 @@ Model
     .. attribute:: __replicate_on_write__
 
 
-    *Model presently supports specifying compaction options via class attributes. 
+    *Model presently supports specifying compaction options via class attributes.
     cqlengine will only use your compaction options if you have a strategy set.
     When a table is synced, it will be altered to match the compaction options set on your table.
     This means that if you are changing settings manually they will be changed back on resync.*
@@ -139,7 +139,7 @@ Model
         object is determined by its primary key(s). And please note using this flag
         would incur performance cost.
 
-        if the insertion didn't applied, a LWTException exception would be raised.
+        If the insertion isn't applied, a :class:`~cassandra.cqlengine.query.LWTException` is raised.
 
         .. code-block:: python
 
@@ -161,7 +161,7 @@ Model
         Simply specify the column(s) and the expected value(s).  As with if_not_exists,
         this incurs a performance cost.
 
-        If the insertion isn't applied, a LWTException is raised
+        If the insertion isn't applied, a :class:`~cassandra.cqlengine.query.LWTException` is raised.
 
         .. code-block:: python
 
@@ -169,7 +169,8 @@ Model
             try:
                  t.iff(count=5).update('other text')
             except LWTException as e:
-                # handle failure
+                # handle failure case
+                print e.existing # existing object
 
     .. automethod:: get
 
