@@ -1019,11 +1019,6 @@ def read_binary_string(f):
     return contents
 
 
-def write_binary_string(f, s):
-    write_short(f, len(s))
-    f.write(s)
-
-
 def write_string(f, s):
     if isinstance(s, six.text_type):
         s = s.encode('utf8')
@@ -1080,7 +1075,7 @@ def read_bytesmap(f):
     bytesmap = {}
     for _ in range(numpairs):
         k = read_string(f)
-        bytesmap[k] = read_binary_string(f)
+        bytesmap[k] = read_value(f)
     return bytesmap
 
 
@@ -1088,7 +1083,7 @@ def write_bytesmap(f, bytesmap):
     write_short(f, len(bytesmap))
     for k, v in bytesmap.items():
         write_string(f, k)
-        write_binary_string(f, v)
+        write_value(f, v)
 
 
 def read_stringmultimap(f):
