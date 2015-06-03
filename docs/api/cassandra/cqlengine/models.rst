@@ -48,7 +48,6 @@ Model
     See the `list of supported table properties for more information
     <http://www.datastax.com/documentation/cql/3.1/cql/cql_reference/tabProp.html>`_.
 
-
     .. attribute:: __options__
 
         For example:
@@ -89,7 +88,7 @@ Model
         object is determined by its primary key(s). And please note using this flag
         would incur performance cost.
 
-        if the insertion didn't applied, a LWTException exception would be raised.
+        If the insertion isn't applied, a :class:`~cassandra.cqlengine.query.LWTException` is raised.
 
         .. code-block:: python
 
@@ -111,7 +110,7 @@ Model
         Simply specify the column(s) and the expected value(s).  As with if_not_exists,
         this incurs a performance cost.
 
-        If the insertion isn't applied, a LWTException is raised
+        If the insertion isn't applied, a :class:`~cassandra.cqlengine.query.LWTException` is raised.
 
         .. code-block:: python
 
@@ -119,7 +118,8 @@ Model
             try:
                  t.iff(count=5).update('other text')
             except LWTException as e:
-                # handle failure
+                # handle failure case
+                print e.existing # existing object
 
     .. automethod:: get
 

@@ -29,8 +29,9 @@ from cassandra.cqlengine.statements import TransactionClause
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration import CASSANDRA_VERSION
 
+
 class TestTransactionModel(Model):
-    id = columns.UUID(primary_key=True, default=lambda:uuid4())
+    id = columns.UUID(primary_key=True, default=uuid4)
     count = columns.Integer()
     text = columns.Text(required=False)
 
@@ -71,7 +72,14 @@ class TestTransaction(BaseCassEngTestCase):
         t = TestTransactionModel.create(text='blah blah')
         t.text = 'new blah'
         t = t.iff(text='something wrong')
-        self.assertRaises(LWTException, t.save)
+
+        with self.assertRaises(LWTException) as assertion:
+            t.save()
+
+        self.assertEqual(assertion.exception.existing, {
+            'text': 'blah blah',
+            '[applied]': False,
+        })
 
     def test_blind_update(self):
         t = TestTransactionModel.create(text='blah blah')
@@ -89,7 +97,13 @@ class TestTransaction(BaseCassEngTestCase):
         t.text = 'something else'
         uid = t.id
         qs = TestTransactionModel.objects(id=uid).iff(text='Not dis!')
-        self.assertRaises(LWTException, qs.update, text='this will never work')
+        with self.assertRaises(LWTException) as assertion:
+            qs.update(text='this will never work')
+
+        self.assertEqual(assertion.exception.existing, {
+            'text': 'blah blah',
+            '[applied]': False,
+        })
 
     def test_transaction_clause(self):
         tc = TransactionClause('some_value', 23)
@@ -109,7 +123,14 @@ class TestTransaction(BaseCassEngTestCase):
 
         b = BatchQuery()
         updated.batch(b).iff(count=6).update(text='and another thing')
-        self.assertRaises(LWTException, b.execute)
+        with self.assertRaises(LWTException) as assertion:
+            b.execute()
+
+        self.assertEqual(assertion.exception.existing, {
+            'id': id,
+            'count': 5,
+            '[applied]': False,
+        })
 
         updated = TestTransactionModel.objects(id=id).first()
         self.assertEqual(updated.text, 'something else')
