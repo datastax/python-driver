@@ -106,9 +106,9 @@
 
    .. autoattribute:: encoder
 
-   .. automethod:: execute(statement[, parameters][, timeout][, trace])
+   .. automethod:: execute(statement[, parameters][, timeout][, trace][, custom_payload])
 
-   .. automethod:: execute_async(statement[, parameters][, trace])
+   .. automethod:: execute_async(statement[, parameters][, trace][, custom_payload])
 
    .. automethod:: prepare(statement)
 
