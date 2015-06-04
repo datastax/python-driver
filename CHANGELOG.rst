@@ -1,5 +1,6 @@
 2.6.0rc1
 =====
+June 4, 2015
 
 This release adds support for Cassandra 2.2 features, including version
 4 of the native protocol.
@@ -15,7 +16,7 @@ Features
 * Support new types in C* 2.2: date, time, smallint, tinyint (PYTHON-245, 295)
 * cqle: add Double column type and remove Float overload (PYTHON-246)
 * Use partition key column information in prepared response for protocol v4+ (PYTHON-277)
-* Support message custom payloads in protocol v4+ (PYTHON-280)
+* Support message custom payloads in protocol v4+ (PYTHON-280, PYTHON-329)
 * Deprecate refresh_schema and replace with functions for specific entities (PYTHON-291)
 * Save trace id even when trace complete times out (PYTHON-302)
 * Warn when registering client UDT class for protocol < v3 (PYTHON-305)
