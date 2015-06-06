@@ -1052,6 +1052,14 @@ class DowngradingConsistencyRetryPolicyTest(unittest.TestCase):
         self.assertEqual(retry, RetryPolicy.RETHROW)
         self.assertEqual(consistency, None)
 
+	    # On these type of writes failures should not be ignored
+        # if received_responses is 0
+        for write_type in (WriteType.SIMPLE, WriteType.BATCH, WriteType.COUNTER):
+            retry, consistency = policy.on_write_timeout(
+                query=None, consistency=ONE, write_type=write_type,
+                required_responses=1, received_responses=0, retry_num=0)
+            self.assertEqual(retry, RetryPolicy.RETHROW)
+
         # ignore failures on these types of writes
         for write_type in (WriteType.SIMPLE, WriteType.BATCH, WriteType.COUNTER):
             retry, consistency = policy.on_write_timeout(
