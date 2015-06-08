@@ -23,17 +23,14 @@ import time
 from threading import Lock
 
 from cassandra.cluster import Cluster
-from cassandra.connection import (Connection, HEADER_DIRECTION_TO_CLIENT,
-                                  HEADER_DIRECTION_FROM_CLIENT, ProtocolError,
-                                  locally_supported_compressions, ConnectionHeartbeat)
-from cassandra.marshal import uint8_pack, uint32_pack
+from cassandra.connection import (Connection, HEADER_DIRECTION_TO_CLIENT, ProtocolError,
+                                  locally_supported_compressions, ConnectionHeartbeat, _Frame)
+from cassandra.marshal import uint8_pack, uint32_pack, int32_pack
 from cassandra.protocol import (write_stringmultimap, write_int, write_string,
                                 SupportedMessage)
 
 
 class ConnectionTest(unittest.TestCase):
-
-    protocol_version = 2
 
     def make_connection(self):
         c = Connection('1.2.3.4')
@@ -41,13 +38,23 @@ class ConnectionTest(unittest.TestCase):
         c._socket.send.side_effect = lambda x: len(x)
         return c
 
-    def make_header_prefix(self, message_class, version=2, stream_id=0):
-        return six.binary_type().join(map(uint8_pack, [
-            0xff & (HEADER_DIRECTION_TO_CLIENT | version),
-            0,  # flags (compression)
-            stream_id,
-            message_class.opcode  # opcode
-        ]))
+    def make_header_prefix(self, message_class, version=Connection.protocol_version, stream_id=0):
+        if Connection.protocol_version < 3:
+            return six.binary_type().join(map(uint8_pack, [
+                0xff & (HEADER_DIRECTION_TO_CLIENT | version),
+                0,  # flags (compression)
+                stream_id,
+                message_class.opcode  # opcode
+            ]))
+        else:
+            return six.binary_type().join(map(uint8_pack, [
+                0xff & (HEADER_DIRECTION_TO_CLIENT | version),
+                0,  # flags (compression)
+                0,  # MSB for v3+ stream
+                stream_id,
+                message_class.opcode  # opcode
+            ]))
+
 
     def make_options_body(self):
         options_buf = BytesIO()
@@ -72,31 +79,12 @@ class ConnectionTest(unittest.TestCase):
         c.defunct = Mock()
 
         # read in a SupportedMessage response
-        header = self.make_header_prefix(SupportedMessage, version=0x04)
+        header = self.make_header_prefix(SupportedMessage, version=0x7f)
         options = self.make_options_body()
         message = self.make_msg(header, options)
-        c.process_msg(message, len(message) - 8)
-
-        # make sure it errored correctly
-        c.defunct.assert_called_once_with(ANY)
-        args, kwargs = c.defunct.call_args
-        self.assertIsInstance(args[0], ProtocolError)
-
-    def test_bad_header_direction(self, *args):
-        c = self.make_connection()
-        c._callbacks = Mock()
-        c.defunct = Mock()
-
-        # read in a SupportedMessage response
-        header = six.binary_type().join(uint8_pack(i) for i in (
-            0xff & (HEADER_DIRECTION_FROM_CLIENT | self.protocol_version),
-            0,  # flags (compression)
-            0,
-            SupportedMessage.opcode  # opcode
-        ))
-        options = self.make_options_body()
-        message = self.make_msg(header, options)
-        c.process_msg(message, len(message) - 8)
+        c._iobuf = BytesIO()
+        c._iobuf.write(message)
+        c.process_io_buffer()
 
         # make sure it errored correctly
         c.defunct.assert_called_once_with(ANY)
@@ -110,9 +98,10 @@ class ConnectionTest(unittest.TestCase):
 
         # read in a SupportedMessage response
         header = self.make_header_prefix(SupportedMessage)
-        options = self.make_options_body()
-        message = self.make_msg(header, options)
-        c.process_msg(message, -13)
+        message = header + int32_pack(-13)
+        c._iobuf = BytesIO()
+        c._iobuf.write(message)
+        c.process_io_buffer()
 
         # make sure it errored correctly
         c.defunct.assert_called_once_with(ANY)
@@ -135,8 +124,7 @@ class ConnectionTest(unittest.TestCase):
         })
         options = options_buf.getvalue()
 
-        message = self.make_msg(header, options)
-        c.process_msg(message, len(message) - 8)
+        c.process_msg(_Frame(version=4, flags=0, stream=0, opcode=SupportedMessage.opcode, body_offset=9, end_pos=9 + len(options)), options)
 
         # make sure it errored correctly
         c.defunct.assert_called_once_with(ANY)
@@ -155,8 +143,6 @@ class ConnectionTest(unittest.TestCase):
         locally_supported_compressions['snappy'] = ('snappycompress', 'snappydecompress')
 
         # read in a SupportedMessage response
-        header = self.make_header_prefix(SupportedMessage)
-
         options_buf = BytesIO()
         write_stringmultimap(options_buf, {
             'CQL_VERSION': ['3.0.3'],
@@ -164,8 +150,7 @@ class ConnectionTest(unittest.TestCase):
         })
         options = options_buf.getvalue()
 
-        message = self.make_msg(header, options)
-        c.process_msg(message, len(message) - 8)
+        c.process_msg(_Frame(version=4, flags=0, stream=0, opcode=SupportedMessage.opcode, body_offset=9, end_pos=9 + len(options)), options)
 
         self.assertEqual(c.decompressor, locally_supported_compressions['lz4'][1])
 
@@ -192,8 +177,7 @@ class ConnectionTest(unittest.TestCase):
         })
         options = options_buf.getvalue()
 
-        message = self.make_msg(header, options)
-        c.process_msg(message, len(message) - 8)
+        c.process_msg(_Frame(version=4, flags=0, stream=0, opcode=SupportedMessage.opcode, body_offset=9, end_pos=9 + len(options)), options)
 
         # make sure it errored correctly
         c.defunct.assert_called_once_with(ANY)
@@ -223,8 +207,7 @@ class ConnectionTest(unittest.TestCase):
         })
         options = options_buf.getvalue()
 
-        message = self.make_msg(header, options)
-        c.process_msg(message, len(message) - 8)
+        c.process_msg(_Frame(version=4, flags=0, stream=0, opcode=SupportedMessage.opcode, body_offset=9, end_pos=9 + len(options)), options)
 
         self.assertEqual(c.decompressor, locally_supported_compressions['snappy'][1])
 

@@ -53,7 +53,9 @@ class InternalError(Exception):
 
 ColumnMetadata = namedtuple("ColumnMetadata", ['keyspace_name', 'table_name', 'name', 'type'])
 
-HEADER_DIRECTION_FROM_CLIENT = 0x00
+MIN_SUPPORTED_VERSION = 1
+MAX_SUPPORTED_VERSION = 4
+
 HEADER_DIRECTION_TO_CLIENT = 0x80
 HEADER_DIRECTION_MASK = 0x80
 
@@ -967,7 +969,7 @@ def write_header(f, version, flags, stream_id, opcode, length):
     Write a CQL protocol frame header.
     """
     pack = v3_header_pack if version >= 3 else header_pack
-    f.write(pack(version | HEADER_DIRECTION_FROM_CLIENT, flags, stream_id, opcode))
+    f.write(pack(version, flags, stream_id, opcode))
     write_int(f, length)
 
 

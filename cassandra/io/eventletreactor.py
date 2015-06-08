@@ -48,7 +48,6 @@ class EventletConnection(Connection):
     An implementation of :class:`.Connection` that utilizes ``eventlet``.
     """
 
-    _total_reqd_bytes = 0
     _read_watcher = None
     _write_watcher = None
     _socket = None

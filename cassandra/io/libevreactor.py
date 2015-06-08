@@ -215,7 +215,6 @@ class LibevConnection(Connection):
     """
     _libevloop = None
     _write_watcher_is_active = False
-    _total_reqd_bytes = 0
     _read_watcher = None
     _write_watcher = None
     _socket = None

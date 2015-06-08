@@ -47,7 +47,7 @@ from cassandra import (ConsistencyLevel, AuthenticationFailed,
                        InvalidRequest, OperationTimedOut,
                        UnsupportedOperation, Unauthorized)
 from cassandra.connection import (ConnectionException, ConnectionShutdown,
-                                  ConnectionHeartbeat)
+                                  ConnectionHeartbeat, ProtocolVersionUnsupported)
 from cassandra.cqltypes import UserType
 from cassandra.encoder import Encoder
 from cassandra.protocol import (QueryMessage, ResultMessage,
@@ -60,7 +60,7 @@ from cassandra.protocol import (QueryMessage, ResultMessage,
                                 IsBootstrappingErrorMessage,
                                 BatchMessage, RESULT_KIND_PREPARED,
                                 RESULT_KIND_SET_KEYSPACE, RESULT_KIND_ROWS,
-                                RESULT_KIND_SCHEMA_CHANGE)
+                                RESULT_KIND_SCHEMA_CHANGE, MIN_SUPPORTED_VERSION)
 from cassandra.metadata import Metadata, protect_name
 from cassandra.policies import (TokenAwarePolicy, DCAwareRoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
@@ -220,9 +220,14 @@ class Cluster(object):
     server will be automatically used.
     """
 
-    protocol_version = 2
+    protocol_version = 4
     """
-    The version of the native protocol to use.
+    The maximum version of the native protocol to use.
+
+    The driver will automatically downgrade version based on a negotiation with
+    the server, but it is most efficient to set this to the maximum supported
+    by your version of Cassandra. Setting this will also prevent conflicting
+    versions negotiated if your cluster is upgraded.
 
     Version 2 of the native protocol adds support for lightweight transactions,
     batch operations, and automatic query paging. The v2 protocol is
@@ -232,6 +237,10 @@ class Cluster(object):
     client-side timestamps (see :attr:`.Session.use_client_timestamp`),
     serial consistency levels for :class:`~.BatchStatement`, and an
     improved connection pool.
+
+    Version 4 of the native protocol adds a number of new types, server warnings,
+    new failure messages, and custom payloads. Details in the
+    `project docs <https://github.com/apache/cassandra/blob/trunk/doc/native_protocol_v4.spec>`_
 
     The following table describes the native protocol versions that
     are supported by each version of Cassandra:
@@ -244,6 +253,8 @@ class Cluster(object):
     | 2.0               | 1, 2              |
     +-------------------+-------------------+
     | 2.1               | 1, 2, 3           |
+    +-------------------+-------------------+
+    | 2.2               | 1, 2, 3, 4        |
     +-------------------+-------------------+
     """
 
@@ -495,7 +506,7 @@ class Cluster(object):
                  ssl_options=None,
                  sockopts=None,
                  cql_version=None,
-                 protocol_version=2,
+                 protocol_version=4,
                  executor_threads=2,
                  max_schema_agreement_wait=10,
                  control_connection_timeout=2.0,
@@ -787,6 +798,15 @@ class Cluster(object):
         kwargs_dict['user_type_map'] = self._user_types
 
         return kwargs_dict
+
+    def protocol_downgrade(self, host_addr, previous_version):
+        new_version = previous_version - 1
+        if new_version < self.protocol_version:
+            if new_version >= MIN_SUPPORTED_VERSION:
+                log.warning("Downgrading core protocol version from %d to %d for %s", self.protocol_version, new_version, host_addr)
+                self.protocol_version = new_version
+            else:
+                raise Exception("Cannot downgrade protocol version (%d) below minimum supported version: %d" % (new_version, MIN_SUPPORTED_VERSION))
 
     def connect(self, keyspace=None):
         """
@@ -1503,7 +1523,6 @@ class Session(object):
     _pools = None
     _load_balancer = None
     _metrics = None
-    _protocol_version = None
 
     def __init__(self, cluster, hosts):
         self.cluster = cluster
@@ -2094,7 +2113,13 @@ class ControlConnection(object):
         node/token and schema metadata.
         """
         log.debug("[control connection] Opening new connection to %s", host)
-        connection = self._cluster.connection_factory(host.address, is_control_connection=True)
+
+        while True:
+            try:
+                connection = self._cluster.connection_factory(host.address, is_control_connection=True)
+                break
+            except ProtocolVersionUnsupported as e:
+                self._cluster.protocol_downgrade(host.address, e.startup_version)
 
         log.debug("[control connection] Established new connection %r, "
                   "registering watchers and refreshing schema and topology",

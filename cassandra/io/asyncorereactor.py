@@ -135,7 +135,6 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
 
     _loop = None
 
-    _total_reqd_bytes = 0
     _writable = False
     _readable = False
 
