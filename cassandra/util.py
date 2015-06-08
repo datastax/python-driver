@@ -480,13 +480,6 @@ try:
     from blist import sortedset
 except ImportError:
 
-    import warnings
-
-    warnings.warn(
-        "The blist library is not available, so a pure python list-based set will "
-        "be used in place of blist.sortedset for set collection values. "
-        "You can find the blist library here: https://pypi.python.org/pypi/blist/")
-
     from bisect import bisect_left
 
     class sortedset(object):
