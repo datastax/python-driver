@@ -201,7 +201,7 @@ murmur3(PyObject *self, PyObject *args)
 
     // TODO handle x86 version?
     result = MurmurHash3_x64_128((void *)key, len, seed);
-    return (PyObject *) PyLong_FromLong((long int)result);
+    return (PyObject *) PyLong_FromLongLong(result);
 }
 
 static PyMethodDef murmur3_methods[] = {
