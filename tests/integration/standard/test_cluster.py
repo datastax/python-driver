@@ -336,10 +336,7 @@ class ClusterTests(unittest.TestCase):
 
             # cluster agreement wait exceeded
             c = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=agreement_timeout)
-            start_time = time.time()
-            s = c.connect()
-            end_time = time.time()
-            self.assertGreaterEqual(end_time - start_time, agreement_timeout)
+            c.connect()
             self.assertTrue(c.metadata.keyspaces)
 
             # cluster agreement wait used for refresh
