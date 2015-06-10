@@ -558,30 +558,10 @@ class TimeUUID(UUID):
         :type dt: datetime
         :return:
         """
-        global _last_timestamp
-
-        epoch = datetime(1970, 1, 1, tzinfo=dt.tzinfo)
-        offset = epoch.tzinfo.utcoffset(epoch).total_seconds() if epoch.tzinfo else 0
-        timestamp = (dt - epoch).total_seconds() - offset
-
-        node = None
-        clock_seq = None
-
-        nanoseconds = int(timestamp * 1e9)
-        timestamp = int(nanoseconds // 100) + 0x01b21dd213814000
-
-        if clock_seq is None:
-            import random
-            clock_seq = random.randrange(1 << 14)  # instead of stable storage
-        time_low = timestamp & 0xffffffff
-        time_mid = (timestamp >> 32) & 0xffff
-        time_hi_version = (timestamp >> 48) & 0x0fff
-        clock_seq_low = clock_seq & 0xff
-        clock_seq_hi_variant = (clock_seq >> 8) & 0x3f
-        if node is None:
-            node = getnode()
-        return pyUUID(fields=(time_low, time_mid, time_hi_version,
-                              clock_seq_hi_variant, clock_seq_low, node), version=1)
+        msg = "cqlengine.columns.TimeUUID.from_datetime is deprecated. Use cassandra.util.uuid_from_time instead."
+        warnings.warn(msg, DeprecationWarning)
+        log.warning(msg)
+        return util.uuid_from_time(dt)
 
 
 class Boolean(Column):

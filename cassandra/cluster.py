@@ -61,7 +61,7 @@ from cassandra.protocol import (QueryMessage, ResultMessage,
                                 BatchMessage, RESULT_KIND_PREPARED,
                                 RESULT_KIND_SET_KEYSPACE, RESULT_KIND_ROWS,
                                 RESULT_KIND_SCHEMA_CHANGE)
-from cassandra.metadata import Metadata, protect_name
+from cassandra.metadata import Metadata, protect_name, murmur3
 from cassandra.policies import (TokenAwarePolicy, DCAwareRoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy)
@@ -173,7 +173,9 @@ def _shutdown_cluster(cluster):
 import platform
 if platform.python_implementation() == 'CPython':
     def default_lbp_factory():
-        return TokenAwarePolicy(DCAwareRoundRobinPolicy())
+        if murmur3 is not None:
+            return TokenAwarePolicy(DCAwareRoundRobinPolicy())
+        return DCAwareRoundRobinPolicy()
 else:
     def default_lbp_factory():
         return DCAwareRoundRobinPolicy()
