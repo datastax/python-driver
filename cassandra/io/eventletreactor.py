@@ -24,11 +24,9 @@ from eventlet.queue import Queue
 from functools import partial
 import logging
 import os
+from six.moves import xrange
 from threading import Event
 
-from six.moves import xrange
-
-from cassandra import OperationTimedOut
 from cassandra.connection import Connection, ConnectionShutdown
 from cassandra.protocol import RegisterMessage
 
@@ -51,7 +49,9 @@ class EventletConnection(Connection):
     _total_reqd_bytes = 0
     _read_watcher = None
     _write_watcher = None
-    _socket = None
+
+    _socket_impl = eventlet.green.socket
+    _ssl_impl = eventlet.green.ssl
 
     @classmethod
     def initialize_reactor(cls):
@@ -66,29 +66,7 @@ class EventletConnection(Connection):
         self._callbacks = {}
         self._push_watchers = defaultdict(set)
 
-        sockerr = None
-        addresses = socket.getaddrinfo(
-            self.host, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM
-        )
-        for (af, socktype, proto, canonname, sockaddr) in addresses:
-            try:
-                self._socket = socket.socket(af, socktype, proto)
-                self._socket.settimeout(1.0)
-                self._socket.connect(sockaddr)
-                sockerr = None
-                break
-            except socket.error as err:
-                sockerr = err
-        if sockerr:
-            raise socket.error(
-                sockerr.errno,
-                "Tried connecting to %s. Last error: %s" % (
-                    [a[4] for a in addresses], sockerr.strerror)
-            )
-
-        if self.sockopts:
-            for args in self.sockopts:
-                self._socket.setsockopt(*args)
+        self._connect_socket()
 
         self._read_watcher = eventlet.spawn(lambda: self.handle_read())
         self._write_watcher = eventlet.spawn(lambda: self.handle_write())
