@@ -36,10 +36,11 @@ class BaseCompactionTest(BaseCassEngTestCase):
         # key is a normal_key, converted to
         # __compaction_key__
 
-        key = "__compaction_{}__".format(key)
+        key = "__compaction_{0}__".format(key)
 
-        with patch.object(self.model, key, 10), self.assertRaises(CQLEngineException):
-            get_compaction_options(self.model)
+        with patch.object(self.model, key, 10):
+            with self.assertRaises(CQLEngineException):
+                get_compaction_options(self.model)
 
 
 class SizeTieredCompactionTest(BaseCompactionTest):

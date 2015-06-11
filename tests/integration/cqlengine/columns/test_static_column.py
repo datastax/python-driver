@@ -12,7 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from unittest import skipUnless
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
+
 from uuid import uuid4
 
 from cassandra.cqlengine import columns
@@ -33,19 +37,21 @@ class TestStaticModel(Model):
     text = columns.Text()
 
 
-@skipUnless(STATIC_SUPPORTED, "only runs against the cql3 protocol v2.0")
 class TestStaticColumn(BaseCassEngTestCase):
+
+    def setUp(cls):
+        if not STATIC_SUPPORTED:
+            raise unittest.SkipTest("only runs against the cql3 protocol v2.0")
+        super(TestStaticColumn, cls).setUp()
 
     @classmethod
     def setUpClass(cls):
-        super(TestStaticColumn, cls).setUpClass()
         drop_table(TestStaticModel)
         if STATIC_SUPPORTED:  # setup and teardown run regardless of skip
             sync_table(TestStaticModel)
 
     @classmethod
     def tearDownClass(cls):
-        super(TestStaticColumn, cls).tearDownClass()
         drop_table(TestStaticModel)
 
     def test_mixed_updates(self):

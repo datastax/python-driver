@@ -11,10 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 
 import mock
-
-from unittest import skipUnless
 import warnings
 
 from cassandra.cqlengine import CACHING_ALL, CACHING_NONE
@@ -310,7 +312,7 @@ class NonModelFailureTest(BaseCassEngTestCase):
             sync_table(self.FakeModel)
 
 
-@skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
+@unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
 def test_static_columns():
     class StaticModel(Model):
         id = columns.Integer(primary_key=True)

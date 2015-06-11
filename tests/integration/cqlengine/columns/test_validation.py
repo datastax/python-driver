@@ -12,9 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
+
 from datetime import datetime, timedelta, date, tzinfo
 from decimal import Decimal as D
-from unittest import TestCase, SkipTest
 from uuid import uuid4, uuid1
 
 from cassandra import InvalidRequest
@@ -46,12 +50,10 @@ class TestDatetime(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(TestDatetime, cls).setUpClass()
         sync_table(cls.DatetimeTest)
 
     @classmethod
     def tearDownClass(cls):
-        super(TestDatetime, cls).tearDownClass()
         drop_table(cls.DatetimeTest)
 
     def test_datetime_io(self):
@@ -95,7 +97,6 @@ class TestBoolDefault(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(TestBoolDefault, cls).setUpClass()
         sync_table(cls.BoolDefaultValueTest)
 
     def test_default_is_set(self):
@@ -112,7 +113,6 @@ class TestBoolValidation(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(TestBoolValidation, cls).setUpClass()
         sync_table(cls.BoolValidationTest)
 
     def test_validation_preserves_none(self):
@@ -129,12 +129,10 @@ class TestVarInt(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(TestVarInt, cls).setUpClass()
         sync_table(cls.VarIntTest)
 
     @classmethod
     def tearDownClass(cls):
-        super(TestVarInt, cls).tearDownClass()
         sync_table(cls.VarIntTest)
 
     def test_varint_io(self):
@@ -155,14 +153,12 @@ class TestDate(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         if PROTOCOL_VERSION < 4:
-            raise SkipTest("Protocol v4 datatypes require native protocol 4+, currently using: {0}".format(PROTOCOL_VERSION))
+            raise unittest.SkipTest("Protocol v4 datatypes require native protocol 4+, currently using: {0}".format(PROTOCOL_VERSION))
 
-        super(TestDate, cls).setUpClass()
         sync_table(cls.DateTest)
 
     @classmethod
     def tearDownClass(cls):
-        super(TestDate, cls).tearDownClass()
         drop_table(cls.DateTest)
 
     def test_date_io(self):
@@ -195,12 +191,10 @@ class TestDecimal(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(TestDecimal, cls).setUpClass()
         sync_table(cls.DecimalTest)
 
     @classmethod
     def tearDownClass(cls):
-        super(TestDecimal, cls).tearDownClass()
         drop_table(cls.DecimalTest)
 
     def test_decimal_io(self):
@@ -220,12 +214,10 @@ class TestUUID(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(TestUUID, cls).setUpClass()
         sync_table(cls.UUIDTest)
 
     @classmethod
     def tearDownClass(cls):
-        super(TestUUID, cls).tearDownClass()
         drop_table(cls.UUIDTest)
 
     def test_uuid_str_with_dashes(self):
@@ -255,12 +247,10 @@ class TestTimeUUID(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(TestTimeUUID, cls).setUpClass()
         sync_table(cls.TimeUUIDTest)
 
     @classmethod
     def tearDownClass(cls):
-        super(TestTimeUUID, cls).tearDownClass()
         drop_table(cls.TimeUUIDTest)
 
     def test_timeuuid_io(self):
@@ -361,10 +351,10 @@ class TestPythonDoesntDieWhenExtraFieldIsInCassandra(BaseCassEngTestCase):
         drop_table(self.TestModel)
         sync_table(self.TestModel)
         self.TestModel.create()
-        execute("ALTER TABLE {} add blah int".format(self.TestModel.column_family_name(include_keyspace=True)))
+        execute("ALTER TABLE {0} add blah int".format(self.TestModel.column_family_name(include_keyspace=True)))
         self.TestModel.objects().all()
 
-class TestTimeUUIDFromDatetime(TestCase):
+class TestTimeUUIDFromDatetime(BaseCassEngTestCase):
     def test_conversion_specific_date(self):
         dt = datetime(1981, 7, 11, microsecond=555000)
 

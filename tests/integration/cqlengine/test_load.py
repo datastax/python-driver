@@ -11,22 +11,26 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 
 import gc
 import os
 import resource
-from unittest import skipUnless
 
 from cassandra.cqlengine import columns
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.management import sync_table
+
 
 class LoadTest(Model):
     k = columns.Integer(primary_key=True)
     v = columns.Integer()
 
 
-@skipUnless("LOADTEST" in os.environ, "LOADTEST not on")
+@unittest.skipUnless("LOADTEST" in os.environ, "LOADTEST not on")
 def test_lots_of_queries():
     sync_table(LoadTest)
     import objgraph

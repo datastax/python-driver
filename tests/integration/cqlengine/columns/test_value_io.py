@@ -11,12 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 
 from datetime import datetime, timedelta, time
 from decimal import Decimal
 from uuid import uuid1, uuid4, UUID
 import six
-import unittest
 
 from cassandra.cqlengine import columns
 from cassandra.cqlengine.management import sync_table
@@ -58,7 +61,7 @@ class BaseColumnIOTest(BaseCassEngTestCase):
 
         # create a table with the given column
         class IOTestModel(Model):
-            table_name = cls.column.db_type + "_io_test_model_{}".format(uuid4().hex[:8])
+            table_name = cls.column.db_type + "_io_test_model_{0}".format(uuid4().hex[:8])
             pkey = cls.column(primary_key=True)
             data = cls.column()
 
@@ -150,22 +153,6 @@ class TestDateTime(BaseColumnIOTest):
     data_val = now + timedelta(days=1)
 
 
-class TestDate(BaseColumnIOTest):
-
-    @classmethod
-    def setUpClass(cls):
-        if PROTOCOL_VERSION < 4:
-            raise unittest.SkipTest("Protocol v4 datatypes require native protocol 4+, currently using: {0}".format(PROTOCOL_VERSION))
-
-        super(TestDate, cls).setUpClass()
-
-    column = columns.Date
-
-    now = Date(datetime.now().date())
-    pkey_val = now
-    data_val = Date(now.days_from_epoch + 1)
-
-
 class TestUUID(BaseColumnIOTest):
 
     column = columns.UUID
@@ -218,16 +205,43 @@ class TestDecimalIO(BaseColumnIOTest):
     data_val = Decimal('0.005'), 3.5, '8'
 
     def comparator_converter(self, val):
-        return Decimal(val)
+        return Decimal(repr(val) if isinstance(val, float) else val)
 
-class TestTime(BaseColumnIOTest):
+
+class ProtocolV4Test(BaseColumnIOTest):
 
     @classmethod
     def setUpClass(cls):
+        if PROTOCOL_VERSION >= 4:
+            super(ProtocolV4Test, cls).setUpClass()
+
+    @classmethod
+    def tearDownClass(cls):
+        if PROTOCOL_VERSION >= 4:
+            super(ProtocolV4Test, cls).tearDownClass()
+
+class TestDate(ProtocolV4Test):
+
+    def setUp(self):
         if PROTOCOL_VERSION < 4:
             raise unittest.SkipTest("Protocol v4 datatypes require native protocol 4+, currently using: {0}".format(PROTOCOL_VERSION))
 
-        super(TestTime, cls).setUpClass()
+        super(TestDate, self).setUp()
+
+    column = columns.Date
+
+    now = Date(datetime.now().date())
+    pkey_val = now
+    data_val = Date(now.days_from_epoch + 1)
+
+
+class TestTime(ProtocolV4Test):
+
+    def setUp(self):
+        if PROTOCOL_VERSION < 4:
+            raise unittest.SkipTest("Protocol v4 datatypes require native protocol 4+, currently using: {0}".format(PROTOCOL_VERSION))
+
+        super(TestTime, self).setUp()
 
     column = columns.Time
 
@@ -235,14 +249,13 @@ class TestTime(BaseColumnIOTest):
     data_val = Time(time(16, 47, 25, 7))
 
 
-class TestSmallInt(BaseColumnIOTest):
+class TestSmallInt(ProtocolV4Test):
 
-    @classmethod
-    def setUpClass(cls):
+    def setUp(self):
         if PROTOCOL_VERSION < 4:
             raise unittest.SkipTest("Protocol v4 datatypes require native protocol 4+, currently using: {0}".format(PROTOCOL_VERSION))
 
-        super(TestSmallInt, cls).setUpClass()
+        super(TestSmallInt, self).setUp()
 
     column = columns.SmallInt
 
@@ -250,14 +263,13 @@ class TestSmallInt(BaseColumnIOTest):
     data_val = 32523
 
 
-class TestTinyInt(BaseColumnIOTest):
+class TestTinyInt(ProtocolV4Test):
 
-    @classmethod
-    def setUpClass(cls):
+    def setUp(self):
         if PROTOCOL_VERSION < 4:
             raise unittest.SkipTest("Protocol v4 datatypes require native protocol 4+, currently using: {0}".format(PROTOCOL_VERSION))
 
-        super(TestTinyInt, cls).setUpClass()
+        super(TestTinyInt, self).setUp()
 
     column = columns.TinyInt
 

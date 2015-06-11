@@ -11,13 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 
-from unittest import TestCase
 from cassandra.cqlengine.statements import InsertStatement, StatementException, AssignmentClause
 
 import six
 
-class InsertStatementTests(TestCase):
+class InsertStatementTests(unittest.TestCase):
 
     def test_where_clause_failure(self):
         """ tests that where clauses cannot be added to Insert statements """

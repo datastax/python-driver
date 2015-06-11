@@ -62,23 +62,16 @@ class BaseQueryFunction(QueryValue):
     pass
 
 
-class MinTimeUUID(BaseQueryFunction):
-    """
-    return a fake timeuuid corresponding to the smallest possible timeuuid for the given timestamp
-
-    http://cassandra.apache.org/doc/cql3/CQL.html#timeuuidFun
-    """
-
-    format_string = 'MinTimeUUID(%({0})s)'
+class TimeUUIDQueryFunction(BaseQueryFunction):
 
     def __init__(self, value):
         """
-        :param value: the time to create a maximum time uuid from
+        :param value: the time to create bounding time uuid from
         :type value: datetime
         """
         if not isinstance(value, datetime):
             raise ValidationError('datetime instance is required')
-        super(MinTimeUUID, self).__init__(value)
+        super(TimeUUIDQueryFunction, self).__init__(value)
 
     def to_database(self, val):
         epoch = datetime(1970, 1, 1, tzinfo=val.tzinfo)
@@ -89,31 +82,23 @@ class MinTimeUUID(BaseQueryFunction):
         ctx[str(self.context_id)] = self.to_database(self.value)
 
 
-class MaxTimeUUID(BaseQueryFunction):
+class MinTimeUUID(TimeUUIDQueryFunction):
+    """
+    return a fake timeuuid corresponding to the smallest possible timeuuid for the given timestamp
+
+    http://cassandra.apache.org/doc/cql3/CQL.html#timeuuidFun
+    """
+    format_string = 'MinTimeUUID(%({0})s)'
+
+
+class MaxTimeUUID(TimeUUIDQueryFunction):
     """
     return a fake timeuuid corresponding to the largest possible timeuuid for the given timestamp
 
     http://cassandra.apache.org/doc/cql3/CQL.html#timeuuidFun
     """
-
     format_string = 'MaxTimeUUID(%({0})s)'
 
-    def __init__(self, value):
-        """
-        :param value: the time to create a minimum time uuid from
-        :type value: datetime
-        """
-        if not isinstance(value, datetime):
-            raise ValidationError('datetime instance is required')
-        super(MaxTimeUUID, self).__init__(value)
-
-    def to_database(self, val):
-        epoch = datetime(1970, 1, 1, tzinfo=val.tzinfo)
-        offset = epoch.tzinfo.utcoffset(epoch).total_seconds() if epoch.tzinfo else 0
-        return int(((val - epoch).total_seconds() - offset) * 1000)
-
-    def update_context(self, ctx):
-        ctx[str(self.context_id)] = self.to_database(self.value)
 
 
 class Token(BaseQueryFunction):

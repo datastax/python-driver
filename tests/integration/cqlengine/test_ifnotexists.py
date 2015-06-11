@@ -11,9 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 
 import mock
-from unittest import skipUnless
 from uuid import uuid4
 
 from cassandra.cqlengine import columns
@@ -71,7 +74,7 @@ class BaseIfNotExistsWithCounterTest(BaseCassEngTestCase):
 
 class IfNotExistsInsertTests(BaseIfNotExistsTest):
 
-    @skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
+    @unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
     def test_insert_if_not_exists_success(self):
         """ tests that insertion with if_not_exists work as expected """
 
@@ -103,7 +106,7 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
         self.assertEqual(tm.count, 9)
         self.assertEqual(tm.text, '111111111111')
 
-    @skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
+    @unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
     def test_batch_insert_if_not_exists_success(self):
         """ tests that batch insertion with if_not_exists work as expected """
 

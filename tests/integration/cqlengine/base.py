@@ -11,28 +11,30 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 
 import sys
-from unittest import TestCase
 
 from cassandra.cqlengine.connection import get_session
 
 
-class BaseCassEngTestCase(TestCase):
+class BaseCassEngTestCase(unittest.TestCase):
 
     session = None
 
     def setUp(self):
         self.session = get_session()
-        super(BaseCassEngTestCase, self).setUp()
 
     def assertHasAttr(self, obj, attr):
         self.assertTrue(hasattr(obj, attr),
-                "{} doesn't have attribute: {}".format(obj, attr))
+                "{0} doesn't have attribute: {1}".format(obj, attr))
 
     def assertNotHasAttr(self, obj, attr):
         self.assertFalse(hasattr(obj, attr),
-                "{} shouldn't have the attribute: {}".format(obj, attr))
+                "{0} shouldn't have the attribute: {1}".format(obj, attr))
 
     if sys.version_info > (3, 0):
         def assertItemsEqual(self, first, second, msg=None):

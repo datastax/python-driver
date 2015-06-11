@@ -11,13 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 
-from unittest import TestCase
 from cassandra.cqlengine.statements import SelectStatement, WhereClause
 from cassandra.cqlengine.operators import *
 import six
 
-class SelectStatementTests(TestCase):
+class SelectStatementTests(unittest.TestCase):
 
     def test_single_field_is_listified(self):
         """ tests that passing a string field into the constructor puts it into a list """

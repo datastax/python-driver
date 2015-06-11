@@ -11,15 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from unittest import TestCase
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 
 from cassandra.cqlengine import columns
 from cassandra.cqlengine.management import sync_table, drop_table, create_keyspace_simple, drop_keyspace
 from cassandra.cqlengine.models import Model, ModelDefinitionException
 
 
-class TestModel(TestCase):
+class TestModel(unittest.TestCase):
     """ Tests the non-io functionality of models """
 
     def test_instance_equality(self):
@@ -104,7 +106,7 @@ class TestModel(TestCase):
         drop_keyspace('keyspace')
 
 
-class BuiltInAttributeConflictTest(TestCase):
+class BuiltInAttributeConflictTest(unittest.TestCase):
     """tests Model definitions that conflict with built-in attributes/methods"""
 
     def test_model_with_attribute_name_conflict(self):

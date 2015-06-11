@@ -12,11 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from unittest import TestCase
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
+
 from cassandra.cqlengine.operators import BaseQueryOperator, QueryOperatorException
 
 
-class BaseOperatorTest(TestCase):
+class BaseOperatorTest(unittest.TestCase):
 
     def test_get_operator_cannot_be_called_from_base_class(self):
         with self.assertRaises(QueryOperatorException):

@@ -11,9 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 
-from unittest import TestCase
-from cassandra.cqlengine.columns import Set, List
 from cassandra.cqlengine.operators import *
 from cassandra.cqlengine.statements import (UpdateStatement, WhereClause,
                                   AssignmentClause, SetUpdateClause,
@@ -21,7 +23,7 @@ from cassandra.cqlengine.statements import (UpdateStatement, WhereClause,
 import six
 
 
-class UpdateStatementTests(TestCase):
+class UpdateStatementTests(unittest.TestCase):
 
     def test_table_rendering(self):
         """ tests that fields are properly added to the select statement """
@@ -60,7 +62,7 @@ class UpdateStatementTests(TestCase):
 
     def test_update_set_add(self):
         us = UpdateStatement('table')
-        us.add_assignment_clause(SetUpdateClause('a', {1}, operation='add'))
+        us.add_assignment_clause(SetUpdateClause('a', set((1,)), operation='add'))
         self.assertEqual(six.text_type(us), 'UPDATE table SET "a" = "a" + %(0)s')
 
     def test_update_empty_set_add_does_not_assign(self):

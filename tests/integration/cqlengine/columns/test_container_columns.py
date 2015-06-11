@@ -13,13 +13,18 @@
 # limitations under the License.
 
 from datetime import datetime, timedelta
-import json, six, sys, traceback, logging
+import json
+import logging
+import six
+import sys
+import traceback
 from uuid import uuid4
 
 from cassandra import WriteTimeout
 
-from cassandra.cqlengine.models import Model, ValidationError
 import cassandra.cqlengine.columns as columns
+from cassandra.cqlengine.functions import get_total_seconds
+from cassandra.cqlengine.models import Model, ValidationError
 from cassandra.cqlengine.management import sync_table, drop_table
 from tests.integration.cqlengine import is_prepend_reversed
 from tests.integration.cqlengine.base import BaseCassEngTestCase
@@ -38,14 +43,16 @@ class JsonTestColumn(columns.Column):
     db_type = 'text'
 
     def to_python(self, value):
-        if value is None: return
+        if value is None:
+            return
         if isinstance(value, six.string_types):
             return json.loads(value)
         else:
             return value
 
     def to_database(self, value):
-        if value is None: return
+        if value is None:
+            return
         return json.dumps(value)
 
 
@@ -53,18 +60,15 @@ class TestSetColumn(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(TestSetColumn, cls).setUpClass()
         drop_table(TestSetModel)
         sync_table(TestSetModel)
 
     @classmethod
     def tearDownClass(cls):
-        super(TestSetColumn, cls).tearDownClass()
         drop_table(TestSetModel)
 
     def test_add_none_fails(self):
-        with self.assertRaises(ValidationError):
-            m = TestSetModel.create(int_set=set([None]))
+        self.assertRaises(ValidationError, TestSetModel.create, **{'int_set': set([None])})
 
     def test_empty_set_initial(self):
         """
@@ -83,7 +87,7 @@ class TestSetColumn(BaseCassEngTestCase):
         m.save()
 
         m = TestSetModel.get(partition=m.partition)
-        self.assertNotIn(5, m.int_set)
+        self.assertTrue(5 not in m.int_set)
 
     def test_blind_deleting_last_item_should_succeed(self):
         m = TestSetModel.create()
@@ -93,7 +97,7 @@ class TestSetColumn(BaseCassEngTestCase):
         TestSetModel.objects(partition=m.partition).update(int_set=set())
 
         m = TestSetModel.get(partition=m.partition)
-        self.assertNotIn(5, m.int_set)
+        self.assertTrue(5 not in m.int_set)
 
     def test_empty_set_retrieval(self):
         m = TestSetModel.create()
@@ -102,7 +106,7 @@ class TestSetColumn(BaseCassEngTestCase):
 
     def test_io_success(self):
         """ Tests that a basic usage works as expected """
-        m1 = TestSetModel.create(int_set={1, 2}, text_set={'kai', 'andreas'})
+        m1 = TestSetModel.create(int_set=set((1, 2)), text_set=set(('kai', 'andreas')))
         m2 = TestSetModel.get(partition=m1.partition)
 
         assert isinstance(m2.int_set, set)
@@ -118,8 +122,7 @@ class TestSetColumn(BaseCassEngTestCase):
         """
         Tests that attempting to use the wrong types will raise an exception
         """
-        with self.assertRaises(ValidationError):
-            TestSetModel.create(int_set={'string', True}, text_set={1, 3.0})
+        self.assertRaises(ValidationError, TestSetModel.create, **{'int_set': set(('string', True)), 'text_set': set((1, 3.0))})
 
     def test_element_count_validation(self):
         """
@@ -127,27 +130,26 @@ class TestSetColumn(BaseCassEngTestCase):
         """
         while True:
             try:
-                TestSetModel.create(text_set={str(uuid4()) for i in range(65535)})
+                TestSetModel.create(text_set=set(str(uuid4()) for i in range(65535)))
                 break
             except WriteTimeout:
                 ex_type, ex, tb = sys.exc_info()
                 log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                 del tb
-        with self.assertRaises(ValidationError):
-            TestSetModel.create(text_set={str(uuid4()) for i in range(65536)})
+        self.assertRaises(ValidationError, TestSetModel.create, **{'text_set': set(str(uuid4()) for i in range(65536))})
 
     def test_partial_updates(self):
         """ Tests that partial udpates work as expected """
-        m1 = TestSetModel.create(int_set={1, 2, 3, 4})
+        m1 = TestSetModel.create(int_set=set((1, 2, 3, 4)))
 
         m1.int_set.add(5)
         m1.int_set.remove(1)
-        assert m1.int_set == {2, 3, 4, 5}
+        assert m1.int_set == set((2, 3, 4, 5))
 
         m1.save()
 
         m2 = TestSetModel.get(partition=m1.partition)
-        assert m2.int_set == {2, 3, 4, 5}
+        assert m2.int_set == set((2, 3, 4, 5))
 
     def test_instantiation_with_column_class(self):
         """
@@ -167,9 +169,9 @@ class TestSetColumn(BaseCassEngTestCase):
     def test_to_python(self):
         """ Tests that to_python of value column is called """
         column = columns.Set(JsonTestColumn)
-        val = {1, 2, 3}
+        val = set((1, 2, 3))
         db_val = column.to_database(val)
-        assert db_val == {json.dumps(v) for v in val}
+        assert db_val == set(json.dumps(v) for v in val)
         py_val = column.to_python(db_val)
         assert py_val == val
 
@@ -177,16 +179,15 @@ class TestSetColumn(BaseCassEngTestCase):
         """ tests that the default empty container is not saved if it hasn't been updated """
         pkey = uuid4()
         # create a row with set data
-        TestSetModel.create(partition=pkey, int_set={3, 4})
+        TestSetModel.create(partition=pkey, int_set=set((3, 4)))
         # create another with no set data
         TestSetModel.create(partition=pkey)
 
         m = TestSetModel.get(partition=pkey)
-        self.assertEqual(m.int_set, {3, 4})
+        self.assertEqual(m.int_set, set((3, 4)))
 
 
 class TestListModel(Model):
-
 
     partition = columns.UUID(primary_key=True, default=uuid4)
     int_list = columns.List(columns.Integer, required=False)
@@ -197,20 +198,18 @@ class TestListColumn(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(TestListColumn, cls).setUpClass()
         drop_table(TestListModel)
         sync_table(TestListModel)
 
     @classmethod
     def tearDownClass(cls):
-        super(TestListColumn, cls).tearDownClass()
         drop_table(TestListModel)
 
     def test_initial(self):
         tmp = TestListModel.create()
         tmp.int_list.append(1)
 
-    def test_initial(self):
+    def test_initial_retrieve(self):
         tmp = TestListModel.create()
         tmp2 = TestListModel.get(partition=tmp.partition)
         tmp2.int_list.append(1)
@@ -236,8 +235,7 @@ class TestListColumn(BaseCassEngTestCase):
         """
         Tests that attempting to use the wrong types will raise an exception
         """
-        with self.assertRaises(ValidationError):
-            TestListModel.create(int_list=['string', True], text_list=[1, 3.0])
+        self.assertRaises(ValidationError, TestListModel.create, **{'int_list': ['string', True], 'text_list': [1, 3.0]})
 
     def test_element_count_validation(self):
         """
@@ -251,8 +249,7 @@ class TestListColumn(BaseCassEngTestCase):
                 ex_type, ex, tb = sys.exc_info()
                 log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                 del tb
-        with self.assertRaises(ValidationError):
-            TestListModel.create(text_list=[str(uuid4()) for i in range(65536)])
+        self.assertRaises(ValidationError, TestListModel.create, **{'text_list': [str(uuid4()) for _ in range(65536)]})
 
     def test_partial_updates(self):
         """ Tests that partial udpates work as expected """
@@ -300,16 +297,16 @@ class TestListColumn(BaseCassEngTestCase):
         """ tests that the default empty container is not saved if it hasn't been updated """
         pkey = uuid4()
         # create a row with list data
-        TestListModel.create(partition=pkey, int_list=[1,2,3,4])
+        TestListModel.create(partition=pkey, int_list=[1, 2, 3, 4])
         # create another with no list data
         TestListModel.create(partition=pkey)
 
         m = TestListModel.get(partition=pkey)
-        self.assertEqual(m.int_list, [1,2,3,4])
+        self.assertEqual(m.int_list, [1, 2, 3, 4])
 
     def test_remove_entry_works(self):
         pkey = uuid4()
-        tmp = TestListModel.create(partition=pkey, int_list=[1,2])
+        tmp = TestListModel.create(partition=pkey, int_list=[1, 2])
         tmp.int_list.pop()
         tmp.update()
         tmp = TestListModel.get(partition=pkey)
@@ -317,7 +314,7 @@ class TestListColumn(BaseCassEngTestCase):
 
     def test_update_from_non_empty_to_empty(self):
         pkey = uuid4()
-        tmp = TestListModel.create(partition=pkey, int_list=[1,2])
+        tmp = TestListModel.create(partition=pkey, int_list=[1, 2])
         tmp.int_list = []
         tmp.update()
 
@@ -326,8 +323,7 @@ class TestListColumn(BaseCassEngTestCase):
 
     def test_insert_none(self):
         pkey = uuid4()
-        with self.assertRaises(ValidationError):
-            TestListModel.create(partition=pkey, int_list=[None])
+        self.assertRaises(ValidationError, TestListModel.create, **{'partition': pkey, 'int_list': [None]})
 
     def test_blind_list_updates_from_none(self):
         """ Tests that updates from None work as expected """
@@ -344,6 +340,7 @@ class TestListColumn(BaseCassEngTestCase):
         m3 = TestListModel.get(partition=m.partition)
         assert m3.int_list == []
 
+
 class TestMapModel(Model):
     partition = columns.UUID(primary_key=True, default=uuid4)
     int_map = columns.Map(columns.Integer, columns.UUID, required=False)
@@ -354,13 +351,11 @@ class TestMapColumn(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(TestMapColumn, cls).setUpClass()
         drop_table(TestMapModel)
         sync_table(TestMapModel)
 
     @classmethod
     def tearDownClass(cls):
-        super(TestMapColumn, cls).tearDownClass()
         drop_table(TestMapModel)
 
     def test_empty_default(self):
@@ -368,8 +363,7 @@ class TestMapColumn(BaseCassEngTestCase):
         tmp.int_map['blah'] = 1
 
     def test_add_none_as_map_key(self):
-        with self.assertRaises(ValidationError):
-            TestMapModel.create(int_map={None: uuid4()})
+        self.assertRaises(ValidationError, TestMapModel.create, **{'int_map': {None: uuid4()}})
 
     def test_empty_retrieve(self):
         tmp = TestMapModel.create()
@@ -384,7 +378,7 @@ class TestMapColumn(BaseCassEngTestCase):
         tmp.save()
 
         tmp = TestMapModel.get(partition=tmp.partition)
-        self.assertNotIn("blah", tmp.int_map)
+        self.assertTrue("blah" not in tmp.int_map)
 
     def test_io_success(self):
         """ Tests that a basic usage works as expected """
@@ -395,25 +389,24 @@ class TestMapColumn(BaseCassEngTestCase):
         m1 = TestMapModel.create(int_map={1: k1, 2: k2}, text_map={'now': now, 'then': then})
         m2 = TestMapModel.get(partition=m1.partition)
 
-        assert isinstance(m2.int_map, dict)
-        assert isinstance(m2.text_map, dict)
+        self.assertTrue(isinstance(m2.int_map, dict))
+        self.assertTrue(isinstance(m2.text_map, dict))
 
-        assert 1 in m2.int_map
-        assert 2 in m2.int_map
-        assert m2.int_map[1] == k1
-        assert m2.int_map[2] == k2
+        self.assertTrue(1 in m2.int_map)
+        self.assertTrue(2 in m2.int_map)
+        self.assertEqual(m2.int_map[1], k1)
+        self.assertEqual(m2.int_map[2], k2)
 
-        assert 'now' in m2.text_map
-        assert 'then' in m2.text_map
-        assert (now - m2.text_map['now']).total_seconds() < 0.001
-        assert (then - m2.text_map['then']).total_seconds() < 0.001
+        self.assertTrue('now' in m2.text_map)
+        self.assertTrue('then' in m2.text_map)
+        self.assertAlmostEqual(get_total_seconds(now - m2.text_map['now']), 0, 2)
+        self.assertAlmostEqual(get_total_seconds(then - m2.text_map['then']), 0, 2)
 
     def test_type_validation(self):
         """
         Tests that attempting to use the wrong types will raise an exception
         """
-        with self.assertRaises(ValidationError):
-            TestMapModel.create(int_map={'key': 2, uuid4(): 'val'}, text_map={2: 5})
+        self.assertRaises(ValidationError, TestMapModel.create, **{'int_map': {'key': 2, uuid4(): 'val'}, 'text_map': {2: 5}})
 
     def test_element_count_validation(self):
         """
@@ -421,19 +414,18 @@ class TestMapColumn(BaseCassEngTestCase):
         """
         while True:
             try:
-                TestMapModel.create(text_map={str(uuid4()): i for i in range(65535)})
+                TestMapModel.create(text_map=dict((str(uuid4()), i) for i in range(65535)))
                 break
             except WriteTimeout:
                 ex_type, ex, tb = sys.exc_info()
                 log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                 del tb
-        with self.assertRaises(ValidationError):
-            TestMapModel.create(text_map={str(uuid4()): i for i in range(65536)})
+        self.assertRaises(ValidationError, TestMapModel.create, **{'text_map': dict((str(uuid4()), i) for i in range(65536))})
 
     def test_partial_updates(self):
         """ Tests that partial udpates work as expected """
         now = datetime.now()
-        #derez it a bit
+        # derez it a bit
         now = datetime(*now.timetuple()[:-3])
         early = now - timedelta(minutes=30)
         earlier = early - timedelta(minutes=30)
@@ -511,7 +503,7 @@ class TestMapColumn(BaseCassEngTestCase):
         column = columns.Map(JsonTestColumn, JsonTestColumn)
         val = {1: 2, 3: 4, 5: 6}
         db_val = column.to_database(val)
-        assert db_val == {json.dumps(k):json.dumps(v) for k,v in val.items()}
+        assert db_val == dict((json.dumps(k), json.dumps(v)) for k, v in val.items())
         py_val = column.to_python(db_val)
         assert py_val == val
 
@@ -530,7 +522,6 @@ class TestMapColumn(BaseCassEngTestCase):
 
 class TestCamelMapModel(Model):
 
-
     partition = columns.UUID(primary_key=True, default=uuid4)
     camelMap = columns.Map(columns.Text, columns.Integer, required=False)
 
@@ -539,13 +530,11 @@ class TestCamelMapColumn(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(TestCamelMapColumn, cls).setUpClass()
         drop_table(TestCamelMapModel)
         sync_table(TestCamelMapModel)
 
     @classmethod
     def tearDownClass(cls):
-        super(TestCamelMapColumn, cls).tearDownClass()
         drop_table(TestCamelMapModel)
 
     def test_camelcase_column(self):

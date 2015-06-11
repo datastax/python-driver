@@ -11,11 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from __future__ import absolute_import
+
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
+
 from datetime import datetime
 import time
-from unittest import TestCase, skipUnless
 from uuid import uuid1, uuid4
 import uuid
 
@@ -685,7 +689,7 @@ class TestObjectsProperty(BaseQuerySetUsage):
         assert TestModel.objects._result_cache is None
 
 
-@skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
+@unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
 def test_paged_result_handling():
     # addresses #225
     class PagingTest(Model):

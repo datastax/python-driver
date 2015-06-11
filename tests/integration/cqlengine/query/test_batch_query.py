@@ -116,7 +116,7 @@ class BatchQueryTests(BaseCassEngTestCase):
 
         for i in range(1):
             for j in range(5):
-                TestMultiKeyModel.create(partition=i, cluster=j, count=i*j, text='{}:{}'.format(i,j))
+                TestMultiKeyModel.create(partition=i, cluster=j, count=i*j, text='{0}:{1}'.format(i,j))
 
         with BatchQuery() as b:
             TestMultiKeyModel.objects.batch(b).filter(partition=0).delete()

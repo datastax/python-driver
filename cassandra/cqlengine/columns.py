@@ -639,7 +639,7 @@ class Decimal(Column):
         if val is None:
             return
         try:
-            return _Decimal(val)
+            return _Decimal(repr(val)) if isinstance(val, float) else _Decimal(val)
         except InvalidOperation:
             raise ValidationError("{0} '{1}' can't be coerced to decimal".format(self.column_name, val))
 
@@ -808,7 +808,7 @@ class Map(BaseContainerColumn):
         if not isinstance(val, dict):
             raise ValidationError('{0} {1} is not a dict object'.format(self.column_name, val))
         if None in val:
-            raise ValidationError("{} None is not allowed in a map".format(self.column_name))
+            raise ValidationError("{0} None is not allowed in a map".format(self.column_name))
         return dict((self.key_col.validate(k), self.value_col.validate(v)) for k, v in val.items())
 
     def to_python(self, value):

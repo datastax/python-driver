@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from unittest import skip
 from uuid import uuid4
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 

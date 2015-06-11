@@ -11,12 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 
-from unittest import TestCase
 from cassandra.cqlengine.statements import BaseCQLStatement, StatementException
 
 
-class BaseStatementTest(TestCase):
+class BaseStatementTest(unittest.TestCase):
 
     def test_where_clause_type_checking(self):
         """ tests that only assignment clauses can be added to queries """
