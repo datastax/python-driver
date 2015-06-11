@@ -79,12 +79,12 @@ def create_keyspace(name, strategy_class, replication_factor, durable_writes=Tru
             replication_map.pop('replication_factor', None)
 
         query = """
-        CREATE KEYSPACE {}
-        WITH REPLICATION = {}
+        CREATE KEYSPACE {0}
+        WITH REPLICATION = {1}
         """.format(metadata.protect_name(name), json.dumps(replication_map).replace('"', "'"))
 
         if strategy_class != 'SimpleStrategy':
-            query += " AND DURABLE_WRITES = {}".format('true' if durable_writes else 'false')
+            query += " AND DURABLE_WRITES = {0}".format('true' if durable_writes else 'false')
 
         execute(query)
 
@@ -163,7 +163,7 @@ def drop_keyspace(name):
 
     cluster = get_cluster()
     if name in cluster.metadata.keyspaces:
-        execute("DROP KEYSPACE {}".format(metadata.protect_name(name)))
+        execute("DROP KEYSPACE {0}".format(metadata.protect_name(name)))
 
 
 def sync_table(model):
@@ -235,7 +235,7 @@ def sync_table(model):
                 continue  # skip columns already defined
 
             # add missing column using the column def
-            query = "ALTER TABLE {} add {}".format(cf_name, col.get_column_def())
+            query = "ALTER TABLE {0} add {1}".format(cf_name, col.get_column_def())
             execute(query)
 
         db_fields_not_in_model = model_fields.symmetric_difference(field_names)
@@ -252,9 +252,9 @@ def sync_table(model):
         if table.columns[column.db_field_name].index:
             continue
 
-        qs = ['CREATE INDEX index_{}_{}'.format(raw_cf_name, column.db_field_name)]
-        qs += ['ON {}'.format(cf_name)]
-        qs += ['("{}")'.format(column.db_field_name)]
+        qs = ['CREATE INDEX index_{0}_{1}'.format(raw_cf_name, column.db_field_name)]
+        qs += ['ON {0}'.format(cf_name)]
+        qs += ['("{0}")'.format(column.db_field_name)]
         qs = ' '.join(qs)
         execute(qs)
 
@@ -310,7 +310,7 @@ def _sync_type(ks_name, type_model, omit_subtypes=None):
         for field in type_model._fields.values():
             model_fields.add(field.db_field_name)
             if field.db_field_name not in defined_fields:
-                execute("ALTER TYPE {} ADD {}".format(type_name_qualified, field.get_column_def()))
+                execute("ALTER TYPE {0} ADD {1}".format(type_name_qualified, field.get_column_def()))
 
         type_model.register_for_keyspace(ks_name)
 
@@ -333,7 +333,7 @@ def get_create_type(type_model, keyspace):
 
 def get_create_table(model):
     cf_name = model.column_family_name()
-    qs = ['CREATE TABLE {}'.format(cf_name)]
+    qs = ['CREATE TABLE {0}'.format(cf_name)]
 
     # add column types
     pkeys = []  # primary keys
@@ -344,15 +344,15 @@ def get_create_table(model):
         s = col.get_column_def()
         if col.primary_key:
             keys = (pkeys if col.partition_key else ckeys)
-            keys.append('"{}"'.format(col.db_field_name))
+            keys.append('"{0}"'.format(col.db_field_name))
         qtypes.append(s)
 
     for name, col in model._columns.items():
         add_column(col)
 
-    qtypes.append('PRIMARY KEY (({}){})'.format(', '.join(pkeys), ckeys and ', ' + ', '.join(ckeys) or ''))
+    qtypes.append('PRIMARY KEY (({0}){1})'.format(', '.join(pkeys), ckeys and ', ' + ', '.join(ckeys) or ''))
 
-    qs += ['({})'.format(', '.join(qtypes))]
+    qs += ['({0})'.format(', '.join(qtypes))]
 
     with_qs = []
 
@@ -361,25 +361,25 @@ def get_create_table(model):
                         'index_interval', 'memtable_flush_period_in_ms', 'populate_io_cache_on_flush',
                         'read_repair_chance', 'replicate_on_write']
     for prop_name in table_properties:
-        prop_value = getattr(model, '__{}__'.format(prop_name), None)
+        prop_value = getattr(model, '__{0}__'.format(prop_name), None)
         if prop_value is not None:
             # Strings needs to be single quoted
             if isinstance(prop_value, six.string_types):
-                prop_value = "'{}'".format(prop_value)
-            with_qs.append("{} = {}".format(prop_name, prop_value))
+                prop_value = "'{0}'".format(prop_value)
+            with_qs.append("{0} = {1}".format(prop_name, prop_value))
 
-    _order = ['"{}" {}'.format(c.db_field_name, c.clustering_order or 'ASC') for c in model._clustering_keys.values()]
+    _order = ['"{0}" {1}'.format(c.db_field_name, c.clustering_order or 'ASC') for c in model._clustering_keys.values()]
     if _order:
-        with_qs.append('clustering order by ({})'.format(', '.join(_order)))
+        with_qs.append('clustering order by ({0})'.format(', '.join(_order)))
 
     compaction_options = get_compaction_options(model)
     if compaction_options:
         compaction_options = json.dumps(compaction_options).replace('"', "'")
-        with_qs.append("compaction = {}".format(compaction_options))
+        with_qs.append("compaction = {0}".format(compaction_options))
 
     # Add table properties.
     if with_qs:
-        qs += ['WITH {}'.format(' AND '.join(with_qs))]
+        qs += ['WITH {0}'.format(' AND '.join(with_qs))]
 
     qs = ' '.join(qs)
     return qs
@@ -405,10 +405,10 @@ def get_compaction_options(model):
         :param limited_to_strategy: SizeTieredCompactionStrategy, LeveledCompactionStrategy
         :return:
         """
-        mkey = "__compaction_{}__".format(key)
+        mkey = "__compaction_{0}__".format(key)
         tmp = getattr(model, mkey)
         if tmp and limited_to_strategy and limited_to_strategy != model.__compaction__:
-            raise CQLEngineException("{} is limited to {}".format(key, limited_to_strategy))
+            raise CQLEngineException("{0} is limited to {1}".format(key, limited_to_strategy))
 
         if tmp:
             # Explicitly cast the values to strings to be able to compare the
@@ -496,7 +496,7 @@ def update_compaction(model):
         # jsonify
         options = json.dumps(options).replace('"', "'")
         cf_name = model.column_family_name()
-        query = "ALTER TABLE {} with compaction = {}".format(cf_name, options)
+        query = "ALTER TABLE {0} with compaction = {1}".format(cf_name, options)
         execute(query)
         return True
 
@@ -523,7 +523,7 @@ def drop_table(model):
 
     try:
         meta.keyspaces[ks_name].tables[raw_cf_name]
-        execute('DROP TABLE {};'.format(model.column_family_name()))
+        execute('DROP TABLE {0};'.format(model.column_family_name()))
     except KeyError:
         pass
 

@@ -56,7 +56,7 @@ class BaseUserType(object):
         return not self.__eq__(other)
 
     def __str__(self):
-        return "{{{}}}".format(', '.join("'{}': {}".format(k, getattr(self, k)) for k, v in six.iteritems(self._values)))
+        return "{{{0}}}".format(', '.join("'{0}': {1}".format(k, getattr(self, k)) for k, v in six.iteritems(self._values)))
 
     def has_changed_fields(self):
         return any(v.changed for v in self._values.values())
@@ -116,7 +116,7 @@ class BaseUserType(object):
             type_name = cls.__type_name__.lower()
         else:
             camelcase = re.compile(r'([a-z])([A-Z])')
-            ccase = lambda s: camelcase.sub(lambda v: '{}_{}'.format(v.group(1), v.group(2)), s)
+            ccase = lambda s: camelcase.sub(lambda v: '{0}_{1}'.format(v.group(1), v.group(2)), s)
 
             type_name = ccase(cls.__name__)
             # trim to less than 48 characters or cassandra will complain
@@ -157,7 +157,7 @@ class UserTypeMetaClass(type):
         for k, v in field_defs:
             # don't allow a field with the same name as a built-in attribute or method
             if k in BaseUserType.__dict__:
-                raise UserTypeDefinitionException("field '{}' conflicts with built-in attribute/method".format(k))
+                raise UserTypeDefinitionException("field '{0}' conflicts with built-in attribute/method".format(k))
             _transform_column(k, v)
 
         # create db_name -> model name map for loading

@@ -108,7 +108,7 @@ class WhereClause(BaseClause):
         """
         if not isinstance(operator, BaseWhereOperator):
             raise StatementException(
-                "operator must be of type {}, got {}".format(BaseWhereOperator, type(operator))
+                "operator must be of type {0}, got {1}".format(BaseWhereOperator, type(operator))
             )
         super(WhereClause, self).__init__(field, value)
         self.operator = operator
@@ -116,8 +116,8 @@ class WhereClause(BaseClause):
         self.quote_field = quote_field
 
     def __unicode__(self):
-        field = ('"{}"' if self.quote_field else '{}').format(self.field)
-        return u'{} {} {}'.format(field, self.operator, six.text_type(self.query_value))
+        field = ('"{0}"' if self.quote_field else '{0}').format(self.field)
+        return u'{0} {1} {2}'.format(field, self.operator, six.text_type(self.query_value))
 
     def __hash__(self):
         return super(WhereClause, self).__hash__() ^ hash(self.operator)
@@ -145,7 +145,7 @@ class AssignmentClause(BaseClause):
     """ a single variable st statement """
 
     def __unicode__(self):
-        return u'"{}" = %({})s'.format(self.field, self.context_id)
+        return u'"{0}" = %({1})s'.format(self.field, self.context_id)
 
     def insert_tuple(self):
         return self.field, self.context_id
@@ -155,7 +155,7 @@ class TransactionClause(BaseClause):
     """ A single variable iff statement """
 
     def __unicode__(self):
-        return u'"{}" = %({})s'.format(self.field, self.context_id)
+        return u'"{0}" = %({1})s'.format(self.field, self.context_id)
 
     def insert_tuple(self):
         return self.field, self.context_id
@@ -199,9 +199,9 @@ class SetUpdateClause(ContainerUpdateClause):
                 self._assignments is None and
                 self._additions is None and
                 self._removals is None):
-            qs += ['"{}" = %({})s'.format(self.field, ctx_id)]
+            qs += ['"{0}" = %({1})s'.format(self.field, ctx_id)]
         if self._assignments is not None:
-            qs += ['"{}" = %({})s'.format(self.field, ctx_id)]
+            qs += ['"{0}" = %({1})s'.format(self.field, ctx_id)]
             ctx_id += 1
         if self._additions is not None:
             qs += ['"{0}" = "{0}" + %({1})s'.format(self.field, ctx_id)]
@@ -270,7 +270,7 @@ class ListUpdateClause(ContainerUpdateClause):
         qs = []
         ctx_id = self.context_id
         if self._assignments is not None:
-            qs += ['"{}" = %({})s'.format(self.field, ctx_id)]
+            qs += ['"{0}" = %({1})s'.format(self.field, ctx_id)]
             ctx_id += 1
 
         if self._prepend is not None:
@@ -398,10 +398,10 @@ class MapUpdateClause(ContainerUpdateClause):
 
         ctx_id = self.context_id
         if self.previous is None and not self._updates:
-            qs += ['"{}" = %({})s'.format(self.field, ctx_id)]
+            qs += ['"{0}" = %({1})s'.format(self.field, ctx_id)]
         else:
             for _ in self._updates or []:
-                qs += ['"{}"[%({})s] = %({})s'.format(self.field, ctx_id, ctx_id + 1)]
+                qs += ['"{0}"[%({1})s] = %({2})s'.format(self.field, ctx_id, ctx_id + 1)]
                 ctx_id += 2
 
         return ', '.join(qs)
@@ -436,7 +436,7 @@ class FieldDeleteClause(BaseDeleteClause):
         super(FieldDeleteClause, self).__init__(field, None)
 
     def __unicode__(self):
-        return '"{}"'.format(self.field)
+        return '"{0}"'.format(self.field)
 
     def update_context(self, ctx):
         pass
@@ -473,7 +473,7 @@ class MapDeleteClause(BaseDeleteClause):
     def __unicode__(self):
         if not self._analyzed:
             self._analyze()
-        return ', '.join(['"{}"[%({})s]'.format(self.field, self.context_id + i) for i in range(len(self._removals))])
+        return ', '.join(['"{0}"[%({1})s]'.format(self.field, self.context_id + i) for i in range(len(self._removals))])
 
 
 class BaseCQLStatement(UnicodeMixin):
@@ -550,7 +550,7 @@ class BaseCQLStatement(UnicodeMixin):
 
     @property
     def _where(self):
-        return 'WHERE {}'.format(' AND '.join([six.text_type(c) for c in self.where_clauses]))
+        return 'WHERE {0}'.format(' AND '.join([six.text_type(c) for c in self.where_clauses]))
 
 
 class SelectStatement(BaseCQLStatement):
@@ -587,17 +587,17 @@ class SelectStatement(BaseCQLStatement):
         if self.count:
             qs += ['COUNT(*)']
         else:
-            qs += [', '.join(['"{}"'.format(f) for f in self.fields]) if self.fields else '*']
+            qs += [', '.join(['"{0}"'.format(f) for f in self.fields]) if self.fields else '*']
         qs += ['FROM', self.table]
 
         if self.where_clauses:
             qs += [self._where]
 
         if self.order_by and not self.count:
-            qs += ['ORDER BY {}'.format(', '.join(six.text_type(o) for o in self.order_by))]
+            qs += ['ORDER BY {0}'.format(', '.join(six.text_type(o) for o in self.order_by))]
 
         if self.limit:
-            qs += ['LIMIT {}'.format(self.limit)]
+            qs += ['LIMIT {0}'.format(self.limit)]
 
         if self.allow_filtering:
             qs += ['ALLOW FILTERING']
@@ -681,24 +681,24 @@ class InsertStatement(AssignmentStatement):
         raise StatementException("Cannot add where clauses to insert statements")
 
     def __unicode__(self):
-        qs = ['INSERT INTO {}'.format(self.table)]
+        qs = ['INSERT INTO {0}'.format(self.table)]
 
         # get column names and context placeholders
         fields = [a.insert_tuple() for a in self.assignments]
         columns, values = zip(*fields)
 
-        qs += ["({})".format(', '.join(['"{}"'.format(c) for c in columns]))]
+        qs += ["({0})".format(', '.join(['"{0}"'.format(c) for c in columns]))]
         qs += ['VALUES']
-        qs += ["({})".format(', '.join(['%({})s'.format(v) for v in values]))]
+        qs += ["({0})".format(', '.join(['%({0})s'.format(v) for v in values]))]
 
         if self.if_not_exists:
             qs += ["IF NOT EXISTS"]
 
         if self.ttl:
-            qs += ["USING TTL {}".format(self.ttl)]
+            qs += ["USING TTL {0}".format(self.ttl)]
 
         if self.timestamp:
-            qs += ["USING TIMESTAMP {}".format(self.timestamp_normalized)]
+            qs += ["USING TIMESTAMP {0}".format(self.timestamp_normalized)]
 
         return ' '.join(qs)
 
@@ -732,13 +732,13 @@ class UpdateStatement(AssignmentStatement):
         using_options = []
 
         if self.ttl:
-            using_options += ["TTL {}".format(self.ttl)]
+            using_options += ["TTL {0}".format(self.ttl)]
 
         if self.timestamp:
-            using_options += ["TIMESTAMP {}".format(self.timestamp_normalized)]
+            using_options += ["TIMESTAMP {0}".format(self.timestamp_normalized)]
 
         if using_options:
-            qs += ["USING {}".format(" AND ".join(using_options))]
+            qs += ["USING {0}".format(" AND ".join(using_options))]
 
         qs += ['SET']
         qs += [', '.join([six.text_type(c) for c in self.assignments])]
@@ -771,7 +771,7 @@ class UpdateStatement(AssignmentStatement):
         return ctx
 
     def _get_transactions(self):
-        return 'IF {}'.format(' AND '.join([six.text_type(c) for c in self.transactions]))
+        return 'IF {0}'.format(' AND '.join([six.text_type(c) for c in self.transactions]))
 
     def update_context_id(self, i):
         super(UpdateStatement, self).update_context_id(i)
@@ -820,16 +820,16 @@ class DeleteStatement(BaseCQLStatement):
     def __unicode__(self):
         qs = ['DELETE']
         if self.fields:
-            qs += [', '.join(['{}'.format(f) for f in self.fields])]
+            qs += [', '.join(['{0}'.format(f) for f in self.fields])]
         qs += ['FROM', self.table]
 
         delete_option = []
 
         if self.timestamp:
-            delete_option += ["TIMESTAMP {}".format(self.timestamp_normalized)]
+            delete_option += ["TIMESTAMP {0}".format(self.timestamp_normalized)]
 
         if delete_option:
-            qs += [" USING {} ".format(" AND ".join(delete_option))]
+            qs += [" USING {0} ".format(" AND ".join(delete_option))]
 
         if self.where_clauses:
             qs += [self._where]

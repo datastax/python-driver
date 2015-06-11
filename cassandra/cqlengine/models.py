@@ -280,7 +280,7 @@ class ColumnDescriptor(object):
             if self.column.can_delete:
                 instance._values[self.column.column_name].delval()
             else:
-                raise AttributeError('cannot delete {} columns'.format(self.column.column_name))
+                raise AttributeError('cannot delete {0} columns'.format(self.column.column_name))
 
 
 class BaseModel(object):
@@ -378,8 +378,8 @@ class BaseModel(object):
         self._timeout = connection.NOT_SET
 
     def __repr__(self):
-        return '{}({})'.format(self.__class__.__name__,
-                               ', '.join('{}={!r}'.format(k, getattr(self, k))
+        return '{0}({1})'.format(self.__class__.__name__,
+                               ', '.join('{0}={1!r}'.format(k, getattr(self, k))
                                          for k in self._defined_columns.keys()
                                          if k != self._discriminator_column_name))
 
@@ -387,8 +387,8 @@ class BaseModel(object):
         """
         Pretty printing of models by their primary key
         """
-        return '{} <{}>'.format(self.__class__.__name__,
-                                ', '.join('{}={}'.format(k, getattr(self, k)) for k in self._primary_keys.keys()))
+        return '{0} <{1}>'.format(self.__class__.__name__,
+                                ', '.join('{0}={1}'.format(k, getattr(self, k)) for k in self._primary_keys.keys()))
 
     @classmethod
     def _discover_polymorphic_submodels(cls):
@@ -434,15 +434,15 @@ class BaseModel(object):
                 klass = poly_base._get_model_by_discriminator_value(disc_key)
                 if klass is None:
                     raise PolymorphicModelException(
-                        'unrecognized discriminator column {} for class {}'.format(disc_key, poly_base.__name__)
+                        'unrecognized discriminator column {0} for class {1}'.format(disc_key, poly_base.__name__)
                     )
 
             if not issubclass(klass, cls):
                 raise PolymorphicModelException(
-                    '{} is not a subclass of {}'.format(klass.__name__, cls.__name__)
+                    '{0} is not a subclass of {1}'.format(klass.__name__, cls.__name__)
                 )
 
-            field_dict = {k: v for k, v in field_dict.items() if k in klass._columns.keys()}
+            field_dict = dict((k, v) for k, v in field_dict.items() if k in klass._columns.keys())
 
         else:
             klass = cls
@@ -509,7 +509,7 @@ class BaseModel(object):
         """
         cf_name = protect_name(cls._raw_column_family_name())
         if include_keyspace:
-            return '{}.{}'.format(protect_name(cls._get_keyspace()), cf_name)
+            return '{0}.{1}'.format(protect_name(cls._get_keyspace()), cf_name)
 
         return cf_name
 
@@ -524,7 +524,7 @@ class BaseModel(object):
                     cls._table_name = cls._polymorphic_base._raw_column_family_name()
                 else:
                     camelcase = re.compile(r'([a-z])([A-Z])')
-                    ccase = lambda s: camelcase.sub(lambda v: '{}_{}'.format(v.group(1), v.group(2).lower()), s)
+                    ccase = lambda s: camelcase.sub(lambda v: '{0}_{1}'.format(v.group(1), v.group(2).lower()), s)
 
                     cf_name = ccase(cls.__name__)
                     # trim to less than 48 characters or cassandra will complain
@@ -608,7 +608,7 @@ class BaseModel(object):
         """
         extra_columns = set(kwargs.keys()) - set(cls._columns.keys())
         if extra_columns:
-            raise ValidationError("Incorrect columns passed: {}".format(extra_columns))
+            raise ValidationError("Incorrect columns passed: {0}".format(extra_columns))
         return cls.objects.create(**kwargs)
 
     @classmethod
@@ -701,11 +701,11 @@ class BaseModel(object):
 
             # check for nonexistant columns
             if col is None:
-                raise ValidationError("{}.{} has no column named: {}".format(self.__module__, self.__class__.__name__, k))
+                raise ValidationError("{0}.{1} has no column named: {2}".format(self.__module__, self.__class__.__name__, k))
 
             # check for primary key update attempts
             if col.is_primary_key:
-                raise ValidationError("Cannot apply update to primary key '{}' for {}.{}".format(k, self.__module__, self.__class__.__name__))
+                raise ValidationError("Cannot apply update to primary key '{0}' for {1}.{2}".format(k, self.__module__, self.__class__.__name__))
 
             setattr(self, k, v)
 
@@ -808,7 +808,7 @@ class ModelMetaClass(type):
         discriminator_columns = [c for c in column_definitions if c[1].discriminator_column]
         is_polymorphic = len(discriminator_columns) > 0
         if len(discriminator_columns) > 1:
-            raise ModelDefinitionException('only one discriminator_column (polymorphic_key (deprecated)) can be defined in a model, {} found'.format(len(discriminator_columns)))
+            raise ModelDefinitionException('only one discriminator_column (polymorphic_key (deprecated)) can be defined in a model, {0} found'.format(len(discriminator_columns)))
 
         if attrs['__discriminator_value__'] and not is_polymorphic:
             raise ModelDefinitionException('__discriminator_value__ specified, but no base columns defined with discriminator_column=True')
@@ -847,7 +847,7 @@ class ModelMetaClass(type):
         for k, v in column_definitions:
             # don't allow a column with the same name as a built-in attribute or method
             if k in BaseModel.__dict__:
-                raise ModelDefinitionException("column '{}' conflicts with built-in attribute/method".format(k))
+                raise ModelDefinitionException("column '{0}' conflicts with built-in attribute/method".format(k))
 
             # counter column primary keys are not allowed
             if (v.primary_key or v.partition_key) and isinstance(v, (columns.Counter, columns.BaseContainerColumn)):
@@ -881,11 +881,11 @@ class ModelMetaClass(type):
         for v in column_dict.values():
             # check for duplicate column names
             if v.db_field_name in col_names:
-                raise ModelException("{} defines the column {} more than once".format(name, v.db_field_name))
+                raise ModelException("{0} defines the column {1} more than once".format(name, v.db_field_name))
             if v.clustering_order and not (v.primary_key and not v.partition_key):
                 raise ModelException("clustering_order may be specified only for clustering primary keys")
             if v.clustering_order and v.clustering_order.lower() not in ('asc', 'desc'):
-                raise ModelException("invalid clustering order {} for column {}".format(repr(v.clustering_order), v.db_field_name))
+                raise ModelException("invalid clustering order {0} for column {1}".format(repr(v.clustering_order), v.db_field_name))
             col_names.add(v.db_field_name)
 
         # create db_name -> model name map for loading
