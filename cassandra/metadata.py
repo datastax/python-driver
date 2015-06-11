@@ -1118,14 +1118,14 @@ class Function(object):
                              for n, t in zip(self.argument_names, self.type_signature)])
         typ = self.return_type.cql_parameterized_type()
         lang = self.language
-        body = protect_value(self.body)
+        body = self.body
         on_null = "CALLED" if self.called_on_null_input else "RETURNS NULL"
 
         return "CREATE FUNCTION %(keyspace)s.%(name)s(%(arg_list)s)%(sep)s" \
                "%(on_null)s ON NULL INPUT%(sep)s" \
                "RETURNS %(typ)s%(sep)s" \
                "LANGUAGE %(lang)s%(sep)s" \
-               "AS %(body)s;" % locals()
+               "AS $$%(body)s$$;" % locals()
 
     @property
     def signature(self):
