@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import division
 from datetime import datetime
 
 from cassandra.cqlengine import UnicodeMixin, ValidationError
@@ -23,7 +24,9 @@ if sys.version_info >= (2, 7):
         return td.total_seconds()
 else:
     def get_total_seconds(td):
-        return 86400*td.days + td.seconds + td.microseconds/1e6
+        # integer division used here to emulate built-in total_seconds
+        return ((86400 * td.days + td.seconds) * 10 ** 6 + td.microseconds) / 10 ** 6
+
 
 class QueryValue(UnicodeMixin):
     """
