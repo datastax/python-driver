@@ -3305,6 +3305,11 @@ class ResponseFuture(object):
         If the final result has already been seen when this method is called,
         the callback will be called immediately (before this method returns).
 
+        Note: in the case that the result is not available when the callback is added,
+        the callback is executed by IO event thread. This means that the callback
+        should not block or attempt further synchronous requests, because no further
+        IO will be processed until the callback returns.
+
         **Important**: if the callback you attach results in an exception being
         raised, **the exception will be ignored**, so please ensure your
         callback handles all error cases that you care about.
