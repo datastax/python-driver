@@ -37,6 +37,7 @@ from datetime import tzinfo
 
 from cassandra.cqlengine import statements
 from cassandra.cqlengine import operators
+from cassandra.util import uuid_from_time
 
 from cassandra.cqlengine.connection import get_session
 from tests.integration import PROTOCOL_VERSION
@@ -582,17 +583,17 @@ class TestMinMaxTimeUUIDFunctions(BaseCassEngTestCase):
 
         TimeUUIDQueryModel.create(
             partition=pk,
-            time=columns.TimeUUID.from_datetime(midpoint_utc - timedelta(minutes=1)),
+            time=uuid_from_time(midpoint_utc - timedelta(minutes=1)),
             data='1')
 
         TimeUUIDQueryModel.create(
             partition=pk,
-            time=columns.TimeUUID.from_datetime(midpoint_utc),
+            time=uuid_from_time(midpoint_utc),
             data='2')
 
         TimeUUIDQueryModel.create(
             partition=pk,
-            time=columns.TimeUUID.from_datetime(midpoint_utc + timedelta(minutes=1)),
+            time=uuid_from_time(midpoint_utc + timedelta(minutes=1)),
             data='3')
 
         assert ['1', '2'] == [o.data for o in TimeUUIDQueryModel.filter(

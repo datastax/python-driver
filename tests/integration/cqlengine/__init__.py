@@ -28,7 +28,7 @@ def setup_package():
     use_single_node()
 
     keyspace = 'cqlengine_test'
-    connection.setup(['localhost'],
+    connection.setup(['127.0.0.1'],
                      protocol_version=PROTOCOL_VERSION,
                      default_keyspace=keyspace)
 

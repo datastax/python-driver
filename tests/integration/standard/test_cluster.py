@@ -30,7 +30,7 @@ from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
                                 WhiteListRoundRobinPolicy)
 from cassandra.query import SimpleStatement, TraceUnavailable
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, get_node
+from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, get_node, execute_until_pass
 from tests.integration.util import assert_quiescent_pool_state
 
 
@@ -72,14 +72,14 @@ class ClusterTests(unittest.TestCase):
 
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
-        result = session.execute(
+        result = execute_until_pass(session,
             """
             CREATE KEYSPACE clustertests
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
             """)
         self.assertEqual(None, result)
 
-        result = session.execute(
+        result = execute_until_pass(session,
             """
             CREATE TABLE clustertests.cf0 (
                 a text,
@@ -99,7 +99,7 @@ class ClusterTests(unittest.TestCase):
         result = session.execute("SELECT * FROM clustertests.cf0")
         self.assertEqual([('a', 'b', 'c')], result)
 
-        session.execute("DROP KEYSPACE clustertests")
+        execute_until_pass(session, "DROP KEYSPACE clustertests")
 
         cluster.shutdown()
 
@@ -227,7 +227,7 @@ class ClusterTests(unittest.TestCase):
 
         other_cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = other_cluster.connect()
-        session.execute(
+        execute_until_pass(session,
             """
             CREATE KEYSPACE newkeyspace
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
@@ -238,7 +238,7 @@ class ClusterTests(unittest.TestCase):
 
         self.assertIn("newkeyspace", cluster.metadata.keyspaces)
 
-        session.execute("DROP KEYSPACE newkeyspace")
+        execute_until_pass(session, "DROP KEYSPACE newkeyspace")
         cluster.shutdown()
         other_cluster.shutdown()
 
@@ -303,7 +303,7 @@ class ClusterTests(unittest.TestCase):
         keyspace_name = 'test1rf'
         type_name = self._testMethodName
 
-        session.execute('CREATE TYPE IF NOT EXISTS %s.%s (one int, two text)' % (keyspace_name, type_name))
+        execute_until_pass(session, 'CREATE TYPE IF NOT EXISTS %s.%s (one int, two text)' % (keyspace_name, type_name))
         original_meta = cluster.metadata.keyspaces
         original_test1rf_meta = original_meta[keyspace_name]
         original_type_meta = original_test1rf_meta.user_types[type_name]

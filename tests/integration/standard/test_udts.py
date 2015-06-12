@@ -17,9 +17,6 @@ try:
 except ImportError:
     import unittest  # noqa
 
-import logging
-log = logging.getLogger(__name__)
-
 from collections import namedtuple
 from functools import partial
 
@@ -28,7 +25,7 @@ from cassandra.cluster import Cluster, UserTypeDoesNotExist
 from cassandra.query import dict_factory
 from cassandra.util import OrderedMap
 
-from tests.integration import get_server_versions, use_singledc, PROTOCOL_VERSION
+from tests.integration import get_server_versions, use_singledc, PROTOCOL_VERSION, execute_until_pass
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, COLLECTION_TYPES, \
     get_sample, get_collection_sample
 
@@ -51,13 +48,14 @@ class UDTTests(unittest.TestCase):
 
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         self.session = self.cluster.connect()
-        self.session.execute("CREATE KEYSPACE udttests WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}")
+        execute_until_pass(self.session,
+                           "CREATE KEYSPACE udttests WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}")
         self.cluster.shutdown()
 
     def tearDown(self):
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         self.session = self.cluster.connect()
-        self.session.execute("DROP KEYSPACE udttests")
+        execute_until_pass(self.session, "DROP KEYSPACE udttests")
         self.cluster.shutdown()
 
     def test_can_insert_unprepared_registered_udts(self):

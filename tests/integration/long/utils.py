@@ -131,23 +131,31 @@ def ring(node):
 
 
 def wait_for_up(cluster, node, wait=True):
-    while True:
+    tries = 0
+    while tries < 100:
         host = cluster.metadata.get_host(IP_FORMAT % node)
         if host and host.is_up:
             log.debug("Done waiting for node %s to be up", node)
             return
         else:
             log.debug("Host is still marked down, waiting")
+            tries += 1
             time.sleep(1)
+
+    raise RuntimeError("Host {0} is not up after 100 attempts".format(IP_FORMAT.format(node)))
 
 
 def wait_for_down(cluster, node, wait=True):
     log.debug("Waiting for node %s to be down", node)
-    while True:
+    tries = 0
+    while tries < 100:
         host = cluster.metadata.get_host(IP_FORMAT % node)
         if not host or not host.is_up:
             log.debug("Done waiting for node %s to be down", node)
             return
         else:
             log.debug("Host is still marked up, waiting")
+            tries += 1
             time.sleep(1)
+
+    raise RuntimeError("Host {0} is not down after 100 attempts".format(IP_FORMAT.format(node)))

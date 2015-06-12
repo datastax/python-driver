@@ -358,7 +358,7 @@ class TestTimeUUIDFromDatetime(BaseCassEngTestCase):
     def test_conversion_specific_date(self):
         dt = datetime(1981, 7, 11, microsecond=555000)
 
-        uuid = TimeUUID.from_datetime(dt)
+        uuid = util.uuid_from_time(dt)
 
         from uuid import UUID
         assert isinstance(uuid, UUID)

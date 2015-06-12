@@ -1,3 +1,16 @@
+# Copyright 2013-2015 DataStax, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 try:
     import unittest2 as unittest
@@ -14,11 +27,10 @@ def setup_module():
 
 
 class StressInsertsTests(unittest.TestCase):
-
-    '''
+    """
     Test case for PYTHON-124: Repeated inserts may exhaust all connections
     causing NoConnectionsAvailable, in_flight never decreased
-    '''
+    """
 
     def setUp(self):
         """
@@ -61,7 +73,7 @@ class StressInsertsTests(unittest.TestCase):
             for pool in self.session._pools.values():
                 if leaking_connections:
                     break
-                for conn in pool._connections:
+                for conn in pool.get_connections():
                     if conn.in_flight > 1:
                         print self.session.get_pool_state()
                         leaking_connections = True

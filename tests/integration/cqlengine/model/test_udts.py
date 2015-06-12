@@ -26,7 +26,7 @@ from cassandra.cqlengine import columns
 from cassandra.cqlengine.management import sync_table, sync_type, create_keyspace_simple, drop_keyspace
 from cassandra.util import Date, Time
 
-from tests.integration import get_server_versions, PROTOCOL_VERSION
+from tests.integration import PROTOCOL_VERSION
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 
 

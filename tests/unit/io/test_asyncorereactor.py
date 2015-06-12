@@ -44,7 +44,7 @@ class AsyncoreConnectionTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         if is_monkey_patched():
-            raise unittest.SkipTest("monkey-patching detected")
+            return
         AsyncoreConnection.initialize_reactor()
         cls.socket_patcher = patch('socket.socket', spec=socket.socket)
         cls.mock_socket = cls.socket_patcher.start()
@@ -56,7 +56,13 @@ class AsyncoreConnectionTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        if is_monkey_patched():
+            return
         cls.socket_patcher.stop()
+
+    def setUp(self):
+        if is_monkey_patched():
+            raise unittest.SkipTest("Can't test asyncore with monkey patching")
 
     def make_connection(self):
         c = AsyncoreConnection('1.2.3.4', cql_version='3.0.1')

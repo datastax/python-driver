@@ -14,7 +14,8 @@
 
 import struct, time, logging, sys, traceback
 
-from cassandra import ConsistencyLevel, Unavailable, OperationTimedOut, ReadTimeout
+from cassandra import ConsistencyLevel, Unavailable, OperationTimedOut, ReadTimeout, ReadFailure, \
+    WriteTimeout, WriteFailure
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.metadata import murmur3
@@ -50,9 +51,20 @@ class LoadBalancingPolicyTests(unittest.TestCase):
     def _insert(self, session, keyspace, count=12,
                 consistency_level=ConsistencyLevel.ONE):
         session.execute('USE %s' % keyspace)
-        ss = SimpleStatement('INSERT INTO cf(k, i) VALUES (0, 0)',
-                             consistency_level=consistency_level)
-        execute_concurrent_with_args(session, ss, [None] * count)
+        ss = SimpleStatement('INSERT INTO cf(k, i) VALUES (0, 0)', consistency_level=consistency_level)
+
+        tries = 0
+        while tries < 100:
+            try:
+                execute_concurrent_with_args(session, ss, [None] * count)
+                return
+            except (OperationTimedOut, WriteTimeout, WriteFailure):
+                ex_type, ex, tb = sys.exc_info()
+                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                del tb
+                tries += 1
+
+        raise RuntimeError("Failed to execute query after 100 attempts: {0}".format(ss))
 
     def _query(self, session, keyspace, count=12,
                consistency_level=ConsistencyLevel.ONE, use_prepared=False):
@@ -62,28 +74,36 @@ class LoadBalancingPolicyTests(unittest.TestCase):
                 self.prepared = session.prepare(query_string)
 
             for i in range(count):
+                tries = 0
                 while True:
+                    if tries > 100:
+                        raise RuntimeError("Failed to execute query after 100 attempts: {0}".format(self.prepared))
                     try:
                         self.coordinator_stats.add_coordinator(session.execute_async(self.prepared.bind((0,))))
                         break
-                    except (OperationTimedOut, ReadTimeout):
+                    except (OperationTimedOut, ReadTimeout, ReadFailure):
                         ex_type, ex, tb = sys.exc_info()
                         log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                         del tb
+                        tries += 1
         else:
             routing_key = struct.pack('>i', 0)
             for i in range(count):
                 ss = SimpleStatement('SELECT * FROM %s.cf WHERE k = 0' % keyspace,
                                      consistency_level=consistency_level,
                                      routing_key=routing_key)
+                tries = 0
                 while True:
+                    if tries > 100:
+                        raise RuntimeError("Failed to execute query after 100 attempts: {0}".format(ss))
                     try:
                         self.coordinator_stats.add_coordinator(session.execute_async(ss))
                         break
-                    except (OperationTimedOut, ReadTimeout):
+                    except (OperationTimedOut, ReadTimeout, ReadFailure):
                         ex_type, ex, tb = sys.exc_info()
                         log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                         del tb
+                        tries += 1
 
     def test_token_aware_is_used_by_default(self):
         """

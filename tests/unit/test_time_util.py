@@ -42,11 +42,11 @@ class TimeUtilTest(unittest.TestCase):
         u = uuid.uuid1(node, 0)
 
         t = util.unix_time_from_uuid1(u)
-        self.assertAlmostEqual(now, t, 3)
+        self.assertAlmostEqual(now, t, 2)
 
         dt = util.datetime_from_uuid1(u)
         t = calendar.timegm(dt.timetuple()) + dt.microsecond / 1e6
-        self.assertAlmostEqual(now, t, 3)
+        self.assertAlmostEqual(now, t, 2)
 
     def test_uuid_from_time(self):
         t = time.time()

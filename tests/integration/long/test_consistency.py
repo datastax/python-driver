@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import struct, logging, sys, traceback, time
+import struct, time, traceback, sys, logging
 
 from cassandra import ConsistencyLevel, OperationTimedOut, ReadTimeout, WriteTimeout, Unavailable
 from cassandra.cluster import Cluster
 from cassandra.policies import TokenAwarePolicy, RoundRobinPolicy, DowngradingConsistencyRetryPolicy
 from cassandra.query import SimpleStatement
-from tests.integration import use_singledc, PROTOCOL_VERSION
+from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass
 
 from tests.integration.long.utils import (force_stop, create_schema, wait_for_down, wait_for_up,
                                           start, CoordinatorStats)
@@ -27,8 +27,6 @@ try:
     import unittest2 as unittest
 except ImportError:
     import unittest  # noqa
-
-log = logging.getLogger(__name__)
 
 ALL_CONSISTENCY_LEVELS = set([
     ConsistencyLevel.ANY, ConsistencyLevel.ONE, ConsistencyLevel.TWO,
@@ -40,6 +38,8 @@ MULTI_DC_CONSISTENCY_LEVELS = set([
     ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.EACH_QUORUM])
 
 SINGLE_DC_CONSISTENCY_LEVELS = ALL_CONSISTENCY_LEVELS - MULTI_DC_CONSISTENCY_LEVELS
+
+log = logging.getLogger(__name__)
 
 
 def setup_module():
@@ -65,15 +65,7 @@ class ConsistencyTests(unittest.TestCase):
         for i in range(count):
             ss = SimpleStatement('INSERT INTO cf(k, i) VALUES (0, 0)',
                                  consistency_level=consistency_level)
-            while True:
-                try:
-                    session.execute(ss)
-                    break
-                except (OperationTimedOut, WriteTimeout):
-                    ex_type, ex, tb = sys.exc_info()
-                    log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
-                    del tb
-                    time.sleep(1)
+            execute_until_pass(session, ss)
 
     def _query(self, session, keyspace, count, consistency_level=ConsistencyLevel.ONE):
         routing_key = struct.pack('>i', 0)
@@ -81,7 +73,10 @@ class ConsistencyTests(unittest.TestCase):
             ss = SimpleStatement('SELECT * FROM cf WHERE k = 0',
                                  consistency_level=consistency_level,
                                  routing_key=routing_key)
+            tries = 0
             while True:
+                if tries > 100:
+                    raise RuntimeError("Failed to execute query after 100 attempts: {0}".format(ss))
                 try:
                     self.coordinator_stats.add_coordinator(session.execute_async(ss))
                     break
@@ -89,6 +84,7 @@ class ConsistencyTests(unittest.TestCase):
                     ex_type, ex, tb = sys.exc_info()
                     log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                     del tb
+                    tries += 1
                     time.sleep(1)
 
     def _assert_writes_succeed(self, session, keyspace, consistency_levels):
