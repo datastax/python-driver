@@ -557,7 +557,12 @@ class TimeUUID(UUID):
 
         :param dt: datetime
         :type dt: datetime
-        :return:
+        :return: uuid1
+
+        .. deprecated:: 2.6.0
+
+            Use :func:`cassandra.util.uuid_from_time`
+
         """
         msg = "cqlengine.columns.TimeUUID.from_datetime is deprecated. Use cassandra.util.uuid_from_time instead."
         warnings.warn(msg, DeprecationWarning)

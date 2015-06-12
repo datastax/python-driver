@@ -150,3 +150,6 @@ After::
         __discriminator_value__ = 'dog'
 
 
+TimeUUID.from_datetime
+----------------------
+This function is deprecated in favor of the core utility function :func:`~.uuid_from_time`.
