@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging, sys, traceback
+import logging
 
-from cassandra import ConsistencyLevel, OperationTimedOut
+from cassandra import ConsistencyLevel, AlreadyExists
 from cassandra.cluster import Cluster
-from cassandra.protocol import ConfigurationException
 from cassandra.query import SimpleStatement
-from tests.integration import use_singledc, PROTOCOL_VERSION
+
+from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass
 
 try:
     import unittest2 as unittest
@@ -54,29 +54,29 @@ class SchemaTests(unittest.TestCase):
             for keyspace_number in range(5):
                 keyspace = "ks_{0}".format(keyspace_number)
 
-                results = session.execute("SELECT keyspace_name FROM system.schema_keyspaces")
+                results = execute_until_pass(session, "SELECT keyspace_name FROM system.schema_keyspaces")
                 existing_keyspaces = [row[0] for row in results]
                 if keyspace in existing_keyspaces:
                     drop = "DROP KEYSPACE {0}".format(keyspace)
                     log.debug(drop)
-                    session.execute(drop)
+                    execute_until_pass(session, drop)
 
                 create = "CREATE KEYSPACE {0} WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': 3}}".format(keyspace)
                 log.debug(create)
-                session.execute(create)
+                execute_until_pass(session, create)
 
                 create = "CREATE TABLE {0}.cf (k int PRIMARY KEY, i int)".format(keyspace)
                 log.debug(create)
-                session.execute(create)
+                execute_until_pass(session, create)
 
                 use = "USE {0}".format(keyspace)
                 log.debug(use)
-                session.execute(use)
+                execute_until_pass(session, use)
 
                 insert = "INSERT INTO cf (k, i) VALUES (0, 0)"
                 log.debug(insert)
                 ss = SimpleStatement(insert, consistency_level=ConsistencyLevel.QUORUM)
-                session.execute(ss)
+                execute_until_pass(session, ss)
 
     def test_for_schema_disagreements_different_keyspaces(self):
         """
@@ -86,28 +86,13 @@ class SchemaTests(unittest.TestCase):
         session = self.session
 
         for i in xrange(30):
-            try:
-                session.execute("CREATE KEYSPACE test_{0} WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': 1}}".format(i))
-                session.execute("CREATE TABLE test_{0}.cf (key int PRIMARY KEY, value int)".format(i))
+            execute_until_pass(session, "CREATE KEYSPACE test_{0} WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': 1}}".format(i))
+            execute_until_pass(session, "CREATE TABLE test_{0}.cf (key int PRIMARY KEY, value int)".format(i))
 
-                for j in xrange(100):
-                    session.execute("INSERT INTO test_{0}.cf (key, value) VALUES ({1}, {1})".format(i, j))
-            except OperationTimedOut:
-                ex_type, ex, tb = sys.exc_info()
-                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
-                del tb
-            finally:
-                while True:
-                    try:
-                        session.execute("DROP KEYSPACE test_{0}".format(i))
-                        break
-                    except OperationTimedOut:
-                        ex_type, ex, tb = sys.exc_info()
-                        log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
-                        del tb
-                    except ConfigurationException:
-                        # We're good, the keyspace was never created due to OperationTimedOut
-                        break
+            for j in xrange(100):
+                execute_until_pass(session, "INSERT INTO test_{0}.cf (key, value) VALUES ({1}, {1})".format(i, j))
+
+            execute_until_pass(session, "DROP KEYSPACE test_{0}".format(i))
 
     def test_for_schema_disagreements_same_keyspace(self):
         """
@@ -119,24 +104,14 @@ class SchemaTests(unittest.TestCase):
 
         for i in xrange(30):
             try:
-                session.execute("CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
-                session.execute("CREATE TABLE test.cf (key int PRIMARY KEY, value int)")
+                execute_until_pass(session, "CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
+            except AlreadyExists:
+                execute_until_pass(session, "DROP KEYSPACE test")
+                execute_until_pass(session, "CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
 
-                for j in xrange(100):
-                    session.execute("INSERT INTO test.cf (key, value) VALUES ({0}, {0})".format(j))
-            except OperationTimedOut:
-                ex_type, ex, tb = sys.exc_info()
-                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
-                del tb
-            finally:
-                while True:
-                    try:
-                        session.execute("DROP KEYSPACE test")
-                        break
-                    except OperationTimedOut:
-                        ex_type, ex, tb = sys.exc_info()
-                        log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
-                        del tb
-                    except ConfigurationException:
-                        # We're good, the keyspace was never created due to OperationTimedOut
-                        break
+            execute_until_pass(session, "CREATE TABLE test.cf (key int PRIMARY KEY, value int)")
+
+            for j in xrange(100):
+                execute_until_pass(session, "INSERT INTO test.cf (key, value) VALUES ({0}, {0})".format(j))
+
+            execute_until_pass(session, "DROP KEYSPACE test")

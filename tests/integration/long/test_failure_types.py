@@ -12,19 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys, logging, traceback
+
+from cassandra import ConsistencyLevel, OperationTimedOut, ReadTimeout, WriteTimeout, ReadFailure, WriteFailure,\
+    FunctionFailure
+from cassandra.cluster import Cluster
+from cassandra.concurrent import execute_concurrent_with_args
+from cassandra.query import SimpleStatement
+from tests.integration import use_singledc, PROTOCOL_VERSION, get_cluster, setup_keyspace, remove_cluster
 
 try:
     import unittest2 as unittest
 except ImportError:
     import unittest
 
-
-from cassandra.cluster import Cluster
-from cassandra import ConsistencyLevel
-from cassandra import WriteFailure, ReadFailure, FunctionFailure
-from cassandra.concurrent import execute_concurrent_with_args
-from cassandra.query import SimpleStatement
-from tests.integration import use_singledc, PROTOCOL_VERSION, get_cluster, setup_keyspace
+log = logging.getLogger(__name__)
 
 
 def setup_module():
@@ -48,14 +50,10 @@ def setup_module():
 def teardown_module():
     """
     The rest of the tests don't need custom tombstones
-    reset the config options so as to not mess with other tests.
+    remove the cluster so as to not interfere with other tests.
     """
     if PROTOCOL_VERSION >= 4:
-        ccm_cluster = get_cluster()
-        config_options = {}
-        ccm_cluster.set_configuration_options(config_options)
-        if ccm_cluster is not None:
-            ccm_cluster.stop()
+        remove_cluster()
 
 
 class ClientExceptionTests(unittest.TestCase):
@@ -82,6 +80,19 @@ class ClientExceptionTests(unittest.TestCase):
 
         # Restart the nodes to fully functional again
         self.setFailingNodes(failing_nodes, "testksfail")
+
+    def execute_concurrent_args_helper(self, session, query, params):
+        tries = 0
+        while tries < 100:
+            try:
+                return execute_concurrent_with_args(session, query, params, concurrency=50)
+            except (ReadTimeout, WriteTimeout, OperationTimedOut, ReadFailure, WriteFailure):
+                ex_type, ex, tb = sys.exc_info()
+                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                del tb
+                tries += 1
+
+        raise RuntimeError("Failed to execute query after 100 attempts: {0}".format(query))
 
     def setFailingNodes(self, failing_nodes, keyspace):
         """
@@ -210,11 +221,11 @@ class ClientExceptionTests(unittest.TestCase):
 
         statement = self.session.prepare("INSERT INTO test3rf.test2 (k, v0,v1) VALUES  (1,?,1)")
         parameters = [(x,) for x in range(3000)]
-        execute_concurrent_with_args(self.session, statement, parameters, concurrency=50)
+        self.execute_concurrent_args_helper(self.session, statement, parameters)
 
         statement = self.session.prepare("DELETE v1 FROM test3rf.test2 WHERE k = 1 AND v0 =?")
         parameters = [(x,) for x in range(2001)]
-        execute_concurrent_with_args(self.session, statement, parameters, concurrency=50)
+        self.execute_concurrent_args_helper(self.session, statement, parameters)
 
         self._perform_cql_statement(
             """

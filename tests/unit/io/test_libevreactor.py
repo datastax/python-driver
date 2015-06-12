@@ -49,7 +49,7 @@ class LibevConnectionTest(unittest.TestCase):
 
     def setUp(self):
         if 'gevent.monkey' in sys.modules:
-            raise unittest.SkipTest("gevent monkey-patching detected")
+            raise unittest.SkipTest("Can't test libev with monkey patching")
         if LibevConnection is None:
             raise unittest.SkipTest('libev does not appear to be installed correctly')
         LibevConnection.initialize_reactor()

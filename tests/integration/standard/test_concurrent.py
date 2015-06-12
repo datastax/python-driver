@@ -12,6 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from itertools import cycle
+import sys, logging, traceback
+
+from cassandra import InvalidRequest, ConsistencyLevel, ReadTimeout, WriteTimeout, OperationTimedOut, \
+    ReadFailure, WriteFailure
+from cassandra.cluster import Cluster, PagedResult
+from cassandra.concurrent import execute_concurrent, execute_concurrent_with_args
+from cassandra.policies import HostDistance
+from cassandra.query import tuple_factory, SimpleStatement
+
 from tests.integration import use_singledc, PROTOCOL_VERSION
 
 try:
@@ -19,14 +29,7 @@ try:
 except ImportError:
     import unittest  # noqa
 
-from itertools import cycle
-
-from cassandra import InvalidRequest, ConsistencyLevel
-from cassandra.cluster import Cluster, PagedResult
-from cassandra.concurrent import (execute_concurrent,
-                                  execute_concurrent_with_args)
-from cassandra.policies import HostDistance
-from cassandra.query import tuple_factory, SimpleStatement
+log = logging.getLogger(__name__)
 
 
 def setup_module():
@@ -47,6 +50,31 @@ class ClusterTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.cluster.shutdown()
 
+    def execute_concurrent_helper(self, session, query):
+        count = 0
+        while count < 100:
+            try:
+                return execute_concurrent(session, query)
+            except (ReadTimeout, WriteTimeout, OperationTimedOut, ReadFailure, WriteFailure):
+                ex_type, ex, tb = sys.exc_info()
+                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                del tb
+                count += 1
+
+        raise RuntimeError("Failed to execute query after 100 attempts: {0}".format(query))
+
+    def execute_concurrent_args_helper(self, session, query, params):
+        count = 0
+        while count < 100:
+            try:
+                return execute_concurrent_with_args(session, query, params)
+            except (ReadTimeout, WriteTimeout, OperationTimedOut, ReadFailure, WriteFailure):
+                ex_type, ex, tb = sys.exc_info()
+                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                del tb
+
+        raise RuntimeError("Failed to execute query after 100 attempts: {0}".format(query))
+
     def test_execute_concurrent(self):
         for num_statements in (0, 1, 2, 7, 10, 99, 100, 101, 199, 200, 201):
             # write
@@ -56,7 +84,7 @@ class ClusterTests(unittest.TestCase):
             statements = cycle((statement, ))
             parameters = [(i, i) for i in range(num_statements)]
 
-            results = execute_concurrent(self.session, list(zip(statements, parameters)))
+            results = self.execute_concurrent_helper(self.session, list(zip(statements, parameters)))
             self.assertEqual(num_statements, len(results))
             self.assertEqual([(True, None)] * num_statements, results)
 
@@ -67,7 +95,7 @@ class ClusterTests(unittest.TestCase):
             statements = cycle((statement, ))
             parameters = [(i, ) for i in range(num_statements)]
 
-            results = execute_concurrent(self.session, list(zip(statements, parameters)))
+            results = self.execute_concurrent_helper(self.session, list(zip(statements, parameters)))
             self.assertEqual(num_statements, len(results))
             self.assertEqual([(True, [(i,)]) for i in range(num_statements)], results)
 
@@ -78,7 +106,7 @@ class ClusterTests(unittest.TestCase):
                 consistency_level=ConsistencyLevel.QUORUM)
             parameters = [(i, i) for i in range(num_statements)]
 
-            results = execute_concurrent_with_args(self.session, statement, parameters)
+            results = self.execute_concurrent_args_helper(self.session, statement, parameters)
             self.assertEqual(num_statements, len(results))
             self.assertEqual([(True, None)] * num_statements, results)
 
@@ -88,7 +116,7 @@ class ClusterTests(unittest.TestCase):
                 consistency_level=ConsistencyLevel.QUORUM)
             parameters = [(i, ) for i in range(num_statements)]
 
-            results = execute_concurrent_with_args(self.session, statement, parameters)
+            results = self.execute_concurrent_args_helper(self.session, statement, parameters)
             self.assertEqual(num_statements, len(results))
             self.assertEqual([(True, [(i,)]) for i in range(num_statements)], results)
 
@@ -104,7 +132,7 @@ class ClusterTests(unittest.TestCase):
             consistency_level=ConsistencyLevel.QUORUM)
         parameters = [(i, i) for i in range(num_statements)]
 
-        results = execute_concurrent_with_args(self.session, statement, parameters)
+        results = self.execute_concurrent_args_helper(self.session, statement, parameters)
         self.assertEqual(num_statements, len(results))
         self.assertEqual([(True, None)] * num_statements, results)
 
@@ -115,7 +143,7 @@ class ClusterTests(unittest.TestCase):
             fetch_size=int(num_statements / 2))
         parameters = [(i, ) for i in range(num_statements)]
 
-        results = execute_concurrent_with_args(self.session, statement, [(num_statements,)])
+        results = self.execute_concurrent_args_helper(self.session, statement, [(num_statements,)])
         self.assertEqual(1, len(results))
         self.assertTrue(results[0][0])
         result = results[0][1]

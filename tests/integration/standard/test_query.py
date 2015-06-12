@@ -512,8 +512,14 @@ class LightweightTransactionTests(unittest.TestCase):
                 if type(result).__name__ == "WriteTimeout":
                     received_timeout = True
                     continue
+                if type(result).__name__ == "WriteFailure":
+                    received_timeout = True
+                    continue
                 if type(result).__name__ == "ReadTimeout":
                     continue
+                if type(result).__name__ == "ReadFailure":
+                    continue
+
                 self.fail("Unexpected exception %s: %s" % (type(result).__name__, result.message))
 
         # Make sure test passed

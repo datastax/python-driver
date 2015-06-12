@@ -17,15 +17,10 @@ try:
 except ImportError:
     import unittest  # noqa
 
-import difflib
+import difflib, six, sys
 from mock import Mock
-import logging
-import six
-import sys
-import traceback
 
-from cassandra import AlreadyExists, OperationTimedOut, SignatureDescriptor, UserFunctionDescriptor, \
-    UserAggregateDescriptor
+from cassandra import AlreadyExists, SignatureDescriptor, UserFunctionDescriptor, UserAggregateDescriptor
 
 from cassandra.cluster import Cluster
 from cassandra.cqltypes import DoubleType, Int32Type, ListType, UTF8Type, MapType
@@ -35,10 +30,7 @@ from cassandra.metadata import (Metadata, KeyspaceMetadata, TableMetadata, Index
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
-from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION,
-                               get_server_versions)
-
-log = logging.getLogger(__name__)
+from tests.integration import get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass
 
 
 def setup_module():
@@ -58,18 +50,12 @@ class SchemaMetadataTests(unittest.TestCase):
 
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         self.session = self.cluster.connect()
-        self.session.execute("CREATE KEYSPACE schemametadatatest WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}")
+        execute_until_pass(self.session,
+                           "CREATE KEYSPACE schemametadatatest WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}")
 
     def tearDown(self):
-        while True:
-            try:
-                self.session.execute("DROP KEYSPACE schemametadatatest")
-                self.cluster.shutdown()
-                break
-            except OperationTimedOut:
-                ex_type, ex, tb = sys.exc_info()
-                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
-                del tb
+        execute_until_pass(self.session, "DROP KEYSPACE schemametadatatest")
+        self.cluster.shutdown()
 
     def make_create_statement(self, partition_cols, clustering_cols=None, other_cols=None, compact=False):
         clustering_cols = clustering_cols or []
@@ -107,13 +93,13 @@ class SchemaMetadataTests(unittest.TestCase):
     def check_create_statement(self, tablemeta, original):
         recreate = tablemeta.as_cql_query(formatted=False)
         self.assertEqual(original, recreate[:len(original)])
-        self.session.execute("DROP TABLE %s.%s" % (self.ksname, self.cfname))
-        self.session.execute(recreate)
+        execute_until_pass(self.session, "DROP TABLE {0}.{1}".format(self.ksname, self.cfname))
+        execute_until_pass(self.session, recreate)
 
         # create the table again, but with formatting enabled
-        self.session.execute("DROP TABLE %s.%s" % (self.ksname, self.cfname))
+        execute_until_pass(self.session, "DROP TABLE {0}.{1}".format(self.ksname, self.cfname))
         recreate = tablemeta.as_cql_query(formatted=True)
-        self.session.execute(recreate)
+        execute_until_pass(self.session, recreate)
 
     def get_table_metadata(self):
         self.cluster.refresh_table_metadata(self.ksname, self.cfname)

@@ -12,25 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
-import traceback
-
 try:
     import unittest2 as unittest
 except ImportError:
     import unittest  # noqa
 
-import logging
-log = logging.getLogger(__name__)
-
-import os
+import os, six, time, sys, logging, traceback
 from threading import Event
-import six
 from subprocess import call
-
 from itertools import groupby
 
+from cassandra import OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure
 from cassandra.cluster import Cluster
+from cassandra.protocol import ConfigurationException
 
 try:
     from ccmlib.cluster import Cluster as CCMCluster
@@ -38,6 +32,8 @@ try:
     from ccmlib import common
 except ImportError as e:
     CCMClusterFactory = None
+
+log = logging.getLogger(__name__)
 
 CLUSTER_NAME = 'test_cluster'
 SINGLE_NODE_CLUSTER_NAME = 'single_node'
@@ -84,7 +80,7 @@ def _tuple_version(version_string):
 
 USE_CASS_EXTERNAL = bool(os.getenv('USE_CASS_EXTERNAL', False))
 
-default_cassandra_version = '2.1.3'
+default_cassandra_version = '2.1.5'
 
 if USE_CASS_EXTERNAL:
     if CCMClusterFactory:
@@ -157,10 +153,21 @@ def remove_cluster():
 
     global CCM_CLUSTER
     if CCM_CLUSTER:
-        log.debug("removing cluster %s", CCM_CLUSTER.name)
-        CCM_CLUSTER.remove()
-        CCM_CLUSTER = None
+        log.debug("Removing cluster {0}".format(CCM_CLUSTER.name))
+        tries = 0
+        while tries < 100:
+            try:
+                CCM_CLUSTER.remove()
+                CCM_CLUSTER = None
+                return
+            except WindowsError:
+                ex_type, ex, tb = sys.exc_info()
+                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                del tb
+                tries += 1
+                time.sleep(1)
 
+        raise RuntimeError("Failed to remove cluster after 100 attempts")
 
 def is_current_cluster(cluster_name, node_counts):
     global CCM_CLUSTER
@@ -175,49 +182,55 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True):
     global CCM_CLUSTER
     if USE_CASS_EXTERNAL:
         if CCM_CLUSTER:
-            log.debug("Using external ccm cluster %s", CCM_CLUSTER.name)
+            log.debug("Using external CCM cluster {0}".format(CCM_CLUSTER.name))
         else:
             log.debug("Using unnamed external cluster")
         return
 
     if is_current_cluster(cluster_name, nodes):
-        log.debug("Using existing cluster %s", cluster_name)
-        return
+        log.debug("Using existing cluster, matching topology: {0}".format(cluster_name))
+    else:
+        if CCM_CLUSTER:
+            log.debug("Stopping existing cluster, topology mismatch: {0}".format(CCM_CLUSTER.name))
+            CCM_CLUSTER.stop()
 
-    if CCM_CLUSTER:
-        log.debug("Stopping cluster %s", CCM_CLUSTER.name)
-        CCM_CLUSTER.stop()
-
-    try:
         try:
-            cluster = CCMClusterFactory.load(path, cluster_name)
-            log.debug("Found existing ccm %s cluster; clearing", cluster_name)
-            cluster.clear()
-            cluster.set_install_dir(**CCM_KWARGS)
+            CCM_CLUSTER = CCMClusterFactory.load(path, cluster_name)
+            log.debug("Found existing CCM cluster, {0}; clearing.".format(cluster_name))
+            CCM_CLUSTER.clear()
+            CCM_CLUSTER.set_install_dir(**CCM_KWARGS)
         except Exception:
-            log.debug("Creating new ccm %s cluster with %s", cluster_name, CCM_KWARGS)
-            cluster = CCMCluster(path, cluster_name, **CCM_KWARGS)
-            cluster.set_configuration_options({'start_native_transport': True})
-            if CASSANDRA_VERSION >= '2.2':
-                cluster.set_configuration_options({'enable_user_defined_functions': True})
-            common.switch_cluster(path, cluster_name)
-            cluster.populate(nodes, ipformat=ipformat)
+            ex_type, ex, tb = sys.exc_info()
+            log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+            del tb
 
+            log.debug("Creating new CCM cluster, {0}, with args {1}".format(cluster_name, CCM_KWARGS))
+            CCM_CLUSTER = CCMCluster(path, cluster_name, **CCM_KWARGS)
+            CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
+            if CASSANDRA_VERSION >= '2.2':
+                CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
+            common.switch_cluster(path, cluster_name)
+            CCM_CLUSTER.populate(nodes, ipformat=ipformat)
+    try:
         jvm_args = []
         # This will enable the Mirroring query handler which will echo our custom payload k,v pairs back
         if PROTOCOL_VERSION >= 4:
             jvm_args = [" -Dcassandra.custom_query_handler_class=org.apache.cassandra.cql3.CustomPayloadMirroringQueryHandler"]
 
         if start:
-            log.debug("Starting ccm %s cluster", cluster_name)
-            cluster.start(wait_for_binary_proto=True, wait_other_notice=True, jvm_args=jvm_args)
+            log.debug("Starting CCM cluster: {0}".format(cluster_name))
+            CCM_CLUSTER.start(wait_for_binary_proto=True, wait_other_notice=True, jvm_args=jvm_args)
             setup_keyspace(ipformat=ipformat)
-
-        CCM_CLUSTER = cluster
     except Exception:
-        log.exception("Failed to start ccm cluster. Removing cluster.")
+        log.exception("Failed to start CCM cluster; removing cluster.")
+        
+        if os.name == "nt":
+            if CCM_CLUSTER:
+                for node in CCM_CLUSTER.nodes.itervalues():
+                    os.system("taskkill /F /PID " + str(node.pid))
+        else:
+            call(["pkill", "-9", "-f", ".ccm"])
         remove_cluster()
-        call(["pkill", "-9", "-f", ".ccm"])
         raise
 
 
@@ -240,6 +253,22 @@ def teardown_package():
             log.warning('Did not find cluster: %s' % cluster_name)
 
 
+def execute_until_pass(session, query):
+    tries = 0
+    while tries < 100:
+        try:
+            return session.execute(query)
+        except ConfigurationException:
+            # keyspace/table was already created/dropped
+            return
+        except (OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure):
+            ex_type, ex, tb = sys.exc_info()
+            log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+            del tb
+            tries += 1
+
+    raise RuntimeError("Failed to execute query after 100 attempts: {0}".format(query))
+
 def setup_keyspace(ipformat=None):
     # wait for nodes to startup
     time.sleep(10)
@@ -251,32 +280,32 @@ def setup_keyspace(ipformat=None):
     session = cluster.connect()
 
     try:
-        results = session.execute("SELECT keyspace_name FROM system.schema_keyspaces")
+        results = execute_until_pass(session, "SELECT keyspace_name FROM system.schema_keyspaces")
         existing_keyspaces = [row[0] for row in results]
         for ksname in ('test1rf', 'test2rf', 'test3rf'):
             if ksname in existing_keyspaces:
-                session.execute("DROP KEYSPACE %s" % ksname)
+                execute_until_pass(session, "DROP KEYSPACE %s" % ksname)
 
         ddl = '''
             CREATE KEYSPACE test3rf
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '3'}'''
-        session.execute(ddl)
+        execute_until_pass(session, ddl)
 
         ddl = '''
             CREATE KEYSPACE test2rf
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '2'}'''
-        session.execute(ddl)
+        execute_until_pass(session, ddl)
 
         ddl = '''
             CREATE KEYSPACE test1rf
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}'''
-        session.execute(ddl)
+        execute_until_pass(session, ddl)
 
         ddl = '''
             CREATE TABLE test3rf.test (
                 k int PRIMARY KEY,
                 v int )'''
-        session.execute(ddl)
+        execute_until_pass(session, ddl)
 
     except Exception:
         traceback.print_exc()

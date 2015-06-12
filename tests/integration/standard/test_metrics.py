@@ -23,7 +23,7 @@ from cassandra.query import SimpleStatement
 from cassandra import ConsistencyLevel, WriteTimeout, Unavailable, ReadTimeout
 
 from cassandra.cluster import Cluster, NoHostAvailable
-from tests.integration import get_cluster, get_node, use_singledc, PROTOCOL_VERSION
+from tests.integration import get_cluster, get_node, use_singledc, PROTOCOL_VERSION, execute_until_pass
 
 
 def setup_module():
@@ -76,7 +76,7 @@ class MetricsTests(unittest.TestCase):
 
         # Assert read
         query = SimpleStatement("SELECT * FROM test WHERE k=1", consistency_level=ConsistencyLevel.ALL)
-        results = session.execute(query)
+        results = execute_until_pass(session, query)
         self.assertEqual(1, len(results))
 
         # Pause node so it shows as unreachable to coordinator
@@ -109,7 +109,7 @@ class MetricsTests(unittest.TestCase):
 
         # Assert read
         query = SimpleStatement("SELECT * FROM test WHERE k=1", consistency_level=ConsistencyLevel.ALL)
-        results = session.execute(query)
+        results = execute_until_pass(session, query)
         self.assertEqual(1, len(results))
 
         # Pause node so it shows as unreachable to coordinator
@@ -142,11 +142,11 @@ class MetricsTests(unittest.TestCase):
 
         # Assert read
         query = SimpleStatement("SELECT * FROM test WHERE k=1", consistency_level=ConsistencyLevel.ALL)
-        results = session.execute(query)
+        results = execute_until_pass(session, query)
         self.assertEqual(1, len(results))
 
         # Stop node gracefully
-        get_node(1).stop(wait=True, gently=True)
+        get_node(1).stop(wait=True, wait_other_notice=True)
 
         try:
             # Test write
