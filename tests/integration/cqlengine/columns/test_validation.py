@@ -153,13 +153,18 @@ class TestDate(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         if PROTOCOL_VERSION < 4:
-            raise unittest.SkipTest("Protocol v4 datatypes require native protocol 4+, currently using: {0}".format(PROTOCOL_VERSION))
-
+            return
         sync_table(cls.DateTest)
 
     @classmethod
     def tearDownClass(cls):
+        if PROTOCOL_VERSION < 4:
+            return
         drop_table(cls.DateTest)
+
+    def setUp(self):
+        if PROTOCOL_VERSION < 4:
+            raise unittest.SkipTest("Protocol v4 datatypes require native protocol 4+, currently using: {0}".format(PROTOCOL_VERSION))
 
     def test_date_io(self):
         today = date.today()

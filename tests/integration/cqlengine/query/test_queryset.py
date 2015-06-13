@@ -689,23 +689,25 @@ class TestObjectsProperty(BaseQuerySetUsage):
         len(TestModel.objects) # evaluate queryset
         assert TestModel.objects._result_cache is None
 
+class PageQueryTests(BaseCassEngTestCase):
+    def test_paged_result_handling(self):
+        if PROTOCOL_VERSION < 2:
+            raise unittest.SkipTest("Paging requires native protocol 2+, currently using: {0}".format(PROTOCOL_VERSION))
 
-@unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
-def test_paged_result_handling():
-    # addresses #225
-    class PagingTest(Model):
-        id = columns.Integer(primary_key=True)
-        val = columns.Integer()
-    sync_table(PagingTest)
+        # addresses #225
+        class PagingTest(Model):
+            id = columns.Integer(primary_key=True)
+            val = columns.Integer()
+        sync_table(PagingTest)
 
-    PagingTest.create(id=1, val=1)
-    PagingTest.create(id=2, val=2)
+        PagingTest.create(id=1, val=1)
+        PagingTest.create(id=2, val=2)
 
-    session = get_session()
-    with mock.patch.object(session, 'default_fetch_size', 1):
-        results = PagingTest.objects()[:]
+        session = get_session()
+        with mock.patch.object(session, 'default_fetch_size', 1):
+            results = PagingTest.objects()[:]
 
-    assert len(results) == 2
+        assert len(results) == 2
 
 
 class ModelQuerySetTimeoutTestCase(BaseQuerySetUsage):
