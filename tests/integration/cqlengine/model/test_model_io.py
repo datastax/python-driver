@@ -437,7 +437,7 @@ class TestQuerying(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         if PROTOCOL_VERSION < 4:
-            raise unittest.SkipTest("Date query tests require native protocol 4+, currently using: {0}".format(PROTOCOL_VERSION))
+            return
 
         super(TestQuerying, cls).setUpClass()
         drop_table(TestQueryModel)
@@ -445,8 +445,15 @@ class TestQuerying(BaseCassEngTestCase):
 
     @classmethod
     def tearDownClass(cls):
+        if PROTOCOL_VERSION < 4:
+            return
+
         super(TestQuerying, cls).tearDownClass()
         drop_table(TestQueryModel)
+
+    def setUp(self):
+        if PROTOCOL_VERSION < 4:
+            raise unittest.SkipTest("Date query tests require native protocol 4+, currently using: {0}".format(PROTOCOL_VERSION))
 
     def test_query_with_date(self):
         uid = uuid4()

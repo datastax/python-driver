@@ -311,30 +311,32 @@ class NonModelFailureTest(BaseCassEngTestCase):
         with self.assertRaises(CQLEngineException):
             sync_table(self.FakeModel)
 
+class StaticColumnTests(BaseCassEngTestCase):
+    def test_static_columns(self):
+        if PROTOCOL_VERSION < 2:
+            raise unittest.SkipTest("Native protocol 2+ required, currently using: {0}".format(PROTOCOL_VERSION))
 
-@unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
-def test_static_columns():
-    class StaticModel(Model):
-        id = columns.Integer(primary_key=True)
-        c = columns.Integer(primary_key=True)
-        name = columns.Text(static=True)
+        class StaticModel(Model):
+            id = columns.Integer(primary_key=True)
+            c = columns.Integer(primary_key=True)
+            name = columns.Text(static=True)
 
-    drop_table(StaticModel)
+        drop_table(StaticModel)
 
-    session = get_session()
+        session = get_session()
 
-    with mock.patch.object(session, "execute", wraps=session.execute) as m:
+        with mock.patch.object(session, "execute", wraps=session.execute) as m:
+            sync_table(StaticModel)
+
+        assert m.call_count > 0
+        statement = m.call_args[0][0].query_string
+        assert '"name" text static' in statement, statement
+
+        # if we sync again, we should not apply an alter w/ a static
         sync_table(StaticModel)
 
-    assert m.call_count > 0
-    statement = m.call_args[0][0].query_string
-    assert '"name" text static' in statement, statement
+        with mock.patch.object(session, "execute", wraps=session.execute) as m2:
+            sync_table(StaticModel)
 
-    # if we sync again, we should not apply an alter w/ a static
-    sync_table(StaticModel)
-
-    with mock.patch.object(session, "execute", wraps=session.execute) as m2:
-        sync_table(StaticModel)
-
-    assert len(m2.call_args_list) == 1
-    assert "ALTER" not in m2.call_args[0][0].query_string
+        assert len(m2.call_args_list) == 1
+        assert "ALTER" not in m2.call_args[0][0].query_string
