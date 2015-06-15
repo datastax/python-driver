@@ -30,7 +30,9 @@ from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
                                 WhiteListRoundRobinPolicy)
 from cassandra.query import SimpleStatement, TraceUnavailable
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, get_node
+
+from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, get_node, CASSANDRA_VERSION
+
 from tests.integration.util import assert_quiescent_pool_state
 
 
@@ -100,6 +102,38 @@ class ClusterTests(unittest.TestCase):
         self.assertEqual([('a', 'b', 'c')], result)
 
         session.execute("DROP KEYSPACE clustertests")
+
+        cluster.shutdown()
+
+    def test_protocol_negotiation(self):
+        """
+        Test for protocol negotiation
+
+        test_protocol_negotiation tests that the driver will select the correct protocol version to match
+        the correct cassandra version. Please note that 2.1.5 has a
+        bug https://issues.apache.org/jira/browse/CASSANDRA-9451 that will cause this test to fail
+        that will cause this to not pass. It was rectified in 2.1.6
+
+        @since 2.6.0
+        @jira_ticket PYTHON-240
+        @expected_result the correct protocol version should be selected
+
+        @test_category connection
+        """
+
+        cluster = Cluster()
+        session = cluster.connect()
+        default_protocol_version = session._protocol_version
+
+        # Make sure the correct protocol was selected by default
+        if CASSANDRA_VERSION >= '2.2':
+            self.assertEqual(default_protocol_version, 4)
+        elif CASSANDRA_VERSION >= '2.1':
+            self.assertEqual(default_protocol_version, 3)
+        elif CASSANDRA_VERSION >= '2.0':
+            self.assertEqual(default_protocol_version, 2)
+        else:
+            self.assertEqual(default_protocol_version, 1)
 
         cluster.shutdown()
 
@@ -577,3 +611,5 @@ class ClusterTests(unittest.TestCase):
         assert_quiescent_pool_state(self, cluster)
 
         cluster.shutdown()
+
+
