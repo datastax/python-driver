@@ -2120,7 +2120,7 @@ class ControlConnection(object):
                 peers_query, local_query, timeout=self._timeout)
 
             self._refresh_node_list_and_token_map(connection, preloaded_results=shared_results)
-            self._refresh_schema(connection, preloaded_results=shared_results)
+            self._refresh_schema(connection, preloaded_results=shared_results, schema_agreement_wait=-1)
             if not self._cluster.metadata.keyspaces:
                 log.warning("[control connection] No schema built on connect; retrying without wait for schema agreement")
                 self._refresh_schema(connection, preloaded_results=shared_results, schema_agreement_wait=0)
