@@ -538,7 +538,6 @@ class Metadata(object):
                 self._hosts[host.address] = host
                 return host, True
 
-
     def remove_host(self, host):
         with self._hosts_lock:
             return bool(self._hosts.pop(host.address, False))
@@ -893,6 +892,7 @@ class KeyspaceMetadata(object):
         if table_meta:
             for index_name in table_meta.indexes:
                 self.indexes.pop(index_name, None)
+
 
 class UserType(object):
     """
@@ -1607,17 +1607,17 @@ class TokenMap(object):
         if tokens_to_hosts is None:
             self.rebuild_keyspace(keyspace, build_if_absent=True)
             tokens_to_hosts = self.tokens_to_hosts_by_ks.get(keyspace, None)
-            if not tokens_to_hosts:
-                return []
 
-        # token range ownership is exclusive on the LHS (the start token), so
-        # we use bisect_right, which, in the case of a tie/exact match,
-        # picks an insertion point to the right of the existing match
-        point = bisect_right(self.ring, token)
-        if point == len(self.ring):
-            return tokens_to_hosts[self.ring[0]]
-        else:
-            return tokens_to_hosts[self.ring[point]]
+        if tokens_to_hosts:
+            # token range ownership is exclusive on the LHS (the start token), so
+            # we use bisect_right, which, in the case of a tie/exact match,
+            # picks an insertion point to the right of the existing match
+            point = bisect_right(self.ring, token)
+            if point == len(self.ring):
+                return tokens_to_hosts[self.ring[0]]
+            else:
+                return tokens_to_hosts[self.ring[point]]
+        return []
 
 
 class Token(object):
