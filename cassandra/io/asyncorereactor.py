@@ -33,8 +33,10 @@ import asyncore
 
 try:
     import ssl
+    from ssl import match_hostname
 except ImportError:
     ssl = None  # NOQA
+    match_hostname = None
 
 from cassandra import OperationTimedOut
 from cassandra.connection import (Connection, ConnectionShutdown,
@@ -204,11 +206,17 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         # copied from asyncore, but with the line to set the socket in
         # non-blocking mode removed (we will do that after connecting)
         self.family_and_type = family, type
+        self.check_hostname = False
         sock = socket.socket(family, type)
         if self.ssl_options:
             if not ssl:
                 raise Exception("This version of Python was not compiled with SSL support")
-            sock = ssl.wrap_socket(sock, **self.ssl_options)
+
+            opts = dict(self.ssl_options)
+            if opts.has_key('check_hostname'):
+                self.check_hostname = opts.pop('check_hostname')
+            sock = ssl.wrap_socket(sock, **opts)
+
         self.set_socket(sock)
 
     def connect(self, address):
@@ -222,6 +230,11 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
            or err == EINVAL and os.name in ('nt', 'ce'):
             raise ConnectionException("Timed out connecting to %s" % (address[0]))
         if err in (0, EISCONN):
+            if self.check_hostname:
+                if not match_hostname:
+                    raise Exception("This version of Python does not provide ssl.match_hostname for host verification")
+                cert = self.socket.getpeercert()
+                match_hostname(cert, self.host)
             self.addr = address
             self.socket.setblocking(0)
             self.handle_connect_event()
