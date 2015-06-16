@@ -1344,10 +1344,11 @@ class FunctionMetadata(FunctionTest):
 
     def test_functions_after_udt(self):
         """
-        Test to to ensure udt's come after functions in in keyspace dump
+        Test to to ensure functions come after UDTs in in keyspace dump
 
         test_functions_after_udt creates a basic function. Then queries that function and  make sure that in the results
         that UDT's are listed before any corresponding functions, when we dump the keyspace
+
         Ideally we would make a function that takes a udt type, but this presently fails because C* c059a56 requires
         udt to be frozen to create, but does not store meta indicating frozen
         SEE https://issues.apache.org/jira/browse/CASSANDRA-9186
