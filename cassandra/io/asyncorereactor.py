@@ -23,7 +23,6 @@ import weakref
 
 from six.moves import range
 
-from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL, EISCONN, errorcode
 try:
     from weakref import WeakSet
 except ImportError:
@@ -36,9 +35,7 @@ try:
 except ImportError:
     ssl = None  # NOQA
 
-from cassandra import OperationTimedOut
-from cassandra.connection import (Connection, ConnectionShutdown,
-                                  ConnectionException, NONBLOCKING)
+from cassandra.connection import (Connection, ConnectionShutdown, NONBLOCKING)
 from cassandra.protocol import RegisterMessage
 
 log = logging.getLogger(__name__)
@@ -168,65 +165,16 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
 
         self._loop.connection_created(self)
 
-        sockerr = None
-        addresses = socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM)
-        for (af, socktype, proto, canonname, sockaddr) in addresses:
-            try:
-                self.create_socket(af, socktype)
-                self.connect(sockaddr)
-                sockerr = None
-                break
-            except socket.error as err:
-                sockerr = err
-        if sockerr:
-            raise socket.error(sockerr.errno, "Tried connecting to %s. Last error: %s" % ([a[4] for a in addresses], sockerr.strerror))
-
-        self.add_channel()
-
-        if self.sockopts:
-            for args in self.sockopts:
-                self.socket.setsockopt(*args)
+        self._connect_socket()
+        asyncore.dispatcher.__init__(self, self._socket)
 
         self._writable = True
         self._readable = True
 
+        self._send_options_message()
+
         # start the event loop if needed
         self._loop.maybe_start()
-
-    def set_socket(self, sock):
-        # Overrides the same method in asyncore. We deliberately
-        # do not call add_channel() in this method so that we can call
-        # it later, after connect() has completed.
-        self.socket = sock
-        self._fileno = sock.fileno()
-
-    def create_socket(self, family, type):
-        # copied from asyncore, but with the line to set the socket in
-        # non-blocking mode removed (we will do that after connecting)
-        self.family_and_type = family, type
-        sock = socket.socket(family, type)
-        if self.ssl_options:
-            if not ssl:
-                raise Exception("This version of Python was not compiled with SSL support")
-            sock = ssl.wrap_socket(sock, **self.ssl_options)
-        self.set_socket(sock)
-
-    def connect(self, address):
-        # this is copied directly from asyncore.py, except that
-        # a timeout is set before connecting
-        self.connected = False
-        self.connecting = True
-        self.socket.settimeout(1.0)
-        err = self.socket.connect_ex(address)
-        if err in (EINPROGRESS, EALREADY, EWOULDBLOCK) \
-           or err == EINVAL and os.name in ('nt', 'ce'):
-            raise ConnectionException("Timed out connecting to %s" % (address[0]))
-        if err in (0, EISCONN):
-            self.addr = address
-            self.socket.setblocking(0)
-            self.handle_connect_event()
-        else:
-            raise socket.error(err, os.strerror(err))
 
     def close(self):
         with self.lock:
@@ -247,9 +195,6 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
                 ConnectionShutdown("Connection to %s was closed" % self.host))
             # don't leave in-progress operations hanging
             self.connected_event.set()
-
-    def handle_connect(self):
-        self._send_options_message()
 
     def handle_error(self):
         self.defunct(sys.exc_info()[1])

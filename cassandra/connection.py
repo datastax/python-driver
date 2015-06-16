@@ -19,9 +19,15 @@ from functools import wraps, partial
 import io
 import logging
 import os
+import socket
 import sys
 from threading import Thread, Event, RLock
 import time
+
+try:
+    import ssl
+except ImportError:
+    ssl = None  # NOQA
 
 if 'gevent.monkey' in sys.modules:
     from gevent.queue import Queue, Empty
@@ -177,6 +183,11 @@ class Connection(object):
     is_control_connection = False
     _iobuf = None
 
+    _socket = None
+
+    _socket_impl = socket
+    _ssl_impl = ssl
+
     def __init__(self, host='127.0.0.1', port=9042, authenticator=None,
                  ssl_options=None, sockopts=None, compression=True,
                  cql_version=None, protocol_version=2, is_control_connection=False,
@@ -255,6 +266,33 @@ class Connection(object):
             raise OperationTimedOut("Timed out creating connection (%s seconds)" % timeout)
         else:
             return conn
+
+    def _connect_socket(self):
+        sockerr = None
+        addresses = socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        for (af, socktype, proto, canonname, sockaddr) in addresses:
+            try:
+                self._socket = self._socket_impl.socket(af, socktype, proto)
+                if self.ssl_options:
+                    if not self._ssl_impl:
+                        raise Exception("This version of Python was not compiled with SSL support")
+                    self._socket = self._ssl_impl.wrap_socket(self._socket, **self.ssl_options)
+                self._socket.settimeout(1.0)
+                self._socket.connect(sockaddr)
+                sockerr = None
+                break
+            except socket.error as err:
+                if self._socket:
+                    self._socket.close()
+                    self._socket = None
+                sockerr = err
+
+        if sockerr:
+            raise socket.error(sockerr.errno, "Tried connecting to %s. Last error: %s" % ([a[4] for a in addresses], sockerr.strerror))
+
+        if self.sockopts:
+            for args in self.sockopts:
+                self._socket.setsockopt(*args)
 
     def close(self):
         raise NotImplementedError()

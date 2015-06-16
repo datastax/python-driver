@@ -22,8 +22,7 @@ import weakref
 
 from six.moves import xrange
 
-from cassandra import OperationTimedOut
-from cassandra.connection import Connection, ConnectionShutdown, NONBLOCKING
+from cassandra.connection import Connection, ConnectionShutdown, NONBLOCKING, ssl
 from cassandra.protocol import RegisterMessage
 try:
     import cassandra.io.libevwrapper as libev
@@ -36,11 +35,6 @@ except ImportError:
         "for instructions on installing build dependencies and building "
         "the C extension.")
 
-
-try:
-    import ssl
-except ImportError:
-    ssl = None # NOQA
 
 log = logging.getLogger(__name__)
 
@@ -244,30 +238,8 @@ class LibevConnection(Connection):
         self._callbacks = {}
         self.deque = deque()
         self._deque_lock = Lock()
-
-        sockerr = None
-        addresses = socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM)
-        for (af, socktype, proto, canonname, sockaddr) in addresses:
-            try:
-                self._socket = socket.socket(af, socktype, proto)
-                if self.ssl_options:
-                    if not ssl:
-                        raise Exception("This version of Python was not compiled with SSL support")
-                    self._socket = ssl.wrap_socket(self._socket, **self.ssl_options)
-                self._socket.settimeout(1.0)  # TODO potentially make this value configurable
-                self._socket.connect(sockaddr)
-                sockerr = None
-                break
-            except socket.error as err:
-                sockerr = err
-        if sockerr:
-            raise socket.error(sockerr.errno, "Tried connecting to %s. Last error: %s" % ([a[4] for a in addresses], sockerr.strerror))
-
+        self._connect_socket()
         self._socket.setblocking(0)
-
-        if self.sockopts:
-            for args in self.sockopts:
-                self._socket.setsockopt(*args)
 
         with self._libevloop._lock:
             self._read_watcher = libev.IO(self._socket.fileno(), libev.EV_READ, self._libevloop._loop, self.handle_read)

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import gevent
-from gevent import select, socket, ssl
+from gevent import select, socket
 from gevent.event import Event
 from gevent.queue import Queue
 
@@ -25,7 +25,6 @@ from six.moves import xrange
 
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL
 
-from cassandra import OperationTimedOut
 from cassandra.connection import Connection, ConnectionShutdown
 from cassandra.protocol import RegisterMessage
 
@@ -48,7 +47,9 @@ class GeventConnection(Connection):
     _total_reqd_bytes = 0
     _read_watcher = None
     _write_watcher = None
-    _socket = None
+
+    _socket_impl = gevent.socket
+    _ssl_impl = gevent.ssl
 
     def __init__(self, *args, **kwargs):
         Connection.__init__(self, *args, **kwargs)
@@ -59,25 +60,7 @@ class GeventConnection(Connection):
         self._callbacks = {}
         self._push_watchers = defaultdict(set)
 
-        sockerr = None
-        addresses = socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM)
-        for (af, socktype, proto, canonname, sockaddr) in addresses:
-            try:
-                self._socket = socket.socket(af, socktype, proto)
-                if self.ssl_options:
-                    self._socket = ssl.wrap_socket(self._socket, **self.ssl_options)
-                self._socket.settimeout(1.0)
-                self._socket.connect(sockaddr)
-                sockerr = None
-                break
-            except socket.error as err:
-                sockerr = err
-        if sockerr:
-            raise socket.error(sockerr.errno, "Tried connecting to %s. Last error: %s" % ([a[4] for a in addresses], sockerr.strerror))
-
-        if self.sockopts:
-            for args in self.sockopts:
-                self._socket.setsockopt(*args)
+        self._connect_socket()
 
         self._read_watcher = gevent.spawn(self.handle_read)
         self._write_watcher = gevent.spawn(self.handle_write)

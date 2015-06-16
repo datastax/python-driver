@@ -22,7 +22,6 @@ import logging
 import weakref
 import atexit
 
-from cassandra import OperationTimedOut
 from cassandra.connection import Connection, ConnectionShutdown
 from cassandra.protocol import RegisterMessage
 
