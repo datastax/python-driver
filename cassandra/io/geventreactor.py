@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import gevent
-from gevent import select, socket
 from gevent.event import Event
 from gevent.queue import Queue
+from gevent import select, socket
+import gevent.ssl
 
 from collections import defaultdict
 from functools import partial
