@@ -61,7 +61,7 @@ TABLE = "testtable"
 def setup(hosts):
     log.info("Using 'cassandra' package from %s", cassandra.__path__)
 
-    cluster = Cluster(hosts)
+    cluster = Cluster(hosts, protocol_version=1)
     cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
     try:
         session = cluster.connect()
@@ -89,7 +89,7 @@ def setup(hosts):
 
 
 def teardown(hosts):
-    cluster = Cluster(hosts)
+    cluster = Cluster(hosts, protocol_version=1)
     cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
     session = cluster.connect()
     session.execute("DROP KEYSPACE " + KEYSPACE)
