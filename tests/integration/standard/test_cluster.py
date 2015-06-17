@@ -30,6 +30,7 @@ from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
                                 WhiteListRoundRobinPolicy)
 from cassandra.query import SimpleStatement, TraceUnavailable
 
+from cassandra.protocol import MAX_SUPPORTED_VERSION
 
 from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, get_node, CASSANDRA_VERSION
 
@@ -122,18 +123,23 @@ class ClusterTests(unittest.TestCase):
         """
 
         cluster = Cluster()
+        self.assertEqual(cluster.protocol_version,  MAX_SUPPORTED_VERSION)
         session = cluster.connect()
-        default_protocol_version = session._protocol_version
-
+        updated_protocol_version = session._protocol_version
+        updated_cluster_version = cluster.protocol_version
         # Make sure the correct protocol was selected by default
         if CASSANDRA_VERSION >= '2.2':
-            self.assertEqual(default_protocol_version, 4)
+            self.assertEqual(updated_protocol_version, 4)
+            self.assertEqual(updated_cluster_version, 4)
         elif CASSANDRA_VERSION >= '2.1':
-            self.assertEqual(default_protocol_version, 3)
+            self.assertEqual(updated_protocol_version, 3)
+            self.assertEqual(updated_cluster_version, 3)
         elif CASSANDRA_VERSION >= '2.0':
-            self.assertEqual(default_protocol_version, 2)
+            self.assertEqual(updated_protocol_version, 2)
+            self.assertEqual(updated_cluster_version, 2)
         else:
-            self.assertEqual(default_protocol_version, 1)
+            self.assertEqual(updated_protocol_version, 1)
+            self.assertEqual(updated_cluster_version, 1)
 
         cluster.shutdown()
 
