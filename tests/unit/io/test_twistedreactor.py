@@ -25,6 +25,7 @@ try:
 except ImportError:
     twistedreactor = None  # NOQA
 
+from cassandra.connection import _Frame
 
 class TestTwistedProtocol(unittest.TestCase):
 
@@ -154,16 +155,16 @@ class TestTwistedConnection(unittest.TestCase):
         self.obj_ut.process_msg = Mock()
         self.assertEqual(self.obj_ut._iobuf.getvalue(), '')  # buf starts empty
         # incomplete header
-        self.obj_ut._iobuf.write('\xff\x00\x00\x00')
+        self.obj_ut._iobuf.write('\x84\x00\x00\x00\x00')
         self.obj_ut.handle_read()
-        self.assertEqual(self.obj_ut._iobuf.getvalue(), '\xff\x00\x00\x00')
+        self.assertEqual(self.obj_ut._iobuf.getvalue(), '\x84\x00\x00\x00\x00')
 
         # full header, but incomplete body
         self.obj_ut._iobuf.write('\x00\x00\x00\x15')
         self.obj_ut.handle_read()
         self.assertEqual(self.obj_ut._iobuf.getvalue(),
-                         '\xff\x00\x00\x00\x00\x00\x00\x15')
-        self.assertEqual(self.obj_ut._total_reqd_bytes, 29)
+                         '\x84\x00\x00\x00\x00\x00\x00\x00\x15')
+        self.assertEqual(self.obj_ut._current_frame.end_pos, 30)
 
         # verify we never attempted to process the incomplete message
         self.assertFalse(self.obj_ut.process_msg.called)
@@ -176,12 +177,15 @@ class TestTwistedConnection(unittest.TestCase):
         self.assertEqual(self.obj_ut._iobuf.getvalue(), '')  # buf starts empty
 
         # write a complete message, plus 'NEXT' (to simulate next message)
+        # assumes protocol v3+ as default Connection.protocol_version
+        body = 'this is the drum roll'
+        extra = 'NEXT'
         self.obj_ut._iobuf.write(
-            '\xff\x00\x00\x00\x00\x00\x00\x15this is the drum rollNEXT')
+            '\x84\x01\x00\x02\x03\x00\x00\x00\x15' + body + extra)
         self.obj_ut.handle_read()
-        self.assertEqual(self.obj_ut._iobuf.getvalue(), 'NEXT')
+        self.assertEqual(self.obj_ut._iobuf.getvalue(), extra)
         self.obj_ut.process_msg.assert_called_with(
-            '\xff\x00\x00\x00\x00\x00\x00\x15this is the drum roll', 21)
+            _Frame(version=4, flags=1, stream=2, opcode=3, body_offset=9, end_pos= 9 + len(body)), body)
 
     @patch('twisted.internet.reactor.connectTCP')
     def test_push(self, mock_connectTCP):

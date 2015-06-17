@@ -13,13 +13,13 @@
 # limitations under the License.
 
 from __future__ import absolute_import  # to enable import io from stdlib
-from collections import defaultdict, deque
+from collections import defaultdict, deque, namedtuple
 import errno
 from functools import wraps, partial
 import io
 import logging
-import os
 import socket
+import struct
 import sys
 from threading import Thread, Event, RLock
 import time
@@ -38,13 +38,13 @@ import six
 from six.moves import range
 
 from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut
-from cassandra.marshal import int32_pack, header_unpack, v3_header_unpack, int32_unpack
+from cassandra.marshal import int32_pack, uint8_unpack
 from cassandra.protocol import (ReadyMessage, AuthenticateMessage, OptionsMessage,
                                 StartupMessage, ErrorMessage, CredentialsMessage,
                                 QueryMessage, ResultMessage, decode_response,
                                 InvalidRequestException, SupportedMessage,
                                 AuthResponseMessage, AuthChallengeMessage,
-                                AuthSuccessMessage, ProtocolException)
+                                AuthSuccessMessage, ProtocolException, MAX_SUPPORTED_VERSION)
 from cassandra.util import OrderedDict
 
 
@@ -94,6 +94,11 @@ HEADER_DIRECTION_FROM_CLIENT = 0x00
 HEADER_DIRECTION_TO_CLIENT = 0x80
 HEADER_DIRECTION_MASK = 0x80
 
+frame_header_v1_v2 = struct.Struct('>BbBi')
+frame_header_v3 = struct.Struct('>BhBi')
+
+_Frame = namedtuple('Frame', ('version', 'flags', 'stream', 'opcode', 'body_offset', 'end_pos'))
+
 NONBLOCKING = (errno.EAGAIN, errno.EWOULDBLOCK)
 
 
@@ -114,6 +119,14 @@ class ConnectionShutdown(ConnectionException):
     """
     pass
 
+class ProtocolVersionUnsupported(ConnectionException):
+    """
+    Server rejected startup message due to unsupported protocol version
+    """
+    def __init__(self, host, startup_version):
+        super(ProtocolVersionUnsupported, self).__init__("Unsupported protocol version on %s: %d",
+                                                         (host, startup_version))
+        self.startup_version = startup_version
 
 class ConnectionBusy(Exception):
     """
@@ -150,7 +163,7 @@ class Connection(object):
     out_buffer_size = 4096
 
     cql_version = None
-    protocol_version = 2
+    protocol_version = MAX_SUPPORTED_VERSION
 
     keyspace = None
     compression = True
@@ -180,8 +193,11 @@ class Connection(object):
 
     msg_received = False
 
+    is_unsupported_proto_version = False
+
     is_control_connection = False
     _iobuf = None
+    _current_frame = None
 
     _socket = None
 
@@ -190,7 +206,7 @@ class Connection(object):
 
     def __init__(self, host='127.0.0.1', port=9042, authenticator=None,
                  ssl_options=None, sockopts=None, compression=True,
-                 cql_version=None, protocol_version=2, is_control_connection=False,
+                 cql_version=None, protocol_version=MAX_SUPPORTED_VERSION, is_control_connection=False,
                  user_type_map=None):
         self.host = host
         self.port = port
@@ -204,33 +220,17 @@ class Connection(object):
         self.user_type_map = user_type_map
         self._push_watchers = defaultdict(set)
         self._iobuf = io.BytesIO()
+
         if protocol_version >= 3:
-            self._header_unpack = v3_header_unpack
-            self._header_length = 5
             self.max_request_id = (2 ** 15) - 1
             # Don't fill the deque with 2**15 items right away. Start with 300 and add
             # more if needed.
             self.request_ids = deque(range(300))
             self.highest_request_id = 299
         else:
-            self._header_unpack = header_unpack
-            self._header_length = 4
             self.max_request_id = (2 ** 7) - 1
             self.request_ids = deque(range(self.max_request_id + 1))
             self.highest_request_id = self.max_request_id
-
-        # 0         8        16        24        32         40
-        # +---------+---------+---------+---------+---------+
-        # | version |  flags  |      stream       | opcode  |
-        # +---------+---------+---------+---------+---------+
-        # |                length                 |
-        # +---------+---------+---------+---------+
-        # |                                       |
-        # .            ...  body ...              .
-        # .                                       .
-        # .                                       .
-        # +----------------------------------------
-        self._full_header_length = self._header_length + 4
 
         self.lock = RLock()
 
@@ -260,6 +260,8 @@ class Connection(object):
         conn = cls(host, *args, **kwargs)
         conn.connected_event.wait(timeout)
         if conn.last_error:
+            if conn.is_unsupported_proto_version:
+                raise ProtocolVersionUnsupported(host, conn.protocol_version)
             raise conn.last_error
         elif not conn.connected_event.is_set():
             conn.close()
@@ -415,42 +417,56 @@ class Connection(object):
         self.is_control_connection = False
         self._push_watchers = {}
 
+    @defunct_on_error
+    def _read_frame_header(self):
+        buf = self._iobuf
+        pos = buf.tell()
+        if pos:
+            buf.seek(0)
+            version = uint8_unpack(buf.read(1)) & PROTOCOL_VERSION_MASK
+            if version > MAX_SUPPORTED_VERSION:
+                raise ProtocolError("This version of the driver does not support protocol version %d" % version)
+            frame_header = frame_header_v3 if version >= 3 else frame_header_v1_v2
+            # this frame header struct is everything after the version byte
+            header_size = frame_header.size + 1
+            if pos >= header_size:
+                flags, stream, op, body_len = frame_header.unpack(buf.read(frame_header.size))
+                if body_len < 0:
+                    raise ProtocolError("Received negative body length: %r" % body_len)
+                self._current_frame = _Frame(version, flags, stream, op, header_size, body_len + header_size)
+
+            self._iobuf.seek(pos)
+
+        return pos
+
+    def _reset_frame(self):
+        leftover = self._iobuf.read()
+        self._iobuf = io.BytesIO()
+        self._iobuf.write(leftover)
+        self._current_frame = None
+
     def process_io_buffer(self):
         while True:
-            pos = self._iobuf.tell()
-            if pos < self._full_header_length or (self._total_reqd_bytes > 0 and pos < self._total_reqd_bytes):
+            if not self._current_frame:
+                pos = self._read_frame_header()
+            else:
+                pos = self._iobuf.tell()
+
+            if not self._current_frame or pos < self._current_frame.end_pos:
                 # we don't have a complete header yet or we
                 # already saw a header, but we don't have a
                 # complete message yet
                 return
             else:
-                # have enough for header, read body len from header
-                self._iobuf.seek(self._header_length)
-                body_len = int32_unpack(self._iobuf.read(4))
-
-                # seek to end to get length of current buffer
-                self._iobuf.seek(0, os.SEEK_END)
-                pos = self._iobuf.tell()
-
-                if pos >= body_len + self._full_header_length:
-                    # read message header and body
-                    self._iobuf.seek(0)
-                    msg = self._iobuf.read(self._full_header_length + body_len)
-
-                    # leave leftover in current buffer
-                    leftover = self._iobuf.read()
-                    self._iobuf = io.BytesIO()
-                    self._iobuf.write(leftover)
-
-                    self._total_reqd_bytes = 0
-                    self.process_msg(msg, body_len)
-                else:
-                    self._total_reqd_bytes = body_len + self._full_header_length
-                    return
+                frame = self._current_frame
+                self._iobuf.seek(frame.body_offset)
+                msg = self._iobuf.read(frame.end_pos - frame.body_offset)
+                self.process_msg(self._current_frame, msg)
+                self._reset_frame()
 
     @defunct_on_error
-    def process_msg(self, msg, body_len):
-        version, flags, stream_id, opcode = self._header_unpack(msg[:self._header_length])
+    def process_msg(self, header, body):
+        stream_id = header.stream
         if stream_id < 0:
             callback = None
         else:
@@ -460,33 +476,12 @@ class Connection(object):
 
         self.msg_received = True
 
-        body = None
         try:
-            # check that the protocol version is supported
-            given_version = version & PROTOCOL_VERSION_MASK
-            if given_version != self.protocol_version:
-                msg = "Server protocol version (%d) does not match the specified driver protocol version (%d). " +\
-                      "Consider setting Cluster.protocol_version to %d."
-                raise ProtocolError(msg % (given_version, self.protocol_version, given_version))
-
-            # check that the header direction is correct
-            if version & HEADER_DIRECTION_MASK != HEADER_DIRECTION_TO_CLIENT:
-                raise ProtocolError(
-                    "Header direction in response is incorrect; opcode %04x, stream id %r"
-                    % (opcode, stream_id))
-
-            if body_len > 0:
-                body = msg[self._full_header_length:]
-            elif body_len == 0:
-                body = six.binary_type()
-            else:
-                raise ProtocolError("Got negative body length: %r" % body_len)
-
-            response = decode_response(given_version, self.user_type_map, stream_id,
-                                       flags, opcode, body, self.decompressor)
+            response = decode_response(header.version, self.user_type_map, stream_id,
+                                       header.flags, header.opcode, body, self.decompressor)
         except Exception as exc:
             log.exception("Error decoding response from Cassandra. "
-                          "opcode: %04x; message contents: %r", opcode, msg)
+                          "opcode: %04x; message contents: %r", header.opcode, body)
             if callback is not None:
                 callback(exc)
             self.defunct(exc)
@@ -495,6 +490,9 @@ class Connection(object):
         try:
             if stream_id >= 0:
                 if isinstance(response, ProtocolException):
+                    if 'unsupported protocol version' in response.message:
+                        self.is_unsupported_proto_version = True
+
                     log.error("Closing connection %s due to protocol error: %s", self, response.summary_msg())
                     self.defunct(response)
                 if callback is not None:

@@ -28,9 +28,10 @@ from cassandra.concurrent import execute_concurrent
 from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
                                 RetryPolicy, SimpleConvictionPolicy, HostDistance,
                                 WhiteListRoundRobinPolicy)
+from cassandra.protocol import MAX_SUPPORTED_VERSION
 from cassandra.query import SimpleStatement, TraceUnavailable
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, get_node, execute_until_pass
+from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, get_node, CASSANDRA_VERSION, execute_until_pass
 from tests.integration.util import assert_quiescent_pool_state
 
 
@@ -100,6 +101,43 @@ class ClusterTests(unittest.TestCase):
         self.assertEqual([('a', 'b', 'c')], result)
 
         execute_until_pass(session, "DROP KEYSPACE clustertests")
+
+        cluster.shutdown()
+
+    def test_protocol_negotiation(self):
+        """
+        Test for protocol negotiation
+
+        test_protocol_negotiation tests that the driver will select the correct protocol version to match
+        the correct cassandra version. Please note that 2.1.5 has a
+        bug https://issues.apache.org/jira/browse/CASSANDRA-9451 that will cause this test to fail
+        that will cause this to not pass. It was rectified in 2.1.6
+
+        @since 2.6.0
+        @jira_ticket PYTHON-240
+        @expected_result the correct protocol version should be selected
+
+        @test_category connection
+        """
+
+        cluster = Cluster()
+        self.assertEqual(cluster.protocol_version,  MAX_SUPPORTED_VERSION)
+        session = cluster.connect()
+        updated_protocol_version = session._protocol_version
+        updated_cluster_version = cluster.protocol_version
+        # Make sure the correct protocol was selected by default
+        if CASSANDRA_VERSION >= '2.2':
+            self.assertEqual(updated_protocol_version, 4)
+            self.assertEqual(updated_cluster_version, 4)
+        elif CASSANDRA_VERSION >= '2.1':
+            self.assertEqual(updated_protocol_version, 3)
+            self.assertEqual(updated_cluster_version, 3)
+        elif CASSANDRA_VERSION >= '2.0':
+            self.assertEqual(updated_protocol_version, 2)
+            self.assertEqual(updated_cluster_version, 2)
+        else:
+            self.assertEqual(updated_protocol_version, 1)
+            self.assertEqual(updated_cluster_version, 1)
 
         cluster.shutdown()
 
@@ -574,3 +612,5 @@ class ClusterTests(unittest.TestCase):
         assert_quiescent_pool_state(self, cluster)
 
         cluster.shutdown()
+
+

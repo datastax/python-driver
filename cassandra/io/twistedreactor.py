@@ -140,7 +140,6 @@ class TwistedConnection(Connection):
     """
 
     _loop = None
-    _total_reqd_bytes = 0
 
     @classmethod
     def initialize_reactor(cls):

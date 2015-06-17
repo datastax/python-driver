@@ -20,17 +20,15 @@ except ImportError:
     import unittest # noqa
 
 import errno
+import math
+from mock import patch, Mock
 import os
-
 from six import BytesIO
-
 import socket
 from socket import error as socket_error
 
-from mock import patch, Mock
-
 from cassandra.connection import (HEADER_DIRECTION_TO_CLIENT,
-                                  ConnectionException)
+                                  ConnectionException, ProtocolError)
 from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.protocol import (write_stringmultimap, write_int, write_string,
                                 SupportedMessage, ReadyMessage, ServerError)
@@ -138,7 +136,7 @@ class AsyncoreConnectionTest(unittest.TestCase):
 
         c.socket.recv.side_effect = side_effect
         c.handle_read()
-        self.assertEqual(c._total_reqd_bytes, 20000 + len(header))
+        self.assertEqual(c._current_frame.end_pos, 20000 + len(header))
         # the EAGAIN prevents it from reading the last 100 bytes
         c._iobuf.seek(0, os.SEEK_END)
         pos = c._iobuf.tell()
@@ -165,7 +163,7 @@ class AsyncoreConnectionTest(unittest.TestCase):
         # make sure it errored correctly
         self.assertTrue(c.is_defunct)
         self.assertTrue(c.connected_event.is_set())
-        self.assertIsInstance(c.last_error, ConnectionException)
+        self.assertIsInstance(c.last_error, ProtocolError)
 
     def test_error_message_on_startup(self, *args):
         c = self.make_connection()
@@ -223,13 +221,18 @@ class AsyncoreConnectionTest(unittest.TestCase):
         c = self.make_connection()
 
         # only write the first four bytes of the OptionsMessage
+        write_size = 4
         c.socket.send.side_effect = None
-        c.socket.send.return_value = 4
+        c.socket.send.return_value = write_size
         c.handle_write()
 
+        msg_size = 9  # v3+ frame header
+        expected_writes = int(math.ceil(float(msg_size) / write_size))
+        size_mod = msg_size % write_size
+        last_write_size = size_mod if size_mod else write_size
         self.assertFalse(c.is_defunct)
-        self.assertEqual(2, c.socket.send.call_count)
-        self.assertEqual(4, len(c.socket.send.call_args[0][0]))
+        self.assertEqual(expected_writes, c.socket.send.call_count)
+        self.assertEqual(last_write_size, len(c.socket.send.call_args[0][0]))
 
     def test_socket_error_on_read(self, *args):
         c = self.make_connection()
