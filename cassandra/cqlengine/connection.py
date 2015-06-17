@@ -82,6 +82,11 @@ def set_session(s):
     session = s
     cluster = s.cluster
 
+    # Set default keyspace from given session's keyspace if not already set
+    from cassandra.cqlengine import models
+    if not models.DEFAULT_KEYSPACE and session.keyspace:
+        models.DEFAULT_KEYSPACE = session.keyspace
+
     _register_known_types(cluster)
 
     log.debug("cqlengine connection initialized with %s", s)
@@ -108,9 +113,6 @@ def setup(
 
     if 'username' in kwargs or 'password' in kwargs:
         raise CQLEngineException("Username & Password are now handled by using the native driver's auth_provider")
-
-    if not default_keyspace:
-        raise UndefinedKeyspaceException()
 
     from cassandra.cqlengine import models
     models.DEFAULT_KEYSPACE = default_keyspace
