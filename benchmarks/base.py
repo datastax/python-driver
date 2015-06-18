@@ -36,6 +36,8 @@ handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
 log.addHandler(handler)
 
+logging.getLogger('cassandra').setLevel(logging.WARN)
+
 have_libev = False
 supported_reactors = [AsyncoreConnection]
 try:
