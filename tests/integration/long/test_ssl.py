@@ -80,13 +80,13 @@ class SSLConnectionTests(unittest.TestCase):
         # Setup temporary keyspace.
         abs_path_ca_cert_path = os.path.abspath(DEFAULT_CLIENT_CA_CERTS)
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION, ssl_options={'ca_certs': abs_path_ca_cert_path,
-                                                                               'ssl_version': ssl.PROTOCOL_TLSv1})
         tries = 0
         while True:
             if tries > 5:
                 raise RuntimeError("Failed to connect to SSL cluster after 5 attempts")
             try:
+                cluster = Cluster(protocol_version=PROTOCOL_VERSION, ssl_options={'ca_certs': abs_path_ca_cert_path,
+                                                                                  'ssl_version': ssl.PROTOCOL_TLSv1})
                 session = cluster.connect()
                 break
             except Exception:

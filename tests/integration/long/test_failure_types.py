@@ -81,6 +81,19 @@ class ClientExceptionTests(unittest.TestCase):
         # Restart the nodes to fully functional again
         self.setFailingNodes(failing_nodes, "testksfail")
 
+    def execute_helper(self, session, query):
+        tries = 0
+        while tries < 100:
+            try:
+                return session.execute(query)
+            except OperationTimedOut:
+                ex_type, ex, tb = sys.exc_info()
+                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                del tb
+                tries += 1
+
+        raise RuntimeError("Failed to execute query after 100 attempts: {0}".format(query))
+
     def execute_concurrent_args_helper(self, session, query, params):
         tries = 0
         while tries < 100:
@@ -129,10 +142,10 @@ class ClientExceptionTests(unittest.TestCase):
         statement.consistency_level = consistency_level
 
         if expected_exception is None:
-            self.session.execute(statement)
+            self.execute_helper(self.session, statement)
         else:
             with self.assertRaises(expected_exception):
-                self.session.execute(statement)
+                self.execute_helper(self.session, statement)
 
     def test_write_failures_from_coordinator(self):
         """
