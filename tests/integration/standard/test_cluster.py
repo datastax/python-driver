@@ -352,7 +352,7 @@ class ClusterTests(unittest.TestCase):
         current_test1rf_meta = current_meta[keyspace_name]
         current_type_meta = current_test1rf_meta.user_types[type_name]
         self.assertIs(original_meta, current_meta)
-        self.assertIs(original_test1rf_meta, current_test1rf_meta)
+        self.assertEqual(original_test1rf_meta.export_as_string(), current_test1rf_meta.export_as_string())
         self.assertIsNot(original_type_meta, current_type_meta)
         self.assertEqual(original_type_meta.as_cql_query(), current_type_meta.as_cql_query())
         session.shutdown()
