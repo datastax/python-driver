@@ -244,10 +244,7 @@ class ConnectionTest(unittest.TestCase):
         Ensure the following methods throw NIE's. If not, come back and test them.
         """
         c = self.make_connection()
-
         self.assertRaises(NotImplementedError, c.close)
-        self.assertRaises(NotImplementedError, c.register_watcher, None, None)
-        self.assertRaises(NotImplementedError, c.register_watchers, None)
 
     def test_set_keyspace_blocking(self):
         c = self.make_connection()
