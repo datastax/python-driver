@@ -138,7 +138,7 @@ def _handle_error(error, result_index, event, session, statements, results,
         return
 
     try:
-        future = session.execute_async(statement, params)
+        future = session.execute_async(statement, params, timeout=None)
         args = (next_index, event, session, statements, results, future, num_finished, to_execute, first_error)
         future.add_callbacks(
             callback=_execute_next, callback_args=args,
@@ -176,7 +176,7 @@ def _execute_next(result, result_index, event, session, statements, results,
         return
 
     try:
-        future = session.execute_async(statement, params)
+        future = session.execute_async(statement, params, timeout=None)
         args = (next_index, event, session, statements, results, future, num_finished, to_execute, first_error)
         future.add_callbacks(
             callback=_execute_next, callback_args=args,
