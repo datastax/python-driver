@@ -19,6 +19,7 @@ import os
 import socket
 import ssl
 from threading import Lock, Thread
+import time
 import weakref
 
 from six.moves import range
@@ -144,9 +145,9 @@ class LibevLoop(object):
 
     def _update_timer(self):
         if not self._shutdown:
-            self._timers.service_timeouts()
-            offset = self._timers.next_offset or 100000  # none pending; will be updated again when something new happens
-            self._loop_timer.start(offset)
+            next_end = self._timers.service_timeouts()
+            if next_end:
+                self._loop_timer.start(next_end - time.time())  # timer handles negative values
         else:
             self._loop_timer.stop()
 

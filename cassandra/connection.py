@@ -973,32 +973,26 @@ class TimerManager(object):
         :return: next end time, or None
         """
         queue = self._queue
-        new_timers = self._new_timers
-        while new_timers:
-            heappush(queue, new_timers.pop())
+        if self._new_timers:
+            new_timers = self._new_timers
+            while new_timers:
+                heappush(queue, new_timers.pop())
 
-        now = time.time()
-        while queue:
-            try:
-                timer = queue[0][1]
-                if timer.finish(now):
-                    heappop(queue)
-                else:
-                    return timer.end
-            except Exception:
-                log.exception("Exception while servicing timeout callback: ")
+        if queue:
+            now = time.time()
+            while queue:
+                try:
+                    timer = queue[0][1]
+                    if timer.finish(now):
+                        heappop(queue)
+                    else:
+                        return timer.end
+                except Exception:
+                    log.exception("Exception while servicing timeout callback: ")
 
     @property
     def next_timeout(self):
         try:
             return self._queue[0][0]
-        except IndexError:
-            pass
-
-    @property
-    def next_offset(self):
-        try:
-            next_end = self._queue[0][0]
-            return next_end - time.time()
         except IndexError:
             pass
