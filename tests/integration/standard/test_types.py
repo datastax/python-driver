@@ -261,7 +261,7 @@ class TypeTests(unittest.TestCase):
             if datatype in string_types:
                 string_columns.add(col_name)
 
-        s.execute("CREATE TABLE all_empty ({0})".format(', '.join(alpha_type_list)))
+        execute_until_pass(s, "CREATE TABLE all_empty ({0})".format(', '.join(alpha_type_list)))
 
         # verify all types initially null with simple statement
         columns_string = ','.join(col_names)
@@ -349,11 +349,11 @@ class TypeTests(unittest.TestCase):
         """
         s = self.session
 
-        s.execute("CREATE TABLE empty_values (a text PRIMARY KEY, b int)")
-        s.execute("INSERT INTO empty_values (a, b) VALUES ('a', blobAsInt(0x))")
+        execute_until_pass(s, "CREATE TABLE empty_values (a text PRIMARY KEY, b int)")
+        execute_until_pass(s, "INSERT INTO empty_values (a, b) VALUES ('a', blobAsInt(0x))")
         try:
             Int32Type.support_empty_values = True
-            results = s.execute("SELECT b FROM empty_values WHERE a='a'")[0]
+            results = execute_until_pass(s, "SELECT b FROM empty_values WHERE a='a'")[0]
             self.assertIs(EMPTY, results.b)
         finally:
             Int32Type.support_empty_values = False

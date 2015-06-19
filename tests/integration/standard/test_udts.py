@@ -326,21 +326,21 @@ class UDTTests(unittest.TestCase):
 
     def nested_udt_schema_helper(self, session, MAX_NESTING_DEPTH):
         # create the seed udt
-        session.execute("CREATE TYPE depth_0 (age int, name text)")
+        execute_until_pass(session, "CREATE TYPE depth_0 (age int, name text)")
 
         # create the nested udts
         for i in range(MAX_NESTING_DEPTH):
-            session.execute("CREATE TYPE depth_{} (value frozen<depth_{}>)".format(i + 1, i))
+            execute_until_pass(session, "CREATE TYPE depth_{} (value frozen<depth_{}>)".format(i + 1, i))
 
         # create a table with multiple sizes of nested udts
         # no need for all nested types, only a spot checked few and the largest one
-        session.execute("CREATE TABLE mytable ("
-                        "k int PRIMARY KEY, "
-                        "v_0 frozen<depth_0>, "
-                        "v_1 frozen<depth_1>, "
-                        "v_2 frozen<depth_2>, "
-                        "v_3 frozen<depth_3>, "
-                        "v_{0} frozen<depth_{0}>)".format(MAX_NESTING_DEPTH))
+        execute_until_pass(session, "CREATE TABLE mytable ("
+                                    "k int PRIMARY KEY, "
+                                    "v_0 frozen<depth_0>, "
+                                    "v_1 frozen<depth_1>, "
+                                    "v_2 frozen<depth_2>, "
+                                    "v_3 frozen<depth_3>, "
+                                    "v_{0} frozen<depth_{0}>)".format(MAX_NESTING_DEPTH))
 
     def nested_udt_creation_helper(self, udts, i):
         if i == 0:
