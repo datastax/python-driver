@@ -42,7 +42,7 @@ from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut
 from cassandra.marshal import int32_pack, uint8_unpack
 from cassandra.protocol import (ReadyMessage, AuthenticateMessage, OptionsMessage,
                                 StartupMessage, ErrorMessage, CredentialsMessage,
-                                QueryMessage, ResultMessage, decode_response,
+                                QueryMessage, ResultMessage, ProtocolHandler,
                                 InvalidRequestException, SupportedMessage,
                                 AuthResponseMessage, AuthChallengeMessage,
                                 AuthSuccessMessage, ProtocolException,
@@ -209,7 +209,7 @@ class Connection(object):
     def __init__(self, host='127.0.0.1', port=9042, authenticator=None,
                  ssl_options=None, sockopts=None, compression=True,
                  cql_version=None, protocol_version=MAX_SUPPORTED_VERSION, is_control_connection=False,
-                 user_type_map=None):
+                 user_type_map=None, protocol_handler_class=ProtocolHandler):
         self.host = host
         self.port = port
         self.authenticator = authenticator
@@ -220,6 +220,8 @@ class Connection(object):
         self.protocol_version = protocol_version
         self.is_control_connection = is_control_connection
         self.user_type_map = user_type_map
+        self.decoder = protocol_handler_class.decode_message
+        self.encoder = protocol_handler_class.encode_message
         self._push_watchers = defaultdict(set)
         self._callbacks = {}
         self._iobuf = io.BytesIO()
@@ -362,7 +364,7 @@ class Connection(object):
             raise ConnectionShutdown("Connection to %s is closed" % self.host)
 
         self._callbacks[request_id] = cb
-        self.push(msg.to_binary(request_id, self.protocol_version, compression=self.compressor))
+        self.push(self.encoder(msg, request_id, self.protocol_version, compressor=self.compressor))
         return request_id
 
     def wait_for_response(self, msg, timeout=None):
@@ -498,8 +500,8 @@ class Connection(object):
         self.msg_received = True
 
         try:
-            response = decode_response(header.version, self.user_type_map, stream_id,
-                                       header.flags, header.opcode, body, self.decompressor)
+            response = self.decoder(header.version, self.user_type_map, stream_id,
+                                    header.flags, header.opcode, body, self.decompressor)
         except Exception as exc:
             log.exception("Error decoding response from Cassandra. "
                           "opcode: %04x; message contents: %r", header.opcode, body)

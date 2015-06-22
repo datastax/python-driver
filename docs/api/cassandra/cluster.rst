@@ -27,6 +27,8 @@
 
    .. autoattribute:: connection_class
 
+   .. autoattribute:: protocol_handler_class
+
    .. autoattribute:: metrics_enabled
 
    .. autoattribute:: metrics
