@@ -313,6 +313,30 @@ class SchemaMetadataTests(unittest.TestCase):
         tablemeta = self.get_table_metadata()
         self.assertIn("compression = {}", tablemeta.export_as_string())
 
+    def test_non_size_tiered_compaction(self):
+        """
+        test options for non-size-tiered compaction strategy
+
+        Creates a table with LeveledCompactionStrategy, specifying one non-default option. Verifies that the option is
+        present in generated CQL, and that other legacy table parameters (min_threshold, max_threshold) are not included.
+
+        @since 2.6.0
+        @jira_ticket PYTHON-352
+        @expected_result the options map for LeveledCompactionStrategy does not contain min_threshold, max_threshold
+
+        @test_category metadata
+        """
+        create_statement = self.make_create_statement(["a"], [], ["b", "c"])
+        create_statement += "WITH COMPACTION = {'class': 'LeveledCompactionStrategy', 'tombstone_threshold': '0.3'}"
+        self.session.execute(create_statement)
+
+        table_meta = self.get_table_metadata()
+        cql = table_meta.export_as_string()
+        self.assertIn("'tombstone_threshold': '0.3'", cql)
+        self.assertIn("LeveledCompactionStrategy", cql)
+        self.assertNotIn("min_threshold", cql)
+        self.assertNotIn("max_threshold", cql)
+
     def test_refresh_schema_metadata(self):
         """
         test for synchronously refreshing all cluster metadata
@@ -670,7 +694,7 @@ CREATE TABLE export_udts.users (
 ) WITH bloom_filter_fp_chance = 0.01
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = ''
-    AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
+    AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
     AND dclocal_read_repair_chance = 0.1
     AND default_time_to_live = 0
@@ -691,7 +715,7 @@ CREATE TABLE export_udts.users (
 ) WITH bloom_filter_fp_chance = 0.01
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = ''
-    AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
+    AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
     AND dclocal_read_repair_chance = 0.1
     AND default_time_to_live = 0
@@ -926,7 +950,7 @@ CREATE TABLE legacy.composite_comp_with_col (
     AND CLUSTERING ORDER BY (t ASC, b ASC, s ASC)
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = 'Stores file meta data'
-    AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
+    AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
     AND dclocal_read_repair_chance = 0.1
     AND default_time_to_live = 0
@@ -948,7 +972,7 @@ CREATE TABLE legacy.nested_composite_key (
 ) WITH COMPACT STORAGE
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = ''
-    AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
+    AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
     AND dclocal_read_repair_chance = 0.1
     AND default_time_to_live = 0
@@ -967,7 +991,7 @@ CREATE TABLE legacy.composite_partition_with_col (
 ) WITH COMPACT STORAGE
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = ''
-    AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
+    AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
     AND dclocal_read_repair_chance = 0.1
     AND default_time_to_live = 0
@@ -988,7 +1012,7 @@ CREATE TABLE legacy.composite_partition_no_col (
     AND CLUSTERING ORDER BY (column1 ASC)
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = ''
-    AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
+    AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
     AND dclocal_read_repair_chance = 0.1
     AND default_time_to_live = 0
@@ -1005,7 +1029,7 @@ CREATE TABLE legacy.simple_with_col (
 ) WITH COMPACT STORAGE
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = ''
-    AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
+    AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
     AND dclocal_read_repair_chance = 0.1
     AND default_time_to_live = 0
@@ -1025,7 +1049,7 @@ CREATE TABLE legacy.simple_no_col (
     AND CLUSTERING ORDER BY (column1 ASC)
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = ''
-    AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
+    AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
     AND dclocal_read_repair_chance = 0.1
     AND default_time_to_live = 0
@@ -1052,7 +1076,7 @@ CREATE TABLE legacy.composite_comp_no_col (
     AND CLUSTERING ORDER BY (column1 ASC, column1 ASC, column2 ASC)
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = 'Stores file meta data'
-    AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
+    AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
     AND dclocal_read_repair_chance = 0.1
     AND default_time_to_live = 0
