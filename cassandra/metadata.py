@@ -1207,7 +1207,6 @@ class TableMetadata(object):
         "rows_per_partition_to_cache",
         "memtable_flush_period_in_ms",
         "populate_io_cache_on_flush",
-        "compaction",
         "compression",
         "default_time_to_live")
 
@@ -1350,17 +1349,13 @@ class TableMetadata(object):
     def _make_option_strings(self):
         ret = []
         options_copy = dict(self.options.items())
-        if not options_copy.get('compaction'):
-            options_copy.pop('compaction', None)
 
-            actual_options = json.loads(options_copy.pop('compaction_strategy_options', '{}'))
-            for system_table_name, compact_option_name in self.compaction_options.items():
-                value = options_copy.pop(system_table_name, None)
-                if value:
-                    actual_options.setdefault(compact_option_name, value)
+        actual_options = json.loads(options_copy.pop('compaction_strategy_options', '{}'))
+        value = options_copy.pop("compaction_strategy_class", None)
+        actual_options.setdefault("class", value)
 
-            compaction_option_strings = ["'%s': '%s'" % (k, v) for k, v in actual_options.items()]
-            ret.append('compaction = {%s}' % ', '.join(compaction_option_strings))
+        compaction_option_strings = ["'%s': '%s'" % (k, v) for k, v in actual_options.items()]
+        ret.append('compaction = {%s}' % ', '.join(compaction_option_strings))
 
         for system_table_name in self.compaction_options.keys():
             options_copy.pop(system_table_name, None)  # delete if present
