@@ -60,7 +60,8 @@ from cassandra.protocol import (QueryMessage, ResultMessage,
                                 IsBootstrappingErrorMessage,
                                 BatchMessage, RESULT_KIND_PREPARED,
                                 RESULT_KIND_SET_KEYSPACE, RESULT_KIND_ROWS,
-                                RESULT_KIND_SCHEMA_CHANGE, MIN_SUPPORTED_VERSION, ProtocolHandler)
+                                RESULT_KIND_SCHEMA_CHANGE, MIN_SUPPORTED_VERSION,
+                                ProtocolHandler)
 from cassandra.metadata import Metadata, protect_name, murmur3
 from cassandra.policies import (TokenAwarePolicy, DCAwareRoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
@@ -802,16 +803,16 @@ class Cluster(object):
 
     def _make_connection_kwargs(self, address, kwargs_dict):
         if self._auth_provider_callable:
-            kwargs_dict['authenticator'] = self._auth_provider_callable(address)
+            kwargs_dict.setdefault('authenticator', self._auth_provider_callable(address))
 
-        kwargs_dict['port'] = self.port
-        kwargs_dict['compression'] = self.compression
-        kwargs_dict['sockopts'] = self.sockopts
-        kwargs_dict['ssl_options'] = self.ssl_options
-        kwargs_dict['cql_version'] = self.cql_version
-        kwargs_dict['protocol_version'] = self.protocol_version
-        kwargs_dict['user_type_map'] = self._user_types
-        kwargs_dict['protocol_handler_class'] = self.protocol_handler_class
+        kwargs_dict.setdefault('port', self.port)
+        kwargs_dict.setdefault('compression', self.compression)
+        kwargs_dict.setdefault('sockopts', self.sockopts)
+        kwargs_dict.setdefault('ssl_options', self.ssl_options)
+        kwargs_dict.setdefault('cql_version', self.cql_version)
+        kwargs_dict.setdefault('protocol_version', self.protocol_version)
+        kwargs_dict.setdefault('user_type_map', self._user_types)
+        kwargs_dict.setdefault('protocol_handler_class', self.protocol_handler_class)
 
         return kwargs_dict
 
@@ -1371,7 +1372,7 @@ class Cluster(object):
         log.debug("Preparing all known prepared statements against host %s", host)
         connection = None
         try:
-            connection = self.connection_factory(host.address)
+            connection = self.connection_factory(host.address, protocol_handler_class=ProtocolHandler)
             try:
                 self.control_connection.wait_for_schema_agreement(connection)
             except Exception:
@@ -2130,7 +2131,7 @@ class ControlConnection(object):
 
         while True:
             try:
-                connection = self._cluster.connection_factory(host.address, is_control_connection=True)
+                connection = self._cluster.connection_factory(host.address, is_control_connection=True, protocol_handler_class=ProtocolHandler)
                 break
             except ProtocolVersionUnsupported as e:
                 self._cluster.protocol_downgrade(host.address, e.startup_version)
