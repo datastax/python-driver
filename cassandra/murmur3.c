@@ -20,6 +20,13 @@ typedef int Py_ssize_t;
 #define PY_SSIZE_T_MIN INT_MIN
 #endif
 
+#ifdef PYPY_VERSION
+#define COMPILING_IN_PYPY 1
+#define COMPILING_IN_CPYTHON 0
+#else
+#define COMPILING_IN_PYPY 0
+#define COMPILING_IN_CPYTHON 1
+#endif
 //-----------------------------------------------------------------------------
 // Platform-specific functions and macros
 
@@ -179,7 +186,8 @@ struct module_state {
     PyObject *error;
 };
 
-#if PY_MAJOR_VERSION >= 3
+// pypy3 doesn't have GetState yet.
+#if COMPILING_IN_CPYTHON && PY_MAJOR_VERSION >= 3
 #define GETSTATE(m) ((struct module_state*)PyModule_GetState(m))
 #else
 #define GETSTATE(m) (&_state)
