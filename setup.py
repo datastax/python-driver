@@ -235,6 +235,7 @@ def run_setup(extensions):
         **kw)
 
 is_windows = os.name == 'nt'
+
 if is_windows:
     build_extensions.error_message = """
 ===============================================================================
@@ -291,8 +292,7 @@ The optional C extensions are not supported on big-endian systems.
 
 if extensions:
     if (sys.platform.startswith("java")
-            or sys.platform == "cli"
-            or "PyPy" in sys.version):
+        or sys.platform == "cli"):
         sys.stderr.write(platform_unsupported_msg)
         extensions = ()
     elif sys.byteorder == "big":
