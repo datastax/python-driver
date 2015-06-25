@@ -392,6 +392,7 @@ class TestInet(BaseCassEngTestCase):
         assert m.address == "192.168.1.1"
 
     def test_non_address_fails(self):
+        # TODO: presently this only tests that the server blows it up. Is there supposed to be local validation?
         with self.assertRaises(InvalidRequest):
-            self.InetTestModel.create(address="ham sandwich")
+            self.InetTestModel.create(address="what is going on here?")
 
