@@ -1,5 +1,24 @@
+2.6.0c2
+=======
+June 24, 2015
+
+Features
+--------
+* Automatic Protocol Version Downgrade (PYTHON-240)
+* cqlengine Python 2.6 compatibility (PYTHON-288)
+* Double-dollar string quote UDF body (PYTHON-345)
+* Set models.DEFAULT_KEYSPACE when calling set_session (github #352)
+
+Bug Fixes
+---------
+* Avoid stall while connecting to mixed version cluster (PYTHON-303)
+* Make SSL work with AsyncoreConnection in python 2.6.9 (PYTHON-322)
+* Fix Murmur3Token.from_key() on Windows (PYTHON-331)
+* Fix cqlengine TimeUUID rounding error for Windows (PYTHON-341)
+* Avoid invalid compaction options in CQL export for non-SizeTiered (PYTHON-352)
+
 2.6.0c1
-=====
+=======
 June 4, 2015
 
 This release adds support for Cassandra 2.2 features, including version
