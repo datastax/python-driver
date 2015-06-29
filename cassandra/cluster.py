@@ -1981,7 +1981,6 @@ class _ControlReconnectionHandler(_ReconnectionHandler):
         self.control_connection = weakref.proxy(control_connection)
 
     def try_reconnect(self):
-        # we'll either get back a new Connection or a NoHostAvailable
         return self.control_connection._reconnect_internal()
 
     def on_reconnection(self, connection):
@@ -2032,7 +2031,7 @@ class ControlConnection(object):
     _SELECT_TRIGGERS = "SELECT * FROM system.schema_triggers"
 
     _SELECT_PEERS = "SELECT peer, data_center, rack, tokens, rpc_address, schema_version FROM system.peers"
-    _SELECT_LOCAL = "SELECT cluster_name, data_center, rack, tokens, partitioner, schema_version FROM system.local WHERE key='local'"
+    _SELECT_LOCAL = "SELECT cluster_name, data_center, rack, tokens, partitioner, release_version, schema_version FROM system.local WHERE key='local'"
 
     _SELECT_SCHEMA_PEERS = "SELECT peer, rpc_address, schema_version FROM system.peers"
     _SELECT_SCHEMA_LOCAL = "SELECT schema_version FROM system.local WHERE key='local'"
@@ -2447,6 +2446,8 @@ class ControlConnection(object):
             tokens = local_row.get("tokens")
             if partitioner and tokens:
                 token_map[host] = tokens
+
+            connection.server_version = local_row['release_version']
 
         # Check metadata.partitioner to see if we haven't built anything yet. If
         # every node in the cluster was in the contact points, we won't discover
