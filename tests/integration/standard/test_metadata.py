@@ -662,7 +662,7 @@ class TestCodeCoverage(unittest.TestCase):
                 "Protocol 3.0+ is required for UDT change events, currently testing against %r"
                 % (PROTOCOL_VERSION,))
 
-        if sys.version_info[0:2] != (2, 7):
+        if sys.version_info[:2] != (2, 7):
             raise unittest.SkipTest('This test compares static strings generated from dict items, which may change orders. Test with 2.7.')
 
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
@@ -863,7 +863,7 @@ CREATE TABLE export_udts.users (
         if cass_ver >= (2, 2, 0):
             raise unittest.SkipTest('Cannot test cli script on Cassandra 2.2.0+')
 
-        if sys.version_info[0:2] != (2, 7):
+        if sys.version_info[:2] != (2, 7):
             raise unittest.SkipTest('This test compares static strings generated from dict items, which may change orders. Test with 2.7.')
 
         cli_script = """CREATE KEYSPACE legacy
@@ -908,7 +908,7 @@ CREATE COLUMN FAMILY nested_composite_key
 
 create column family composite_comp_no_col
   with column_type = 'Standard'
-  and comparator = 'DynamicCompositeType(t=>org.apache.cassandra.db.marshal.TimeUUIDType,s=>org.apache.cassandra.db.marshal.UTF8Type,b=>org.apache.cassandra.db.marshal.BytesType)'
+  and comparator = 'DynamicCompositeType(t=>TimeUUIDType,s=>UTF8Type,b=>BytesType)'
   and default_validation_class = 'BytesType'
   and key_validation_class = 'BytesType'
   and read_repair_chance = 0.0
@@ -925,7 +925,7 @@ create column family composite_comp_no_col
 
 create column family composite_comp_with_col
   with column_type = 'Standard'
-  and comparator = 'DynamicCompositeType(t=>org.apache.cassandra.db.marshal.TimeUUIDType,s=>org.apache.cassandra.db.marshal.UTF8Type,b=>org.apache.cassandra.db.marshal.BytesType)'
+  and comparator = 'DynamicCompositeType(t=>TimeUUIDType,s=>UTF8Type,b=>BytesType)'
   and default_validation_class = 'BytesType'
   and key_validation_class = 'BytesType'
   and read_repair_chance = 0.0
@@ -963,14 +963,13 @@ Approximate structure, for reference:
 
 CREATE TABLE legacy.composite_comp_with_col (
     key blob,
-    t timeuuid,
-    b blob,
-    s text,
+    column0 'org.apache.cassandra.db.marshal.DynamicCompositeType(b=>org.apache.cassandra.db.marshal.BytesType, s=>org.apache.cassandra.db.marshal.UTF8Type, t=>org.apache.cassandra.db.marshal.TimeUUIDType)',
+    value blob,
     "b@6869746d65776974686d75736963" blob,
     "b@6d616d6d616a616d6d61" blob,
-    PRIMARY KEY (key, t, b, s)
+    PRIMARY KEY (key, column0)
 ) WITH COMPACT STORAGE
-    AND CLUSTERING ORDER BY (t ASC, b ASC, s ASC)
+    AND CLUSTERING ORDER BY (column0 ASC)
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = 'Stores file meta data'
     AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
@@ -1083,20 +1082,13 @@ CREATE TABLE legacy.simple_no_col (
     AND read_repair_chance = 0.0
     AND speculative_retry = 'NONE';
 
-/*
-Warning: Table legacy.composite_comp_no_col omitted because it has constructs not compatible with CQL (was created via legacy API).
-
-Approximate structure, for reference:
-(this should not be used to reproduce this schema)
-
 CREATE TABLE legacy.composite_comp_no_col (
     key blob,
-    column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(org.apache.cassandra.db.marshal.TimeUUIDType, org.apache.cassandra.db.marshal.BytesType, org.apache.cassandra.db.marshal.UTF8Type)',
-    column2 text,
+    column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(b=>org.apache.cassandra.db.marshal.BytesType, s=>org.apache.cassandra.db.marshal.UTF8Type, t=>org.apache.cassandra.db.marshal.TimeUUIDType)',
     value blob,
-    PRIMARY KEY (key, column1, column1, column2)
+    PRIMARY KEY (key, column1)
 ) WITH COMPACT STORAGE
-    AND CLUSTERING ORDER BY (column1 ASC, column1 ASC, column2 ASC)
+    AND CLUSTERING ORDER BY (column1 ASC)
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = 'Stores file meta data'
     AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
@@ -1108,8 +1100,7 @@ CREATE TABLE legacy.composite_comp_no_col (
     AND memtable_flush_period_in_ms = 0
     AND min_index_interval = 128
     AND read_repair_chance = 0.0
-    AND speculative_retry = 'NONE';
-*/"""
+    AND speculative_retry = 'NONE';"""
 
         ccm = get_cluster()
         ccm.run_cli(cli_script)
