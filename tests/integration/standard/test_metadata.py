@@ -17,7 +17,9 @@ try:
 except ImportError:
     import unittest  # noqa
 
-import difflib, six, sys
+import difflib
+import six
+import sys
 from mock import Mock
 
 from cassandra import AlreadyExists, SignatureDescriptor, UserFunctionDescriptor, UserAggregateDescriptor
@@ -230,6 +232,26 @@ class SchemaMetadataTests(unittest.TestCase):
         self.assertEqual([u'a', u'b', u'c', u'd'], sorted(tablemeta.columns.keys()))
 
         self.check_create_statement(tablemeta, create_statement)
+
+    def test_cql_compatibility(self):
+        # having more than one non-PK column is okay if there aren't any
+        # clustering columns
+        create_statement = self.make_create_statement(["a"], [], ["b", "c", "d"], compact=True)
+        self.session.execute(create_statement)
+        tablemeta = self.get_table_metadata()
+
+        self.assertEqual([u'a'], [c.name for c in tablemeta.partition_key])
+        self.assertEqual([], tablemeta.clustering_key)
+        self.assertEqual([u'a', u'b', u'c', u'd'], sorted(tablemeta.columns.keys()))
+
+        self.assertTrue(tablemeta.is_cql_compatible)
+
+        # ... but if there are clustering columns, it's not CQL compatible.
+        # This is a hacky way to simulate having clustering columns.
+        tablemeta.clustering_key = ["foo", "bar"]
+        tablemeta.columns["foo"] = None
+        tablemeta.columns["bar"] = None
+        self.assertFalse(tablemeta.is_cql_compatible)
 
     def test_compound_primary_keys_ordering(self):
         create_statement = self.make_create_statement(["a"], ["b"], ["c"])
@@ -591,6 +613,7 @@ class SchemaMetadataTests(unittest.TestCase):
         self.assertIn("sum_agg(int)", cluster2.metadata.keyspaces[self.ksname].aggregates)
 
         cluster2.shutdown()
+
 
 class TestCodeCoverage(unittest.TestCase):
 
