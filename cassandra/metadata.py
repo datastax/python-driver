@@ -1534,25 +1534,16 @@ class _SchemaParser(object):
             return build_func(result[0])
 
 
-class SchemaParserV12(_SchemaParser):
+class SchemaParserV22(_SchemaParser):
     _SELECT_KEYSPACES = "SELECT * FROM system.schema_keyspaces"
     _SELECT_COLUMN_FAMILIES = "SELECT * FROM system.schema_columnfamilies"
     _SELECT_COLUMNS = "SELECT * FROM system.schema_columns"
-
-    pass
-
-
-class SchemaParserV20(SchemaParserV12):
     _SELECT_TRIGGERS = "SELECT * FROM system.schema_triggers"
-
-
-class SchemaParserV21(SchemaParserV20):
-    _SELECT_USERTYPES = "SELECT * FROM system.schema_usertypes"
-
-
-class SchemaParserV22(SchemaParserV21):
+    _SELECT_TYPES = "SELECT * FROM system.schema_usertypes"
     _SELECT_FUNCTIONS = "SELECT * FROM system.schema_functions"
     _SELECT_AGGREGATES = "SELECT * FROM system.schema_aggregates"
+
+    _table_name_col = 'columnfamily_name'
 
     def __init__(self, connection, timeout):
         super(SchemaParserV22, self).__init__(connection, timeout)
@@ -1600,7 +1591,7 @@ class SchemaParserV22(SchemaParserV21):
 
     def get_table(self, keyspace, table):
         cl = ConsistencyLevel.ONE
-        where_clause = " WHERE keyspace_name = '%s' AND columnfamily_name = '%s'" % (keyspace, table)
+        where_clause = " WHERE keyspace_name = '%s' AND %s = '%s'" % (keyspace, self._table_name_col, table)
         cf_query = QueryMessage(query=self._SELECT_COLUMN_FAMILIES + where_clause, consistency_level=cl)
         col_query = QueryMessage(query=self._SELECT_COLUMNS + where_clause, consistency_level=cl)
         triggers_query = QueryMessage(query=self._SELECT_TRIGGERS + where_clause, consistency_level=cl)
@@ -1620,7 +1611,7 @@ class SchemaParserV22(SchemaParserV21):
 
     def get_type(self, keyspace, type):
         where_clause = " WHERE keyspace_name = '%s' AND type_name = '%s'" % (keyspace, type)
-        return self._query_build_row(self._SELECT_USERTYPES + where_clause, self._build_user_type)
+        return self._query_build_row(self._SELECT_TYPES + where_clause, self._build_user_type)
 
     def get_function(self, keyspace, function):
         where_clause = " WHERE keyspace_name = '%s' AND function_name = '%s' AND signature = [%s]" \
@@ -1671,7 +1662,7 @@ class SchemaParserV22(SchemaParserV21):
 
     def _build_table_metadata(self, row, col_rows, trigger_rows):
         keyspace_name = row["keyspace_name"]
-        cfname = row["columnfamily_name"]
+        cfname = row[self._table_name_col]
         cf_col_rows = col_rows.get(cfname, [])
 
         if not cf_col_rows:  # CASSANDRA-8487
@@ -1869,7 +1860,7 @@ class SchemaParserV22(SchemaParserV21):
             QueryMessage(query=self._SELECT_KEYSPACES, consistency_level=cl),
             QueryMessage(query=self._SELECT_COLUMN_FAMILIES, consistency_level=cl),
             QueryMessage(query=self._SELECT_COLUMNS, consistency_level=cl),
-            QueryMessage(query=self._SELECT_USERTYPES, consistency_level=cl),
+            QueryMessage(query=self._SELECT_TYPES, consistency_level=cl),
             QueryMessage(query=self._SELECT_FUNCTIONS, consistency_level=cl),
             QueryMessage(query=self._SELECT_AGGREGATES, consistency_level=cl),
             QueryMessage(query=self._SELECT_TRIGGERS, consistency_level=cl)
@@ -1936,7 +1927,7 @@ class SchemaParserV22(SchemaParserV21):
         m = self.keyspace_table_col_rows
         for row in self.columns_result:
             ksname = row["keyspace_name"]
-            cfname = row["columnfamily_name"]
+            cfname = row[self._table_name_col]
             m[ksname][cfname].append(row)
 
         m = self.keyspace_type_rows
@@ -1954,12 +1945,28 @@ class SchemaParserV22(SchemaParserV21):
         m = self.keyspace_table_trigger_rows
         for row in self.triggers_result:
             ksname = row["keyspace_name"]
-            cfname = row["columnfamily_name"]
+            cfname = row[self._table_name_col]
             m[ksname][cfname].append(row)
 
 
 class SchemaParserV3(SchemaParserV22):
-    pass
+    _SELECT_KEYSPACES = "SELECT * FROM system_schema.keyspaces"
+    _SELECT_COLUMN_FAMILIES = "SELECT * FROM system_schema.tables"
+    _SELECT_COLUMNS = "SELECT * FROM system_schema.columns"
+    _SELECT_TRIGGERS = "SELECT * FROM system_schema.triggers"
+    _SELECT_TYPES = "SELECT * FROM system_schema.types"
+    _SELECT_FUNCTIONS = "SELECT * FROM system_schema.functions"
+    _SELECT_AGGREGATES = "SELECT * FROM system_schema.aggregates"
+
+    _table_name_col = 'table_name'
+
+    @staticmethod
+    def _build_keyspace_metadata(row):
+        name = row["keyspace_name"]
+        durable_writes = row["durable_writes"]
+        strategy_options = dict(row["replication"])
+        strategy_class = strategy_options.pop("class")
+        return KeyspaceMetadata(name, durable_writes, strategy_class, strategy_options)
 
 
 def get_schema_parser(connection, timeout):
@@ -1968,5 +1975,5 @@ def get_schema_parser(connection, timeout):
         return SchemaParserV3(connection, timeout)
     else:
         # we could further specialize by version. Right now just refactoring the
-        # multi-version parser we have.
+        # multi-version parser we have as of C* 2.2.0rc1.
         return SchemaParserV22(connection, timeout)
