@@ -280,10 +280,8 @@ def setup_keyspace(ipformat=None):
     session = cluster.connect()
 
     try:
-        results = execute_until_pass(session, "SELECT keyspace_name FROM system.schema_keyspaces")
-        existing_keyspaces = [row[0] for row in results]
         for ksname in ('test1rf', 'test2rf', 'test3rf'):
-            if ksname in existing_keyspaces:
+            if ksname in cluster.metadata.keyspaces:
                 execute_until_pass(session, "DROP KEYSPACE %s" % ksname)
 
         ddl = '''
