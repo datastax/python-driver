@@ -1526,6 +1526,13 @@ class _SchemaParser(object):
         else:
             raise result
 
+    def _query_build_row(self, query_string, build_func):
+        query = QueryMessage(query=query_string, consistency_level=ConsistencyLevel.ONE)
+        response = self.connection.wait_for_response(query, self.timeout)
+        result = dict_factory(*response.results)
+        if result:
+            return build_func(result[0])
+
 
 class SchemaParserV12(_SchemaParser):
     _SELECT_KEYSPACES = "SELECT * FROM system.schema_keyspaces"
@@ -1573,20 +1580,20 @@ class SchemaParserV22(SchemaParserV21):
             keyspace_col_rows = self.keyspace_table_col_rows.get(keyspace_meta.name, {})
             keyspace_trigger_rows = self.keyspace_table_trigger_rows.get(keyspace_meta.name, {})
             for table_row in self.keyspace_table_rows.get(keyspace_meta.name, []):
-                table_meta = self._build_table_metadata(keyspace_meta.name, table_row, keyspace_col_rows, keyspace_trigger_rows)
+                table_meta = self._build_table_metadata(table_row, keyspace_col_rows, keyspace_trigger_rows)
                 table_meta.keyspace = keyspace_meta  # temporary while TableMetadata.keyspace is deprecated
                 keyspace_meta._add_table_metadata(table_meta)
 
             for usertype_row in self.keyspace_type_rows.get(keyspace_meta.name, []):
-                usertype = self._build_user_type(keyspace_meta.name, usertype_row)
+                usertype = self._build_user_type(usertype_row)
                 keyspace_meta.user_types[usertype.name] = usertype
 
             for fn_row in self.keyspace_func_rows.get(keyspace_meta.name, []):
-                fn = self._build_function(keyspace_meta.name, fn_row)
+                fn = self._build_function(fn_row)
                 keyspace_meta.functions[fn.signature] = fn
 
             for agg_row in self.keyspace_agg_rows.get(keyspace_meta.name, []):
-                agg = self._build_aggregate(keyspace_meta.name, agg_row)
+                agg = self._build_aggregate(agg_row)
                 keyspace_meta.aggregates[agg.signature] = agg
 
             yield keyspace_meta
@@ -1609,43 +1616,25 @@ class SchemaParserV22(SchemaParserV21):
             triggers_result = self._handle_results(triggers_success, triggers_result)
 
         if table_result:
-            return self._build_table_metadata(keyspace, table_result[0], {table: col_result}, {table: triggers_result})
+            return self._build_table_metadata(table_result[0], {table: col_result}, {table: triggers_result})
 
-    # TODO: refactor common query/build code
     def get_type(self, keyspace, type):
         where_clause = " WHERE keyspace_name = '%s' AND type_name = '%s'" % (keyspace, type)
-        type_query = QueryMessage(query=self._SELECT_USERTYPES + where_clause, consistency_level=ConsistencyLevel.ONE)
-        type_result = self.connection.wait_for_response(type_query, self.timeout)
-        type_result = dict_factory(*type_result.results)
-        if type_result:
-            return self._build_user_type(keyspace, type_result[0])
+        return self._query_build_row(self._SELECT_USERTYPES + where_clause, self._build_user_type)
 
     def get_function(self, keyspace, function):
         where_clause = " WHERE keyspace_name = '%s' AND function_name = '%s' AND signature = [%s]" \
                        % (keyspace, function.name, ','.join("'%s'" % t for t in function.type_signature))
-        function_query = QueryMessage(query=self._SELECT_FUNCTIONS + where_clause, consistency_level=ConsistencyLevel.ONE)
-        function_result = self.connection.wait_for_response(function_query, self.timeout)
-        function_result = dict_factory(*function_result.results)
-        if function_result:
-            return self._build_function(keyspace, function_result[0])
+        return self._query_build_row(self._SELECT_FUNCTIONS + where_clause, self._build_function)
 
     def get_aggregate(self, keyspace, aggregate):
-        # user defined aggregate within this keyspace changed
         where_clause = " WHERE keyspace_name = '%s' AND aggregate_name = '%s' AND signature = [%s]" \
                        % (keyspace, aggregate.name, ','.join("'%s'" % t for t in aggregate.type_signature))
-        aggregate_query = QueryMessage(query=self._SELECT_AGGREGATES + where_clause, consistency_level=ConsistencyLevel.ONE)
-        aggregate_result = self.connection.wait_for_response(aggregate_query, self.timeout)
-        aggregate_result = dict_factory(*aggregate_result.results)
-        if aggregate_result:
-            return self._build_aggregate(keyspace, aggregate_result[0])
+        return self._query_build_row(self._SELECT_AGGREGATES + where_clause, self._build_aggregate)
 
     def get_keyspace(self, keyspace):
         where_clause = " WHERE keyspace_name = '%s'" % (keyspace,)
-        ks_query = QueryMessage(query=self._SELECT_KEYSPACES + where_clause, consistency_level=ConsistencyLevel.ONE)
-        ks_result = self.connection.wait_for_response(ks_query, self.timeout)
-        ks_result = dict_factory(*ks_result.results)
-        if ks_result:
-            return self._build_keyspace_metadata(ks_result[0])
+        return self._query_build_row(self._SELECT_KEYSPACES + where_clause, self._build_keyspace_metadata)
 
     @staticmethod
     def _build_keyspace_metadata(row):
@@ -1656,31 +1645,32 @@ class SchemaParserV22(SchemaParserV21):
         return KeyspaceMetadata(name, durable_writes, strategy_class, strategy_options)
 
     @staticmethod
-    def _build_user_type(keyspace, usertype_row):
+    def _build_user_type(usertype_row):
         type_classes = list(map(types.lookup_casstype, usertype_row['field_types']))
-        return UserType(keyspace, usertype_row['type_name'],
+        return UserType(usertype_row['keyspace_name'], usertype_row['type_name'],
                         usertype_row['field_names'], type_classes)
 
     @staticmethod
-    def _build_function(keyspace, function_row):
+    def _build_function(function_row):
         return_type = types.lookup_casstype(function_row['return_type'])
-        return Function(keyspace, function_row['function_name'],
+        return Function(function_row['keyspace_name'], function_row['function_name'],
                         function_row['signature'], function_row['argument_names'],
                         return_type, function_row['language'], function_row['body'],
                         function_row['called_on_null_input'])
 
     @staticmethod
-    def _build_aggregate(keyspace, aggregate_row):
+    def _build_aggregate(aggregate_row):
         state_type = types.lookup_casstype(aggregate_row['state_type'])
         initial_condition = aggregate_row['initcond']
         if initial_condition is not None:
             initial_condition = state_type.deserialize(initial_condition, 3)
         return_type = types.lookup_casstype(aggregate_row['return_type'])
-        return Aggregate(keyspace, aggregate_row['aggregate_name'],
+        return Aggregate(aggregate_row['keyspace_name'], aggregate_row['aggregate_name'],
                          aggregate_row['signature'], aggregate_row['state_func'], state_type,
                          aggregate_row['final_func'], initial_condition, return_type)
 
-    def _build_table_metadata(self, keyspace_name, row, col_rows, trigger_rows):
+    def _build_table_metadata(self, row, col_rows, trigger_rows):
+        keyspace_name = row["keyspace_name"]
         cfname = row["columnfamily_name"]
         cf_col_rows = col_rows.get(cfname, [])
 
