@@ -26,7 +26,7 @@ from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
                        WriteFailure, ReadFailure, FunctionFailure,
                        AlreadyExists, InvalidRequest, Unauthorized,
                        UnsupportedOperation, UserFunctionDescriptor,
-                       UserAggregateDescriptor)
+                       UserAggregateDescriptor, SchemaTargetType)
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
                                int8_pack, int8_unpack, uint64_pack, header_pack,
                                v3_header_pack)
@@ -68,6 +68,7 @@ _message_types_by_name = {}
 _message_types_by_opcode = {}
 
 _UNSET_VALUE = object()
+
 
 class _RegisterMessageType(type):
     def __init__(cls, name, bases, dct):
@@ -948,19 +949,22 @@ class EventMessage(_MessageType):
         if protocol_version >= 3:
             target = read_string(f)
             keyspace = read_string(f)
-            event = {'change_type': change_type, 'keyspace': keyspace}
-            if target != "KEYSPACE":
+            event = {'target_type': target, 'change_type': change_type, 'keyspace': keyspace}
+            if target != SchemaTargetType.KEYSPACE:
                 target_name = read_string(f)
-                if target == 'FUNCTION':
+                if target == SchemaTargetType.FUNCTION:
                     event['function'] = UserFunctionDescriptor(target_name, [read_string(f) for _ in range(read_short(f))])
-                elif target == 'AGGREGATE':
+                elif target == SchemaTargetType.AGGREGATE:
                     event['aggregate'] = UserAggregateDescriptor(target_name, [read_string(f) for _ in range(read_short(f))])
                 else:
                     event[target.lower()] = target_name
         else:
             keyspace = read_string(f)
             table = read_string(f)
-            event = {'change_type': change_type, 'keyspace': keyspace, 'table': table}
+            if table:
+                event = {'target_type': SchemaTargetType.TABLE, 'change_type': change_type, 'keyspace': keyspace, 'table': table}
+            else:
+                event = {'target_type': SchemaTargetType.KEYSPACE, 'change_type': change_type, 'keyspace': keyspace}
         return event
 
 

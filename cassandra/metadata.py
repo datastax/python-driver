@@ -29,10 +29,12 @@ try:
 except ImportError as e:
     pass
 
-from cassandra import SignatureDescriptor
+from cassandra import SignatureDescriptor, ConsistencyLevel, InvalidRequest, SchemaChangeType, Unauthorized
 import cassandra.cqltypes as types
 from cassandra.encoder import Encoder
 from cassandra.marshal import varint_unpack
+from cassandra.protocol import QueryMessage
+from cassandra.query import dict_factory
 from cassandra.util import OrderedDict
 
 log = logging.getLogger(__name__)
@@ -110,64 +112,38 @@ class Metadata(object):
         """
         return "\n".join(ks.export_as_string() for ks in self.keyspaces.values())
 
-    def rebuild_schema(self, ks_results, type_results, function_results,
-                       aggregate_results, cf_results, col_results, triggers_result):
-        """
-        Rebuild the view of the current schema from a fresh set of rows from
-        the system schema tables.
+    def refresh(self, connection, timeout, target_type=None, change_type=None, **kwargs):
 
+        if not target_type:
+            self._rebuild_all(connection, timeout)
+            return
+
+        tt_lower = target_type.lower()
+        try:
+            if change_type == SchemaChangeType.DROPPED:
+                drop_method = getattr(self, '_drop_' + tt_lower)
+                drop_method(**kwargs)
+            else:
+                parser = get_schema_parser(connection, timeout)
+                parse_method = getattr(parser, 'get_' + tt_lower)
+                meta = parse_method(**kwargs)
+                if meta:
+                    update_method = getattr(self, '_update_' + tt_lower)
+                    update_method(meta)
+                else:
+                    drop_method = getattr(self, '_drop_' + tt_lower)
+                    drop_method(**kwargs)
+        except AttributeError:
+            raise ValueError("Unknown schema target_type: '%s'" % target_type)
+
+    def _rebuild_all(self, connection, timeout):
+        """
         For internal use only.
         """
-        cf_def_rows = defaultdict(list)
-        col_def_rows = defaultdict(lambda: defaultdict(list))
-        usertype_rows = defaultdict(list)
-        fn_rows = defaultdict(list)
-        agg_rows = defaultdict(list)
-        trigger_rows = defaultdict(lambda: defaultdict(list))
-
-        for row in cf_results:
-            cf_def_rows[row["keyspace_name"]].append(row)
-
-        for row in col_results:
-            ksname = row["keyspace_name"]
-            cfname = row["columnfamily_name"]
-            col_def_rows[ksname][cfname].append(row)
-
-        for row in type_results:
-            usertype_rows[row["keyspace_name"]].append(row)
-
-        for row in function_results:
-            fn_rows[row["keyspace_name"]].append(row)
-
-        for row in aggregate_results:
-            agg_rows[row["keyspace_name"]].append(row)
-
-        for row in triggers_result:
-            ksname = row["keyspace_name"]
-            cfname = row["columnfamily_name"]
-            trigger_rows[ksname][cfname].append(row)
+        parser = get_schema_parser(connection, timeout)
 
         current_keyspaces = set()
-        for row in ks_results:
-            keyspace_meta = self._build_keyspace_metadata(row)
-            keyspace_col_rows = col_def_rows.get(keyspace_meta.name, {})
-            keyspace_trigger_rows = trigger_rows.get(keyspace_meta.name, {})
-            for table_row in cf_def_rows.get(keyspace_meta.name, []):
-                table_meta = self._build_table_metadata(keyspace_meta, table_row, keyspace_col_rows, keyspace_trigger_rows)
-                keyspace_meta._add_table_metadata(table_meta)
-
-            for usertype_row in usertype_rows.get(keyspace_meta.name, []):
-                usertype = self._build_usertype(keyspace_meta.name, usertype_row)
-                keyspace_meta.user_types[usertype.name] = usertype
-
-            for fn_row in fn_rows.get(keyspace_meta.name, []):
-                fn = self._build_function(keyspace_meta.name, fn_row)
-                keyspace_meta.functions[fn.signature] = fn
-
-            for agg_row in agg_rows.get(keyspace_meta.name, []):
-                agg = self._build_aggregate(keyspace_meta.name, agg_row)
-                keyspace_meta.aggregates[agg.signature] = agg
-
+        for keyspace_meta in parser.get_all_keyspaces():
             current_keyspaces.add(keyspace_meta.name)
             old_keyspace_meta = self.keyspaces.get(keyspace_meta.name, None)
             self.keyspaces[keyspace_meta.name] = keyspace_meta
@@ -184,16 +160,10 @@ class Metadata(object):
         for ksname in removed_keyspaces:
             self._keyspace_removed(ksname)
 
-    def keyspace_changed(self, keyspace, ks_results):
-        if not ks_results:
-            if keyspace in self.keyspaces:
-                del self.keyspaces[keyspace]
-                self._keyspace_removed(keyspace)
-            return
-
-        keyspace_meta = self._build_keyspace_metadata(ks_results[0])
-        old_keyspace_meta = self.keyspaces.get(keyspace, None)
-        self.keyspaces[keyspace] = keyspace_meta
+    def _update_keyspace(self, keyspace_meta):
+        ks_name = keyspace_meta.name
+        old_keyspace_meta = self.keyspaces.get(ks_name, None)
+        self.keyspaces[ks_name] = keyspace_meta
         if old_keyspace_meta:
             keyspace_meta.tables = old_keyspace_meta.tables
             keyspace_meta.user_types = old_keyspace_meta.user_types
@@ -201,50 +171,69 @@ class Metadata(object):
             keyspace_meta.functions = old_keyspace_meta.functions
             keyspace_meta.aggregates = old_keyspace_meta.aggregates
             if (keyspace_meta.replication_strategy != old_keyspace_meta.replication_strategy):
-                self._keyspace_updated(keyspace)
+                self._keyspace_updated(ks_name)
         else:
-            self._keyspace_added(keyspace)
+            self._keyspace_added(ks_name)
 
-    def usertype_changed(self, keyspace, name, type_results):
-        if type_results:
-            new_usertype = self._build_usertype(keyspace, type_results[0])
-            self.keyspaces[keyspace].user_types[name] = new_usertype
-        else:
-            # the type was deleted
-            self.keyspaces[keyspace].user_types.pop(name, None)
+    def _drop_keyspace(self, keyspace):
+        if self.keyspaces.pop(keyspace, None):
+            self._keyspace_removed(keyspace)
 
-    def function_changed(self, keyspace, function, function_results):
-        if function_results:
-            new_function = self._build_function(keyspace, function_results[0])
-            self.keyspaces[keyspace].functions[function.signature] = new_function
-        else:
-            # the function was deleted
-            self.keyspaces[keyspace].functions.pop(function.signature, None)
+    def _update_table(self, table_meta):
+        try:
+            keyspace_meta = self.keyspaces[table_meta.keyspace_name]
+            table_meta.keyspace = keyspace_meta  # temporary while TableMetadata.keyspace is deprecated
+            keyspace_meta._add_table_metadata(table_meta)
+        except KeyError:
+            # can happen if keyspace disappears while processing async event
+            pass
 
-    def aggregate_changed(self, keyspace, aggregate, aggregate_results):
-        if aggregate_results:
-            new_aggregate = self._build_aggregate(keyspace, aggregate_results[0])
-            self.keyspaces[keyspace].aggregates[aggregate.signature] = new_aggregate
-        else:
-            # the aggregate was deleted
-            self.keyspaces[keyspace].aggregates.pop(aggregate.signature, None)
-
-    def table_changed(self, keyspace, table, cf_results, col_results, triggers_result):
+    def _drop_table(self, keyspace, table):
         try:
             keyspace_meta = self.keyspaces[keyspace]
-        except KeyError:
-            # we're trying to update a table in a keyspace we don't know about
-            log.error("Tried to update schema for table '%s' in unknown keyspace '%s'",
-                      table, keyspace)
-            return
-
-        if not cf_results:
-            # the table was removed
             keyspace_meta._drop_table_metadata(table)
-        else:
-            assert len(cf_results) == 1
-            table_meta = self._build_table_metadata(keyspace_meta, cf_results[0], {table: col_results}, {table: triggers_result})
-            keyspace_meta._add_table_metadata(table_meta)
+        except KeyError:
+            # can happen if keyspace disappears while processing async event
+            pass
+
+    def _update_type(self, type_meta):
+        try:
+            self.keyspaces[type_meta.keyspace].user_types[type_meta.name] = type_meta
+        except KeyError:
+            # can happen if keyspace disappears while processing async event
+            pass
+
+    def _drop_type(self, keyspace, type):
+        try:
+            self.keyspaces[keyspace].user_types.pop(type, None)
+        except KeyError:
+            # can happen if keyspace disappears while processing async event
+            pass
+
+    def _update_function(self, function_meta):
+        try:
+            self.keyspaces[function_meta.keyspace].functions[function_meta.signature] = function_meta
+        except KeyError:
+            # can happen if keyspace disappears while processing async event
+            pass
+
+    def _drop_function(self, keyspace, function):
+        try:
+            self.keyspaces[keyspace].functions.pop(function.signature, None)
+        except KeyError:
+            pass
+
+    def _update_aggregate(self, aggregate_meta):
+        try:
+            self.keyspaces[aggregate_meta.keyspace].aggregates[aggregate_meta.signature] = aggregate_meta
+        except KeyError:
+            pass
+
+    def _drop_aggregate(self, keyspace, aggregate):
+        try:
+            self.keyspaces[keyspace].aggregates.pop(aggregate.signature, None)
+        except KeyError:
+            pass
 
     def _keyspace_added(self, ksname):
         if self.token_map:
@@ -257,225 +246,6 @@ class Metadata(object):
     def _keyspace_removed(self, ksname):
         if self.token_map:
             self.token_map.remove_keyspace(ksname)
-
-    def _build_keyspace_metadata(self, row):
-        name = row["keyspace_name"]
-        durable_writes = row["durable_writes"]
-        strategy_class = row["strategy_class"]
-        strategy_options = json.loads(row["strategy_options"])
-        return KeyspaceMetadata(name, durable_writes, strategy_class, strategy_options)
-
-    def _build_usertype(self, keyspace, usertype_row):
-        type_classes = list(map(types.lookup_casstype, usertype_row['field_types']))
-        return UserType(usertype_row['keyspace_name'], usertype_row['type_name'],
-                        usertype_row['field_names'], type_classes)
-
-    def _build_function(self, keyspace, function_row):
-        return_type = types.lookup_casstype(function_row['return_type'])
-        return Function(function_row['keyspace_name'], function_row['function_name'],
-                        function_row['signature'], function_row['argument_names'],
-                        return_type, function_row['language'], function_row['body'],
-                        function_row['called_on_null_input'])
-
-    def _build_aggregate(self, keyspace, aggregate_row):
-        state_type = types.lookup_casstype(aggregate_row['state_type'])
-        initial_condition = aggregate_row['initcond']
-        if initial_condition is not None:
-            initial_condition = state_type.deserialize(initial_condition, 3)
-        return_type = types.lookup_casstype(aggregate_row['return_type'])
-        return Aggregate(aggregate_row['keyspace_name'], aggregate_row['aggregate_name'],
-                         aggregate_row['signature'], aggregate_row['state_func'], state_type,
-                         aggregate_row['final_func'], initial_condition, return_type)
-
-    def _build_table_metadata(self, keyspace_metadata, row, col_rows, trigger_rows):
-        cfname = row["columnfamily_name"]
-        cf_col_rows = col_rows.get(cfname, [])
-
-        if not cf_col_rows:  # CASSANDRA-8487
-            log.warning("Building table metadata with no column meta for %s.%s",
-                        keyspace_metadata.name, cfname)
-
-        comparator = types.lookup_casstype(row["comparator"])
-
-        if issubclass(comparator, types.CompositeType):
-            column_name_types = comparator.subtypes
-            is_composite_comparator = True
-        else:
-            column_name_types = (comparator,)
-            is_composite_comparator = False
-
-        num_column_name_components = len(column_name_types)
-        last_col = column_name_types[-1]
-
-        column_aliases = row.get("column_aliases", None)
-
-        clustering_rows = [r for r in cf_col_rows
-                           if r.get('type', None) == "clustering_key"]
-        if len(clustering_rows) > 1:
-            clustering_rows = sorted(clustering_rows, key=lambda row: row.get('component_index'))
-
-        if column_aliases is not None:
-            column_aliases = json.loads(column_aliases)
-        else:
-            column_aliases = [r.get('column_name') for r in clustering_rows]
-
-        if is_composite_comparator:
-            if issubclass(last_col, types.ColumnToCollectionType):
-                # collections
-                is_compact = False
-                has_value = False
-                clustering_size = num_column_name_components - 2
-            elif (len(column_aliases) == num_column_name_components - 1
-                    and issubclass(last_col, types.UTF8Type)):
-                # aliases?
-                is_compact = False
-                has_value = False
-                clustering_size = num_column_name_components - 1
-            else:
-                # compact table
-                is_compact = True
-                has_value = column_aliases or not cf_col_rows
-                clustering_size = num_column_name_components
-
-                # Some thrift tables define names in composite types (see PYTHON-192)
-                if not column_aliases and hasattr(comparator, 'fieldnames'):
-                    column_aliases = comparator.fieldnames
-        else:
-            is_compact = True
-            if column_aliases or not cf_col_rows:
-                has_value = True
-                clustering_size = num_column_name_components
-            else:
-                has_value = False
-                clustering_size = 0
-
-        table_meta = TableMetadata(keyspace_metadata, cfname)
-        table_meta.comparator = comparator
-
-        # partition key
-        partition_rows = [r for r in cf_col_rows
-                          if r.get('type', None) == "partition_key"]
-
-        if len(partition_rows) > 1:
-            partition_rows = sorted(partition_rows, key=lambda row: row.get('component_index'))
-
-        key_aliases = row.get("key_aliases")
-        if key_aliases is not None:
-            key_aliases = json.loads(key_aliases) if key_aliases else []
-        else:
-            # In 2.0+, we can use the 'type' column. In 3.0+, we have to use it.
-            key_aliases = [r.get('column_name') for r in partition_rows]
-
-        key_validator = row.get("key_validator")
-        if key_validator is not None:
-            key_type = types.lookup_casstype(key_validator)
-            key_types = key_type.subtypes if issubclass(key_type, types.CompositeType) else [key_type]
-        else:
-            key_types = [types.lookup_casstype(r.get('validator')) for r in partition_rows]
-
-        for i, col_type in enumerate(key_types):
-            if len(key_aliases) > i:
-                column_name = key_aliases[i]
-            elif i == 0:
-                column_name = "key"
-            else:
-                column_name = "key%d" % i
-
-            col = ColumnMetadata(table_meta, column_name, col_type)
-            table_meta.columns[column_name] = col
-            table_meta.partition_key.append(col)
-
-        # clustering key
-        for i in range(clustering_size):
-            if len(column_aliases) > i:
-                column_name = column_aliases[i]
-            else:
-                column_name = "column%d" % i
-
-            col = ColumnMetadata(table_meta, column_name, column_name_types[i])
-            table_meta.columns[column_name] = col
-            table_meta.clustering_key.append(col)
-
-        # value alias (if present)
-        if has_value:
-            value_alias_rows = [r for r in cf_col_rows
-                                if r.get('type', None) == "compact_value"]
-
-            if not key_aliases:  # TODO are we checking the right thing here?
-                value_alias = "value"
-            else:
-                value_alias = row.get("value_alias", None)
-                if value_alias is None and value_alias_rows:  # CASSANDRA-8487
-                    # In 2.0+, we can use the 'type' column. In 3.0+, we have to use it.
-                    value_alias = value_alias_rows[0].get('column_name')
-
-            default_validator = row.get("default_validator")
-            if default_validator:
-                validator = types.lookup_casstype(default_validator)
-            else:
-                if value_alias_rows:  # CASSANDRA-8487
-                    validator = types.lookup_casstype(value_alias_rows[0].get('validator'))
-
-            col = ColumnMetadata(table_meta, value_alias, validator)
-            if value_alias:  # CASSANDRA-8487
-                table_meta.columns[value_alias] = col
-
-        # other normal columns
-        for col_row in cf_col_rows:
-            column_meta = self._build_column_metadata(table_meta, col_row)
-            table_meta.columns[column_meta.name] = column_meta
-
-        if trigger_rows:
-            for trigger_row in trigger_rows[cfname]:
-                trigger_meta = self._build_trigger_metadata(table_meta, trigger_row)
-                table_meta.triggers[trigger_meta.name] = trigger_meta
-
-        table_meta.options = self._build_table_options(row)
-        table_meta.is_compact_storage = is_compact
-
-        return table_meta
-
-    def _build_table_options(self, row):
-        """ Setup the mostly-non-schema table options, like caching settings """
-        options = dict((o, row.get(o)) for o in TableMetadata.recognized_options if o in row)
-
-        # the option name when creating tables is "dclocal_read_repair_chance",
-        # but the column name in system.schema_columnfamilies is
-        # "local_read_repair_chance".  We'll store this as dclocal_read_repair_chance,
-        # since that's probably what users are expecting (and we need it for the
-        # CREATE TABLE statement anyway).
-        if "local_read_repair_chance" in options:
-            val = options.pop("local_read_repair_chance")
-            options["dclocal_read_repair_chance"] = val
-
-        return options
-
-    def _build_column_metadata(self, table_metadata, row):
-        name = row["column_name"]
-        data_type = types.lookup_casstype(row["validator"])
-        is_static = row.get("type", None) == "static"
-        column_meta = ColumnMetadata(table_metadata, name, data_type, is_static=is_static)
-        index_meta = self._build_index_metadata(column_meta, row)
-        column_meta.index = index_meta
-        if index_meta:
-            table_metadata.indexes[index_meta.name] = index_meta
-        return column_meta
-
-    def _build_index_metadata(self, column_metadata, row):
-        index_name = row.get("index_name")
-        index_type = row.get("index_type")
-        if index_name or index_type:
-            options = row.get("index_options")
-            index_options = json.loads(options) if options else {}
-            return IndexMetadata(column_metadata, index_name, index_type, index_options)
-        else:
-            return None
-
-    def _build_trigger_metadata(self, table_metadata, row):
-        name = row["trigger_name"]
-        options = row["trigger_options"]
-        trigger_meta = TriggerMetadata(table_metadata, name, options)
-        return trigger_meta
 
     def rebuild_token_map(self, partitioner, token_map):
         """
@@ -1138,7 +908,15 @@ class TableMetadata(object):
     """
 
     keyspace = None
-    """ An instance of :class:`~.KeyspaceMetadata`. """
+    """
+    An instance of :class:`~.KeyspaceMetadata`.
+
+    .. deprecated:: 2.7.0
+
+    """
+
+    keyspace_name = None
+    """ String name of this Table's keyspace """
 
     name = None
     """ The string name of the table. """
@@ -1236,8 +1014,8 @@ class TableMetadata(object):
 
         return not incompatible
 
-    def __init__(self, keyspace_metadata, name, partition_key=None, clustering_key=None, columns=None, triggers=None, options=None):
-        self.keyspace = keyspace_metadata
+    def __init__(self, keyspace_name, name, partition_key=None, clustering_key=None, columns=None, triggers=None, options=None):
+        self.keyspace_name = keyspace_name
         self.name = name
         self.partition_key = [] if partition_key is None else partition_key
         self.clustering_key = [] if clustering_key is None else clustering_key
@@ -1258,7 +1036,7 @@ class TableMetadata(object):
         else:
             # If we can't produce this table with CQL, comment inline
             ret = "/*\nWarning: Table %s.%s omitted because it has constructs not compatible with CQL (was created via legacy API).\n" % \
-                  (self.keyspace.name, self.name)
+                  (self.keyspace_name, self.name)
             ret += "\nApproximate structure, for reference:\n(this should not be used to reproduce this schema)\n\n%s" % self.all_as_cql()
             ret += "\n*/"
 
@@ -1283,7 +1061,7 @@ class TableMetadata(object):
         extra whitespace will be added to make the query human readable.
         """
         ret = "CREATE TABLE %s.%s (%s" % (
-            protect_name(self.keyspace.name),
+            protect_name(self.keyspace_name),
             protect_name(self.name),
             "\n" if formatted else "")
 
@@ -1738,3 +1516,471 @@ class TriggerMetadata(object):
             protect_value(self.options['class'])
         )
         return ret
+
+
+class _SchemaParser(object):
+
+    def __init__(self, connection, timeout):
+        self.connection = connection
+        self.timeout = timeout
+
+    def _handle_results(self, success, result):
+        if success:
+            return dict_factory(*result.results) if result else []
+        else:
+            raise result
+
+
+class SchemaParserV12(_SchemaParser):
+    _SELECT_KEYSPACES = "SELECT * FROM system.schema_keyspaces"
+    _SELECT_COLUMN_FAMILIES = "SELECT * FROM system.schema_columnfamilies"
+    _SELECT_COLUMNS = "SELECT * FROM system.schema_columns"
+
+    pass
+
+
+class SchemaParserV20(SchemaParserV12):
+    _SELECT_TRIGGERS = "SELECT * FROM system.schema_triggers"
+
+
+class SchemaParserV21(SchemaParserV20):
+    _SELECT_USERTYPES = "SELECT * FROM system.schema_usertypes"
+
+
+class SchemaParserV22(SchemaParserV21):
+    _SELECT_FUNCTIONS = "SELECT * FROM system.schema_functions"
+    _SELECT_AGGREGATES = "SELECT * FROM system.schema_aggregates"
+
+    def __init__(self, connection, timeout):
+        super(SchemaParserV22, self).__init__(connection, timeout)
+        self.keyspaces_result = []
+        self.tables_result = []
+        self.columns_result = []
+        self.triggers_result = []
+        self.types_result = []
+        self.functions_result = []
+        self.aggregates_result = []
+
+        self.keyspace_table_rows = defaultdict(list)
+        self.keyspace_table_col_rows = defaultdict(lambda: defaultdict(list))
+        self.keyspace_type_rows = defaultdict(list)
+        self.keyspace_func_rows = defaultdict(list)
+        self.keyspace_agg_rows = defaultdict(list)
+        self.keyspace_table_trigger_rows = defaultdict(lambda: defaultdict(list))
+
+    def get_all_keyspaces(self):
+        self._query_all()
+
+        for row in self.keyspaces_result:
+            keyspace_meta = self._build_keyspace_metadata(row)
+
+            keyspace_col_rows = self.keyspace_table_col_rows.get(keyspace_meta.name, {})
+            keyspace_trigger_rows = self.keyspace_table_trigger_rows.get(keyspace_meta.name, {})
+            for table_row in self.keyspace_table_rows.get(keyspace_meta.name, []):
+                table_meta = self._build_table_metadata(keyspace_meta.name, table_row, keyspace_col_rows, keyspace_trigger_rows)
+                table_meta.keyspace = keyspace_meta  # temporary while TableMetadata.keyspace is deprecated
+                keyspace_meta._add_table_metadata(table_meta)
+
+            for usertype_row in self.keyspace_type_rows.get(keyspace_meta.name, []):
+                usertype = self._build_user_type(keyspace_meta.name, usertype_row)
+                keyspace_meta.user_types[usertype.name] = usertype
+
+            for fn_row in self.keyspace_func_rows.get(keyspace_meta.name, []):
+                fn = self._build_function(keyspace_meta.name, fn_row)
+                keyspace_meta.functions[fn.signature] = fn
+
+            for agg_row in self.keyspace_agg_rows.get(keyspace_meta.name, []):
+                agg = self._build_aggregate(keyspace_meta.name, agg_row)
+                keyspace_meta.aggregates[agg.signature] = agg
+
+            yield keyspace_meta
+
+    def get_table(self, keyspace, table):
+        cl = ConsistencyLevel.ONE
+        where_clause = " WHERE keyspace_name = '%s' AND columnfamily_name = '%s'" % (keyspace, table)
+        cf_query = QueryMessage(query=self._SELECT_COLUMN_FAMILIES + where_clause, consistency_level=cl)
+        col_query = QueryMessage(query=self._SELECT_COLUMNS + where_clause, consistency_level=cl)
+        triggers_query = QueryMessage(query=self._SELECT_TRIGGERS + where_clause, consistency_level=cl)
+        (cf_success, cf_result), (col_success, col_result), (triggers_success, triggers_result) \
+            = self.connection.wait_for_responses(cf_query, col_query, triggers_query, timeout=self.timeout, fail_on_error=False)
+        table_result = self._handle_results(cf_success, cf_result)
+        col_result = self._handle_results(col_success, col_result)
+
+        # handle the triggers table not existing in Cassandra 1.2
+        if not triggers_success and isinstance(triggers_result, InvalidRequest):
+            triggers_result = []
+        else:
+            triggers_result = self._handle_results(triggers_success, triggers_result)
+
+        if table_result:
+            return self._build_table_metadata(keyspace, table_result[0], {table: col_result}, {table: triggers_result})
+
+    # TODO: refactor common query/build code
+    def get_type(self, keyspace, type):
+        where_clause = " WHERE keyspace_name = '%s' AND type_name = '%s'" % (keyspace, type)
+        type_query = QueryMessage(query=self._SELECT_USERTYPES + where_clause, consistency_level=ConsistencyLevel.ONE)
+        type_result = self.connection.wait_for_response(type_query, self.timeout)
+        if type_result.results:
+            type_result = dict_factory(*type_result.results)
+            return self._build_user_type(keyspace, type_result[0])
+
+    def get_function(self, keyspace, function):
+        where_clause = " WHERE keyspace_name = '%s' AND function_name = '%s' AND signature = [%s]" \
+                       % (keyspace, function.name, ','.join("'%s'" % t for t in function.type_signature))
+        function_query = QueryMessage(query=self._SELECT_FUNCTIONS + where_clause, consistency_level=ConsistencyLevel.ONE)
+        function_result = self.connection.wait_for_response(function_query, self.timeout)
+        if function_result.results:
+            function_result = dict_factory(*function_result.results)
+            return self._build_function(keyspace, function_result[0])
+
+    def get_aggregate(self, keyspace, aggregate):
+        # user defined aggregate within this keyspace changed
+        where_clause = " WHERE keyspace_name = '%s' AND aggregate_name = '%s' AND signature = [%s]" \
+                       % (keyspace, aggregate.name, ','.join("'%s'" % t for t in aggregate.type_signature))
+        aggregate_query = QueryMessage(query=self._SELECT_AGGREGATES + where_clause, consistency_level=ConsistencyLevel.ONE)
+        aggregate_result = self.connection.wait_for_response(aggregate_query, self.timeout)
+        if aggregate_result.results:
+            aggregate_result = dict_factory(*aggregate_result.results)
+            return self._build_aggregate(keyspace, aggregate_result[0])
+
+    def get_keyspace(self, keyspace):
+        where_clause = " WHERE keyspace_name = '%s'" % (keyspace,)
+        ks_query = QueryMessage(query=self._SELECT_KEYSPACES + where_clause, consistency_level=ConsistencyLevel.ONE)
+        ks_result = self.connection.wait_for_response(ks_query, self.timeout)
+        if ks_result.results:
+            ks_result = dict_factory(*ks_result.results)
+            return self._build_keyspace_metadata(ks_result[0])
+
+    @staticmethod
+    def _build_keyspace_metadata(row):
+        name = row["keyspace_name"]
+        durable_writes = row["durable_writes"]
+        strategy_class = row["strategy_class"]
+        strategy_options = json.loads(row["strategy_options"])
+        return KeyspaceMetadata(name, durable_writes, strategy_class, strategy_options)
+
+    @staticmethod
+    def _build_user_type(keyspace, usertype_row):
+        type_classes = list(map(types.lookup_casstype, usertype_row['field_types']))
+        return UserType(keyspace, usertype_row['type_name'],
+                        usertype_row['field_names'], type_classes)
+
+    @staticmethod
+    def _build_function(keyspace, function_row):
+        return_type = types.lookup_casstype(function_row['return_type'])
+        return Function(keyspace, function_row['function_name'],
+                        function_row['signature'], function_row['argument_names'],
+                        return_type, function_row['language'], function_row['body'],
+                        function_row['called_on_null_input'])
+
+    @staticmethod
+    def _build_aggregate(keyspace, aggregate_row):
+        state_type = types.lookup_casstype(aggregate_row['state_type'])
+        initial_condition = aggregate_row['initcond']
+        if initial_condition is not None:
+            initial_condition = state_type.deserialize(initial_condition, 3)
+        return_type = types.lookup_casstype(aggregate_row['return_type'])
+        return Aggregate(keyspace, aggregate_row['aggregate_name'],
+                         aggregate_row['signature'], aggregate_row['state_func'], state_type,
+                         aggregate_row['final_func'], initial_condition, return_type)
+
+    def _build_table_metadata(self, keyspace_name, row, col_rows, trigger_rows):
+        cfname = row["columnfamily_name"]
+        cf_col_rows = col_rows.get(cfname, [])
+
+        if not cf_col_rows:  # CASSANDRA-8487
+            log.warning("Building table metadata with no column meta for %s.%s",
+                        keyspace_name, cfname)
+
+        comparator = types.lookup_casstype(row["comparator"])
+
+        if issubclass(comparator, types.CompositeType):
+            column_name_types = comparator.subtypes
+            is_composite_comparator = True
+        else:
+            column_name_types = (comparator,)
+            is_composite_comparator = False
+
+        num_column_name_components = len(column_name_types)
+        last_col = column_name_types[-1]
+
+        column_aliases = row.get("column_aliases", None)
+
+        clustering_rows = [r for r in cf_col_rows
+                           if r.get('type', None) == "clustering_key"]
+        if len(clustering_rows) > 1:
+            clustering_rows = sorted(clustering_rows, key=lambda row: row.get('component_index'))
+
+        if column_aliases is not None:
+            column_aliases = json.loads(column_aliases)
+        else:
+            column_aliases = [r.get('column_name') for r in clustering_rows]
+
+        if is_composite_comparator:
+            if issubclass(last_col, types.ColumnToCollectionType):
+                # collections
+                is_compact = False
+                has_value = False
+                clustering_size = num_column_name_components - 2
+            elif (len(column_aliases) == num_column_name_components - 1
+                  and issubclass(last_col, types.UTF8Type)):
+                # aliases?
+                is_compact = False
+                has_value = False
+                clustering_size = num_column_name_components - 1
+            else:
+                # compact table
+                is_compact = True
+                has_value = column_aliases or not cf_col_rows
+                clustering_size = num_column_name_components
+
+                # Some thrift tables define names in composite types (see PYTHON-192)
+                if not column_aliases and hasattr(comparator, 'fieldnames'):
+                    column_aliases = comparator.fieldnames
+        else:
+            is_compact = True
+            if column_aliases or not cf_col_rows:
+                has_value = True
+                clustering_size = num_column_name_components
+            else:
+                has_value = False
+                clustering_size = 0
+
+        table_meta = TableMetadata(keyspace_name, cfname)
+        table_meta.comparator = comparator
+
+        # partition key
+        partition_rows = [r for r in cf_col_rows
+                          if r.get('type', None) == "partition_key"]
+
+        if len(partition_rows) > 1:
+            partition_rows = sorted(partition_rows, key=lambda row: row.get('component_index'))
+
+        key_aliases = row.get("key_aliases")
+        if key_aliases is not None:
+            key_aliases = json.loads(key_aliases) if key_aliases else []
+        else:
+            # In 2.0+, we can use the 'type' column. In 3.0+, we have to use it.
+            key_aliases = [r.get('column_name') for r in partition_rows]
+
+        key_validator = row.get("key_validator")
+        if key_validator is not None:
+            key_type = types.lookup_casstype(key_validator)
+            key_types = key_type.subtypes if issubclass(key_type, types.CompositeType) else [key_type]
+        else:
+            key_types = [types.lookup_casstype(r.get('validator')) for r in partition_rows]
+
+        for i, col_type in enumerate(key_types):
+            if len(key_aliases) > i:
+                column_name = key_aliases[i]
+            elif i == 0:
+                column_name = "key"
+            else:
+                column_name = "key%d" % i
+
+            col = ColumnMetadata(table_meta, column_name, col_type)
+            table_meta.columns[column_name] = col
+            table_meta.partition_key.append(col)
+
+        # clustering key
+        for i in range(clustering_size):
+            if len(column_aliases) > i:
+                column_name = column_aliases[i]
+            else:
+                column_name = "column%d" % i
+
+            col = ColumnMetadata(table_meta, column_name, column_name_types[i])
+            table_meta.columns[column_name] = col
+            table_meta.clustering_key.append(col)
+
+        # value alias (if present)
+        if has_value:
+            value_alias_rows = [r for r in cf_col_rows
+                                if r.get('type', None) == "compact_value"]
+
+            if not key_aliases:  # TODO are we checking the right thing here?
+                value_alias = "value"
+            else:
+                value_alias = row.get("value_alias", None)
+                if value_alias is None and value_alias_rows:  # CASSANDRA-8487
+                    # In 2.0+, we can use the 'type' column. In 3.0+, we have to use it.
+                    value_alias = value_alias_rows[0].get('column_name')
+
+            default_validator = row.get("default_validator")
+            if default_validator:
+                validator = types.lookup_casstype(default_validator)
+            else:
+                if value_alias_rows:  # CASSANDRA-8487
+                    validator = types.lookup_casstype(value_alias_rows[0].get('validator'))
+
+            col = ColumnMetadata(table_meta, value_alias, validator)
+            if value_alias:  # CASSANDRA-8487
+                table_meta.columns[value_alias] = col
+
+        # other normal columns
+        for col_row in cf_col_rows:
+            column_meta = self._build_column_metadata(table_meta, col_row)
+            table_meta.columns[column_meta.name] = column_meta
+
+        if trigger_rows:
+            for trigger_row in trigger_rows[cfname]:
+                trigger_meta = self._build_trigger_metadata(table_meta, trigger_row)
+                table_meta.triggers[trigger_meta.name] = trigger_meta
+
+        table_meta.options = self._build_table_options(row)
+        table_meta.is_compact_storage = is_compact
+
+        return table_meta
+
+    @staticmethod
+    def _build_table_options(row):
+        """ Setup the mostly-non-schema table options, like caching settings """
+        options = dict((o, row.get(o)) for o in TableMetadata.recognized_options if o in row)
+
+        # the option name when creating tables is "dclocal_read_repair_chance",
+        # but the column name in system.schema_columnfamilies is
+        # "local_read_repair_chance".  We'll store this as dclocal_read_repair_chance,
+        # since that's probably what users are expecting (and we need it for the
+        # CREATE TABLE statement anyway).
+        if "local_read_repair_chance" in options:
+            val = options.pop("local_read_repair_chance")
+            options["dclocal_read_repair_chance"] = val
+
+        return options
+
+    def _build_column_metadata(self, table_metadata, row):
+        name = row["column_name"]
+        data_type = types.lookup_casstype(row["validator"])
+        is_static = row.get("type", None) == "static"
+        column_meta = ColumnMetadata(table_metadata, name, data_type, is_static=is_static)
+        index_meta = self._build_index_metadata(column_meta, row)
+        column_meta.index = index_meta
+        if index_meta:
+            table_metadata.indexes[index_meta.name] = index_meta
+        return column_meta
+
+    @staticmethod
+    def _build_index_metadata(column_metadata, row):
+        index_name = row.get("index_name")
+        index_type = row.get("index_type")
+        if index_name or index_type:
+            options = row.get("index_options")
+            index_options = json.loads(options) if options else {}
+            return IndexMetadata(column_metadata, index_name, index_type, index_options)
+        else:
+            return None
+
+    @staticmethod
+    def _build_trigger_metadata(table_metadata, row):
+        name = row["trigger_name"]
+        options = row["trigger_options"]
+        trigger_meta = TriggerMetadata(table_metadata, name, options)
+        return trigger_meta
+
+    def _query_all(self):
+        cl = ConsistencyLevel.ONE
+        queries = [
+            QueryMessage(query=self._SELECT_KEYSPACES, consistency_level=cl),
+            QueryMessage(query=self._SELECT_COLUMN_FAMILIES, consistency_level=cl),
+            QueryMessage(query=self._SELECT_COLUMNS, consistency_level=cl),
+            QueryMessage(query=self._SELECT_USERTYPES, consistency_level=cl),
+            QueryMessage(query=self._SELECT_FUNCTIONS, consistency_level=cl),
+            QueryMessage(query=self._SELECT_AGGREGATES, consistency_level=cl),
+            QueryMessage(query=self._SELECT_TRIGGERS, consistency_level=cl)
+        ]
+
+        responses = self.connection.wait_for_responses(*queries, timeout=self.timeout, fail_on_error=False)
+        (ks_success, ks_result), (table_success, table_result), \
+        (col_success, col_result), (types_success, types_result), \
+        (functions_success, functions_result), \
+        (aggregates_success, aggregates_result), \
+        (trigger_success, triggers_result) = responses
+
+        self.keyspaces_result = self._handle_results(ks_success, ks_result)
+        self.tables_result = self._handle_results(table_success, table_result)
+        self.columns_result = self._handle_results(col_success, col_result)
+
+        # if we're connected to Cassandra < 2.0, the triggers table will not exist
+        if trigger_success:
+            self.triggers_result = dict_factory(*triggers_result.results)
+        else:
+            if isinstance(triggers_result, InvalidRequest):
+                log.debug("triggers table not found")
+            elif isinstance(triggers_result, Unauthorized):
+                log.warning("this version of Cassandra does not allow access to schema_triggers metadata with authorization enabled (CASSANDRA-7967); "
+                            "The driver will operate normally, but will not reflect triggers in the local metadata model, or schema strings.")
+            else:
+                raise triggers_result
+
+        # if we're connected to Cassandra < 2.1, the usertypes table will not exist
+        if types_success:
+            self.types_result = dict_factory(*types_result.results)
+        else:
+            if isinstance(types_result, InvalidRequest):
+                log.debug("user types table not found")
+                self.types_result = {}
+            else:
+                raise types_result
+
+        # functions were introduced in Cassandra 2.2
+        if functions_success:
+            self.functions_result = dict_factory(*functions_result.results)
+        else:
+            if isinstance(functions_result, InvalidRequest):
+                log.debug("user functions table not found")
+            else:
+                raise functions_result
+
+        # aggregates were introduced in Cassandra 2.2
+        if aggregates_success:
+            self.aggregates_result = dict_factory(aggregates_result)
+        else:
+            if isinstance(aggregates_result, InvalidRequest):
+                log.debug("user aggregates table not found")
+            else:
+                raise aggregates_result
+
+        self._aggregate_results()
+
+    def _aggregate_results(self):
+        m = self.keyspace_table_rows
+        for row in self.tables_result:
+            m[row["keyspace_name"]].append(row)
+
+        m = self.keyspace_table_col_rows
+        for row in self.columns_result:
+            ksname = row["keyspace_name"]
+            cfname = row["columnfamily_name"]
+            m[ksname][cfname].append(row)
+
+        m = self.keyspace_type_rows
+        for row in self.types_result:
+            m[row["keyspace_name"]].append(row)
+
+        m = self.keyspace_func_rows
+        for row in self.functions_result:
+            m[row["keyspace_name"]].append(row)
+
+        m = self.keyspace_agg_rows
+        for row in self.aggregates_result:
+            m[row["keyspace_name"]].append(row)
+
+        m = self.keyspace_table_trigger_rows
+        for row in self.triggers_result:
+            ksname = row["keyspace_name"]
+            cfname = row["columnfamily_name"]
+            m[ksname][cfname].append(row)
+
+
+class SchemaParserV3(SchemaParserV22):
+    pass
+
+
+def get_schema_parser(connection, timeout):
+    server_version = connection.server_version
+    if server_version.startswith('3'):
+        return SchemaParserV3(connection, timeout)
+    else:
+        # we could further specialize by version. Right now just refactoring the
+        # multi-version parser we have.
+        return SchemaParserV22(connection, timeout)

@@ -19,7 +19,7 @@ except ImportError:
 
 from mock import Mock, MagicMock, ANY
 
-from cassandra import ConsistencyLevel, Unavailable
+from cassandra import ConsistencyLevel, Unavailable, SchemaTargetType, SchemaChangeType
 from cassandra.cluster import Session, ResponseFuture, NoHostAvailable
 from cassandra.connection import Connection, ConnectionException
 from cassandra.protocol import (ReadTimeoutErrorMessage, WriteTimeoutErrorMessage,
@@ -101,11 +101,13 @@ class ResponseFutureTests(unittest.TestCase):
         rf = self.make_response_future(session)
         rf.send_request()
 
+        event_results={'target_type': SchemaTargetType.TABLE, 'change_type': SchemaChangeType.CREATED,
+                       'keyspace': "keyspace1", "table": "table1"}
         result = Mock(spec=ResultMessage,
                       kind=RESULT_KIND_SCHEMA_CHANGE,
-                      results={'keyspace': "keyspace1", "table": "table1"})
+                      results=event_results)
         rf._set_result(result)
-        session.submit.assert_called_once_with(ANY, 'keyspace1', 'table1', None, None, None, ANY, rf)
+        session.submit.assert_called_once_with(ANY, ANY, rf, **event_results)
 
     def test_other_result_message_kind(self):
         session = self.make_session()

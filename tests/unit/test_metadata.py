@@ -26,7 +26,7 @@ from cassandra.metadata import (Murmur3Token, MD5Token,
                                 NetworkTopologyStrategy, SimpleStrategy,
                                 LocalStrategy, NoMurmur3, protect_name,
                                 protect_names, protect_value, is_valid_name,
-                                UserType, KeyspaceMetadata, Metadata,
+                                UserType, KeyspaceMetadata, get_schema_parser,
                                 _UnknownStrategy)
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
@@ -316,15 +316,17 @@ class IndexTest(unittest.TestCase):
         column_meta.name = 'column_name_here'
         column_meta.table.name = 'table_name_here'
         column_meta.table.keyspace.name = 'keyspace_name_here'
-        meta_model = Metadata()
+        connection = Mock()
+        connection.server_version = '2.1.0'
+        parser = get_schema_parser(connection, 0.1)
 
         row = {'index_name': 'index_name_here', 'index_type': 'index_type_here'}
-        index_meta = meta_model._build_index_metadata(column_meta, row)
+        index_meta = parser._build_index_metadata(column_meta, row)
         self.assertEqual(index_meta.as_cql_query(),
                 'CREATE INDEX index_name_here ON keyspace_name_here.table_name_here (column_name_here)')
 
         row['index_options'] = '{ "class_name": "class_name_here" }'
         row['index_type'] = 'CUSTOM'
-        index_meta = meta_model._build_index_metadata(column_meta, row)
+        index_meta = parser._build_index_metadata(column_meta, row)
         self.assertEqual(index_meta.as_cql_query(),
                 "CREATE CUSTOM INDEX index_name_here ON keyspace_name_here.table_name_here (column_name_here) USING 'class_name_here'")

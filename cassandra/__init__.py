@@ -126,6 +126,20 @@ def consistency_value_to_name(value):
     return ConsistencyLevel.value_to_name[value] if value is not None else "Not Set"
 
 
+class SchemaChangeType(object):
+    DROPPED = 'DROPPED'
+    CREATED = 'CREATED'
+    UPDATED = 'UPDATED'
+
+
+class SchemaTargetType(object):
+    KEYSPACE = 'KEYSPACE'
+    TABLE = 'TABLE'
+    TYPE = 'TYPE'
+    FUNCTION = 'FUNCTION'
+    AGGREGATE = 'AGGREGATE'
+
+
 class SignatureDescriptor(object):
 
     def __init__(self, name, type_signature):

@@ -125,7 +125,7 @@ class SchemaMetadataTests(unittest.TestCase):
 
         self.assertTrue(self.cfname in ksmeta.tables)
         tablemeta = ksmeta.tables[self.cfname]
-        self.assertEqual(tablemeta.keyspace, ksmeta)
+        self.assertEqual(tablemeta.keyspace, ksmeta)  # tablemeta.keyspace is deprecated
         self.assertEqual(tablemeta.name, self.cfname)
 
         self.assertEqual([u'a'], [c.name for c in tablemeta.partition_key])

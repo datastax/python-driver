@@ -44,8 +44,8 @@ from functools import partial, wraps
 from itertools import groupby
 
 from cassandra import (ConsistencyLevel, AuthenticationFailed,
-                       InvalidRequest, OperationTimedOut,
-                       UnsupportedOperation, Unauthorized)
+                       OperationTimedOut, UnsupportedOperation,
+                       SchemaTargetType)
 from cassandra.connection import (ConnectionException, ConnectionShutdown,
                                   ConnectionHeartbeat, ProtocolVersionUnsupported)
 from cassandra.cqltypes import UserType
@@ -78,6 +78,7 @@ def _is_eventlet_monkey_patched():
         return False
     import eventlet.patcher
     return eventlet.patcher.is_monkey_patched('socket')
+
 
 def _is_gevent_monkey_patched():
     if 'gevent.monkey' not in sys.modules:
@@ -1201,12 +1202,27 @@ class Cluster(object):
             for pool in session._pools.values():
                 pool.ensure_core_connections()
 
-    def _validate_refresh_schema(self, keyspace, table, usertype, function, aggregate):
+    @staticmethod
+    def _validate_refresh_schema(keyspace, table, usertype, function, aggregate):
         if any((table, usertype, function, aggregate)):
             if not keyspace:
                 raise ValueError("keyspace is required to refresh specific sub-entity {table, usertype, function, aggregate}")
             if sum(1 for e in (table, usertype, function) if e) > 1:
                 raise ValueError("{table, usertype, function, aggregate} are mutually exclusive")
+
+    @staticmethod
+    def _target_type_from_refresh_args(keyspace, table, usertype, function, aggregate):
+        if aggregate:
+            return SchemaTargetType.AGGREGATE
+        elif function:
+            return SchemaTargetType.FUNCTION
+        elif usertype:
+            return SchemaTargetType.TYPE
+        elif table:
+            return SchemaTargetType.TABLE
+        elif keyspace:
+            return SchemaTargetType.KEYSPACE
+        return None
 
     def refresh_schema(self, keyspace=None, table=None, usertype=None, function=None, aggregate=None, max_schema_agreement_wait=None):
         """
@@ -1242,8 +1258,10 @@ class Cluster(object):
         log.warning(msg)
 
         self._validate_refresh_schema(keyspace, table, usertype, function, aggregate)
-        if not self.control_connection.refresh_schema(keyspace, table, usertype, function,
-                                                      aggregate, max_schema_agreement_wait):
+        target_type = self._target_type_from_refresh_args(keyspace, table, usertype, function, aggregate)
+        if not self.control_connection.refresh_schema(target_type=target_type, keyspace=keyspace, table=table,
+                                                      type=usertype, function=function, aggregate=aggregate,
+                                                      schema_agreement_wait=max_schema_agreement_wait):
             raise Exception("Schema was not refreshed. See log for details.")
 
     def submit_schema_refresh(self, keyspace=None, table=None, usertype=None, function=None, aggregate=None):
@@ -1259,8 +1277,10 @@ class Cluster(object):
         log.warning(msg)
 
         self._validate_refresh_schema(keyspace, table, usertype, function, aggregate)
+        target_type = self._target_type_from_refresh_args(keyspace, table, usertype, function, aggregate)
         return self.executor.submit(
-            self.control_connection.refresh_schema, keyspace, table, usertype, function, aggregate)
+            self.control_connection.refresh_schema, target_type=target_type, keyspace=keyspace, table=table,
+            type=usertype, function=function, aggregate=aggregate)
 
     def refresh_schema_metadata(self, max_schema_agreement_wait=None):
         """
@@ -1285,7 +1305,8 @@ class Cluster(object):
 
         See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
         """
-        if not self.control_connection.refresh_schema(keyspace, schema_agreement_wait=max_schema_agreement_wait):
+        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.KEYSPACE, keyspace=keyspace,
+                                                      schema_agreement_wait=max_schema_agreement_wait):
             raise Exception("Keyspace metadata was not refreshed. See log for details.")
 
     def refresh_table_metadata(self, keyspace, table, max_schema_agreement_wait=None):
@@ -1295,7 +1316,7 @@ class Cluster(object):
 
         See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
         """
-        if not self.control_connection.refresh_schema(keyspace, table, schema_agreement_wait=max_schema_agreement_wait):
+        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.TABLE, keyspace=keyspace, table=table, schema_agreement_wait=max_schema_agreement_wait):
             raise Exception("Table metadata was not refreshed. See log for details.")
 
     def refresh_user_type_metadata(self, keyspace, user_type, max_schema_agreement_wait=None):
@@ -1304,7 +1325,7 @@ class Cluster(object):
 
         See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
         """
-        if not self.control_connection.refresh_schema(keyspace, usertype=user_type, schema_agreement_wait=max_schema_agreement_wait):
+        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.TYPE, keyspace=keyspace, type=user_type, schema_agreement_wait=max_schema_agreement_wait):
             raise Exception("User Type metadata was not refreshed. See log for details.")
 
     def refresh_user_function_metadata(self, keyspace, function, max_schema_agreement_wait=None):
@@ -1315,7 +1336,7 @@ class Cluster(object):
 
         See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
         """
-        if not self.control_connection.refresh_schema(keyspace, function=function, schema_agreement_wait=max_schema_agreement_wait):
+        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.FUNCTION, keyspace=keyspace, function=function, schema_agreement_wait=max_schema_agreement_wait):
             raise Exception("User Function metadata was not refreshed. See log for details.")
 
     def refresh_user_aggregate_metadata(self, keyspace, aggregate, max_schema_agreement_wait=None):
@@ -1326,7 +1347,7 @@ class Cluster(object):
 
         See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
         """
-        if not self.control_connection.refresh_schema(keyspace, aggregate=aggregate, schema_agreement_wait=max_schema_agreement_wait):
+        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.AGGREGATE, keyspace=keyspace, aggregate=aggregate, schema_agreement_wait=max_schema_agreement_wait):
             raise Exception("User Aggregate metadata was not refreshed. See log for details.")
 
     def refresh_nodes(self):
@@ -2022,14 +2043,6 @@ class ControlConnection(object):
     Internal
     """
 
-    _SELECT_KEYSPACES = "SELECT * FROM system.schema_keyspaces"
-    _SELECT_COLUMN_FAMILIES = "SELECT * FROM system.schema_columnfamilies"
-    _SELECT_COLUMNS = "SELECT * FROM system.schema_columns"
-    _SELECT_USERTYPES = "SELECT * FROM system.schema_usertypes"
-    _SELECT_FUNCTIONS = "SELECT * FROM system.schema_functions"
-    _SELECT_AGGREGATES = "SELECT * FROM system.schema_aggregates"
-    _SELECT_TRIGGERS = "SELECT * FROM system.schema_triggers"
-
     _SELECT_PEERS = "SELECT peer, data_center, rack, tokens, rpc_address, schema_version FROM system.peers"
     _SELECT_LOCAL = "SELECT cluster_name, data_center, rack, tokens, partitioner, release_version, schema_version FROM system.local WHERE key='local'"
 
@@ -2219,16 +2232,14 @@ class ControlConnection(object):
                 self._connection.close()
                 del self._connection
 
-    def refresh_schema(self, keyspace=None, table=None, usertype=None, function=None,
-                       aggregate=None, schema_agreement_wait=None):
+    def refresh_schema(self, **kwargs):
         if not self._meta_refresh_enabled:
             log.debug("[control connection] Skipping schema refresh because meta refresh is disabled")
             return False
 
         try:
             if self._connection:
-                return self._refresh_schema(self._connection, keyspace, table, usertype, function,
-                                            aggregate, schema_agreement_wait=schema_agreement_wait)
+                return self._refresh_schema(self._connection, **kwargs)
         except ReferenceError:
             pass  # our weak reference to the Cluster is no good
         except Exception:
@@ -2236,12 +2247,9 @@ class ControlConnection(object):
             self._signal_error()
         return False
 
-    def _refresh_schema(self, connection, keyspace=None, table=None, usertype=None, function=None,
-                        aggregate=None, preloaded_results=None, schema_agreement_wait=None):
+    def _refresh_schema(self, connection, preloaded_results=None, schema_agreement_wait=None, **kwargs):
         if self._cluster.is_shutdown:
             return False
-
-        assert sum(1 for arg in (table, usertype, function, aggregate) if arg) <= 1
 
         agreed = self.wait_for_schema_agreement(connection,
                                                 preloaded_results=preloaded_results,
@@ -2250,148 +2258,8 @@ class ControlConnection(object):
             log.debug("Skipping schema refresh due to lack of schema agreement")
             return False
 
-        cl = ConsistencyLevel.ONE
-        if table:
-            def _handle_results(success, result):
-                if success:
-                    return dict_factory(*result.results) if result else {}
-                else:
-                    raise result
+        self._cluster.metadata.refresh(connection, self._timeout, **kwargs)
 
-            # a particular table changed
-            where_clause = " WHERE keyspace_name = '%s' AND columnfamily_name = '%s'" % (keyspace, table)
-            cf_query = QueryMessage(query=self._SELECT_COLUMN_FAMILIES + where_clause, consistency_level=cl)
-            col_query = QueryMessage(query=self._SELECT_COLUMNS + where_clause, consistency_level=cl)
-            triggers_query = QueryMessage(query=self._SELECT_TRIGGERS + where_clause, consistency_level=cl)
-            (cf_success, cf_result), (col_success, col_result), (triggers_success, triggers_result) \
-                = connection.wait_for_responses(cf_query, col_query, triggers_query, timeout=self._timeout, fail_on_error=False)
-
-            log.debug("[control connection] Fetched table info for %s.%s, rebuilding metadata", keyspace, table)
-            cf_result = _handle_results(cf_success, cf_result)
-            col_result = _handle_results(col_success, col_result)
-
-            # handle the triggers table not existing in Cassandra 1.2
-            if not triggers_success and isinstance(triggers_result, InvalidRequest):
-                triggers_result = {}
-            else:
-                triggers_result = _handle_results(triggers_success, triggers_result)
-
-            self._cluster.metadata.table_changed(keyspace, table, cf_result, col_result, triggers_result)
-        elif usertype:
-            # user defined types within this keyspace changed
-            where_clause = " WHERE keyspace_name = '%s' AND type_name = '%s'" % (keyspace, usertype)
-            types_query = QueryMessage(query=self._SELECT_USERTYPES + where_clause, consistency_level=cl)
-            types_result = connection.wait_for_response(types_query)
-            log.debug("[control connection] Fetched user type info for %s.%s, rebuilding metadata", keyspace, usertype)
-            types_result = dict_factory(*types_result.results) if types_result.results else {}
-            self._cluster.metadata.usertype_changed(keyspace, usertype, types_result)
-        elif function:
-            # user defined function within this keyspace changed
-            where_clause = " WHERE keyspace_name = '%s' AND function_name = '%s' AND signature = [%s]" \
-                           % (keyspace, function.name, ','.join("'%s'" % t for t in function.type_signature))
-            functions_query = QueryMessage(query=self._SELECT_FUNCTIONS + where_clause, consistency_level=cl)
-            functions_result = connection.wait_for_response(functions_query)
-            log.debug("[control connection] Fetched user function info for %s.%s, rebuilding metadata", keyspace, function.signature)
-            functions_result = dict_factory(*functions_result.results) if functions_result.results else {}
-            self._cluster.metadata.function_changed(keyspace, function, functions_result)
-        elif aggregate:
-            # user defined aggregate within this keyspace changed
-            where_clause = " WHERE keyspace_name = '%s' AND aggregate_name = '%s' AND signature = [%s]" \
-                           % (keyspace, aggregate.name, ','.join("'%s'" % t for t in aggregate.type_signature))
-            aggregates_query = QueryMessage(query=self._SELECT_AGGREGATES + where_clause, consistency_level=cl)
-            aggregates_result = connection.wait_for_response(aggregates_query)
-            log.debug("[control connection] Fetched user aggregate info for %s.%s, rebuilding metadata", keyspace, aggregate.signature)
-            aggregates_result = dict_factory(*aggregates_result.results) if aggregates_result.results else {}
-            self._cluster.metadata.aggregate_changed(keyspace, aggregate, aggregates_result)
-        elif keyspace:
-            # only the keyspace itself changed (such as replication settings)
-            where_clause = " WHERE keyspace_name = '%s'" % (keyspace,)
-            ks_query = QueryMessage(query=self._SELECT_KEYSPACES + where_clause, consistency_level=cl)
-            ks_result = connection.wait_for_response(ks_query)
-            log.debug("[control connection] Fetched keyspace info for %s, rebuilding metadata", keyspace)
-            ks_result = dict_factory(*ks_result.results) if ks_result.results else {}
-            self._cluster.metadata.keyspace_changed(keyspace, ks_result)
-        else:
-            # build everything from scratch
-            queries = [
-                QueryMessage(query=self._SELECT_KEYSPACES, consistency_level=cl),
-                QueryMessage(query=self._SELECT_COLUMN_FAMILIES, consistency_level=cl),
-                QueryMessage(query=self._SELECT_COLUMNS, consistency_level=cl),
-                QueryMessage(query=self._SELECT_USERTYPES, consistency_level=cl),
-                QueryMessage(query=self._SELECT_FUNCTIONS, consistency_level=cl),
-                QueryMessage(query=self._SELECT_AGGREGATES, consistency_level=cl),
-                QueryMessage(query=self._SELECT_TRIGGERS, consistency_level=cl)
-            ]
-
-            responses = connection.wait_for_responses(*queries, timeout=self._timeout, fail_on_error=False)
-            (ks_success, ks_result), (cf_success, cf_result), \
-                (col_success, col_result), (types_success, types_result), \
-                (functions_success, functions_result), \
-                (aggregates_success, aggregates_result), \
-                (trigger_success, triggers_result) = responses
-
-            if ks_success:
-                ks_result = dict_factory(*ks_result.results)
-            else:
-                raise ks_result
-
-            if cf_success:
-                cf_result = dict_factory(*cf_result.results)
-            else:
-                raise cf_result
-
-            if col_success:
-                col_result = dict_factory(*col_result.results)
-            else:
-                raise col_result
-
-            # if we're connected to Cassandra < 2.0, the trigges table will not exist
-            if trigger_success:
-                triggers_result = dict_factory(*triggers_result.results)
-            else:
-                if isinstance(triggers_result, InvalidRequest):
-                    log.debug("[control connection] triggers table not found")
-                    triggers_result = {}
-                elif isinstance(triggers_result, Unauthorized):
-                    log.warning("[control connection] this version of Cassandra does not allow access to schema_triggers metadata with authorization enabled (CASSANDRA-7967); "
-                                "The driver will operate normally, but will not reflect triggers in the local metadata model, or schema strings.")
-                    triggers_result = {}
-                else:
-                    raise triggers_result
-
-            # if we're connected to Cassandra < 2.1, the usertypes table will not exist
-            if types_success:
-                types_result = dict_factory(*types_result.results) if types_result.results else {}
-            else:
-                if isinstance(types_result, InvalidRequest):
-                    log.debug("[control connection] user types table not found")
-                    types_result = {}
-                else:
-                    raise types_result
-
-            # functions were introduced in Cassandra 2.2
-            if functions_success:
-                functions_result = dict_factory(*functions_result.results) if functions_result.results else {}
-            else:
-                if isinstance(functions_result, InvalidRequest):
-                    log.debug("[control connection] user functions table not found")
-                    functions_result = {}
-                else:
-                    raise functions_result
-
-            # aggregates were introduced in Cassandra 2.2
-            if aggregates_success:
-                aggregates_result = dict_factory(*aggregates_result.results) if aggregates_result.results else {}
-            else:
-                if isinstance(aggregates_result, InvalidRequest):
-                    log.debug("[control connection] user aggregates table not found")
-                    aggregates_result = {}
-                else:
-                    raise aggregates_result
-
-            log.debug("[control connection] Fetched schema, rebuilding metadata")
-            self._cluster.metadata.rebuild_schema(ks_result, types_result, functions_result,
-                                                  aggregates_result, cf_result, col_result, triggers_result)
         return True
 
     def refresh_node_list_and_token_map(self, force_token_rebuild=False):
@@ -2538,13 +2406,8 @@ class ControlConnection(object):
     def _handle_schema_change(self, event):
         if self._schema_event_refresh_window < 0:
             return
-        keyspace = event.get('keyspace')
-        table = event.get('table')
-        usertype = event.get('type')
-        function = event.get('function')
-        aggregate = event.get('aggregate')
         delay = random() * self._schema_event_refresh_window
-        self._cluster.scheduler.schedule_unique(delay, self.refresh_schema, keyspace, table, usertype, function, aggregate)
+        self._cluster.scheduler.schedule_unique(delay, self.refresh_schema, **event)
 
     def wait_for_schema_agreement(self, connection=None, preloaded_results=None, wait_time=None):
 
@@ -2727,11 +2590,11 @@ class _Scheduler(object):
         self.is_shutdown = True
         self._queue.put_nowait((0, None))
 
-    def schedule(self, delay, fn, *args):
-        self._insert_task(delay, (fn, args))
+    def schedule(self, delay, fn, *args, **kwargs):
+        self._insert_task(delay, (fn, args, tuple(kwargs.items())))
 
-    def schedule_unique(self, delay, fn, *args):
-        task = (fn, args)
+    def schedule_unique(self, delay, fn, *args, **kwargs):
+        task = (fn, args, tuple(kwargs.items()))
         if task not in self._scheduled_tasks:
             self._insert_task(delay, task)
         else:
@@ -2758,8 +2621,9 @@ class _Scheduler(object):
                         return
                     if run_at <= time.time():
                         self._scheduled_tasks.remove(task)
-                        fn, args = task
-                        future = self._executor.submit(fn, *args)
+                        fn, args, kwargs = task
+                        kwargs = dict(kwargs)
+                        future = self._executor.submit(fn, *args, **kwargs)
                         future.add_done_callback(self._log_if_failed)
                     else:
                         self._queue.put_nowait((run_at, task))
@@ -2777,20 +2641,18 @@ class _Scheduler(object):
                 exc_info=exc)
 
 
-def refresh_schema_and_set_result(keyspace, table, usertype, function, aggregate, control_conn, response_future):
+def refresh_schema_and_set_result(control_conn, response_future, **kwargs):
     try:
         if control_conn._meta_refresh_enabled:
             log.debug("Refreshing schema in response to schema change. "
-                      "Keyspace: %s; Table: %s, Type: %s, Function: %s, Aggregate: %s",
-                      keyspace, table, usertype, function, aggregate)
-            control_conn._refresh_schema(response_future._connection, keyspace, table, usertype, function, aggregate)
+                      "%s", kwargs)
+            control_conn._refresh_schema(response_future._connection, **kwargs)
         else:
             log.debug("Skipping schema refresh in response to schema change because meta refresh is disabled; "
-                      "Keyspace: %s; Table: %s, Type: %s, Function: %s", keyspace, table, usertype, function, aggregate)
+                      "%s", kwargs)
     except Exception:
         log.exception("Exception refreshing schema in response to schema change:")
-        response_future.session.submit(
-            control_conn.refresh_schema, keyspace, table, usertype, function, aggregate)
+        response_future.session.submit(control_conn.refresh_schema, **kwargs)
     finally:
         response_future._set_final_result(None)
 
@@ -3015,13 +2877,8 @@ class ResponseFuture(object):
                     # thread instead of the event loop thread
                     self.session.submit(
                         refresh_schema_and_set_result,
-                        response.results['keyspace'],
-                        response.results.get('table'),
-                        response.results.get('type'),
-                        response.results.get('function'),
-                        response.results.get('aggregate'),
                         self.session.cluster.control_connection,
-                        self)
+                        self, **response.results)
                 else:
                     results = getattr(response, 'results', None)
                     if results is not None and response.kind == RESULT_KIND_ROWS:
