@@ -159,6 +159,9 @@ class SignatureDescriptor(object):
     def format_signature(name, type_signature):
         return "%s(%s)" % (name, ','.join(t for t in type_signature))
 
+    def __repr__(self):
+        return "%s(%s, %s)" % (self.__class__.__name__, self.name, self.type_signature)
+
 
 class UserFunctionDescriptor(SignatureDescriptor):
     """

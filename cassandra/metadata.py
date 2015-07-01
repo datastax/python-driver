@@ -120,19 +120,15 @@ class Metadata(object):
 
         tt_lower = target_type.lower()
         try:
-            if change_type == SchemaChangeType.DROPPED:
+            parser = get_schema_parser(connection, timeout)
+            parse_method = getattr(parser, 'get_' + tt_lower)
+            meta = parse_method(**kwargs)
+            if meta:
+                update_method = getattr(self, '_update_' + tt_lower)
+                update_method(meta)
+            else:
                 drop_method = getattr(self, '_drop_' + tt_lower)
                 drop_method(**kwargs)
-            else:
-                parser = get_schema_parser(connection, timeout)
-                parse_method = getattr(parser, 'get_' + tt_lower)
-                meta = parse_method(**kwargs)
-                if meta:
-                    update_method = getattr(self, '_update_' + tt_lower)
-                    update_method(meta)
-                else:
-                    drop_method = getattr(self, '_drop_' + tt_lower)
-                    drop_method(**kwargs)
         except AttributeError:
             raise ValueError("Unknown schema target_type: '%s'" % target_type)
 
@@ -1620,8 +1616,8 @@ class SchemaParserV22(SchemaParserV21):
         where_clause = " WHERE keyspace_name = '%s' AND type_name = '%s'" % (keyspace, type)
         type_query = QueryMessage(query=self._SELECT_USERTYPES + where_clause, consistency_level=ConsistencyLevel.ONE)
         type_result = self.connection.wait_for_response(type_query, self.timeout)
-        if type_result.results:
-            type_result = dict_factory(*type_result.results)
+        type_result = dict_factory(*type_result.results)
+        if type_result:
             return self._build_user_type(keyspace, type_result[0])
 
     def get_function(self, keyspace, function):
@@ -1629,8 +1625,8 @@ class SchemaParserV22(SchemaParserV21):
                        % (keyspace, function.name, ','.join("'%s'" % t for t in function.type_signature))
         function_query = QueryMessage(query=self._SELECT_FUNCTIONS + where_clause, consistency_level=ConsistencyLevel.ONE)
         function_result = self.connection.wait_for_response(function_query, self.timeout)
-        if function_result.results:
-            function_result = dict_factory(*function_result.results)
+        function_result = dict_factory(*function_result.results)
+        if function_result:
             return self._build_function(keyspace, function_result[0])
 
     def get_aggregate(self, keyspace, aggregate):
@@ -1639,16 +1635,16 @@ class SchemaParserV22(SchemaParserV21):
                        % (keyspace, aggregate.name, ','.join("'%s'" % t for t in aggregate.type_signature))
         aggregate_query = QueryMessage(query=self._SELECT_AGGREGATES + where_clause, consistency_level=ConsistencyLevel.ONE)
         aggregate_result = self.connection.wait_for_response(aggregate_query, self.timeout)
-        if aggregate_result.results:
-            aggregate_result = dict_factory(*aggregate_result.results)
+        aggregate_result = dict_factory(*aggregate_result.results)
+        if aggregate_result:
             return self._build_aggregate(keyspace, aggregate_result[0])
 
     def get_keyspace(self, keyspace):
         where_clause = " WHERE keyspace_name = '%s'" % (keyspace,)
         ks_query = QueryMessage(query=self._SELECT_KEYSPACES + where_clause, consistency_level=ConsistencyLevel.ONE)
         ks_result = self.connection.wait_for_response(ks_query, self.timeout)
-        if ks_result.results:
-            ks_result = dict_factory(*ks_result.results)
+        ks_result = dict_factory(*ks_result.results)
+        if ks_result:
             return self._build_keyspace_metadata(ks_result[0])
 
     @staticmethod
@@ -1933,7 +1929,7 @@ class SchemaParserV22(SchemaParserV21):
 
         # aggregates were introduced in Cassandra 2.2
         if aggregates_success:
-            self.aggregates_result = dict_factory(aggregates_result)
+            self.aggregates_result = dict_factory(*aggregates_result.results)
         else:
             if isinstance(aggregates_result, InvalidRequest):
                 log.debug("user aggregates table not found")
