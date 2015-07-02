@@ -914,8 +914,6 @@ create column family composite_comp_no_col
   and read_repair_chance = 0.0
   and dclocal_read_repair_chance = 0.1
   and gc_grace = 864000
-  and min_compaction_threshold = 4
-  and max_compaction_threshold = 32
   and compaction_strategy = 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'
   and caching = 'KEYS_ONLY'
   and cells_per_row_to_cache = '0'
@@ -931,8 +929,6 @@ create column family composite_comp_with_col
   and read_repair_chance = 0.0
   and dclocal_read_repair_chance = 0.1
   and gc_grace = 864000
-  and min_compaction_threshold = 4
-  and max_compaction_threshold = 32
   and compaction_strategy = 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'
   and caching = 'KEYS_ONLY'
   and cells_per_row_to_cache = '0'

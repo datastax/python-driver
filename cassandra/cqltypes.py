@@ -291,11 +291,7 @@ class _CassandraType(object):
             cname = apache_cassandra_type_prefix + cname
         if not subtypes:
             return cname
-        fieldnames = getattr(cls, 'fieldnames', None)
-        if fieldnames and any(fieldnames):
-            sublist = ', '.join('%s=>%s' % (field_name, subtype.cass_parameterized_type(full=full)) for (field_name, subtype) in zip(fieldnames, subtypes))
-        else:
-            sublist = ', '.join(styp.cass_parameterized_type(full=full) for styp in subtypes)
+        sublist = ', '.join(styp.cass_parameterized_type(full=full) for styp in subtypes)
         return '%s(%s)' % (cname, sublist)
 
     @classmethod
@@ -1032,6 +1028,18 @@ class CompositeType(_CompositeType):
 
 class DynamicCompositeType(_CompositeType):
     typename = "'org.apache.cassandra.db.marshal.DynamicCompositeType'"
+
+    @classmethod
+    def cass_parameterized_type_with(cls, subtypes, full=False):
+        fieldnames = getattr(cls, 'fieldnames', None)
+        if fieldnames and any(fieldnames):
+            cname = cls.cassname
+            if full and '.' not in cname:
+                cname = apache_cassandra_type_prefix + cname
+            sublist = ', '.join('%s=>%s' % (field_name, subtype.cass_parameterized_type(full=full)) for (field_name, subtype) in zip(cls.fieldnames, subtypes))
+            return '%s(%s)' % (cname, sublist)
+        else:
+            return super(DynamicCompositeType, cls).cass_parameterized_type_with(subtypes, full)
 
 
 class ColumnToCollectionType(_ParameterizedType):

@@ -413,6 +413,7 @@ class Metadata(object):
             # we 'has_value', use the default alias. PYTHON-213 for background.
             value_alias = value_alias or "value"
 
+            validator = None
             default_validator = row.get("default_validator")
             if default_validator:
                 validator = types.lookup_casstype(default_validator)
@@ -1231,7 +1232,7 @@ class TableMetadata(object):
         """
         # no compact storage with more than one column beyond PK
         composite_primary = bool(self.clustering_key)
-        incompatible = (self.is_compact_storage and 
+        incompatible = (self.is_compact_storage and
                         composite_primary and
                         len(self.columns) > len(self.primary_key) + 1)
 
