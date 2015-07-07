@@ -19,6 +19,7 @@ except ImportError:
 
 from collections import namedtuple
 from functools import partial
+import six
 
 from cassandra import InvalidRequest
 from cassandra.cluster import Cluster, UserTypeDoesNotExist
@@ -277,10 +278,9 @@ class UDTTests(unittest.TestCase):
         self.assertEqual((None, None, None, None), s.execute(select)[0].b)
 
         # also test empty strings
-        s.execute(insert, [User('', None, None, '')])
+        s.execute(insert, [User('', None, None, six.binary_type())])
         results = s.execute("SELECT b FROM mytable WHERE a=0")
-        self.assertEqual(('', None, None, ''), results[0].b)
-        self.assertEqual(('', None, None, ''), s.execute(select)[0].b)
+        self.assertEqual(('', None, None, six.binary_type()), results[0].b)
 
         c.shutdown()
 
@@ -292,7 +292,7 @@ class UDTTests(unittest.TestCase):
         c = Cluster(protocol_version=PROTOCOL_VERSION)
         s = c.connect("udttests")
 
-        MAX_TEST_LENGTH = 1024
+        MAX_TEST_LENGTH = 254
 
         # create the seed udt, increase timeout to avoid the query failure on slow systems
         s.execute("CREATE TYPE lengthy_udt ({0})"
