@@ -234,16 +234,28 @@ def run_setup(extensions):
         ],
         **kw)
 
-extensions = [murmur3_ext, libev_ext]
+extensions = []
+
+if "--no-murmur3" not in sys.argv:
+    extensions.append(murmur3_ext)
+
+if "--no-libev" not in sys.argv:
+    extensions.append(libev_ext)
+
+if "--no-cython" not in sys.argv:
+    try:
+        from Cython.Build import cythonize
+        cython_candidates = ['cluster', 'concurrent', 'connection', 'cqltypes', 'marshal', 'metadata', 'pool', 'protocol', 'query', 'util']
+        extensions.extend(cythonize(
+            [Extension('cassandra.%s' % m, ['cassandra/%s.py' % m], extra_compile_args=['-Wno-unused-function']) for m in cython_candidates],
+            exclude_failures=True))
+    except ImportError:
+        warnings.warn("Cython is not installed. Not compiling core driver files as extensions (optional).")
+
 if "--no-extensions" in sys.argv:
-    sys.argv = [a for a in sys.argv if a != "--no-extensions"]
     extensions = []
-elif "--no-murmur3" in sys.argv:
-    sys.argv = [a for a in sys.argv if a != "--no-murmur3"]
-    extensions.remove(murmur3_ext)
-elif "--no-libev" in sys.argv:
-    sys.argv = [a for a in sys.argv if a != "--no-libev"]
-    extensions.remove(libev_ext)
+
+sys.argv = [a for a in sys.argv if a not in ("--no-murmur3", "--no-libev", "--no-cython", "--no-extensions")]
 
 is_windows = os.name == 'nt'
 if is_windows:
