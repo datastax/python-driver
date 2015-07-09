@@ -2,12 +2,16 @@ language: python
 python: 2.7
 env:
   - TOX_ENV=py26 CASS_VER=21
+  - TOX_ENV=py26 CASS_VER=21 CYTHON_DEP=cython
   - TOX_ENV=py27 CASS_VER=12
   - TOX_ENV=py27 CASS_VER=20
   - TOX_ENV=py27 CASS_VER=21
+  - TOX_ENV=py27 CASS_VER=21 CYTHON_DEP=cython
   - TOX_ENV=pypy CASS_VER=21
   - TOX_ENV=py33 CASS_VER=21
+  - TOX_ENV=py33 CASS_VER=21 CYTHON_DEP=cython
   - TOX_ENV=py34 CASS_VER=21
+  - TOX_ENV=py34 CASS_VER=21 CYTHON_DEP=cython
 
 before_install:
   - sudo apt-get update -y
