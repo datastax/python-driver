@@ -210,31 +210,37 @@ class Metadata(object):
             new_usertype = self._build_usertype(keyspace, type_results[0])
             self.keyspaces[keyspace].user_types[name] = new_usertype
         else:
-            # the type was deleted
-            self.keyspaces[keyspace].user_types.pop(name, None)
+            try:
+                self.keyspaces[keyspace].user_types.pop(name, None)
+            except KeyError:
+                pass
 
     def function_changed(self, keyspace, function, function_results):
         if function_results:
             new_function = self._build_function(keyspace, function_results[0])
             self.keyspaces[keyspace].functions[function.signature] = new_function
         else:
-            # the function was deleted
-            self.keyspaces[keyspace].functions.pop(function.signature, None)
+            try:
+                self.keyspaces[keyspace].functions.pop(function.signature, None)
+            except KeyError:
+                pass
 
     def aggregate_changed(self, keyspace, aggregate, aggregate_results):
         if aggregate_results:
             new_aggregate = self._build_aggregate(keyspace, aggregate_results[0])
             self.keyspaces[keyspace].aggregates[aggregate.signature] = new_aggregate
         else:
-            # the aggregate was deleted
-            self.keyspaces[keyspace].aggregates.pop(aggregate.signature, None)
+            try:
+                self.keyspaces[keyspace].aggregates.pop(aggregate.signature, None)
+            except KeyError:
+                pass
 
     def table_changed(self, keyspace, table, cf_results, col_results, triggers_result):
         try:
             keyspace_meta = self.keyspaces[keyspace]
         except KeyError:
             # we're trying to update a table in a keyspace we don't know about
-            log.error("Tried to update schema for table '%s' in unknown keyspace '%s'",
+            log.warn("Tried to update schema for table '%s' in unknown keyspace '%s'",
                       table, keyspace)
             return
 
