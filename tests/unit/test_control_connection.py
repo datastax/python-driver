@@ -410,12 +410,12 @@ class ControlConnectionTest(unittest.TestCase):
             }
             self.cluster.scheduler.reset_mock()
             self.control_connection._handle_schema_change(event)
-            self.cluster.scheduler.schedule_unique.assert_called_once_with(0.0, self.control_connection.refresh_schema, 'ks1', 'table1', None, None, None)
+            self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection.refresh_schema, 'ks1', 'table1', None, None, None)
 
             self.cluster.scheduler.reset_mock()
             event['table'] = None
             self.control_connection._handle_schema_change(event)
-            self.cluster.scheduler.schedule_unique.assert_called_once_with(0.0, self.control_connection.refresh_schema, 'ks1', None, None, None, None)
+            self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection.refresh_schema, 'ks1', None, None, None, None)
 
     def test_refresh_disabled(self):
         cluster = MockCluster()

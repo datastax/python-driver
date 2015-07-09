@@ -236,21 +236,16 @@ class Metadata(object):
                 pass
 
     def table_changed(self, keyspace, table, cf_results, col_results, triggers_result):
-        try:
-            keyspace_meta = self.keyspaces[keyspace]
-        except KeyError:
-            # we're trying to update a table in a keyspace we don't know about
-            log.warn("Tried to update schema for table '%s' in unknown keyspace '%s'",
-                      table, keyspace)
-            return
-
-        if not cf_results:
-            # the table was removed
-            keyspace_meta._drop_table_metadata(table)
-        else:
+        if cf_results:
             assert len(cf_results) == 1
+            keyspace_meta = self.keyspaces[keyspace]
             table_meta = self._build_table_metadata(keyspace_meta, cf_results[0], {table: col_results}, {table: triggers_result})
             keyspace_meta._add_table_metadata(table_meta)
+        else:
+            try:
+                self.keyspaces[keyspace]._drop_table_metadata(table)
+            except KeyError:
+                pass
 
     def _keyspace_added(self, ksname):
         if self.token_map:
