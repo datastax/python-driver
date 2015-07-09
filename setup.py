@@ -267,7 +267,7 @@ if "--no-cython" not in sys.argv:
             [Extension('cassandra.%s' % m, ['cassandra/%s.py' % m], extra_compile_args=compile_args) for m in cython_candidates],
             exclude_failures=True))
     except ImportError:
-        warnings.warn("Cython is not installed. Not compiling core driver files as extensions (optional).")
+        print("Cython is not installed. Not compiling core driver files as extensions (optional).")
 
 if "--no-extensions" in sys.argv:
     extensions = []
