@@ -2,7 +2,7 @@
 blist
 scales
 nose
-mock
+mock<=1.0.1
 ccm>=2.0
 unittest2
 PyYAML
