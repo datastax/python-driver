@@ -24,7 +24,6 @@ from cassandra.cluster import PagedResult
 
 log = logging.getLogger(__name__)
 
-
 def execute_concurrent(session, statements_and_parameters, concurrency=100, raise_on_first_error=True):
     """
     Executes a sequence of (statement, parameters) tuples concurrently.  Each
@@ -74,11 +73,6 @@ def execute_concurrent(session, statements_and_parameters, concurrency=100, rais
     if not statements_and_parameters:
         return []
 
-    # TODO handle iterators and generators naturally without converting the
-    # whole thing to a list.  This would require not building a result
-    # list of Nones up front (we don't know how many results there will be),
-    # so a dict keyed by index should be used instead.  The tricky part is
-    # knowing when you're the final statement to finish.
     statements_and_parameters = list(statements_and_parameters)
 
     event = Event()
@@ -100,6 +94,86 @@ def execute_concurrent(session, statements_and_parameters, concurrency=100, rais
             raise exc
     else:
         return results
+
+from threading import Lock, Condition
+from heapq import heappush, heappop
+
+class ConcurrentExecutor(object):
+
+    def __init__(self, session, statements_and_params):
+        self.session = session
+        self._enum_statements = enumerate(iter(statements_and_params))
+        self._lock = Lock()
+        self._condition = Condition(self._lock)
+        self._fail_fast = True
+        self._results_queue = []
+        self._exec_count = 0
+
+    def execute(self, concurrency, fail_fast):
+        self._fail_fast = fail_fast
+        self._results_queue = []
+        self._exec_count = 0
+        with self._lock:
+            for n in xrange(concurrency):
+                if not self._execute_next():
+                    break
+        return self._results()
+
+    def _execute_next(self):
+        # lock must be held
+        try:
+            (idx, (statement, params)) = next(self._enum_statements)
+            self._exec_count += 1
+            self._execute(idx, statement, params)
+            return True
+        except StopIteration:
+            pass
+
+    def _execute(self, idx, statement, params):
+        try:
+            future = self.session.execute_async(statement, params, timeout=None)
+            args = (idx,)
+            future.add_callbacks(
+                callback=self._on_success, callback_args=args,
+                errback=self._on_error, errback_args=args)
+        except Exception as exc:
+            e = sys.exc_info() if six.PY2 else exc
+            self._on_error(e, idx)
+
+    def _on_success(self, result, idx):
+        self._put_result(idx, True, result)
+
+    def _on_error(self, result, idx):
+        self._put_result(idx, False, result)
+
+    def _put_result(self, idx, success, result):
+        with self._condition:
+            heappush(self._results_queue, (idx, (success, result)))
+            self._execute_next()
+            self._condition.notify()
+
+    def _results(self):
+        # todo: done condition
+        current = 0
+        with self._condition:
+            while current < self._exec_count:
+                while not self._results_queue or self._results_queue[0][0] != current:
+                    self._condition.wait()
+                while self._results_queue and self._results_queue[0][0] == current:
+                    _, res = heappop(self._results_queue)
+                    if self._fail_fast and not res[0]:
+                        self._raise(res[1])
+                    yield res
+                    current += 1
+
+    @staticmethod
+    def _raise(exc):
+        if six.PY2 and isinstance(exc, tuple):
+            (exc_type, value, traceback) = exc
+            six.reraise(exc_type, value, traceback)
+        else:
+            raise exc
+
 
 
 def execute_concurrent_with_args(session, statement, parameters, *args, **kwargs):
