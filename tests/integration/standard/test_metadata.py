@@ -28,7 +28,7 @@ from cassandra.cluster import Cluster
 from cassandra.cqltypes import DoubleType, Int32Type, ListType, UTF8Type, MapType
 from cassandra.encoder import Encoder
 from cassandra.metadata import (Metadata, KeyspaceMetadata, TableMetadata, IndexMetadata,
-                                Token, MD5Token, TokenMap, murmur3, Function, Aggregate)
+                                Token, MD5Token, TokenMap, murmur3, Function, Aggregate, get_schema_parser)
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
@@ -132,8 +132,10 @@ class SchemaMetadataTests(unittest.TestCase):
         self.assertEqual([], tablemeta.clustering_key)
         self.assertEqual([u'a', u'b', u'c'], sorted(tablemeta.columns.keys()))
 
+        parser = get_schema_parser(self.cluster.control_connection._connection, 1)
+
         for option in tablemeta.options:
-            self.assertIn(option, TableMetadata.recognized_options)
+            self.assertIn(option, parser.recognized_table_options)
 
         self.check_create_statement(tablemeta, create_statement)
 

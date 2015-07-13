@@ -960,30 +960,6 @@ class TableMetadata(object):
     table.
     """
 
-    recognized_options = (
-        "comment",
-        "read_repair_chance",
-        "dclocal_read_repair_chance",  # kept to be safe, but see _build_table_options()
-        "local_read_repair_chance",
-        "replicate_on_write",
-        "gc_grace_seconds",
-        "bloom_filter_fp_chance",
-        "caching",
-        "compaction_strategy_class",
-        "compaction_strategy_options",
-        "min_compaction_threshold",
-        "max_compaction_threshold",
-        "compression_parameters",
-        "min_index_interval",
-        "max_index_interval",
-        "index_interval",
-        "speculative_retry",
-        "rows_per_partition_to_cache",
-        "memtable_flush_period_in_ms",
-        "populate_io_cache_on_flush",
-        "compression",
-        "default_time_to_live")
-
     compaction_options = {
         "min_compaction_threshold": "min_threshold",
         "max_compaction_threshold": "max_threshold",
@@ -999,16 +975,19 @@ class TableMetadata(object):
         """
         A boolean indicating if this table can be represented as CQL in export
         """
-        # no such thing as DCT in CQL
-        incompatible = issubclass(self.comparator, types.DynamicCompositeType)
+        comparator = getattr(self, 'comparator', None)
+        if comparator:
+            # no such thing as DCT in CQL
+            incompatible = issubclass(self.comparator, types.DynamicCompositeType)
 
-        # no compact storage with more than one column beyond PK if there
-        # are clustering columns
-        incompatible |= (self.is_compact_storage and
-                         len(self.columns) > len(self.primary_key) + 1 and
-                         len(self.clustering_key) >= 1)
+            # no compact storage with more than one column beyond PK if there
+            # are clustering columns
+            incompatible |= (self.is_compact_storage and
+                             len(self.columns) > len(self.primary_key) + 1 and
+                             len(self.clustering_key) >= 1)
 
-        return not incompatible
+            return not incompatible
+        return True
 
     def __init__(self, keyspace_name, name, partition_key=None, clustering_key=None, columns=None, triggers=None, options=None):
         self.keyspace_name = keyspace_name
@@ -1101,18 +1080,10 @@ class TableMetadata(object):
         if self.clustering_key:
             cluster_str = "CLUSTERING ORDER BY "
 
-            clustering_names = protect_names([c.name for c in self.clustering_key])
-
-            if self.is_compact_storage and \
-                    not issubclass(self.comparator, types.CompositeType):
-                subtypes = [self.comparator]
-            else:
-                subtypes = self.comparator.subtypes
-
             inner = []
-            for colname, coltype in zip(clustering_names, subtypes):
-                ordering = "DESC" if issubclass(coltype, types.ReversedType) else "ASC"
-                inner.append("%s %s" % (colname, ordering))
+            for col in self.clustering_key:
+                ordering = "DESC" if issubclass(col.data_type, types.ReversedType) else "ASC"
+                inner.append("%s %s" % (protect_name(col.name), ordering))
 
             cluster_str += "(%s)" % ", ".join(inner)
             option_strings.append(cluster_str)
@@ -1545,6 +1516,30 @@ class SchemaParserV22(_SchemaParser):
 
     _table_name_col = 'columnfamily_name'
 
+    recognized_table_options = (
+        "comment",
+        "read_repair_chance",
+        "dclocal_read_repair_chance",  # kept to be safe, but see _build_table_options()
+        "local_read_repair_chance",
+        "replicate_on_write",
+        "gc_grace_seconds",
+        "bloom_filter_fp_chance",
+        "caching",
+        "compaction_strategy_class",
+        "compaction_strategy_options",
+        "min_compaction_threshold",
+        "max_compaction_threshold",
+        "compression_parameters",
+        "min_index_interval",
+        "max_index_interval",
+        "index_interval",
+        "speculative_retry",
+        "rows_per_partition_to_cache",
+        "memtable_flush_period_in_ms",
+        "populate_io_cache_on_flush",
+        "compression",
+        "default_time_to_live")
+
     def __init__(self, connection, timeout):
         super(SchemaParserV22, self).__init__(connection, timeout)
         self.keyspaces_result = []
@@ -1809,10 +1804,9 @@ class SchemaParserV22(_SchemaParser):
 
         return table_meta
 
-    @staticmethod
-    def _build_table_options(row):
+    def _build_table_options(self, row):
         """ Setup the mostly-non-schema table options, like caching settings """
-        options = dict((o, row.get(o)) for o in TableMetadata.recognized_options if o in row)
+        options = dict((o, row.get(o)) for o in self.recognized_table_options if o in row)
 
         # the option name when creating tables is "dclocal_read_repair_chance",
         # but the column name in system.schema_columnfamilies is
@@ -1960,6 +1954,21 @@ class SchemaParserV3(SchemaParserV22):
 
     _table_name_col = 'table_name'
 
+    recognized_table_options = (
+        'bloom_filter_fp_chance',
+        'caching',
+        'comment',
+        'compaction',
+        'compression',
+        'dclocal_read_repair_chance',
+        'default_time_to_live',
+        'gc_grace_seconds',
+        'max_index_interval',
+        'memtable_flush_period_in_ms',
+        'min_index_interval',
+        'read_repair_chance',
+        'speculative_retry')
+
     @staticmethod
     def _build_keyspace_metadata(row):
         name = row["keyspace_name"]
@@ -1968,6 +1977,81 @@ class SchemaParserV3(SchemaParserV22):
         strategy_class = strategy_options.pop("class")
         return KeyspaceMetadata(name, durable_writes, strategy_class, strategy_options)
 
+    def _build_table_metadata(self, row, col_rows, trigger_rows):
+        keyspace_name = row["keyspace_name"]
+        table_name = row[self._table_name_col]
+        cf_col_rows = col_rows.get(table_name, [])
+
+        if not cf_col_rows:  # CASSANDRA-8487
+            log.warning("Building table metadata with no column meta for %s.%s",
+                        keyspace_name, table_name)
+
+        table_meta = TableMetadataV3(keyspace_name, table_name)
+
+        for col_row in cf_col_rows:
+            column_meta = self._build_column_metadata(table_meta, col_row)
+            table_meta.columns[column_meta.name] = column_meta
+
+        # partition key
+        partition_rows = [r for r in cf_col_rows
+                          if r.get('type', None) == "partition_key"]
+        if len(partition_rows) > 1:
+            partition_rows = sorted(partition_rows, key=lambda row: row.get('component_index'))
+        for r in partition_rows:
+            table_meta.partition_key.append(table_meta.columns[r.get('column_name')])
+
+        # clustering key
+        clustering_rows = [r for r in cf_col_rows
+                           if r.get('type', None) == "clustering"]
+        if len(clustering_rows) > 1:
+            clustering_rows = sorted(clustering_rows, key=lambda row: row.get('component_index'))
+        for r in clustering_rows:
+            table_meta.clustering_key.append(table_meta.columns[r.get('column_name')])
+
+        if trigger_rows:
+            for trigger_row in trigger_rows[table_name]:
+                trigger_meta = self._build_trigger_metadata(table_meta, trigger_row)
+                table_meta.triggers[trigger_meta.name] = trigger_meta
+
+        table_meta.options = self._build_table_options(row)
+        flags = row.get('flags', set())
+        if flags:
+            table_meta.is_compact_storage = 'dense' in flags or 'super' in flags or 'compound' not in flags
+        return table_meta
+
+    def _build_table_options(self, row):
+        """ Setup the mostly-non-schema table options, like caching settings """
+        return dict((o, row.get(o)) for o in self.recognized_table_options if o in row)
+
+class TableMetadataV3(TableMetadata):
+    """
+    For now, until I figure out what to do with this API
+    """
+    compaction_options = {}
+
+    _option_maps = ['caching']
+    option_maps = ['compaction', 'compression', 'caching']
+
+    @property
+    def is_cql_compatible(self):
+        return True
+
+    def _make_option_strings(self):
+        ret = []
+        options_copy = dict(self.options.items())
+
+        for option in self.option_maps:
+            value = options_copy.pop(option, {})
+            params = ("'%s': '%s'" % (k, v) for k, v in value.items())
+            ret.append("%s = {%s}" % (option, ', '.join(params)))
+
+        for name, value in options_copy.items():
+            if value is not None:
+                if name == "comment":
+                    value = value or ""
+                ret.append("%s = %s" % (name, protect_value(value)))
+
+        return list(sorted(ret))
 
 def get_schema_parser(connection, timeout):
     server_version = connection.server_version
