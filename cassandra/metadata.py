@@ -1988,9 +1988,15 @@ class SchemaParserV3(SchemaParserV22):
 
         table_meta = TableMetadataV3(keyspace_name, table_name)
 
-        for col_row in cf_col_rows:
-            column_meta = self._build_column_metadata(table_meta, col_row)
-            table_meta.columns[column_meta.name] = column_meta
+        table_meta.options = self._build_table_options(row)
+        flags = row.get('flags', set())
+        if flags:
+            compact_static = False
+            table_meta.is_compact_storage = 'dense' in flags or 'super' in flags or 'compound' not in flags
+        else:
+            # example: create table t (a int, b int, c int, primary key((a,b))) with compact storage
+            compact_static = True
+            table_meta.is_compact_storage = True
 
         # partition key
         partition_rows = [r for r in cf_col_rows
@@ -1998,25 +2004,38 @@ class SchemaParserV3(SchemaParserV22):
         if len(partition_rows) > 1:
             partition_rows = sorted(partition_rows, key=lambda row: row.get('component_index'))
         for r in partition_rows:
+            # we have to add meta here (and not in the later loop) because TableMetadata.columns is an
+            # OrderedDict, and it assumes keys are inserted first, in order, when exporting CQL
+            column_meta = self._build_column_metadata(table_meta, r)
+            table_meta.columns[column_meta.name] = column_meta
             table_meta.partition_key.append(table_meta.columns[r.get('column_name')])
 
         # clustering key
-        clustering_rows = [r for r in cf_col_rows
-                           if r.get('type', None) == "clustering"]
-        if len(clustering_rows) > 1:
-            clustering_rows = sorted(clustering_rows, key=lambda row: row.get('component_index'))
-        for r in clustering_rows:
-            table_meta.clustering_key.append(table_meta.columns[r.get('column_name')])
+        if not compact_static:
+            clustering_rows = [r for r in cf_col_rows
+                               if r.get('type', None) == "clustering"]
+            if len(clustering_rows) > 1:
+                clustering_rows = sorted(clustering_rows, key=lambda row: row.get('component_index'))
+            for r in clustering_rows:
+                column_meta = self._build_column_metadata(table_meta, r)
+                table_meta.columns[column_meta.name] = column_meta
+                table_meta.clustering_key.append(table_meta.columns[r.get('column_name')])
+
+        for col_row in (r for r in cf_col_rows
+                        if r.get('type', None) not in ('parition_key', 'clustering_key')):
+            column_meta = self._build_column_metadata(table_meta, col_row)
+            if not compact_static or column_meta.is_static:
+                # for compact static tables, we omit the clustering key and value, and only add the logical columns.
+                # They are marked not static so that it generates appropriate CQL
+                if compact_static:
+                    column_meta.is_static = False
+                table_meta.columns[column_meta.name] = column_meta
 
         if trigger_rows:
             for trigger_row in trigger_rows[table_name]:
                 trigger_meta = self._build_trigger_metadata(table_meta, trigger_row)
                 table_meta.triggers[trigger_meta.name] = trigger_meta
 
-        table_meta.options = self._build_table_options(row)
-        flags = row.get('flags', set())
-        if flags:
-            table_meta.is_compact_storage = 'dense' in flags or 'super' in flags or 'compound' not in flags
         return table_meta
 
     def _build_table_options(self, row):
