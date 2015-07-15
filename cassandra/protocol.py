@@ -64,7 +64,6 @@ TRACING_FLAG = 0x02
 CUSTOM_PAYLOAD_FLAG = 0x04
 WARNING_FLAG = 0x08
 
-_message_types_by_name = {}
 _message_types_by_opcode = {}
 
 _UNSET_VALUE = object()
@@ -72,7 +71,6 @@ _UNSET_VALUE = object()
 class _RegisterMessageType(type):
     def __init__(cls, name, bases, dct):
         if not name.startswith('_'):
-            _message_types_by_name[cls.name] = cls
             _message_types_by_opcode[cls.opcode] = cls
 
 
