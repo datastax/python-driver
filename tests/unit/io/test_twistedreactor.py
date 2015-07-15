@@ -153,17 +153,17 @@ class TestTwistedConnection(unittest.TestCase):
         Verify that handle_read() processes incomplete messages properly.
         """
         self.obj_ut.process_msg = Mock()
-        self.assertEqual(self.obj_ut._iobuf.getvalue(), '')  # buf starts empty
+        self.assertEqual(self.obj_ut._iobuf.getvalue(), b'')  # buf starts empty
         # incomplete header
-        self.obj_ut._iobuf.write('\x84\x00\x00\x00\x00')
+        self.obj_ut._iobuf.write(b'\x84\x00\x00\x00\x00')
         self.obj_ut.handle_read()
-        self.assertEqual(self.obj_ut._iobuf.getvalue(), '\x84\x00\x00\x00\x00')
+        self.assertEqual(self.obj_ut._iobuf.getvalue(), b'\x84\x00\x00\x00\x00')
 
         # full header, but incomplete body
-        self.obj_ut._iobuf.write('\x00\x00\x00\x15')
+        self.obj_ut._iobuf.write(b'\x00\x00\x00\x15')
         self.obj_ut.handle_read()
         self.assertEqual(self.obj_ut._iobuf.getvalue(),
-                         '\x84\x00\x00\x00\x00\x00\x00\x00\x15')
+                         b'\x84\x00\x00\x00\x00\x00\x00\x00\x15')
         self.assertEqual(self.obj_ut._current_frame.end_pos, 30)
 
         # verify we never attempted to process the incomplete message
@@ -174,14 +174,14 @@ class TestTwistedConnection(unittest.TestCase):
         Verify that handle_read() processes complete messages properly.
         """
         self.obj_ut.process_msg = Mock()
-        self.assertEqual(self.obj_ut._iobuf.getvalue(), '')  # buf starts empty
+        self.assertEqual(self.obj_ut._iobuf.getvalue(), b'')  # buf starts empty
 
         # write a complete message, plus 'NEXT' (to simulate next message)
         # assumes protocol v3+ as default Connection.protocol_version
-        body = 'this is the drum roll'
-        extra = 'NEXT'
+        body = b'this is the drum roll'
+        extra = b'NEXT'
         self.obj_ut._iobuf.write(
-            '\x84\x01\x00\x02\x03\x00\x00\x00\x15' + body + extra)
+            b'\x84\x01\x00\x02\x03\x00\x00\x00\x15' + body + extra)
         self.obj_ut.handle_read()
         self.assertEqual(self.obj_ut._iobuf.getvalue(), extra)
         self.obj_ut.process_msg.assert_called_with(
