@@ -268,7 +268,7 @@ if "--no-cython" not in sys.argv:
             [Extension('cassandra.%s' % m, ['cassandra/%s.py' % m], extra_compile_args=compile_args) for m in cython_candidates],
             exclude_failures=True))
     except ImportError:
-        print("Cython is not installed. Not compiling core driver files as extensions (optional).")
+        sys.stderr.write("Cython is not installed. Not compiling core driver files as extensions (optional).")
 
 if "--no-extensions" in sys.argv:
     extensions = []
@@ -290,14 +290,25 @@ The optional C extensions are not supported on big-endian systems.
 ===============================================================================
 """
 
+pypy_unsupported_msg = \
+"""
+=================================================================================
+Some optional C extensions are not supported in PyPy. Only murmur3 will be built.
+=================================================================================
+"""
+
 if extensions:
-    if (sys.platform.startswith("java")
-        or sys.platform == "cli"):
+    if "PyPy" in sys.version:
+        sys.stderr.write(pypy_unsupported_msg)
+        extensions = [ext for ext in extensions if ext is murmur3_ext]
+
+    if (sys.platform.startswith("java") or sys.platform == "cli"):
         sys.stderr.write(platform_unsupported_msg)
-        extensions = ()
+        extensions = []
     elif sys.byteorder == "big":
         sys.stderr.write(arch_unsupported_msg)
-        extensions = ()
+        extensions = []
+
 
 while True:
     # try to build as many of the extensions as we can
