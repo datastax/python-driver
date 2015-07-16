@@ -816,7 +816,7 @@ class DowngradingConsistencyRetryPolicy(RetryPolicy):
                          required_responses, received_responses, retry_num):
         if retry_num != 0:
             return (self.RETHROW, None)
-        elif write_type in (WriteType.SIMPLE, WriteType.BATCH, WriteType.COUNTER):
+        elif write_type in (WriteType.SIMPLE, WriteType.BATCH, WriteType.COUNTER) and received_responses > 0:
             return (self.IGNORE, None)
         elif write_type == WriteType.UNLOGGED_BATCH:
             return self._pick_consistency(received_responses)
