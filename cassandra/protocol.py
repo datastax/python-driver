@@ -531,6 +531,34 @@ RESULT_KIND_SET_KEYSPACE = 0x0003
 RESULT_KIND_PREPARED = 0x0004
 RESULT_KIND_SCHEMA_CHANGE = 0x0005
 
+class CassandraTypeCodes(object):
+    CUSTOM_TYPE = 0x0000
+    AsciiType = 0x0001
+    LongType = 0x0002
+    BytesType = 0x0003
+    BooleanType = 0x0004
+    CounterColumnType = 0x0005
+    DecimalType = 0x0006
+    DoubleType = 0x0007
+    FloatType = 0x0008
+    Int32Type = 0x0009
+    UTF8Type = 0x000A
+    DateType = 0x000B
+    UUIDType = 0x000C
+    UTF8Type = 0x000D
+    IntegerType = 0x000E
+    TimeUUIDType = 0x000F
+    InetAddressType = 0x0010
+    SimpleDateType = 0x0011
+    TimeType = 0x0012
+    ShortType = 0x0013
+    ByteType = 0x0014
+    ListType = 0x0020
+    MapType = 0x0021
+    SetType = 0x0022
+    UserType = 0x0030
+    TupleType = 0x0031
+
 
 class ResultMessage(_MessageType):
     opcode = 0x08
@@ -540,34 +568,8 @@ class ResultMessage(_MessageType):
     results = None
     paging_state = None
 
-    type_codes = {
-        0x0000: CUSTOM_TYPE,
-        0x0001: AsciiType,
-        0x0002: LongType,
-        0x0003: BytesType,
-        0x0004: BooleanType,
-        0x0005: CounterColumnType,
-        0x0006: DecimalType,
-        0x0007: DoubleType,
-        0x0008: FloatType,
-        0x0009: Int32Type,
-        0x000A: UTF8Type,
-        0x000B: DateType,
-        0x000C: UUIDType,
-        0x000D: UTF8Type,
-        0x000E: IntegerType,
-        0x000F: TimeUUIDType,
-        0x0010: InetAddressType,
-        0x0011: SimpleDateType,
-        0x0012: TimeType,
-        0x0013: ShortType,
-        0x0014: ByteType,
-        0x0020: ListType,
-        0x0021: MapType,
-        0x0022: SetType,
-        0x0030: UserType,
-        0x0031: TupleType,
-    }
+    # Names match type name in module scope. Most are imported from cassandra.cqltypes (except CUSTOM_TYPE)
+    type_codes = _cqltypes_by_code = dict((v, globals()[k]) for k, v in CassandraTypeCodes.__dict__.items() if not k.startswith('_'))
 
     _FLAGS_GLOBAL_TABLES_SPEC = 0x0001
     _HAS_MORE_PAGES_FLAG = 0x0002
