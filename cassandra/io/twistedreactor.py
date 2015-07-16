@@ -96,7 +96,7 @@ class TwistedConnectionClientFactory(protocol.ClientFactory):
 
         It should be safe to call defunct() here instead of just close, because
         we can assume that if the connection was closed cleanly, there are no
-        callbacks to error out. If this assumption turns out to be false, we
+        requests to error out. If this assumption turns out to be false, we
         can call close() instead of defunct() when "reason" is an appropriate
         type.
         """
@@ -213,7 +213,7 @@ class TwistedConnection(Connection):
 
     def close(self):
         """
-        Disconnect and error-out all callbacks.
+        Disconnect and error-out all requests.
         """
         with self.lock:
             if self.is_closed:
@@ -225,7 +225,7 @@ class TwistedConnection(Connection):
         log.debug("Closed socket to %s", self.host)
 
         if not self.is_defunct:
-            self.error_all_callbacks(
+            self.error_all_requests(
                 ConnectionShutdown("Connection to %s was closed" % self.host))
             # don't leave in-progress operations hanging
             self.connected_event.set()

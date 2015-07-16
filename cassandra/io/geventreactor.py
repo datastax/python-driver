@@ -106,7 +106,7 @@ class GeventConnection(Connection):
         log.debug("Closed socket to %s" % (self.host,))
 
         if not self.is_defunct:
-            self.error_all_callbacks(
+            self.error_all_requests(
                 ConnectionShutdown("Connection to %s was closed" % self.host))
             # don't leave in-progress operations hanging
             self.connected_event.set()

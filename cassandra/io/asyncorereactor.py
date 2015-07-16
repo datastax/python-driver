@@ -183,7 +183,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         log.debug("Closed socket to %s", self.host)
 
         if not self.is_defunct:
-            self.error_all_callbacks(
+            self.error_all_requests(
                 ConnectionShutdown("Connection to %s was closed" % self.host))
             # don't leave in-progress operations hanging
             self.connected_event.set()
@@ -239,7 +239,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
 
         if self._iobuf.tell():
             self.process_io_buffer()
-            if not self._callbacks and not self.is_control_connection:
+            if not self._requests and not self.is_control_connection:
                 self._readable = False
 
     def push(self, data):

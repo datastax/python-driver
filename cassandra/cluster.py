@@ -420,15 +420,6 @@ class Cluster(object):
     GeventConnection will be used automatically.
     """
 
-    protocol_handler_class = ProtocolHandler
-    """
-    Specifies a protocol handler class, which can be used to override or extend features
-    such as message or type deserialization.
-
-    The class must conform to the public classmethod interface defined in the default
-    implementation, :class:`cassandra.protocol.ProtocolHandler`
-    """
-
     control_connection_timeout = 2.0
     """
     A timeout, in seconds, for queries made by the control connection, such
@@ -525,8 +516,7 @@ class Cluster(object):
                  idle_heartbeat_interval=30,
                  schema_event_refresh_window=2,
                  topology_event_refresh_window=10,
-                 connect_timeout=5,
-                 protocol_handler_class=None):
+                 connect_timeout=5):
         """
         Any of the mutable Cluster attributes may be set as keyword arguments
         to the constructor.
@@ -569,9 +559,6 @@ class Cluster(object):
 
         if connection_class is not None:
             self.connection_class = connection_class
-
-        if protocol_handler_class is not None:
-            self.protocol_handler_class = protocol_handler_class
 
         self.metrics_enabled = metrics_enabled
         self.ssl_options = ssl_options
@@ -812,7 +799,6 @@ class Cluster(object):
         kwargs_dict.setdefault('cql_version', self.cql_version)
         kwargs_dict.setdefault('protocol_version', self.protocol_version)
         kwargs_dict.setdefault('user_type_map', self._user_types)
-        kwargs_dict.setdefault('protocol_handler_class', self.protocol_handler_class)
 
         return kwargs_dict
 
@@ -1372,7 +1358,7 @@ class Cluster(object):
         log.debug("Preparing all known prepared statements against host %s", host)
         connection = None
         try:
-            connection = self.connection_factory(host.address, protocol_handler_class=ProtocolHandler)
+            connection = self.connection_factory(host.address)
             try:
                 self.control_connection.wait_for_schema_agreement(connection)
             except Exception:
@@ -1535,6 +1521,20 @@ class Session(object):
     .. versionadded:: 2.1.0
     """
 
+    client_protocol_handler = ProtocolHandler
+    """
+    Specifies a protocol handler that will be used for client-initiated requests (i.e. no
+    internal driver requests). This can be used to override or extend features such as
+    message or type ser/des.
+
+    The class must conform to the public classmethod interface defined in the default
+    implementation, :class:`cassandra.protocol.ProtocolHandler`
+
+    This is not included in published documentation as it is not intended for the casual user.
+    It requires knowledge of the native protocol and driver internals. Only advanced, specialized
+    use cases should need to do anything with this.
+    """
+
     _lock = None
     _pools = None
     _load_balancer = None
@@ -1661,6 +1661,7 @@ class Session(object):
             timeout = self.default_timeout
 
         future = self._create_response_future(query, parameters, trace, custom_payload, timeout)
+        future._protocol_handler = self.client_protocol_handler
         future.send_request()
         return future
 
@@ -2131,7 +2132,7 @@ class ControlConnection(object):
 
         while True:
             try:
-                connection = self._cluster.connection_factory(host.address, is_control_connection=True, protocol_handler_class=ProtocolHandler)
+                connection = self._cluster.connection_factory(host.address, is_control_connection=True)
                 break
             except ProtocolVersionUnsupported as e:
                 self._cluster.protocol_downgrade(host.address, e.startup_version)
@@ -2846,6 +2847,7 @@ class ResponseFuture(object):
     _custom_payload = None
     _warnings = None
     _timer = None
+    _protocol_handler = ProtocolHandler
 
     def __init__(self, session, message, query, timeout, metrics=None, prepared_statement=None):
         self.session = session
@@ -2919,7 +2921,7 @@ class ResponseFuture(object):
             # TODO get connectTimeout from cluster settings
             connection, request_id = pool.borrow_connection(timeout=2.0)
             self._connection = connection
-            connection.send_msg(message, request_id, cb=cb)
+            connection.send_msg(message, request_id, cb=cb, encoder=self._protocol_handler.encode_message, decoder=self._protocol_handler.decode_message)
             return request_id
         except NoConnectionsAvailable as exc:
             log.debug("All connections for host %s are at capacity, moving to the next host", host)
