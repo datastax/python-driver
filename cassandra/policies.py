@@ -816,14 +816,19 @@ class DowngradingConsistencyRetryPolicy(RetryPolicy):
                          required_responses, received_responses, retry_num):
         if retry_num != 0:
             return (self.RETHROW, None)
-        elif write_type in (WriteType.SIMPLE, WriteType.BATCH, WriteType.COUNTER) and received_responses > 0:
-            return (self.IGNORE, None)
+
+        if write_type in (WriteType.SIMPLE, WriteType.BATCH, WriteType.COUNTER):
+            if received_responses > 0:
+                # persisted on at least one replica
+                return (self.IGNORE, None)
+            else:
+                return (self.RETHROW, None)
         elif write_type == WriteType.UNLOGGED_BATCH:
             return self._pick_consistency(received_responses)
         elif write_type == WriteType.BATCH_LOG:
             return (self.RETRY, consistency)
-        else:
-            return (self.RETHROW, None)
+
+        return (self.RETHROW, None)
 
     def on_unavailable(self, query, consistency, required_replicas, alive_replicas, retry_num):
         if retry_num != 0:
