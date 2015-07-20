@@ -42,7 +42,7 @@ from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut
 from cassandra.marshal import int32_pack, uint8_unpack
 from cassandra.protocol import (ReadyMessage, AuthenticateMessage, OptionsMessage,
                                 StartupMessage, ErrorMessage, CredentialsMessage,
-                                QueryMessage, ResultMessage, decode_response,
+                                QueryMessage, ResultMessage, ProtocolHandler,
                                 InvalidRequestException, SupportedMessage,
                                 AuthResponseMessage, AuthChallengeMessage,
                                 AuthSuccessMessage, ProtocolException,
@@ -221,7 +221,7 @@ class Connection(object):
         self.is_control_connection = is_control_connection
         self.user_type_map = user_type_map
         self._push_watchers = defaultdict(set)
-        self._callbacks = {}
+        self._requests = {}
         self._iobuf = io.BytesIO()
 
         if protocol_version >= 3:
@@ -318,20 +318,20 @@ class Connection(object):
 
         self.last_error = exc
         self.close()
-        self.error_all_callbacks(exc)
+        self.error_all_requests(exc)
         self.connected_event.set()
         return exc
 
-    def error_all_callbacks(self, exc):
+    def error_all_requests(self, exc):
         with self.lock:
-            callbacks = self._callbacks
-            self._callbacks = {}
+            requests = self._requests
+            self._requests = {}
         new_exc = ConnectionShutdown(str(exc))
-        for cb in callbacks.values():
+        for cb, _ in requests.values():
             try:
                 cb(new_exc)
             except Exception:
-                log.warning("Ignoring unhandled exception while erroring callbacks for a "
+                log.warning("Ignoring unhandled exception while erroring requests for a "
                             "failed connection (%s) to host %s:",
                             id(self), self.host, exc_info=True)
 
@@ -355,14 +355,16 @@ class Connection(object):
             except Exception:
                 log.exception("Pushed event handler errored, ignoring:")
 
-    def send_msg(self, msg, request_id, cb):
+    def send_msg(self, msg, request_id, cb, encoder=ProtocolHandler.encode_message, decoder=ProtocolHandler.decode_message):
         if self.is_defunct:
             raise ConnectionShutdown("Connection to %s is defunct" % self.host)
         elif self.is_closed:
             raise ConnectionShutdown("Connection to %s is closed" % self.host)
 
-        self._callbacks[request_id] = cb
-        self.push(msg.to_binary(request_id, self.protocol_version, compression=self.compressor))
+        # queue the decoder function with the request
+        # this allows us to inject custom functions per request to encode, decode messages
+        self._requests[request_id] = (cb, decoder)
+        self.push(encoder(msg, request_id, self.protocol_version, compressor=self.compressor))
         return request_id
 
     def wait_for_response(self, msg, timeout=None):
@@ -490,16 +492,17 @@ class Connection(object):
         stream_id = header.stream
         if stream_id < 0:
             callback = None
+            decoder = ProtocolHandler.decode_message
         else:
-            callback = self._callbacks.pop(stream_id, None)
+            callback, decoder = self._requests.pop(stream_id, None)
             with self.lock:
                 self.request_ids.append(stream_id)
 
         self.msg_received = True
 
         try:
-            response = decode_response(header.version, self.user_type_map, stream_id,
-                                       header.flags, header.opcode, body, self.decompressor)
+            response = decoder(header.version, self.user_type_map, stream_id,
+                               header.flags, header.opcode, body, self.decompressor)
         except Exception as exc:
             log.exception("Error decoding response from Cassandra. "
                           "opcode: %04x; message contents: %r", header.opcode, body)

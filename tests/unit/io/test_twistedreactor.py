@@ -140,13 +140,13 @@ class TestTwistedConnection(unittest.TestCase):
         """
         Verify that close() disconnects the connector and errors callbacks.
         """
-        self.obj_ut.error_all_callbacks = Mock()
+        self.obj_ut.error_all_requests = Mock()
         self.obj_ut.add_connection()
         self.obj_ut.is_closed = False
         self.obj_ut.close()
         self.obj_ut.connector.disconnect.assert_called_with()
         self.assertTrue(self.obj_ut.connected_event.is_set())
-        self.assertTrue(self.obj_ut.error_all_callbacks.called)
+        self.assertTrue(self.obj_ut.error_all_requests.called)
 
     def test_handle_read__incomplete(self):
         """

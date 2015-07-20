@@ -290,7 +290,7 @@ class LibevConnection(Connection):
 
         # don't leave in-progress operations hanging
         if not self.is_defunct:
-            self.error_all_callbacks(
+            self.error_all_requests(
                 ConnectionShutdown("Connection to %s was closed" % self.host))
 
     def handle_write(self, watcher, revents, errno=None):

@@ -60,7 +60,8 @@ from cassandra.protocol import (QueryMessage, ResultMessage,
                                 IsBootstrappingErrorMessage,
                                 BatchMessage, RESULT_KIND_PREPARED,
                                 RESULT_KIND_SET_KEYSPACE, RESULT_KIND_ROWS,
-                                RESULT_KIND_SCHEMA_CHANGE, MIN_SUPPORTED_VERSION)
+                                RESULT_KIND_SCHEMA_CHANGE, MIN_SUPPORTED_VERSION,
+                                ProtocolHandler)
 from cassandra.metadata import Metadata, protect_name, murmur3
 from cassandra.policies import (TokenAwarePolicy, DCAwareRoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
@@ -789,15 +790,15 @@ class Cluster(object):
 
     def _make_connection_kwargs(self, address, kwargs_dict):
         if self._auth_provider_callable:
-            kwargs_dict['authenticator'] = self._auth_provider_callable(address)
+            kwargs_dict.setdefault('authenticator', self._auth_provider_callable(address))
 
-        kwargs_dict['port'] = self.port
-        kwargs_dict['compression'] = self.compression
-        kwargs_dict['sockopts'] = self.sockopts
-        kwargs_dict['ssl_options'] = self.ssl_options
-        kwargs_dict['cql_version'] = self.cql_version
-        kwargs_dict['protocol_version'] = self.protocol_version
-        kwargs_dict['user_type_map'] = self._user_types
+        kwargs_dict.setdefault('port', self.port)
+        kwargs_dict.setdefault('compression', self.compression)
+        kwargs_dict.setdefault('sockopts', self.sockopts)
+        kwargs_dict.setdefault('ssl_options', self.ssl_options)
+        kwargs_dict.setdefault('cql_version', self.cql_version)
+        kwargs_dict.setdefault('protocol_version', self.protocol_version)
+        kwargs_dict.setdefault('user_type_map', self._user_types)
 
         return kwargs_dict
 
@@ -1520,6 +1521,20 @@ class Session(object):
     .. versionadded:: 2.1.0
     """
 
+    client_protocol_handler = ProtocolHandler
+    """
+    Specifies a protocol handler that will be used for client-initiated requests (i.e. no
+    internal driver requests). This can be used to override or extend features such as
+    message or type ser/des.
+
+    The class must conform to the public classmethod interface defined in the default
+    implementation, :class:`cassandra.protocol.ProtocolHandler`
+
+    This is not included in published documentation as it is not intended for the casual user.
+    It requires knowledge of the native protocol and driver internals. Only advanced, specialized
+    use cases should need to do anything with this.
+    """
+
     _lock = None
     _pools = None
     _load_balancer = None
@@ -1646,6 +1661,7 @@ class Session(object):
             timeout = self.default_timeout
 
         future = self._create_response_future(query, parameters, trace, custom_payload, timeout)
+        future._protocol_handler = self.client_protocol_handler
         future.send_request()
         return future
 
@@ -2831,6 +2847,7 @@ class ResponseFuture(object):
     _custom_payload = None
     _warnings = None
     _timer = None
+    _protocol_handler = ProtocolHandler
 
     def __init__(self, session, message, query, timeout, metrics=None, prepared_statement=None):
         self.session = session
@@ -2904,7 +2921,7 @@ class ResponseFuture(object):
             # TODO get connectTimeout from cluster settings
             connection, request_id = pool.borrow_connection(timeout=2.0)
             self._connection = connection
-            connection.send_msg(message, request_id, cb=cb)
+            connection.send_msg(message, request_id, cb=cb, encoder=self._protocol_handler.encode_message, decoder=self._protocol_handler.decode_message)
             return request_id
         except NoConnectionsAvailable as exc:
             log.debug("All connections for host %s are at capacity, moving to the next host", host)
