@@ -1,3 +1,11 @@
+2.6.0
+=====
+July 20, 2015
+
+Bug Fixes
+---------
+* Output proper CQL for compact tables with no clustering columns (PYTHON-360)
+
 2.6.0c2
 =======
 June 24, 2015
