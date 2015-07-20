@@ -39,7 +39,7 @@ import six
 from six.moves import range
 
 from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut
-from cassandra.marshal import int32_pack, uint8_unpack
+from cassandra.marshal import int32_pack
 from cassandra.protocol import (ReadyMessage, AuthenticateMessage, OptionsMessage,
                                 StartupMessage, ErrorMessage, CredentialsMessage,
                                 QueryMessage, ResultMessage, ProtocolHandler,
@@ -99,7 +99,16 @@ HEADER_DIRECTION_MASK = 0x80
 frame_header_v1_v2 = struct.Struct('>BbBi')
 frame_header_v3 = struct.Struct('>BhBi')
 
-_Frame = namedtuple('Frame', ('version', 'flags', 'stream', 'opcode', 'body_offset', 'end_pos'))
+
+class _Frame(object):
+    def __init__(self, version, flags, stream, opcode, body_offset, end_pos):
+        self.version = version
+        self.flags = flags
+        self.stream = stream
+        self.opcode = opcode
+        self.body_offset = body_offset
+        self.end_pos = end_pos
+
 
 NONBLOCKING = (errno.EAGAIN, errno.EWOULDBLOCK)
 
@@ -442,24 +451,20 @@ class Connection(object):
 
     @defunct_on_error
     def _read_frame_header(self):
-        buf = self._iobuf
-        pos = buf.tell()
+        buf = self._iobuf.getvalue()
+        pos = len(buf)
         if pos:
-            buf.seek(0)
-            version = uint8_unpack(buf.read(1)) & PROTOCOL_VERSION_MASK
+            version = ord(buf[0]) & PROTOCOL_VERSION_MASK
             if version > MAX_SUPPORTED_VERSION:
                 raise ProtocolError("This version of the driver does not support protocol version %d" % version)
             frame_header = frame_header_v3 if version >= 3 else frame_header_v1_v2
             # this frame header struct is everything after the version byte
             header_size = frame_header.size + 1
             if pos >= header_size:
-                flags, stream, op, body_len = frame_header.unpack(buf.read(frame_header.size))
+                flags, stream, op, body_len = frame_header.unpack_from(buf, 1)
                 if body_len < 0:
                     raise ProtocolError("Received negative body length: %r" % body_len)
                 self._current_frame = _Frame(version, flags, stream, op, header_size, body_len + header_size)
-
-            self._iobuf.seek(pos)
-
         return pos
 
     def _reset_frame(self):
