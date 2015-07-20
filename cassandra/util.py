@@ -15,8 +15,6 @@ def datetime_from_timestamp(timestamp):
     and rounding differences in Python 3.4 (PYTHON-340).
 
     :param timestamp: a unix timestamp, in seconds
-
-    :rtype: datetime
     """
     dt = DATETIME_EPOC + datetime.timedelta(seconds=timestamp)
     return dt
@@ -29,9 +27,6 @@ def unix_time_from_uuid1(uuid_arg):
     results of queries returning a v1 :class:`~uuid.UUID`.
 
     :param uuid_arg: a version 1 :class:`~uuid.UUID`
-
-    :rtype: timestamp
-
     """
     return (uuid_arg.time - 0x01B21DD213814000) / 1e7
 
@@ -42,9 +37,6 @@ def datetime_from_uuid1(uuid_arg):
     specified type-1 UUID.
 
     :param uuid_arg: a version 1 :class:`~uuid.UUID`
-
-    :rtype: timestamp
-
     """
     return datetime_from_timestamp(unix_time_from_uuid1(uuid_arg))
 
