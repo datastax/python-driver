@@ -24,7 +24,7 @@ import re
 import struct
 import time
 import six
-from six.moves import range
+from six.moves import range, zip
 
 from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.util import unix_time_from_uuid1
