@@ -468,9 +468,7 @@ class Connection(object):
         return pos
 
     def _reset_frame(self):
-        leftover = self._iobuf.read()
-        self._iobuf = io.BytesIO()
-        self._iobuf.write(leftover)
+        self._iobuf = io.BytesIO(self._iobuf.read())
         self._current_frame = None
 
     def process_io_buffer(self):
