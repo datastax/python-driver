@@ -2081,6 +2081,8 @@ class ControlConnection(object):
         self._reconnection_handler = None
         self._reconnection_lock = RLock()
 
+        self._event_schedule_times = {}
+
     def connect(self):
         if self._is_shutdown:
             return
@@ -2517,12 +2519,26 @@ class ControlConnection(object):
         self._cluster.load_balancing_policy.on_up(host)
         return True
 
+    def _delay_for_event_type(self, event_type, delay_window):
+        # this serves to order processing correlated events (received within the window)
+        # the window and randomization still have the desired effect of skew across client instances
+        next_time = self._event_schedule_times.get(event_type, 0)
+        now = self._time.time()
+        if now <= next_time:
+            this_time = next_time + 0.01
+            delay = this_time - now
+        else:
+            delay = random() * delay_window
+            this_time = now + delay
+        self._event_schedule_times[event_type] = this_time
+        return delay
+
     def _handle_topology_change(self, event):
         change_type = event["change_type"]
         addr, port = event["address"]
         if change_type == "NEW_NODE" or change_type == "MOVED_NODE":
             if self._topology_event_refresh_window >= 0:
-                delay = random() * self._topology_event_refresh_window
+                delay = self._delay_for_event_type('topology_change', self._topology_event_refresh_window)
                 self._cluster.scheduler.schedule_unique(delay, self.refresh_node_list_and_token_map)
         elif change_type == "REMOVED_NODE":
             host = self._cluster.metadata.get_host(addr)
@@ -2533,7 +2549,7 @@ class ControlConnection(object):
         addr, port = event["address"]
         host = self._cluster.metadata.get_host(addr)
         if change_type == "UP":
-            delay = 1 + random() * 0.5  # randomness to avoid thundering herd problem on events
+            delay = 1 + self._delay_for_event_type('status_change', 0.5)  # randomness to avoid thundering herd problem on events
             if host is None:
                 # this is the first time we've seen the node
                 self._cluster.scheduler.schedule_unique(delay, self.refresh_node_list_and_token_map)
@@ -2556,7 +2572,7 @@ class ControlConnection(object):
         usertype = event.get('type')
         function = event.get('function')
         aggregate = event.get('aggregate')
-        delay = random() * self._schema_event_refresh_window
+        delay = self._delay_for_event_type('schema_change', self._schema_event_refresh_window)
         self._cluster.scheduler.schedule_unique(delay, self.refresh_schema, keyspace, table, usertype, function, aggregate)
 
     def wait_for_schema_agreement(self, connection=None, preloaded_results=None, wait_time=None):
