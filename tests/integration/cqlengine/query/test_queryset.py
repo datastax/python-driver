@@ -712,19 +712,19 @@ class PageQueryTests(BaseCassEngTestCase):
 
 class ModelQuerySetTimeoutTestCase(BaseQuerySetUsage):
     def test_default_timeout(self):
-        with mock.patch.object(Session, 'execute', autospec=True) as mock_execute:
+        with mock.patch.object(Session, 'execute') as mock_execute:
             list(TestModel.objects())
-            mock_execute.assert_called_once_with(mock.ANY, mock.ANY, mock.ANY, timeout=NOT_SET)
+            self.assertEqual(mock_execute.call_args[-1]['timeout'], NOT_SET)
 
     def test_float_timeout(self):
-        with mock.patch.object(Session, 'execute', autospec=True) as mock_execute:
+        with mock.patch.object(Session, 'execute') as mock_execute:
             list(TestModel.objects().timeout(0.5))
-            mock_execute.assert_called_once_with(mock.ANY, mock.ANY, mock.ANY, timeout=0.5)
+            self.assertEqual(mock_execute.call_args[-1]['timeout'], 0.5)
 
     def test_none_timeout(self):
-        with mock.patch.object(Session, 'execute', autospec=True) as mock_execute:
+        with mock.patch.object(Session, 'execute') as mock_execute:
             list(TestModel.objects().timeout(None))
-            mock_execute.assert_called_once_with(mock.ANY, mock.ANY, mock.ANY, timeout=None)
+            self.assertEqual(mock_execute.call_args[-1]['timeout'], None)
 
 
 class DMLQueryTimeoutTestCase(BaseQuerySetUsage):
@@ -733,19 +733,19 @@ class DMLQueryTimeoutTestCase(BaseQuerySetUsage):
         super(DMLQueryTimeoutTestCase, self).setUp()
 
     def test_default_timeout(self):
-        with mock.patch.object(Session, 'execute', autospec=True) as mock_execute:
+        with mock.patch.object(Session, 'execute') as mock_execute:
             self.model.save()
-            mock_execute.assert_called_once_with(mock.ANY, mock.ANY, mock.ANY, timeout=NOT_SET)
+            self.assertEqual(mock_execute.call_args[-1]['timeout'], NOT_SET)
 
     def test_float_timeout(self):
-        with mock.patch.object(Session, 'execute', autospec=True) as mock_execute:
+        with mock.patch.object(Session, 'execute') as mock_execute:
             self.model.timeout(0.5).save()
-            mock_execute.assert_called_once_with(mock.ANY, mock.ANY, mock.ANY, timeout=0.5)
+            self.assertEqual(mock_execute.call_args[-1]['timeout'], 0.5)
 
     def test_none_timeout(self):
-        with mock.patch.object(Session, 'execute', autospec=True) as mock_execute:
+        with mock.patch.object(Session, 'execute') as mock_execute:
             self.model.timeout(None).save()
-            mock_execute.assert_called_once_with(mock.ANY, mock.ANY, mock.ANY, timeout=None)
+            self.assertEqual(mock_execute.call_args[-1]['timeout'], None)
 
     def test_timeout_then_batch(self):
         b = query.BatchQuery()
