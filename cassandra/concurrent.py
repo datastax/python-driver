@@ -166,9 +166,11 @@ class ConcurrentExecutorGenResults(_ConcurrentExecutor):
                     self._condition.wait()
                 while self._results_queue and self._results_queue[0][0] == self._current:
                     _, res = heappop(self._results_queue)
+                    self._condition.release()
                     if self._fail_fast and not res[0]:
                         self._raise(res[1])
                     yield res
+                    self._condition.acquire()
                     self._current += 1
 
 
