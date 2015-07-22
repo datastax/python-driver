@@ -16,6 +16,7 @@ from __future__ import absolute_import  # to enable import io from stdlib
 from collections import defaultdict, deque, namedtuple
 import errno
 from functools import wraps, partial
+from heapq import heappush, heappop
 import io
 import logging
 import socket
@@ -41,10 +42,11 @@ from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut
 from cassandra.marshal import int32_pack, uint8_unpack
 from cassandra.protocol import (ReadyMessage, AuthenticateMessage, OptionsMessage,
                                 StartupMessage, ErrorMessage, CredentialsMessage,
-                                QueryMessage, ResultMessage, decode_response,
+                                QueryMessage, ResultMessage, ProtocolHandler,
                                 InvalidRequestException, SupportedMessage,
                                 AuthResponseMessage, AuthChallengeMessage,
-                                AuthSuccessMessage, ProtocolException, MAX_SUPPORTED_VERSION)
+                                AuthSuccessMessage, ProtocolException,
+                                MAX_SUPPORTED_VERSION, RegisterMessage)
 from cassandra.util import OrderedDict
 
 
@@ -219,6 +221,7 @@ class Connection(object):
         self.is_control_connection = is_control_connection
         self.user_type_map = user_type_map
         self._push_watchers = defaultdict(set)
+        self._requests = {}
         self._iobuf = io.BytesIO()
 
         if protocol_version >= 3:
@@ -233,6 +236,7 @@ class Connection(object):
             self.highest_request_id = self.max_request_id
 
         self.lock = RLock()
+        self.connected_event = Event()
 
     @classmethod
     def initialize_reactor(self):
@@ -249,6 +253,10 @@ class Connection(object):
         from the parent process.
         """
         pass
+
+    @classmethod
+    def create_timer(cls, timeout, callback):
+        raise NotImplementedError()
 
     @classmethod
     def factory(cls, host, timeout, *args, **kwargs):
@@ -310,20 +318,20 @@ class Connection(object):
 
         self.last_error = exc
         self.close()
-        self.error_all_callbacks(exc)
+        self.error_all_requests(exc)
         self.connected_event.set()
         return exc
 
-    def error_all_callbacks(self, exc):
+    def error_all_requests(self, exc):
         with self.lock:
-            callbacks = self._callbacks
-            self._callbacks = {}
+            requests = self._requests
+            self._requests = {}
         new_exc = ConnectionShutdown(str(exc))
-        for cb in callbacks.values():
+        for cb, _ in requests.values():
             try:
                 cb(new_exc)
             except Exception:
-                log.warning("Ignoring unhandled exception while erroring callbacks for a "
+                log.warning("Ignoring unhandled exception while erroring requests for a "
                             "failed connection (%s) to host %s:",
                             id(self), self.host, exc_info=True)
 
@@ -347,14 +355,16 @@ class Connection(object):
             except Exception:
                 log.exception("Pushed event handler errored, ignoring:")
 
-    def send_msg(self, msg, request_id, cb):
+    def send_msg(self, msg, request_id, cb, encoder=ProtocolHandler.encode_message, decoder=ProtocolHandler.decode_message):
         if self.is_defunct:
             raise ConnectionShutdown("Connection to %s is defunct" % self.host)
         elif self.is_closed:
             raise ConnectionShutdown("Connection to %s is closed" % self.host)
 
-        self._callbacks[request_id] = cb
-        self.push(msg.to_binary(request_id, self.protocol_version, compression=self.compressor))
+        # queue the decoder function with the request
+        # this allows us to inject custom functions per request to encode, decode messages
+        self._requests[request_id] = (cb, decoder)
+        self.push(encoder(msg, request_id, self.protocol_version, compressor=self.compressor))
         return request_id
 
     def wait_for_response(self, msg, timeout=None):
@@ -407,11 +417,24 @@ class Connection(object):
             self.defunct(exc)
             raise
 
-    def register_watcher(self, event_type, callback):
-        raise NotImplementedError()
+    def register_watcher(self, event_type, callback, register_timeout=None):
+        """
+        Register a callback for a given event type.
+        """
+        self._push_watchers[event_type].add(callback)
+        self.wait_for_response(
+            RegisterMessage(event_list=[event_type]),
+            timeout=register_timeout)
 
-    def register_watchers(self, type_callback_dict):
-        raise NotImplementedError()
+    def register_watchers(self, type_callback_dict, register_timeout=None):
+        """
+        Register multiple callback/event type pairs, expressed as a dict.
+        """
+        for event_type, callback in type_callback_dict.items():
+            self._push_watchers[event_type].add(callback)
+        self.wait_for_response(
+            RegisterMessage(event_list=type_callback_dict.keys()),
+            timeout=register_timeout)
 
     def control_conn_disposed(self):
         self.is_control_connection = False
@@ -469,16 +492,17 @@ class Connection(object):
         stream_id = header.stream
         if stream_id < 0:
             callback = None
+            decoder = ProtocolHandler.decode_message
         else:
-            callback = self._callbacks.pop(stream_id, None)
+            callback, decoder = self._requests.pop(stream_id, None)
             with self.lock:
                 self.request_ids.append(stream_id)
 
         self.msg_received = True
 
         try:
-            response = decode_response(header.version, self.user_type_map, stream_id,
-                                       header.flags, header.opcode, body, self.decompressor)
+            response = decoder(header.version, self.user_type_map, stream_id,
+                               header.flags, header.opcode, body, self.decompressor)
         except Exception as exc:
             log.exception("Error decoding response from Cassandra. "
                           "opcode: %04x; message contents: %r", header.opcode, body)
@@ -907,3 +931,71 @@ class ConnectionHeartbeat(Thread):
     def _raise_if_stopped(self):
         if self._shutdown_event.is_set():
             raise self.ShutdownException()
+
+
+class Timer(object):
+
+    canceled = False
+
+    def __init__(self, timeout, callback):
+        self.end = time.time() + timeout
+        self.callback = callback
+        if timeout < 0:
+            self.callback()
+
+    def cancel(self):
+        self.canceled = True
+
+    def finish(self, time_now):
+        if self.canceled:
+            return True
+
+        if time_now >= self.end:
+            self.callback()
+            return True
+
+        return False
+
+
+class TimerManager(object):
+
+    def __init__(self):
+        self._queue = []
+        self._new_timers = []
+
+    def add_timer(self, timer):
+        """
+        called from client thread with a Timer object
+        """
+        self._new_timers.append((timer.end, timer))
+
+    def service_timeouts(self):
+        """
+        run callbacks on all expired timers
+        Called from the event thread
+        :return: next end time, or None
+        """
+        queue = self._queue
+        if self._new_timers:
+            new_timers = self._new_timers
+            while new_timers:
+                heappush(queue, new_timers.pop())
+
+        if queue:
+            now = time.time()
+            while queue:
+                try:
+                    timer = queue[0][1]
+                    if timer.finish(now):
+                        heappop(queue)
+                    else:
+                        return timer.end
+                except Exception:
+                    log.exception("Exception while servicing timeout callback: ")
+
+    @property
+    def next_timeout(self):
+        try:
+            return self._queue[0][0]
+        except IndexError:
+            pass

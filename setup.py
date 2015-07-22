@@ -234,24 +234,9 @@ def run_setup(extensions):
         ],
         **kw)
 
-extensions = [murmur3_ext, libev_ext]
-if "--no-extensions" in sys.argv:
-    sys.argv = [a for a in sys.argv if a != "--no-extensions"]
-    extensions = []
-elif "--no-murmur3" in sys.argv:
-    sys.argv = [a for a in sys.argv if a != "--no-murmur3"]
-    extensions.remove(murmur3_ext)
-elif "--no-libev" in sys.argv:
-    sys.argv = [a for a in sys.argv if a != "--no-libev"]
-    extensions.remove(libev_ext)
-
 is_windows = os.name == 'nt'
+
 if is_windows:
-    # libev is difficult to build, and uses select in Windows.
-    try:
-        extensions.remove(libev_ext)
-    except ValueError:
-        pass
     build_extensions.error_message = """
 ===============================================================================
 WARNING: could not compile %s.
@@ -265,6 +250,31 @@ This is often a matter of using vcvarsall.bat from your install directory, or ru
 from a command prompt in the Visual Studio Tools Start Menu.
 ===============================================================================
 """
+
+extensions = []
+
+if "--no-murmur3" not in sys.argv:
+    extensions.append(murmur3_ext)
+
+if "--no-libev" not in sys.argv and not is_windows:
+    extensions.append(libev_ext)
+
+if "--no-cython" not in sys.argv:
+    try:
+        from Cython.Build import cythonize
+        cython_candidates = ['cluster', 'concurrent', 'connection', 'cqltypes', 'marshal', 'metadata', 'pool', 'protocol', 'query', 'util']
+        compile_args = [] if is_windows else ['-Wno-unused-function']
+        extensions.extend(cythonize(
+            [Extension('cassandra.%s' % m, ['cassandra/%s.py' % m], extra_compile_args=compile_args) for m in cython_candidates],
+            exclude_failures=True))
+    except ImportError:
+        sys.stderr.write("Cython is not installed. Not compiling core driver files as extensions (optional).")
+
+if "--no-extensions" in sys.argv:
+    extensions = []
+
+sys.argv = [a for a in sys.argv if a not in ("--no-murmur3", "--no-libev", "--no-cython", "--no-extensions")]
+
 
 platform_unsupported_msg = \
 """
@@ -280,15 +290,25 @@ The optional C extensions are not supported on big-endian systems.
 ===============================================================================
 """
 
+pypy_unsupported_msg = \
+"""
+=================================================================================
+Some optional C extensions are not supported in PyPy. Only murmur3 will be built.
+=================================================================================
+"""
+
 if extensions:
-    if (sys.platform.startswith("java")
-            or sys.platform == "cli"
-            or "PyPy" in sys.version):
+    if "PyPy" in sys.version:
+        sys.stderr.write(pypy_unsupported_msg)
+        extensions = [ext for ext in extensions if ext is murmur3_ext]
+
+    if (sys.platform.startswith("java") or sys.platform == "cli"):
         sys.stderr.write(platform_unsupported_msg)
-        extensions = ()
+        extensions = []
     elif sys.byteorder == "big":
         sys.stderr.write(arch_unsupported_msg)
-        extensions = ()
+        extensions = []
+
 
 while True:
     # try to build as many of the extensions as we can

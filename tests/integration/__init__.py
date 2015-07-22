@@ -80,7 +80,7 @@ def _tuple_version(version_string):
 
 USE_CASS_EXTERNAL = bool(os.getenv('USE_CASS_EXTERNAL', False))
 
-default_cassandra_version = '2.1.5'
+default_cassandra_version = '2.1.6'
 
 if USE_CASS_EXTERNAL:
     if CCMClusterFactory:

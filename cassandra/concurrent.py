@@ -12,33 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import six
-import sys
 
-from itertools import count, cycle
-import logging
-from six.moves import xrange
-from threading import Event
+from heapq import heappush, heappop
+from itertools import cycle
+import six
+from six.moves import xrange, zip
+from threading import Condition
+import sys
 
 from cassandra.cluster import PagedResult
 
+import logging
 log = logging.getLogger(__name__)
 
-
-def execute_concurrent(session, statements_and_parameters, concurrency=100, raise_on_first_error=True):
+def execute_concurrent(session, statements_and_parameters, concurrency=100, raise_on_first_error=True, results_generator=False):
     """
     Executes a sequence of (statement, parameters) tuples concurrently.  Each
     ``parameters`` item must be a sequence or :const:`None`.
-
-    A sequence of ``(success, result_or_exc)`` tuples is returned in the same
-    order that the statements were passed in.  If ``success`` is :const:`False`,
-    there was an error executing the statement, and ``result_or_exc`` will be
-    an :class:`Exception`.  If ``success`` is :const:`True`, ``result_or_exc``
-    will be the query result.
-
-    If `raise_on_first_error` is left as :const:`True`, execution will stop
-    after the first failed statement and the corresponding exception will be
-    raised.
 
     The `concurrency` parameter controls how many statements will be executed
     concurrently.  When :attr:`.Cluster.protocol_version` is set to 1 or 2,
@@ -48,6 +38,26 @@ def execute_concurrent(session, statements_and_parameters, concurrency=100, rais
     the event loop thread may attempt to block on new connection creation,
     substantially impacting throughput.  If :attr:`~.Cluster.protocol_version`
     is 3 or higher, you can safely experiment with higher levels of concurrency.
+
+    If `raise_on_first_error` is left as :const:`True`, execution will stop
+    after the first failed statement and the corresponding exception will be
+    raised.
+
+    `results_generator` controls how the results are returned.
+
+    If :const:`False`, the results are returned only after all requests have completed.
+
+    If :const:`True`, a generator expression is returned. Using a generator results in
+    a constrained memory footprint when the results set will be large -- results are yielded
+    as they return instead of materializing the entire list at once. The trade for lower memory
+    footprint is marginal CPU overhead (more thread coordination and sorting out-of-order results
+    on-the-fly).
+
+    A sequence of ``(success, result_or_exc)`` tuples is returned in the same
+    order that the statements were passed in.  If ``success`` is :const:`False`,
+    there was an error executing the statement, and ``result_or_exc`` will be
+    an :class:`Exception`.  If ``success`` is :const:`True`, ``result_or_exc``
+    will be the query result.
 
     Example usage::
 
@@ -74,32 +84,123 @@ def execute_concurrent(session, statements_and_parameters, concurrency=100, rais
     if not statements_and_parameters:
         return []
 
-    # TODO handle iterators and generators naturally without converting the
-    # whole thing to a list.  This would require not building a result
-    # list of Nones up front (we don't know how many results there will be),
-    # so a dict keyed by index should be used instead.  The tricky part is
-    # knowing when you're the final statement to finish.
-    statements_and_parameters = list(statements_and_parameters)
+    executor = ConcurrentExecutorGenResults(session, statements_and_parameters) if results_generator else ConcurrentExecutorListResults(session, statements_and_parameters)
+    return executor.execute(concurrency, raise_on_first_error)
 
-    event = Event()
-    first_error = [] if raise_on_first_error else None
-    to_execute = len(statements_and_parameters)
-    results = [None] * to_execute
-    num_finished = count(1)
-    statements = enumerate(iter(statements_and_parameters))
-    for i in xrange(min(concurrency, len(statements_and_parameters))):
-        _execute_next(_sentinel, i, event, session, statements, results, None, num_finished, to_execute, first_error)
 
-    event.wait()
-    if first_error:
-        exc = first_error[0]
+class _ConcurrentExecutor(object):
+
+    def __init__(self, session, statements_and_params):
+        self.session = session
+        self._enum_statements = enumerate(iter(statements_and_params))
+        self._condition = Condition()
+        self._fail_fast = False
+        self._results_queue = []
+        self._current = 0
+        self._exec_count = 0
+
+    def execute(self, concurrency, fail_fast):
+        self._fail_fast = fail_fast
+        self._results_queue = []
+        self._current = 0
+        self._exec_count = 0
+        with self._condition:
+            for n in xrange(concurrency):
+                if not self._execute_next():
+                    break
+        return self._results()
+
+    def _execute_next(self):
+        # lock must be held
+        try:
+            (idx, (statement, params)) = next(self._enum_statements)
+            self._exec_count += 1
+            self._execute(idx, statement, params)
+            return True
+        except StopIteration:
+            pass
+
+    def _execute(self, idx, statement, params):
+        try:
+            future = self.session.execute_async(statement, params, timeout=None)
+            args = (future, idx)
+            future.add_callbacks(
+                callback=self._on_success, callback_args=args,
+                errback=self._on_error, errback_args=args)
+        except Exception as exc:
+            # exc_info with fail_fast to preserve stack trace info when raising on the client thread
+            # (matches previous behavior -- not sure why we wouldn't want stack trace in the other case)
+            e = sys.exc_info() if self._fail_fast and six.PY2 else exc
+            self._put_result(e, idx, False)
+
+    def _on_success(self, result, future, idx):
+        if future.has_more_pages:
+            result = PagedResult(future, result)
+            future.clear_callbacks()
+        self._put_result(result, idx, True)
+
+    def _on_error(self, result, future, idx):
+        self._put_result(result, idx, False)
+
+    @staticmethod
+    def _raise(exc):
         if six.PY2 and isinstance(exc, tuple):
             (exc_type, value, traceback) = exc
             six.reraise(exc_type, value, traceback)
         else:
             raise exc
-    else:
-        return results
+
+
+class ConcurrentExecutorGenResults(_ConcurrentExecutor):
+
+    def _put_result(self, result, idx, success):
+        with self._condition:
+            heappush(self._results_queue, (idx, (success, result)))
+            self._execute_next()
+            self._condition.notify()
+
+    def _results(self):
+        with self._condition:
+            while self._current < self._exec_count:
+                while not self._results_queue or self._results_queue[0][0] != self._current:
+                    self._condition.wait()
+                while self._results_queue and self._results_queue[0][0] == self._current:
+                    _, res = heappop(self._results_queue)
+                    self._condition.release()
+                    if self._fail_fast and not res[0]:
+                        self._raise(res[1])
+                    yield res
+                    self._condition.acquire()
+                    self._current += 1
+
+
+class ConcurrentExecutorListResults(_ConcurrentExecutor):
+
+    _exception = None
+
+    def execute(self, concurrency, fail_fast):
+        self._exception = None
+        return super(ConcurrentExecutorListResults, self).execute(concurrency, fail_fast)
+
+    def _put_result(self, result, idx, success):
+        self._results_queue.append((idx, (success, result)))
+        with self._condition:
+            self._current += 1
+            if not success and self._fail_fast:
+                if not self._exception:
+                    self._exception = result
+                self._condition.notify()
+            elif not self._execute_next() and self._current == self._exec_count:
+                self._condition.notify()
+
+    def _results(self):
+        with self._condition:
+            while self._current < self._exec_count:
+                self._condition.wait()
+                if self._exception and self._fail_fast:
+                    self._raise(self._exception)
+        return [r[1] for r in sorted(self._results_queue)]
+
 
 
 def execute_concurrent_with_args(session, statement, parameters, *args, **kwargs):
@@ -114,83 +215,4 @@ def execute_concurrent_with_args(session, statement, parameters, *args, **kwargs
         parameters = [(x,) for x in range(1000)]
         execute_concurrent_with_args(session, statement, parameters, concurrency=50)
     """
-    return execute_concurrent(session, list(zip(cycle((statement,)), parameters)), *args, **kwargs)
-
-
-_sentinel = object()
-
-
-def _handle_error(error, result_index, event, session, statements, results,
-                  future, num_finished, to_execute, first_error):
-    if first_error is not None:
-        first_error.append(error)
-        event.set()
-        return
-    else:
-        results[result_index] = (False, error)
-        if next(num_finished) >= to_execute:
-            event.set()
-            return
-
-    try:
-        (next_index, (statement, params)) = next(statements)
-    except StopIteration:
-        return
-
-    try:
-        future = session.execute_async(statement, params)
-        args = (next_index, event, session, statements, results, future, num_finished, to_execute, first_error)
-        future.add_callbacks(
-            callback=_execute_next, callback_args=args,
-            errback=_handle_error, errback_args=args)
-    except Exception as exc:
-        if first_error is not None:
-            if six.PY2:
-                first_error.append(sys.exc_info())
-            else:
-                first_error.append(exc)
-            event.set()
-            return
-        else:
-            results[next_index] = (False, exc)
-            if next(num_finished) >= to_execute:
-                event.set()
-                return
-
-
-def _execute_next(result, result_index, event, session, statements, results,
-                  future, num_finished, to_execute, first_error):
-    if result is not _sentinel:
-        if future.has_more_pages:
-            result = PagedResult(future, result)
-            future.clear_callbacks()
-        results[result_index] = (True, result)
-        finished = next(num_finished)
-        if finished >= to_execute:
-            event.set()
-            return
-
-    try:
-        (next_index, (statement, params)) = next(statements)
-    except StopIteration:
-        return
-
-    try:
-        future = session.execute_async(statement, params)
-        args = (next_index, event, session, statements, results, future, num_finished, to_execute, first_error)
-        future.add_callbacks(
-            callback=_execute_next, callback_args=args,
-            errback=_handle_error, errback_args=args)
-    except Exception as exc:
-        if first_error is not None:
-            if six.PY2:
-                first_error.append(sys.exc_info())
-            else:
-                first_error.append(exc)
-            event.set()
-            return
-        else:
-            results[next_index] = (False, exc)
-            if next(num_finished) >= to_execute:
-                event.set()
-                return
+    return execute_concurrent(session, zip(cycle((statement,)), parameters), *args, **kwargs)
