@@ -246,6 +246,7 @@ elif "--no-libev" in sys.argv:
     extensions.remove(libev_ext)
 
 is_windows = os.name == 'nt'
+
 if is_windows:
     # libev is difficult to build, and uses select in Windows.
     try:
@@ -282,8 +283,7 @@ The optional C extensions are not supported on big-endian systems.
 
 if extensions:
     if (sys.platform.startswith("java")
-            or sys.platform == "cli"
-            or "PyPy" in sys.version):
+        or sys.platform == "cli"):
         sys.stderr.write(platform_unsupported_msg)
         extensions = ()
     elif sys.byteorder == "big":
