@@ -22,6 +22,8 @@ from cassandra.query import tuple_factory
 from cassandra.cluster import Cluster
 from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, get_sample
+from six import binary_type
+
 import uuid
 
 
@@ -74,7 +76,7 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         result_set = session.execute("SELECT schema_version FROM system.local")
         result = result_set.pop()
         raw_value = result.pop()
-        self.assertEqual(type(raw_value), str)
+        self.assertTrue(isinstance(raw_value, binary_type))
         self.assertEqual(len(raw_value), 16)
 
         # Ensure that we get normal uuid back when we re-connect

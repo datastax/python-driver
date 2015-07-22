@@ -86,14 +86,14 @@ class TimedCallableInvoker(threading.Thread):
     def __init__(self, handler, slowdown=False):
         super(TimedCallableInvoker, self).__init__()
         self.slowdown = slowdown
-        self._stop = threading.Event()
+        self._stopper = threading.Event()
         self.handler = handler
 
     def stop(self):
-        self._stop.set()
+        self._stopper.set()
 
     def stopped(self):
-        return self._stop.isSet()
+        return self._stopper.isSet()
 
     def run(self):
         while(not self.stopped()):
@@ -101,11 +101,11 @@ class TimedCallableInvoker(threading.Thread):
                 pending_callback = self.handler.get_next_callback()
                 priority_num = pending_callback[0]
                 if (priority_num % 10) == 0 and self.slowdown:
-                    self._stop.wait(.1)
+                    self._stopper.wait(.1)
                 callback_args = pending_callback[1]
                 fn, args, kwargs, time_added = callback_args
                 fn(time_added, *args, **kwargs)
-            self._stop.wait(.001)
+            self._stopper.wait(.001)
         return
 
 
