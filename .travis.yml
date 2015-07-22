@@ -7,15 +7,17 @@ env:
   - TOX_ENV=py27 CASS_VER=20
   - TOX_ENV=py27 CASS_VER=21
   - TOX_ENV=py27 CASS_VER=21 CYTHON_DEP=cython
-  - TOX_ENV=pypy CASS_VER=21
   - TOX_ENV=py33 CASS_VER=21
   - TOX_ENV=py33 CASS_VER=21 CYTHON_DEP=cython
   - TOX_ENV=py34 CASS_VER=21
   - TOX_ENV=py34 CASS_VER=21 CYTHON_DEP=cython
+  - TOX_ENV=pypy CASS_VER=21
+  - TOX_ENV=pypy3 CASS_VER=21
 
 before_install:
   - sudo apt-get update -y
   - sudo apt-get install -y build-essential python-dev
+  - sudo apt-get install -y pypy-dev
   - sudo apt-get install -y libev4 libev-dev
   - sudo echo "deb http://www.apache.org/dist/cassandra/debian ${CASS_VER}x main" | sudo tee -a /etc/apt/sources.list
   - sudo echo "deb-src http://www.apache.org/dist/cassandra/debian ${CASS_VER}x main" | sudo tee -a /etc/apt/sources.list
