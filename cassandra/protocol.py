@@ -22,6 +22,7 @@ import six
 from six.moves import range
 import io
 
+from cassandra import typecodes
 from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
                        WriteFailure, ReadFailure, FunctionFailure,
                        AlreadyExists, InvalidRequest, Unauthorized,
@@ -35,7 +36,7 @@ from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 DoubleType, FloatType, Int32Type,
                                 InetAddressType, IntegerType, ListType,
                                 LongType, MapType, SetType, TimeUUIDType,
-                                UTF8Type, UUIDType, UserType,
+                                UTF8Type, VarcharType, UUIDType, UserType,
                                 TupleType, lookup_casstype, SimpleDateType,
                                 TimeType, ByteType, ShortType)
 from cassandra.policies import WriteType
@@ -531,35 +532,6 @@ RESULT_KIND_SET_KEYSPACE = 0x0003
 RESULT_KIND_PREPARED = 0x0004
 RESULT_KIND_SCHEMA_CHANGE = 0x0005
 
-class CassandraTypeCodes(object):
-    CUSTOM_TYPE = 0x0000
-    AsciiType = 0x0001
-    LongType = 0x0002
-    BytesType = 0x0003
-    BooleanType = 0x0004
-    CounterColumnType = 0x0005
-    DecimalType = 0x0006
-    DoubleType = 0x0007
-    FloatType = 0x0008
-    Int32Type = 0x0009
-    UTF8Type = 0x000A
-    DateType = 0x000B
-    UUIDType = 0x000C
-    UTF8Type = 0x000D
-    IntegerType = 0x000E
-    TimeUUIDType = 0x000F
-    InetAddressType = 0x0010
-    SimpleDateType = 0x0011
-    TimeType = 0x0012
-    ShortType = 0x0013
-    ByteType = 0x0014
-    ListType = 0x0020
-    MapType = 0x0021
-    SetType = 0x0022
-    UserType = 0x0030
-    TupleType = 0x0031
-
-
 class ResultMessage(_MessageType):
     opcode = 0x08
     name = 'RESULT'
@@ -569,7 +541,7 @@ class ResultMessage(_MessageType):
     paging_state = None
 
     # Names match type name in module scope. Most are imported from cassandra.cqltypes (except CUSTOM_TYPE)
-    type_codes = _cqltypes_by_code = dict((v, globals()[k]) for k, v in CassandraTypeCodes.__dict__.items() if not k.startswith('_'))
+    type_codes = _cqltypes_by_code = dict((v, globals()[k]) for k, v in typecodes.__dict__.items() if not k.startswith('_'))
 
     _FLAGS_GLOBAL_TABLES_SPEC = 0x0001
     _HAS_MORE_PAGES_FLAG = 0x0002
