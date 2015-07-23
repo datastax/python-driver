@@ -1,4 +1,4 @@
-# cython: profile=True
+# -- cython: profile=True
 # Copyright 2013-2015 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");

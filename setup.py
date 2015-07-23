@@ -37,7 +37,6 @@ from distutils.errors import (CCompilerError, DistutilsPlatformError,
                               DistutilsExecError)
 from distutils.cmd import Command
 
-
 try:
     import subprocess
     has_subprocess = True
@@ -262,11 +261,13 @@ if "--no-libev" not in sys.argv and not is_windows:
 if "--no-cython" not in sys.argv:
     try:
         from Cython.Build import cythonize
-        cython_candidates = ['cluster', 'concurrent', 'connection', 'cqltypes', 'marshal', 'metadata', 'pool', 'protocol', 'query', 'util']
+        cython_candidates = ['cluster', 'concurrent', 'connection', 'cqltypes', 'metadata', 'pool', 'protocol', 'query', 'util']
         compile_args = [] if is_windows else ['-Wno-unused-function']
         extensions.extend(cythonize(
             [Extension('cassandra.%s' % m, ['cassandra/%s.py' % m], extra_compile_args=compile_args) for m in cython_candidates],
             exclude_failures=True))
+
+        extensions.extend(cythonize("cassandra/*.pyx"))
     except ImportError:
         sys.stderr.write("Cython is not installed. Not compiling core driver files as extensions (optional).")
 

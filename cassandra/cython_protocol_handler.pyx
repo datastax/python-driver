@@ -1,4 +1,4 @@
-# ython: profile=True
+# -- cython: profile=True
 
 from libc.stdint cimport int64_t, int32_t
 
