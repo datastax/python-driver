@@ -48,9 +48,9 @@ cdef inline void swap_order(char *buf, Py_ssize_t size):
     Swap the byteorder of `buf` in-place (reverse all the bytes).
     There are functions ntohl etc, but these may be POSIX-dependent.
     """
-    cdef Py_ssize_t start, end
+    cdef Py_ssize_t start, end, i
     cdef char c
-    for i in range(size/2):
+    for i in range(size//2):
         end = size - i - 1
         c = buf[i]
         buf[i] = buf[end]
