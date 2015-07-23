@@ -43,7 +43,7 @@ cdef inline bytes pack(char *buf, Py_ssize_t size):
     return buf[:size]
 
 
-cdef inline swap_order(char *buf, Py_ssize_t size):
+cdef inline void swap_order(char *buf, Py_ssize_t size):
     """
     Swap the byteorder of `buf` in-place (reverse all the bytes).
     There are functions ntohl etc, but these may be POSIX-dependent.
