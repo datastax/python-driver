@@ -22,7 +22,7 @@ from libc.stdint cimport (int8_t, int16_t, int32_t, int64_t,
                           uint8_t, uint16_t, uint32_t, uint64_t)
 
 assert sys.byteorder in ('little', 'big')
-is_little_endian = sys.byteorder == 'little'
+cdef bint is_little_endian = sys.byteorder == 'little'
 
 # cdef extern from "marshal.h":
 #     cdef str c_string_to_python(char *p, Py_ssize_t len)
@@ -38,23 +38,25 @@ cdef inline bytes pack(char *buf, Py_ssize_t size):
     """
     Pack a buffer, given as a char *, into Python bytes in byte order.
     """
-    if is_little_endian:
-        swap_order(buf, size)
+    swap_order(buf, size)
     return buf[:size]
 
 
 cdef inline void swap_order(char *buf, Py_ssize_t size):
     """
-    Swap the byteorder of `buf` in-place (reverse all the bytes).
+    Swap the byteorder of `buf` in-place on little-endian platforms
+    (reverse all the bytes).
     There are functions ntohl etc, but these may be POSIX-dependent.
     """
     cdef Py_ssize_t start, end, i
     cdef char c
-    for i in range(size//2):
-        end = size - i - 1
-        c = buf[i]
-        buf[i] = buf[end]
-        buf[end] = c
+
+    if is_little_endian:
+        for i in range(size//2):
+            end = size - i - 1
+            c = buf[i]
+            buf[i] = buf[end]
+            buf[end] = c
 
 ### Packing and unpacking of signed integers
 
