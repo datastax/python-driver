@@ -13,12 +13,14 @@
 # limitations under the License.
 
 from __future__ import absolute_import  # to enable import io from stdlib
-from collections import defaultdict, deque, namedtuple
+from collections import defaultdict, deque
 import errno
 from functools import wraps, partial
 from heapq import heappush, heappop
 import io
 import logging
+import six
+from six.moves import range
 import socket
 import struct
 import sys
@@ -34,9 +36,6 @@ if 'gevent.monkey' in sys.modules:
     from gevent.queue import Queue, Empty
 else:
     from six.moves.queue import Queue, Empty  # noqa
-
-import six
-from six.moves import range
 
 from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut
 from cassandra.marshal import int32_pack
@@ -109,6 +108,16 @@ class _Frame(object):
         self.body_offset = body_offset
         self.end_pos = end_pos
 
+    def __eq__(self, other):  # facilitates testing
+        if isinstance(other, _Frame):
+            return (self.version == other.version and
+                    self.flags == other.flags and
+                    self.stream == other.stream and
+                    self.opcode == other.opcode and
+                    self.body_offset == other.body_offset and
+                    self.end_pos == other.end_pos)
+        return NotImplemented
+
 
 NONBLOCKING = (errno.EAGAIN, errno.EWOULDBLOCK)
 
@@ -130,6 +139,7 @@ class ConnectionShutdown(ConnectionException):
     """
     pass
 
+
 class ProtocolVersionUnsupported(ConnectionException):
     """
     Server rejected startup message due to unsupported protocol version
@@ -138,6 +148,7 @@ class ProtocolVersionUnsupported(ConnectionException):
         super(ProtocolVersionUnsupported, self).__init__("Unsupported protocol version on %s: %d",
                                                          (host, startup_version))
         self.startup_version = startup_version
+
 
 class ConnectionBusy(Exception):
     """
@@ -248,7 +259,7 @@ class Connection(object):
         self.connected_event = Event()
 
     @classmethod
-    def initialize_reactor(self):
+    def initialize_reactor(cls):
         """
         Called once by Cluster.connect().  This should be used by implementations
         to set up any resources that will be shared across connections.
@@ -256,7 +267,7 @@ class Connection(object):
         pass
 
     @classmethod
-    def handle_fork(self):
+    def handle_fork(cls):
         """
         Called after a forking.  This should cleanup any remaining reactor state
         from the parent process.
