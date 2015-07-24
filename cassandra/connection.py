@@ -178,6 +178,11 @@ def defunct_on_error(f):
 
 DEFAULT_CQL_VERSION = '3.0.0'
 
+if six.PY3:
+    def int_from_buf_item(i):
+        return i
+else:
+    int_from_buf_item = ord
 
 class Connection(object):
 
@@ -465,7 +470,7 @@ class Connection(object):
         buf = self._iobuf.getvalue()
         pos = len(buf)
         if pos:
-            version = ord(buf[0]) & PROTOCOL_VERSION_MASK
+            version = int_from_buf_item(buf[0]) & PROTOCOL_VERSION_MASK
             if version > MAX_SUPPORTED_VERSION:
                 raise ProtocolError("This version of the driver does not support protocol version %d" % version)
             frame_header = frame_header_v3 if version >= 3 else frame_header_v1_v2
