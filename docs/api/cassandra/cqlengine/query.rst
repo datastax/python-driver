@@ -6,7 +6,7 @@
 QuerySet
 --------
 QuerySet objects are typically obtained by calling :meth:`~.cassandra.cqlengine.models.Model.objects` on a model class.
-The mehtods here are used to filter, order, and constrain results.
+The methods here are used to filter, order, and constrain results.
 
 .. autoclass:: ModelQuerySet
 
