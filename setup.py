@@ -216,6 +216,7 @@ def run_setup(extensions):
         keywords='cassandra,cql,orm',
         include_package_data=True,
         install_requires=dependencies,
+        extras_require = {'cython': ['Cython']},
         tests_require=['nose', 'mock<=1.0.1', 'PyYAML', 'pytz', 'sure'],
         classifiers=[
             'Development Status :: 5 - Production/Stable',
