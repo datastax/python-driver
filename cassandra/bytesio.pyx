@@ -1,4 +1,4 @@
-# -- cython profile=True
+# -- cython: profile=True
 
 cdef class BytesIOReader:
     """

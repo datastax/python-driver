@@ -8,15 +8,21 @@ from libc.stdint cimport int64_t, int32_t
 
 from cassandra.marshal import varint_pack, varint_unpack
 from cassandra import util
-from cassandra.cqltypes import EMPTY
+from cassandra.cqltypes import EMPTY, LongType
 from cassandra.protocol import ResultMessage, ProtocolHandler
 
 from cassandra.bytesio cimport BytesIOReader
 from cassandra cimport typecodes
+from cassandra.datatypes cimport DataType
+from cassandra.rowparser cimport RowParser
 
-import numpy as np
+from cassandra.rowparser import TupleRowParser
+from cassandra.datatypes import Int64, GenericDataType
+
+from cython.view cimport array as cython_array
 
 include "marshal.pyx"
+
 
 class FastResultMessage(ResultMessage):
     """
@@ -32,74 +38,24 @@ class FastResultMessage(ResultMessage):
 
         colnames = [c[2] for c in column_metadata]
         coltypes = [c[3] for c in column_metadata]
-        colcodes = np.array(
-                [cls.code_to_type.get(coltype, -1) for coltype in coltypes],
-                dtype=np.dtype('i'))
-        parsed_rows = parse_rows(BytesIOReader(f.read()), colnames,
-                                 coltypes, colcodes, protocol_version)
+
+        cdef DataType[::1] datatypes
+        datatypes = obj_array(
+            [Int64() if coltype == LongType else GenericDataType(coltype) for coltype in coltypes])
+            # [GenericDataType(coltype) for coltype in coltypes])
+
+        # parsed_rows = parse_rows2(BytesIOReader(f.read()), colnames, coltypes, protocol_version)
+        parsed_rows = parse_rows(BytesIOReader(f.read()), datatypes, protocol_version)
         return (paging_state, (colnames, parsed_rows))
 
 
-cdef parse_rows(BytesIOReader reader, list colnames, list coltypes,
-        int[::1] colcodes, protocol_version):
-    cdef Py_ssize_t i, rowcount
-    cdef char *raw_val
-    cdef int32_t raw_val_size
-    rowcount = read_int(reader)
-    # return RowIterator(reader, coltypes, colcodes, protocol_version, rowcount)
-    return [parse_row(reader, coltypes, colcodes, protocol_version)
-                for i in range(rowcount)]
-
-
-cdef class RowIterator:
-    """
-    Result iterator for a set of rows
-
-    There seems to be an issue with generator expressions + memoryviews, so we
-    have a special iterator class instead.
-    """
-    cdef list coltypes
-    cdef int[::1] colcodes
-    cdef Py_ssize_t rowcount, pos
-    cdef BytesIOReader reader
-    cdef object protocol_version
-
-    def __init__(self, reader, coltypes, colcodes, protocol_version, rowcount):
-        self.reader = reader
-        self.coltypes = coltypes
-        self.colcodes = colcodes
-        self.protocol_version = protocol_version
-        self.rowcount = rowcount
-        self.pos = 0
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        if self.pos >= self.rowcount:
-            raise StopIteration
-        self.pos += 1
-        return parse_row(self.reader, self.coltypes, self.colcodes, self.protocol_version)
-
-    next = __next__
-
-
-cdef inline parse_row(BytesIOReader reader, list coltypes, int[::1] colcodes,
-                      protocol_version):
-    cdef Py_ssize_t j
-
-    row = []
-    for j, ctype in enumerate(coltypes):
-        raw_val_size = read_int(reader)
-        if raw_val_size < 0:
-            val = None
-        else:
-            raw_val = reader.read(raw_val_size)
-            val = from_binary(ctype, colcodes[j], raw_val,
-                              raw_val_size, protocol_version)
-        row.append(val)
-
-    return row
+def obj_array(list objs):
+    cdef object[:] arr
+    arr = cython_array(shape=(len(objs),), itemsize=sizeof(void *), format="O")
+    # arr[:] = objs # This does not work (segmentation faults)
+    for i, obj in enumerate(objs):
+        arr[i] = obj
+    return arr
 
 
 class CythonProtocolHandler(ProtocolHandler):
@@ -111,44 +67,120 @@ class CythonProtocolHandler(ProtocolHandler):
     message_types_by_opcode = my_opcodes
 
 
+cdef parse_rows(BytesIOReader reader, DataType[::1] datatypes, protocol_version):
+    cdef Py_ssize_t i, rowcount
+    cdef RowParser parser = TupleRowParser(len(datatypes), datatypes)
+    rowcount = read_int(reader)
+    return [parser.unpack_row(reader, protocol_version) for i in range(rowcount)]
+
+
 cdef inline int32_t read_int(BytesIOReader reader):
     return int32_unpack(reader.read(4))
 
 
-cdef inline from_binary(cqltype, int typecode, char *byts, int32_t size, protocol_version):
-    """
-    Deserialize a bytestring into a value. See the deserialize() method
-    for more information. This method differs in that if None or the empty
-    string is passed in, None may be returned.
-
-    This method provides a fast-path deserialization routine.
-    """
-    if size == 0 and cqltype.empty_binary_ok:
-        return empty(cqltype)
-    return deserialize(cqltype, typecode, byts, size, protocol_version)
-
-
-cdef empty(cqltype):
-    return EMPTY if cqltype.support_empty_values else None
-
-
-def to_binary(cqltype, val, protocol_version):
-    """
-    Serialize a value into a bytestring. See the serialize() method for
-    more information. This method differs in that if None is passed in,
-    the result is the empty string.
-    """
-    return b'' if val is None else cqltype.serialize(val, protocol_version)
-
-
-cdef deserialize(cqltype, int typecode, char *byts, int32_t size, protocol_version):
-    if typecode == typecodes.LongType:
-        return int64_unpack(byts)
-    else:
-        return deserialize_generic(cqltype, typecode, byts, size, protocol_version)
-
-cdef deserialize_generic(cqltype, int typecode, char *byts, int32_t size,
-        protocol_version):
-    print("deserialize", cqltype)
-    return cqltype.deserialize(byts[:size], protocol_version)
-
+# cdef parse_rows2(BytesIOReader reader, list colnames, list coltypes, protocol_version):
+#     cdef Py_ssize_t i, rowcount
+#     cdef char *raw_val
+#     cdef int[::1] colcodes
+#
+#     colcodes = np.array(
+#                 [FastResultMessage.code_to_type.get(coltype, -1) for coltype in coltypes],
+#                 dtype=np.dtype('i'))
+#
+#     rowcount = read_int(reader)
+#     # return RowIterator(reader, coltypes, colcodes, protocol_version, rowcount)
+#     return [parse_row(reader, coltypes, colcodes, protocol_version)
+#                 for i in range(rowcount)]
+#
+#
+# cdef class RowIterator:
+#     """
+#     Result iterator for a set of rows
+#
+#     There seems to be an issue with generator expressions + memoryviews, so we
+#     have a special iterator class instead.
+#     """
+#
+#     cdef list coltypes
+#     cdef int[::1] colcodes
+#     cdef Py_ssize_t rowcount, pos
+#     cdef BytesIOReader reader
+#     cdef object protocol_version
+#
+#     def __init__(self, reader, coltypes, colcodes, protocol_version, rowcount):
+#         self.reader = reader
+#         self.coltypes = coltypes
+#         self.colcodes = colcodes
+#         self.protocol_version = protocol_version
+#         self.rowcount = rowcount
+#         self.pos = 0
+#
+#     def __iter__(self):
+#         return self
+#
+#     def __next__(self):
+#         if self.pos >= self.rowcount:
+#             raise StopIteration
+#         self.pos += 1
+#         return parse_row(self.reader, self.coltypes, self.colcodes, self.protocol_version)
+#
+#     next = __next__
+#
+#
+# cdef inline parse_row(BytesIOReader reader, list coltypes, int[::1] colcodes,
+#                       protocol_version):
+#     cdef Py_ssize_t j
+#
+#     row = []
+#     for j, ctype in enumerate(coltypes):
+#         raw_val_size = read_int(reader)
+#         if raw_val_size < 0:
+#             val = None
+#         else:
+#             raw_val = reader.read(raw_val_size)
+#             val = from_binary(ctype, colcodes[j], raw_val,
+#                               raw_val_size, protocol_version)
+#         row.append(val)
+#
+#     return row
+#
+#
+# cdef inline from_binary(cqltype, int typecode, char *byts, int32_t size, protocol_version):
+#     """
+#     Deserialize a bytestring into a value. See the deserialize() method
+#     for more information. This method differs in that if None or the empty
+#     string is passed in, None may be returned.
+#
+#     This method provides a fast-path deserialization routine.
+#     """
+#     if size == 0 and cqltype.empty_binary_ok:
+#         return empty(cqltype)
+#     return deserialize(cqltype, typecode, byts, size, protocol_version)
+#
+#
+# cdef empty(cqltype):
+#     return EMPTY if cqltype.support_empty_values else None
+#
+#
+# def to_binary(cqltype, val, protocol_version):
+#     """
+#     Serialize a value into a bytestring. See the serialize() method for
+#     more information. This method differs in that if None is passed in,
+#     the result is the empty string.
+#     """
+#     return b'' if val is None else cqltype.serialize(val, protocol_version)
+#
+# cdef DataType obj = Int64()
+#
+# cdef deserialize(cqltype, int typecode, char *byts, int32_t size, protocol_version):
+#     # if typecode == typecodes.LongType:
+#     #     # return int64_unpack(byts)
+#     #     return obj.deserialize(byts, size, protocol_version)
+#     # else:
+#     # return deserialize_generic(cqltype, typecode, byts, size, protocol_version)
+#     return cqltype.deserialize(byts[:size], protocol_version)
+#
+# cdef deserialize_generic(cqltype, int typecode, char *byts, int32_t size,
+#         protocol_version):
+#     return cqltype.deserialize(byts[:size], protocol_version)
+#
