@@ -11,32 +11,45 @@ as numpy is an optional dependency.
 include "ioutils.pyx"
 
 from libc.stdint cimport uint64_t
+from cpython.ref cimport Py_INCREF, PyObject
 
 from cassandra.rowparser cimport RowParser
 from cassandra.bytesio cimport BytesIOReader
 from cassandra.datatypes cimport DataType
 from cassandra import cqltypes
-
-import numpy as np
-cimport numpy as np
-
 from cassandra.util import is_little_endian
 
-from cpython.ref cimport Py_INCREF, PyObject
+import numpy as np
+
+
+cdef extern from "numpyFlags.h":
+
+    pass
 
 cdef extern from "Python.h":
     # An integer type large enough to hold a pointer
     ctypedef uint64_t Py_uintptr_t
 
-# ctypedef struct TypeRepr:
-#     Py_ssize_t size
-#     int is_object
+cdef extern from "numpy/arrayobject.h":
+    # Avoid using 'numpy' from Cython, as it access the 'data' attribute
+    # of PyArrayObject, which is deprecated:
+    #
+    #     warning: #warning "Using deprecated NumPy API, disable it by
+    #     #defining NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION" [-Wcpp]
+    #
+    ctypedef class np.ndarray [object PyArrayObject]:
+        pass
 
-ctypedef struct ArrRepr:
-    # TypeRepr typ
+
+# Simple array descriptor, useful to parse rows into a NumPy array
+ctypedef struct ArrDesc:
     Py_uintptr_t buf_ptr
     Py_ssize_t stride
     int is_object
+
+cdef ArrDesc[:] _dummyArray = <ArrDesc[:0]> NULL
+arrDescDtype = np.array(_dummyArray).dtype
+
 
 _cqltype_to_numpy = {
     cqltypes.LongType:          np.dtype('>i8'),
@@ -47,34 +60,51 @@ _cqltype_to_numpy = {
     cqltypes.DoubleType:        np.dtype('>f8'),
 }
 
+obj_dtype = np.dtype('O')
 
-# cdef type_repr(coltype):
+def make_array(coltype, array_size):
+    """
+    Allocate a new NumPy array of the given column type and size.
+    """
+    dtype = _cqltype_to_numpy.get(coltype, obj_dtype)
+    return np.empty((array_size,), dtype=dtype)
+
+
+def make_arrays(colnames, coltypes, array_size):
+    """
+    Allocate arrays for each result column.
+
+    returns a tuple of (array_descs, arrays), where
+        'array_descs' describe the arrays for NativeRowParser and
+        'arrays' is a dict mapping column names to arrays
+            (e.g. this can be fed into pandas.DataFrame)
+    """
+    row_size = len(colnames)
+    array_descs = np.empty((row_size,), arrDescDtype)
+    arrays = {}
+
+    for i, colname, coltype in zip(range(row_size), colnames, coltypes):
+        arr = make_array(coltype, array_size)
+        array_descs[i].buf_ptr = arr.ctypes.data
+        array_descs[i].stride = arr.strides[0]
+        array_descs[i].is_object = coltype in _cqltype_to_numpy
+        arrays[colname] = arr
+
+    return array_descs, arrays
+
+
+# cdef ArrDesc array_repr(np.ndarray arr, coltype):
 #     """
-#     Get a low-level type representation for the cqltype
+#     Construct a low-level array representation
 #     """
-#     cdef TypeRepr res
-#     if coltype in _cqltype_to_numpy:
-#         dtype = _cqltype_to_numpy[coltype]
-#         res.size = dtype.itemsize
-#         res.is_object = False
-#     else:
-#         res.size = sizeof(PyObject *)
-#         res.is_object = True
+#     assert arr.ndim == 1, "Expected a one-dimensional array"
+#
+#     cdef ArrDesc res
+#     # Get the data pointer to the underlying memory of the numpy array
+#     res.buf_ptr = arr.ctypes.data
+#     res.stride = arr.strides[0]
+#     res.is_object = coltype in _cqltype_to_numpy
 #     return res
-
-
-cdef ArrRepr array_repr(np.ndarray arr, coltype):
-    """
-    Construct a low-level array representation
-    """
-    assert arr.ndim == 1, "Expected a one-dimensional array"
-
-    cdef ArrRepr res
-    # Get the data pointer to the underlying memory of the numpy array
-    res.buf_ptr = arr.ctypes.data
-    res.stride = arr.strides[0]
-    res.is_object = coltype in _cqltype_to_numpy
-    return res
 
 
 cdef class NativeRowParser(RowParser):
@@ -88,12 +118,11 @@ cdef class NativeRowParser(RowParser):
           of self.arrays
     """
 
-    # ArrRepr contains a 'buf_ptr' field, which is not supported as a memoryview dtype
-    cdef ArrRepr[::1] arrays
+    cdef ArrDesc[::1] arrays
     cdef DataType[::1] datatypes
     cdef Py_ssize_t size
 
-    def __init__(self, ArrRepr[::1] arrays, DataType[::1] datatypes):
+    def __init__(self, ArrDesc[::1] arrays, DataType[::1] datatypes):
         self.arrays = arrays
         self.datatypes = datatypes
         self.size = len(datatypes)
@@ -101,7 +130,7 @@ cdef class NativeRowParser(RowParser):
     cpdef unpack_row(self, BytesIOReader reader, protocol_version):
         cdef char *buf
         cdef Py_ssize_t i, bufsize, rowsize = self.size
-        cdef ArrRepr arr
+        cdef ArrDesc arr
 
         for i in range(rowsize):
             buf = get_buf(reader, &bufsize)
@@ -110,7 +139,7 @@ cdef class NativeRowParser(RowParser):
 
             arr = self.arrays[i]
 
-            if arr.is_object:
+            if self.is_object[i]:
                 dt = self.datatypes[i]
                 val = dt.deserialize(buf, bufsize, protocol_version)
                 Py_INCREF(val)
