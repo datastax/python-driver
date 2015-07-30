@@ -4,9 +4,12 @@ import datetime
 import random
 import six
 import uuid
+import sys
 
 DATETIME_EPOC = datetime.datetime(1970, 1, 1)
 
+assert sys.byteorder in ('little', 'big')
+is_little_endian = sys.byteorder == 'little'
 
 def datetime_from_timestamp(timestamp):
     """

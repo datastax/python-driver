@@ -22,8 +22,8 @@ import math
 from libc.stdint cimport (int8_t, int16_t, int32_t, int64_t,
                           uint8_t, uint16_t, uint32_t, uint64_t)
 
-assert sys.byteorder in ('little', 'big')
-cdef bint is_little_endian = sys.byteorder == 'little'
+cdef bint is_little_endian
+from cassandra.util import is_little_endian
 
 # cdef extern from "marshal.h":
 #     cdef str c_string_to_python(char *p, Py_ssize_t len)

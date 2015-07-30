@@ -1,27 +1,8 @@
 include 'marshal.pyx'
 
-from cassandra import cqltypes
-
-
-cdef class LLDataType:
-    cdef void deserialize_ptr(self, char *buf, Py_ssize_t size,
-                              void *out, protocol_version):
-        pass
-
-
 cdef class DataType:
     cdef object deserialize(self, char *buf, Py_ssize_t size, protocol_version):
         pass
-
-
-cdef class LLInt64(LLDataType):
-    """
-    Low-level Cassandra datatype
-    """
-
-    cdef void deserialize_ptr(self, char *buf, Py_ssize_t size, void *out, protocol_version):
-        cdef int64_t x = int64_unpack(buf)
-        (<int64_t *> out)[0] = x
 
 
 cdef class Int64(DataType):
