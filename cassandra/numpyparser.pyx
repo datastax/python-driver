@@ -139,7 +139,7 @@ cdef class NativeRowParser(RowParser):
 
             arr = self.arrays[i]
 
-            if self.is_object[i]:
+            if arr.is_object:
                 dt = self.datatypes[i]
                 val = dt.deserialize(buf, bufsize, protocol_version)
                 Py_INCREF(val)
