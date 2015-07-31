@@ -22,7 +22,42 @@ from cassandra.bytesio cimport BytesIOReader
 from cassandra.datatypes cimport DataType
 
 
+cdef class ColumnParser:
+    """Decode a ResultMessage into a set of columns"""
+    cpdef parse_rows(self, BytesIOReader reader, DataType[::1] datatypes,
+                     protocol_version):
+        raise NotImplementedError
+
+
+cdef class ListParser(ColumnParser):
+    """Decode a ResultMessage into a list of tuples (or other objects)"""
+
+    cpdef parse_rows(self, BytesIOReader r, DataType[::1] datatypes, ver):
+        cdef Py_ssize_t i, rowcount
+        rowcount = read_int(r)
+        cdef RowParser rowparser = TupleRowParser(len(datatypes), datatypes)
+        return [rowparser.unpack_row(r, ver) for i in range(rowcount)]
+
+
+cdef class LazyParser(ColumnParser):
+    """Decode a ResultMessage lazily using a generator"""
+
+    cpdef parse_rows(self, BytesIOReader r, DataType[::1] datatypes, ver):
+        # Use a little helper function as closures (generators) are not
+        # supported in cpdef methods
+        return parse_rows_lazy(r, self.rowparser, datatypes, ver)
+
+
+def parse_rows_lazy(BytesIOReader r, DataType[::1] datatypes, ver):
+    cdef Py_ssize_t i, rowcount
+    rowcount = read_int(r)
+    cdef RowParser rowparser = TupleRowParser(len(datatypes), datatypes)
+    return (rowparser.unpack_row(r, ver) for i in range(rowcount))
+
+
 cdef class RowParser:
+    """Parser for a single row"""
+
     cpdef unpack_row(self, BytesIOReader reader, protocol_version):
         """
         Unpack a single row of data in a ResultMessage.

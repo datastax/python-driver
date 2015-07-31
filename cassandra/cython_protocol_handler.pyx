@@ -14,9 +14,9 @@ from cassandra.protocol import ResultMessage, ProtocolHandler
 from cassandra.bytesio cimport BytesIOReader
 from cassandra cimport typecodes
 from cassandra.datatypes cimport DataType
-from cassandra.objparser cimport RowParser
+from cassandra.objparser cimport ColumnParser, RowParser
 
-from cassandra.objparser import TupleRowParser
+from cassandra.objparser import ListParser
 from cassandra.datatypes import Int64, GenericDataType
 
 from cython.view cimport array as cython_array
@@ -24,16 +24,12 @@ from cython.view cimport array as cython_array
 include "ioutils.pyx"
 
 
-class FastResultMessage(ResultMessage):
-    """
-    Cython version of Result Message that has a faster implementation of
-    recv_results_row.
-    """
-    # type_codes = ResultMessage.type_codes.copy()
-    code_to_type = dict((v, k) for k, v in ResultMessage.type_codes.items())
-
-    @classmethod
+def make_recv_results_rows(ColumnParser colparser):
     def recv_results_rows(cls, f, protocol_version, user_type_map):
+        """
+        Parse protocol data given as a BytesIO f into a set of columns (e.g. list of tuples)
+        This is used as the recv_results_rows method of (Fast)ResultMessage
+        """
         paging_state, column_metadata = cls.recv_results_metadata(f, user_type_map)
 
         colnames = [c[2] for c in column_metadata]
@@ -44,9 +40,12 @@ class FastResultMessage(ResultMessage):
             [Int64() if coltype == LongType else GenericDataType(coltype) for coltype in coltypes])
             # [GenericDataType(coltype) for coltype in coltypes])
 
+        parsed_rows = colparser.parse_rows(
+            BytesIOReader(f.read()), datatypes, protocol_version)
         # parsed_rows = parse_rows2(BytesIOReader(f.read()), colnames, coltypes, protocol_version)
-        parsed_rows = parse_rows(BytesIOReader(f.read()), datatypes, protocol_version)
+        # parsed_rows = parse_rows(BytesIOReader(f.read()), datatypes, protocol_version)
         return (paging_state, (colnames, parsed_rows))
+    return recv_results_rows
 
 
 def obj_array(list objs):
@@ -59,20 +58,46 @@ def obj_array(list objs):
     return arr
 
 
-class CythonProtocolHandler(ProtocolHandler):
+def make_protocol_handler(colparser=ListParser()):
     """
-    Use FastResultMessage to decode query result message messages.
+    Given a column parser to deserialize ResultMessages, return a suitable
+    Cython-based protocol handler.
+
+    There are three Cython-based protocol handlers (least to most performant):
+
+        1. objparser.ListParser
+            this parser decodes result messages into a list of tuples
+
+        2. objparser.LazyParser
+            this parser decodes result messages lazily by returning an iterator
+
+        3. numpyparser.NumPyParser
+            this parser decodes result messages into NumPy arrays
+
+    The default is to use objparser.ListParser
     """
-    my_opcodes = ProtocolHandler.message_types_by_opcode.copy()
-    my_opcodes[FastResultMessage.opcode] = FastResultMessage
-    message_types_by_opcode = my_opcodes
+    # TODO: It may be cleaner to turn ProtocolHandler and ResultMessage into
+    # TODO:     instances and use methods instead of class methods
 
+    class FastResultMessage(ResultMessage):
+        """
+        Cython version of Result Message that has a faster implementation of
+        recv_results_row.
+        """
+        # type_codes = ResultMessage.type_codes.copy()
+        code_to_type = dict((v, k) for k, v in ResultMessage.type_codes.items())
+        recv_results_rows = classmethod(make_recv_results_rows(colparser))
 
-cdef parse_rows(BytesIOReader reader, DataType[::1] datatypes, protocol_version):
-    cdef Py_ssize_t i, rowcount
-    cdef RowParser parser = TupleRowParser(len(datatypes), datatypes)
-    rowcount = read_int(reader)
-    return [parser.unpack_row(reader, protocol_version) for i in range(rowcount)]
+    class CythonProtocolHandler(ProtocolHandler):
+        """
+        Use FastResultMessage to decode query result message messages.
+        """
+
+        my_opcodes = ProtocolHandler.message_types_by_opcode.copy()
+        my_opcodes[FastResultMessage.opcode] = FastResultMessage
+        message_types_by_opcode = my_opcodes
+
+    return CythonProtocolHandler
 
 
 # cdef parse_rows2(BytesIOReader reader, list colnames, list coltypes, protocol_version):
