@@ -1,3 +1,5 @@
+# -- cython: profile=True
+
 include 'marshal.pyx'
 
 from cython.view cimport array as cython_array

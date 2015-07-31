@@ -1,3 +1,5 @@
+# -- cython: profile=True
+
 """
 This module provider an optional protocol parser that returns
 NumPy arrays.
@@ -10,6 +12,7 @@ as numpy is an optional dependency.
 
 include "ioutils.pyx"
 
+cimport cython
 from libc.stdint cimport uint64_t
 from cpython.ref cimport Py_INCREF, PyObject
 
@@ -62,15 +65,17 @@ cdef class NumpyParser(ColumnParser):
 
     cpdef parse_rows(self, BytesIOReader reader, ParseDesc desc):
         cdef Py_ssize_t i, rowcount
+        cdef ArrDesc[::1] array_descs
+        cdef ArrDesc *arrs
 
         rowcount = read_int(reader)
         array_descs, arrays = make_arrays(desc, rowcount)
-        cdef RowParser rowparser = NumPyRowParser(array_descs)
-        for i in range(rowcount):
-            rowparser.unpack_row(reader, desc)
+        arrs = &array_descs[0]
 
-        # arrays = map(make_native_byteorder, arrays)
-        return arrays
+        for i in range(rowcount):
+            unpack_row(reader, desc, arrs)
+
+        return [make_native_byteorder(arr) for arr in arrays]
         # return pd.DataFrame(dict(zip(desc.colnames, arrays)))
 
 
@@ -92,7 +97,7 @@ def make_arrays(ParseDesc desc, array_size):
         arr = make_array(coltype, array_size)
         array_descs[i]['buf_ptr'] = arr.ctypes.data
         array_descs[i]['stride'] = arr.strides[0]
-        array_descs[i]['is_object'] = coltype in _cqltype_to_numpy
+        array_descs[i]['is_object'] = coltype not in _cqltype_to_numpy
         arrays.append(arr)
 
     return array_descs, arrays
@@ -108,48 +113,37 @@ def make_array(coltype, array_size):
 
 #### Parse rows into NumPy arrays
 
-cdef class NumPyRowParser(RowParser):
-    """
-    This is a row parser that copies bytes into arrays (e.g. NumPy arrays)
-    for types it recognizes, such as int64. Values of other types are
-    converted to objects.
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef inline int unpack_row(
+        BytesIOReader reader, ParseDesc desc, ArrDesc *arrays) except -1:
+    cdef char *buf
+    cdef Py_ssize_t i, bufsize, rowsize = desc.rowsize
+    cdef ArrDesc arr
+    cdef DataType dt
 
-    NOTE: This class is stateful, in that every time unpack_row is called it
-          advanced the pointer into the array by updates the buf_ptr field
-          of self.arrays
-    """
+    for i in range(rowsize):
+        buf = get_buf(reader, &bufsize)
+        if buf == NULL:
+            raise ValueError("Unexpected end of stream")
 
-    cdef ArrDesc[::1] arrays
+        arr = arrays[i]
 
-    def __init__(self, ArrDesc[::1] arrays):
-        self.arrays = arrays
+        if arr.is_object:
+            dt = desc.datatypes[i]
+            val = dt.deserialize(buf, bufsize, desc.protocol_version)
+            Py_INCREF(val)
+            (<PyObject **> arr.buf_ptr)[0] = <PyObject *> val
+        else:
+            memcopy(buf, <char *> arr.buf_ptr, bufsize)
 
-    cpdef unpack_row(self, BytesIOReader reader, ParseDesc desc):
-        cdef char *buf
-        cdef Py_ssize_t i, bufsize, rowsize = desc.rowsize
-        cdef ArrDesc arr
-        cdef DataType dt
+        # Update the pointer into the array for the next time
+        arrays[i].buf_ptr += arr.stride
 
-        for i in range(rowsize):
-            buf = get_buf(reader, &bufsize)
-            if buf == NULL:
-                raise ValueError("Unexpected end of stream")
-
-            arr = self.arrays[i]
-
-            if arr.is_object:
-                dt = desc.datatypes[i]
-                val = dt.deserialize(buf, bufsize, desc.protocol_version)
-                Py_INCREF(val)
-                (<PyObject **> arr.buf_ptr)[0] = <PyObject *> val
-            else:
-                memcopy(buf, <char *> arr.buf_ptr, bufsize)
-
-            # Update the pointer into the array for the next time
-            self.arrays[i].buf_ptr += arr.stride
+    return 0
 
 
-cdef inline memcopy(char *src, char *dst, Py_ssize_t size):
+cdef inline void memcopy(char *src, char *dst, Py_ssize_t size):
     """
     Our own simple memcopy which can be inlined. This is useful because our data types
     are only a few bytes.

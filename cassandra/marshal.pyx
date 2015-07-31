@@ -53,11 +53,14 @@ cdef inline void swap_order(char *buf, Py_ssize_t size):
     cdef char c
 
     if is_little_endian:
-        for i in range(size//2):
+        for i in range(div2(size)):
             end = size - i - 1
             c = buf[i]
             buf[i] = buf[end]
             buf[end] = c
+
+cdef inline Py_ssize_t div2(Py_ssize_t x):
+    return x >> 1
 
 ### Packing and unpacking of signed integers
 
@@ -80,9 +83,9 @@ cpdef inline bytes int32_pack(int32_t x):
 cpdef inline int32_t int32_unpack(const char *buf):
     cdef int32_t x = (<int32_t *> buf)[0]
     cdef char *p = <char *> &x
-    swap_order(<char *> &x, 4)
     # if is_little_endian:
     #     p[0], p[1], p[2], p[3] = p[3], p[2], p[1], p[0]
+    swap_order(<char *> &x, 4)
     return x
 
 cpdef inline bytes int16_pack(int16_t x):
