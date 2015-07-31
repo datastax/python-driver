@@ -6,20 +6,16 @@ from libc.stdint cimport int64_t, int32_t
 #                                 uint16_pack, uint16_unpack, uint32_pack, uint32_unpack,
 #                                 int32_pack, int32_unpack, int64_pack, int64_unpack, float_pack, float_unpack, double_pack, double_unpack)
 
-from cassandra.marshal import varint_pack, varint_unpack
-from cassandra import util
-from cassandra.cqltypes import EMPTY, LongType
+# from cassandra.marshal import varint_pack, varint_unpack
+# from cassandra import util
+# from cassandra.cqltypes import EMPTY, LongType
 from cassandra.protocol import ResultMessage, ProtocolHandler
 
-from cassandra.bytesio cimport BytesIOReader
-from cassandra cimport typecodes
-from cassandra.datatypes cimport DataType
-from cassandra.objparser cimport ColumnParser, RowParser
-
+# from cassandra.bytesio cimport BytesIOReader
+from cassandra.parsing cimport ParseDesc, ColumnParser
+from cassandra.datatypes import make_datatypes
 from cassandra.objparser import ListParser
-from cassandra.datatypes import Int64, GenericDataType
 
-from cython.view cimport array as cython_array
 
 include "ioutils.pyx"
 
@@ -35,27 +31,13 @@ def make_recv_results_rows(ColumnParser colparser):
         colnames = [c[2] for c in column_metadata]
         coltypes = [c[3] for c in column_metadata]
 
-        cdef DataType[::1] datatypes
-        datatypes = obj_array(
-            [Int64() if coltype == LongType else GenericDataType(coltype) for coltype in coltypes])
-            # [GenericDataType(coltype) for coltype in coltypes])
+        desc = ParseDesc(colnames, coltypes, make_datatypes(coltypes), protocol_version)
+        reader = BytesIOReader(f.read())
+        parsed_rows = colparser.parse_rows(reader, desc)
 
-        parsed_rows = colparser.parse_rows(
-            BytesIOReader(f.read()), datatypes, protocol_version)
-        # parsed_rows = parse_rows2(BytesIOReader(f.read()), colnames, coltypes, protocol_version)
-        # parsed_rows = parse_rows(BytesIOReader(f.read()), datatypes, protocol_version)
         return (paging_state, (colnames, parsed_rows))
+
     return recv_results_rows
-
-
-def obj_array(list objs):
-    """Create a (Cython) array of objects given a list of objects"""
-    cdef object[:] arr
-    arr = cython_array(shape=(len(objs),), itemsize=sizeof(void *), format="O")
-    # arr[:] = objs # This does not work (segmentation faults)
-    for i, obj in enumerate(objs):
-        arr[i] = obj
-    return arr
 
 
 def make_protocol_handler(colparser=ListParser()):

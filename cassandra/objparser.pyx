@@ -20,49 +20,33 @@ from cpython.ref cimport (
 
 from cassandra.bytesio cimport BytesIOReader
 from cassandra.datatypes cimport DataType
-
-
-cdef class ColumnParser:
-    """Decode a ResultMessage into a set of columns"""
-    cpdef parse_rows(self, BytesIOReader reader, DataType[::1] datatypes,
-                     protocol_version):
-        raise NotImplementedError
+from cassandra.parsing cimport ParseDesc, ColumnParser, RowParser
 
 
 cdef class ListParser(ColumnParser):
     """Decode a ResultMessage into a list of tuples (or other objects)"""
 
-    cpdef parse_rows(self, BytesIOReader r, DataType[::1] datatypes, ver):
+    cpdef parse_rows(self, BytesIOReader reader, ParseDesc desc):
         cdef Py_ssize_t i, rowcount
-        rowcount = read_int(r)
-        cdef RowParser rowparser = TupleRowParser(len(datatypes), datatypes)
-        return [rowparser.unpack_row(r, ver) for i in range(rowcount)]
+        rowcount = read_int(reader)
+        cdef RowParser rowparser = TupleRowParser()
+        return [rowparser.unpack_row(reader, desc) for i in range(rowcount)]
 
 
 cdef class LazyParser(ColumnParser):
     """Decode a ResultMessage lazily using a generator"""
 
-    cpdef parse_rows(self, BytesIOReader r, DataType[::1] datatypes, ver):
+    cpdef parse_rows(self, BytesIOReader reader, ParseDesc desc):
         # Use a little helper function as closures (generators) are not
         # supported in cpdef methods
-        return parse_rows_lazy(r, self.rowparser, datatypes, ver)
+        return parse_rows_lazy(reader, desc)
 
 
-def parse_rows_lazy(BytesIOReader r, DataType[::1] datatypes, ver):
+def parse_rows_lazy(BytesIOReader reader, ParseDesc desc):
     cdef Py_ssize_t i, rowcount
-    rowcount = read_int(r)
-    cdef RowParser rowparser = TupleRowParser(len(datatypes), datatypes)
-    return (rowparser.unpack_row(r, ver) for i in range(rowcount))
-
-
-cdef class RowParser:
-    """Parser for a single row"""
-
-    cpdef unpack_row(self, BytesIOReader reader, protocol_version):
-        """
-        Unpack a single row of data in a ResultMessage.
-        """
-        raise NotImplementedError
+    rowcount = read_int(reader)
+    cdef RowParser rowparser = TupleRowParser()
+    return (rowparser.unpack_row(reader, desc) for i in range(rowcount))
 
 
 cdef class TupleRowParser(RowParser):
@@ -78,26 +62,19 @@ cdef class TupleRowParser(RowParser):
         into objects
     """
 
-    cdef DataType[::1] datatypes
-    cdef Py_ssize_t size
-
-    def __init__(self, Py_ssize_t n, DataType[::1] datatypes):
-        self.datatypes = datatypes
-        self.size = n
-
-    cpdef unpack_row(self, BytesIOReader reader, protocol_version):
+    cpdef unpack_row(self, BytesIOReader reader, ParseDesc desc):
         cdef char *buf
-        cdef Py_ssize_t i, bufsize, rowsize = self.size
+        cdef Py_ssize_t i, bufsize, rowsize = desc.rowsize
         cdef DataType dt
-        cdef tuple res = PyTuple_New(self.size)
+        cdef tuple res = PyTuple_New(desc.rowsize)
 
         for i in range(rowsize):
             buf = get_buf(reader, &bufsize)
             if buf == NULL:
                 val = None
             else:
-                dt = self.datatypes[i]
-                val = dt.deserialize(buf, bufsize, protocol_version)
+                dt = desc.datatypes[i]
+                val = dt.deserialize(buf, bufsize, desc.protocol_version)
 
             Py_INCREF(val)
             PyTuple_SET_ITEM(res, i, val)
