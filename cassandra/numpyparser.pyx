@@ -13,7 +13,7 @@ include "ioutils.pyx"
 from libc.stdint cimport uint64_t
 from cpython.ref cimport Py_INCREF, PyObject
 
-from cassandra.rowparser cimport RowParser
+from cassandra.objparser cimport RowParser
 from cassandra.bytesio cimport BytesIOReader
 from cassandra.datatypes cimport DataType
 from cassandra import cqltypes
@@ -23,7 +23,8 @@ import numpy as np
 
 
 cdef extern from "numpyFlags.h":
-
+    # Include 'numpyFlags.h' into the generated C code to disable the
+    # deprecated NumPy API
     pass
 
 cdef extern from "Python.h":
@@ -93,20 +94,6 @@ def make_arrays(colnames, coltypes, array_size):
     return array_descs, arrays
 
 
-# cdef ArrDesc array_repr(np.ndarray arr, coltype):
-#     """
-#     Construct a low-level array representation
-#     """
-#     assert arr.ndim == 1, "Expected a one-dimensional array"
-#
-#     cdef ArrDesc res
-#     # Get the data pointer to the underlying memory of the numpy array
-#     res.buf_ptr = arr.ctypes.data
-#     res.stride = arr.strides[0]
-#     res.is_object = coltype in _cqltype_to_numpy
-#     return res
-
-
 cdef class NativeRowParser(RowParser):
     """
     This is a row parser that copies bytes into arrays (e.g. NumPy arrays)
@@ -165,9 +152,11 @@ def make_native_byteorder(arr):
     """
     Make sure all values have a native endian in the NumPy arrays.
     """
-    if is_little_endian:
+    if is_little_endian and not arr.dtype.kind == 'O':
         # We have arrays in big-endian order. First swap the bytes
         # into little endian order, and then update the numpy dtype
         # accordingly (e.g. from '>i8' to '<i8')
+        #
+        # Ignore any object arrays of dtype('O')
         return arr.byteswap().newbyteorder()
     return arr

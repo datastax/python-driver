@@ -14,14 +14,14 @@ from cassandra.protocol import ResultMessage, ProtocolHandler
 from cassandra.bytesio cimport BytesIOReader
 from cassandra cimport typecodes
 from cassandra.datatypes cimport DataType
-from cassandra.rowparser cimport RowParser
+from cassandra.objparser cimport RowParser
 
-from cassandra.rowparser import TupleRowParser
+from cassandra.objparser import TupleRowParser
 from cassandra.datatypes import Int64, GenericDataType
 
 from cython.view cimport array as cython_array
 
-include "marshal.pyx"
+include "ioutils.pyx"
 
 
 class FastResultMessage(ResultMessage):
@@ -50,6 +50,7 @@ class FastResultMessage(ResultMessage):
 
 
 def obj_array(list objs):
+    """Create a (Cython) array of objects given a list of objects"""
     cdef object[:] arr
     arr = cython_array(shape=(len(objs),), itemsize=sizeof(void *), format="O")
     # arr[:] = objs # This does not work (segmentation faults)
@@ -72,10 +73,6 @@ cdef parse_rows(BytesIOReader reader, DataType[::1] datatypes, protocol_version)
     cdef RowParser parser = TupleRowParser(len(datatypes), datatypes)
     rowcount = read_int(reader)
     return [parser.unpack_row(reader, protocol_version) for i in range(rowcount)]
-
-
-cdef inline int32_t read_int(BytesIOReader reader):
-    return int32_unpack(reader.read(4))
 
 
 # cdef parse_rows2(BytesIOReader reader, list colnames, list coltypes, protocol_version):
