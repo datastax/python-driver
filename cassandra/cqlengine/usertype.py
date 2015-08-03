@@ -27,14 +27,13 @@ class BaseUserType(object):
 
     def __init__(self, **values):
         self._values = {}
+        self._is_persisted = False
 
         for name, field in self._fields.items():
             value = values.get(name, None)
             if value is not None or isinstance(field, columns.BaseContainerColumn):
                 value = field.to_python(value)
             value_mngr = field.value_manager(self, field, value)
-            if name in values:
-                value_mngr.explicit = True
             self._values[name] = value_mngr
 
     def __eq__(self, other):
@@ -134,7 +133,7 @@ class BaseUserType(object):
         pass
         for name, field in self._fields.items():
             v = getattr(self, name)
-            if v is None and not self._values[name].explicit and field.has_default:
+            if v is None and field.has_default:
                 v = field.get_default()
             val = field.validate(v)
             setattr(self, name, val)
