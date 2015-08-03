@@ -2865,6 +2865,8 @@ class ResponseFuture(object):
     _timer = None
     _protocol_handler = ProtocolHandler
 
+    _warned_timeout = False
+
     def __init__(self, session, message, query, timeout, metrics=None, prepared_statement=None):
         self.session = session
         self.row_factory = session.row_factory
@@ -3322,10 +3324,11 @@ class ResponseFuture(object):
             ...     log.exception("Operation failed:")
 
         """
-        if timeout is not _NOT_SET:
+        if timeout is not _NOT_SET and not ResponseFuture._warned_timeout:
             msg = "ResponseFuture.result timeout argument is deprecated. Specify the request timeout via Session.execute[_async]."
             warnings.warn(msg, DeprecationWarning)
             log.warning(msg)
+            ResponseFuture._warned_timeout = True
         else:
             timeout = None
 
