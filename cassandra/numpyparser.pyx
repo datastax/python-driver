@@ -23,7 +23,6 @@ from cassandra import cqltypes
 from cassandra.util import is_little_endian
 
 import numpy as np
-import pandas as pd
 
 
 cdef extern from "numpyFlags.h":
@@ -124,9 +123,6 @@ cdef inline int unpack_row(
 
     for i in range(rowsize):
         buf = get_buf(reader, &bufsize)
-        if buf == NULL:
-            raise ValueError("Unexpected end of stream")
-
         arr = arrays[i]
 
         if arr.is_object:

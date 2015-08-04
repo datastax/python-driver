@@ -70,11 +70,8 @@ cdef class TupleRowParser(RowParser):
 
         for i in range(rowsize):
             buf = get_buf(reader, &bufsize)
-            if buf == NULL:
-                val = None
-            else:
-                dt = desc.datatypes[i]
-                val = dt.deserialize(buf, bufsize, desc.protocol_version)
+            dt = desc.datatypes[i]
+            val = dt.deserialize(buf, bufsize, desc.protocol_version)
 
             Py_INCREF(val)
             PyTuple_SET_ITEM(res, i, val)

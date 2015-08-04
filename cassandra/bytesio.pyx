@@ -11,7 +11,7 @@ cdef class BytesIOReader:
         self.size = len(buf)
         self.buf_ptr = self.buf
 
-    cdef char *read(self, Py_ssize_t n = -1):
+    cdef char *read(self, Py_ssize_t n = -1) except NULL:
         """Read at most size bytes from the file
         (less if the read hits EOF before obtaining size bytes).
 
@@ -24,13 +24,16 @@ cdef class BytesIOReader:
 
         if n < 0:
             newpos = self.size
-        elif newpos > self.size:
-            self.pos = self.size
-            return b''
+
+        if newpos > self.size:
+            # Raise an error here, as we do not want the caller to consume past the
+            # end of the buffer
+            raise EOFError("Cannot read past the end of the file")
         else:
             res = self.buf_ptr + self.pos
-            self.pos = newpos
-            return res
+
+        self.pos = newpos
+        return res
 
 
 class PyBytesIOReader(BytesIOReader):
