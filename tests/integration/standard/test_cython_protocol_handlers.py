@@ -16,7 +16,7 @@ from six import next
 try:
     from cassandra.cython_protocol_handler import make_protocol_handler
 except ImportError as e:
-    raise unittest.skip("Skipping test, not compiled with Cython enabled")
+    raise unittest.SkipTest("Skipping test, not compiled with Cython enabled")
 
 from cassandra.numpyparser import NumpyParser
 from cassandra.objparser import ListParser, LazyParser
@@ -35,6 +35,8 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         cls.session = cls.cluster.connect()
         cls.session.execute("CREATE KEYSPACE testspace WITH replication = "
                             "{ 'class' : 'SimpleStrategy', 'replication_factor': '1'}")
+        cls.session.set_keyspace("testspace")
+        create_table_with_all_types("test_table", cls.session)
 
     @classmethod
     def tearDownClass(cls):
@@ -54,21 +56,18 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         self.cython_parser(LazyParser())
 
     def cython_parser(self, colparser):
-        session = Cluster().connect()
-        session.set_keyspace("smallspace")
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        session = cluster.connect(keyspace="testspace")
 
         # use our custom protocol handler
         session.client_protocol_handler = make_protocol_handler(colparser)
         # session.row_factory = tuple_factory
-        create_table_with_all_types("test_table", session)
 
         # verify data
         params = get_all_primitive_params()
         [first_result] = session.execute("SELECT * FROM test_table WHERE primkey=0")
         self.assertEqual(len(params), len(first_result),
                          msg="Not the right number of columns?")
-        print(first_result)
-        assert False
         for expected, actual in zip(params, first_result):
             self.assertEqual(actual, expected)
 

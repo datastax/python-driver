@@ -63,7 +63,7 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         """
 
         # Ensure that we get normal uuid back first
-        session = Cluster().connect()
+        session = Cluster(protocol_version=PROTOCOL_VERSION).connect(keyspace="custserdes")
         session.row_factory = tuple_factory
         result_set = session.execute("SELECT schema_version FROM system.local")
         result = result_set.pop()
@@ -103,7 +103,7 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         @test_category data_types:serialization
         """
         # Connect using a custom protocol handler that tracks the various types the result message is used with.
-        session = Cluster().connect(keyspace="custserdes")
+        session = Cluster(protocol_version=PROTOCOL_VERSION).connect(keyspace="custserdes")
         session.client_protocol_handler = CustomProtocolHandlerResultMessageTracked
         session.row_factory = tuple_factory
 
@@ -111,7 +111,7 @@ class CustomProtocolHandlerTest(unittest.TestCase):
 
         # verify data
         params = get_all_primitive_params()
-        results = session.execute("SELECT {0} FROM alltypes WHERE pimkey=0".format(columns_string))[0]
+        results = session.execute("SELECT {0} FROM alltypes WHERE primkey=0".format(columns_string))[0]
         for expected, actual in zip(params, results):
             self.assertEqual(actual, expected)
         # Ensure we have covered the various primitive types
