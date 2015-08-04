@@ -4,6 +4,7 @@
 *.so
 *.egg
 *.egg-info
+*.attr
 .tox
 .python-version
 build
@@ -19,6 +20,7 @@ setuptools*.egg
 
 cassandra/*.c
 !cassandra/murmur3.c
+cassandra/*.html
 
 # OSX
 .DS_Store
@@ -38,3 +40,4 @@ cassandra/*.c
 
 #iPython
 *.ipynb
+

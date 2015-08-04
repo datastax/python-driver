@@ -21,7 +21,8 @@ from cassandra.protocol import ProtocolHandler, ResultMessage, UUIDType, read_in
 from cassandra.query import tuple_factory
 from cassandra.cluster import Cluster
 from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass
-from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, get_sample
+from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES
+from tests.integration.standard.utils import create_table_with_all_types, get_all_primitive_params
 from six import binary_type
 
 import uuid
@@ -106,53 +107,16 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         session.client_protocol_handler = CustomProtocolHandlerResultMessageTracked
         session.row_factory = tuple_factory
 
-        columns_string = create_table_with_all_types("test_table", session)
+        columns_string = create_table_with_all_types("alltypes", session)
 
         # verify data
         params = get_all_primitive_params()
-        results = session.execute("SELECT {0} FROM alltypes WHERE zz=0".format(columns_string))[0]
+        results = session.execute("SELECT {0} FROM alltypes WHERE pimkey=0".format(columns_string))[0]
         for expected, actual in zip(params, results):
             self.assertEqual(actual, expected)
         # Ensure we have covered the various primitive types
         self.assertEqual(len(CustomResultMessageTracked.checked_rev_row_set), len(PRIMITIVE_DATATYPES)-1)
         session.shutdown()
-
-
-def create_table_with_all_types(table_name, session):
-    """
-    Method that given a table_name and session construct a table that contains all possible primitive types
-    :param table_name: Name of table to create
-    :param session: session to use for table creation
-    :return: a string containing and columns. This can be used to query the table.
-    """
-    # create table
-    alpha_type_list = ["zz int PRIMARY KEY"]
-    col_names = ["zz"]
-    start_index = ord('a')
-    for i, datatype in enumerate(PRIMITIVE_DATATYPES):
-        alpha_type_list.append("{0} {1}".format(chr(start_index + i), datatype))
-        col_names.append(chr(start_index + i))
-
-    session.execute("CREATE TABLE alltypes ({0})".format(', '.join(alpha_type_list)), timeout=120)
-
-    # create the input
-    params = get_all_primitive_params()
-
-    # insert into table as a simple statement
-    columns_string = ', '.join(col_names)
-    placeholders = ', '.join(["%s"] * len(col_names))
-    session.execute("INSERT INTO alltypes ({0}) VALUES ({1})".format(columns_string, placeholders), params, timeout=120)
-    return columns_string
-
-
-def get_all_primitive_params():
-    """
-    Simple utility method used to give back a list of all possible primitive data sample types.
-    """
-    params = [0]
-    for datatype in PRIMITIVE_DATATYPES:
-        params.append((get_sample(datatype)))
-    return params
 
 
 class CustomResultMessageRaw(ResultMessage):
