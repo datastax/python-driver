@@ -160,7 +160,7 @@ def remove_cluster():
                 CCM_CLUSTER.remove()
                 CCM_CLUSTER = None
                 return
-            except WindowsError:
+            except OSError:
                 ex_type, ex, tb = sys.exc_info()
                 log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                 del tb
