@@ -2883,7 +2883,6 @@ class ResponseFuture(object):
         self._errors = {}
         self._callbacks = []
         self._errbacks = []
-        self._start_timer()
 
     def _start_timer(self):
         if self.timeout is not None:
@@ -2911,6 +2910,12 @@ class ResponseFuture(object):
             req_id = self._query(host)
             if req_id is not None:
                 self._req_id = req_id
+
+                # timer is only started here, after we have at least one message queued
+                # this is done to avoid overrun of timers with unfettered client requests
+                # in the case of full disconnect, where no hosts will be available
+                if self._timer is None:
+                    self._start_timer()
                 return
 
         self._set_final_exception(NoHostAvailable(
@@ -3019,7 +3024,7 @@ class ResponseFuture(object):
         self._event.clear()
         self._final_result = _NOT_SET
         self._final_exception = None
-        self._start_timer()
+        self._timer = None  # clear cancelled timer; new one will be set when request is queued
         self.send_request()
 
     def _reprepare(self, prepare_message):
