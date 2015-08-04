@@ -274,6 +274,8 @@ if "--no-cython" not in sys.argv:
             exclude_failures=True))
         extensions.extend(cythonize("cassandra/*.pyx",
             compiler_directives=directives))
+        extensions.extend(cythonize("tests/unit/cython/*.pyx",
+            compiler_directives=directives))
     except ImportError:
         sys.stderr.write("Cython is not installed. Not compiling core driver files as extensions (optional).")
 

@@ -20,39 +20,13 @@ cdef class BytesIOReader:
         string is returned when EOF is encountered immediately.
         """
         cdef Py_ssize_t newpos = self.pos + n
-        cdef char *res
-
         if n < 0:
             newpos = self.size
-
-        if newpos > self.size:
+        elif newpos > self.size:
             # Raise an error here, as we do not want the caller to consume past the
             # end of the buffer
             raise EOFError("Cannot read past the end of the file")
-        else:
-            res = self.buf_ptr + self.pos
 
+        cdef char *res = self.buf_ptr + self.pos
         self.pos = newpos
         return res
-
-
-class PyBytesIOReader(BytesIOReader):
-    """
-    Python-compatible BytesIOReader class
-    """
-
-    def read(self, n = -1):
-        """Read at most size bytes from the file
-        (less if the read hits EOF before obtaining size bytes).
-
-        If the size argument is negative or omitted, read all data until EOF
-        is reached. The bytes are returned as a string object. An empty
-        string is returned when EOF is encountered immediately.
-        """
-        if n is None or n < 0:
-            newpos = self.len
-        else:
-            newpos = min(self.pos+n, self.len)
-        r = self.buf[self.pos:newpos]
-        self.pos = newpos
-        return r
