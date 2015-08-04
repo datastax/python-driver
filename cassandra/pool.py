@@ -316,11 +316,12 @@ class HostConnection(object):
         with connection.lock:
             connection.in_flight -= 1
 
-        if connection.is_defunct or connection.is_closed:
+        if (connection.is_defunct or connection.is_closed) and not connection.signaled_error:
             log.debug("Defunct or closed connection (%s) returned to pool, potentially "
                       "marking host %s as down", id(connection), self.host)
             is_down = self._session.cluster.signal_connection_failure(
                 self.host, connection.last_error, is_host_addition=False)
+            connection.signaled_error = True
             if is_down:
                 self.shutdown()
             else:
@@ -572,14 +573,16 @@ class HostConnectionPool(object):
             in_flight = connection.in_flight
 
         if connection.is_defunct or connection.is_closed:
-            log.debug("Defunct or closed connection (%s) returned to pool, potentially "
-                      "marking host %s as down", id(connection), self.host)
-            is_down = self._session.cluster.signal_connection_failure(
-                self.host, connection.last_error, is_host_addition=False)
-            if is_down:
-                self.shutdown()
-            else:
-                self._replace(connection)
+            if not connection.signaled_error:
+                log.debug("Defunct or closed connection (%s) returned to pool, potentially "
+                          "marking host %s as down", id(connection), self.host)
+                is_down = self._session.cluster.signal_connection_failure(
+                    self.host, connection.last_error, is_host_addition=False)
+                connection.signaled_error = True
+                if is_down:
+                    self.shutdown()
+                else:
+                    self._replace(connection)
         else:
             if connection in self._trash:
                 with connection.lock:

@@ -184,6 +184,7 @@ if six.PY3:
 else:
     int_from_buf_item = ord
 
+
 class Connection(object):
 
     in_buffer_size = 4096
@@ -223,6 +224,8 @@ class Connection(object):
     is_unsupported_proto_version = False
 
     is_control_connection = False
+    signaled_error = False  # used for flagging at the pool level
+
     _iobuf = None
     _current_frame = None
 
