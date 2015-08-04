@@ -18,4 +18,3 @@ cdef inline char *get_buf(BytesIOReader reader, Py_ssize_t *size_out):
 
 cdef inline int32_t read_int(BytesIOReader reader):
     return int32_unpack(reader.read(4))
-

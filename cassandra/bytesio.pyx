@@ -53,4 +53,3 @@ class PyBytesIOReader(BytesIOReader):
         r = self.buf[self.pos:newpos]
         self.pos = newpos
         return r
-
