@@ -18,7 +18,7 @@ setuptools*.tar.gz
 setuptools*.egg
 
 cassandra/*.c
-!cassandra/murmur3.c
+!cassandra/cmurmur3.c
 
 # OSX
 .DS_Store
