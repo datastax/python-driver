@@ -126,7 +126,7 @@ cdef inline int unpack_row(
         arr = arrays[i]
 
         if arr.is_object:
-            deserializer = desc.datatypes[i]
+            deserializer = desc.deserializers[i]
             val = deserializer.deserialize(&buf, desc.protocol_version)
             Py_INCREF(val)
             (<PyObject **> arr.buf_ptr)[0] = <PyObject *> val

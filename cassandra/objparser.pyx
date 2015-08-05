@@ -54,12 +54,6 @@ cdef class TupleRowParser(RowParser):
     Parse a single returned row into a tuple of objects:
 
         (obj1, ..., objN)
-
-    Attributes
-    ===========
-    datatypes:
-        this is a memoryview of N DataType objects that can deserialize bytes
-        into objects
     """
 
     cpdef unpack_row(self, BytesIOReader reader, ParseDesc desc):
@@ -73,7 +67,7 @@ cdef class TupleRowParser(RowParser):
             get_buf(reader, &buf)
 
             # Deserialize bytes to python object
-            deserializer = desc.datatypes[i]
+            deserializer = desc.deserializers[i]
             val = deserializer.deserialize(&buf, desc.protocol_version)
 
             # Insert new object into tuple
