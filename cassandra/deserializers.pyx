@@ -69,6 +69,8 @@ cdef class GenericDeserializer(Deserializer):
     Wrap a generic datatype for deserialization
     """
 
+    cdef object cqltype
+
     def __init__(self, cqltype):
         self.cqltype = cqltype
 
@@ -85,10 +87,11 @@ def make_deserializers(cqltypes):
 
 cpdef Deserializer find_deserializer(cqltype):
     """Find a deserializer for a cqltype"""
-    deserializer = None
-    if inspect.isclass(cqltype):
-        deserializer = globals().get('Des' + cqltype.__name__)()
-    return deserializer or GenericDeserializer(cqltype)
+    name = inspect.isclass(cqltype) and 'Des' + cqltype.__name__
+    if name in globals():
+        deserializer_cls =  globals()[name]
+        deserializer_cls()
+    return GenericDeserializer(cqltype)
 
 
 def obj_array(list objs):
