@@ -1,30 +1,15 @@
-import six
 from six.moves import range
+import struct
 
-if six.PY3:
-    def blocks_and_tail(data, nblocks):
-        # use array 'q' here?
-        pass
-else:
-    import struct
 
-    def body_and_tail(data):
-        l = len(data)
-        nblocks = l // 16
-        tail = l % 16
-        if nblocks:
-            return struct.unpack_from('qq' * nblocks, data), struct.unpack_from('b' * tail, data, -tail), l
-        # TODO: try unpack generator vs built formatter
-        # TODO: try unpack pairs in generator ^^
-        else:
-            return tuple(), struct.unpack_from('b' * tail, data, -tail), l
-
-INT64_MAX = 2 ** 63 - 1
-# TODO: better if these are int or long constants?
-INT64_MIN = -INT64_MAX - 1
-
-INT64_OVF_OFFSET = INT64_MAX + 1
-INT64_OVF_DIV = 2 * INT64_OVF_OFFSET
+def body_and_tail(data):
+    l = len(data)
+    nblocks = l // 16
+    tail = l % 16
+    if nblocks:
+        return struct.unpack_from('qq' * nblocks, data), struct.unpack_from('b' * tail, data, -tail), l
+    else:
+        return tuple(), struct.unpack_from('b' * tail, data, -tail), l
 
 
 def rotl64(x, r):
@@ -40,6 +25,12 @@ def fmix(k):
     k *= 0xc4ceb9fe1a85ec53
     k ^= (k >> 33) & 0x7fffffff
     return k
+
+
+INT64_MAX = int(2 ** 63 - 1)
+INT64_MIN = -INT64_MAX - 1
+INT64_OVF_OFFSET = INT64_MAX + 1
+INT64_OVF_DIV = 2 * INT64_OVF_OFFSET
 
 
 def truncate_int64(x):
