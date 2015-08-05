@@ -19,7 +19,7 @@ from cpython.ref cimport (
         )
 
 from cassandra.bytesio cimport BytesIOReader
-from cassandra.datatypes cimport DataType
+from cassandra.deserializers cimport Deserializer
 from cassandra.parsing cimport ParseDesc, ColumnParser, RowParser
 
 
@@ -63,16 +63,20 @@ cdef class TupleRowParser(RowParser):
     """
 
     cpdef unpack_row(self, BytesIOReader reader, ParseDesc desc):
-        cdef char *buf
-        cdef Py_ssize_t i, bufsize, rowsize = desc.rowsize
-        cdef DataType dt
+        cdef Buffer buf
+        cdef Py_ssize_t i, rowsize = desc.rowsize
+        cdef Deserializer deserializer
         cdef tuple res = PyTuple_New(desc.rowsize)
 
         for i in range(rowsize):
-            buf = get_buf(reader, &bufsize)
-            dt = desc.datatypes[i]
-            val = dt.deserialize(buf, bufsize, desc.protocol_version)
+            # Read the next few bytes
+            get_buf(reader, &buf)
 
+            # Deserialize bytes to python object
+            deserializer = desc.datatypes[i]
+            val = deserializer.deserialize(&buf, desc.protocol_version)
+
+            # Insert new object into tuple
             Py_INCREF(val)
             PyTuple_SET_ITEM(res, i, val)
 

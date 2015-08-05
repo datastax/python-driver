@@ -17,7 +17,7 @@ from libc.stdint cimport uint64_t
 from cpython.ref cimport Py_INCREF, PyObject
 
 from cassandra.bytesio cimport BytesIOReader
-from cassandra.datatypes cimport DataType
+from cassandra.deserializers cimport Deserializer
 from cassandra.parsing cimport ParseDesc, ColumnParser, RowParser
 from cassandra import cqltypes
 from cassandra.util import is_little_endian
@@ -116,22 +116,22 @@ def make_array(coltype, array_size):
 @cython.wraparound(False)
 cdef inline int unpack_row(
         BytesIOReader reader, ParseDesc desc, ArrDesc *arrays) except -1:
-    cdef char *buf
-    cdef Py_ssize_t i, bufsize, rowsize = desc.rowsize
+    cdef Buffer buf
+    cdef Py_ssize_t i, rowsize = desc.rowsize
     cdef ArrDesc arr
-    cdef DataType dt
+    cdef Deserializer deserializer
 
     for i in range(rowsize):
-        buf = get_buf(reader, &bufsize)
+        get_buf(reader, &buf)
         arr = arrays[i]
 
         if arr.is_object:
-            dt = desc.datatypes[i]
-            val = dt.deserialize(buf, bufsize, desc.protocol_version)
+            deserializer = desc.datatypes[i]
+            val = deserializer.deserialize(&buf, desc.protocol_version)
             Py_INCREF(val)
             (<PyObject **> arr.buf_ptr)[0] = <PyObject *> val
         else:
-            memcopy(buf, <char *> arr.buf_ptr, bufsize)
+            memcopy(buf.ptr, <char *> arr.buf_ptr, buf.size)
 
         # Update the pointer into the array for the next time
         arrays[i].buf_ptr += arr.stride

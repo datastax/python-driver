@@ -71,9 +71,6 @@ cpdef inline int64_t int64_unpack(const char *buf):
     # The 'const' makes sure the buffer is not mutated in-place!
     cdef int64_t x = (<int64_t *> buf)[0]
     cdef char *p = <char *> &x
-    # if is_little_endian:
-    #     p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7] = (
-    #         p[7], p[6], p[5], p[4], p[3], p[2], p[1], p[0])
     swap_order(<char *> &x, 8)
     return x
 
@@ -83,8 +80,6 @@ cpdef inline bytes int32_pack(int32_t x):
 cpdef inline int32_t int32_unpack(const char *buf):
     cdef int32_t x = (<int32_t *> buf)[0]
     cdef char *p = <char *> &x
-    # if is_little_endian:
-    #     p[0], p[1], p[2], p[3] = p[3], p[2], p[1], p[0]
     swap_order(<char *> &x, 4)
     return x
 

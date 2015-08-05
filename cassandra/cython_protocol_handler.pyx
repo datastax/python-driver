@@ -3,7 +3,7 @@
 from cassandra.protocol import ResultMessage, ProtocolHandler
 
 from cassandra.parsing cimport ParseDesc, ColumnParser
-from cassandra.datatypes import make_datatypes
+from cassandra.deserializers import make_deserializers
 from cassandra.objparser import ListParser
 
 
@@ -21,7 +21,8 @@ def make_recv_results_rows(ColumnParser colparser):
         colnames = [c[2] for c in column_metadata]
         coltypes = [c[3] for c in column_metadata]
 
-        desc = ParseDesc(colnames, coltypes, make_datatypes(coltypes), protocol_version)
+        desc = ParseDesc(colnames, coltypes, make_deserializers(coltypes),
+                         protocol_version)
         reader = BytesIOReader(f.read())
         parsed_rows = colparser.parse_rows(reader, desc)
 

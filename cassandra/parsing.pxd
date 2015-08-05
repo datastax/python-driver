@@ -1,10 +1,10 @@
 from cassandra.bytesio cimport BytesIOReader
-from cassandra.datatypes cimport DataType
+from cassandra.deserializers cimport Deserializer
 
 cdef class ParseDesc:
     cdef public object colnames
     cdef public object coltypes
-    cdef DataType[::1] datatypes
+    cdef Deserializer[::1] datatypes
     cdef public object protocol_version
     cdef Py_ssize_t rowsize
 
