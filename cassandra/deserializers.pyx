@@ -148,6 +148,7 @@ cdef class _DesParameterizedType(Deserializer):
     cdef object adapter
     cdef object subtypes
     cdef Deserializer[::1] deserializers
+    cdef Py_ssize_t subtypes_len
 
     def __init__(self, cqltype):
         assert cqltype.subtypes and len(cqltype.subtypes) == 1
@@ -287,22 +288,16 @@ cdef _deserialize_map(itemlen_t dummy_version,
     return themap
 
 #--------------------------------------------------------------------------
-# Tuple deserialization
+# Tuple and UserType deserialization
 
 cdef class DesTupleType(_DesParameterizedType):
 
     # TODO: Use TupleRowParser to parse these tuples
 
-    cdef Py_ssize_t tuple_len
-
-    def __init__(self, cqltype):
-        super().__init__(cqltype)
-        self.tuple_len = len(cqltype.subtypes)
-
     cdef deserialize(self, Buffer *buf, int protocol_version):
         cdef Py_ssize_t i, p
         cdef int32_t itemlen
-        cdef tuple res = tuple_new(self.tuple_len)
+        cdef tuple res = tuple_new(self.subtypes_len)
         cdef Buffer item_buf
         cdef Deserializer deserializer
 
@@ -310,7 +305,7 @@ cdef class DesTupleType(_DesParameterizedType):
 
         p = 0
         values = []
-        for i in range(self.tuple_len):
+        for i in range(self.subtypes_len):
             item = None
             if p != buf.size:
                 itemlen = int32_unpack(buf.ptr + p)
@@ -325,6 +320,48 @@ cdef class DesTupleType(_DesParameterizedType):
             tuple_set(res, i, item)
 
         return res
+
+
+cdef class DesUserType(DesTupleType):
+    cdef deserialize(self, Buffer *buf, int protocol_version):
+        typ = self.cqltype
+        values = DesTupleType.deserialize(self, buf, protocol_version)
+        if typ.mapped_class:
+            return typ.mapped_class(**dict(zip(typ.fieldnames, values)))
+        else:
+            return typ.tuple_type(*values)
+
+#--------------------------------------------------------------------------
+# CompositeType
+
+cdef class DesCompositeType(_DesParameterizedType):
+    cdef deserialize(self, Buffer *buf, int protocol_version):
+        cdef Py_ssize_t i
+        cdef Buffer elem_buf
+        cdef int16_t element_length
+        cdef Deserializer deserializer
+        cdef tuple res = tuple_new(self.subtypes_len)
+
+        for i in range(self.subtypes_len):
+            if not buf.size:
+                # CompositeType can have missing elements at the end
+                break
+
+            element_length = uint16_unpack(buf.ptr)
+            elem_buf.ptr = buf.ptr + 2
+            elem_buf.size = element_length
+
+            # skip element length, element, and the EOC (one byte)
+            buf.ptr = buf.ptr + 2 + element_length + 1
+            buf.size = buf.size - (2 + element_length + 1)
+            deserializer = self.deserializers[i]
+            item = deserializer.deserialize(&elem_buf, protocol_version)
+            tuple_set(res, i, item)
+
+        return res
+
+
+DesDynamicCompositeType = DesCompositeType
 
 #--------------------------------------------------------------------------
 # Generic deserialization
@@ -363,8 +400,17 @@ cpdef Deserializer find_deserializer(cqltype):
         return DesSetType
     elif issubclass(cqltype, cqltypes.MapType):
         return DesMapType
+    elif issubclass(cqltype, cqltypes.UserType):
+        # UserType is a subclass of TupleType, so should precede it
+        return DesUserType
     elif issubclass(cqltype, cqltypes.TupleType):
         return DesTupleType
+    elif issubclass(cqltype, cqltypes.DynamicCompositeType):
+        # DynamicCompositeType is a subclass of CompositeType, so should precede it
+        return DesDynamicCompositeType
+    elif issubclass(cqltype, cqltypes.CompositeType):
+        return DesCompositeType
+
     return GenericDeserializer(cqltype)
 
 
