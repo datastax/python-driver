@@ -5,14 +5,19 @@ from libc.stdint cimport int32_t, uint16_t
 include 'marshal.pyx'
 include 'cython_utils.pyx'
 from cassandra.buffer cimport Buffer, to_bytes
+from cassandra.parsing cimport ParseDesc, RowParser
 
 from cython.view cimport array as cython_array
+from cpython.tuple cimport PyTuple_New, PyTuple_SET_ITEM
+from cpython.ref cimport Py_INCREF
+
 
 import socket
 import inspect
 from decimal import Decimal
 from uuid import UUID
 
+from cassandra.objparser import TupleRowParser
 from cassandra import cqltypes
 from cassandra import util
 
@@ -284,6 +289,48 @@ cdef _deserialize_map(itemlen_t dummy_version,
     return themap
 
 #--------------------------------------------------------------------------
+# Tuple deserialization
+
+cdef class DesTupleType(_DesParameterizedType):
+
+    # TODO: Use TupleRowParser to parse these tuples
+
+    cdef Py_ssize_t tuple_len
+
+    def __init__(self, cqltype):
+        super().__init__(cqltype)
+        self.tuple_len = len(cqltype.subtypes)
+
+    cdef deserialize(self, Buffer *buf, int protocol_version):
+        cdef Py_ssize_t i, p
+        cdef int32_t itemlen
+        cdef tuple res = PyTuple_New(self.tuple_len)
+        cdef Buffer item_buf
+        cdef Deserializer deserializer
+
+        protocol_version = max(3, protocol_version)
+
+        p = 0
+        values = []
+        for i in range(self.tuple_len):
+            item = None
+            if p != buf.size:
+                itemlen = int32_unpack(buf.ptr + p)
+                p += 4
+                if itemlen >= 0:
+                    item_buf.ptr = buf.ptr + p
+                    item_buf.size = itemlen
+                    deserializer = self.deserializers[i]
+                    item = deserializer.deserialize(&item_buf, protocol_version)
+                    p += itemlen
+
+            # Insert new object into tuple (PyTuple_SET_ITEM steals a reference)
+            Py_INCREF(item)
+            PyTuple_SET_ITEM(res, i, item)
+
+        return res
+
+#--------------------------------------------------------------------------
 # Generic deserialization
 
 cdef class GenericDeserializer(Deserializer):
@@ -320,6 +367,8 @@ cpdef Deserializer find_deserializer(cqltype):
         return DesSetType
     elif issubclass(cqltype, cqltypes.MapType):
         return DesMapType
+    elif issubclass(cqltype, cqltypes.TupleType):
+        return DesTupleType
     return GenericDeserializer(cqltype)
 
 

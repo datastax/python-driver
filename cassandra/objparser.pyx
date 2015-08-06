@@ -66,9 +66,12 @@ cdef class TupleRowParser(RowParser):
             # Read the next few bytes
             get_buf(reader, &buf)
 
-            # Deserialize bytes to python object
-            deserializer = desc.deserializers[i]
-            val = deserializer.deserialize(&buf, desc.protocol_version)
+            if buf.size == 0:
+                val = None
+            else:
+                # Deserialize bytes to python object
+                deserializer = desc.deserializers[i]
+                val = deserializer.deserialize(&buf, desc.protocol_version)
 
             # Insert new object into tuple
             Py_INCREF(val)
