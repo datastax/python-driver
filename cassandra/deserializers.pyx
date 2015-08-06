@@ -157,10 +157,8 @@ cdef class _DesParameterizedType(Deserializer):
         self.subtypes = cqltype.subtypes
         self.deserializers = make_deserializers(cqltype.subtypes)
 
-#--------------------------------------------------------------------------
-# List and set deserialization
 
-cdef class DesListType(_DesParameterizedType):
+cdef class _DesSingleParamType(_DesParameterizedType):
 
     cdef Deserializer deserializer
 
@@ -168,6 +166,11 @@ cdef class DesListType(_DesParameterizedType):
         super().__init__(cqltype)
         self.deserializer = self.deserializers[0]
 
+
+#--------------------------------------------------------------------------
+# List and set deserialization
+
+cdef class DesListType(_DesSingleParamType):
     cdef deserialize(self, Buffer *buf, int protocol_version):
         cdef uint16_t v2_and_below = 2
         cdef int32_t v3_and_above = 3
@@ -288,7 +291,6 @@ cdef _deserialize_map(itemlen_t dummy_version,
     return themap
 
 #--------------------------------------------------------------------------
-# Tuple and UserType deserialization
 
 cdef class DesTupleType(_DesParameterizedType):
 
@@ -331,8 +333,6 @@ cdef class DesUserType(DesTupleType):
         else:
             return typ.tuple_type(*values)
 
-#--------------------------------------------------------------------------
-# CompositeType
 
 cdef class DesCompositeType(_DesParameterizedType):
     cdef deserialize(self, Buffer *buf, int protocol_version):
@@ -362,6 +362,16 @@ cdef class DesCompositeType(_DesParameterizedType):
 
 
 DesDynamicCompositeType = DesCompositeType
+
+
+cdef class DesReversedType(_DesSingleParamType):
+    cdef deserialize(self, Buffer *buf, int protocol_version):
+        return self.deserializer.deserialize(buf, protocol_version)
+
+
+cdef class DesFrozenType(_DesSingleParamType):
+    cdef deserialize(self, Buffer *buf, int protocol_version):
+        return self.deserializer.deserialize(buf, protocol_version)
 
 #--------------------------------------------------------------------------
 # Generic deserialization
@@ -410,6 +420,10 @@ cpdef Deserializer find_deserializer(cqltype):
         return DesDynamicCompositeType
     elif issubclass(cqltype, cqltypes.CompositeType):
         return DesCompositeType
+    elif issubclass(cqltype, cqltypes.ReversedType):
+        return DesReversedType
+    elif issubclass(cqltype, cqltypes.FrozenType):
+        return DesFrozenType
 
     return GenericDeserializer(cqltype)
 
