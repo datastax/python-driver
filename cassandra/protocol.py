@@ -40,6 +40,7 @@ from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 TupleType, lookup_casstype, SimpleDateType,
                                 TimeType, ByteType, ShortType)
 from cassandra.policies import WriteType
+from cassandra.cython_deps import HAVE_CYTHON
 from cassandra import util
 
 log = logging.getLogger(__name__)
@@ -69,10 +70,16 @@ _message_types_by_opcode = {}
 
 _UNSET_VALUE = object()
 
+def register_class(cls):
+    _message_types_by_opcode[cls.opcode] = cls
+
+def get_registered_classes():
+    return _message_types_by_opcode.copy()
+
 class _RegisterMessageType(type):
     def __init__(cls, name, bases, dct):
         if not name.startswith('_'):
-            _message_types_by_opcode[cls.opcode] = cls
+            register_class(cls)
 
 
 @six.add_metaclass(_RegisterMessageType)
@@ -985,6 +992,62 @@ class ProtocolHandler(object):
                 log.warning("Server warning: %s", w)
 
         return msg
+
+
+def cython_protocol_handler(colparser):
+    """
+    Given a column parser to deserialize ResultMessages, return a suitable
+    Cython-based protocol handler.
+
+    There are three Cython-based protocol handlers (least to most performant):
+
+        1. objparser.ListParser
+            this parser decodes result messages into a list of tuples
+
+        2. objparser.LazyParser
+            this parser decodes result messages lazily by returning an iterator
+
+        3. numpyparser.NumPyParser
+            this parser decodes result messages into NumPy arrays
+
+    The default is to use objparser.ListParser
+    """
+    # TODO: It may be cleaner to turn ProtocolHandler and ResultMessage into
+    # TODO:     instances and use methods instead of class methods
+    from cassandra.rowparser import make_recv_results_rows
+
+    class FastResultMessage(ResultMessage):
+        """
+        Cython version of Result Message that has a faster implementation of
+        recv_results_row.
+        """
+        # type_codes = ResultMessage.type_codes.copy()
+        code_to_type = dict((v, k) for k, v in ResultMessage.type_codes.items())
+        recv_results_rows = classmethod(make_recv_results_rows(colparser))
+
+    class CythonProtocolHandler(ProtocolHandler):
+        """
+        Use FastResultMessage to decode query result message messages.
+        """
+
+        my_opcodes = ProtocolHandler.message_types_by_opcode.copy()
+        my_opcodes[FastResultMessage.opcode] = FastResultMessage
+        message_types_by_opcode = my_opcodes
+
+    return CythonProtocolHandler
+
+
+if HAVE_CYTHON:
+    from cassandra.objparser import ListParser, LazyParser
+    from cassandra.numpyparser import NumpyParser
+
+    ProtocolHandler = cython_protocol_handler(ListParser())
+    LazyProtocolHandler = cython_protocol_handler(LazyParser())
+    NumpyProtocolHandler = cython_protocol_handler(NumpyParser())
+else:
+    # Use Python-based ProtocolHandler
+    LazyProtocolHandler = None
+    NumpyProtocolHandler = None
 
 
 def read_byte(f):

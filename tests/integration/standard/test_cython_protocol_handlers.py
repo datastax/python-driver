@@ -8,18 +8,14 @@ except ImportError:
     import unittest
 
 from cassandra.cluster import Cluster
+from cassandra.protocol import ProtocolHandler, LazyProtocolHandler, NumpyProtocolHandler
 from tests.integration import use_singledc, PROTOCOL_VERSION
 from tests.integration.datatype_utils import update_datatypes
 from tests.integration.standard.utils import create_table_with_all_types, get_all_primitive_params
-from six import next
 
-try:
-    from cassandra.cython_protocol_handler import make_protocol_handler
-except ImportError as e:
+from cassandra.cython_deps import HAVE_CYTHON
+if not HAVE_CYTHON:
     raise unittest.SkipTest("Skipping test, not compiled with Cython enabled")
-
-from cassandra.numpyparser import NumpyParser
-from cassandra.objparser import ListParser, LazyParser
 
 
 def setup_module():
@@ -47,20 +43,20 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         """
         Test Cython-based parser that returns a list of tuples
         """
-        self.cython_parser(ListParser())
+        self.cython_parser(ProtocolHandler)
 
     def test_cython_lazy_parser(self):
         """
         Test Cython-based parser that returns a list of tuples
         """
-        self.cython_parser(LazyParser())
+        self.cython_parser(LazyProtocolHandler)
 
-    def cython_parser(self, colparser):
+    def cython_parser(self, protocol_handler):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect(keyspace="testspace")
 
         # use our custom protocol handler
-        session.client_protocol_handler = make_protocol_handler(colparser)
+        session.client_protocol_handler = protocol_handler
         # session.row_factory = tuple_factory
 
         # verify data
