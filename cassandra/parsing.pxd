@@ -5,7 +5,7 @@ cdef class ParseDesc:
     cdef public object colnames
     cdef public object coltypes
     cdef Deserializer[::1] deserializers
-    cdef public object protocol_version
+    cdef public int protocol_version
     cdef Py_ssize_t rowsize
 
 cdef class ColumnParser:

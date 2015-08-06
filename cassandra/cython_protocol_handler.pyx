@@ -11,7 +11,7 @@ include "ioutils.pyx"
 
 
 def make_recv_results_rows(ColumnParser colparser):
-    def recv_results_rows(cls, f, protocol_version, user_type_map):
+    def recv_results_rows(cls, f, int protocol_version, user_type_map):
         """
         Parse protocol data given as a BytesIO f into a set of columns (e.g. list of tuples)
         This is used as the recv_results_rows method of (Fast)ResultMessage

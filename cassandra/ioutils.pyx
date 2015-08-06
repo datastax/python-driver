@@ -1,5 +1,5 @@
 include 'marshal.pyx'
-include 'buffer.pyx'
+from cassandra.buffer cimport Buffer
 
 from libc.stdint cimport int32_t
 from cassandra.bytesio cimport BytesIOReader

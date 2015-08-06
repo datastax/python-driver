@@ -25,6 +25,8 @@ from libc.stdint cimport (int8_t, int16_t, int32_t, int64_t,
 cdef bint is_little_endian
 from cassandra.util import is_little_endian
 
+cdef bint PY3 = six.PY3
+
 # cdef extern from "marshal.h":
 #     cdef str c_string_to_python(char *p, Py_ssize_t len)
 
@@ -165,21 +167,30 @@ v3_header_pack = v3_header_struct.pack
 v3_header_unpack = v3_header_struct.unpack
 
 
-if six.PY3:
-    def varint_unpack(term):
-        val = int(''.join("%02x" % i for i in term), 16)
-        if (term[0] & 128) != 0:
-            # There is a bug in Cython (0.20 - 0.22), where if we do
-            # '1 << (len(term) * 8)' Cython generates '1' directly into the
-            # C code, causing integer overflows. Treat it as an object for now
-            val -= (<object> 1L) << (len(term) * 8)
-        return val
-else:
-    def varint_unpack(term):  # noqa
-        val = int(term.encode('hex'), 16)
-        if (ord(term[0]) & 128) != 0:
-            val = val - (1 << (len(term) * 8))
-        return val
+cpdef varint_unpack(term):
+    """Unpack a variable-sized integer"""
+    if PY3:
+        return varint_unpack_py3(term)
+    else:
+        return varint_unpack_py2(term)
+
+# TODO: Optimize these two functions
+def varint_unpack_py3(term):
+    cdef int64_t one = 1L
+    val = int(''.join("%02x" % i for i in term), 16)
+    if (term[0] & 128) != 0:
+        # There is a bug in Cython (0.20 - 0.22), where if we do
+        # '1 << (len(term) * 8)' Cython generates '1' directly into the
+        # C code, causing integer overflows
+        val -= one << (len(term) * 8)
+    return val
+
+def varint_unpack_py2(term):  # noqa
+    cdef int64_t one = 1L
+    val = int(term.encode('hex'), 16)
+    if (ord(term[0]) & 128) != 0:
+        val = val - (one << (len(term) * 8))
+    return val
 
 
 def bitlength(n):
