@@ -1311,7 +1311,7 @@ class TableMetadata(object):
             if len(self.partition_key) > 1:
                 ret += "(%s)" % ", ".join(protect_name(col.name) for col in self.partition_key)
             else:
-                ret += self.partition_key[0].name
+                ret += protect_name(self.partition_key[0].name)
 
             if self.clustering_key:
                 ret += ", %s" % ", ".join(protect_name(col.name) for col in self.clustering_key)
