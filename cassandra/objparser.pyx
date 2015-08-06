@@ -1,26 +1,9 @@
 include "ioutils.pyx"
 
-from cpython.tuple cimport (
-        PyTuple_New,
-        # Return value: New reference.
-        # Return a new tuple object of size len, or NULL on failure.
-        PyTuple_SET_ITEM,
-        # Like PyTuple_SetItem(), but does no error checking, and should
-        # only be used to fill in brand new tuples. Note: This function
-        # ``steals'' a reference to o.
-        )
-
-from cpython.ref cimport (
-        Py_INCREF
-        # void Py_INCREF(object o)
-        #     Increment the reference count for object o. The object must not
-        #     be NULL; if you aren't sure that it isn't NULL, use
-        #     Py_XINCREF().
-        )
-
 from cassandra.bytesio cimport BytesIOReader
 from cassandra.deserializers cimport Deserializer
 from cassandra.parsing cimport ParseDesc, ColumnParser, RowParser
+from cassandra.tuple cimport tuple_new, tuple_set
 
 
 cdef class ListParser(ColumnParser):
@@ -60,7 +43,7 @@ cdef class TupleRowParser(RowParser):
         cdef Buffer buf
         cdef Py_ssize_t i, rowsize = desc.rowsize
         cdef Deserializer deserializer
-        cdef tuple res = PyTuple_New(desc.rowsize)
+        cdef tuple res = tuple_new(desc.rowsize)
 
         for i in range(rowsize):
             # Read the next few bytes
@@ -74,7 +57,6 @@ cdef class TupleRowParser(RowParser):
                 val = deserializer.deserialize(&buf, desc.protocol_version)
 
             # Insert new object into tuple
-            Py_INCREF(val)
-            PyTuple_SET_ITEM(res, i, val)
+            tuple_set(res, i, val)
 
         return res

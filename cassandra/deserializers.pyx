@@ -8,9 +8,7 @@ from cassandra.buffer cimport Buffer, to_bytes
 from cassandra.parsing cimport ParseDesc, RowParser
 
 from cython.view cimport array as cython_array
-from cpython.tuple cimport PyTuple_New, PyTuple_SET_ITEM
-from cpython.ref cimport Py_INCREF
-
+from cassandra.tuple cimport tuple_new, tuple_set
 
 import socket
 import inspect
@@ -304,7 +302,7 @@ cdef class DesTupleType(_DesParameterizedType):
     cdef deserialize(self, Buffer *buf, int protocol_version):
         cdef Py_ssize_t i, p
         cdef int32_t itemlen
-        cdef tuple res = PyTuple_New(self.tuple_len)
+        cdef tuple res = tuple_new(self.tuple_len)
         cdef Buffer item_buf
         cdef Deserializer deserializer
 
@@ -324,9 +322,7 @@ cdef class DesTupleType(_DesParameterizedType):
                     item = deserializer.deserialize(&item_buf, protocol_version)
                     p += itemlen
 
-            # Insert new object into tuple (PyTuple_SET_ITEM steals a reference)
-            Py_INCREF(item)
-            PyTuple_SET_ITEM(res, i, item)
+            tuple_set(res, i, item)
 
         return res
 
