@@ -1,7 +1,7 @@
 include "ioutils.pyx"
 
 from cassandra.bytesio cimport BytesIOReader
-from cassandra.deserializers cimport Deserializer
+from cassandra.deserializers cimport Deserializer, from_binary
 from cassandra.parsing cimport ParseDesc, ColumnParser, RowParser
 from cassandra.tuple cimport tuple_new, tuple_set
 
@@ -49,12 +49,9 @@ cdef class TupleRowParser(RowParser):
             # Read the next few bytes
             get_buf(reader, &buf)
 
-            if buf.size == 0:
-                val = None
-            else:
-                # Deserialize bytes to python object
-                deserializer = desc.deserializers[i]
-                val = deserializer.deserialize(&buf, desc.protocol_version)
+            # Deserialize bytes to python object
+            deserializer = desc.deserializers[i]
+            val = from_binary(deserializer, &buf, desc.protocol_version)
 
             # Insert new object into tuple
             tuple_set(res, i, val)

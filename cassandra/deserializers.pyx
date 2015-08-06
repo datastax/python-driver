@@ -21,6 +21,12 @@ from cassandra import util
 
 
 cdef class Deserializer:
+    """Cython-based deserializer class for a cqltype"""
+
+    def __init__(self, cqltype):
+        self.cqltype = cqltype
+        self.empty_binary_ok = False
+
     cdef deserialize(self, Buffer *buf, int protocol_version):
         raise NotImplementedError
 
@@ -144,25 +150,21 @@ cdef class DesVarcharType(DesUTF8Type):
 
 cdef class _DesParameterizedType(Deserializer):
 
-    cdef object cqltype
-    cdef object adapter
     cdef object subtypes
     cdef Deserializer[::1] deserializers
     cdef Py_ssize_t subtypes_len
 
     def __init__(self, cqltype):
-        assert cqltype.subtypes and len(cqltype.subtypes) == 1
-        self.cqltype = cqltype
-        self.adapter = cqltype.adapter
+        super().__init__(cqltype)
         self.subtypes = cqltype.subtypes
         self.deserializers = make_deserializers(cqltype.subtypes)
 
 
 cdef class _DesSingleParamType(_DesParameterizedType):
-
     cdef Deserializer deserializer
 
     def __init__(self, cqltype):
+        assert cqltype.subtypes and len(cqltype.subtypes) == 1, cqltype.subtypes
         super().__init__(cqltype)
         self.deserializer = self.deserializers[0]
 
@@ -182,7 +184,7 @@ cdef class DesListType(_DesSingleParamType):
             result = _deserialize_list_or_set[uint16_t](
                 v2_and_below, buf, protocol_version, self.deserializer)
 
-        return self.adapter(result)
+        return self.cqltype.adapter(result)
 
 
 DesSetType = DesListType
@@ -214,7 +216,7 @@ cdef list _deserialize_list_or_set(itemlen_t dummy_version,
         sub_buf.ptr = buf.ptr + p
         sub_buf.size = itemlen
         p += itemlen
-        result.append(deserializer.deserialize(&sub_buf, protocol_version))
+        result.append(from_binary(deserializer, &sub_buf, protocol_version))
 
     return result
 
@@ -284,8 +286,8 @@ cdef _deserialize_map(itemlen_t dummy_version,
         val_buf.ptr = buf.ptr + p
         val_buf.size = val_len
         p += val_len
-        key = key_deserializer.deserialize(&key_buf, protocol_version)
-        val = val_deserializer.deserialize(&val_buf, protocol_version)
+        key = from_binary(key_deserializer, &key_buf, protocol_version)
+        val = from_binary(val_deserializer, &val_buf, protocol_version)
         themap._insert_unchecked(key, to_bytes(&key_buf), val)
 
     return themap
@@ -316,7 +318,7 @@ cdef class DesTupleType(_DesParameterizedType):
                     item_buf.ptr = buf.ptr + p
                     item_buf.size = itemlen
                     deserializer = self.deserializers[i]
-                    item = deserializer.deserialize(&item_buf, protocol_version)
+                    item = from_binary(deserializer, &item_buf, protocol_version)
                     p += itemlen
 
             tuple_set(res, i, item)
@@ -355,7 +357,7 @@ cdef class DesCompositeType(_DesParameterizedType):
             buf.ptr = buf.ptr + 2 + element_length + 1
             buf.size = buf.size - (2 + element_length + 1)
             deserializer = self.deserializers[i]
-            item = deserializer.deserialize(&elem_buf, protocol_version)
+            item = from_binary(deserializer, &elem_buf, protocol_version)
             tuple_set(res, i, item)
 
         return res
@@ -366,12 +368,26 @@ DesDynamicCompositeType = DesCompositeType
 
 cdef class DesReversedType(_DesSingleParamType):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        return self.deserializer.deserialize(buf, protocol_version)
+        return from_binary(self.deserializer, buf, protocol_version)
 
 
 cdef class DesFrozenType(_DesSingleParamType):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        return self.deserializer.deserialize(buf, protocol_version)
+        return from_binary(self.deserializer, buf, protocol_version)
+
+#--------------------------------------------------------------------------
+
+cdef _ret_empty(Deserializer deserializer, Py_ssize_t buf_size):
+    """
+    Decide whether to return None or EMPTY when a buffer size is
+    zero or negative. This is used by from_binary in deserializers.pxd.
+    """
+    if buf_size < 0:
+        return None
+    elif deserializer.cqltype.support_empty_values:
+        return cqltypes.EMPTY
+    else:
+        return None
 
 #--------------------------------------------------------------------------
 # Generic deserialization
@@ -380,11 +396,6 @@ cdef class GenericDeserializer(Deserializer):
     """
     Wrap a generic datatype for deserialization
     """
-
-    cdef object cqltype
-
-    def __init__(self, cqltype):
-        self.cqltype = cqltype
 
     cdef deserialize(self, Buffer *buf, int protocol_version):
         return self.cqltype.deserialize(to_bytes(buf), protocol_version)
@@ -401,31 +412,33 @@ def make_deserializers(cqltypes):
 cpdef Deserializer find_deserializer(cqltype):
     """Find a deserializer for a cqltype"""
     name = 'Des' + cqltype.__name__
+
     if name in globals():
-        deserializer_cls =  globals()[name]
-        deserializer_cls()
+        cls = globals()[name]
     elif issubclass(cqltype, cqltypes.ListType):
-        return DesListType
+        cls = DesListType
     elif issubclass(cqltype, cqltypes.SetType):
-        return DesSetType
+        cls = DesSetType
     elif issubclass(cqltype, cqltypes.MapType):
-        return DesMapType
+        cls = DesMapType
     elif issubclass(cqltype, cqltypes.UserType):
         # UserType is a subclass of TupleType, so should precede it
-        return DesUserType
+        cls = DesUserType
     elif issubclass(cqltype, cqltypes.TupleType):
-        return DesTupleType
+        cls = DesTupleType
     elif issubclass(cqltype, cqltypes.DynamicCompositeType):
         # DynamicCompositeType is a subclass of CompositeType, so should precede it
-        return DesDynamicCompositeType
+        cls = DesDynamicCompositeType
     elif issubclass(cqltype, cqltypes.CompositeType):
-        return DesCompositeType
+        cls = DesCompositeType
     elif issubclass(cqltype, cqltypes.ReversedType):
-        return DesReversedType
+        cls = DesReversedType
     elif issubclass(cqltype, cqltypes.FrozenType):
-        return DesFrozenType
+        cls = DesFrozenType
+    else:
+        cls = GenericDeserializer
 
-    return GenericDeserializer(cqltype)
+    return cls(cqltype)
 
 
 def obj_array(list objs):

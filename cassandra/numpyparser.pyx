@@ -17,7 +17,7 @@ from libc.stdint cimport uint64_t
 from cpython.ref cimport Py_INCREF, PyObject
 
 from cassandra.bytesio cimport BytesIOReader
-from cassandra.deserializers cimport Deserializer
+from cassandra.deserializers cimport Deserializer, from_binary
 from cassandra.parsing cimport ParseDesc, ColumnParser, RowParser
 from cassandra import cqltypes
 from cassandra.util import is_little_endian
@@ -125,9 +125,11 @@ cdef inline int unpack_row(
         get_buf(reader, &buf)
         arr = arrays[i]
 
+        if buf.size == 0:
+            raise ValueError("Cannot handle NULL value")
         if arr.is_object:
             deserializer = desc.deserializers[i]
-            val = deserializer.deserialize(&buf, desc.protocol_version)
+            val = from_binary(deserializer, &buf, desc.protocol_version)
             Py_INCREF(val)
             (<PyObject **> arr.buf_ptr)[0] = <PyObject *> val
         else:

@@ -12,7 +12,7 @@ cdef inline int get_buf(BytesIOReader reader, Buffer *buf_out) except -1:
     """
     cdef Py_ssize_t raw_val_size = read_int(reader)
     if raw_val_size < 0:
-        raise ValueError("Expected positive item size")
+        raw_val_size = 0
 
     buf_out.ptr = reader.read(raw_val_size)
     buf_out.size = raw_val_size
