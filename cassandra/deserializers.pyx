@@ -51,7 +51,9 @@ cdef class DesUUIDType(Deserializer):
 
 cdef class DesBooleanType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        return bool(int8_unpack(buf.ptr))
+        if int8_unpack(buf.ptr):
+            return True
+        return False
 
 
 cdef class DesByteType(Deserializer):
@@ -184,10 +186,11 @@ cdef class DesListType(_DesSingleParamType):
             result = _deserialize_list_or_set[uint16_t](
                 v2_and_below, buf, protocol_version, self.deserializer)
 
-        return self.cqltype.adapter(result)
+        return result
 
-
-DesSetType = DesListType
+cdef class DesSetType(DesListType):
+    cdef deserialize(self, Buffer *buf, int protocol_version):
+        return util.sortedset(DesListType.deserialize(self, buf, protocol_version))
 
 
 ctypedef fused itemlen_t:
