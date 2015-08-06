@@ -300,7 +300,7 @@ class _CassandraType(object):
         Given a set of other CassandraTypes, create a new subtype of this type
         using them as parameters. This is how composite types are constructed.
 
-            >>> MapType.apply_parameters(DateType, BooleanType)
+            >>> MapType.apply_parameters([DateType, BooleanType])
             <class 'cassandra.types.MapType(DateType, BooleanType)'>
 
         `subtypes` will be a sequence of CassandraTypes.  If provided, `names`

@@ -13,6 +13,7 @@ import inspect
 from decimal import Decimal
 from uuid import UUID
 
+from cassandra import cqltypes
 from cassandra import util
 
 
@@ -152,46 +153,56 @@ cdef class _DesParameterizedType(Deserializer):
         self.subtypes = cqltype.subtypes
         self.deserializers = make_deserializers(cqltype.subtypes)
 
+#--------------------------------------------------------------------------
+# List and set deserialization
 
-cdef class _DesSimpleParameterizedType(_DesParameterizedType):
+cdef class DesListType(_DesParameterizedType):
+
+    cdef Deserializer deserializer
+
+    def __init__(self, cqltype):
+        super().__init__(cqltype)
+        self.deserializer = self.deserializers[0]
+
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        cdef uint16_t v2_and_below = 0
-        cdef int32_t v3_and_above = 0
+        cdef uint16_t v2_and_below = 2
+        cdef int32_t v3_and_above = 3
 
         if protocol_version >= 3:
-            result = _deserialize_parameterized[int32_t](
-                v3_and_above, self.deserializers[0], buf, protocol_version)
+            result = _deserialize_list_or_set[int32_t](
+                v3_and_above, buf, protocol_version, self.deserializer)
         else:
-            result = _deserialize_parameterized[uint16_t](
-                v2_and_below, self.deserializers[0], buf, protocol_version)
+            result = _deserialize_list_or_set[uint16_t](
+                v2_and_below, buf, protocol_version, self.deserializer)
+
         return self.adapter(result)
+
+
+DesSetType = DesListType
 
 
 ctypedef fused itemlen_t:
     uint16_t # protocol <= v2
     int32_t  # protocol >= v3
 
+cdef list _deserialize_list_or_set(itemlen_t dummy_version,
+                                   Buffer *buf, int protocol_version,
+                                   Deserializer deserializer):
+    """
+    Deserialize a list or set.
 
-cdef itemlen_t _unpack(itemlen_t dummy, const char *buf):
-    cdef itemlen_t result
-    if itemlen_t is uint16_t:
-        result = uint16_unpack(buf)
-    else:
-        result = int32_unpack(buf)
-    return result
-
-cdef list _deserialize_parameterized(
-        itemlen_t dummy, Deserializer deserializer,
-        Buffer *buf, int protocol_version):
+    The 'dummy' parameter is needed to make fused types work, so that
+    we can specialize on the protocol version.
+    """
     cdef itemlen_t itemlen
     cdef Buffer sub_buf
 
-    cdef itemlen_t numelements = _unpack[itemlen_t](dummy, buf.ptr)
+    cdef itemlen_t numelements = _unpack[itemlen_t](dummy_version, buf.ptr)
     cdef itemlen_t p = sizeof(itemlen_t)
     cdef list result = []
 
     for _ in range(numelements):
-        itemlen = _unpack[itemlen_t](dummy, buf.ptr + p)
+        itemlen = _unpack[itemlen_t](dummy_version, buf.ptr + p)
         p += sizeof(itemlen_t)
         sub_buf.ptr = buf.ptr + p
         sub_buf.size = itemlen
@@ -200,46 +211,80 @@ cdef list _deserialize_parameterized(
 
     return result
 
-# cdef deserialize_v3_and_above(
-#         Deserializer deserializer, Buffer *buf, int protocol_version):
-#     cdef Py_ssize_t itemlen
-#     cdef Buffer sub_buf
-#
-#     cdef Py_ssize_t numelements = int32_unpack(buf.ptr)
-#     cdef Py_ssize_t p = 4
-#     cdef list result = []
-#
-#     for _ in range(numelements):
-#         itemlen = int32_unpack(buf.ptr + p)
-#         p += 4
-#         sub_buf.ptr = buf.ptr + p
-#         sub_buf.size = itemlen
-#         p += itemlen
-#         result.append(deserializer.deserialize(&sub_buf, protocol_version))
-#
-#     return result
-#
-#
-# cdef deserialize_v2_and_below(
-#         Deserializer deserializer, Buffer *buf, int protocol_version):
-#     cdef Py_ssize_t itemlen
-#     cdef Buffer sub_buf
-#
-#     cdef Py_ssize_t numelements = uint16_unpack(buf.ptr)
-#     cdef Py_ssize_t p = 2
-#     cdef list result = []
-#
-#     for _ in range(numelements):
-#         itemlen = uint16_unpack(buf.ptr + p)
-#         p += 2
-#         sub_buf.ptr = buf.ptr + p
-#         sub_buf.size = itemlen
-#         p += itemlen
-#         result.append(deserializer.deserialize(&sub_buf, protocol_version))
-#
-#     return result
+cdef itemlen_t _unpack(itemlen_t dummy_version, const char *buf):
+    cdef itemlen_t result
+    if itemlen_t is uint16_t:
+        result = uint16_unpack(buf)
+    else:
+        result = int32_unpack(buf)
+    return result
+
+#--------------------------------------------------------------------------
+# Map deserialization
+
+cdef class DesMapType(_DesParameterizedType):
+
+    cdef Deserializer key_deserializer, val_deserializer
+
+    def __init__(self, cqltype):
+        super().__init__(cqltype)
+        self.key_deserializer = self.deserializers[0]
+        self.val_deserializer = self.deserializers[1]
+
+    cdef deserialize(self, Buffer *buf, int protocol_version):
+        cdef uint16_t v2_and_below = 0
+        cdef int32_t v3_and_above = 0
+        key_type, val_type = self.cqltype.subtypes
+
+        if protocol_version >= 3:
+            result = _deserialize_map[int32_t](
+                v3_and_above, buf, protocol_version,
+                self.key_deserializer, self.val_deserializer,
+                key_type, val_type)
+        else:
+            result = _deserialize_map[uint16_t](
+                v2_and_below, buf, protocol_version,
+                self.key_deserializer, self.val_deserializer,
+                key_type, val_type)
+
+        return self.adapter(result)
 
 
+cdef _deserialize_map(itemlen_t dummy_version,
+                      Buffer *buf, int protocol_version,
+                      Deserializer key_deserializer, Deserializer val_deserializer,
+                      key_type, val_type):
+    cdef itemlen_t itemlen, val_len, key_len
+    cdef Buffer key_buf, val_buf
+
+    cdef itemlen_t numelements = _unpack[itemlen_t](dummy_version, buf.ptr)
+    cdef itemlen_t p = sizeof(itemlen_t)
+    cdef list result = []
+
+    numelements = _unpack[itemlen_t](dummy_version, buf.ptr)
+    p = sizeof(itemlen_t)
+    themap = util.OrderedMapSerializedKey(key_type, protocol_version)
+    for _ in range(numelements):
+        key_len = _unpack[itemlen_t](dummy_version, buf.ptr + p)
+        p += sizeof(itemlen_t)
+        # keybytes = byts[p:p + key_len]
+        key_buf.ptr = buf.ptr + p
+        key_buf.size = key_len
+        p += key_len
+        val_len = _unpack(dummy_version, buf.ptr + p)
+        p += sizeof(itemlen_t)
+        # valbytes = byts[p:p + val_len]
+        val_buf.ptr = buf.ptr + p
+        val_buf.size = val_len
+        p += val_len
+        key = key_deserializer.deserialize(&key_buf, protocol_version)
+        val = val_deserializer.deserialize(&val_buf, protocol_version)
+        themap._insert_unchecked(key, to_bytes(&key_buf), val)
+
+    return themap
+
+#--------------------------------------------------------------------------
+# Generic deserialization
 
 cdef class GenericDeserializer(Deserializer):
     """
@@ -255,6 +300,7 @@ cdef class GenericDeserializer(Deserializer):
         return self.cqltype.deserialize(to_bytes(buf), protocol_version)
 
 #--------------------------------------------------------------------------
+# Helper utilities
 
 def make_deserializers(cqltypes):
     """Create an array of Deserializers for each given cqltype in cqltypes"""
@@ -264,10 +310,16 @@ def make_deserializers(cqltypes):
 
 cpdef Deserializer find_deserializer(cqltype):
     """Find a deserializer for a cqltype"""
-    name = inspect.isclass(cqltype) and 'Des' + cqltype.__name__
+    name = 'Des' + cqltype.__name__
     if name in globals():
         deserializer_cls =  globals()[name]
         deserializer_cls()
+    elif issubclass(cqltype, cqltypes.ListType):
+        return DesListType
+    elif issubclass(cqltype, cqltypes.SetType):
+        return DesSetType
+    elif issubclass(cqltype, cqltypes.MapType):
+        return DesMapType
     return GenericDeserializer(cqltype)
 
 
