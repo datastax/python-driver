@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from itertools import cycle
+from six import next
 import sys, logging, traceback
 
 from cassandra import InvalidRequest, ConsistencyLevel, ReadTimeout, WriteTimeout, OperationTimedOut, \
@@ -151,8 +152,9 @@ class ClusterTests(unittest.TestCase):
 
             results = self.execute_concurrent_args_helper(self.session, statement, parameters, results_generator=True)
             for i in range(num_statements):
-                result = results.next()
+                result = next(results)
                 self.assertEqual((True, [(i,)]), result)
+            self.assertRaises(StopIteration, next, results)
 
     def test_execute_concurrent_paged_result(self):
         if PROTOCOL_VERSION < 2:
@@ -175,7 +177,6 @@ class ClusterTests(unittest.TestCase):
             "SELECT * FROM test3rf.test LIMIT %s",
             consistency_level=ConsistencyLevel.QUORUM,
             fetch_size=int(num_statements / 2))
-        parameters = [(i, ) for i in range(num_statements)]
 
         results = self.execute_concurrent_args_helper(self.session, statement, [(num_statements,)])
         self.assertEqual(1, len(results))
@@ -216,7 +217,6 @@ class ClusterTests(unittest.TestCase):
             "SELECT * FROM test3rf.test LIMIT %s",
             consistency_level=ConsistencyLevel.QUORUM,
             fetch_size=int(num_statements / 2))
-        parameters = [(i, ) for i in range(num_statements)]
 
         paged_results_gen = self.execute_concurrent_args_helper(self.session, statement, [(num_statements,)], results_generator=True)
 
