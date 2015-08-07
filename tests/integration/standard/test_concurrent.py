@@ -24,6 +24,8 @@ from cassandra.query import tuple_factory, SimpleStatement
 
 from tests.integration import use_singledc, PROTOCOL_VERSION
 
+from six import next
+
 try:
     import unittest2 as unittest
 except ImportError:
@@ -151,7 +153,7 @@ class ClusterTests(unittest.TestCase):
 
             results = self.execute_concurrent_args_helper(self.session, statement, parameters, results_generator=True)
             for i in range(num_statements):
-                result = results.next()
+                result = next(results)
                 self.assertEqual((True, [(i,)]), result)
 
     def test_execute_concurrent_paged_result(self):
