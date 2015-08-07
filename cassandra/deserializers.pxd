@@ -21,8 +21,11 @@ cdef class Deserializer:
 cdef inline object from_binary(Deserializer deserializer,
                                Buffer *buf,
                                int protocol_version):
-    if buf.size <= 0 and not deserializer.empty_binary_ok:
+    if buf.size < 0:
+        return None
+    elif buf.size == 0 and not deserializer.empty_binary_ok:
         return _ret_empty(deserializer, buf.size)
-    return deserializer.deserialize(buf, protocol_version)
+    else:
+        return deserializer.deserialize(buf, protocol_version)
 
 cdef _ret_empty(Deserializer deserializer, Py_ssize_t buf_size)
