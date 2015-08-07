@@ -64,6 +64,11 @@ cdef class DesByteType(Deserializer):
 
 
 cdef class DesAsciiType(Deserializer):
+
+    def __init__(self, cqltype):
+        super().__init__(cqltype)
+        self.empty_binary_ok = True
+
     cdef deserialize(self, Buffer *buf, int protocol_version):
         if six.PY2:
             return to_bytes(buf)
@@ -144,6 +149,10 @@ cdef class DesTimeType(Deserializer):
 
 
 cdef class DesUTF8Type(Deserializer):
+    def __init__(self, cqltype):
+        super().__init__(cqltype)
+        self.empty_binary_ok = True
+
     cdef deserialize(self, Buffer *buf, int protocol_version):
         return to_bytes(buf).decode('utf8')
 
