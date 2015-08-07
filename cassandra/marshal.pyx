@@ -177,6 +177,7 @@ cpdef varint_unpack(term):
 # TODO: Optimize these two functions
 def varint_unpack_py3(term):
     cdef int64_t one = 1L
+
     val = int(''.join("%02x" % i for i in term), 16)
     if (term[0] & 128) != 0:
         # There is a bug in Cython (0.20 - 0.22), where if we do

@@ -36,8 +36,13 @@ cdef class DesLongType(Deserializer):
 # TODO: Use libmpdec: http://www.bytereef.org/mpdecimal/index.html
 cdef class DesDecimalType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
+        cdef Buffer varint_buf
+        varint_buf.ptr = buf.ptr + 4
+        varint_buf.size = buf.size - 4
+
         scale = int32_unpack(buf.ptr)
-        unscaled = varint_unpack(buf.ptr + 4)
+        unscaled = varint_unpack(to_bytes(&varint_buf))
+
         return Decimal('%de%d' % (unscaled, -scale))
 
 
