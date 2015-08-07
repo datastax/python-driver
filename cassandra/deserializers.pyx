@@ -3,19 +3,16 @@
 from libc.stdint cimport int32_t, uint16_t
 
 include 'marshal.pyx'
-include 'cython_utils.pyx'
 from cassandra.buffer cimport Buffer, to_bytes
-from cassandra.parsing cimport ParseDesc, RowParser
+from cassandra.cython_utils cimport datetime_from_timestamp
 
 from cython.view cimport array as cython_array
 from cassandra.tuple cimport tuple_new, tuple_set
 
 import socket
-import inspect
 from decimal import Decimal
 from uuid import UUID
 
-from cassandra.objparser import TupleRowParser
 from cassandra import cqltypes
 from cassandra import util
 
@@ -107,7 +104,7 @@ cdef class DesCounterColumnType(DesLongType):
 
 cdef class DesDateType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        timestamp = int64_unpack(buf.ptr) / 1000.0
+        cdef double timestamp = int64_unpack(buf.ptr) / 1000.0
         return datetime_from_timestamp(timestamp)
 
 

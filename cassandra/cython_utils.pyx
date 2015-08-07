@@ -23,5 +23,7 @@ is_little_endian = sys.byteorder == 'little'
 
 import_datetime()
 
-cdef datetime_from_timestamp(timestamp):
-    return DATETIME_EPOC + timedelta_new(0, timestamp, 0)
+cdef datetime_from_timestamp(double timestamp):
+    cdef int seconds = <int> timestamp
+    cdef int microseconds = (<int64_t> (timestamp * 1000000)) % 1000000
+    return DATETIME_EPOC + timedelta_new(0, seconds, microseconds)
