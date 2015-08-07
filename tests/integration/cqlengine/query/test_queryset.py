@@ -629,7 +629,7 @@ class TestMinMaxTimeUUIDFunctions(BaseCassEngTestCase):
         # test kwarg filtering
         q = TimeUUIDQueryModel.filter(partition=pk, time__lte=functions.MaxTimeUUID(midpoint))
         q = [d for d in q]
-        assert len(q) == 2
+        self.assertEqual(len(q), 2, msg="Got: %s" % q)
         datas = [d.data for d in q]
         assert '1' in datas
         assert '2' in datas

@@ -95,7 +95,7 @@ cdef class DesInetAddressType(Deserializer):
         cdef bytes byts = to_bytes(buf)
 
         # TODO: optimize inet_ntop, inet_ntoa
-        if len(buf.size) == 16:
+        if buf.size == 16:
             return util.inet_ntop(socket.AF_INET6, byts)
         else:
             # util.inet_pton could also handle, but this is faster
@@ -162,6 +162,7 @@ cdef class _DesParameterizedType(Deserializer):
         super().__init__(cqltype)
         self.subtypes = cqltype.subtypes
         self.deserializers = make_deserializers(cqltype.subtypes)
+        self.subtypes_len = len(self.subtypes)
 
 
 cdef class _DesSingleParamType(_DesParameterizedType):
@@ -352,6 +353,14 @@ cdef class DesCompositeType(_DesParameterizedType):
         for i in range(self.subtypes_len):
             if not buf.size:
                 # CompositeType can have missing elements at the end
+
+                # Fill the tuple with None values and slice it
+                #
+                # (I'm not sure a tuple needs to be fully initialized before
+                #  it can be destroyed, so play it safe)
+                for j in range(i, self.subtypes_len):
+                    tuple_set(res, j, None)
+                res = res[:i]
                 break
 
             element_length = uint16_unpack(buf.ptr)
