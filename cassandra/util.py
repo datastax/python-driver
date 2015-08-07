@@ -493,8 +493,7 @@ except ImportError:
 
         def __init__(self, iterable=()):
             self._items = []
-            for i in iterable:
-                self.add(i)
+            self.update(iterable)
 
         def __len__(self):
             return len(self._items)
@@ -566,6 +565,10 @@ except ImportError:
                     self._items.insert(i, item)
             else:
                 self._items.append(item)
+
+        def update(self, iterable):
+            for i in iterable:
+                self.add(i)
 
         def clear(self):
             del self._items[:]
