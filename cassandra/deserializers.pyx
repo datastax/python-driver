@@ -259,7 +259,7 @@ cdef class DesMapType(_DesParameterizedType):
                 self.key_deserializer, self.val_deserializer,
                 key_type, val_type)
 
-        return self.adapter(result)
+        return result
 
 
 cdef _deserialize_map(itemlen_t dummy_version,
