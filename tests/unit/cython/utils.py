@@ -1,9 +1,4 @@
-try:
-    import tests.unit.cython.dummy_module
-except ImportError:
-    have_cython = False
-else:
-    have_cython = True
+from cassandra.cython_deps import HAVE_CYTHON, HAVE_NUMPY
 
 try:
     import unittest2 as unittest
@@ -18,10 +13,11 @@ def cyimport(import_path):
     try:
         return __import__(import_path, fromlist=True)
     except ImportError:
-        if have_cython:
+        if HAVE_CYTHON:
             raise
         return None
 
 # @cythontest
 # def test_something(self): ...
-cythontest = unittest.skipUnless(have_cython, 'Cython is not available')
+cythontest = unittest.skipUnless(HAVE_CYTHON, 'Cython is not available')
+numpytest  = unittest.skipUnless(HAVE_CYTHON and HAVE_NUMPY, 'NumPy is not available')

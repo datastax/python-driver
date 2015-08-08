@@ -3,3 +3,9 @@ try:
     HAVE_CYTHON = True
 except ImportError:
     HAVE_CYTHON = False
+
+try:
+    import numpy
+    HAVE_NUMPY = True
+except ImportError:
+    HAVE_NUMPY = False

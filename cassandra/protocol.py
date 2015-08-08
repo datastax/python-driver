@@ -40,7 +40,7 @@ from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 TupleType, lookup_casstype, SimpleDateType,
                                 TimeType, ByteType, ShortType)
 from cassandra.policies import WriteType
-from cassandra.cython_deps import HAVE_CYTHON
+from cassandra.cython_deps import HAVE_CYTHON, HAVE_NUMPY
 from cassandra import util
 
 log = logging.getLogger(__name__)
@@ -1039,14 +1039,17 @@ def cython_protocol_handler(colparser):
 
 if HAVE_CYTHON:
     from cassandra.objparser import ListParser, LazyParser
-    from cassandra.numpyparser import NumpyParser
-
     ProtocolHandler = cython_protocol_handler(ListParser())
     LazyProtocolHandler = cython_protocol_handler(LazyParser())
-    NumpyProtocolHandler = cython_protocol_handler(NumpyParser())
 else:
     # Use Python-based ProtocolHandler
     LazyProtocolHandler = None
+
+
+if HAVE_CYTHON and HAVE_NUMPY:
+    from cassandra.numpyparser import NumpyParser
+    NumpyProtocolHandler = cython_protocol_handler(NumpyParser())
+else:
     NumpyProtocolHandler = None
 
 
