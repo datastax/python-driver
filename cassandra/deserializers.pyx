@@ -16,21 +16,20 @@ from uuid import UUID
 from cassandra import cqltypes
 from cassandra import util
 
-
 cdef class Deserializer:
     """Cython-based deserializer class for a cqltype"""
 
     def __init__(self, cqltype):
         self.cqltype = cqltype
-        self.empty_binary_ok = False
+        self.empty_binary_ok = cqltype.empty_binary_ok
 
     cdef deserialize(self, Buffer *buf, int protocol_version):
         raise NotImplementedError
 
 
-cdef class DesLongType(Deserializer):
+cdef class DesBytesType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        return int64_unpack(buf.ptr)
+        return to_bytes(buf)
 
 
 # TODO: Use libmpdec: http://www.bytereef.org/mpdecimal/index.html
@@ -64,11 +63,6 @@ cdef class DesByteType(Deserializer):
 
 
 cdef class DesAsciiType(Deserializer):
-
-    def __init__(self, cqltype):
-        super().__init__(cqltype)
-        self.empty_binary_ok = True
-
     cdef deserialize(self, Buffer *buf, int protocol_version):
         if six.PY2:
             return to_bytes(buf)
@@ -83,6 +77,11 @@ cdef class DesFloatType(Deserializer):
 cdef class DesDoubleType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
         return double_unpack(buf.ptr)
+
+
+cdef class DesLongType(Deserializer):
+    cdef deserialize(self, Buffer *buf, int protocol_version):
+        return int64_unpack(buf.ptr)
 
 
 cdef class DesInt32Type(Deserializer):
@@ -149,10 +148,6 @@ cdef class DesTimeType(Deserializer):
 
 
 cdef class DesUTF8Type(Deserializer):
-    def __init__(self, cqltype):
-        super().__init__(cqltype)
-        self.empty_binary_ok = True
-
     cdef deserialize(self, Buffer *buf, int protocol_version):
         return to_bytes(buf).decode('utf8')
 
@@ -320,21 +315,24 @@ cdef class DesTupleType(_DesParameterizedType):
         cdef Buffer item_buf
         cdef Deserializer deserializer
 
+        # collections inside UDTs are always encoded with at least the
+        # version 3 format
         protocol_version = max(3, protocol_version)
 
         p = 0
         values = []
         for i in range(self.subtypes_len):
             item = None
-            if p != buf.size:
+            if p < buf.size:
                 itemlen = int32_unpack(buf.ptr + p)
                 p += 4
                 if itemlen >= 0:
                     item_buf.ptr = buf.ptr + p
                     item_buf.size = itemlen
+                    p += itemlen
+
                     deserializer = self.deserializers[i]
                     item = from_binary(deserializer, &item_buf, protocol_version)
-                    p += itemlen
 
             tuple_set(res, i, item)
 
@@ -422,6 +420,9 @@ cdef class GenericDeserializer(Deserializer):
 
     cdef deserialize(self, Buffer *buf, int protocol_version):
         return self.cqltype.deserialize(to_bytes(buf), protocol_version)
+
+    def __repr__(self):
+        return "GenericDeserializer(%s)" % (self.cqltype,)
 
 #--------------------------------------------------------------------------
 # Helper utilities
