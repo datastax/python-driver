@@ -23,7 +23,7 @@ from cassandra import cqltypes
 from cassandra.util import is_little_endian
 
 import numpy as np
-
+# import pandas as pd
 
 cdef extern from "numpyFlags.h":
     # Include 'numpyFlags.h' into the generated C code to disable the
@@ -74,8 +74,10 @@ cdef class NumpyParser(ColumnParser):
         for i in range(rowcount):
             unpack_row(reader, desc, arrs)
 
-        return [make_native_byteorder(arr) for arr in arrays]
-        # return pd.DataFrame(dict(zip(desc.colnames, arrays)))
+        arrays = [make_native_byteorder(arr) for arr in arrays]
+        result = dict(zip(desc.colnames, arrays))
+        # return pd.DataFrame(result)
+        return result
 
 
 ### Helper functions to create NumPy arrays and array descriptors

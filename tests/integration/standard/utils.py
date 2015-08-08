@@ -4,15 +4,16 @@ Helper module to populate a dummy Cassandra tables with data.
 
 from tests.integration.datatype_utils import PRIMITIVE_DATATYPES, get_sample
 
-def create_table_with_all_types(table_name, session):
+def create_table_with_all_types(table_name, session, N):
     """
     Method that given a table_name and session construct a table that contains
     all possible primitive types.
 
     :param table_name: Name of table to create
     :param session: session to use for table creation
-    :return: a string containing the names of all the columns.
-             This can be used to query the table.
+    :param N: the number of items to insert into the table
+
+    :return: a list of column names
     """
     # create table
     alpha_type_list = ["primkey int PRIMARY KEY"]
@@ -26,21 +27,27 @@ def create_table_with_all_types(table_name, session):
                         table_name, ', '.join(alpha_type_list)), timeout=120)
 
     # create the input
-    params = get_all_primitive_params()
 
-    # insert into table as a simple statement
-    columns_string = ', '.join(col_names)
-    placeholders = ', '.join(["%s"] * len(col_names))
-    session.execute("INSERT INTO {0} ({1}) VALUES ({2})".format(
-                        table_name, columns_string, placeholders), params, timeout=120)
-    return columns_string
+    for key in range(N):
+        params = get_all_primitive_params(key)
+
+        # insert into table as a simple statement
+        columns_string = ', '.join(col_names)
+        placeholders = ', '.join(["%s"] * len(col_names))
+        session.execute("INSERT INTO {0} ({1}) VALUES ({2})".format(
+                            table_name, columns_string, placeholders), params, timeout=120)
+    return col_names
 
 
-def get_all_primitive_params():
+def get_all_primitive_params(key):
     """
     Simple utility method used to give back a list of all possible primitive data sample types.
     """
-    params = [0]
+    params = [key]
     for datatype in PRIMITIVE_DATATYPES:
         params.append(get_sample(datatype))
     return params
+
+
+def get_primitive_datatypes():
+    return ['int'] + list(PRIMITIVE_DATATYPES)

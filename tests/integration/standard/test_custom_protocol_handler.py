@@ -107,10 +107,11 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         session.client_protocol_handler = CustomProtocolHandlerResultMessageTracked
         session.row_factory = tuple_factory
 
-        columns_string = create_table_with_all_types("alltypes", session)
+        colnames = create_table_with_all_types("alltypes", session, 1)
+        columns_string = ", ".join(colnames)
 
         # verify data
-        params = get_all_primitive_params()
+        params = get_all_primitive_params(0)
         results = session.execute("SELECT {0} FROM alltypes WHERE primkey=0".format(columns_string))[0]
         for expected, actual in zip(params, results):
             self.assertEqual(actual, expected)

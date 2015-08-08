@@ -17,6 +17,7 @@ def cyimport(import_path):
             raise
         return None
 
+
 # @cythontest
 # def test_something(self): ...
 cythontest = unittest.skipUnless(HAVE_CYTHON, 'Cython is not available')
