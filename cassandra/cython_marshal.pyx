@@ -21,6 +21,7 @@ import math
 
 from libc.stdint cimport (int8_t, int16_t, int32_t, int64_t,
                           uint8_t, uint16_t, uint32_t, uint64_t)
+from cassandra.buffer cimport Buffer, buf_read
 
 cdef bint is_little_endian
 from cassandra.util import is_little_endian
@@ -66,82 +67,81 @@ cdef inline Py_ssize_t div2(Py_ssize_t x):
 
 ### Packing and unpacking of signed integers
 
-cpdef inline bytes int64_pack(int64_t x):
+cdef inline bytes int64_pack(int64_t x):
     return pack(<char *> &x, 8)
 
-cpdef inline int64_t int64_unpack(const char *buf):
-    # The 'const' makes sure the buffer is not mutated in-place!
-    cdef int64_t x = (<int64_t *> buf)[0]
+cdef inline int64_t int64_unpack(Buffer *buf):
+    cdef int64_t x = (<int64_t *> buf_read(buf, 8))[0]
     cdef char *p = <char *> &x
     swap_order(<char *> &x, 8)
     return x
 
-cpdef inline bytes int32_pack(int32_t x):
+cdef inline bytes int32_pack(int32_t x):
     return pack(<char *> &x, 4)
 
-cpdef inline int32_t int32_unpack(const char *buf):
-    cdef int32_t x = (<int32_t *> buf)[0]
+cdef inline int32_t int32_unpack(Buffer *buf):
+    cdef int32_t x = (<int32_t *> buf_read(buf, 4))[0]
     cdef char *p = <char *> &x
     swap_order(<char *> &x, 4)
     return x
 
-cpdef inline bytes int16_pack(int16_t x):
+cdef inline bytes int16_pack(int16_t x):
     return pack(<char *> &x, 2)
 
-cpdef inline int16_t int16_unpack(const char *buf):
-    cdef int16_t x = (<int16_t *> buf)[0]
+cdef inline int16_t int16_unpack(Buffer *buf):
+    cdef int16_t x = (<int16_t *> buf_read(buf, 2))[0]
     swap_order(<char *> &x, 2)
     return x
 
-cpdef inline bytes int8_pack(int8_t x):
+cdef inline bytes int8_pack(int8_t x):
     return (<char *> &x)[:1]
 
-cpdef inline int8_t int8_unpack(const char *buf):
-    return (<int8_t *> buf)[0]
+cdef inline int8_t int8_unpack(Buffer *buf):
+    return (<int8_t *> buf_read(buf, 1))[0]
 
-cpdef inline bytes uint64_pack(uint64_t x):
+cdef inline bytes uint64_pack(uint64_t x):
     return pack(<char *> &x, 8)
 
-cpdef inline uint64_t uint64_unpack(const char *buf):
-    cdef uint64_t x = (<uint64_t *> buf)[0]
+cdef inline uint64_t uint64_unpack(Buffer *buf):
+    cdef uint64_t x = (<uint64_t *> buf_read(buf, 8))[0]
     swap_order(<char *> &x, 8)
     return x
 
-cpdef inline bytes uint32_pack(uint32_t x):
+cdef inline bytes uint32_pack(uint32_t x):
     return pack(<char *> &x, 4)
 
-cpdef inline uint32_t uint32_unpack(const char *buf):
-    cdef uint32_t x = (<uint32_t *> buf)[0]
+cdef inline uint32_t uint32_unpack(Buffer *buf):
+    cdef uint32_t x = (<uint32_t *> buf_read(buf, 4))[0]
     swap_order(<char *> &x, 4)
     return x
 
-cpdef inline bytes uint16_pack(uint16_t x):
+cdef inline bytes uint16_pack(uint16_t x):
     return pack(<char *> &x, 2)
 
-cpdef inline uint16_t uint16_unpack(const char *buf):
-    cdef uint16_t x = (<uint16_t *> buf)[0]
+cdef inline uint16_t uint16_unpack(Buffer *buf):
+    cdef uint16_t x = (<uint16_t *> buf_read(buf, 2))[0]
     swap_order(<char *> &x, 2)
     return x
 
-cpdef inline bytes uint8_pack(uint8_t x):
+cdef inline bytes uint8_pack(uint8_t x):
     return pack(<char *> &x, 1)
 
-cpdef inline uint8_t uint8_unpack(const char *buf):
-    return (<uint8_t *> buf)[0]
+cdef inline uint8_t uint8_unpack(Buffer *buf):
+    return (<uint8_t *> buf_read(buf, 1))[0]
 
-cpdef inline bytes double_pack(double x):
+cdef inline bytes double_pack(double x):
     return pack(<char *> &x, 8)
 
-cpdef inline double double_unpack(const char *buf):
-    cdef double x = (<double *> buf)[0]
+cdef inline double double_unpack(Buffer *buf):
+    cdef double x = (<double *> buf_read(buf, 8))[0]
     swap_order(<char *> &x, 8)
     return x
 
-cpdef inline bytes float_pack(float x):
+cdef inline bytes float_pack(float x):
     return pack(<char *> &x, 4)
 
-cpdef inline float float_unpack(const char *buf):
-    cdef float x = (<float *> buf)[0]
+cdef inline float float_unpack(Buffer *buf):
+    cdef float x = (<float *> buf_read(buf, 4))[0]
     swap_order(<char *> &x, 4)
     return x
 
@@ -167,7 +167,7 @@ v3_header_pack = v3_header_struct.pack
 v3_header_unpack = v3_header_struct.unpack
 
 
-cpdef varint_unpack(term):
+cdef varint_unpack(term):
     """Unpack a variable-sized integer"""
     if PY3:
         return varint_unpack_py3(term)

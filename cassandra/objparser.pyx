@@ -40,6 +40,8 @@ cdef class TupleRowParser(RowParser):
     """
 
     cpdef unpack_row(self, BytesIOReader reader, ParseDesc desc):
+        assert desc.rowsize >= 0
+
         cdef Buffer buf
         cdef Py_ssize_t i, rowsize = desc.rowsize
         cdef Deserializer deserializer

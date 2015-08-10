@@ -16,8 +16,6 @@ cdef struct Buffer:
     char *ptr
     Py_ssize_t size
 
-cdef inline Buffer from_bytes(bytes byts):
-    return from_ptr_and_size(PyBytes_AS_STRING(byts), len(byts))
 
 cdef inline bytes to_bytes(Buffer *buf):
     return buf.ptr[:buf.size]
@@ -25,8 +23,23 @@ cdef inline bytes to_bytes(Buffer *buf):
 cdef inline char *buf_ptr(Buffer *buf):
     return buf.ptr
 
-cdef inline Buffer from_ptr_and_size(char *ptr, Py_ssize_t size):
-    cdef Buffer res
-    res.ptr = ptr
-    res.size = size
-    return res
+cdef inline char *buf_read(Buffer *buf, Py_ssize_t size) except NULL:
+    if size > buf.size:
+        raise IndexError("Requested more than length of buffer")
+    return buf.ptr
+
+cdef inline int slice_buffer(Buffer *buf, Buffer *out,
+                             Py_ssize_t start, Py_ssize_t size) except -1:
+    if size < 0:
+        raise ValueError("Length must be positive")
+
+    if start + size > buf.size:
+        raise IndexError("Buffer slice out of bounds")
+
+    out.ptr = buf.ptr + start
+    out.size = size
+    return 0
+
+cdef inline void from_ptr_and_size(char *ptr, Py_ssize_t size, Buffer *out):
+    out.ptr = ptr
+    out.size = size
