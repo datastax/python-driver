@@ -70,7 +70,7 @@ cdef inline Py_ssize_t div2(Py_ssize_t x):
 cdef inline bytes int64_pack(int64_t x):
     return pack(<char *> &x, 8)
 
-cdef inline int64_t int64_unpack(Buffer *buf):
+cdef inline int64_t int64_unpack(Buffer *buf) except ?0xDEAD:
     cdef int64_t x = (<int64_t *> buf_read(buf, 8))[0]
     cdef char *p = <char *> &x
     swap_order(<char *> &x, 8)
@@ -79,7 +79,7 @@ cdef inline int64_t int64_unpack(Buffer *buf):
 cdef inline bytes int32_pack(int32_t x):
     return pack(<char *> &x, 4)
 
-cdef inline int32_t int32_unpack(Buffer *buf):
+cdef inline int32_t int32_unpack(Buffer *buf) except ?0xDEAD:
     cdef int32_t x = (<int32_t *> buf_read(buf, 4))[0]
     cdef char *p = <char *> &x
     swap_order(<char *> &x, 4)
@@ -88,7 +88,7 @@ cdef inline int32_t int32_unpack(Buffer *buf):
 cdef inline bytes int16_pack(int16_t x):
     return pack(<char *> &x, 2)
 
-cdef inline int16_t int16_unpack(Buffer *buf):
+cdef inline int16_t int16_unpack(Buffer *buf) except ?0xDED:
     cdef int16_t x = (<int16_t *> buf_read(buf, 2))[0]
     swap_order(<char *> &x, 2)
     return x
@@ -96,13 +96,13 @@ cdef inline int16_t int16_unpack(Buffer *buf):
 cdef inline bytes int8_pack(int8_t x):
     return (<char *> &x)[:1]
 
-cdef inline int8_t int8_unpack(Buffer *buf):
+cdef inline int8_t int8_unpack(Buffer *buf) except ?80:
     return (<int8_t *> buf_read(buf, 1))[0]
 
 cdef inline bytes uint64_pack(uint64_t x):
     return pack(<char *> &x, 8)
 
-cdef inline uint64_t uint64_unpack(Buffer *buf):
+cdef inline uint64_t uint64_unpack(Buffer *buf) except ?0xDEAD:
     cdef uint64_t x = (<uint64_t *> buf_read(buf, 8))[0]
     swap_order(<char *> &x, 8)
     return x
@@ -110,7 +110,7 @@ cdef inline uint64_t uint64_unpack(Buffer *buf):
 cdef inline bytes uint32_pack(uint32_t x):
     return pack(<char *> &x, 4)
 
-cdef inline uint32_t uint32_unpack(Buffer *buf):
+cdef inline uint32_t uint32_unpack(Buffer *buf) except ?0xDEAD:
     cdef uint32_t x = (<uint32_t *> buf_read(buf, 4))[0]
     swap_order(<char *> &x, 4)
     return x
@@ -118,7 +118,7 @@ cdef inline uint32_t uint32_unpack(Buffer *buf):
 cdef inline bytes uint16_pack(uint16_t x):
     return pack(<char *> &x, 2)
 
-cdef inline uint16_t uint16_unpack(Buffer *buf):
+cdef inline uint16_t uint16_unpack(Buffer *buf) except ?0xDEAD:
     cdef uint16_t x = (<uint16_t *> buf_read(buf, 2))[0]
     swap_order(<char *> &x, 2)
     return x
@@ -126,13 +126,13 @@ cdef inline uint16_t uint16_unpack(Buffer *buf):
 cdef inline bytes uint8_pack(uint8_t x):
     return pack(<char *> &x, 1)
 
-cdef inline uint8_t uint8_unpack(Buffer *buf):
+cdef inline uint8_t uint8_unpack(Buffer *buf) except ?0xff:
     return (<uint8_t *> buf_read(buf, 1))[0]
 
 cdef inline bytes double_pack(double x):
     return pack(<char *> &x, 8)
 
-cdef inline double double_unpack(Buffer *buf):
+cdef inline double double_unpack(Buffer *buf) except ?1.74:
     cdef double x = (<double *> buf_read(buf, 8))[0]
     swap_order(<char *> &x, 8)
     return x
@@ -140,7 +140,7 @@ cdef inline double double_unpack(Buffer *buf):
 cdef inline bytes float_pack(float x):
     return pack(<char *> &x, 4)
 
-cdef inline float float_unpack(Buffer *buf):
+cdef inline float float_unpack(Buffer *buf) except ?1.74:
     cdef float x = (<float *> buf_read(buf, 4))[0]
     swap_order(<char *> &x, 4)
     return x

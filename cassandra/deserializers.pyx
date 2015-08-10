@@ -219,38 +219,52 @@ cdef list _deserialize_list_or_set(itemlen_t dummy_version,
     cdef Buffer itemlen_buf
     cdef Buffer elem_buf
 
-    cdef itemlen_t numelements = _unpack_len[itemlen_t](0, buf)
-    cdef itemlen_t idx = sizeof(itemlen_t)
+    cdef itemlen_t numelements
+    cdef itemlen_t idx
     cdef list result = []
 
+    _unpack_len[itemlen_t](0, &numelements, buf)
+    idx = sizeof(itemlen_t)
+
     for _ in range(numelements):
-        idx = subelem(buf, &elem_buf, idx)
+        subelem(buf, &elem_buf, &idx)
         result.append(from_binary(deserializer, &elem_buf, protocol_version))
 
     return result
 
 
-cdef inline itemlen_t subelem(
-        Buffer *buf, Buffer *elem_buf, itemlen_t idx):
+cdef inline int subelem(
+        Buffer *buf, Buffer *elem_buf, itemlen_t *idx_p) except -1:
+    """
+    Read the next element from the buffer: first read the size (in bytes) of the
+    element, then fill elem_buf with a newly sliced buffer of this size (and the
+    right offset).
+
+    NOTE:   The handling of 'idx' is somewhat atrocious, as there is a Cython
+            bug with the combination fused types + 'except' clause.
+            So instead, we pass in a pointer to 'idx', namely 'idx_p', and write
+            to this instead.
+    """
     cdef itemlen_t elemlen
 
-    elemlen = _unpack_len[itemlen_t](idx, buf)
-    idx += sizeof(itemlen_t)
-    slice_buffer(buf, elem_buf, idx, elemlen)
-    return idx + elemlen
+    _unpack_len[itemlen_t](idx_p[0], &elemlen, buf)
+    idx_p[0] += sizeof(itemlen_t)
+    slice_buffer(buf, elem_buf, idx_p[0], elemlen)
+    idx_p[0] += elemlen
+    return 0
 
 
-cdef itemlen_t _unpack_len(itemlen_t idx, Buffer *buf):
+cdef int _unpack_len(itemlen_t idx, itemlen_t *elemlen, Buffer *buf) except -1:
     cdef itemlen_t result
     cdef Buffer itemlen_buf
     slice_buffer(buf, &itemlen_buf, idx, sizeof(itemlen_t))
 
     if itemlen_t is uint16_t:
-        result = uint16_unpack(&itemlen_buf)
+        elemlen[0] = uint16_unpack(&itemlen_buf)
     else:
-        result = int32_unpack(&itemlen_buf)
+        elemlen[0] = int32_unpack(&itemlen_buf)
 
-    return result
+    return 0
 
 #--------------------------------------------------------------------------
 # Map deserialization
@@ -295,12 +309,12 @@ cdef _deserialize_map(itemlen_t dummy_version,
     cdef itemlen_t idx = sizeof(itemlen_t)
     cdef list result = []
 
-    numelements = _unpack_len[itemlen_t](0, buf)
+    _unpack_len[itemlen_t](0, &numelements, buf)
     idx = sizeof(itemlen_t)
     themap = util.OrderedMapSerializedKey(key_type, protocol_version)
     for _ in range(numelements):
-        idx = subelem(buf, &key_buf, idx)
-        idx = subelem(buf, &val_buf, idx)
+        subelem(buf, &key_buf, &idx)
+        subelem(buf, &val_buf, &idx)
         key = from_binary(key_deserializer, &key_buf, protocol_version)
         val = from_binary(val_deserializer, &val_buf, protocol_version)
         themap._insert_unchecked(key, to_bytes(&key_buf), val)
