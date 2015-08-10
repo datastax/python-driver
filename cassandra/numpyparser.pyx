@@ -63,7 +63,7 @@ cdef class NumpyParser(ColumnParser):
     """Decode a ResultMessage into a bunch of NumPy arrays"""
 
     cpdef parse_rows(self, BytesIOReader reader, ParseDesc desc):
-        cdef Py_ssize_t i, rowcount
+        cdef Py_ssize_t rowcount
         cdef ArrDesc[::1] array_descs
         cdef ArrDesc *arrs
 
@@ -71,13 +71,20 @@ cdef class NumpyParser(ColumnParser):
         array_descs, arrays = make_arrays(desc, rowcount)
         arrs = &array_descs[0]
 
-        for i in range(rowcount):
-            unpack_row(reader, desc, arrs)
+        _parse_rows(reader, desc, arrs, rowcount)
 
         arrays = [make_native_byteorder(arr) for arr in arrays]
         result = dict(zip(desc.colnames, arrays))
         # return pd.DataFrame(result)
         return result
+
+
+cdef _parse_rows(BytesIOReader reader, ParseDesc desc,
+                 ArrDesc *arrs, Py_ssize_t rowcount):
+    cdef Py_ssize_t i
+
+    for i in range(rowcount):
+        unpack_row(reader, desc, arrs)
 
 
 ### Helper functions to create NumPy arrays and array descriptors

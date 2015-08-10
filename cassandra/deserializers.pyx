@@ -16,6 +16,9 @@ from uuid import UUID
 from cassandra import cqltypes
 from cassandra import util
 
+cdef bint PY2 = six.PY2
+
+
 cdef class Deserializer:
     """Cython-based deserializer class for a cqltype"""
 
@@ -64,7 +67,7 @@ cdef class DesByteType(Deserializer):
 
 cdef class DesAsciiType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        if six.PY2:
+        if PY2:
             return to_bytes(buf)
         return to_bytes(buf).decode('ascii')
 
