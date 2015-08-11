@@ -894,7 +894,7 @@ class ProtocolHandler(object):
     result decoding implementations.
     """
 
-    @classmethod    
+    @classmethod
     def encode_message(cls, msg, stream_id, protocol_version, compressor):
         """
         Encodes a message using the specified frame parameters, and compressor

@@ -24,3 +24,17 @@ See :meth:`.Session.execute`, ::meth:`.Session.execute_async`, :attr:`.ResponseF
     .. automethod:: encode_message
 
     .. automethod:: decode_message
+
+Faster Deserialization
+----------------------
+When python-driver is compiled with Cython, it uses a Cython-based deserialization path
+to deserialize messages. There are two additional ProtocolHandler classes that can be
+used to deserialize response messages: the first is ``LazyProtocolHandler`` and the
+second is ``NumpyProtocolHandler``.They can be used as follows:
+
+.. code:: python
+
+    from cassandra.protocol import NumpyProtocolHandler, LazyProtocolHandler
+    s.client_protocol_handler = LazyProtocolHandler   # for a result iterator
+    s.client_protocol_handler = NumpyProtocolHandler  # for a dict of NumPy arrays as result
+
