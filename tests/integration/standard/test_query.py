@@ -293,7 +293,10 @@ class BatchStatementTests(unittest.TestCase):
     def confirm_results(self):
         keys = set()
         values = set()
-        results = self.session.execute("SELECT * FROM test3rf.test")
+        # Assuming the test data is inserted at default CL.ONE, we need ALL here to guarantee we see
+        # everything inserted
+        results = self.session.execute(SimpleStatement("SELECT * FROM test3rf.test",
+                                                       consistency_level=ConsistencyLevel.ALL))
         for result in results:
             keys.add(result.k)
             values.add(result.v)
