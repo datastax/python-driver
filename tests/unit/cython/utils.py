@@ -11,7 +11,7 @@ def cyimport(import_path):
     (and skip any relevant tests).
     """
     try:
-        return __import__(import_path, fromlist=True)
+        return __import__(import_path, fromlist=[True])
     except ImportError:
         if HAVE_CYTHON:
             raise

@@ -16,12 +16,13 @@ from cpython.datetime cimport (
 import datetime
 import sys
 
-DATETIME_EPOC = datetime.datetime(1970, 1, 1)
-
-assert sys.byteorder in ('little', 'big')
-is_little_endian = sys.byteorder == 'little'
+cdef bint is_little_endian
+from cassandra.util import is_little_endian
 
 import_datetime()
+
+DATETIME_EPOC = datetime.datetime(1970, 1, 1)
+
 
 cdef datetime_from_timestamp(double timestamp):
     cdef int seconds = <int> timestamp

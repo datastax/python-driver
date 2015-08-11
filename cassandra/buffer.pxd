@@ -10,7 +10,6 @@ from cpython.bytes cimport PyBytes_AS_STRING
     # checking. Only string objects are supported; no Unicode objects
     # should be passed.
 
-from cassandra.buffer cimport Buffer
 
 cdef struct Buffer:
     char *ptr

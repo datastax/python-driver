@@ -3,8 +3,8 @@ Module with constants for Cassandra type codes.
 
 These constants are useful for
 
-    a) mapping messages to cqltypes                 (cassandra/cqltypes.py)
-    b) optimizezd dispatching for (de)serialization (cassandra/encoding.py)
+    a) mapping messages to cqltypes                (cassandra/cqltypes.py)
+    b) optimized dispatching for (de)serialization (cassandra/encoding.py)
 
 Type codes are repeated here from the Cassandra binary protocol specification:
 

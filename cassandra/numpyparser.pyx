@@ -75,7 +75,6 @@ cdef class NumpyParser(ColumnParser):
 
         arrays = [make_native_byteorder(arr) for arr in arrays]
         result = dict(zip(desc.colnames, arrays))
-        # return pd.DataFrame(result)
         return result
 
 

@@ -42,7 +42,7 @@ cdef class DesDecimalType(Deserializer):
         slice_buffer(buf, &varint_buf, 4, buf.size - 4)
 
         scale = int32_unpack(buf)
-        unscaled = varint_unpack(to_bytes(&varint_buf))
+        unscaled = varint_unpack(&varint_buf)
 
         return Decimal('%de%d' % (unscaled, -scale))
 
@@ -93,7 +93,7 @@ cdef class DesInt32Type(Deserializer):
 
 cdef class DesIntegerType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        return varint_unpack(to_bytes(buf))
+        return varint_unpack(buf)
 
 
 cdef class DesInetAddressType(Deserializer):
