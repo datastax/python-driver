@@ -1012,8 +1012,6 @@ def cython_protocol_handler(colparser):
 
     The default is to use obj_parser.ListParser
     """
-    # TODO: It may be cleaner to turn ProtocolHandler and ResultMessage into
-    # TODO:     instances and use methods instead of class methods
     from cassandra.row_parser import make_recv_results_rows
 
     class FastResultMessage(ResultMessage):
