@@ -22,7 +22,7 @@ import six
 from six.moves import range
 import io
 
-from cassandra import typecodes
+from cassandra import type_codes
 from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
                        WriteFailure, ReadFailure, FunctionFailure,
                        AlreadyExists, InvalidRequest, Unauthorized,
@@ -548,7 +548,7 @@ class ResultMessage(_MessageType):
     paging_state = None
 
     # Names match type name in module scope. Most are imported from cassandra.cqltypes (except CUSTOM_TYPE)
-    type_codes = _cqltypes_by_code = dict((v, globals()[k]) for k, v in typecodes.__dict__.items() if not k.startswith('_'))
+    type_codes = _cqltypes_by_code = dict((v, globals()[k]) for k, v in type_codes.__dict__.items() if not k.startswith('_'))
 
     _FLAGS_GLOBAL_TABLES_SPEC = 0x0001
     _HAS_MORE_PAGES_FLAG = 0x0002
@@ -1001,20 +1001,20 @@ def cython_protocol_handler(colparser):
 
     There are three Cython-based protocol handlers (least to most performant):
 
-        1. objparser.ListParser
+        1. obj_parser.ListParser
             this parser decodes result messages into a list of tuples
 
-        2. objparser.LazyParser
+        2. obj_parser.LazyParser
             this parser decodes result messages lazily by returning an iterator
 
-        3. numpyparser.NumPyParser
+        3. numpy_parser.NumPyParser
             this parser decodes result messages into NumPy arrays
 
-    The default is to use objparser.ListParser
+    The default is to use obj_parser.ListParser
     """
     # TODO: It may be cleaner to turn ProtocolHandler and ResultMessage into
     # TODO:     instances and use methods instead of class methods
-    from cassandra.rowparser import make_recv_results_rows
+    from cassandra.row_parser import make_recv_results_rows
 
     class FastResultMessage(ResultMessage):
         """
@@ -1038,7 +1038,7 @@ def cython_protocol_handler(colparser):
 
 
 if HAVE_CYTHON:
-    from cassandra.objparser import ListParser, LazyParser
+    from cassandra.obj_parser import ListParser, LazyParser
     ProtocolHandler = cython_protocol_handler(ListParser())
     LazyProtocolHandler = cython_protocol_handler(LazyParser())
 else:
@@ -1047,7 +1047,7 @@ else:
 
 
 if HAVE_CYTHON and HAVE_NUMPY:
-    from cassandra.numpyparser import NumpyParser
+    from cassandra.numpy_parser import NumpyParser
     NumpyProtocolHandler = cython_protocol_handler(NumpyParser())
 else:
     NumpyProtocolHandler = None
