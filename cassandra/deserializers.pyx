@@ -164,7 +164,8 @@ cdef class DesTimeType(Deserializer):
 
 cdef class DesUTF8Type(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        return to_bytes(buf).decode('utf8')
+        cdef val = to_bytes(buf)
+        return val.decode('utf8')
 
 
 cdef class DesVarcharType(DesUTF8Type):
@@ -502,6 +503,7 @@ cpdef Deserializer find_deserializer(cqltype):
 def obj_array(list objs):
     """Create a (Cython) array of objects given a list of objects"""
     cdef object[:] arr
+    cdef Py_ssize_t i
     arr = cython_array(shape=(len(objs),), itemsize=sizeof(void *), format="O")
     # arr[:] = objs # This does not work (segmentation faults)
     for i, obj in enumerate(objs):
