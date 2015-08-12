@@ -2073,7 +2073,7 @@ class SchemaParserV3(SchemaParserV22):
         index_name = row.get("index_name")
         index_type = row.get("index_type")
         if index_name or index_type:
-            index_options = dict(row.get("index_options") or {})
+            index_options = dict(row.get("options") or {})
             target_columns = row.get('target_columns') or set()
             target_type = row.get('target_type')
             return IndexMetadataV3(table_metadata, index_name, index_type, index_options, target_columns, target_type)
