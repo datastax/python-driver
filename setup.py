@@ -121,8 +121,8 @@ class BuildFailed(Exception):
         self.ext = ext
 
 
-murmur3_ext = Extension('cassandra.murmur3',
-                        sources=['cassandra/murmur3.c'])
+murmur3_ext = Extension('cassandra.cmurmur3',
+                        sources=['cassandra/cmurmur3.c'])
 
 libev_ext = Extension('cassandra.io.libevwrapper',
                       sources=['cassandra/io/libevwrapper.c'],

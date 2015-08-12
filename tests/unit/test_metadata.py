@@ -18,6 +18,9 @@ except ImportError:
     import unittest  # noqa
 
 from mock import Mock
+import os
+import random
+import six
 
 import cassandra
 from cassandra.cqltypes import IntegerType, AsciiType, TupleType
@@ -215,25 +218,55 @@ class NameEscapingTest(unittest.TestCase):
             self.assertEqual(is_valid_name(keyword), False)
 
 
-class TokensTest(unittest.TestCase):
+class Murmur3TokensTest(unittest.TestCase):
 
-    def test_murmur3_tokens(self):
+    def test_murmur3_init(self):
+        murmur3_token = Murmur3Token(cassandra.metadata.MIN_LONG - 1)
+        self.assertEqual(str(murmur3_token), '<Murmur3Token: -9223372036854775809>')
+
+    def test_python_vs_c(self):
+        from cassandra.murmur3 import _murmur3 as mm3_python
         try:
-            murmur3_token = Murmur3Token(cassandra.metadata.MIN_LONG - 1)
-            self.assertEqual(murmur3_token.hash_fn('123'), -7468325962851647638)
-            self.assertEqual(murmur3_token.hash_fn(b'\x00\xff\x10\xfa\x99' * 10), 5837342703291459765)
-            self.assertEqual(murmur3_token.hash_fn(b'\xfe' * 8), -8927430733708461935)
-            self.assertEqual(murmur3_token.hash_fn(b'\x10' * 8), 1446172840243228796)
-            self.assertEqual(murmur3_token.hash_fn(str(cassandra.metadata.MAX_LONG)), 7162290910810015547)
-            self.assertEqual(str(murmur3_token), '<Murmur3Token: -9223372036854775809>')
-        except NoMurmur3:
-            raise unittest.SkipTest('The murmur3 extension is not available')
+            from cassandra.cmurmur3 import murmur3 as mm3_c
+
+            iterations = 100
+            for _ in range(iterations):
+                for len in range(0, 32):  # zero to one block plus full range of tail lengths
+                    key = os.urandom(len)
+                    self.assertEqual(mm3_python(key), mm3_c(key))
+
+        except ImportError:
+            raise unittest.SkipTest('The cmurmur3 extension is not available')
+
+    def test_murmur3_python(self):
+        from cassandra.murmur3 import _murmur3
+        self._verify_hash(_murmur3)
+
+    def test_murmur3_c(self):
+        try:
+            from cassandra.cmurmur3 import murmur3
+            self._verify_hash(murmur3)
+        except ImportError:
+            raise unittest.SkipTest('The cmurmur3 extension is not available')
+
+    def _verify_hash(self, fn):
+        self.assertEqual(fn(six.b('123')), -7468325962851647638)
+        self.assertEqual(fn(b'\x00\xff\x10\xfa\x99' * 10), 5837342703291459765)
+        self.assertEqual(fn(b'\xfe' * 8), -8927430733708461935)
+        self.assertEqual(fn(b'\x10' * 8), 1446172840243228796)
+        self.assertEqual(fn(six.b(str(cassandra.metadata.MAX_LONG))), 7162290910810015547)
+
+
+class MD5TokensTest(unittest.TestCase):
 
     def test_md5_tokens(self):
         md5_token = MD5Token(cassandra.metadata.MIN_LONG - 1)
         self.assertEqual(md5_token.hash_fn('123'), 42767516990368493138776584305024125808)
         self.assertEqual(md5_token.hash_fn(str(cassandra.metadata.MAX_LONG)), 28528976619278518853815276204542453639)
         self.assertEqual(str(md5_token), '<MD5Token: %s>' % -9223372036854775809)
+
+
+class BytesTokensTest(unittest.TestCase):
 
     def test_bytes_tokens(self):
         bytes_token = BytesToken(str(cassandra.metadata.MIN_LONG - 1))
