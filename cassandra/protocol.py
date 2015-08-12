@@ -596,6 +596,8 @@ class ResultMessage(_MessageType):
             results = cls.recv_results_prepared(f, protocol_version, user_type_map)
         elif kind == RESULT_KIND_SCHEMA_CHANGE:
             results = cls.recv_results_schema_change(f, protocol_version)
+        else:
+            raise Exception("Unknown RESULT kind: %d" % kind)
         return cls(kind, results, paging_state)
 
     @classmethod
