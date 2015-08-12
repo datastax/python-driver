@@ -31,7 +31,6 @@ from cassandra import util
 
 cdef bint PY2 = six.PY2
 
-
 cdef class Deserializer:
     """Cython-based deserializer class for a cqltype"""
 
@@ -468,12 +467,14 @@ def make_deserializers(cqltypes):
     return obj_array([find_deserializer(ct) for ct in cqltypes])
 
 
+cdef dict classes = globals()
+
 cpdef Deserializer find_deserializer(cqltype):
     """Find a deserializer for a cqltype"""
     name = 'Des' + cqltype.__name__
 
     if name in globals():
-        cls = globals()[name]
+        cls = classes[name]
     elif issubclass(cqltype, cqltypes.ListType):
         cls = DesListType
     elif issubclass(cqltype, cqltypes.SetType):
