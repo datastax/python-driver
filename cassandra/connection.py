@@ -118,6 +118,10 @@ class _Frame(object):
                     self.end_pos == other.end_pos)
         return NotImplemented
 
+    def __str__(self):
+        return "ver({0}); flags({1:04b}); stream({2}); op({3}); offset({4}); len({5})".format(self.version, self.flags, self.stream, self.opcode, self.body_offset, self.end_pos - self.body_offset)
+
+
 
 NONBLOCKING = (errno.EAGAIN, errno.EWOULDBLOCK)
 
@@ -503,7 +507,7 @@ class Connection(object):
                 frame = self._current_frame
                 self._iobuf.seek(frame.body_offset)
                 msg = self._iobuf.read(frame.end_pos - frame.body_offset)
-                self.process_msg(self._current_frame, msg)
+                self.process_msg(frame, msg)
                 self._reset_frame()
 
     @defunct_on_error
@@ -524,7 +528,7 @@ class Connection(object):
                                header.flags, header.opcode, body, self.decompressor)
         except Exception as exc:
             log.exception("Error decoding response from Cassandra. "
-                          "opcode: %04x; message contents: %r", header.opcode, body)
+                          "%s; buffer: %r", header, self._iobuf.getvalue())
             if callback is not None:
                 callback(exc)
             self.defunct(exc)
