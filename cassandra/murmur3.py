@@ -13,12 +13,15 @@ def body_and_tail(data):
 
 
 def rotl64(x, r):
+    # note: not a general-purpose function because it leaves the high-order bits intact
+    # suitable for this use case without wasting cycles
     mask = 2 ** r - 1
     rotated = (x << r) | ((x >> 64 - r) & mask)
     return rotated
 
 
 def fmix(k):
+    # masking off the 31s bits that would be leftover after >> 33 a 64-bit number
     k ^= (k >> 33) & 0x7fffffff
     k *= 0xff51afd7ed558ccd
     k ^= (k >> 33) & 0x7fffffff
