@@ -1,3 +1,4 @@
 include setup.py README.rst MANIFEST.in LICENSE ez_setup.py
 include cassandra/*.pyx
 include cassandra/*.pxd
+include tests/unit/cython/*.pyx
