@@ -313,7 +313,7 @@ class Text(Column):
         """
         :param int min_length: Sets the minimum length of this string, for validation purposes.
             Defaults to 1 if this is a ``required`` column. Otherwise, None.
-        :param int max_lemgth: Sets the maximum length of this string, for validation purposes.
+        :param int max_length: Sets the maximum length of this string, for validation purposes.
         """
         self.min_length = min_length or (1 if kwargs.get('required', False) else None)
         self.max_length = max_length
