@@ -184,7 +184,7 @@ class HostConnectionPoolTests(unittest.TestCase):
     def test_return_defunct_connection_on_down_host(self):
         host = Mock(spec=Host, address='ip1')
         session = self.make_session()
-        conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=False, max_request_id=100)
+        conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=False, max_request_id=100, signaled_error=False)
         session.cluster.connection_factory.return_value = conn
 
         pool = HostConnectionPool(host, HostDistance.LOCAL, session)
