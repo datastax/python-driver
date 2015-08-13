@@ -216,7 +216,6 @@ def run_setup(extensions):
         keywords='cassandra,cql,orm',
         include_package_data=True,
         install_requires=dependencies,
-        extras_require = {'cython': ['Cython']},
         tests_require=['nose', 'mock<=1.0.1', 'PyYAML', 'pytz', 'sure'],
         classifiers=[
             'Development Status :: 5 - Production/Stable',
@@ -260,8 +259,10 @@ if "--no-murmur3" not in sys.argv:
 if "--no-libev" not in sys.argv and not is_windows:
     extensions.append(libev_ext)
 
-if "--no-cython" not in sys.argv:
+if "--no-cython" not in sys.argv and not os.environ.get('CASS_DRIVER_NO_CYTHON'):
     try:
+        setup(setup_requires=['Cython'])
+
         from Cython.Build import cythonize
         cython_candidates = ['cluster', 'concurrent', 'connection', 'cqltypes', 'metadata',
                              'pool', 'protocol', 'query', 'util']
@@ -273,7 +274,7 @@ if "--no-cython" not in sys.argv:
             exclude_failures=True))
         extensions.extend(cythonize("cassandra/*.pyx"))
         extensions.extend(cythonize("tests/unit/cython/*.pyx"))
-    except ImportError:
+    except Exception:
         sys.stderr.write("Cython is not installed. Not compiling core driver files as extensions (optional).")
 
 if "--no-extensions" in sys.argv:
