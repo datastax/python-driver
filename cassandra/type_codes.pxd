@@ -12,12 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest  # noqa
+cdef enum:
+    CUSTOM_TYPE
+    AsciiType
+    LongType
+    BytesType
+    BooleanType
+    CounterColumnType
+    DecimalType
+    DoubleType
+    FloatType
+    Int32Type
+    UTF8Type
+    DateType
+    UUIDType
+    VarcharType
+    IntegerType
+    TimeUUIDType
+    InetAddressType
+    SimpleDateType
+    TimeType
+    ShortType
+    ByteType
+    ListType
+    MapType
+    SetType
+    UserType
+    TupleType
 
-try:
-    from ccmlib import common
-except ImportError as e:
-    raise unittest.SkipTest('ccm is a dependency for integration tests:', e)

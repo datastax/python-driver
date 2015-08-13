@@ -12,12 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest  # noqa
+from cassandra.bytesio cimport BytesIOReader
+from cassandra.deserializers cimport Deserializer
 
-try:
-    from ccmlib import common
-except ImportError as e:
-    raise unittest.SkipTest('ccm is a dependency for integration tests:', e)
+cdef class ParseDesc:
+    cdef public object colnames
+    cdef public object coltypes
+    cdef Deserializer[::1] deserializers
+    cdef public int protocol_version
+    cdef Py_ssize_t rowsize
+
+cdef class ColumnParser:
+    cpdef parse_rows(self, BytesIOReader reader, ParseDesc desc)
+
+cdef class RowParser:
+    cpdef unpack_row(self, BytesIOReader reader, ParseDesc desc)
+

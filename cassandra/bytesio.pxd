@@ -12,12 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest  # noqa
-
-try:
-    from ccmlib import common
-except ImportError as e:
-    raise unittest.SkipTest('ccm is a dependency for integration tests:', e)
+cdef class BytesIOReader:
+    cdef bytes buf
+    cdef char *buf_ptr
+    cdef Py_ssize_t pos
+    cdef Py_ssize_t size
+    cdef char *read(self, Py_ssize_t n = ?) except NULL

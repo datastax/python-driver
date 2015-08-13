@@ -85,11 +85,11 @@ class SchemaTests(unittest.TestCase):
 
         session = self.session
 
-        for i in xrange(30):
+        for i in range(30):
             execute_until_pass(session, "CREATE KEYSPACE test_{0} WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': 1}}".format(i))
             execute_until_pass(session, "CREATE TABLE test_{0}.cf (key int PRIMARY KEY, value int)".format(i))
 
-            for j in xrange(100):
+            for j in range(100):
                 execute_until_pass(session, "INSERT INTO test_{0}.cf (key, value) VALUES ({1}, {1})".format(i, j))
 
             execute_until_pass(session, "DROP KEYSPACE test_{0}".format(i))
@@ -102,7 +102,7 @@ class SchemaTests(unittest.TestCase):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
-        for i in xrange(30):
+        for i in range(30):
             try:
                 execute_until_pass(session, "CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
             except AlreadyExists:
@@ -111,7 +111,7 @@ class SchemaTests(unittest.TestCase):
 
             execute_until_pass(session, "CREATE TABLE test.cf (key int PRIMARY KEY, value int)")
 
-            for j in xrange(100):
+            for j in range(100):
                 execute_until_pass(session, "INSERT INTO test.cf (key, value) VALUES ({0}, {0})".format(j))
 
             execute_until_pass(session, "DROP KEYSPACE test")

@@ -301,8 +301,8 @@ class BatchStatementTests(unittest.TestCase):
             keys.add(result.k)
             values.add(result.v)
 
-        self.assertEqual(set(range(10)), keys)
-        self.assertEqual(set(range(10)), values)
+        self.assertEqual(set(range(10)), keys, msg=results)
+        self.assertEqual(set(range(10)), values, msg=results)
 
     def test_string_statements(self):
         batch = BatchStatement(BatchType.LOGGED)
@@ -369,6 +369,11 @@ class BatchStatementTests(unittest.TestCase):
 
         self.session.execute(batch)
         self.confirm_results()
+
+    def test_no_parameters_many_times(self):
+        for i in range(1000):
+            self.test_no_parameters()
+            self.session.execute("TRUNCATE test3rf.test")
 
 
 class SerialConsistencyTests(unittest.TestCase):

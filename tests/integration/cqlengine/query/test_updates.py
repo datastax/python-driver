@@ -52,17 +52,17 @@ class QueryUpdateTests(BaseCassEngTestCase):
 
         # sanity check
         for i, row in enumerate(TestQueryUpdateModel.objects(partition=partition)):
-            assert row.cluster == i
-            assert row.count == i
-            assert row.text == str(i)
+            self.assertEqual(row.cluster, i)
+            self.assertEqual(row.count, i)
+            self.assertEqual(row.text, str(i))
 
         # perform update
         TestQueryUpdateModel.objects(partition=partition, cluster=3).update(count=6)
 
         for i, row in enumerate(TestQueryUpdateModel.objects(partition=partition)):
-            assert row.cluster == i
-            assert row.count == (6 if i == 3 else i)
-            assert row.text == str(i)
+            self.assertEqual(row.cluster, i)
+            self.assertEqual(row.count, 6 if i == 3 else i)
+            self.assertEqual(row.text, str(i))
 
     def test_update_values_validation(self):
         """ tests calling udpate on models with values passed in """
@@ -72,9 +72,9 @@ class QueryUpdateTests(BaseCassEngTestCase):
 
         # sanity check
         for i, row in enumerate(TestQueryUpdateModel.objects(partition=partition)):
-            assert row.cluster == i
-            assert row.count == i
-            assert row.text == str(i)
+            self.assertEqual(row.cluster, i)
+            self.assertEqual(row.count, i)
+            self.assertEqual(row.text, str(i))
 
         # perform update
         with self.assertRaises(ValidationError):
@@ -98,17 +98,17 @@ class QueryUpdateTests(BaseCassEngTestCase):
 
         # sanity check
         for i, row in enumerate(TestQueryUpdateModel.objects(partition=partition)):
-            assert row.cluster == i
-            assert row.count == i
-            assert row.text == str(i)
+            self.assertEqual(row.cluster, i)
+            self.assertEqual(row.count, i)
+            self.assertEqual(row.text, str(i))
 
         # perform update
         TestQueryUpdateModel.objects(partition=partition, cluster=3).update(text=None)
 
         for i, row in enumerate(TestQueryUpdateModel.objects(partition=partition)):
-            assert row.cluster == i
-            assert row.count == i
-            assert row.text == (None if i == 3 else str(i))
+            self.assertEqual(row.cluster, i)
+            self.assertEqual(row.count, i)
+            self.assertEqual(row.text, None if i == 3 else str(i))
 
     def test_mixed_value_and_null_update(self):
         """ tests that updating a columns value, and removing another works properly """
@@ -118,17 +118,17 @@ class QueryUpdateTests(BaseCassEngTestCase):
 
         # sanity check
         for i, row in enumerate(TestQueryUpdateModel.objects(partition=partition)):
-            assert row.cluster == i
-            assert row.count == i
-            assert row.text == str(i)
+            self.assertEqual(row.cluster, i)
+            self.assertEqual(row.count, i)
+            self.assertEqual(row.text, str(i))
 
         # perform update
         TestQueryUpdateModel.objects(partition=partition, cluster=3).update(count=6, text=None)
 
         for i, row in enumerate(TestQueryUpdateModel.objects(partition=partition)):
-            assert row.cluster == i
-            assert row.count == (6 if i == 3 else i)
-            assert row.text == (None if i == 3 else str(i))
+            self.assertEqual(row.cluster, i)
+            self.assertEqual(row.count, 6 if i == 3 else i)
+            self.assertEqual(row.text, None if i == 3 else str(i))
 
     def test_counter_updates(self):
         pass

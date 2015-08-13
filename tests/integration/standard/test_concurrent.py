@@ -25,6 +25,8 @@ from cassandra.query import tuple_factory, SimpleStatement
 
 from tests.integration import use_singledc, PROTOCOL_VERSION
 
+from six import next
+
 try:
     import unittest2 as unittest
 except ImportError:

@@ -75,7 +75,7 @@ class StressInsertsTests(unittest.TestCase):
                     break
                 for conn in pool.get_connections():
                     if conn.in_flight > 1:
-                        print self.session.get_pool_state()
+                        print(self.session.get_pool_state())
                         leaking_connections = True
                         break
             i = i + 1
