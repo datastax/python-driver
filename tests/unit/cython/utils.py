@@ -14,6 +14,10 @@
 
 from cassandra.cython_deps import HAVE_CYTHON, HAVE_NUMPY
 
+if HAVE_CYTHON:
+    import pyximport
+    pyximport.install()
+
 try:
     import unittest2 as unittest
 except ImportError:

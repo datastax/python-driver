@@ -273,7 +273,6 @@ if "--no-cython" not in sys.argv and not os.environ.get('CASS_DRIVER_NO_CYTHON')
                 for m in cython_candidates],
             exclude_failures=True))
         extensions.extend(cythonize("cassandra/*.pyx"))
-        extensions.extend(cythonize("tests/unit/cython/*.pyx"))
     except Exception:
         sys.stderr.write("Cython is not installed. Not compiling core driver files as extensions (optional).")
 
