@@ -246,6 +246,7 @@ On OSX, via homebrew:
     def _setup_extensions(self):
         # We defer extension setup until this command to leveraage 'setup_requires' pulling in Cython before we
         # attempt to import anything
+        self.extensions = []
 
         if try_murmur3:
             self.extensions.append(murmur3_ext)
@@ -279,7 +280,7 @@ def run_setup(extensions):
         kw['cmdclass']['eventlet_nosetests'] = eventlet_nosetests
 
     kw['cmdclass']['build_ext'] = build_extensions
-    kw['ext_modules'] = []
+    kw['ext_modules'] = [Extension('DUMMY', [])]  # dummy extension makes sure build_ext is called for install
 
     if try_cython:
         kw['setup_requires'] = ['Cython']
