@@ -173,6 +173,8 @@ try_cython = try_extensions and "--no-cython" not in sys.argv and not is_pypy an
 
 sys.argv = [a for a in sys.argv if a not in ("--no-murmur3", "--no-libev", "--no-cython", "--no-extensions")]
 
+build_concurrency = int(os.environ.get('CASS_DRIVER_BUILD_CONCURRENCY', '0'))
+
 
 class build_extensions(build_ext):
 
@@ -234,6 +236,15 @@ On OSX, via homebrew:
             sys.stderr.write('%s\n' % str(exc))
             warnings.warn(self.error_message % "C extensions.")
 
+    def build_extensions(self):
+        if build_concurrency > 1:
+            self.check_extensions_list(self.extensions)
+
+            import multiprocessing.pool
+            multiprocessing.pool.ThreadPool(processes=build_concurrency).map(self.build_extension, self.extensions)
+        else:
+            build_ext.build_extensions(self)
+
     def build_extension(self, ext):
         try:
             build_ext.build_extension(self, ext)
@@ -264,8 +275,9 @@ On OSX, via homebrew:
                     [Extension('cassandra.%s' % m, ['cassandra/%s.py' % m],
                                extra_compile_args=compile_args)
                         for m in cython_candidates],
+                    nthreads=build_concurrency,
                     exclude_failures=True))
-                self.extensions.extend(cythonize("cassandra/*.pyx"))
+                self.extensions.extend(cythonize("cassandra/*.pyx", nthreads=build_concurrency))
             except Exception:
                 sys.stderr.write("Cython is not available. Not compiling core driver files as extensions (optional).")
 
