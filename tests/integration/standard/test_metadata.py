@@ -1793,12 +1793,12 @@ class BadMetaTest(unittest.TestCase):
         cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         cls.keyspace_name = cls.__name__.lower()
         cls.session = cls.cluster.connect()
-        cls.session.execute("CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}" % cls.keyspace_name)
+        cls.session.execute("CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}" % cls.keyspace_name)
         cls.session.set_keyspace(cls.keyspace_name)
 
     @classmethod
     def teardown_class(cls):
-        cls.session.execute("DROP KEYSPACE IF EXISTS %s" % cls.keyspace_name)
+        cls.session.execute("DROP KEYSPACE %s" % cls.keyspace_name)
         cls.cluster.shutdown()
 
     def _run_on_all_nodes(self, query, params):
@@ -1821,8 +1821,8 @@ class BadMetaTest(unittest.TestCase):
             self._run_on_all_nodes('UPDATE system.schema_keyspaces SET strategy_options=%s' + where_cls, (strategy_options,))
 
     def test_keyspace_bad_index(self):
-        self.session.execute('CREATE TABLE %s (k int PRIMARY KEY, v int)' % self.function_name)
-        self.session.execute('CREATE INDEX ON %s(v)' % self.function_name)
+        self.session.execute('CREATE TABLE %s (k int PRIMARY KEY, v int)' % self.function_name, timeout=30.0)
+        self.session.execute('CREATE INDEX ON %s(v)' % self.function_name, timeout=30.0)
         where_cls = " WHERE keyspace_name='%s' AND columnfamily_name='%s' AND column_name='v'" \
                     % (self.keyspace_name, self.function_name)
         index_options = self.session.execute('SELECT index_options FROM system.schema_columns' + where_cls)[0].index_options
@@ -1838,7 +1838,7 @@ class BadMetaTest(unittest.TestCase):
             self._run_on_all_nodes('UPDATE system.schema_columns SET index_options=%s' + where_cls, (index_options,))
 
     def test_table_bad_comparator(self):
-        self.session.execute('CREATE TABLE %s (k int PRIMARY KEY, v int)' % self.function_name)
+        self.session.execute('CREATE TABLE %s (k int PRIMARY KEY, v int)' % self.function_name, timeout=30.0)
         where_cls = " WHERE keyspace_name='%s' AND columnfamily_name='%s'" % (self.keyspace_name, self.function_name)
         comparator = self.session.execute('SELECT comparator FROM system.schema_columnfamilies' + where_cls)[0].comparator
         try:
@@ -1854,7 +1854,7 @@ class BadMetaTest(unittest.TestCase):
 
     @unittest.skipUnless(PROTOCOL_VERSION >= 3, "Requires protocol version 3+")
     def test_user_type_bad_typename(self):
-        self.session.execute('CREATE TYPE %s (i int, d double)' % self.function_name)
+        self.session.execute('CREATE TYPE %s (i int, d double)' % self.function_name, timeout=60.0)
         where_cls = " WHERE keyspace_name='%s' AND type_name='%s'" % (self.keyspace_name, self.function_name)
         field_types = self.session.execute('SELECT field_types FROM system.schema_usertypes' + where_cls)[0].field_types
         try:
