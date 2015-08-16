@@ -282,6 +282,7 @@ class HostConnection(object):
         self.host_distance = host_distance
         self._session = weakref.proxy(session)
         self._lock = Lock()
+        self._is_replacing = False
 
         if host_distance == HostDistance.IGNORED:
             log.debug("Not opening connection to ignored host %s", self.host)
