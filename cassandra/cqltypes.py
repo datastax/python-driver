@@ -917,15 +917,11 @@ class UserType(TupleType):
         return nt
 
 
-class CompositeType(_ParameterizedType):
-    typename = "'org.apache.cassandra.db.marshal.CompositeType'"
+class _CompositeType(_ParameterizedType):
     num_subtypes = 'UNKNOWN'
 
     @classmethod
     def cql_parameterized_type(cls):
-        """
-        There is no CQL notation for Composites, so we override this.
-        """
         typestring = cls.cass_parameterized_type(full=True)
         return "'%s'" % (typestring,)
 
@@ -947,8 +943,24 @@ class CompositeType(_ParameterizedType):
         return tuple(result)
 
 
-class DynamicCompositeType(CompositeType):
+class CompositeType(_CompositeType):
+    typename = "'org.apache.cassandra.db.marshal.CompositeType'"
+
+
+class DynamicCompositeType(_CompositeType):
     typename = "'org.apache.cassandra.db.marshal.DynamicCompositeType'"
+
+    @classmethod
+    def cass_parameterized_type_with(cls, subtypes, full=False):
+        fieldnames = getattr(cls, 'fieldnames', None)
+        if fieldnames and any(fieldnames):
+            cname = cls.cassname
+            if full and '.' not in cname:
+                cname = apache_cassandra_type_prefix + cname
+            sublist = ', '.join('%s=>%s' % (field_name, subtype.cass_parameterized_type(full=full)) for (field_name, subtype) in zip(cls.fieldnames, subtypes))
+            return '%s(%s)' % (cname, sublist)
+        else:
+            return super(DynamicCompositeType, cls).cass_parameterized_type_with(subtypes, full)
 
 
 class ColumnToCollectionType(_ParameterizedType):
