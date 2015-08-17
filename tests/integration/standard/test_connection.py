@@ -19,7 +19,9 @@ except ImportError:
 
 from functools import partial
 from six.moves import range
+import sys
 from threading import Thread, Event
+import time
 
 from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.cluster import NoHostAvailable
@@ -46,7 +48,7 @@ class ConnectionTests(object):
     def setUp(self):
         self.klass.initialize_reactor()
 
-    def get_connection(self):
+    def get_connection(self, timeout=5):
         """
         Helper method to solve automated testing issues within Jenkins.
         Officially patched under the 2.0 branch through
@@ -58,7 +60,7 @@ class ConnectionTests(object):
         e = None
         for i in range(5):
             try:
-                conn = self.klass.factory(host='127.0.0.1', timeout=5, protocol_version=PROTOCOL_VERSION)
+                conn = self.klass.factory(host='127.0.0.1', timeout=timeout, protocol_version=PROTOCOL_VERSION)
                 break
             except (OperationTimedOut, NoHostAvailable) as e:
                 continue
@@ -223,6 +225,12 @@ class ConnectionTests(object):
 
         for t in threads:
             t.join()
+
+    def test_connect_timeout(self):
+        start = time.time()
+        self.assertRaises(Exception, self.get_connection, timeout=sys.float_info.min)
+        end = time.time()
+        self.assertAlmostEqual(start, end, 1)
 
 
 class AsyncoreConnectionTests(ConnectionTests, unittest.TestCase):
