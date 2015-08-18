@@ -1563,10 +1563,8 @@ class SchemaParserV22(_SchemaParser):
         for row in self.keyspaces_result:
             keyspace_meta = self._build_keyspace_metadata(row)
 
-            keyspace_col_rows = self.keyspace_table_col_rows.get(keyspace_meta.name, {})
-            keyspace_trigger_rows = self.keyspace_table_trigger_rows.get(keyspace_meta.name, {})
             for table_row in self.keyspace_table_rows.get(keyspace_meta.name, []):
-                table_meta = self._build_table_metadata(table_row, keyspace_col_rows, keyspace_trigger_rows)
+                table_meta = self._build_table_metadata(table_row)
                 table_meta.keyspace = keyspace_meta  # temporary while TableMetadata.keyspace is deprecated
                 keyspace_meta._add_table_metadata(table_meta)
 
@@ -1602,7 +1600,7 @@ class SchemaParserV22(_SchemaParser):
             triggers_result = self._handle_results(triggers_success, triggers_result)
 
         if table_result:
-            return self._build_table_metadata(table_result[0], {table: col_result}, {table: triggers_result})
+            return self._build_table_metadata(table_result[0], col_result, triggers_result)
 
     def get_type(self, keyspace, type):
         where_clause = " WHERE keyspace_name = '%s' AND type_name = '%s'" % (keyspace, type)
@@ -1655,12 +1653,14 @@ class SchemaParserV22(_SchemaParser):
                          aggregate_row['signature'], aggregate_row['state_func'], state_type,
                          aggregate_row['final_func'], initial_condition, return_type)
 
-    def _build_table_metadata(self, row, col_rows, trigger_rows):
+    def _build_table_metadata(self, row, col_rows=None, trigger_rows=None):
         keyspace_name = row["keyspace_name"]
         cfname = row[self._table_name_col]
-        cf_col_rows = col_rows.get(cfname, [])
 
-        if not cf_col_rows:  # CASSANDRA-8487
+        col_rows = col_rows or self.keyspace_table_col_rows[keyspace_name][cfname]
+        trigger_rows = trigger_rows or self.keyspace_table_trigger_rows[keyspace_name][cfname]
+
+        if not col_rows:  # CASSANDRA-8487
             log.warning("Building table metadata with no column meta for %s.%s",
                         keyspace_name, cfname)
 
@@ -1678,7 +1678,7 @@ class SchemaParserV22(_SchemaParser):
 
         column_aliases = row.get("column_aliases", None)
 
-        clustering_rows = [r for r in cf_col_rows
+        clustering_rows = [r for r in col_rows
                            if r.get('type', None) == "clustering_key"]
         if len(clustering_rows) > 1:
             clustering_rows = sorted(clustering_rows, key=lambda row: row.get('component_index'))
@@ -1703,7 +1703,7 @@ class SchemaParserV22(_SchemaParser):
             else:
                 # compact table
                 is_compact = True
-                has_value = column_aliases or not cf_col_rows
+                has_value = column_aliases or not col_rows
                 clustering_size = num_column_name_components
 
                 # Some thrift tables define names in composite types (see PYTHON-192)
@@ -1711,7 +1711,7 @@ class SchemaParserV22(_SchemaParser):
                     column_aliases = comparator.fieldnames
         else:
             is_compact = True
-            if column_aliases or not cf_col_rows:
+            if column_aliases or not col_rows:
                 has_value = True
                 clustering_size = num_column_name_components
             else:
@@ -1722,7 +1722,7 @@ class SchemaParserV22(_SchemaParser):
         table_meta.comparator = comparator
 
         # partition key
-        partition_rows = [r for r in cf_col_rows
+        partition_rows = [r for r in col_rows
                           if r.get('type', None) == "partition_key"]
 
         if len(partition_rows) > 1:
@@ -1767,7 +1767,7 @@ class SchemaParserV22(_SchemaParser):
 
         # value alias (if present)
         if has_value:
-            value_alias_rows = [r for r in cf_col_rows
+            value_alias_rows = [r for r in col_rows
                                 if r.get('type', None) == "compact_value"]
 
             if not key_aliases:  # TODO are we checking the right thing here?
@@ -1790,14 +1790,13 @@ class SchemaParserV22(_SchemaParser):
                 table_meta.columns[value_alias] = col
 
         # other normal columns
-        for col_row in cf_col_rows:
+        for col_row in col_rows:
             column_meta = self._build_column_metadata(table_meta, col_row)
             table_meta.columns[column_meta.name] = column_meta
 
-        if trigger_rows:
-            for trigger_row in trigger_rows[cfname]:
-                trigger_meta = self._build_trigger_metadata(table_meta, trigger_row)
-                table_meta.triggers[trigger_meta.name] = trigger_meta
+        for trigger_row in trigger_rows:
+            trigger_meta = self._build_trigger_metadata(table_meta, trigger_row)
+            table_meta.triggers[trigger_meta.name] = trigger_meta
 
         table_meta.options = self._build_table_options(row)
         table_meta.is_compact_storage = is_compact
@@ -1865,14 +1864,14 @@ class SchemaParserV22(_SchemaParser):
         (col_success, col_result), (types_success, types_result), \
         (functions_success, functions_result), \
         (aggregates_success, aggregates_result), \
-        (trigger_success, triggers_result) = responses
+        (triggers_success, triggers_result) = responses
 
         self.keyspaces_result = self._handle_results(ks_success, ks_result)
         self.tables_result = self._handle_results(table_success, table_result)
         self.columns_result = self._handle_results(col_success, col_result)
 
         # if we're connected to Cassandra < 2.0, the triggers table will not exist
-        if trigger_success:
+        if triggers_success:
             self.triggers_result = dict_factory(*triggers_result.results)
         else:
             if isinstance(triggers_result, InvalidRequest):
@@ -1945,8 +1944,9 @@ class SchemaParserV22(_SchemaParser):
 
 class SchemaParserV3(SchemaParserV22):
     _SELECT_KEYSPACES = "SELECT * FROM system_schema.keyspaces"
-    _SELECT_COLUMN_FAMILIES = "SELECT * FROM system_schema.tables"
+    _SELECT_TABLES = "SELECT * FROM system_schema.tables"
     _SELECT_COLUMNS = "SELECT * FROM system_schema.columns"
+    _SELECT_INDEXES = "SELECT * FROM system_schema.indexes"
     _SELECT_TRIGGERS = "SELECT * FROM system_schema.triggers"
     _SELECT_TYPES = "SELECT * FROM system_schema.types"
     _SELECT_FUNCTIONS = "SELECT * FROM system_schema.functions"
@@ -1969,6 +1969,29 @@ class SchemaParserV3(SchemaParserV22):
         'read_repair_chance',
         'speculative_retry')
 
+    def __init__(self, connection, timeout):
+        super(SchemaParserV3, self).__init__(connection, timeout)
+        self.indexes_result = []
+        self.keyspace_table_index_rows = defaultdict(lambda: defaultdict(list))
+
+    def get_table(self, keyspace, table):
+        cl = ConsistencyLevel.ONE
+        where_clause = " WHERE keyspace_name = '%s' AND %s = '%s'" % (keyspace, self._table_name_col, table)
+        cf_query = QueryMessage(query=self._SELECT_TABLES + where_clause, consistency_level=cl)
+        col_query = QueryMessage(query=self._SELECT_COLUMNS + where_clause, consistency_level=cl)
+        indexes_query = QueryMessage(query=self._SELECT_INDEXES + where_clause, consistency_level=cl)
+        triggers_query = QueryMessage(query=self._SELECT_TRIGGERS + where_clause, consistency_level=cl)
+        (cf_success, cf_result), (col_success, col_result), \
+        (indexes_sucess, indexes_result), (triggers_success, triggers_result) \
+            = self.connection.wait_for_responses(cf_query, col_query, indexes_query, triggers_query, timeout=self.timeout, fail_on_error=False)
+        table_result = self._handle_results(cf_success, cf_result)
+
+        if table_result:
+            col_result = self._handle_results(col_success, col_result)
+            indexes_result = self._handle_results(indexes_sucess, indexes_result)
+            triggers_result = self._handle_results(triggers_success, triggers_result)
+            return self._build_table_metadata(table_result[0], col_result, triggers_result, indexes_result)
+
     @staticmethod
     def _build_keyspace_metadata(row):
         name = row["keyspace_name"]
@@ -1977,14 +2000,13 @@ class SchemaParserV3(SchemaParserV22):
         strategy_class = strategy_options.pop("class")
         return KeyspaceMetadata(name, durable_writes, strategy_class, strategy_options)
 
-    def _build_table_metadata(self, row, col_rows, trigger_rows):
+    def _build_table_metadata(self, row, col_rows=None, trigger_rows=None, index_rows=None):
         keyspace_name = row["keyspace_name"]
         table_name = row[self._table_name_col]
-        cf_col_rows = col_rows.get(table_name, [])
 
-        if not cf_col_rows:  # CASSANDRA-8487
-            log.warning("Building table metadata with no column meta for %s.%s",
-                        keyspace_name, table_name)
+        col_rows = col_rows or self.keyspace_table_col_rows[keyspace_name][table_name]
+        trigger_rows = trigger_rows or self.keyspace_table_trigger_rows[keyspace_name][table_name]
+        index_rows = index_rows or self.keyspace_table_index_rows[keyspace_name][table_name]
 
         table_meta = TableMetadataV3(keyspace_name, table_name)
 
@@ -1999,7 +2021,7 @@ class SchemaParserV3(SchemaParserV22):
             table_meta.is_compact_storage = True
 
         # partition key
-        partition_rows = [r for r in cf_col_rows
+        partition_rows = [r for r in col_rows
                           if r.get('type', None) == "partition_key"]
         if len(partition_rows) > 1:
             partition_rows = sorted(partition_rows, key=lambda row: row.get('component_index'))
@@ -2012,7 +2034,7 @@ class SchemaParserV3(SchemaParserV22):
 
         # clustering key
         if not compact_static:
-            clustering_rows = [r for r in cf_col_rows
+            clustering_rows = [r for r in col_rows
                                if r.get('type', None) == "clustering"]
             if len(clustering_rows) > 1:
                 clustering_rows = sorted(clustering_rows, key=lambda row: row.get('component_index'))
@@ -2021,7 +2043,7 @@ class SchemaParserV3(SchemaParserV22):
                 table_meta.columns[column_meta.name] = column_meta
                 table_meta.clustering_key.append(table_meta.columns[r.get('column_name')])
 
-        for col_row in (r for r in cf_col_rows
+        for col_row in (r for r in col_rows
                         if r.get('type', None) not in ('parition_key', 'clustering_key')):
             column_meta = self._build_column_metadata(table_meta, col_row)
             if not compact_static or column_meta.is_static:
@@ -2031,10 +2053,14 @@ class SchemaParserV3(SchemaParserV22):
                     column_meta.is_static = False
                 table_meta.columns[column_meta.name] = column_meta
 
-        if trigger_rows:
-            for trigger_row in trigger_rows[table_name]:
-                trigger_meta = self._build_trigger_metadata(table_meta, trigger_row)
-                table_meta.triggers[trigger_meta.name] = trigger_meta
+        for trigger_row in trigger_rows:
+            trigger_meta = self._build_trigger_metadata(table_meta, trigger_row)
+            table_meta.triggers[trigger_meta.name] = trigger_meta
+
+        for index_row in index_rows:
+            index_meta = self._build_index_metadata(table_meta, index_row)
+            if index_meta:
+                table_meta.indexes[index_meta.name] = index_meta
 
         return table_meta
 
@@ -2042,10 +2068,61 @@ class SchemaParserV3(SchemaParserV22):
         """ Setup the mostly-non-schema table options, like caching settings """
         return dict((o, row.get(o)) for o in self.recognized_table_options if o in row)
 
+    @staticmethod
+    def _build_index_metadata(table_metadata, row):
+        index_name = row.get("index_name")
+        index_type = row.get("index_type")
+        if index_name or index_type:
+            index_options = dict(row.get("options") or {})
+            target_columns = row.get('target_columns') or set()
+            target_type = row.get('target_type')
+            return IndexMetadataV3(table_metadata, index_name, index_type, index_options, target_columns, target_type)
+        else:
+            return None
+
+    def _query_all(self):
+        cl = ConsistencyLevel.ONE
+        queries = [
+            QueryMessage(query=self._SELECT_KEYSPACES, consistency_level=cl),
+            QueryMessage(query=self._SELECT_TABLES, consistency_level=cl),
+            QueryMessage(query=self._SELECT_COLUMNS, consistency_level=cl),
+            QueryMessage(query=self._SELECT_TYPES, consistency_level=cl),
+            QueryMessage(query=self._SELECT_FUNCTIONS, consistency_level=cl),
+            QueryMessage(query=self._SELECT_AGGREGATES, consistency_level=cl),
+            QueryMessage(query=self._SELECT_TRIGGERS, consistency_level=cl),
+            QueryMessage(query=self._SELECT_INDEXES, consistency_level=cl)
+        ]
+
+        responses = self.connection.wait_for_responses(*queries, timeout=self.timeout, fail_on_error=False)
+        (ks_success, ks_result), (table_success, table_result), \
+        (col_success, col_result), (types_success, types_result), \
+        (functions_success, functions_result), \
+        (aggregates_success, aggregates_result), \
+        (triggers_success, triggers_result), \
+        (indexes_success, indexes_result) = responses
+
+        self.keyspaces_result = self._handle_results(ks_success, ks_result)
+        self.tables_result = self._handle_results(table_success, table_result)
+        self.columns_result = self._handle_results(col_success, col_result)
+        self.triggers_result = self._handle_results(triggers_success, triggers_result)
+        self.types_result = self._handle_results(types_success, types_result)
+        self.functions_result = self._handle_results(functions_success, functions_result)
+        self.aggregates_result = self._handle_results(aggregates_success, aggregates_result)
+        self.indexes_result = self._handle_results(indexes_success, indexes_result)
+
+        self._aggregate_results()
+
+    def _aggregate_results(self):
+        super(SchemaParserV3, self)._aggregate_results()
+
+        m = self.keyspace_table_index_rows
+        for row in self.indexes_result:
+            ksname = row["keyspace_name"]
+            cfname = row[self._table_name_col]
+            m[ksname][cfname].append(row)
+
+
 class TableMetadataV3(TableMetadata):
-    """
-    For now, until I figure out what to do with this API
-    """
     compaction_options = {}
 
     _option_maps = ['caching']
@@ -2071,6 +2148,48 @@ class TableMetadataV3(TableMetadata):
                 ret.append("%s = %s" % (name, protect_value(value)))
 
         return list(sorted(ret))
+
+
+class IndexMetadataV3(IndexMetadata):
+
+    table = None
+    """
+    The table (:class:`.TableMetadata`) this index is on.
+    """
+
+    columns = None
+    """
+    The set of columns (:class:`.ColumnMetadata`) this index is on
+    (may be empty for per-row indexes).
+    """
+
+    name = None
+    """ A string name for the index. """
+
+    index_type = None
+    """ A string representing the type of index. """
+
+    index_options = {}
+    """ A dict of index options. """
+
+    target_columns = set()
+    """ A set of target columns """
+
+    target_type = None
+
+    def __init__(self, table_metadata, index_name, index_type=None, index_options={}, target_columns=(), target_type=''):
+        self.table = table_metadata
+        self.name = index_name
+        self.index_type = index_type
+        self.index_options = index_options
+        self.target_columns = set(target_columns)
+        self.target_type = target_type
+
+        # TODO: temporary until we diverge more with multiple column indexes
+        # giving the base class what it expects
+        self.column = table_metadata.columns[target_columns[0]]
+        self.column.index = self
+
 
 def get_schema_parser(connection, timeout):
     server_version = connection.server_version

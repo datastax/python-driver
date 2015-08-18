@@ -314,13 +314,13 @@ class ClusterTests(unittest.TestCase):
 
         original_meta = cluster.metadata.keyspaces
         original_system_meta = original_meta['system']
-        original_system_schema_meta = original_system_meta.tables['schema_columnfamilies']
+        original_system_schema_meta = original_system_meta.tables['local']
 
         # only refresh one table
-        cluster.refresh_table_metadata('system', 'schema_columnfamilies')
+        cluster.refresh_table_metadata('system', 'local')
         current_meta = cluster.metadata.keyspaces
         current_system_meta = current_meta['system']
-        current_system_schema_meta = current_system_meta.tables['schema_columnfamilies']
+        current_system_schema_meta = current_system_meta.tables['local']
         self.assertIs(original_meta, current_meta)
         self.assertIs(original_system_meta, current_system_meta)
         self.assertIsNot(original_system_schema_meta, current_system_schema_meta)

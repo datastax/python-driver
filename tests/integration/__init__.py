@@ -209,6 +209,8 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True):
             CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
             if CASSANDRA_VERSION >= '2.2':
                 CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
+                if CASSANDRA_VERSION >= '3.0':
+                    CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
             common.switch_cluster(path, cluster_name)
             CCM_CLUSTER.populate(nodes, ipformat=ipformat)
     try:
