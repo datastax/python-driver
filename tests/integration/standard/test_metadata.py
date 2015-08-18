@@ -985,7 +985,7 @@ CREATE TABLE legacy.composite_comp_with_col (
     AND CLUSTERING ORDER BY (t ASC, b ASC, s ASC)
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = 'Stores file meta data'
-    AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
+    AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
     AND dclocal_read_repair_chance = 0.1
     AND default_time_to_live = 0
@@ -1111,7 +1111,7 @@ CREATE TABLE legacy.composite_comp_no_col (
     AND CLUSTERING ORDER BY (column1 ASC, column1 ASC, column2 ASC)
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = 'Stores file meta data'
-    AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
+    AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
     AND dclocal_read_repair_chance = 0.1
     AND default_time_to_live = 0

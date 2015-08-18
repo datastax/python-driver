@@ -34,6 +34,10 @@ def setup_module():
 
 class ControlConnectionTests(unittest.TestCase):
     def setUp(self):
+        if PROTOCOL_VERSION < 3:
+            raise unittest.SkipTest(
+                "Native protocol 3,0+ is required for UDTs using %r"
+                % (PROTOCOL_VERSION,))
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         self.session = self.cluster.connect()
 
