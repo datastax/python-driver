@@ -519,7 +519,7 @@ class Connection(object):
 
     def _reset_frame(self):
         self._iobuf = io.BytesIO(self._iobuf.read())
-        self._iobuf.seek(0, io.SEEK_END)
+        self._iobuf.seek(0, 2)  # io.SEEK_END == 2 (constant not present in 2.6)
         self._current_frame = None
 
     def process_io_buffer(self):
