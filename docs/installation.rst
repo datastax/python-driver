@@ -31,6 +31,23 @@ To fix this, re-run the installation with an extra compilation flag::
 
     ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future pip install cassandra-driver
 
+.. _windows_build:
+
+Windows Installation Notes
+--------------------------
+Installing the driver with extensions in Windows sometimes presents some challenges. A few notes about common
+hang-ups:
+
+Setup requires a compiler. When using Python 2, this is as simple as installing `this package <http://aka.ms/vcpython27>`_
+(this link is also emitted during install if setuptools is unable to find the resources it needs). Depending on your
+system settings, this package may install as a user-specific application. Make sure to install for everyone, or at least
+as the user that will be building the Python environment.
+
+It is also possible to run the build with your compiler of choice. Just make sure to have your environment setup with
+the proper paths. Make sure the compiler target architecture matches the bitness of your Python runtime.
+Perhaps the easiest way to do this is to run the build/install from a Visual Studio Command Prompt (a
+shortcut installed with Visual Studio that sources the appropriate environment and presents a shell).
+
 Manual Installation
 -------------------
 You can always install the driver directly from a source checkout or tarball.
@@ -114,6 +131,8 @@ On RedHat and RedHat-based systems like CentOS and Fedora::
 
 On OS X, homebrew installations of Python should provide the necessary headers.
 
+See :ref:`windows_build` for notes on configuring the build environment on Windows.
+
 libev support
 ^^^^^^^^^^^^^
 The driver currently uses Python's ``asyncore`` module for its default
@@ -133,6 +152,9 @@ If you're on Mac OS X, you should be able to install libev
 through `Homebrew <http://brew.sh/>`_. For example, on Mac OS X::
 
     $ brew install libev
+
+The libev extension is not built for Windows (the build process is complex, and the Windows implementation uses
+select anyway).
 
 If successful, you should be able to build and install the extension
 (just using ``setup.py build`` or ``setup.py install``) and then use
