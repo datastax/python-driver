@@ -1754,3 +1754,95 @@ class AggregateMetadata(FunctionTest):
             final_func_idx = cql.find('FINALFUNC "%s"' % kwargs['final_func'])
             self.assertNotIn(-1, (init_cond_idx, final_func_idx))
             self.assertGreater(init_cond_idx, final_func_idx)
+
+
+class BadMetaTest(unittest.TestCase):
+    """
+    Test behavior when metadata has unexpected form
+    Verify that new cluster/session can still connect, and the CQL output indicates the exception with a warning.
+    PYTHON-370
+    """
+
+    @property
+    def function_name(self):
+        return self._testMethodName.lower()
+
+    @classmethod
+    def setup_class(cls):
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.keyspace_name = cls.__name__.lower()
+        cls.session = cls.cluster.connect()
+        cls.session.execute("CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}" % cls.keyspace_name)
+        cls.session.set_keyspace(cls.keyspace_name)
+
+    @classmethod
+    def teardown_class(cls):
+        cls.session.execute("DROP KEYSPACE IF EXISTS %s" % cls.keyspace_name)
+        cls.cluster.shutdown()
+
+    def _run_on_all_nodes(self, query, params):
+        # used to update schema data on all nodes in the cluster
+        for _ in self.cluster.metadata.all_hosts():
+            self.session.execute(query, params)
+
+    def test_keyspace_bad_options(self):
+        strategy_options = self.session.execute('SELECT strategy_options FROM system.schema_keyspaces WHERE keyspace_name=%s', (self.keyspace_name,))[0].strategy_options
+        where_cls = " WHERE keyspace_name='%s'" % (self.keyspace_name,)
+        try:
+            self._run_on_all_nodes('UPDATE system.schema_keyspaces SET strategy_options=%s' + where_cls, ('some bad json',))
+            c = Cluster(protocol_version=PROTOCOL_VERSION)
+            c.connect()
+            meta = c.metadata.keyspaces[self.keyspace_name]
+            self.assertIsNotNone(meta._exc_info)
+            self.assertIn("/*\nWarning:", meta.export_as_string())
+            c.shutdown()
+        finally:
+            self._run_on_all_nodes('UPDATE system.schema_keyspaces SET strategy_options=%s' + where_cls, (strategy_options,))
+
+    def test_keyspace_bad_index(self):
+        self.session.execute('CREATE TABLE %s (k int PRIMARY KEY, v int)' % self.function_name)
+        self.session.execute('CREATE INDEX ON %s(v)' % self.function_name)
+        where_cls = " WHERE keyspace_name='%s' AND columnfamily_name='%s' AND column_name='v'" \
+                    % (self.keyspace_name, self.function_name)
+        index_options = self.session.execute('SELECT index_options FROM system.schema_columns' + where_cls)[0].index_options
+        try:
+            self._run_on_all_nodes('UPDATE system.schema_columns SET index_options=%s' + where_cls, ('some bad json',))
+            c = Cluster(protocol_version=PROTOCOL_VERSION)
+            c.connect()
+            meta = c.metadata.keyspaces[self.keyspace_name].tables[self.function_name]
+            self.assertIsNotNone(meta._exc_info)
+            self.assertIn("/*\nWarning:", meta.export_as_string())
+            c.shutdown()
+        finally:
+            self._run_on_all_nodes('UPDATE system.schema_columns SET index_options=%s' + where_cls, (index_options,))
+
+    def test_table_bad_comparator(self):
+        self.session.execute('CREATE TABLE %s (k int PRIMARY KEY, v int)' % self.function_name)
+        where_cls = " WHERE keyspace_name='%s' AND columnfamily_name='%s'" % (self.keyspace_name, self.function_name)
+        comparator = self.session.execute('SELECT comparator FROM system.schema_columnfamilies' + where_cls)[0].comparator
+        try:
+            self._run_on_all_nodes('UPDATE system.schema_columnfamilies SET comparator=%s' + where_cls, ('DynamicCompositeType()',))
+            c = Cluster(protocol_version=PROTOCOL_VERSION)
+            c.connect()
+            meta = c.metadata.keyspaces[self.keyspace_name].tables[self.function_name]
+            self.assertIsNotNone(meta._exc_info)
+            self.assertIn("/*\nWarning:", meta.export_as_string())
+            c.shutdown()
+        finally:
+            self._run_on_all_nodes('UPDATE system.schema_columnfamilies SET comparator=%s' + where_cls, (comparator,))
+
+    @unittest.skipUnless(PROTOCOL_VERSION >= 3, "Requires protocol version 3+")
+    def test_user_type_bad_typename(self):
+        self.session.execute('CREATE TYPE %s (i int, d double)' % self.function_name)
+        where_cls = " WHERE keyspace_name='%s' AND type_name='%s'" % (self.keyspace_name, self.function_name)
+        field_types = self.session.execute('SELECT field_types FROM system.schema_usertypes' + where_cls)[0].field_types
+        try:
+            self._run_on_all_nodes('UPDATE system.schema_usertypes SET field_types[0]=%s' + where_cls, ('Tr@inWr3ck##)))',))
+            c = Cluster(protocol_version=PROTOCOL_VERSION)
+            c.connect()
+            meta = c.metadata.keyspaces[self.keyspace_name]
+            self.assertIsNotNone(meta._exc_info)
+            self.assertIn("/*\nWarning:", meta.export_as_string())
+            c.shutdown()
+        finally:
+            self._run_on_all_nodes('UPDATE system.schema_usertypes SET field_types=%s' + where_cls, (field_types,))
