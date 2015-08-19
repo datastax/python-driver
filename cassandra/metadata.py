@@ -2177,7 +2177,7 @@ class IndexMetadataV3(IndexMetadata):
 
     target_type = None
 
-    def __init__(self, table_metadata, index_name, index_type=None, index_options={}, target_columns=(), target_type=''):
+    def __init__(self, table_metadata, index_name, index_type, index_options, target_columns, target_type):
         self.table = table_metadata
         self.name = index_name
         self.index_type = index_type
@@ -2187,7 +2187,7 @@ class IndexMetadataV3(IndexMetadata):
 
         # TODO: temporary until we diverge more with multiple column indexes
         # giving the base class what it expects
-        self.column = table_metadata.columns[target_columns[0]]
+        self.column = table_metadata.columns[tuple(target_columns)[0]]
         self.column.index = self
 
 
