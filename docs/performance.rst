@@ -26,12 +26,9 @@ more than doubling throughput for many workloads.
 Cython Extensions
 -----------------
 `Cython <http://cython.org/>`_ is an optimizing compiler and language that can be used to compile the core files and
-optional extensions for the driver. Cython is not a strict dependency, but the extensions will be built by default
-if cython is present in the python path. To include Cython as a requirement, invoke with the extra name ``cython``:
+optional extensions for the driver. Cython is not a strict dependency, but the extensions will be built by default.
 
-.. code-block:: bash
-
-    $ pip install cassandra-driver[cython]
+See :doc:`installation` for details on controlling this build.
 
 multiprocessing
 ---------------
