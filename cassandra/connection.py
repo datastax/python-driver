@@ -242,7 +242,7 @@ class Connection(object):
     def __init__(self, host='127.0.0.1', port=9042, authenticator=None,
                  ssl_options=None, sockopts=None, compression=True,
                  cql_version=None, protocol_version=MAX_SUPPORTED_VERSION, is_control_connection=False,
-                 user_type_map=None):
+                 user_type_map=None, connect_timeout=None):
         self.host = host
         self.port = port
         self.authenticator = authenticator
@@ -253,6 +253,7 @@ class Connection(object):
         self.protocol_version = protocol_version
         self.is_control_connection = is_control_connection
         self.user_type_map = user_type_map
+        self.connect_timeout = connect_timeout
         self._push_watchers = defaultdict(set)
         self._requests = {}
         self._iobuf = io.BytesIO()
@@ -298,8 +299,11 @@ class Connection(object):
         succeeded in connecting and are ready for service (or
         raises an exception otherwise).
         """
+        start = time.time()
+        kwargs['connect_timeout'] = timeout
         conn = cls(host, *args, **kwargs)
-        conn.connected_event.wait(timeout)
+        elapsed = time.time() - start
+        conn.connected_event.wait(timeout - elapsed)
         if conn.last_error:
             if conn.is_unsupported_proto_version:
                 raise ProtocolVersionUnsupported(host, conn.protocol_version)
@@ -320,7 +324,7 @@ class Connection(object):
                     if not self._ssl_impl:
                         raise Exception("This version of Python was not compiled with SSL support")
                     self._socket = self._ssl_impl.wrap_socket(self._socket, **self.ssl_options)
-                self._socket.settimeout(1.0)
+                self._socket.settimeout(self.connect_timeout)
                 self._socket.connect(sockaddr)
                 sockerr = None
                 break
@@ -331,7 +335,7 @@ class Connection(object):
                 sockerr = err
 
         if sockerr:
-            raise socket.error(sockerr.errno, "Tried connecting to %s. Last error: %s" % ([a[4] for a in addresses], sockerr.strerror))
+            raise socket.error(sockerr.errno, "Tried connecting to %s. Last error: %s" % ([a[4] for a in addresses], sockerr.strerror or sockerr))
 
         if self.sockopts:
             for args in self.sockopts:

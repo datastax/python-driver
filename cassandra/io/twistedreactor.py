@@ -200,7 +200,8 @@ class TwistedConnection(Connection):
         """
         self.connector = reactor.connectTCP(
             host=self.host, port=self.port,
-            factory=TwistedConnectionClientFactory(self))
+            factory=TwistedConnectionClientFactory(self),
+            timeout=self.connect_timeout)
 
     def client_connection_made(self):
         """
