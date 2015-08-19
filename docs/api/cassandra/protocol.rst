@@ -25,12 +25,15 @@ See :meth:`.Session.execute`, ::meth:`.Session.execute_async`, :attr:`.ResponseF
 
     .. automethod:: decode_message
 
+.. _faster_deser:
+
 Faster Deserialization
 ----------------------
 When python-driver is compiled with Cython, it uses a Cython-based deserialization path
-to deserialize messages. There are two additional ProtocolHandler classes that can be
-used to deserialize response messages: the first is ``LazyProtocolHandler`` and the
-second is ``NumpyProtocolHandler``.They can be used as follows:
+to deserialize messages. By default, the driver will use a Cython-based parser that returns
+lists of rows similar to the pure-Python version. In addition, there are two additional
+ProtocolHandler classes that can be used to deserialize response messages: ``LazyProtocolHandler``
+and ``NumpyProtocolHandler``. They can be used as follows:
 
 .. code:: python
 
@@ -38,3 +41,7 @@ second is ``NumpyProtocolHandler``.They can be used as follows:
     s.client_protocol_handler = LazyProtocolHandler   # for a result iterator
     s.client_protocol_handler = NumpyProtocolHandler  # for a dict of NumPy arrays as result
 
+These protocol handlers comprise different column parsers (with corresponding names), and return
+results as described below:
+
+.. autofunction:: cython_protocol_handler

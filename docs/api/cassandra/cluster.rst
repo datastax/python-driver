@@ -27,8 +27,6 @@
 
    .. autoattribute:: connection_class
 
-   .. autoattribute:: protocol_handler_class
-
    .. autoattribute:: metrics_enabled
 
    .. autoattribute:: metrics
@@ -107,6 +105,8 @@
    .. autoattribute:: use_client_timestamp
 
    .. autoattribute:: encoder
+
+   .. autoattribute:: client_protocol_handler
 
    .. automethod:: execute(statement[, parameters][, timeout][, trace][, custom_payload])
 

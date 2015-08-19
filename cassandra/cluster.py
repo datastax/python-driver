@@ -1527,12 +1527,9 @@ class Session(object):
     internal driver requests). This can be used to override or extend features such as
     message or type ser/des.
 
-    The class must conform to the public classmethod interface defined in the default
-    implementation, :class:`cassandra.protocol.ProtocolHandler`
+    The default pure python implementation is :class:`cassandra.protocol.ProtocolHandler`.
 
-    This is not included in published documentation as it is not intended for the casual user.
-    It requires knowledge of the native protocol and driver internals. Only advanced, specialized
-    use cases should need to do anything with this.
+    When compiled with Cython, there are also built-in faster alternatives. See :ref:`faster_deser`
     """
 
     _lock = None

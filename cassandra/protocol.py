@@ -905,7 +905,6 @@ class ProtocolHandler(object):
         :param stream_id: protocol stream id for the frame header
         :param protocol_version: version for the frame header, and used encoding contents
         :param compressor: optional compression function to be used on the body
-        :return:
         """
         flags = 0
         body = io.BytesIO()
@@ -1001,16 +1000,16 @@ def cython_protocol_handler(colparser):
     Given a column parser to deserialize ResultMessages, return a suitable
     Cython-based protocol handler.
 
-    There are three Cython-based protocol handlers (least to most performant):
+    There are three Cython-based protocol handlers:
 
-        1. obj_parser.ListParser
-            this parser decodes result messages into a list of tuples
+        - obj_parser.ListParser
+            decodes result messages into a list of tuples
 
-        2. obj_parser.LazyParser
-            this parser decodes result messages lazily by returning an iterator
+        - obj_parser.LazyParser
+            decodes result messages lazily by returning an iterator
 
-        3. numpy_parser.NumPyParser
-            this parser decodes result messages into NumPy arrays
+        - numpy_parser.NumPyParser
+            decodes result messages into NumPy arrays
 
     The default is to use obj_parser.ListParser
     """
