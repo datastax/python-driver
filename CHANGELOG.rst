@@ -21,6 +21,7 @@ Bug Fixes
 * DowngradingConsistencyRetryPolicy doesn't check response count on write timeouts (PYTHON-338)
 * Blocking connect does not use connect_timeout (PYTHON-381)
 * Properly protect partition key in CQL export (PYTHON-375)
+* Trigger error callbacks on timeout (PYTHON-294)
 
 2.6.0
 =====
