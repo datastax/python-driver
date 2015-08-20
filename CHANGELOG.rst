@@ -1,6 +1,7 @@
 2.7.0
 =====
-Cython is introduced
+Cython is introduced, providing compiled extensions for core modules, and
+extensions for optimized results deserialization.
 
 Features
 --------
