@@ -112,7 +112,7 @@ The driver has several **optional** features that have non-Python dependencies.
 
 C Extensions
 ^^^^^^^^^^^^
-By default, a number of extensions are complect, providing faster hashing
+By default, a number of extensions are compiled, providing faster hashing
 for token-aware routing with the ``Murmur3Partitioner``,
 `libev <http://software.schmorp.de/pkg/libev.html>`_ event loop integration,
 and Cython optimized extensions.
