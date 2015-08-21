@@ -1021,9 +1021,8 @@ class TableMetadata(object):
         ret = self.as_cql_query(formatted=True)
         ret += ";"
 
-        for col_meta in self.columns.values():
-            if col_meta.index:
-                ret += "\n%s;" % (col_meta.index.as_cql_query(),)
+        for index in self.indexes.values():
+            ret += "\n%s;" % index.as_cql_query()
 
         for trigger_meta in self.triggers.values():
             ret += "\n%s;" % (trigger_meta.as_cql_query(),)
@@ -1223,63 +1222,83 @@ class IndexMetadata(object):
     A representation of a secondary index on a column.
     """
 
-    column = None
-    """
-    The column (:class:`.ColumnMetadata`) this index is on.
-    """
+    table = None
+    """ The :class:`.TableMetadata` this column belongs to. """
 
     name = None
     """ A string name for the index. """
 
+    columns = None
+    """
+    The set of columns (:class:`.ColumnMetadata`) this index is on
+    (may be empty for per-row indexes).
+
+    .. versionchanged:: 3.0.0
+
+        Was previously a singular column
+    """
+
     index_type = None
     """ A string representing the type of index. """
 
-    index_options = {}
+    index_options = None
     """ A dict of index options. """
 
-    def __init__(self, column_metadata, index_name=None, index_type=None, index_options={}):
-        self.column = column_metadata
+    target_type = None
+    """
+    String target type (COLUMN, ROW, etc), if available
+
+    .. versionadded:: 3.0.0
+    """
+
+    def __init__(self, table_metadata, index_name=None, index_type=None, index_options=None, target_columns=None, target_type=None):
+        self.table = table_metadata
         self.name = index_name
+        self.columns = set(table_metadata.columns[col_name] for col_name in target_columns) if target_columns else set()
         self.index_type = index_type
-        self.index_options = index_options
+        self.index_options = index_options or {}
+        self.target_type = target_type
 
     def as_cql_query(self):
         """
         Returns a CQL query that can be used to recreate this index.
         """
-        table = self.column.table
         if self.index_type != "CUSTOM":
-            index_target = protect_name(self.column.name)
-            if self.index_options is not None:
-                option_keys = self.index_options.keys()
-                if "index_keys" in option_keys:
-                    index_target = 'keys(%s)' % (index_target,)
-                elif "index_values" in option_keys:
-                    # don't use any "function" for collection values
-                    pass
-                else:
-                    # it might be a "full" index on a frozen collection, but
-                    # we need to check the data type to verify that, because
-                    # there is no special index option for full-collection
-                    # indexes.
-                    data_type = self.column.data_type
-                    collection_types = ('map', 'set', 'list')
-                    if data_type.typename == "frozen" and data_type.subtypes[0].typename in collection_types:
-                        # no index option for full-collection index
-                        index_target = 'full(%s)' % (index_target,)
-
-            return "CREATE INDEX %s ON %s.%s (%s)" % (
+            target_fmt = "CREATE INDEX %s ON %s.%s (%%s)" % (
                 self.name,  # Cassandra doesn't like quoted index names for some reason
-                protect_name(table.keyspace.name),
-                protect_name(table.name),
-                index_target)
+                protect_name(self.table.keyspace.name),
+                protect_name(self.table.name))
         else:
-            return "CREATE CUSTOM INDEX %s ON %s.%s (%s) USING '%s'" % (
+            target_fmt = "CREATE CUSTOM INDEX %s ON %s.%s (%%s) USING '%s'" % (
                 self.name,  # Cassandra doesn't like quoted index names for some reason
-                protect_name(table.keyspace.name),
-                protect_name(table.name),
-                protect_name(self.column.name),
+                protect_name(self.table.keyspace.name),
+                protect_name(self.table.name),
                 self.index_options["class_name"])
+
+        # TODO: when CASSANDRA-10124 lands, we'll need to loop over self.columns
+        # not updating yet because it seems like index_options will have to change to
+        # specify different options per column(?)
+        # Also, grammar will be changing for indexes with no target columns. This is TBD
+        col = tuple(self.columns)[0] if self.columns else None
+        index_target = protect_name(col.name) if col else ''
+        if col and self.index_options is not None:
+            option_keys = self.index_options.keys()
+            if "index_keys" in option_keys:
+                index_target = 'keys(%s)' % (index_target,)
+            elif "index_values" in option_keys:
+                # don't use any "function" for collection values
+                pass
+            else:
+                # it might be a "full" index on a frozen collection, but
+                # we need to check the data type to verify that, because
+                # there is no special index option for full-collection
+                # indexes.
+                data_type = col.data_type
+                collection_types = ('map', 'set', 'list')
+                if data_type.typename == "frozen" and data_type.subtypes[0].typename in collection_types:
+                    # no index option for full-collection index
+                    index_target = 'full(%s)' % (index_target,)
+        return target_fmt % index_target
 
     def export_as_string(self):
         """
@@ -1605,7 +1624,6 @@ class SchemaParserV22(_SchemaParser):
     def get_type(self, keyspace, type):
         where_clause = " WHERE keyspace_name = '%s' AND type_name = '%s'" % (keyspace, type)
         return self._query_build_row(self._SELECT_TYPES + where_clause, self._build_user_type)
-
     def get_function(self, keyspace, function):
         where_clause = " WHERE keyspace_name = '%s' AND function_name = '%s' AND signature = [%s]" \
                        % (keyspace, function.name, ','.join("'%s'" % t for t in function.type_signature))
@@ -1793,6 +1811,10 @@ class SchemaParserV22(_SchemaParser):
         for col_row in col_rows:
             column_meta = self._build_column_metadata(table_meta, col_row)
             table_meta.columns[column_meta.name] = column_meta
+            index_meta = self._build_index_metadata(column_meta, col_row)
+            column_meta.index = index_meta
+            if index_meta:
+                table_meta.indexes[index_meta.name] = index_meta
 
         for trigger_row in trigger_rows:
             trigger_meta = self._build_trigger_metadata(table_meta, trigger_row)
@@ -1823,10 +1845,6 @@ class SchemaParserV22(_SchemaParser):
         data_type = types.lookup_casstype(row["validator"])
         is_static = row.get("type", None) == "static"
         column_meta = ColumnMetadata(table_metadata, name, data_type, is_static=is_static)
-        index_meta = self._build_index_metadata(column_meta, row)
-        column_meta.index = index_meta
-        if index_meta:
-            table_metadata.indexes[index_meta.name] = index_meta
         return column_meta
 
     @staticmethod
@@ -1835,8 +1853,8 @@ class SchemaParserV22(_SchemaParser):
         index_type = row.get("index_type")
         if index_name or index_type:
             options = row.get("index_options")
-            index_options = json.loads(options) if options else {}
-            return IndexMetadata(column_metadata, index_name, index_type, index_options)
+            index_options = json.loads(options) if options else None
+            return IndexMetadata(column_metadata.table, index_name, index_type, index_options, (column_metadata.name,))
         else:
             return None
 
@@ -2073,10 +2091,10 @@ class SchemaParserV3(SchemaParserV22):
         index_name = row.get("index_name")
         index_type = row.get("index_type")
         if index_name or index_type:
-            index_options = dict(row.get("options") or {})
-            target_columns = row.get('target_columns') or set()
+            index_options = row.get("options")
+            target_columns = row.get('target_columns')
             target_type = row.get('target_type')
-            return IndexMetadataV3(table_metadata, index_name, index_type, index_options, target_columns, target_type)
+            return IndexMetadata(table_metadata, index_name, index_type, index_options, target_columns, target_type)
         else:
             return None
 
@@ -2148,47 +2166,6 @@ class TableMetadataV3(TableMetadata):
                 ret.append("%s = %s" % (name, protect_value(value)))
 
         return list(sorted(ret))
-
-
-class IndexMetadataV3(IndexMetadata):
-
-    table = None
-    """
-    The table (:class:`.TableMetadata`) this index is on.
-    """
-
-    columns = None
-    """
-    The set of columns (:class:`.ColumnMetadata`) this index is on
-    (may be empty for per-row indexes).
-    """
-
-    name = None
-    """ A string name for the index. """
-
-    index_type = None
-    """ A string representing the type of index. """
-
-    index_options = {}
-    """ A dict of index options. """
-
-    target_columns = set()
-    """ A set of target columns """
-
-    target_type = None
-
-    def __init__(self, table_metadata, index_name, index_type, index_options, target_columns, target_type):
-        self.table = table_metadata
-        self.name = index_name
-        self.index_type = index_type
-        self.index_options = index_options
-        self.target_columns = set(target_columns)
-        self.target_type = target_type
-
-        # TODO: temporary until we diverge more with multiple column indexes
-        # giving the base class what it expects
-        self.column = table_metadata.columns[tuple(target_columns)[0]]
-        self.column.index = self
 
 
 def get_schema_parser(connection, timeout):
