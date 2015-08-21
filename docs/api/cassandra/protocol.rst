@@ -41,7 +41,13 @@ and ``NumpyProtocolHandler``. They can be used as follows:
     s.client_protocol_handler = LazyProtocolHandler   # for a result iterator
     s.client_protocol_handler = NumpyProtocolHandler  # for a dict of NumPy arrays as result
 
-These protocol handlers comprise different column parsers (with corresponding names), and return
-results as described below:
+These protocol handlers comprise different parsers, and return results as described below:
 
-.. autofunction:: cython_protocol_handler
+    - ProtocolHandler: this default implementation is a drop-in replacement for the pure-Python version.
+        The rows are all parsed upfront, before results are returned.
+
+    - LazyProtocolHandler: near drop-in replacement for the above, except that it returns an iterator over rows,
+        lazily decoded into the default row format (this is more efficient since all decoded results are not materialized at once)
+
+    - NumpyProtocolHander: deserializes results directly into NumPy arrays. This facilitates efficient integration with
+        analysis toolkits such as Pandas.
