@@ -2063,7 +2063,7 @@ class SchemaParserV3(SchemaParserV22):
                 table_meta.clustering_key.append(table_meta.columns[r.get('column_name')])
 
         for col_row in (r for r in col_rows
-                        if r.get('kind', None) not in ('parition_key', 'clustering_key')):
+                        if r.get('kind', None) not in ('parition_key', 'clustering')):
             column_meta = self._build_column_metadata(table_meta, col_row)
             if not compact_static or column_meta.is_static:
                 # for compact static tables, we omit the clustering key and value, and only add the logical columns.
