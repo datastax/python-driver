@@ -2107,6 +2107,13 @@ class SchemaParserV3(SchemaParserV22):
         else:
             return None
 
+    @staticmethod
+    def _build_trigger_metadata(table_metadata, row):
+        name = row["trigger_name"]
+        options = row["options"]
+        trigger_meta = TriggerMetadata(table_metadata, name, options)
+        return trigger_meta
+
     def _query_all(self):
         cl = ConsistencyLevel.ONE
         queries = [
