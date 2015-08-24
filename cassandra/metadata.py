@@ -1840,7 +1840,8 @@ class SchemaParserV22(_SchemaParser):
 
         return options
 
-    def _build_column_metadata(self, table_metadata, row):
+    @staticmethod
+    def _build_column_metadata(table_metadata, row):
         name = row["column_name"]
         data_type = types.lookup_casstype(row["validator"])
         is_static = row.get("type", None) == "static"
@@ -2040,9 +2041,9 @@ class SchemaParserV3(SchemaParserV22):
 
         # partition key
         partition_rows = [r for r in col_rows
-                          if r.get('type', None) == "partition_key"]
+                          if r.get('kind', None) == "partition_key"]
         if len(partition_rows) > 1:
-            partition_rows = sorted(partition_rows, key=lambda row: row.get('component_index'))
+            partition_rows = sorted(partition_rows, key=lambda row: row.get('position'))
         for r in partition_rows:
             # we have to add meta here (and not in the later loop) because TableMetadata.columns is an
             # OrderedDict, and it assumes keys are inserted first, in order, when exporting CQL
@@ -2053,16 +2054,16 @@ class SchemaParserV3(SchemaParserV22):
         # clustering key
         if not compact_static:
             clustering_rows = [r for r in col_rows
-                               if r.get('type', None) == "clustering"]
+                               if r.get('kind', None) == "clustering"]
             if len(clustering_rows) > 1:
-                clustering_rows = sorted(clustering_rows, key=lambda row: row.get('component_index'))
+                clustering_rows = sorted(clustering_rows, key=lambda row: row.get('position'))
             for r in clustering_rows:
                 column_meta = self._build_column_metadata(table_meta, r)
                 table_meta.columns[column_meta.name] = column_meta
                 table_meta.clustering_key.append(table_meta.columns[r.get('column_name')])
 
         for col_row in (r for r in col_rows
-                        if r.get('type', None) not in ('parition_key', 'clustering_key')):
+                        if r.get('kind', None) not in ('parition_key', 'clustering_key')):
             column_meta = self._build_column_metadata(table_meta, col_row)
             if not compact_static or column_meta.is_static:
                 # for compact static tables, we omit the clustering key and value, and only add the logical columns.
@@ -2085,6 +2086,14 @@ class SchemaParserV3(SchemaParserV22):
     def _build_table_options(self, row):
         """ Setup the mostly-non-schema table options, like caching settings """
         return dict((o, row.get(o)) for o in self.recognized_table_options if o in row)
+
+    @staticmethod
+    def _build_column_metadata(table_metadata, row):
+        name = row["column_name"]
+        data_type = types.lookup_casstype(row["type"])
+        is_static = row.get("kind", None) == "static"
+        column_meta = ColumnMetadata(table_metadata, name, data_type, is_static=is_static)
+        return column_meta
 
     @staticmethod
     def _build_index_metadata(table_metadata, row):
