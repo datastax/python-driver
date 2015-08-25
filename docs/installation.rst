@@ -103,8 +103,9 @@ install the ``blist`` library::
 
     pip install blist
 
-* Note: blist performance is not necessarily better for simply querying sets.
-The only benefit may come with doing set logic in results processing.
+**Note**: This optional dependency is likely to be removed in favor of the internal
+implementation in the next major version.
+
 
 (*Optional*) Non-python Dependencies
 ------------------------------------
