@@ -1,5 +1,7 @@
 2.7.0
 =====
+August 25, 2015
+
 Cython is introduced, providing compiled extensions for core modules, and
 extensions for optimized results deserialization.
 
