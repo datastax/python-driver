@@ -1,3 +1,11 @@
+2.7.1
+=====
+August 25, 2015
+
+Bug Fixes
+---------
+* Explicitly include extension source files in Manifest
+
 2.7.0
 =====
 August 25, 2015
