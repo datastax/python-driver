@@ -37,8 +37,7 @@ from distutils.errors import (CCompilerError, DistutilsPlatformError,
                               DistutilsExecError)
 from distutils.cmd import Command
 
-py_version = sys.version_info[:2]
-PY3 = py_version[0] == 3
+PY3 = sys.version_info[0] == 3
 
 try:
     import subprocess
