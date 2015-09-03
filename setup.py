@@ -37,6 +37,9 @@ from distutils.errors import (CCompilerError, DistutilsPlatformError,
                               DistutilsExecError)
 from distutils.cmd import Command
 
+py_version = sys.version_info[:2]
+PY3 = py_version[0] == 3
+
 try:
     import subprocess
     has_subprocess = True
@@ -297,7 +300,10 @@ def run_setup(extensions):
     if try_cython:
         kw['setup_requires'] = ['Cython']
 
-    dependencies = ['futures', 'six >=1.6']
+    dependencies = ['six >=1.6']
+
+    if not PY3:
+        dependencies.append('futures')
 
     setup(
         name='cassandra-driver',
