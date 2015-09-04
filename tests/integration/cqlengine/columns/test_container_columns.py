@@ -386,7 +386,8 @@ class TestMapColumn(BaseCassEngTestCase):
         k2 = uuid4()
         now = datetime.now()
         then = now + timedelta(days=1)
-        m1 = TestMapModel.create(int_map={1: k1, 2: k2}, text_map={'now': now, 'then': then})
+        m1 = TestMapModel.create(int_map={1: k1, 2: k2},
+                                 text_map={'now': now, 'then': then})
         m2 = TestMapModel.get(partition=m1.partition)
 
         self.assertTrue(isinstance(m2.int_map, dict))

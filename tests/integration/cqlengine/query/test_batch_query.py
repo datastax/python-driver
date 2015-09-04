@@ -187,13 +187,13 @@ class BatchQueryTests(BaseCassEngTestCase):
         self.assertEqual(0, len(obj))
 
     def test_batch_execute_timeout(self):
-        with mock.patch.object(Session, 'execute', autospec=True) as mock_execute:
+        with mock.patch.object(Session, 'execute') as mock_execute:
             with BatchQuery(timeout=1) as b:
                 BatchQueryLogModel.batch(b).create(k=2, v=2)
-            mock_execute.assert_called_once_with(mock.ANY, mock.ANY, mock.ANY, timeout=1)
+            self.assertEqual(mock_execute.call_args[-1]['timeout'], 1)
 
     def test_batch_execute_no_timeout(self):
-        with mock.patch.object(Session, 'execute', autospec=True) as mock_execute:
+        with mock.patch.object(Session, 'execute') as mock_execute:
             with BatchQuery() as b:
                 BatchQueryLogModel.batch(b).create(k=2, v=2)
-            mock_execute.assert_called_once_with(mock.ANY, mock.ANY, mock.ANY, timeout=NOT_SET)
+            self.assertEqual(mock_execute.call_args[-1]['timeout'], NOT_SET)

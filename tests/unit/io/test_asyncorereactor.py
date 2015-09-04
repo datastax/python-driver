@@ -21,20 +21,20 @@ except ImportError:
 
 import errno
 import math
+import time
 from mock import patch, Mock
 import os
 from six import BytesIO
 import socket
 from socket import error as socket_error
-
 from cassandra.connection import (HEADER_DIRECTION_TO_CLIENT,
-                                  ConnectionException, ProtocolError)
+                                  ConnectionException, ProtocolError,Timer)
 from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.protocol import (write_stringmultimap, write_int, write_string,
                                 SupportedMessage, ReadyMessage, ServerError)
 from cassandra.marshal import uint8_pack, uint32_pack, int32_pack
-
 from tests import is_monkey_patched
+from tests.unit.io.utils import submit_and_wait_for_completion, TimerCallback
 
 
 class AsyncoreConnectionTest(unittest.TestCase):
@@ -300,3 +300,37 @@ class AsyncoreConnectionTest(unittest.TestCase):
 
         self.assertTrue(c.connected_event.is_set())
         self.assertFalse(c.is_defunct)
+
+    def test_multi_timer_validation(self, *args):
+        """
+        Verify that timer timeouts are honored appropriately
+        """
+        c = self.make_connection()
+        # Tests timers submitted in order at various timeouts
+        submit_and_wait_for_completion(self, AsyncoreConnection, 0, 100, 1, 100)
+        # Tests timers submitted in reverse order at various timeouts
+        submit_and_wait_for_completion(self, AsyncoreConnection, 100, 0, -1, 100)
+        # Tests timers submitted in varying order at various timeouts
+        submit_and_wait_for_completion(self, AsyncoreConnection, 0, 100, 1, 100, True)
+
+    def test_timer_cancellation(self):
+        """
+        Verify that timer cancellation is honored
+        """
+
+        # Various lists for tracking callback stage
+        connection = self.make_connection()
+        timeout = .1
+        callback = TimerCallback(timeout)
+        timer = connection.create_timer(timeout, callback.invoke)
+        timer.cancel()
+        # Release context allow for timer thread to run.
+        time.sleep(.2)
+        timer_manager = connection._loop._timers
+        # Assert that the cancellation was honored
+        self.assertFalse(timer_manager._queue)
+        self.assertFalse(timer_manager._new_timers)
+        self.assertFalse(callback.was_invoked())
+
+
+

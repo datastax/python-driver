@@ -1,1 +1,6 @@
 include setup.py README.rst MANIFEST.in LICENSE ez_setup.py
+include cassandra/cmurmur3.c
+include cassandra/io/libevwrapper.c
+include cassandra/*.pyx
+include cassandra/*.pxd
+include cassandra/*.h

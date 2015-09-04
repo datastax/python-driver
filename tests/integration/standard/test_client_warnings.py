@@ -47,7 +47,6 @@ class ClientWarningTests(unittest.TestCase):
         for x in range(213):
             cls.warn_batch.add(cls.prepared, (x, x, 1))
 
-
     @classmethod
     def tearDownClass(cls):
         if PROTOCOL_VERSION < 4:
@@ -105,7 +104,7 @@ class ClientWarningTests(unittest.TestCase):
             - batch_size_warn_threshold_in_kb: 5
         @test_category queries:client_warning
         """
-        payload = {'key': 'value'}
+        payload = {'key': b'value'}
         future = self.session.execute_async(self.warn_batch, custom_payload=payload)
         future.result()
         self.assertEqual(len(future.warnings), 1)
@@ -123,7 +122,7 @@ class ClientWarningTests(unittest.TestCase):
             - batch_size_warn_threshold_in_kb: 5
         @test_category queries:client_warning
         """
-        payload = {'key': 'value'}
+        payload = {'key': b'value'}
         future = self.session.execute_async(self.warn_batch, trace=True, custom_payload=payload)
         future.result()
         self.assertEqual(len(future.warnings), 1)

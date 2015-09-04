@@ -28,7 +28,8 @@ from cassandra.cluster import Cluster
 from cassandra.cqltypes import DoubleType, Int32Type, ListType, UTF8Type, MapType
 from cassandra.encoder import Encoder
 from cassandra.metadata import (Metadata, KeyspaceMetadata, TableMetadata, IndexMetadata,
-                                Token, MD5Token, TokenMap, murmur3, Function, Aggregate, get_schema_parser)
+                                Token, MD5Token, TokenMap, murmur3, Function, Aggregate, protect_name, protect_names,
+                                get_schema_parser)
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
@@ -65,24 +66,24 @@ class SchemaMetadataTests(unittest.TestCase):
 
         statement = "CREATE TABLE %s.%s (" % (self.ksname, self.cfname)
         if len(partition_cols) == 1 and not clustering_cols:
-            statement += "%s text PRIMARY KEY, " % partition_cols[0]
+            statement += "%s text PRIMARY KEY, " % protect_name(partition_cols[0])
         else:
-            statement += ", ".join("%s text" % col for col in partition_cols)
+            statement += ", ".join("%s text" % protect_name(col) for col in partition_cols)
             statement += ", "
 
-        statement += ", ".join("%s text" % col for col in clustering_cols + other_cols)
+        statement += ", ".join("%s text" % protect_name(col) for col in clustering_cols + other_cols)
 
         if len(partition_cols) != 1 or clustering_cols:
             statement += ", PRIMARY KEY ("
 
             if len(partition_cols) > 1:
-                statement += "(" + ", ".join(partition_cols) + ")"
+                statement += "(" + ", ".join(protect_names(partition_cols)) + ")"
             else:
-                statement += partition_cols[0]
+                statement += protect_name(partition_cols[0])
 
             if clustering_cols:
                 statement += ", "
-                statement += ", ".join(clustering_cols)
+                statement += ", ".join(protect_names(clustering_cols))
 
             statement += ")"
 
@@ -148,6 +149,18 @@ class SchemaMetadataTests(unittest.TestCase):
         self.assertEqual([u'a'], [c.name for c in tablemeta.partition_key])
         self.assertEqual([u'b'], [c.name for c in tablemeta.clustering_key])
         self.assertEqual([u'a', u'b', u'c'], sorted(tablemeta.columns.keys()))
+
+        self.check_create_statement(tablemeta, create_statement)
+
+    def test_compound_primary_keys_protected(self):
+        create_statement = self.make_create_statement(["Aa"], ["Bb"], ["Cc"])
+        create_statement += ' WITH CLUSTERING ORDER BY ("Bb" ASC)'
+        self.session.execute(create_statement)
+        tablemeta = self.get_table_metadata()
+
+        self.assertEqual([u'Aa'], [c.name for c in tablemeta.partition_key])
+        self.assertEqual([u'Bb'], [c.name for c in tablemeta.clustering_key])
+        self.assertEqual([u'Aa', u'Bb', u'Cc'], sorted(tablemeta.columns.keys()))
 
         self.check_create_statement(tablemeta, create_statement)
 
@@ -975,7 +988,7 @@ CREATE TABLE legacy.composite_comp_with_col (
     AND CLUSTERING ORDER BY (t ASC, b ASC, s ASC)
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = 'Stores file meta data'
-    AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
+    AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
     AND dclocal_read_repair_chance = 0.1
     AND default_time_to_live = 0
@@ -1101,7 +1114,7 @@ CREATE TABLE legacy.composite_comp_no_col (
     AND CLUSTERING ORDER BY (column1 ASC, column1 ASC, column2 ASC)
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = 'Stores file meta data'
-    AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
+    AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
     AND dclocal_read_repair_chance = 0.1
     AND default_time_to_live = 0
@@ -1744,3 +1757,95 @@ class AggregateMetadata(FunctionTest):
             final_func_idx = cql.find('FINALFUNC "%s"' % kwargs['final_func'])
             self.assertNotIn(-1, (init_cond_idx, final_func_idx))
             self.assertGreater(init_cond_idx, final_func_idx)
+
+
+class BadMetaTest(unittest.TestCase):
+    """
+    Test behavior when metadata has unexpected form
+    Verify that new cluster/session can still connect, and the CQL output indicates the exception with a warning.
+    PYTHON-370
+    """
+
+    @property
+    def function_name(self):
+        return self._testMethodName.lower()
+
+    @classmethod
+    def setup_class(cls):
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.keyspace_name = cls.__name__.lower()
+        cls.session = cls.cluster.connect()
+        cls.session.execute("CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}" % cls.keyspace_name)
+        cls.session.set_keyspace(cls.keyspace_name)
+
+    @classmethod
+    def teardown_class(cls):
+        cls.session.execute("DROP KEYSPACE IF EXISTS %s" % cls.keyspace_name)
+        cls.cluster.shutdown()
+
+    def _run_on_all_nodes(self, query, params):
+        # used to update schema data on all nodes in the cluster
+        for _ in self.cluster.metadata.all_hosts():
+            self.session.execute(query, params)
+
+    def test_keyspace_bad_options(self):
+        strategy_options = self.session.execute('SELECT strategy_options FROM system.schema_keyspaces WHERE keyspace_name=%s', (self.keyspace_name,))[0].strategy_options
+        where_cls = " WHERE keyspace_name='%s'" % (self.keyspace_name,)
+        try:
+            self._run_on_all_nodes('UPDATE system.schema_keyspaces SET strategy_options=%s' + where_cls, ('some bad json',))
+            c = Cluster(protocol_version=PROTOCOL_VERSION)
+            c.connect()
+            meta = c.metadata.keyspaces[self.keyspace_name]
+            self.assertIsNotNone(meta._exc_info)
+            self.assertIn("/*\nWarning:", meta.export_as_string())
+            c.shutdown()
+        finally:
+            self._run_on_all_nodes('UPDATE system.schema_keyspaces SET strategy_options=%s' + where_cls, (strategy_options,))
+
+    def test_keyspace_bad_index(self):
+        self.session.execute('CREATE TABLE %s (k int PRIMARY KEY, v int)' % self.function_name)
+        self.session.execute('CREATE INDEX ON %s(v)' % self.function_name)
+        where_cls = " WHERE keyspace_name='%s' AND columnfamily_name='%s' AND column_name='v'" \
+                    % (self.keyspace_name, self.function_name)
+        index_options = self.session.execute('SELECT index_options FROM system.schema_columns' + where_cls)[0].index_options
+        try:
+            self._run_on_all_nodes('UPDATE system.schema_columns SET index_options=%s' + where_cls, ('some bad json',))
+            c = Cluster(protocol_version=PROTOCOL_VERSION)
+            c.connect()
+            meta = c.metadata.keyspaces[self.keyspace_name].tables[self.function_name]
+            self.assertIsNotNone(meta._exc_info)
+            self.assertIn("/*\nWarning:", meta.export_as_string())
+            c.shutdown()
+        finally:
+            self._run_on_all_nodes('UPDATE system.schema_columns SET index_options=%s' + where_cls, (index_options,))
+
+    def test_table_bad_comparator(self):
+        self.session.execute('CREATE TABLE %s (k int PRIMARY KEY, v int)' % self.function_name)
+        where_cls = " WHERE keyspace_name='%s' AND columnfamily_name='%s'" % (self.keyspace_name, self.function_name)
+        comparator = self.session.execute('SELECT comparator FROM system.schema_columnfamilies' + where_cls)[0].comparator
+        try:
+            self._run_on_all_nodes('UPDATE system.schema_columnfamilies SET comparator=%s' + where_cls, ('DynamicCompositeType()',))
+            c = Cluster(protocol_version=PROTOCOL_VERSION)
+            c.connect()
+            meta = c.metadata.keyspaces[self.keyspace_name].tables[self.function_name]
+            self.assertIsNotNone(meta._exc_info)
+            self.assertIn("/*\nWarning:", meta.export_as_string())
+            c.shutdown()
+        finally:
+            self._run_on_all_nodes('UPDATE system.schema_columnfamilies SET comparator=%s' + where_cls, (comparator,))
+
+    @unittest.skipUnless(PROTOCOL_VERSION >= 3, "Requires protocol version 3+")
+    def test_user_type_bad_typename(self):
+        self.session.execute('CREATE TYPE %s (i int, d double)' % self.function_name)
+        where_cls = " WHERE keyspace_name='%s' AND type_name='%s'" % (self.keyspace_name, self.function_name)
+        field_types = self.session.execute('SELECT field_types FROM system.schema_usertypes' + where_cls)[0].field_types
+        try:
+            self._run_on_all_nodes('UPDATE system.schema_usertypes SET field_types[0]=%s' + where_cls, ('Tr@inWr3ck##)))',))
+            c = Cluster(protocol_version=PROTOCOL_VERSION)
+            c.connect()
+            meta = c.metadata.keyspaces[self.keyspace_name]
+            self.assertIsNotNone(meta._exc_info)
+            self.assertIn("/*\nWarning:", meta.export_as_string())
+            c.shutdown()
+        finally:
+            self._run_on_all_nodes('UPDATE system.schema_usertypes SET field_types=%s' + where_cls, (field_types,))

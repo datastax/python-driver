@@ -451,6 +451,131 @@ static PyTypeObject libevwrapper_PrepareType = {
     (initproc)Prepare_init,          /* tp_init */
 };
 
+typedef struct libevwrapper_Timer {
+    PyObject_HEAD
+    struct ev_timer timer;
+    struct libevwrapper_Loop *loop;
+    PyObject *callback;
+} libevwrapper_Timer;
+
+static void
+Timer_dealloc(libevwrapper_Timer *self) {
+    Py_XDECREF(self->loop);
+    Py_XDECREF(self->callback);
+    Py_TYPE(self)->tp_free((PyObject *)self);
+}
+
+static void timer_callback(struct ev_loop *loop, ev_timer *watcher, int revents) {
+    libevwrapper_Timer *self = watcher->data;
+
+    PyObject *result = NULL;
+    PyGILState_STATE gstate;
+
+    gstate = PyGILState_Ensure();
+    result = PyObject_CallFunction(self->callback, NULL);
+    if (!result) {
+        PyErr_WriteUnraisable(self->callback);
+    }
+    Py_XDECREF(result);
+
+    PyGILState_Release(gstate);
+}
+
+static int
+Timer_init(libevwrapper_Timer *self, PyObject *args, PyObject *kwds) {
+    PyObject *callback;
+    PyObject *loop;
+
+    if (!PyArg_ParseTuple(args, "OO", &loop, &callback)) {
+        return -1;
+    }
+
+    if (loop) {
+        Py_INCREF(loop);
+        self->loop = (libevwrapper_Loop *)loop;
+    } else {
+        return -1;
+    }
+
+    if (callback) {
+        if (!PyCallable_Check(callback)) {
+            PyErr_SetString(PyExc_TypeError, "callback parameter must be callable");
+            Py_XDECREF(loop);
+            return -1;
+        }
+        Py_INCREF(callback);
+        self->callback = callback;
+    }
+    ev_init(&self->timer, timer_callback);
+    self->timer.data = self;
+    return 0;
+}
+
+static PyObject *
+Timer_start(libevwrapper_Timer *self, PyObject *args) {
+    double timeout;
+    if (!PyArg_ParseTuple(args, "d", &timeout)) {
+        return NULL;
+    }
+    /* some tiny non-zero number to avoid zero, and
+     make it run immediately for negative timeouts */
+    self->timer.repeat = fmax(timeout, 0.000000001);
+    ev_timer_again(self->loop->loop, &self->timer);
+    Py_RETURN_NONE;
+}
+
+static PyObject *
+Timer_stop(libevwrapper_Timer *self, PyObject *args) {
+    ev_timer_stop(self->loop->loop, &self->timer);
+    Py_RETURN_NONE;
+}
+
+static PyMethodDef Timer_methods[] = {
+    {"start", (PyCFunction)Timer_start, METH_VARARGS, "Start the Timer watcher"},
+    {"stop", (PyCFunction)Timer_stop, METH_NOARGS, "Stop the Timer watcher"},
+    {NULL}  /* Sentinal */
+};
+
+static PyTypeObject libevwrapper_TimerType = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "cassandra.io.libevwrapper.Timer",  /*tp_name*/
+    sizeof(libevwrapper_Timer),      /*tp_basicsize*/
+    0,                               /*tp_itemsize*/
+    (destructor)Timer_dealloc,       /*tp_dealloc*/
+    0,                               /*tp_print*/
+    0,                               /*tp_getattr*/
+    0,                               /*tp_setattr*/
+    0,                               /*tp_compare*/
+    0,                               /*tp_repr*/
+    0,                               /*tp_as_number*/
+    0,                               /*tp_as_sequence*/
+    0,                               /*tp_as_mapping*/
+    0,                               /*tp_hash */
+    0,                               /*tp_call*/
+    0,                               /*tp_str*/
+    0,                               /*tp_getattro*/
+    0,                               /*tp_setattro*/
+    0,                               /*tp_as_buffer*/
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /*tp_flags*/
+    "Timer objects",                 /* tp_doc */
+    0,                               /* tp_traverse */
+    0,                               /* tp_clear */
+    0,                               /* tp_richcompare */
+    0,                               /* tp_weaklistoffset */
+    0,                               /* tp_iter */
+    0,                               /* tp_iternext */
+    Timer_methods,                   /* tp_methods */
+    0,                               /* tp_members */
+    0,                               /* tp_getset */
+    0,                               /* tp_base */
+    0,                               /* tp_dict */
+    0,                               /* tp_descr_get */
+    0,                               /* tp_descr_set */
+    0,                               /* tp_dictoffset */
+    (initproc)Timer_init,            /* tp_init */
+};
+
+
 static PyMethodDef module_methods[] = {
     {NULL}  /* Sentinal */
 };
@@ -500,6 +625,10 @@ initlibevwrapper(void)
     if (PyType_Ready(&libevwrapper_AsyncType) < 0)
         INITERROR;
 
+    libevwrapper_TimerType.tp_new = PyType_GenericNew;
+    if (PyType_Ready(&libevwrapper_TimerType) < 0)
+        INITERROR;
+
 # if PY_MAJOR_VERSION >= 3
     module = PyModule_Create(&moduledef);
 # else
@@ -530,6 +659,10 @@ initlibevwrapper(void)
 
     Py_INCREF(&libevwrapper_AsyncType);
     if (PyModule_AddObject(module, "Async", (PyObject *)&libevwrapper_AsyncType) == -1)
+        INITERROR;
+
+    Py_INCREF(&libevwrapper_TimerType);
+    if (PyModule_AddObject(module, "Timer", (PyObject *)&libevwrapper_TimerType) == -1)
         INITERROR;
 
     if (!PyEval_ThreadsInitialized()) {

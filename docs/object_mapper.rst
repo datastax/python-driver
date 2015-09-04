@@ -48,7 +48,7 @@ Getting Started
         from cassandra.cqlengine import columns
         from cassandra.cqlengine import connection
         from datetime import datetime
-        from cassandra.cqlengine.management import create_keyspace, sync_table
+        from cassandra.cqlengine.management import sync_table
         from cassandra.cqlengine.models import Model
 
         #first, define a model

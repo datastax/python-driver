@@ -412,13 +412,13 @@ class ControlConnectionTest(unittest.TestCase):
             }
             self.cluster.scheduler.reset_mock()
             self.control_connection._handle_schema_change(event)
-            self.cluster.scheduler.schedule_unique.assert_called_once_with(0.0, self.control_connection.refresh_schema, **event)
+            self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection.refresh_schema, **event)
 
             self.cluster.scheduler.reset_mock()
             event['target_type'] = SchemaTargetType.KEYSPACE
             del event['table']
             self.control_connection._handle_schema_change(event)
-            self.cluster.scheduler.schedule_unique.assert_called_once_with(0.0, self.control_connection.refresh_schema, **event)
+            self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection.refresh_schema, **event)
 
     def test_refresh_disabled(self):
         cluster = MockCluster()
@@ -468,3 +468,41 @@ class ControlConnectionTest(unittest.TestCase):
         cluster.scheduler.schedule_unique.assert_has_calls([call(ANY, cc_no_topo_refresh.refresh_node_list_and_token_map),
                                                             call(0.0, cc_no_topo_refresh.refresh_schema,
                                                                  **schema_event)])
+
+
+class EventTimingTest(unittest.TestCase):
+    """
+    A simple test to validate that event scheduling happens in order
+    Added for PYTHON-358
+    """
+    def setUp(self):
+        self.cluster = MockCluster()
+        self.connection = MockConnection()
+        self.time = FakeTime()
+
+        # Use 2 for the schema_event_refresh_window which is what we would normally default to.
+        self.control_connection = ControlConnection(self.cluster, 1, 2, 0)
+        self.control_connection._connection = self.connection
+        self.control_connection._time = self.time
+
+    def test_event_delay_timing(self):
+        """
+        Submits a wide array of events make sure that each is scheduled to occur in the order they were received
+        """
+        prior_delay = 0
+        for _ in range(100):
+            for change_type in ('CREATED', 'DROPPED', 'UPDATED'):
+                event = {
+                    'change_type': change_type,
+                    'keyspace': '1',
+                    'table': 'table1'
+                }
+                # This is to increment the fake time, we don't actually sleep here.
+                self.time.sleep(.001)
+                self.cluster.scheduler.reset_mock()
+                self.control_connection._handle_schema_change(event)
+                self.cluster.scheduler.mock_calls
+                # Grabs the delay parameter from the scheduler invocation
+                current_delay = self.cluster.scheduler.mock_calls[0][1][0]
+                self.assertLess(prior_delay, current_delay)
+                prior_delay = current_delay
