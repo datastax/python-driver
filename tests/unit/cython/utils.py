@@ -14,10 +14,6 @@
 
 from cassandra.cython_deps import HAVE_CYTHON, HAVE_NUMPY
 
-if HAVE_CYTHON:
-    import pyximport
-    pyximport.install()
-
 try:
     import unittest2 as unittest
 except ImportError:
@@ -28,12 +24,12 @@ def cyimport(import_path):
     Import a Cython module if available, otherwise return None
     (and skip any relevant tests).
     """
-    try:
-        return __import__(import_path, fromlist=[True])
-    except ImportError:
-        if HAVE_CYTHON:
-            raise
-        return None
+    if HAVE_CYTHON:
+        import pyximport
+        py_importer, pyx_importer = pyximport.install()
+        mod = __import__(import_path, fromlist=[True])
+        pyximport.uninstall(py_importer, pyx_importer)
+        return mod
 
 
 # @cythontest
