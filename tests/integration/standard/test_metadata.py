@@ -25,7 +25,7 @@ from mock import Mock
 from cassandra import AlreadyExists, SignatureDescriptor, UserFunctionDescriptor, UserAggregateDescriptor
 
 from cassandra.cluster import Cluster
-from cassandra.cqltypes import DoubleType, Int32Type, ListType, UTF8Type, MapType
+from cassandra.cqltypes import DoubleType, Int32Type, ListType, UTF8Type, MapType, LongType
 from cassandra.encoder import Encoder
 from cassandra.metadata import (Metadata, KeyspaceMetadata, TableMetadata, IndexMetadata,
                                 Token, MD5Token, TokenMap, murmur3, Function, Aggregate, protect_name, protect_names)
@@ -1464,6 +1464,27 @@ class FunctionMetadata(FunctionTest):
                 functions = [f for f in self.keyspace_function_meta.values() if f.name == self.function_name]
                 self.assertEqual(len(functions), 2)
                 self.assertNotEqual(functions[0].type_signature, functions[1].type_signature)
+
+    def test_function_no_parameters(self):
+        """
+        Test to verify CQL output for functions with zero parameters
+
+        Creates a function with no input parameters, verify that CQL output is correct.
+
+        @since 2.7.1
+        @jira_ticket PYTHON-392
+        @expected_result function with no parameters should generate proper CQL
+        @test_category function
+        """
+        kwargs = self.make_function_kwargs()
+        kwargs['type_signature'] = []
+        kwargs['argument_names'] = []
+        kwargs['return_type'] = LongType
+        kwargs['body'] = 'return System.currentTimeMillis() / 1000L;'
+
+        with self.VerifiedFunction(self, **kwargs) as vf:
+            fn_meta = self.keyspace_function_meta[vf.signature]
+            self.assertRegexpMatches(fn_meta.as_cql_query(), "CREATE FUNCTION.*%s\(\) .*" % kwargs['name'])
 
     def test_functions_follow_keyspace_alter(self):
         """

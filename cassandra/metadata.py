@@ -955,8 +955,9 @@ class UserType(object):
     def __init__(self, keyspace, name, field_names, field_types):
         self.keyspace = keyspace
         self.name = name
-        self.field_names = field_names
-        self.field_types = field_types
+        # non-frozen collections can return None
+        self.field_names = field_names or []
+        self.field_types = field_types or []
 
     def as_cql_query(self, formatted=False):
         """
@@ -1128,7 +1129,9 @@ class Function(object):
         self.keyspace = keyspace
         self.name = name
         self.type_signature = type_signature
-        self.argument_names = argument_names
+        # type_signature (frozen<list<>>) will always be a list
+        # argument_name is not frozen in C* < 3.0 and may return None
+        self.argument_names = argument_names or []
         self.return_type = return_type
         self.language = language
         self.body = body
