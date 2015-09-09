@@ -281,7 +281,7 @@ On OSX, via homebrew:
                     exclude_failures=True))
                 self.extensions.extend(cythonize("cassandra/*.pyx", nthreads=build_concurrency))
             except Exception:
-                sys.stderr.write("Cython is not available. Not compiling core driver files as extensions (optional).")
+                sys.stderr.write("Failed to cythonize one or more modules. These will not be compiled as extensions (optional).\n")
 
 
 def run_setup(extensions):
@@ -297,7 +297,7 @@ def run_setup(extensions):
     kw['ext_modules'] = [Extension('DUMMY', [])]  # dummy extension makes sure build_ext is called for install
 
     if try_cython:
-        kw['setup_requires'] = ['Cython']
+        kw['setup_requires'] = ['Cython >=0.21']
 
     dependencies = ['six >=1.6']
 
