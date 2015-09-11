@@ -22,6 +22,7 @@ import six
 from six.moves import range
 import io
 
+from cassandra import type_codes
 from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
                        WriteFailure, ReadFailure, FunctionFailure,
                        AlreadyExists, InvalidRequest, Unauthorized,
@@ -35,10 +36,11 @@ from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 DoubleType, FloatType, Int32Type,
                                 InetAddressType, IntegerType, ListType,
                                 LongType, MapType, SetType, TimeUUIDType,
-                                UTF8Type, UUIDType, UserType,
+                                UTF8Type, VarcharType, UUIDType, UserType,
                                 TupleType, lookup_casstype, SimpleDateType,
                                 TimeType, ByteType, ShortType)
 from cassandra.policies import WriteType
+from cassandra.cython_deps import HAVE_CYTHON, HAVE_NUMPY
 from cassandra import util
 
 log = logging.getLogger(__name__)
@@ -64,17 +66,23 @@ TRACING_FLAG = 0x02
 CUSTOM_PAYLOAD_FLAG = 0x04
 WARNING_FLAG = 0x08
 
-_message_types_by_name = {}
 _message_types_by_opcode = {}
 
 _UNSET_VALUE = object()
 
 
+def register_class(cls):
+    _message_types_by_opcode[cls.opcode] = cls
+
+
+def get_registered_classes():
+    return _message_types_by_opcode.copy()
+
+
 class _RegisterMessageType(type):
     def __init__(cls, name, bases, dct):
         if not name.startswith('_'):
-            _message_types_by_name[cls.name] = cls
-            _message_types_by_opcode[cls.opcode] = cls
+            register_class(cls)
 
 
 @six.add_metaclass(_RegisterMessageType)
@@ -83,29 +91,6 @@ class _MessageType(object):
     tracing = False
     custom_payload = None
     warnings = None
-
-    def to_binary(self, stream_id, protocol_version, compression=None):
-        flags = 0
-        body = io.BytesIO()
-        if self.custom_payload:
-            if protocol_version < 4:
-                raise UnsupportedOperation("Custom key/value payloads can only be used with protocol version 4 or higher")
-            flags |= CUSTOM_PAYLOAD_FLAG
-            write_bytesmap(body, self.custom_payload)
-        self.send_body(body, protocol_version)
-        body = body.getvalue()
-
-        if compression and len(body) > 0:
-            body = compression(body)
-            flags |= COMPRESSED_FLAG
-        if self.tracing:
-            flags |= TRACING_FLAG
-
-        msg = io.BytesIO()
-        write_header(msg, protocol_version, flags, stream_id, self.opcode, len(body))
-        msg.write(body)
-
-        return msg.getvalue()
 
     def update_custom_payload(self, other):
         if other:
@@ -125,50 +110,6 @@ def _get_params(message_obj):
         (n, a) for n, a in message_obj.__dict__.items()
         if n not in base_attrs and not n.startswith('_') and not callable(a)
     )
-
-
-def decode_response(protocol_version, user_type_map, stream_id, flags, opcode, body,
-                    decompressor=None):
-    if flags & COMPRESSED_FLAG:
-        if decompressor is None:
-            raise Exception("No de-compressor available for compressed frame!")
-        body = decompressor(body)
-        flags ^= COMPRESSED_FLAG
-
-    body = io.BytesIO(body)
-    if flags & TRACING_FLAG:
-        trace_id = UUID(bytes=body.read(16))
-        flags ^= TRACING_FLAG
-    else:
-        trace_id = None
-
-    if flags & WARNING_FLAG:
-        warnings = read_stringlist(body)
-        flags ^= WARNING_FLAG
-    else:
-        warnings = None
-
-    if flags & CUSTOM_PAYLOAD_FLAG:
-        custom_payload = read_bytesmap(body)
-        flags ^= CUSTOM_PAYLOAD_FLAG
-    else:
-        custom_payload = None
-
-    if flags:
-        log.warning("Unknown protocol flags set: %02x. May cause problems.", flags)
-
-    msg_class = _message_types_by_opcode[opcode]
-    msg = msg_class.recv_body(body, protocol_version, user_type_map)
-    msg.stream_id = stream_id
-    msg.trace_id = trace_id
-    msg.custom_payload = custom_payload
-    msg.warnings = warnings
-
-    if msg.warnings:
-        for w in msg.warnings:
-            log.warning("Server warning: %s", w)
-
-    return msg
 
 
 error_classes = {}
@@ -601,7 +542,6 @@ RESULT_KIND_SET_KEYSPACE = 0x0003
 RESULT_KIND_PREPARED = 0x0004
 RESULT_KIND_SCHEMA_CHANGE = 0x0005
 
-
 class ResultMessage(_MessageType):
     opcode = 0x08
     name = 'RESULT'
@@ -610,34 +550,8 @@ class ResultMessage(_MessageType):
     results = None
     paging_state = None
 
-    _type_codes = {
-        0x0000: CUSTOM_TYPE,
-        0x0001: AsciiType,
-        0x0002: LongType,
-        0x0003: BytesType,
-        0x0004: BooleanType,
-        0x0005: CounterColumnType,
-        0x0006: DecimalType,
-        0x0007: DoubleType,
-        0x0008: FloatType,
-        0x0009: Int32Type,
-        0x000A: UTF8Type,
-        0x000B: DateType,
-        0x000C: UUIDType,
-        0x000D: UTF8Type,
-        0x000E: IntegerType,
-        0x000F: TimeUUIDType,
-        0x0010: InetAddressType,
-        0x0011: SimpleDateType,
-        0x0012: TimeType,
-        0x0013: ShortType,
-        0x0014: ByteType,
-        0x0020: ListType,
-        0x0021: MapType,
-        0x0022: SetType,
-        0x0030: UserType,
-        0x0031: TupleType,
-    }
+    # Names match type name in module scope. Most are imported from cassandra.cqltypes (except CUSTOM_TYPE)
+    type_codes = _cqltypes_by_code = dict((v, globals()[k]) for k, v in type_codes.__dict__.items() if not k.startswith('_'))
 
     _FLAGS_GLOBAL_TABLES_SPEC = 0x0001
     _HAS_MORE_PAGES_FLAG = 0x0002
@@ -664,6 +578,8 @@ class ResultMessage(_MessageType):
             results = cls.recv_results_prepared(f, protocol_version, user_type_map)
         elif kind == RESULT_KIND_SCHEMA_CHANGE:
             results = cls.recv_results_schema_change(f, protocol_version)
+        else:
+            raise Exception("Unknown RESULT kind: %d" % kind)
         return cls(kind, results, paging_state)
 
     @classmethod
@@ -745,7 +661,7 @@ class ResultMessage(_MessageType):
     def read_type(cls, f, user_type_map):
         optid = read_short(f)
         try:
-            typeclass = cls._type_codes[optid]
+            typeclass = cls.type_codes[optid]
         except KeyError:
             raise NotSupportedError("Unknown data type code 0x%04x. Have to skip"
                                     " entire result set." % (optid,))
@@ -968,13 +884,178 @@ class EventMessage(_MessageType):
         return event
 
 
-def write_header(f, version, flags, stream_id, opcode, length):
+class ProtocolHandler(object):
     """
-    Write a CQL protocol frame header.
+    ProtocolHander handles encoding and decoding messages.
+
+    This class can be specialized to compose Handlers which implement alternative
+    result decoding or type deserialization. Class definitions are passed to :class:`cassandra.cluster.Cluster`
+    on initialization.
+
+    Contracted class methods are :meth:`ProtocolHandler.encode_message` and :meth:`ProtocolHandler.decode_message`.
     """
-    pack = v3_header_pack if version >= 3 else header_pack
-    f.write(pack(version, flags, stream_id, opcode))
-    write_int(f, length)
+
+    message_types_by_opcode = _message_types_by_opcode.copy()
+    """
+    Default mapping of opcode to Message implementation. The default ``decode_message`` implementation uses
+    this to instantiate a message and populate using ``recv_body``. This mapping can be updated to inject specialized
+    result decoding implementations.
+    """
+
+    @classmethod
+    def encode_message(cls, msg, stream_id, protocol_version, compressor):
+        """
+        Encodes a message using the specified frame parameters, and compressor
+
+        :param msg: the message, typically of cassandra.protocol._MessageType, generated by the driver
+        :param stream_id: protocol stream id for the frame header
+        :param protocol_version: version for the frame header, and used encoding contents
+        :param compressor: optional compression function to be used on the body
+        """
+        flags = 0
+        body = io.BytesIO()
+        if msg.custom_payload:
+            if protocol_version < 4:
+                raise UnsupportedOperation("Custom key/value payloads can only be used with protocol version 4 or higher")
+            flags |= CUSTOM_PAYLOAD_FLAG
+            write_bytesmap(body, msg.custom_payload)
+        msg.send_body(body, protocol_version)
+        body = body.getvalue()
+
+        if compressor and len(body) > 0:
+            body = compressor(body)
+            flags |= COMPRESSED_FLAG
+
+        if msg.tracing:
+            flags |= TRACING_FLAG
+
+        buff = io.BytesIO()
+        cls._write_header(buff, protocol_version, flags, stream_id, msg.opcode, len(body))
+        buff.write(body)
+
+        return buff.getvalue()
+
+    @staticmethod
+    def _write_header(f, version, flags, stream_id, opcode, length):
+        """
+        Write a CQL protocol frame header.
+        """
+        pack = v3_header_pack if version >= 3 else header_pack
+        f.write(pack(version, flags, stream_id, opcode))
+        write_int(f, length)
+
+    @classmethod
+    def decode_message(cls, protocol_version, user_type_map, stream_id, flags, opcode, body,
+                       decompressor):
+        """
+        Decodes a native protocol message body
+
+        :param protocol_version: version to use decoding contents
+        :param user_type_map: map[keyspace name] = map[type name] = custom type to instantiate when deserializing this type
+        :param stream_id: native protocol stream id from the frame header
+        :param flags: native protocol flags bitmap from the header
+        :param opcode: native protocol opcode from the header
+        :param body: frame body
+        :param decompressor: optional decompression function to inflate the body
+        :return: a message decoded from the body and frame attributes
+        """
+        if flags & COMPRESSED_FLAG:
+            if decompressor is None:
+                raise Exception("No de-compressor available for compressed frame!")
+            body = decompressor(body)
+            flags ^= COMPRESSED_FLAG
+
+        body = io.BytesIO(body)
+        if flags & TRACING_FLAG:
+            trace_id = UUID(bytes=body.read(16))
+            flags ^= TRACING_FLAG
+        else:
+            trace_id = None
+
+        if flags & WARNING_FLAG:
+            warnings = read_stringlist(body)
+            flags ^= WARNING_FLAG
+        else:
+            warnings = None
+
+        if flags & CUSTOM_PAYLOAD_FLAG:
+            custom_payload = read_bytesmap(body)
+            flags ^= CUSTOM_PAYLOAD_FLAG
+        else:
+            custom_payload = None
+
+        if flags:
+            log.warning("Unknown protocol flags set: %02x. May cause problems.", flags)
+
+        msg_class = cls.message_types_by_opcode[opcode]
+        msg = msg_class.recv_body(body, protocol_version, user_type_map)
+        msg.stream_id = stream_id
+        msg.trace_id = trace_id
+        msg.custom_payload = custom_payload
+        msg.warnings = warnings
+
+        if msg.warnings:
+            for w in msg.warnings:
+                log.warning("Server warning: %s", w)
+
+        return msg
+
+
+def cython_protocol_handler(colparser):
+    """
+    Given a column parser to deserialize ResultMessages, return a suitable
+    Cython-based protocol handler.
+
+    There are three Cython-based protocol handlers:
+
+        - obj_parser.ListParser
+            decodes result messages into a list of tuples
+
+        - obj_parser.LazyParser
+            decodes result messages lazily by returning an iterator
+
+        - numpy_parser.NumPyParser
+            decodes result messages into NumPy arrays
+
+    The default is to use obj_parser.ListParser
+    """
+    from cassandra.row_parser import make_recv_results_rows
+
+    class FastResultMessage(ResultMessage):
+        """
+        Cython version of Result Message that has a faster implementation of
+        recv_results_row.
+        """
+        # type_codes = ResultMessage.type_codes.copy()
+        code_to_type = dict((v, k) for k, v in ResultMessage.type_codes.items())
+        recv_results_rows = classmethod(make_recv_results_rows(colparser))
+
+    class CythonProtocolHandler(ProtocolHandler):
+        """
+        Use FastResultMessage to decode query result message messages.
+        """
+
+        my_opcodes = ProtocolHandler.message_types_by_opcode.copy()
+        my_opcodes[FastResultMessage.opcode] = FastResultMessage
+        message_types_by_opcode = my_opcodes
+
+    return CythonProtocolHandler
+
+
+if HAVE_CYTHON:
+    from cassandra.obj_parser import ListParser, LazyParser
+    ProtocolHandler = cython_protocol_handler(ListParser())
+    LazyProtocolHandler = cython_protocol_handler(LazyParser())
+else:
+    # Use Python-based ProtocolHandler
+    LazyProtocolHandler = None
+
+
+if HAVE_CYTHON and HAVE_NUMPY:
+    from cassandra.numpy_parser import NumpyParser
+    NumpyProtocolHandler = cython_protocol_handler(NumpyParser())
+else:
+    NumpyProtocolHandler = None
 
 
 def read_byte(f):

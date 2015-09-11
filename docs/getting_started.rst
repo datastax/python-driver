@@ -212,6 +212,8 @@ following way:
     | | ``int``          | | ``int``               |
     | | ``long``         | | ``bigint``            |
     |                    | | ``varint``            |
+    |                    | | ``smallint``          |
+    |                    | | ``tinyint``           |
     |                    | | ``counter``           |
     +--------------------+-------------------------+
     | ``decimal.Decimal``| ``decimal``             |

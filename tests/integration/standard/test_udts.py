@@ -19,6 +19,7 @@ except ImportError:
 
 from collections import namedtuple
 from functools import partial
+import six
 
 from cassandra import InvalidRequest
 from cassandra.cluster import Cluster, UserTypeDoesNotExist
@@ -277,10 +278,9 @@ class UDTTests(unittest.TestCase):
         self.assertEqual((None, None, None, None), s.execute(select)[0].b)
 
         # also test empty strings
-        s.execute(insert, [User('', None, None, '')])
+        s.execute(insert, [User('', None, None, six.binary_type())])
         results = s.execute("SELECT b FROM mytable WHERE a=0")
-        self.assertEqual(('', None, None, ''), results[0].b)
-        self.assertEqual(('', None, None, ''), s.execute(select)[0].b)
+        self.assertEqual(('', None, None, six.binary_type()), results[0].b)
 
         c.shutdown()
 
@@ -292,11 +292,11 @@ class UDTTests(unittest.TestCase):
         c = Cluster(protocol_version=PROTOCOL_VERSION)
         s = c.connect("udttests")
 
-        MAX_TEST_LENGTH = 1024
+        MAX_TEST_LENGTH = 254
 
         # create the seed udt, increase timeout to avoid the query failure on slow systems
-        s.execute("CREATE TYPE lengthy_udt ({})"
-                  .format(', '.join(['v_{} int'.format(i)
+        s.execute("CREATE TYPE lengthy_udt ({0})"
+                  .format(', '.join(['v_{0} int'.format(i)
                                     for i in range(MAX_TEST_LENGTH)])))
 
         # create a table with multiple sizes of nested udts
@@ -306,7 +306,7 @@ class UDTTests(unittest.TestCase):
                   "v frozen<lengthy_udt>)")
 
         # create and register the seed udt type
-        udt = namedtuple('lengthy_udt', tuple(['v_{}'.format(i) for i in range(MAX_TEST_LENGTH)]))
+        udt = namedtuple('lengthy_udt', tuple(['v_{0}'.format(i) for i in range(MAX_TEST_LENGTH)]))
         c.register_user_type("udttests", "lengthy_udt", udt)
 
         # verify inserts and reads
@@ -330,7 +330,7 @@ class UDTTests(unittest.TestCase):
 
         # create the nested udts
         for i in range(MAX_NESTING_DEPTH):
-            execute_until_pass(session, "CREATE TYPE depth_{} (value frozen<depth_{}>)".format(i + 1, i))
+            execute_until_pass(session, "CREATE TYPE depth_{0} (value frozen<depth_{1}>)".format(i + 1, i))
 
         # create a table with multiple sizes of nested udts
         # no need for all nested types, only a spot checked few and the largest one
@@ -390,9 +390,9 @@ class UDTTests(unittest.TestCase):
 
         # create and register the nested udt types
         for i in range(MAX_NESTING_DEPTH):
-            udt = namedtuple('depth_{}'.format(i + 1), ('value'))
+            udt = namedtuple('depth_{0}'.format(i + 1), ('value'))
             udts.append(udt)
-            c.register_user_type("udttests", "depth_{}".format(i + 1), udts[i + 1])
+            c.register_user_type("udttests", "depth_{0}".format(i + 1), udts[i + 1])
 
         # insert udts and verify inserts with reads
         self.nested_udt_verification_helper(s, MAX_NESTING_DEPTH, udts)
@@ -420,7 +420,7 @@ class UDTTests(unittest.TestCase):
 
         # create the nested udt types
         for i in range(MAX_NESTING_DEPTH):
-            udt = namedtuple('depth_{}'.format(i + 1), ('value'))
+            udt = namedtuple('depth_{0}'.format(i + 1), ('value'))
             udts.append(udt)
 
         # insert udts via prepared statements and verify inserts with reads
@@ -461,9 +461,9 @@ class UDTTests(unittest.TestCase):
 
         # create and register the nested udt types
         for i in range(MAX_NESTING_DEPTH):
-            udt = namedtuple('level_{}'.format(i + 1), ('value'))
+            udt = namedtuple('level_{0}'.format(i + 1), ('value'))
             udts.append(udt)
-            c.register_user_type("udttests", "depth_{}".format(i + 1), udts[i + 1])
+            c.register_user_type("udttests", "depth_{0}".format(i + 1), udts[i + 1])
 
         # insert udts and verify inserts with reads
         self.nested_udt_verification_helper(s, MAX_NESTING_DEPTH, udts)
@@ -514,7 +514,7 @@ class UDTTests(unittest.TestCase):
         # register UDT
         alphabet_list = []
         for i in range(ord('a'), ord('a') + len(PRIMITIVE_DATATYPES)):
-            alphabet_list.append('{}'.format(chr(i)))
+            alphabet_list.append('{0}'.format(chr(i)))
         Alldatatypes = namedtuple("alldatatypes", alphabet_list)
         c.register_user_type("udttests", "alldatatypes", Alldatatypes)
 

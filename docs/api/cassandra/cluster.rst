@@ -106,6 +106,8 @@
 
    .. autoattribute:: encoder
 
+   .. autoattribute:: client_protocol_handler
+
    .. automethod:: execute(statement[, parameters][, timeout][, trace][, custom_payload])
 
    .. automethod:: execute_async(statement[, parameters][, trace][, custom_payload])

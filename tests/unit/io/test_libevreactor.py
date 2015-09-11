@@ -24,6 +24,7 @@ import six
 from six import BytesIO
 from socket import error as socket_error
 import sys
+import time
 
 from cassandra.connection import (HEADER_DIRECTION_TO_CLIENT,
                                   ConnectionException, ProtocolError)
@@ -31,6 +32,10 @@ from cassandra.connection import (HEADER_DIRECTION_TO_CLIENT,
 from cassandra.protocol import (write_stringmultimap, write_int, write_string,
                                 SupportedMessage, ReadyMessage, ServerError)
 from cassandra.marshal import uint8_pack, uint32_pack, int32_pack
+from tests.unit.io.utils import TimerCallback
+from tests.unit.io.utils import submit_and_wait_for_completion
+from tests import is_monkey_patched
+
 
 try:
     from cassandra.io.libevreactor import LibevConnection
@@ -46,7 +51,7 @@ except ImportError:
 class LibevConnectionTest(unittest.TestCase):
 
     def setUp(self):
-        if 'gevent.monkey' in sys.modules:
+        if is_monkey_patched():
             raise unittest.SkipTest("Can't test libev with monkey patching")
         if LibevConnection is None:
             raise unittest.SkipTest('libev does not appear to be installed correctly')

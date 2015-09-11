@@ -18,6 +18,8 @@ try:
 except ImportError:
     import unittest
 
+import six
+
 from cassandra.query import (SimpleStatement, BatchStatement, BatchType)
 from cassandra.cluster import Cluster
 
@@ -123,29 +125,29 @@ class CustomPayloadTests(unittest.TestCase):
         """
 
         # Simple key value
-        custom_payload = {'test': 'test_return'}
+        custom_payload = {'test': b'test_return'}
         self.execute_async_validate_custom_payload(statement=statement, custom_payload=custom_payload)
 
         # no key value
-        custom_payload = {'': ''}
+        custom_payload = {'': b''}
         self.execute_async_validate_custom_payload(statement=statement, custom_payload=custom_payload)
 
         # Space value
-        custom_payload = {' ': ' '}
+        custom_payload = {' ': b' '}
         self.execute_async_validate_custom_payload(statement=statement, custom_payload=custom_payload)
 
         # Long key value pair
-        key_value = "x" * 10000
-        custom_payload = {key_value: key_value}
+        key_value = "x" * 10
+        custom_payload = {key_value: six.b(key_value)}
         self.execute_async_validate_custom_payload(statement=statement, custom_payload=custom_payload)
 
         # Max supported value key pairs according C* binary protocol v4 should be 65534 (unsigned short max value)
         for i in range(65534):
-            custom_payload[str(i)] = str(i)
+            custom_payload[str(i)] = six.b('x')
         self.execute_async_validate_custom_payload(statement=statement, custom_payload=custom_payload)
 
         # Add one custom payload to this is too many key value pairs and should fail
-        custom_payload[str(65535)] = str(65535)
+        custom_payload[str(65535)] = six.b('x')
         with self.assertRaises(ValueError):
             self.execute_async_validate_custom_payload(statement=statement, custom_payload=custom_payload)
 

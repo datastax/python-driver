@@ -27,7 +27,7 @@ from cassandra.connection import (Connection, HEADER_DIRECTION_TO_CLIENT, Protoc
                                   locally_supported_compressions, ConnectionHeartbeat, _Frame)
 from cassandra.marshal import uint8_pack, uint32_pack, int32_pack
 from cassandra.protocol import (write_stringmultimap, write_int, write_string,
-                                SupportedMessage)
+                                SupportedMessage, ProtocolHandler)
 
 
 class ConnectionTest(unittest.TestCase):
@@ -75,7 +75,7 @@ class ConnectionTest(unittest.TestCase):
 
     def test_bad_protocol_version(self, *args):
         c = self.make_connection()
-        c._callbacks = Mock()
+        c._requests = Mock()
         c.defunct = Mock()
 
         # read in a SupportedMessage response
@@ -93,7 +93,7 @@ class ConnectionTest(unittest.TestCase):
 
     def test_negative_body_length(self, *args):
         c = self.make_connection()
-        c._callbacks = Mock()
+        c._requests = Mock()
         c.defunct = Mock()
 
         # read in a SupportedMessage response
@@ -110,7 +110,7 @@ class ConnectionTest(unittest.TestCase):
 
     def test_unsupported_cql_version(self, *args):
         c = self.make_connection()
-        c._callbacks = {0: c._handle_options_response}
+        c._requests = {0: (c._handle_options_response, ProtocolHandler.decode_message)}
         c.defunct = Mock()
         c.cql_version = "3.0.3"
 
@@ -133,7 +133,7 @@ class ConnectionTest(unittest.TestCase):
 
     def test_prefer_lz4_compression(self, *args):
         c = self.make_connection()
-        c._callbacks = {0: c._handle_options_response}
+        c._requests = {0: (c._handle_options_response, ProtocolHandler.decode_message)}
         c.defunct = Mock()
         c.cql_version = "3.0.3"
 
@@ -156,7 +156,7 @@ class ConnectionTest(unittest.TestCase):
 
     def test_requested_compression_not_available(self, *args):
         c = self.make_connection()
-        c._callbacks = {0: c._handle_options_response}
+        c._requests = {0: (c._handle_options_response, ProtocolHandler.decode_message)}
         c.defunct = Mock()
         # request lz4 compression
         c.compression = "lz4"
@@ -186,7 +186,7 @@ class ConnectionTest(unittest.TestCase):
 
     def test_use_requested_compression(self, *args):
         c = self.make_connection()
-        c._callbacks = {0: c._handle_options_response}
+        c._requests = {0: (c._handle_options_response, ProtocolHandler.decode_message)}
         c.defunct = Mock()
         # request snappy compression
         c.compression = "snappy"
@@ -213,7 +213,7 @@ class ConnectionTest(unittest.TestCase):
 
     def test_disable_compression(self, *args):
         c = self.make_connection()
-        c._callbacks = {0: c._handle_options_response}
+        c._requests = {0: (c._handle_options_response, ProtocolHandler.decode_message)}
         c.defunct = Mock()
         # disable compression
         c.compression = False
@@ -244,10 +244,7 @@ class ConnectionTest(unittest.TestCase):
         Ensure the following methods throw NIE's. If not, come back and test them.
         """
         c = self.make_connection()
-
         self.assertRaises(NotImplementedError, c.close)
-        self.assertRaises(NotImplementedError, c.register_watcher, None, None)
-        self.assertRaises(NotImplementedError, c.register_watchers, None)
 
     def test_set_keyspace_blocking(self):
         c = self.make_connection()

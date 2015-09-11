@@ -24,7 +24,7 @@ import re
 import struct
 import time
 import six
-from six.moves import range
+from six.moves import range, zip
 
 from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.util import unix_time_from_uuid1
@@ -917,14 +917,14 @@ class QueryTrace(object):
             break
 
     def _execute(self, query, parameters, time_spent, max_wait):
+        timeout = (max_wait - time_spent) if max_wait is not None else None
+        future = self._session._create_response_future(query, parameters, trace=False, custom_payload=None, timeout=timeout)
         # in case the user switched the row factory, set it to namedtuple for this query
-        future = self._session._create_response_future(query, parameters, trace=False, custom_payload=None)
         future.row_factory = named_tuple_factory
         future.send_request()
 
-        timeout = (max_wait - time_spent) if max_wait is not None else None
         try:
-            return future.result(timeout=timeout)
+            return future.result()
         except OperationTimedOut:
             raise TraceUnavailable("Trace information was not available within %f seconds" % (max_wait,))
 

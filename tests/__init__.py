@@ -14,6 +14,7 @@
 
 import logging
 import sys
+import socket
 
 log = logging.getLogger()
 log.setLevel('DEBUG')
@@ -24,15 +25,18 @@ if not log.handlers:
     log.addHandler(handler)
 
 
-def is_gevent_monkey_patched():
-    return 'gevent.monkey' in sys.modules
-
-
 def is_eventlet_monkey_patched():
-    if 'eventlet.patcher' in sys.modules:
-        import eventlet
-        return eventlet.patcher.is_monkey_patched('socket')
-    return False
+    if 'eventlet.patcher' not in sys.modules:
+        return False
+    import eventlet.patcher
+    return eventlet.patcher.is_monkey_patched('socket')
+
+
+def is_gevent_monkey_patched():
+    if 'gevent.monkey' not in sys.modules:
+        return False
+    import gevent.socket
+    return socket.socket is gevent.socket.socket
 
 
 def is_monkey_patched():
