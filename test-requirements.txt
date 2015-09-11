@@ -12,3 +12,4 @@ pure-sasl
 twisted
 gevent>=1.0
 eventlet
+cython>=0.21
