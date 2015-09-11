@@ -111,7 +111,7 @@ class Metadata(object):
         Returns a string that can be executed as a query in order to recreate
         the entire schema.  The string is formatted to be human readable.
         """
-        return "\n".join(ks.export_as_string() for ks in self.keyspaces.values())
+        return "\n\n".join(ks.export_as_string() for ks in self.keyspaces.values())
 
     def refresh(self, connection, timeout, target_type=None, change_type=None, **kwargs):
 
@@ -123,7 +123,7 @@ class Metadata(object):
         try:
             parser = get_schema_parser(connection, timeout)
             parse_method = getattr(parser, 'get_' + tt_lower)
-            meta = parse_method(**kwargs)
+            meta = parse_method(self.keyspaces, **kwargs)
             if meta:
                 update_method = getattr(self, '_update_' + tt_lower)
                 update_method(meta)
@@ -167,6 +167,7 @@ class Metadata(object):
             keyspace_meta.indexes = old_keyspace_meta.indexes
             keyspace_meta.functions = old_keyspace_meta.functions
             keyspace_meta.aggregates = old_keyspace_meta.aggregates
+            keyspace_meta.views = old_keyspace_meta.views
             if (keyspace_meta.replication_strategy != old_keyspace_meta.replication_strategy):
                 self._keyspace_updated(ks_name)
         else:
@@ -601,6 +602,11 @@ class KeyspaceMetadata(object):
     .. versionadded:: 2.6.0
     """
 
+    views = None
+    """
+    A dict mapping view names to :class:`.MaterializedViewMetadata` instances.
+    """
+
     _exc_info = None
     """ set if metadata parsing failed """
 
@@ -613,6 +619,7 @@ class KeyspaceMetadata(object):
         self.user_types = {}
         self.functions = {}
         self.aggregates = {}
+        self.views = {}
 
     def export_as_string(self):
         """
@@ -623,7 +630,8 @@ class KeyspaceMetadata(object):
                          + self.user_type_strings()
                          + [f.as_cql_query(True) for f in self.functions.values()]
                          + [a.as_cql_query(True) for a in self.aggregates.values()]
-                         + [t.export_as_string() for t in self.tables.values()])
+                         + [t.export_as_string() for t in self.tables.values()]
+                         + [v.as_cql_query(True) for v in self.views.values()])
         if self._exc_info:
             import traceback
             ret = "/*\nWarning: Keyspace %s is incomplete because of an error processing metadata.\n" % \
@@ -666,12 +674,18 @@ class KeyspaceMetadata(object):
         self.tables[table_metadata.name] = table_metadata
         for index_name, index_metadata in six.iteritems(table_metadata.indexes):
             self.indexes[index_name] = index_metadata
+        if table_metadata.is_view:
+            view_meta = self.views.get(table_metadata.name)
+            if view_meta:
+                view_meta.table = table_metadata
 
     def _drop_table_metadata(self, table_name):
         table_meta = self.tables.pop(table_name, None)
         if table_meta:
             for index_name in table_meta.indexes:
                 self.indexes.pop(index_name, None)
+            if table_meta.is_view:
+                self.views.pop(table_meta.name, None)
 
 
 class UserType(object):
@@ -968,6 +982,8 @@ class TableMetadata(object):
 
     is_compact_storage = False
 
+    is_view = False
+
     options = None
     """
     A dict mapping table option names to their specific settings for this
@@ -1049,6 +1065,7 @@ class TableMetadata(object):
 
         for trigger_meta in self.triggers.values():
             ret += "\n%s;" % (trigger_meta.as_cql_query(),)
+
         return ret
 
     def as_cql_query(self, formatted=False):
@@ -1092,12 +1109,16 @@ class TableMetadata(object):
 
             ret += ")"
 
-        # options
+        # properties
         ret += "%s) WITH " % ("\n" if formatted else "")
+        ret += self._property_string(formatted)
 
-        option_strings = []
+        return ret
+
+    def _property_string(self, formatted):
+        properties = []
         if self.is_compact_storage:
-            option_strings.append("COMPACT STORAGE")
+            properties.append("COMPACT STORAGE")
 
         if self.clustering_key:
             cluster_str = "CLUSTERING ORDER BY "
@@ -1108,14 +1129,12 @@ class TableMetadata(object):
                 inner.append("%s %s" % (protect_name(col.name), ordering))
 
             cluster_str += "(%s)" % ", ".join(inner)
-            option_strings.append(cluster_str)
+            properties.append(cluster_str)
 
-        option_strings.extend(self._make_option_strings())
+        properties.extend(self._make_option_strings())
 
         join_str = "\n    AND " if formatted else " AND "
-        ret += join_str.join(option_strings)
-
-        return ret
+        return join_str.join(properties)
 
     def _make_option_strings(self):
         ret = []
@@ -1628,7 +1647,7 @@ class SchemaParserV22(_SchemaParser):
 
             yield keyspace_meta
 
-    def get_table(self, keyspace, table):
+    def get_table(self, keyspaces, keyspace, table):
         cl = ConsistencyLevel.ONE
         where_clause = " WHERE keyspace_name = '%s' AND %s = '%s'" % (keyspace, self._table_name_col, table)
         cf_query = QueryMessage(query=self._SELECT_COLUMN_FAMILIES + where_clause, consistency_level=cl)
@@ -1648,20 +1667,21 @@ class SchemaParserV22(_SchemaParser):
         if table_result:
             return self._build_table_metadata(table_result[0], col_result, triggers_result)
 
-    def get_type(self, keyspace, type):
+    def get_type(self, keyspaces, keyspace, type):
         where_clause = " WHERE keyspace_name = '%s' AND type_name = '%s'" % (keyspace, type)
         return self._query_build_row(self._SELECT_TYPES + where_clause, self._build_user_type)
-    def get_function(self, keyspace, function):
+
+    def get_function(self, keyspaces, keyspace, function):
         where_clause = " WHERE keyspace_name = '%s' AND function_name = '%s' AND signature = [%s]" \
                        % (keyspace, function.name, ','.join("'%s'" % t for t in function.type_signature))
         return self._query_build_row(self._SELECT_FUNCTIONS + where_clause, self._build_function)
 
-    def get_aggregate(self, keyspace, aggregate):
+    def get_aggregate(self, keyspaces, keyspace, aggregate):
         where_clause = " WHERE keyspace_name = '%s' AND aggregate_name = '%s' AND signature = [%s]" \
                        % (keyspace, aggregate.name, ','.join("'%s'" % t for t in aggregate.type_signature))
         return self._query_build_row(self._SELECT_AGGREGATES + where_clause, self._build_aggregate)
 
-    def get_keyspace(self, keyspace):
+    def get_keyspace(self, keyspaces, keyspace):
         where_clause = " WHERE keyspace_name = '%s'" % (keyspace,)
         return self._query_build_row(self._SELECT_KEYSPACES + where_clause, self._build_keyspace_metadata)
 
@@ -2012,6 +2032,7 @@ class SchemaParserV3(SchemaParserV22):
     _SELECT_TYPES = "SELECT * FROM system_schema.types"
     _SELECT_FUNCTIONS = "SELECT * FROM system_schema.functions"
     _SELECT_AGGREGATES = "SELECT * FROM system_schema.aggregates"
+    _SELECT_VIEWS = "SELECT * FROM system_schema.materialized_views"
 
     _table_name_col = 'table_name'
 
@@ -2034,24 +2055,47 @@ class SchemaParserV3(SchemaParserV22):
         super(SchemaParserV3, self).__init__(connection, timeout)
         self.indexes_result = []
         self.keyspace_table_index_rows = defaultdict(lambda: defaultdict(list))
+        self.keyspace_table_view_rows = defaultdict(lambda: defaultdict(list))
 
-    def get_table(self, keyspace, table):
+    def get_all_keyspaces(self):
+        for keyspace_meta in super(SchemaParserV3, self).get_all_keyspaces():
+            # views are handled after everything else is built so that both target
+            # and view tables resolve
+            keyspace_table_views = self.keyspace_table_view_rows[keyspace_meta.name]
+            tables = keyspace_meta.tables
+            for subject_table_name, views in keyspace_table_views.items():
+                for row in views:
+                    view_meta = self._build_view_metadata(tables, row)
+                    keyspace_meta.views[view_meta.name] = view_meta
+
+            yield keyspace_meta
+
+    def get_table(self, keyspaces, keyspace, table):
         cl = ConsistencyLevel.ONE
         where_clause = " WHERE keyspace_name = '%s' AND %s = '%s'" % (keyspace, self._table_name_col, table)
         cf_query = QueryMessage(query=self._SELECT_TABLES + where_clause, consistency_level=cl)
         col_query = QueryMessage(query=self._SELECT_COLUMNS + where_clause, consistency_level=cl)
         indexes_query = QueryMessage(query=self._SELECT_INDEXES + where_clause, consistency_level=cl)
         triggers_query = QueryMessage(query=self._SELECT_TRIGGERS + where_clause, consistency_level=cl)
-        (cf_success, cf_result), (col_success, col_result), \
-        (indexes_sucess, indexes_result), (triggers_success, triggers_result) \
-            = self.connection.wait_for_responses(cf_query, col_query, indexes_query, triggers_query, timeout=self.timeout, fail_on_error=False)
+        views_query = QueryMessage(query=self._SELECT_VIEWS + where_clause, consistency_level=cl)
+        (cf_success, cf_result), (col_success, col_result), (indexes_sucess, indexes_result), \
+        (triggers_success, triggers_result), (views_success, views_result) \
+            = self.connection.wait_for_responses(cf_query, col_query, indexes_query, triggers_query, views_query,
+                                                 timeout=self.timeout, fail_on_error=False)
         table_result = self._handle_results(cf_success, cf_result)
 
         if table_result:
             col_result = self._handle_results(col_success, col_result)
             indexes_result = self._handle_results(indexes_sucess, indexes_result)
             triggers_result = self._handle_results(triggers_success, triggers_result)
-            return self._build_table_metadata(table_result[0], col_result, triggers_result, indexes_result)
+            views_result = self._handle_results(views_success, views_result)
+            table_meta = self._build_table_metadata(table_result[0], col_result, triggers_result, indexes_result)
+            keyspace_meta = keyspaces.get(keyspace)
+            if keyspace_meta:
+                for view_row in views_result:
+                    view_meta = self._build_view_metadata(keyspace_meta.tables, view_row)
+                    keyspace_meta.views[view_meta.name] = view_meta
+            return table_meta
 
     @staticmethod
     def _build_keyspace_metadata_internal(row):
@@ -2149,8 +2193,17 @@ class SchemaParserV3(SchemaParserV22):
             target_columns = row.get('target_columns')
             target_type = row.get('target_type')
             return IndexMetadata(table_metadata, index_name, index_type, index_options, target_columns, target_type)
-        else:
-            return None
+
+    @staticmethod
+    def _build_view_metadata(tables, row):
+        table_name = row.get("table_name")
+        view_name = row.get("view_name")
+        view_table_metadata = tables.get(view_name)
+        clustering_columns = row.get("clustering_columns")
+        included_columns = row.get("included_columns")
+        target_columns = row.get("target_columns")
+        return MaterializedViewMetadata(view_table_metadata, table_name, view_name,
+                                        clustering_columns, included_columns, target_columns)
 
     @staticmethod
     def _build_trigger_metadata(table_metadata, row):
@@ -2169,7 +2222,8 @@ class SchemaParserV3(SchemaParserV22):
             QueryMessage(query=self._SELECT_FUNCTIONS, consistency_level=cl),
             QueryMessage(query=self._SELECT_AGGREGATES, consistency_level=cl),
             QueryMessage(query=self._SELECT_TRIGGERS, consistency_level=cl),
-            QueryMessage(query=self._SELECT_INDEXES, consistency_level=cl)
+            QueryMessage(query=self._SELECT_INDEXES, consistency_level=cl),
+            QueryMessage(query=self._SELECT_VIEWS, consistency_level=cl)
         ]
 
         responses = self.connection.wait_for_responses(*queries, timeout=self.timeout, fail_on_error=False)
@@ -2178,7 +2232,8 @@ class SchemaParserV3(SchemaParserV22):
         (functions_success, functions_result), \
         (aggregates_success, aggregates_result), \
         (triggers_success, triggers_result), \
-        (indexes_success, indexes_result) = responses
+        (indexes_success, indexes_result), \
+        (views_success, views_result) = responses
 
         self.keyspaces_result = self._handle_results(ks_success, ks_result)
         self.tables_result = self._handle_results(table_success, table_result)
@@ -2188,6 +2243,7 @@ class SchemaParserV3(SchemaParserV22):
         self.functions_result = self._handle_results(functions_success, functions_result)
         self.aggregates_result = self._handle_results(aggregates_success, aggregates_result)
         self.indexes_result = self._handle_results(indexes_success, indexes_result)
+        self.views_result = self._handle_results(views_success, views_result)
 
         self._aggregate_results()
 
@@ -2200,11 +2256,16 @@ class SchemaParserV3(SchemaParserV22):
             cfname = row[self._table_name_col]
             m[ksname][cfname].append(row)
 
+        m = self.keyspace_table_view_rows
+        for row in self.views_result:
+            ksname = row["keyspace_name"]
+            cfname = row[self._table_name_col]
+            m[ksname][cfname].append(row)
+
 
 class TableMetadataV3(TableMetadata):
     compaction_options = {}
 
-    _option_maps = ['caching']
     option_maps = ['compaction', 'compression', 'caching']
 
     @property
@@ -2227,6 +2288,79 @@ class TableMetadataV3(TableMetadata):
                 ret.append("%s = %s" % (name, protect_value(value)))
 
         return list(sorted(ret))
+
+
+class MaterializedViewMetadata(object):
+    """
+    A representation of a materialized view on a table
+    """
+
+    table = None
+    """ The :class:`.TableMetadata` describing this view (not the table the view is on). """
+
+    target_table_name = None
+    """ String name of the table this view targets """
+
+    name = None
+    """ A string name of the view."""
+
+    clustering_columns = None
+    """ List of clustering column names."""
+
+    included_columns = None
+    """ List of included column names selected by the view."""
+
+    target_columns = None
+    """ List of target column names (essentially the partition key of the view) """
+
+    def __init__(self, view_table_metadata, target_table_name, view_name,
+                 clustering_columns, included_columns, target_columns):
+        self.table = view_table_metadata
+        self.target_table_name = target_table_name
+        self.name = view_name
+        self.clustering_columns = clustering_columns or []
+        self.included_columns = included_columns or []
+        self.target_columns = target_columns or []
+
+    def as_cql_query(self, formatted=False):
+        """
+        Returns a CQL query that can be used to recreate this function.
+        If `formatted` is set to :const:`True`, extra whitespace will
+        be added to make the query more readable.
+        """
+        sep = '\n    ' if formatted else ' '
+        keyspace = protect_name(self.table.keyspace_name) if self.table else '<keyspace>'
+        name = protect_name(self.name)
+
+        selected_cols = ', '.join(protect_name(col) for col in self.included_columns)
+        target_table = protect_name(self.target_table_name)
+        where_clause = " AND ".join("%s IS NOT NULL" % protect_name(col) for col in self.target_columns + self.clustering_columns)
+
+        part_key = ', '.join(protect_name(n) for n in self.target_columns)
+        if len(self.target_columns) > 1:
+            pk = "((%s)" % part_key
+        else:
+            pk = "(%s" % part_key
+        if self.clustering_columns:
+            pk += ", %s" % ', '.join(protect_name(n) for n in self.clustering_columns)
+        pk += ")"
+
+        properties = self.table._property_string(formatted) if self.table else '<table properties>'
+
+        body = "CREATE MATERIALIZED VIEW %(keyspace)s.%(name)s AS%(sep)s" \
+               "SELECT %(selected_cols)s FROM %(keyspace)s.%(target_table)s%(sep)s" \
+               "WHERE %(where_clause)s%(sep)s" \
+               "PRIMARY KEY %(pk)s%(sep)s" \
+               "WITH %(properties)s;" % locals()
+
+        if not self.table:
+            ret = "/*\nWarning: Materialize View  omitted because the model is missing a table describing it.\n" \
+                  "\nApproximate structure, for reference:\n(this should not be used to reproduce this schema)\n\n%s" \
+                  + body + "\n*/"
+            return ret
+
+        return body
+
 
 
 def get_schema_parser(connection, timeout):
