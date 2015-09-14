@@ -1,3 +1,14 @@
+2.7.2
+=====
+Setpember 14, 2015
+
+Bug Fixes
+---------
+* Resolve CQL export error for UDF with zero parameters (PYTHON-392)
+* Remove futures dep. for Python 3 (PYTHON-393)
+* Avoid Python closure in cdef (supports earlier Cython compiler) (PYTHON-396)
+* Unit test runtime issues (PYTHON-397,398)
+
 2.7.1
 =====
 August 25, 2015
