@@ -2239,9 +2239,6 @@ class IndexMetadataV3(object):
         """
         options = dict(self.index_options)
         index_target = options.pop("target")
-        # "values(...) is implicit in CQL
-        if index_target.lower().startswith('values('):
-            index_target = index_target[7:-1]
         if self.kind != "CUSTOM":
             return "CREATE INDEX %s ON %s.%s (%s)" % (
                 self.name,  # Cassandra doesn't like quoted index names for some reason
