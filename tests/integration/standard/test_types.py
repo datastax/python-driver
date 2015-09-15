@@ -627,13 +627,13 @@ class TypeTests(unittest.TestCase):
                   "v_1 frozen<%s>,"
                   "v_2 frozen<%s>,"
                   "v_3 frozen<%s>,"
-                  "v_128 frozen<%s>"
+                  "v_32 frozen<%s>"
                   ")" % (self.nested_tuples_schema_helper(1),
                          self.nested_tuples_schema_helper(2),
                          self.nested_tuples_schema_helper(3),
-                         self.nested_tuples_schema_helper(128)))
+                         self.nested_tuples_schema_helper(32)))
 
-        for i in (1, 2, 3, 128):
+        for i in (1, 2, 3, 32):
             # create tuple
             created_tuple = self.nested_tuples_creator_helper(i)
 

@@ -4,8 +4,7 @@ Installation
 Supported Platforms
 -------------------
 Python 2.6, 2.7, 3.3, and 3.4 are supported.  Both CPython (the standard Python
-implementation) and `PyPy <http://pypy.org>`_ are supported and tested
-against.
+implementation) and `PyPy <http://pypy.org>`_ are supported and tested.
 
 Linux, OSX, and Windows are supported.
 
@@ -31,6 +30,23 @@ To fix this, re-run the installation with an extra compilation flag::
 
     ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future pip install cassandra-driver
 
+.. _windows_build:
+
+Windows Installation Notes
+--------------------------
+Installing the driver with extensions in Windows sometimes presents some challenges. A few notes about common
+hang-ups:
+
+Setup requires a compiler. When using Python 2, this is as simple as installing `this package <http://aka.ms/vcpython27>`_
+(this link is also emitted during install if setuptools is unable to find the resources it needs). Depending on your
+system settings, this package may install as a user-specific application. Make sure to install for everyone, or at least
+as the user that will be building the Python environment.
+
+It is also possible to run the build with your compiler of choice. Just make sure to have your environment setup with
+the proper paths. Make sure the compiler target architecture matches the bitness of your Python runtime.
+Perhaps the easiest way to do this is to run the build/install from a Visual Studio Command Prompt (a
+shortcut installed with Visual Studio that sources the appropriate environment and presents a shell).
+
 Manual Installation
 -------------------
 You can always install the driver directly from a source checkout or tarball.
@@ -48,7 +64,7 @@ To check if the installation was successful, you can run::
 
     python -c 'import cassandra; print cassandra.__version__'
 
-It should print something like "2.0.0".
+It should print something like "2.7.0".
 
 (*Optional*) Compression Support
 --------------------------------
@@ -77,15 +93,19 @@ support this::
 
     pip install scales
 
-(*Optional*) Sorted Sets
-------------------------
+(*Optional*) blist for Sorted Sets
+----------------------------------
 Cassandra can store entire collections within a column.  One of those
 collection types is a set.  Cassandra's sets are actually ordered
-sets.  By default, the driver will use unordered sets to represent
-these collections.  If you would like to maintain the ordering,
+sets.  By default, the driver will use a pure Python ordered sets to represent
+these collections.  If you would like to use an optimized implementation,
 install the ``blist`` library::
 
     pip install blist
+
+**Note**: This optional dependency is likely to be removed in favor of the internal
+implementation in the next major version.
+
 
 (*Optional*) Non-python Dependencies
 ------------------------------------
@@ -93,14 +113,14 @@ The driver has several **optional** features that have non-Python dependencies.
 
 C Extensions
 ^^^^^^^^^^^^
-By default, two C extensions are compiled: one that adds support
-for token-aware routing with the ``Murmur3Partitioner``, and one that
-allows you to use `libev <http://software.schmorp.de/pkg/libev.html>`_
-for the event loop, which improves performance.
+By default, a number of extensions are compiled, providing faster hashing
+for token-aware routing with the ``Murmur3Partitioner``,
+`libev <http://software.schmorp.de/pkg/libev.html>`_ event loop integration,
+and Cython optimized extensions.
 
 When installing manually through setup.py, you can disable both with
-the ``--no-extensions`` option, or selectively disable one or the other
-with ``--no-murmur3`` and ``--no-libev``.
+the ``--no-extensions`` option, or selectively disable them with
+with ``--no-murmur3``, ``--no-libev``, or ``--no-cython``.
 
 To compile the extensions, ensure that GCC and the Python headers are available.
 
@@ -113,6 +133,25 @@ On RedHat and RedHat-based systems like CentOS and Fedora::
     $ sudo yum install gcc python-devel
 
 On OS X, homebrew installations of Python should provide the necessary headers.
+
+See :ref:`windows_build` for notes on configuring the build environment on Windows.
+
+Cython-based Extensions
+~~~~~~~~~~~~~~~~~~~~~~~
+By default, this package uses `Cython <http://cython.org/>`_ to optimize core modules and build custom extensions.
+This is not a hard requirement, but is engaged by default to build extensions offering better performance than the
+pure Python implementation.
+
+This build phase can be avoided using the build switch, or an environment variable::
+
+    python setup.py install --no-cython
+    -or-
+    pip install --install-option="--no-cython" <spec-or-path>
+
+Alternatively, an environment variable can be used to switch this option regardless of
+context::
+
+    CASS_DRIVER_NO_CYTHON=1 <your script here>
 
 libev support
 ^^^^^^^^^^^^^
@@ -133,6 +172,9 @@ If you're on Mac OS X, you should be able to install libev
 through `Homebrew <http://brew.sh/>`_. For example, on Mac OS X::
 
     $ brew install libev
+
+The libev extension is not built for Windows (the build process is complex, and the Windows implementation uses
+select anyway).
 
 If successful, you should be able to build and install the extension
 (just using ``setup.py build`` or ``setup.py install``) and then use

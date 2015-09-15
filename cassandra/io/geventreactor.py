@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import gevent
-from gevent.event import Event
+import gevent.event
 from gevent.queue import Queue
 from gevent import select, socket
 import gevent.ssl
@@ -21,13 +21,13 @@ from collections import defaultdict
 from functools import partial
 import logging
 import os
+import time
 
-from six.moves import xrange
+from six.moves import range
 
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL
 
-from cassandra.connection import Connection, ConnectionShutdown
-from cassandra.protocol import RegisterMessage
+from cassandra.connection import Connection, ConnectionShutdown, Timer, TimerManager
 
 
 log = logging.getLogger(__name__)
@@ -51,14 +51,38 @@ class GeventConnection(Connection):
     _socket_impl = gevent.socket
     _ssl_impl = gevent.ssl
 
+    _timers = None
+    _timeout_watcher = None
+    _new_timer = None
+
+    @classmethod
+    def initialize_reactor(cls):
+        if not cls._timers:
+            cls._timers = TimerManager()
+            cls._timeout_watcher = gevent.spawn(cls.service_timeouts)
+            cls._new_timer = gevent.event.Event()
+
+    @classmethod
+    def create_timer(cls, timeout, callback):
+        timer = Timer(timeout, callback)
+        cls._timers.add_timer(timer)
+        cls._new_timer.set()
+        return timer
+
+    @classmethod
+    def service_timeouts(cls):
+        timer_manager = cls._timers
+        timer_event = cls._new_timer
+        while True:
+            next_end = timer_manager.service_timeouts()
+            sleep_time = max(next_end - time.time(), 0) if next_end else 10000
+            timer_event.wait(sleep_time)
+            timer_event.clear()
+
     def __init__(self, *args, **kwargs):
         Connection.__init__(self, *args, **kwargs)
 
-        self.connected_event = Event()
         self._write_queue = Queue()
-
-        self._callbacks = {}
-        self._push_watchers = defaultdict(set)
 
         self._connect_socket()
 
@@ -82,7 +106,7 @@ class GeventConnection(Connection):
         log.debug("Closed socket to %s" % (self.host,))
 
         if not self.is_defunct:
-            self.error_all_callbacks(
+            self.error_all_requests(
                 ConnectionShutdown("Connection to %s was closed" % self.host))
             # don't leave in-progress operations hanging
             self.connected_event.set()
@@ -142,18 +166,5 @@ class GeventConnection(Connection):
 
     def push(self, data):
         chunk_size = self.out_buffer_size
-        for i in xrange(0, len(data), chunk_size):
+        for i in range(0, len(data), chunk_size):
             self._write_queue.put(data[i:i + chunk_size])
-
-    def register_watcher(self, event_type, callback, register_timeout=None):
-        self._push_watchers[event_type].add(callback)
-        self.wait_for_response(
-            RegisterMessage(event_list=[event_type]),
-            timeout=register_timeout)
-
-    def register_watchers(self, type_callback_dict, register_timeout=None):
-        for event_type, callback in type_callback_dict.items():
-            self._push_watchers[event_type].add(callback)
-        self.wait_for_response(
-            RegisterMessage(event_list=type_callback_dict.keys()),
-            timeout=register_timeout)

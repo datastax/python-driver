@@ -1,3 +1,46 @@
+2.7.1
+=====
+August 25, 2015
+
+Bug Fixes
+---------
+* Explicitly include extension source files in Manifest
+
+2.7.0
+=====
+August 25, 2015
+
+Cython is introduced, providing compiled extensions for core modules, and
+extensions for optimized results deserialization.
+
+Features
+--------
+* General Performance Improvements for Throughput (PYTHON-283)
+* Improve synchronous request performance with Timers (PYTHON-108)
+* Enable C Extensions for PyPy Runtime (PYTHON-357)
+* Refactor SerDes functionality for pluggable interface (PYTHON-313)
+* Cython SerDes Extension (PYTHON-377)
+* Accept iterators/generators for execute_concurrent() (PYTHON-123)
+* cythonize existing modules (PYTHON-342)
+* Pure Python murmur3 implementation (PYTHON-363)
+* Make driver tolerant of inconsistent metadata (PYTHON-370)
+
+Bug Fixes
+---------
+* Drop Events out-of-order Cause KeyError on Processing (PYTHON-358)
+* DowngradingConsistencyRetryPolicy doesn't check response count on write timeouts (PYTHON-338)
+* Blocking connect does not use connect_timeout (PYTHON-381)
+* Properly protect partition key in CQL export (PYTHON-375)
+* Trigger error callbacks on timeout (PYTHON-294)
+
+2.6.0
+=====
+July 20, 2015
+
+Bug Fixes
+---------
+* Output proper CQL for compact tables with no clustering columns (PYTHON-360)
+
 2.6.0c2
 =======
 June 24, 2015

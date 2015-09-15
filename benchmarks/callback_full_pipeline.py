@@ -42,7 +42,7 @@ class Runner(BenchmarkThread):
                 self.event.set()
 
         if next(self.num_started) <= self.num_queries:
-            future = self.session.execute_async(self.query, self.values)
+            future = self.session.execute_async(self.query, self.values, timeout=None)
             future.add_callbacks(self.insert_next, self.insert_next)
 
     def run(self):

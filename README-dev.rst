@@ -17,12 +17,17 @@ Releasing
     python setup.py sdist upload
 
 * Update the docs (see below)
-* Append a 'post' string to the version tuple in ``cassandra/__init__.py``
-  so that it looks like ``(x, y, z, 'post')``
+* Append a 'postN' string to the version tuple in ``cassandra/__init__.py``
+  so that it looks like ``(x, y, z, 'postN')``
 
-  * After a beta or rc release, this should look like ``(2, 1, '0b1', 'post')``
+  * After a beta or rc release, this should look like ``(2, 1, '0b1', 'post0')``
 
 * Commit and push
+* Update 'cassandra-test' branch to reflect new release
+  
+    * this is typically a matter of merging or rebasing onto master
+    * test and push updated branch to origin
+
 * Update the JIRA versions: https://datastax-oss.atlassian.net/plugins/servlet/project-config/PYTHON/versions
 * Make an announcement on the mailing list
 

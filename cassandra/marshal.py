@@ -48,13 +48,15 @@ if six.PY3:
     def varint_unpack(term):
         val = int(''.join("%02x" % i for i in term), 16)
         if (term[0] & 128) != 0:
-            val -= 1 << (len(term) * 8)
+            len_term = len(term)  # pulling this out of the expression to avoid overflow in cython optimized code
+            val -= 1 << (len_term * 8)
         return val
 else:
     def varint_unpack(term):  # noqa
         val = int(term.encode('hex'), 16)
         if (ord(term[0]) & 128) != 0:
-            val = val - (1 << (len(term) * 8))
+            len_term = len(term)  # pulling this out of the expression to avoid overflow in cython optimized code
+            val = val - (1 << (len_term * 8))
         return val
 
 

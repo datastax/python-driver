@@ -213,20 +213,8 @@ class _CassandraType(object):
     of EmptyValue) will be returned.
     """
 
-    def __init__(self, val):
-        self.val = self.validate(val)
-
     def __repr__(self):
         return '<%s( %r )>' % (self.cql_parameterized_type(), self.val)
-
-    @staticmethod
-    def validate(val):
-        """
-        Called to transform an input value into one of a suitable type
-        for this class. As an example, the BooleanType class uses this
-        to convert an incoming value to True or False.
-        """
-        return val
 
     @classmethod
     def from_binary(cls, byts, protocol_version):
@@ -300,7 +288,7 @@ class _CassandraType(object):
         Given a set of other CassandraTypes, create a new subtype of this type
         using them as parameters. This is how composite types are constructed.
 
-            >>> MapType.apply_parameters(DateType, BooleanType)
+            >>> MapType.apply_parameters([DateType, BooleanType])
             <class 'cassandra.types.MapType(DateType, BooleanType)'>
 
         `subtypes` will be a sequence of CassandraTypes.  If provided, `names`
@@ -359,20 +347,12 @@ class BytesType(_CassandraType):
     empty_binary_ok = True
 
     @staticmethod
-    def validate(val):
-        return bytearray(val)
-
-    @staticmethod
     def serialize(val, protocol_version):
         return six.binary_type(val)
 
 
 class DecimalType(_CassandraType):
     typename = 'decimal'
-
-    @staticmethod
-    def validate(val):
-        return Decimal(val)
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -411,10 +391,6 @@ class UUIDType(_CassandraType):
 
 class BooleanType(_CassandraType):
     typename = 'boolean'
-
-    @staticmethod
-    def validate(val):
-        return bool(val)
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -556,14 +532,9 @@ _have_warned_about_timestamps = False
 class DateType(_CassandraType):
     typename = 'timestamp'
 
-    @classmethod
-    def validate(cls, val):
-        if isinstance(val, six.string_types):
-            val = cls.interpret_datestring(val)
-        return val
-
     @staticmethod
     def interpret_datestring(val):
+        # not used internally. deprecate?
         if val[-5] in ('+', '-'):
             offset = (int(val[-4:-2]) * 3600 + int(val[-2:]) * 60) * int(val[-5] + '1')
             val = val[:-5]
@@ -578,9 +549,6 @@ class DateType(_CassandraType):
             return (calendar.timegm(tval) + offset) * 1e3
         else:
             raise ValueError("can't interpret %r as a date" % (val,))
-
-    def my_timestamp(self):
-        return self.val
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -633,12 +601,6 @@ class SimpleDateType(_CassandraType):
     # range (2^31).
     EPOCH_OFFSET_DAYS = 2 ** 31
 
-    @classmethod
-    def validate(cls, val):
-        if not isinstance(val, util.Date):
-            val = util.Date(val)
-        return val
-
     @staticmethod
     def deserialize(byts, protocol_version):
         days = uint32_unpack(byts) - SimpleDateType.EPOCH_OFFSET_DAYS
@@ -667,12 +629,6 @@ class ShortType(_CassandraType):
 
 class TimeType(_CassandraType):
     typename = 'time'
-
-    @classmethod
-    def validate(cls, val):
-        if not isinstance(val, util.Time):
-            val = util.Time(val)
-        return val
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -709,11 +665,6 @@ class VarcharType(UTF8Type):
 
 
 class _ParameterizedType(_CassandraType):
-    def __init__(self, val):
-        if not self.subtypes:
-            raise ValueError("%s type with no parameters can't be instantiated" % (self.typename,))
-        _CassandraType.__init__(self, val)
-
     @classmethod
     def deserialize(cls, byts, protocol_version):
         if not cls.subtypes:
@@ -730,11 +681,6 @@ class _ParameterizedType(_CassandraType):
 
 
 class _SimpleParameterizedType(_ParameterizedType):
-    @classmethod
-    def validate(cls, val):
-        subtype, = cls.subtypes
-        return cls.adapter([subtype.validate(subval) for subval in val])
-
     @classmethod
     def deserialize_safe(cls, byts, protocol_version):
         subtype, = cls.subtypes
@@ -786,11 +732,6 @@ class SetType(_SimpleParameterizedType):
 class MapType(_ParameterizedType):
     typename = 'map'
     num_subtypes = 2
-
-    @classmethod
-    def validate(cls, val):
-        key_type, value_type = cls.subtypes
-        return dict((key_type.validate(k), value_type.validate(v)) for (k, v) in six.iteritems(val))
 
     @classmethod
     def deserialize_safe(cls, byts, protocol_version):
@@ -943,27 +884,7 @@ class UserType(TupleType):
 
     @classmethod
     def deserialize_safe(cls, byts, protocol_version):
-        proto_version = max(3, protocol_version)
-        p = 0
-        values = []
-        for col_type in cls.subtypes:
-            if p == len(byts):
-                break
-            itemlen = int32_unpack(byts[p:p + 4])
-            p += 4
-            if itemlen >= 0:
-                item = byts[p:p + itemlen]
-                p += itemlen
-            else:
-                item = None
-            # collections inside UDTs are always encoded with at least the
-            # version 3 format
-            values.append(col_type.from_binary(item, proto_version))
-
-        if len(values) < len(cls.subtypes):
-            nones = [None] * (len(cls.subtypes) - len(values))
-            values = values + nones
-
+        values = super(UserType, cls).deserialize_safe(byts, protocol_version)
         if cls.mapped_class:
             return cls.mapped_class(**dict(zip(cls.fieldnames, values)))
         else:

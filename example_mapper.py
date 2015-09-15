@@ -14,10 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# silence warnings just for demo -- applications would typically not do this
+import os
+os.environ['CQLENG_ALLOW_SCHEMA_MANAGEMENT'] = '1'
+
 import logging
 
 log = logging.getLogger()
-log.setLevel('DEBUG')
+log.setLevel('INFO')
 handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
 log.addHandler(handler)
@@ -27,9 +31,9 @@ from uuid import uuid4
 from cassandra.cqlengine import columns
 from cassandra.cqlengine import connection
 from cassandra.cqlengine import management
-from cassandra.cqlengine.exceptions import ValidationError
+from cassandra.cqlengine import ValidationError
 from cassandra.cqlengine.models import Model
-from cassandra.cqlengine.query import BatchQuery
+from cassandra.cqlengine.query import BatchQuery, LWTException
 
 KEYSPACE = "testkeyspace"
 
@@ -61,12 +65,19 @@ def main():
     log.info("### syncing model...")
     management.sync_table(FamilyMembers)
 
-    log.info("### add entities serially")
-    simmons = FamilyMembers.create(surname='Simmons', name='Gene', birth_year=1949, sex='m')  # default uuid is assigned
+    # default uuid is assigned
+    simmons = FamilyMembers.create(surname='Simmons', name='Gene', birth_year=1949, sex='m')
 
-    # add members later
+    # add members to his family later
     FamilyMembers.create(id=simmons.id, surname='Simmons', name='Nick', birth_year=1989, sex='m')
-    FamilyMembers.create(id=simmons.id, surname='Simmons', name='Sophie', sex='f')
+    sophie = FamilyMembers.create(id=simmons.id, surname='Simmons', name='Sophie', sex='f')
+
+    nick = FamilyMembers.objects(id=simmons.id, surname='Simmons', name='Nick')
+    try:
+        nick.iff(birth_year=1988).update(birth_year=1989)
+    except LWTException:
+        print "precondition not met"
+
     # showing validation
     try:
         FamilyMembers.create(id=simmons.id, surname='Tweed', name='Shannon', birth_year=1957, sex='f')
@@ -94,6 +105,9 @@ def main():
     log.info("### Constrain on clustering key")
     for m in FamilyMembers.objects(id=simmons.id, surname=simmons.surname):
         print m, m.birth_year, m.sex
+
+    log.info("### Constrain on clustering key")
+    kids = FamilyMembers.objects(id=simmons.id, surname=simmons.surname, name__in=['Nick', 'Sophie'])
 
     log.info("### Delete a record")
     FamilyMembers(id=hogan_id, surname='Hogan', name='Linda').delete()

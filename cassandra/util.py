@@ -1,12 +1,29 @@
+# Copyright 2013-2015 DataStax, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from __future__ import with_statement
 import calendar
 import datetime
 import random
 import six
 import uuid
+import sys
 
 DATETIME_EPOC = datetime.datetime(1970, 1, 1)
 
+assert sys.byteorder in ('little', 'big')
+is_little_endian = sys.byteorder == 'little'
 
 def datetime_from_timestamp(timestamp):
     """
@@ -15,8 +32,6 @@ def datetime_from_timestamp(timestamp):
     and rounding differences in Python 3.4 (PYTHON-340).
 
     :param timestamp: a unix timestamp, in seconds
-
-    :rtype: datetime
     """
     dt = DATETIME_EPOC + datetime.timedelta(seconds=timestamp)
     return dt
@@ -29,9 +44,6 @@ def unix_time_from_uuid1(uuid_arg):
     results of queries returning a v1 :class:`~uuid.UUID`.
 
     :param uuid_arg: a version 1 :class:`~uuid.UUID`
-
-    :rtype: timestamp
-
     """
     return (uuid_arg.time - 0x01B21DD213814000) / 1e7
 
@@ -42,9 +54,6 @@ def datetime_from_uuid1(uuid_arg):
     specified type-1 UUID.
 
     :param uuid_arg: a version 1 :class:`~uuid.UUID`
-
-    :rtype: timestamp
-
     """
     return datetime_from_timestamp(unix_time_from_uuid1(uuid_arg))
 
@@ -498,8 +507,7 @@ except ImportError:
 
         def __init__(self, iterable=()):
             self._items = []
-            for i in iterable:
-                self.add(i)
+            self.update(iterable)
 
         def __len__(self):
             return len(self._items)
@@ -574,6 +582,10 @@ except ImportError:
                     self._items.insert(i, item)
             else:
                 self._items.append(item)
+
+        def update(self, iterable):
+            for i in iterable:
+                self.add(i)
 
         def clear(self):
             del self._items[:]

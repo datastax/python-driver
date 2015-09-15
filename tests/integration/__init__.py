@@ -59,7 +59,7 @@ def get_server_versions():
     if cass_version is not None:
         return (cass_version, cql_version)
 
-    c = Cluster(protocol_version=1)
+    c = Cluster()
     s = c.connect()
     row = s.execute('SELECT cql_version, release_version FROM system.local')[0]
 
@@ -160,7 +160,7 @@ def remove_cluster():
                 CCM_CLUSTER.remove()
                 CCM_CLUSTER = None
                 return
-            except WindowsError:
+            except OSError:
                 ex_type, ex, tb = sys.exc_info()
                 log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                 del tb
