@@ -58,7 +58,7 @@ PROJECT_LOGO           =
 # entered, it will be relative to the location where doxygen was started. If
 # left blank the current directory will be used.
 
-OUTPUT_DIRECTORY       = /home/jenkins/workspace/python_docs 
+OUTPUT_DIRECTORY       =  
 
 # If the CREATE_SUBDIRS tag is set to YES, then doxygen will create 4096 sub-
 # directories (in 2 levels) under the output directory of each output format and
@@ -228,13 +228,15 @@ TAB_SIZE               = 4
 # "Side Effects:". You can put \n's in the value part of an alias to insert
 # newlines.
 
-ALIASES                =
-ALIASES += expected_errors="\par Expected Errors\n" 
-ALIASES += jira_ticket="\par JIRA Ticket\n" 
-ALIASES += expected_result="\par Expected Result\n"
-ALIASES += test_assumptions="\par Test Assumptions\n"
-ALIASES += note="\par Note\n"
-ALIASES += test_category="\par Test Category\n"
+ALIASES                = "test_assumptions=\par Test Assumptions\n" \
+                         "note=\par Note\n" \
+                         "test_category=\par Test Category\n" \
+                         "jira_ticket=\par JIRA Ticket\n" \
+                         "expected_result=\par Expected Result\n" \
+                         "since=\par Since\n" \
+                         "param=\par Parameters\n" \
+                         "return=\par Return\n" \
+                         "expected_errors=\par Expected Errors\n"
 
 # This tag can be used to specify a number of word-keyword mappings (TCL only).
 # A mapping has the form "name=value". For example adding "class=itcl::class"
@@ -759,7 +761,7 @@ WARN_LOGFILE           =
 # spaces.
 # Note: If this tag is empty the current directory is searched.
 
-INPUT                  = /home/jenkins/workspace/python_docs/tests/integration/
+INPUT                  = ./tests
 
 # This tag can be used to specify the character encoding of the source files
 # that doxygen parses. Internally doxygen uses the UTF-8 encoding. Doxygen uses
