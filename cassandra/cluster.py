@@ -1955,7 +1955,7 @@ class Session(object):
 
         def encode(val):
             return '{ %s }' % ' , '.join('%s : %s' % (
-                field_name.encode('utf-8'),
+                field_name.encode('utf-8') if six.PY2 and isinstance(field_name, six.text_type) else field_name,
                 self.encoder.cql_encode_all_types(getattr(val, field_name, None))
             ) for field_name in type_meta.field_names)
 
