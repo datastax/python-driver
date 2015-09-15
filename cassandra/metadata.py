@@ -2394,6 +2394,9 @@ class MaterializedViewMetadata(object):
                "PRIMARY KEY %(pk)s%(sep)s" \
                "WITH %(properties)s;" % locals()
 
+    def export_as_string(self):
+        return self.as_cql_query(formatted=True)
+
 
 def get_schema_parser(connection, timeout):
     server_version = connection.server_version
