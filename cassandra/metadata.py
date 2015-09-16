@@ -2144,7 +2144,7 @@ class SchemaParserV3(SchemaParserV22):
         partition_rows = [r for r in col_rows
                           if r.get('kind', None) == "partition_key"]
         if len(partition_rows) > 1:
-            partition_rows = sorted(partition_rows, key=lambda row: row.get('component_index'))
+            partition_rows = sorted(partition_rows, key=lambda row: row.get('position'))
         for r in partition_rows:
             # we have to add meta here (and not in the later loop) because TableMetadata.columns is an
             # OrderedDict, and it assumes keys are inserted first, in order, when exporting CQL
@@ -2157,7 +2157,7 @@ class SchemaParserV3(SchemaParserV22):
             clustering_rows = [r for r in col_rows
                                if r.get('kind', None) == "clustering"]
             if len(clustering_rows) > 1:
-                clustering_rows = sorted(clustering_rows, key=lambda row: row.get('component_index'))
+                clustering_rows = sorted(clustering_rows, key=lambda row: row.get('position'))
             for r in clustering_rows:
                 column_meta = self._build_column_metadata(meta, r)
                 meta.columns[column_meta.name] = column_meta
