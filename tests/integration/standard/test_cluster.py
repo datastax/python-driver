@@ -365,9 +365,8 @@ class ClusterTests(unittest.TestCase):
         session = cluster.connect()
 
         schema_ver = session.execute("SELECT schema_version FROM system.local WHERE key='local'")[0][0]
-
-        # create a schema disagreement
-        session.execute("UPDATE system.local SET schema_version=%s WHERE key='local'", (uuid4(),))
+        new_schema_ver = uuid4()
+        session.execute("UPDATE system.local SET schema_version=%s WHERE key='local'", (new_schema_ver,))
 
         try:
             agreement_timeout = 1
@@ -422,9 +421,10 @@ class ClusterTests(unittest.TestCase):
             end_time = time.time()
             self.assertGreaterEqual(end_time - start_time, agreement_timeout)
             self.assertIs(original_meta, c.metadata.keyspaces)
-
             c.shutdown()
         finally:
+            # TODO once fixed this connect call
+            session = cluster.connect()
             session.execute("UPDATE system.local SET schema_version=%s WHERE key='local'", (schema_ver,))
 
         cluster.shutdown()
