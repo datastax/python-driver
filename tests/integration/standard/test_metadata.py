@@ -352,7 +352,8 @@ class SchemaMetadataTests(unittest.TestCase):
         create_statement += " WITH compression = {}"
         self.session.execute(create_statement)
         tablemeta = self.get_table_metadata()
-        self.assertIn("compression = {}", tablemeta.export_as_string())
+        expected = "compression = {}" if CASS_SERVER_VERSION < (3, 0) else "compression = {'enabled': 'false'}"
+        self.assertIn(expected, tablemeta.export_as_string())
 
     def test_non_size_tiered_compaction(self):
         """
