@@ -669,6 +669,15 @@ class TestCodeCoverage(unittest.TestCase):
                                                          lineterm=''))
             self.fail(diff_string)
 
+    def assert_startswith_diff(self, received, prefix):
+        if not received.startswith(prefix):
+            prefix_lines = previx.split('\n')
+            diff_string = '\n'.join(difflib.unified_diff(prefix_lines,
+                                                         received.split('\n')[:len(prefix_lines)],
+                                                         'EXPECTED', 'RECEIVED',
+                                                         lineterm=''))
+            self.fail(diff_string)
+
     def test_export_keyspace_schema_udts(self):
         """
         Test udt exports
@@ -714,7 +723,7 @@ class TestCodeCoverage(unittest.TestCase):
             addresses map<text, frozen<address>>)
         """)
 
-        expected_string = """CREATE KEYSPACE export_udts WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;
+        expected_prefix = """CREATE KEYSPACE export_udts WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;
 
 CREATE TYPE export_udts.street (
     street_number int,
@@ -733,43 +742,17 @@ CREATE TYPE export_udts.address (
 
 CREATE TABLE export_udts.users (
     user text PRIMARY KEY,
-    addresses map<text, frozen<address>>
-) WITH bloom_filter_fp_chance = 0.01
-    AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
-    AND comment = ''
-    AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
-    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
-    AND dclocal_read_repair_chance = 0.1
-    AND default_time_to_live = 0
-    AND gc_grace_seconds = 864000
-    AND max_index_interval = 2048
-    AND memtable_flush_period_in_ms = 0
-    AND min_index_interval = 128
-    AND read_repair_chance = 0.0
-    AND speculative_retry = '99.0PERCENTILE';"""
+    addresses map<text, frozen<address>>"""
 
-        self.assert_equal_diff(cluster.metadata.keyspaces['export_udts'].export_as_string(), expected_string)
+        self.assert_startswith_diff(cluster.metadata.keyspaces['export_udts'].export_as_string(), expected_prefix)
 
         table_meta = cluster.metadata.keyspaces['export_udts'].tables['users']
 
-        expected_string = """CREATE TABLE export_udts.users (
+        expected_prefix = """CREATE TABLE export_udts.users (
     user text PRIMARY KEY,
-    addresses map<text, frozen<address>>
-) WITH bloom_filter_fp_chance = 0.01
-    AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
-    AND comment = ''
-    AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
-    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
-    AND dclocal_read_repair_chance = 0.1
-    AND default_time_to_live = 0
-    AND gc_grace_seconds = 864000
-    AND max_index_interval = 2048
-    AND memtable_flush_period_in_ms = 0
-    AND min_index_interval = 128
-    AND read_repair_chance = 0.0
-    AND speculative_retry = '99.0PERCENTILE';"""
+    addresses map<text, frozen<address>>"""
 
-        self.assert_equal_diff(table_meta.export_as_string(), expected_string)
+        self.assert_startswith_diff(table_meta.export_as_string(), expected_prefix)
 
         cluster.shutdown()
 
