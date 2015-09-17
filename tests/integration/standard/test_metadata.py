@@ -330,7 +330,8 @@ class SchemaMetadataTests(unittest.TestCase):
                              % (self.ksname, self.cfname))
 
         tablemeta = self.get_table_metadata()
-        self.assertIn(' (b)', tablemeta.export_as_string())
+        target = ' (b)' if CASS_SERVER_VERSION < (3, 0) else 'values(b))'  # explicit values in C* 3+
+        self.assertIn(target, tablemeta.export_as_string())
 
         # test full indexes on frozen collections, if available
         if CASS_SERVER_VERSION >= (2, 1, 3):
