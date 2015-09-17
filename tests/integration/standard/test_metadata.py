@@ -20,7 +20,7 @@ except ImportError:
 import difflib
 import six
 import sys
-from mock import Mock
+from mock import Mock, patch
 
 from cassandra import AlreadyExists, SignatureDescriptor, UserFunctionDescriptor, UserAggregateDescriptor
 
@@ -38,6 +38,8 @@ from tests.integration import get_cluster, use_singledc, PROTOCOL_VERSION, get_s
 
 def setup_module():
     use_singledc()
+    global CASS_SERVER_VERSION
+    CASS_SERVER_VERSION = get_server_versions()[0]
 
 
 class SchemaMetadataTests(unittest.TestCase):
@@ -49,8 +51,6 @@ class SchemaMetadataTests(unittest.TestCase):
         return self._testMethodName.lower()
 
     def setUp(self):
-        self._cass_version, self._cql_version = get_server_versions()
-
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         self.session = self.cluster.connect()
         execute_until_pass(self.session,
@@ -314,7 +314,7 @@ class SchemaMetadataTests(unittest.TestCase):
         self.assertIn('CREATE INDEX e_index', statement)
 
     def test_collection_indexes(self):
-        if get_server_versions()[0] < (2, 1, 0):
+        if CASS_SERVER_VERSION < (2, 1, 0):
             raise unittest.SkipTest("Secondary index on collections were introduced in Cassandra 2.1")
 
         self.session.execute("CREATE TABLE %s.%s (a int PRIMARY KEY, b map<text, text>)"
@@ -333,7 +333,7 @@ class SchemaMetadataTests(unittest.TestCase):
         self.assertIn(' (b)', tablemeta.export_as_string())
 
         # test full indexes on frozen collections, if available
-        if get_server_versions()[0] >= (2, 1, 3):
+        if CASS_SERVER_VERSION >= (2, 1, 3):
             self.session.execute("DROP TABLE %s.%s" % (self.ksname, self.cfname))
             self.session.execute("CREATE TABLE %s.%s (a int PRIMARY KEY, b frozen<map<text, text>>)"
                                  % (self.ksname, self.cfname))
@@ -669,7 +669,7 @@ class TestCodeCoverage(unittest.TestCase):
         Test udt exports
         """
 
-        if get_server_versions()[0] < (2, 1, 0):
+        if CASS_SERVER_VERSION < (2, 1, 0):
             raise unittest.SkipTest('UDTs were introduced in Cassandra 2.1')
 
         if PROTOCOL_VERSION < 3:
@@ -871,11 +871,10 @@ CREATE TABLE export_udts.users (
 
     def test_legacy_tables(self):
 
-        cass_ver = get_server_versions()[0]
-        if cass_ver < (2, 1, 0):
+        if CASS_SERVER_VERSION < (2, 1, 0):
             raise unittest.SkipTest('Test schema output assumes 2.1.0+ options')
 
-        if cass_ver >= (2, 2, 0):
+        if CASS_SERVER_VERSION >= (2, 2, 0):
             raise unittest.SkipTest('Cannot test cli script on Cassandra 2.2.0+')
 
         if sys.version_info[0:2] != (2, 7):
@@ -1766,6 +1765,10 @@ class BadMetaTest(unittest.TestCase):
     PYTHON-370
     """
 
+    class BadMetaException(Exception):
+        pass
+
+
     @property
     def function_name(self):
         return self._testMethodName.lower()
@@ -1777,75 +1780,75 @@ class BadMetaTest(unittest.TestCase):
         cls.session = cls.cluster.connect()
         cls.session.execute("CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}" % cls.keyspace_name)
         cls.session.set_keyspace(cls.keyspace_name)
+        connection = cls.cluster.control_connection._connection
+        cls.parser_class = get_schema_parser(connection, timeout=20).__class__
 
     @classmethod
     def teardown_class(cls):
         cls.session.execute("DROP KEYSPACE IF EXISTS %s" % cls.keyspace_name)
         cls.cluster.shutdown()
 
-    def _run_on_all_nodes(self, query, params):
-        # used to update schema data on all nodes in the cluster
-        for _ in self.cluster.metadata.all_hosts():
-            self.session.execute(query, params)
+    def _skip_if_not_version(self, version):
+        if CASS_SERVER_VERSION < version:
+            raise unittest.SkipTest("Requires server version >= %s" % (version,))
 
-    def test_keyspace_bad_options(self):
-        strategy_options = self.session.execute('SELECT strategy_options FROM system.schema_keyspaces WHERE keyspace_name=%s', (self.keyspace_name,))[0].strategy_options
-        where_cls = " WHERE keyspace_name='%s'" % (self.keyspace_name,)
-        try:
-            self._run_on_all_nodes('UPDATE system.schema_keyspaces SET strategy_options=%s' + where_cls, ('some bad json',))
-            c = Cluster(protocol_version=PROTOCOL_VERSION)
-            c.connect()
-            meta = c.metadata.keyspaces[self.keyspace_name]
-            self.assertIsNotNone(meta._exc_info)
-            self.assertIn("/*\nWarning:", meta.export_as_string())
-            c.shutdown()
-        finally:
-            self._run_on_all_nodes('UPDATE system.schema_keyspaces SET strategy_options=%s' + where_cls, (strategy_options,))
+    def test_bad_keyspace(self):
+        with patch.object(self.parser_class, '_build_keyspace_metadata_internal', side_effect=self.BadMetaException):
+            self.cluster.refresh_keyspace_metadata(self.keyspace_name)
+            m = self.cluster.metadata.keyspaces[self.keyspace_name]
+            self.assertIs(m._exc_info[0], self.BadMetaException)
+            self.assertIn("/*\nWarning:", m.export_as_string())
 
-    def test_keyspace_bad_index(self):
+    def test_bad_table(self):
+        self.session.execute('CREATE TABLE %s (k int PRIMARY KEY, v int)' % self.function_name)
+        with patch.object(self.parser_class, '_build_column_metadata', side_effect=self.BadMetaException):
+            self.cluster.refresh_table_metadata(self.keyspace_name, self.function_name)
+            m = self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_name]
+            self.assertIs(m._exc_info[0], self.BadMetaException)
+            self.assertIn("/*\nWarning:", m.export_as_string())
+
+    def test_bad_index(self):
         self.session.execute('CREATE TABLE %s (k int PRIMARY KEY, v int)' % self.function_name)
         self.session.execute('CREATE INDEX ON %s(v)' % self.function_name)
-        where_cls = " WHERE keyspace_name='%s' AND columnfamily_name='%s' AND column_name='v'" \
-                    % (self.keyspace_name, self.function_name)
-        index_options = self.session.execute('SELECT index_options FROM system.schema_columns' + where_cls)[0].index_options
-        try:
-            self._run_on_all_nodes('UPDATE system.schema_columns SET index_options=%s' + where_cls, ('some bad json',))
-            c = Cluster(protocol_version=PROTOCOL_VERSION)
-            c.connect()
-            meta = c.metadata.keyspaces[self.keyspace_name].tables[self.function_name]
-            self.assertIsNotNone(meta._exc_info)
-            self.assertIn("/*\nWarning:", meta.export_as_string())
-            c.shutdown()
-        finally:
-            self._run_on_all_nodes('UPDATE system.schema_columns SET index_options=%s' + where_cls, (index_options,))
+        with patch.object(self.parser_class, '_build_index_metadata', side_effect=self.BadMetaException):
+            self.cluster.refresh_table_metadata(self.keyspace_name, self.function_name)
+            m = self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_name]
+            self.assertIs(m._exc_info[0], self.BadMetaException)
+            self.assertIn("/*\nWarning:", m.export_as_string())
 
-    def test_table_bad_comparator(self):
-        self.session.execute('CREATE TABLE %s (k int PRIMARY KEY, v int)' % self.function_name)
-        where_cls = " WHERE keyspace_name='%s' AND columnfamily_name='%s'" % (self.keyspace_name, self.function_name)
-        comparator = self.session.execute('SELECT comparator FROM system.schema_columnfamilies' + where_cls)[0].comparator
-        try:
-            self._run_on_all_nodes('UPDATE system.schema_columnfamilies SET comparator=%s' + where_cls, ('DynamicCompositeType()',))
-            c = Cluster(protocol_version=PROTOCOL_VERSION)
-            c.connect()
-            meta = c.metadata.keyspaces[self.keyspace_name].tables[self.function_name]
-            self.assertIsNotNone(meta._exc_info)
-            self.assertIn("/*\nWarning:", meta.export_as_string())
-            c.shutdown()
-        finally:
-            self._run_on_all_nodes('UPDATE system.schema_columnfamilies SET comparator=%s' + where_cls, (comparator,))
-
-    @unittest.skipUnless(PROTOCOL_VERSION >= 3, "Requires protocol version 3+")
-    def test_user_type_bad_typename(self):
+    def test_bad_user_type(self):
+        self._skip_if_not_version((2, 1, 0))
         self.session.execute('CREATE TYPE %s (i int, d double)' % self.function_name)
-        where_cls = " WHERE keyspace_name='%s' AND type_name='%s'" % (self.keyspace_name, self.function_name)
-        field_types = self.session.execute('SELECT field_types FROM system.schema_usertypes' + where_cls)[0].field_types
-        try:
-            self._run_on_all_nodes('UPDATE system.schema_usertypes SET field_types[0]=%s' + where_cls, ('Tr@inWr3ck##)))',))
-            c = Cluster(protocol_version=PROTOCOL_VERSION)
-            c.connect()
-            meta = c.metadata.keyspaces[self.keyspace_name]
-            self.assertIsNotNone(meta._exc_info)
-            self.assertIn("/*\nWarning:", meta.export_as_string())
-            c.shutdown()
-        finally:
-            self._run_on_all_nodes('UPDATE system.schema_usertypes SET field_types=%s' + where_cls, (field_types,))
+        with patch.object(self.parser_class, '_build_user_type', side_effect=self.BadMetaException):
+            self.cluster.refresh_schema_metadata()   # presently do not capture these errors on udt direct refresh -- make sure it's contained during full refresh
+            m = self.cluster.metadata.keyspaces[self.keyspace_name]
+            self.assertIs(m._exc_info[0], self.BadMetaException)
+            self.assertIn("/*\nWarning:", m.export_as_string())
+
+    def test_bad_user_function(self):
+        self._skip_if_not_version((2, 2, 0))
+        self.session.execute("""CREATE FUNCTION IF NOT EXISTS %s (key int, val int)
+                                RETURNS NULL ON NULL INPUT
+                                RETURNS int
+                                LANGUAGE javascript AS 'key + val';""" % self.function_name)
+        with patch.object(self.parser_class, '_build_function', side_effect=self.BadMetaException):
+            self.cluster.refresh_schema_metadata()   # presently do not capture these errors on udt direct refresh -- make sure it's contained during full refresh
+            m = self.cluster.metadata.keyspaces[self.keyspace_name]
+            self.assertIs(m._exc_info[0], self.BadMetaException)
+            self.assertIn("/*\nWarning:", m.export_as_string())
+
+    def test_bad_user_aggregate(self):
+        self._skip_if_not_version((2, 2, 0))
+        self.session.execute("""CREATE FUNCTION IF NOT EXISTS sum_int (key int, val int)
+                                RETURNS NULL ON NULL INPUT
+                                RETURNS int
+                                LANGUAGE javascript AS 'key + val';""")
+        self.session.execute("""CREATE AGGREGATE %s(int)
+                                 SFUNC sum_int
+                                 STYPE int
+                                 INITCOND 0""" % self.function_name)
+        with patch.object(self.parser_class, '_build_aggregate', side_effect=self.BadMetaException):
+            self.cluster.refresh_schema_metadata()   # presently do not capture these errors on udt direct refresh -- make sure it's contained during full refresh
+            m = self.cluster.metadata.keyspaces[self.keyspace_name]
+            self.assertIs(m._exc_info[0], self.BadMetaException)
+            self.assertIn("/*\nWarning:", m.export_as_string())
