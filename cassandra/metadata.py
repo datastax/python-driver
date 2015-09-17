@@ -2435,10 +2435,10 @@ class MaterializedViewMetadata(object):
                "FROM %(keyspace)s.%(base_table)s%(sep)s" \
                "WHERE %(where_clause)s%(sep)s" \
                "PRIMARY KEY %(pk)s%(sep)s" \
-               "WITH %(properties)s;" % locals()
+               "WITH %(properties)s" % locals()
 
     def export_as_string(self):
-        return self.as_cql_query(formatted=True)
+        return self.as_cql_query(formatted=True) + ";"
 
 
 def get_schema_parser(connection, timeout):
