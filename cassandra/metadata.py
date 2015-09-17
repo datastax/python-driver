@@ -688,9 +688,15 @@ class KeyspaceMetadata(object):
                 self.indexes.pop(index_name, None)
             for view_name in table_meta.views:
                 self.views.pop(view_name, None)
+            return
         # we can't tell table drops from views, so drop both
         # (name is unique among them, within a keyspace)
-        self.views.pop(table_name, None)
+        view_meta = self.views.pop(table_name, None)
+        if view_meta:
+            try:
+                self.tables[view_meta.base_table_name].views.pop(table_name, None)
+            except KeyError:
+                pass
 
     def _add_view_metadata(self, view_metadata):
         try:
