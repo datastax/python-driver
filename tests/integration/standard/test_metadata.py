@@ -843,8 +843,8 @@ CREATE TABLE export_udts.users (
 
         cluster.connect('test3rf')
 
-        self.assertNotEqual(list(cluster.metadata.get_replicas('test3rf', 'key')), [])
-        host = list(cluster.metadata.get_replicas('test3rf', 'key'))[0]
+        self.assertNotEqual(list(cluster.metadata.get_replicas('test3rf', six.b('key'))), [])
+        host = list(cluster.metadata.get_replicas('test3rf', six.b('key')))[0]
         self.assertEqual(host.datacenter, 'dc1')
         self.assertEqual(host.rack, 'r1')
         cluster.shutdown()
