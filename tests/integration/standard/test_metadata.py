@@ -249,6 +249,9 @@ class SchemaMetadataTests(unittest.TestCase):
         self.check_create_statement(tablemeta, create_statement)
 
     def test_cql_compatibility(self):
+        if CASS_SERVER_VERSION >= (3, 0):
+            raise unittest.SkipTest("cql compatibility does not apply Cassandra 3.0+")
+
         # having more than one non-PK column is okay if there aren't any
         # clustering columns
         create_statement = self.make_create_statement(["a"], [], ["b", "c", "d"], compact=True)
