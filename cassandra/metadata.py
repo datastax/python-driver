@@ -1151,7 +1151,7 @@ class TableMetadata(object):
 
             inner = []
             for col in clustering_key:
-                ordering = "DESC" if issubclass(col.data_type, types.ReversedType) else "ASC"
+                ordering = "DESC" if col.is_reversed else "ASC"
                 inner.append("%s %s" % (protect_name(col.name), ordering))
 
             cluster_str += "(%s)" % ", ".join(inner)
@@ -1264,12 +1264,18 @@ class ColumnMetadata(object):
     be :const:`True`, otherwise :const:`False`.
     """
 
-    def __init__(self, table_metadata, column_name, data_type, index_metadata=None, is_static=False):
+    is_reversed = False
+    """
+    If this column is reversed (DESC) as in clustering order
+    """
+
+    def __init__(self, table_metadata, column_name, data_type, index_metadata=None, is_static=False, is_reversed=False):
         self.table = table_metadata
         self.name = column_name
         self.data_type = data_type
         self.index = index_metadata
         self.is_static = is_static
+        self.is_reversed = is_reversed
 
     @property
     def typestring(self):
@@ -1845,7 +1851,8 @@ class SchemaParserV22(_SchemaParser):
                 else:
                     column_name = "column%d" % i
 
-                col = ColumnMetadata(table_meta, column_name, column_name_types[i])
+                data_type = column_name_types[i]
+                col = ColumnMetadata(table_meta, column_name, data_type, is_reversed=types.is_reversed_casstype(data_type))
                 table_meta.columns[column_name] = col
                 table_meta.clustering_key.append(col)
 
@@ -1914,7 +1921,8 @@ class SchemaParserV22(_SchemaParser):
         name = row["column_name"]
         data_type = types.lookup_casstype(row["validator"])
         is_static = row.get("type", None) == "static"
-        column_meta = ColumnMetadata(table_metadata, name, data_type, is_static=is_static)
+        is_reversed = types.is_reversed_casstype(data_type)
+        column_meta = ColumnMetadata(table_metadata, name, data_type, is_static=is_static, is_reversed=is_reversed)
         return column_meta
 
     @staticmethod
@@ -2196,7 +2204,8 @@ class SchemaParserV3(SchemaParserV22):
         name = row["column_name"]
         data_type = types.lookup_casstype(row["type"])
         is_static = row.get("kind", None) == "static"
-        column_meta = ColumnMetadata(table_metadata, name, data_type, is_static=is_static)
+        is_reversed = row["clustering_order"].upper() == "DESC"
+        column_meta = ColumnMetadata(table_metadata, name, data_type, is_static=is_static, is_reversed=is_reversed)
         return column_meta
 
     @staticmethod
