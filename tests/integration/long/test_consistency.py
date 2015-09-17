@@ -134,7 +134,7 @@ class ConsistencyTests(unittest.TestCase):
         wait_for_up(cluster, 1, wait=False)
         wait_for_up(cluster, 2)
 
-        create_schema(session, keyspace, replication_factor=rf)
+        create_schema(cluster, session, keyspace, replication_factor=rf)
         self._insert(session, keyspace, count=1)
         self._query(session, keyspace, count=1)
         self.coordinator_stats.assert_query_count_equals(self, 1, 0)
@@ -186,7 +186,7 @@ class ConsistencyTests(unittest.TestCase):
         wait_for_up(cluster, 1, wait=False)
         wait_for_up(cluster, 2)
 
-        create_schema(session, keyspace, replication_factor=3)
+        create_schema(cluster, session, keyspace, replication_factor=3)
         self._insert(session, keyspace, count=1)
         self._query(session, keyspace, count=1)
         self.coordinator_stats.assert_query_count_equals(self, 1, 0)
@@ -209,7 +209,7 @@ class ConsistencyTests(unittest.TestCase):
             protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
-        create_schema(session, keyspace, replication_factor=rf)
+        create_schema(cluster, session, keyspace, replication_factor=rf)
         self._insert(session, keyspace, 1)
         self._query(session, keyspace, 1)
         self.coordinator_stats.assert_query_count_equals(self, 1, 0)
@@ -264,7 +264,7 @@ class ConsistencyTests(unittest.TestCase):
     def rfthree_downgradingcl(self, cluster, keyspace, roundrobin):
         session = cluster.connect()
 
-        create_schema(session, keyspace, replication_factor=2)
+        create_schema(cluster, session, keyspace, replication_factor=2)
         self._insert(session, keyspace, count=12)
         self._query(session, keyspace, count=12)
 
