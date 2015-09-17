@@ -688,9 +688,15 @@ class KeyspaceMetadata(object):
                 self.indexes.pop(index_name, None)
             for view_name in table_meta.views:
                 self.views.pop(view_name, None)
+            return
         # we can't tell table drops from views, so drop both
         # (name is unique among them, within a keyspace)
-        self.views.pop(table_name, None)
+        view_meta = self.views.pop(table_name, None)
+        if view_meta:
+            try:
+                self.tables[view_meta.base_table_name].views.pop(table_name, None)
+            except KeyError:
+                pass
 
     def _add_view_metadata(self, view_metadata):
         try:
@@ -1145,7 +1151,7 @@ class TableMetadata(object):
 
             inner = []
             for col in clustering_key:
-                ordering = "DESC" if issubclass(col.data_type, types.ReversedType) else "ASC"
+                ordering = "DESC" if col.is_reversed else "ASC"
                 inner.append("%s %s" % (protect_name(col.name), ordering))
 
             cluster_str += "(%s)" % ", ".join(inner)
@@ -1258,12 +1264,18 @@ class ColumnMetadata(object):
     be :const:`True`, otherwise :const:`False`.
     """
 
-    def __init__(self, table_metadata, column_name, data_type, index_metadata=None, is_static=False):
+    is_reversed = False
+    """
+    If this column is reversed (DESC) as in clustering order
+    """
+
+    def __init__(self, table_metadata, column_name, data_type, index_metadata=None, is_static=False, is_reversed=False):
         self.table = table_metadata
         self.name = column_name
         self.data_type = data_type
         self.index = index_metadata
         self.is_static = is_static
+        self.is_reversed = is_reversed
 
     @property
     def typestring(self):
@@ -1839,7 +1851,8 @@ class SchemaParserV22(_SchemaParser):
                 else:
                     column_name = "column%d" % i
 
-                col = ColumnMetadata(table_meta, column_name, column_name_types[i])
+                data_type = column_name_types[i]
+                col = ColumnMetadata(table_meta, column_name, data_type, is_reversed=types.is_reversed_casstype(data_type))
                 table_meta.columns[column_name] = col
                 table_meta.clustering_key.append(col)
 
@@ -1908,7 +1921,8 @@ class SchemaParserV22(_SchemaParser):
         name = row["column_name"]
         data_type = types.lookup_casstype(row["validator"])
         is_static = row.get("type", None) == "static"
-        column_meta = ColumnMetadata(table_metadata, name, data_type, is_static=is_static)
+        is_reversed = types.is_reversed_casstype(data_type)
+        column_meta = ColumnMetadata(table_metadata, name, data_type, is_static=is_static, is_reversed=is_reversed)
         return column_meta
 
     @staticmethod
@@ -2144,7 +2158,7 @@ class SchemaParserV3(SchemaParserV22):
         partition_rows = [r for r in col_rows
                           if r.get('kind', None) == "partition_key"]
         if len(partition_rows) > 1:
-            partition_rows = sorted(partition_rows, key=lambda row: row.get('component_index'))
+            partition_rows = sorted(partition_rows, key=lambda row: row.get('position'))
         for r in partition_rows:
             # we have to add meta here (and not in the later loop) because TableMetadata.columns is an
             # OrderedDict, and it assumes keys are inserted first, in order, when exporting CQL
@@ -2157,7 +2171,7 @@ class SchemaParserV3(SchemaParserV22):
             clustering_rows = [r for r in col_rows
                                if r.get('kind', None) == "clustering"]
             if len(clustering_rows) > 1:
-                clustering_rows = sorted(clustering_rows, key=lambda row: row.get('component_index'))
+                clustering_rows = sorted(clustering_rows, key=lambda row: row.get('position'))
             for r in clustering_rows:
                 column_meta = self._build_column_metadata(meta, r)
                 meta.columns[column_meta.name] = column_meta
@@ -2190,7 +2204,8 @@ class SchemaParserV3(SchemaParserV22):
         name = row["column_name"]
         data_type = types.lookup_casstype(row["type"])
         is_static = row.get("kind", None) == "static"
-        column_meta = ColumnMetadata(table_metadata, name, data_type, is_static=is_static)
+        is_reversed = row["clustering_order"].upper() == "DESC"
+        column_meta = ColumnMetadata(table_metadata, name, data_type, is_static=is_static, is_reversed=is_reversed)
         return column_meta
 
     @staticmethod
@@ -2429,10 +2444,10 @@ class MaterializedViewMetadata(object):
                "FROM %(keyspace)s.%(base_table)s%(sep)s" \
                "WHERE %(where_clause)s%(sep)s" \
                "PRIMARY KEY %(pk)s%(sep)s" \
-               "WITH %(properties)s;" % locals()
+               "WITH %(properties)s" % locals()
 
     def export_as_string(self):
-        return self.as_cql_query(formatted=True)
+        return self.as_cql_query(formatted=True) + ";"
 
 
 def get_schema_parser(connection, timeout):
