@@ -2639,9 +2639,11 @@ class ControlConnection(object):
 
         versions = defaultdict(set)
         if local_result.results:
-            local_row = dict_factory(*local_result.results)[0]
-            if local_row.get("schema_version"):
-                versions[local_row.get("schema_version")].add(local_address)
+            local_row = dict_factory(*local_result.results)
+            if local_row:
+                local_row = local_row[0]
+                if local_row.get("schema_version"):
+                    versions[local_row.get("schema_version")].add(local_address)
 
         for row in peers_result:
             schema_ver = row.get('schema_version')

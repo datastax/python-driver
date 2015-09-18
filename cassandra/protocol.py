@@ -580,16 +580,33 @@ class ResultMessage(_MessageType):
         return cls(kind, results, paging_state)
 
     @classmethod
+    def _get_parsed_rows(cls, column_metadata, coltypes, f, protocol_version):
+        rowcount = read_int(f)
+        column_length = len(column_metadata)
+        for i in range(rowcount):
+            row = cls.recv_row(f, column_length)
+            yield tuple(
+                ctype.from_binary(val, protocol_version)
+                for ctype, val in zip(coltypes, row)
+            )
+
+    @classmethod
     def recv_results_rows(cls, f, protocol_version, user_type_map):
         paging_state, column_metadata = cls.recv_results_metadata(f, user_type_map)
-        rowcount = read_int(f)
-        rows = [cls.recv_row(f, len(column_metadata)) for _ in range(rowcount)]
-        colnames = [c[2] for c in column_metadata]
-        coltypes = [c[3] for c in column_metadata]
-        parsed_rows = [
-            tuple(ctype.from_binary(val, protocol_version)
-                  for ctype, val in zip(coltypes, row))
-            for row in rows]
+        colnames = []
+        coltypes = []
+
+        for c in column_metadata:
+            colnames.append(c[2])
+            coltypes.append(c[3])
+
+        parsed_rows = cls._get_parsed_rows(
+            column_metadata,
+            coltypes,
+            f,
+            protocol_version
+        )
+
         return (paging_state, (colnames, parsed_rows))
 
     @classmethod
