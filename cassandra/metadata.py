@@ -2292,8 +2292,9 @@ class TableMetadataV3(TableMetadata):
 
         for option in cls.option_maps:
             value = options_copy.pop(option, {})
-            params = ("'%s': '%s'" % (k, v) for k, v in value.items())
-            ret.append("%s = {%s}" % (option, ', '.join(params)))
+            if value:
+                params = ("'%s': '%s'" % (k, v) for k, v in value.items())
+                ret.append("%s = {%s}" % (option, ', '.join(params)))
 
         for name, value in options_copy.items():
             if value is not None:

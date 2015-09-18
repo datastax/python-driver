@@ -211,7 +211,7 @@ def sync_table(model):
     # check for an existing column family
     if raw_cf_name not in tables:
         log.debug("sync_table creating new table %s", cf_name)
-        qs = get_create_table(model)
+        qs = _get_create_table(model)
 
         try:
             execute(qs)
@@ -223,8 +223,7 @@ def sync_table(model):
     else:
         log.debug("sync_table checking existing table %s", cf_name)
         # see if we're missing any columns
-        fields = get_fields(model)
-        field_names = [x.name for x in fields]
+        field_names = _get_non_pk_field_names(tables[raw_cf_name])
         model_fields = set()
         # # TODO: does this work with db_name??
         for name, col in model._columns.items():
@@ -242,7 +241,7 @@ def sync_table(model):
         if db_fields_not_in_model:
             log.info("Table %s has fields not referenced by model: %s", cf_name, db_fields_not_in_model)
 
-        update_compaction(model)
+        _update_options(model)
 
     table = cluster.metadata.keyspaces[ks_name].tables[raw_cf_name]
 
@@ -331,9 +330,14 @@ def get_create_type(type_model, keyspace):
     return type_meta.as_cql_query()
 
 
-def get_create_table(model):
-    cf_name = model.column_family_name()
-    qs = ['CREATE TABLE {0}'.format(cf_name)]
+def _get_create_table(model):
+    ks_table_name = model.column_family_name()
+    query_strings = ['CREATE TABLE {0}'.format(ks_table_name)]
+
+    # Need to use an existing table to make sure we're using the right
+    # metadata class
+    cluster = get_cluster()
+    existing_meta = cluster.metadata.keyspaces['system'].tables['local']
 
     # add column types
     pkeys = []  # primary keys
@@ -352,102 +356,30 @@ def get_create_table(model):
 
     qtypes.append('PRIMARY KEY (({0}){1})'.format(', '.join(pkeys), ckeys and ', ' + ', '.join(ckeys) or ''))
 
-    qs += ['({0})'.format(', '.join(qtypes))]
+    query_strings += ['({0})'.format(', '.join(qtypes))]
 
-    with_qs = []
-
-    table_properties = ['bloom_filter_fp_chance', 'caching', 'comment',
-                        'dclocal_read_repair_chance', 'default_time_to_live', 'gc_grace_seconds',
-                        'index_interval', 'memtable_flush_period_in_ms', 'populate_io_cache_on_flush',
-                        'read_repair_chance', 'replicate_on_write']
-    for prop_name in table_properties:
-        prop_value = getattr(model, '__{0}__'.format(prop_name), None)
-        if prop_value is not None:
-            # Strings needs to be single quoted
-            if isinstance(prop_value, six.string_types):
-                prop_value = "'{0}'".format(prop_value)
-            with_qs.append("{0} = {1}".format(prop_name, prop_value))
+    property_strings = []
 
     _order = ['"{0}" {1}'.format(c.db_field_name, c.clustering_order or 'ASC') for c in model._clustering_keys.values()]
     if _order:
-        with_qs.append('clustering order by ({0})'.format(', '.join(_order)))
+        property_strings.append('CLUSTERING ORDER BY ({0})'.format(', '.join(_order)))
 
-    compaction_options = get_compaction_options(model)
-    if compaction_options:
-        compaction_options = json.dumps(compaction_options).replace('"', "'")
-        with_qs.append("compaction = {0}".format(compaction_options))
+    property_strings += existing_meta._make_option_strings(model.__options__ or {})
 
-    # Add table properties.
-    if with_qs:
-        qs += ['WITH {0}'.format(' AND '.join(with_qs))]
+    if property_strings:
+        query_strings += ['WITH {0}'.format(' AND '.join(property_strings))]
 
-    qs = ' '.join(qs)
-    return qs
+    return ' '.join(query_strings)
 
 
-def get_compaction_options(model):
-    """
-    Generates dictionary (later converted to a string) for creating and altering
-    tables with compaction strategy
-
-    :param model:
-    :return:
-    """
-    if not model.__compaction__:
-        return {}
-
-    result = {'class': model.__compaction__}
-
-    def setter(key, limited_to_strategy=None):
-        """
-        sets key in result, checking if the key is limited to either SizeTiered or Leveled
-        :param key: one of the compaction options, like "bucket_high"
-        :param limited_to_strategy: SizeTieredCompactionStrategy, LeveledCompactionStrategy
-        :return:
-        """
-        mkey = "__compaction_{0}__".format(key)
-        tmp = getattr(model, mkey)
-        if tmp and limited_to_strategy and limited_to_strategy != model.__compaction__:
-            raise CQLEngineException("{0} is limited to {1}".format(key, limited_to_strategy))
-
-        if tmp:
-            # Explicitly cast the values to strings to be able to compare the
-            # values against introspected values from Cassandra.
-            result[key] = str(tmp)
-
-    setter('tombstone_compaction_interval')
-    setter('tombstone_threshold')
-
-    setter('bucket_high', SizeTieredCompactionStrategy)
-    setter('bucket_low', SizeTieredCompactionStrategy)
-    setter('max_threshold', SizeTieredCompactionStrategy)
-    setter('min_threshold', SizeTieredCompactionStrategy)
-    setter('min_sstable_size', SizeTieredCompactionStrategy)
-
-    setter('sstable_size_in_mb', LeveledCompactionStrategy)
-
-    return result
-
-
-def get_fields(model):
+def _get_non_pk_field_names(table_meta):
     # returns all fields that aren't part of the PK
-    ks_name = model._get_keyspace()
-    col_family = model._raw_column_family_name()
-    field_types = ['regular', 'static']
-    query = "select * from system.schema_columns where keyspace_name = %s and columnfamily_name = %s"
-    tmp = execute(query, [ks_name, col_family])
-
-    # Tables containing only primary keys do not appear to create
-    # any entries in system.schema_columns, as only non-primary-key attributes
-    # appear to be inserted into the schema_columns table
-    try:
-        return [Field(x['column_name'], x['validator']) for x in tmp if x['type'] in field_types]
-    except KeyError:
-        return [Field(x['column_name'], x['validator']) for x in tmp]
-    # convert to Field named tuples
+    pk_names = set(col.name for col in table_meta.primary_key)
+    field_names = [name for name in table_meta.columns.keys() if name not in pk_names]
+    return field_names
 
 
-def get_table_settings(model):
+def _get_table_metadata(model):
     # returns the table as provided by the native driver for a given model
     cluster = get_cluster()
     ks = model._get_keyspace()
@@ -456,47 +388,26 @@ def get_table_settings(model):
     return table
 
 
-def update_compaction(model):
-    """Updates the compaction options for the given model if necessary.
+def _update_options(model):
+    """Updates the table options for the given model if necessary.
 
     :param model: The model to update.
 
-    :return: `True`, if the compaction options were modified in Cassandra,
+    :return: `True`, if the options were modified in Cassandra,
         `False` otherwise.
     :rtype: bool
     """
-    log.debug("Checking %s for compaction differences", model)
-    table = get_table_settings(model)
+    log.debug("Checking %s for option differences", model)
+    table_meta = _get_table_metadata(model)
+    existing_options = table_meta.options
 
-    existing_options = table.options.copy()
+    model_options = model.__options__ or {}
+    update_options = dict((k, v) for k, v in model_options if existing_options[k] != v)
 
-    existing_compaction_strategy = existing_options['compaction_strategy_class']
-
-    existing_options = json.loads(existing_options['compaction_strategy_options'])
-
-    desired_options = get_compaction_options(model)
-
-    desired_compact_strategy = desired_options.get('class', SizeTieredCompactionStrategy)
-
-    desired_options.pop('class', None)
-
-    do_update = False
-
-    if desired_compact_strategy not in existing_compaction_strategy:
-        do_update = True
-
-    for k, v in desired_options.items():
-        val = existing_options.pop(k, None)
-        if val != v:
-            do_update = True
-
-    # check compaction_strategy_options
-    if do_update:
-        options = get_compaction_options(model)
-        # jsonify
-        options = json.dumps(options).replace('"', "'")
-        cf_name = model.column_family_name()
-        query = "ALTER TABLE {0} with compaction = {1}".format(cf_name, options)
+    if update_options:
+        option_strings = table_meta._make_option_strings(update_options)
+        options = ' AND '.join(option_strings)
+        query = "ALTER TABLE {0} WITH {1}".format(model.column_family_name(), options)
         execute(query)
         return True
 
