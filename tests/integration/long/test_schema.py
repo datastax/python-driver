@@ -54,9 +54,7 @@ class SchemaTests(unittest.TestCase):
             for keyspace_number in range(5):
                 keyspace = "ks_{0}".format(keyspace_number)
 
-                results = execute_until_pass(session, "SELECT keyspace_name FROM system.schema_keyspaces")
-                existing_keyspaces = [row[0] for row in results]
-                if keyspace in existing_keyspaces:
+                if keyspace in self.cluster.metadata.keyspaces.keys():
                     drop = "DROP KEYSPACE {0}".format(keyspace)
                     log.debug(drop)
                     execute_until_pass(session, drop)
