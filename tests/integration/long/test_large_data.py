@@ -66,7 +66,7 @@ class LargeDataTests(unittest.TestCase):
         session.default_timeout = 20.0  # increase the default timeout
         session.row_factory = dict_factory
 
-        create_schema(session, self.keyspace)
+        create_schema(cluster, session, self.keyspace)
         return session
 
     def batch_futures(self, session, statement_generator):

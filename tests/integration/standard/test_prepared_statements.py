@@ -23,6 +23,7 @@ from cassandra import InvalidRequest
 
 from cassandra.cluster import Cluster
 from cassandra.query import PreparedStatement, UNSET_VALUE
+from tests.integration import get_server_versions
 
 
 def setup_module():
@@ -30,6 +31,10 @@ def setup_module():
 
 
 class PreparedStatementTests(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.cass_version = get_server_versions()
 
     def test_basic(self):
         """
@@ -111,17 +116,20 @@ class PreparedStatementTests(unittest.TestCase):
 
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
-
-        prepared = session.prepare(
-            """
-            INSERT INTO test3rf.test (v) VALUES  (?)
-            """)
-
-        self.assertIsInstance(prepared, PreparedStatement)
-        bound = prepared.bind((1,))
-        self.assertRaises(InvalidRequest, session.execute, bound)
+        self._run_missing_primary_key(session)
 
         cluster.shutdown()
+
+    def _run_missing_primary_key(self, session):
+        statement_to_prepare = """INSERT INTO test3rf.test (v) VALUES  (?)"""
+        # logic needed work with changes in CASSANDRA-6237
+        if self.cass_version[0] >= (3, 0, 0):
+            self.assertRaises(InvalidRequest, session.prepare, statement_to_prepare)
+        else:
+            prepared = session.prepare(statement_to_prepare)
+            self.assertIsInstance(prepared, PreparedStatement)
+            bound = prepared.bind((1,))
+            self.assertRaises(InvalidRequest, session.execute, bound)
 
     def test_missing_primary_key_dicts(self):
         """
@@ -132,35 +140,38 @@ class PreparedStatementTests(unittest.TestCase):
 
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
-
-        prepared = session.prepare(
-            """
-            INSERT INTO test3rf.test (v) VALUES  (?)
-            """)
-
-        self.assertIsInstance(prepared, PreparedStatement)
-        bound = prepared.bind({'v': 1})
-        self.assertRaises(InvalidRequest, session.execute, bound)
-
+        self._run_missing_primary_key_dicts(session)
         cluster.shutdown()
+
+    def _run_missing_primary_key_dicts(self, session):
+        statement_to_prepare = """ INSERT INTO test3rf.test (v) VALUES  (?)"""
+        # logic needed work with changes in CASSANDRA-6237
+        if self.cass_version[0] >= (3, 0, 0):
+            self.assertRaises(InvalidRequest, session.prepare, statement_to_prepare)
+        else:
+            prepared = session.prepare(statement_to_prepare)
+            self.assertIsInstance(prepared, PreparedStatement)
+            bound = prepared.bind({'v': 1})
+            self.assertRaises(InvalidRequest, session.execute, bound)
 
     def test_too_many_bind_values(self):
         """
         Ensure a ValueError is thrown when attempting to bind too many variables
         """
-
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
-
-        prepared = session.prepare(
-            """
-            INSERT INTO test3rf.test (v) VALUES  (?)
-            """)
-
-        self.assertIsInstance(prepared, PreparedStatement)
-        self.assertRaises(ValueError, prepared.bind, (1, 2))
-
+        self._run_too_many_bind_values(session)
         cluster.shutdown()
+
+    def _run_too_many_bind_values(self, session):
+        statement_to_prepare = """ INSERT INTO test3rf.test (v) VALUES  (?)"""
+         # logic needed work with changes in CASSANDRA-6237
+        if self.cass_version[0] >= (3, 0, 0):
+            self.assertRaises(InvalidRequest, session.prepare, statement_to_prepare)
+        else:
+            prepared = session.prepare(statement_to_prepare)
+            self.assertIsInstance(prepared, PreparedStatement)
+            self.assertRaises(ValueError, prepared.bind, (1, 2))
 
     def test_too_many_bind_values_dicts(self):
         """

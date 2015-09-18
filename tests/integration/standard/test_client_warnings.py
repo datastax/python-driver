@@ -44,7 +44,7 @@ class ClientWarningTests(unittest.TestCase):
         cls.warn_batch = BatchStatement()
         # 213 = 5 * 1024 / (4+4 + 4+4 + 4+4)
         #        thresh_kb/ (min param size)
-        for x in range(213):
+        for x in range(214):
             cls.warn_batch.add(cls.prepared, (x, x, 1))
 
     @classmethod

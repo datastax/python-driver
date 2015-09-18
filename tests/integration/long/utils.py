@@ -55,15 +55,12 @@ class CoordinatorStats():
                 expected, ip, self.coordinator_counts[ip], dict(self.coordinator_counts)))
 
 
-def create_schema(session, keyspace, simple_strategy=True,
+def create_schema(cluster, session, keyspace, simple_strategy=True,
                   replication_factor=1, replication_strategy=None):
     row_factory = session.row_factory
     session.row_factory = named_tuple_factory
 
-    results = session.execute(
-        'SELECT keyspace_name FROM system.schema_keyspaces')
-    existing_keyspaces = [row[0] for row in results]
-    if keyspace in existing_keyspaces:
+    if keyspace in cluster.metadata.keyspaces.keys():
         session.execute('DROP KEYSPACE %s' % keyspace, timeout=20)
 
     if simple_strategy:

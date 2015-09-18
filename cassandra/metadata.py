@@ -2057,6 +2057,7 @@ class SchemaParserV3(SchemaParserV22):
         'comment',
         'compaction',
         'compression',
+        'crc_check_chance',
         'dclocal_read_repair_chance',
         'default_time_to_live',
         'gc_grace_seconds',
