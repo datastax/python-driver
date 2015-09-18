@@ -492,7 +492,7 @@ class SchemaMetadataTests(unittest.TestCase):
 
         cluster2.shutdown()
 
-    def test_refresh_table_metatadata(self):
+    def test_refresh_table_metadata(self):
         """
         test for synchronously refreshing table metadata
 
@@ -521,6 +521,44 @@ class SchemaMetadataTests(unittest.TestCase):
 
         cluster2.refresh_table_metadata(self.ksname, table_name)
         self.assertIn("c", cluster2.metadata.keyspaces[self.ksname].tables[table_name].columns)
+
+        cluster2.shutdown()
+
+    def test_refresh_table_metadata_for_materialized_views(self):
+        """
+        test for synchronously refreshing materialized view metadata
+
+        test_refresh_table_metadata_for_materialized_views tests that materialized view metadata is refreshed when calling
+        test_refresh_table_metatadata() with the materialized view name as the table. It creates a second cluster object
+        with schema_event_refresh_window=-1 such that schema refreshes are disabled for schema change push events.
+        It then creates a new materialized view , using the first cluster object, and verifies that the materialized view
+        metadata has not changed in the second cluster object. Finally, it calls test_refresh_table_metatadata() with the
+        materialized view name as the table name, and verifies that the materialized view metadata is updated in the
+        second cluster object.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-371
+        @expected_result Materialized view metadata should be refreshed when refresh_table_metadata() is called.
+
+        @test_category metadata
+        """
+
+        if CASS_SERVER_VERSION < (3, 0):
+            raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
+
+        table_name = "test"
+        self.session.execute("CREATE TABLE {0}.{1} (a int PRIMARY KEY, b text)".format(self.ksname, table_name))
+
+        cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
+        cluster2.connect()
+
+        self.assertNotIn("mv1", cluster2.metadata.keyspaces[self.ksname].tables[table_name].views)
+        self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT b FROM {0}.{1} WHERE b IS NOT NULL PRIMARY KEY (a, b)"
+                             .format(self.ksname, table_name))
+        self.assertNotIn("mv1", cluster2.metadata.keyspaces[self.ksname].tables[table_name].views)
+
+        cluster2.refresh_table_metadata(self.ksname, "mv1")
+        self.assertIn("mv1", cluster2.metadata.keyspaces[self.ksname].tables[table_name].views)
 
         cluster2.shutdown()
 
@@ -1840,3 +1878,97 @@ class BadMetaTest(unittest.TestCase):
             m = self.cluster.metadata.keyspaces[self.keyspace_name]
             self.assertIs(m._exc_info[0], self.BadMetaException)
             self.assertIn("/*\nWarning:", m.export_as_string())
+
+class MaterializedViewMetadataTest(unittest.TestCase):
+
+    ksname = "materialized_view_test"
+
+    def setUp(self):
+        if CASS_SERVER_VERSION < (3, 0):
+            raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
+
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.session = self.cluster.connect()
+        execute_until_pass(self.session,
+                           "CREATE KEYSPACE {0} WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': '1'}}"
+                           .format(self.ksname))
+
+    def tearDown(self):
+        execute_until_pass(self.session, "DROP KEYSPACE {0}".format(self.ksname))
+        self.cluster.shutdown()
+
+    def test_materialized_view_metadata_creation(self):
+        """
+        test for materialized view metadata creation
+
+        test_materialized_view_metadata_creation tests that materialized view metadata properly created implicitly in
+        both keyspace and table metadata under "views". It creates a simple base table and then creates a view based
+        on that table. It then checks that the materialized view metadata is contained in the keyspace and table
+        metadata. Finally, it checks that the keyspace_name and the base_table_name in the view metadata is properly set.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-371
+        @expected_result Materialized view metadata in both the ks and table should be created with a new view is created.
+
+        @test_category metadata
+        """
+
+        self.session.execute("CREATE TABLE {0}.table1 (pk int PRIMARY KEY, c int)".format(self.ksname))
+        self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT c FROM {0}.table1 WHERE c IS NOT NULL PRIMARY KEY (pk, c)".format(self.ksname))
+
+        self.assertIn("mv1", self.cluster.metadata.keyspaces[self.ksname].views)
+        self.assertIn("mv1", self.cluster.metadata.keyspaces[self.ksname].tables["table1"].views)
+
+        self.assertEqual(self.ksname, self.cluster.metadata.keyspaces[self.ksname].tables["table1"].views["mv1"].keyspace_name)
+        self.assertEqual("table1", self.cluster.metadata.keyspaces[self.ksname].tables["table1"].views["mv1"].base_table_name)
+
+    def test_materialized_view_metadata_alter(self):
+        """
+        test for materialized view metadata alteration
+
+        test_materialized_view_metadata_alter tests that materialized view metadata is properly updated implicitly in the
+        table metadata once that view is updated. It creates a simple base table and then creates a view based
+        on that table. It then alters that materalized view and checks that the materialized view metadata is altered in
+        the table metadata.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-371
+        @expected_result Materialized view metadata should be updated with the view is altered.
+
+        @test_category metadata
+        """
+
+        self.session.execute("CREATE TABLE {0}.table1 (pk int PRIMARY KEY, c int)".format(self.ksname))
+        self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT c FROM {0}.table1 WHERE c IS NOT NULL PRIMARY KEY (pk, c)".format(self.ksname))
+
+        self.assertRegex(self.cluster.metadata.keyspaces[self.ksname].tables["table1"].views["mv1"].options["compaction"]["class"],
+                         "SizeTieredCompactionStrategy")
+
+        self.session.execute("ALTER MATERIALIZED VIEW {0}.mv1 WITH compaction = {{ 'class' : 'LeveledCompactionStrategy' }}".format(self.ksname))
+        self.assertRegex(self.cluster.metadata.keyspaces[self.ksname].tables["table1"].views["mv1"].options["compaction"]["class"],
+                         "LeveledCompactionStrategy")
+
+    def test_materialized_view_metadata_drop(self):
+        """
+        test for materialized view metadata dropping
+
+        test_materialized_view_metadata_drop tests that materialized view metadata is properly removed implicitly in
+        both keyspace and table metadata once that view is dropped. It creates a simple base table and then creates a view
+        based on that table. It then drops that materalized view and checks that the materialized view metadata is removed
+        from the keyspace and table metadata.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-371
+        @expected_result Materialized view metadata in both the ks and table should be removed with the view is dropped.
+
+        @test_category metadata
+        """
+
+        self.session.execute("CREATE TABLE {0}.table1 (pk int PRIMARY KEY, c int)".format(self.ksname))
+        self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT c FROM {0}.table1 WHERE c IS NOT NULL PRIMARY KEY (pk, c)".format(self.ksname))
+        self.session.execute("DROP MATERIALIZED VIEW {0}.mv1".format(self.ksname))
+
+        self.assertNotIn("mv1", self.cluster.metadata.keyspaces[self.ksname].tables["table1"].views)
+        self.assertNotIn("mv1", self.cluster.metadata.keyspaces[self.ksname].views)
+        self.assertDictEqual({}, self.cluster.metadata.keyspaces[self.ksname].tables["table1"].views)
+        self.assertDictEqual({}, self.cluster.metadata.keyspaces[self.ksname].views)
