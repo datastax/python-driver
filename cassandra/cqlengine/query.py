@@ -40,7 +40,17 @@ class IfNotExistsWithCounterColumn(CQLEngineException):
 
 
 class LWTException(CQLEngineException):
-    pass
+    """Lightweight transaction exception.
+
+    This exception will be raised when a write using an `IF` clause could not be
+    applied due to existing data violating the condition. The existing data is
+    available through the ``existing`` attribute.
+
+    :param existing: The current state of the data which prevented the write.
+    """
+    def __init__(self, existing):
+        super(LWTException, self).__init__(self)
+        self.existing = existing
 
 
 class DoesNotExist(QueryException):
@@ -58,7 +68,7 @@ def check_applied(result):
     applied to database.
     """
     if result and '[applied]' in result[0] and not result[0]['[applied]']:
-        raise LWTException('')
+        raise LWTException(result[0])
 
 
 class AbstractQueryableColumn(UnicodeMixin):

@@ -40,3 +40,4 @@ The methods here are used to filter, order, and constrain results.
 
 .. autoclass:: MultipleObjectsReturned
 
+.. autoclass:: LWTException
