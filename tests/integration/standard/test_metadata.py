@@ -1879,6 +1879,7 @@ class BadMetaTest(unittest.TestCase):
             self.assertIs(m._exc_info[0], self.BadMetaException)
             self.assertIn("/*\nWarning:", m.export_as_string())
 
+
 class MaterializedViewMetadataTest(unittest.TestCase):
 
     ksname = "materialized_view_test"
@@ -1972,3 +1973,197 @@ class MaterializedViewMetadataTest(unittest.TestCase):
         self.assertNotIn("mv1", self.cluster.metadata.keyspaces[self.ksname].views)
         self.assertDictEqual({}, self.cluster.metadata.keyspaces[self.ksname].tables["table1"].views)
         self.assertDictEqual({}, self.cluster.metadata.keyspaces[self.ksname].views)
+
+    def test_create_view_metadata(self):
+        """
+        test to ensure that materialized view metadata is properly constructed
+
+        test_create_view_metadata tests that materialized views metadata is properly constructed. It runs a simple
+        query to construct a materialized view, then proceeds to inspect the metadata associated with that MV.
+        Columns are inspected to insure that all are of the proper type, and in the proper type.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-371
+        @expected_result Materialized view metadata should be constructed appropriately.
+
+        @test_category metadata
+        """
+        create_table = """CREATE TABLE {0}.scores(
+                        user TEXT,
+                        game TEXT,
+                        year INT,
+                        month INT,
+                        day INT,
+                        score INT,
+                        PRIMARY KEY (user, game, year, month, day)
+                        )""".format(self.ksname)
+
+        self.session.execute(create_table)
+
+        create_mv = """CREATE MATERIALIZED VIEW {0}.monthlyhigh AS
+                        SELECT game, year, month, score, user, day FROM {0}.scores
+                        WHERE game IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL AND day IS NOT NULL
+                        PRIMARY KEY ((game, year, month), score, user, day)
+                        WITH CLUSTERING ORDER BY (score DESC, user ASC, day ASC)""".format(self.ksname)
+
+        self.session.execute(create_mv)
+        score_table = self.cluster.metadata.keyspaces[self.ksname].tables['scores']
+        mv = self.cluster.metadata.keyspaces[self.ksname].views['monthlyhigh']
+
+        self.assertIsNotNone(score_table.views["monthlyhigh"])
+        self.assertIsNotNone(len(score_table.views), 1)
+
+        # Make sure user is a partition key, and not null
+        self.assertEqual(len(score_table.partition_key), 1)
+        self.assertIsNotNone(score_table.columns['user'])
+        self.assertTrue(score_table.columns['user'], score_table.partition_key[0])
+
+        # Validate clustering keys
+        self.assertEqual(len(score_table.clustering_key), 4)
+
+        self.assertIsNotNone(score_table.columns['game'])
+        self.assertTrue(score_table.columns['game'], score_table.clustering_key[0])
+
+        self.assertIsNotNone(score_table.columns['year'])
+        self.assertTrue(score_table.columns['year'], score_table.clustering_key[1])
+
+        self.assertIsNotNone(score_table.columns['month'])
+        self.assertTrue(score_table.columns['month'], score_table.clustering_key[2])
+
+        self.assertIsNotNone(score_table.columns['day'])
+        self.assertTrue(score_table.columns['day'], score_table.clustering_key[3])
+
+        self.assertIsNotNone(score_table.columns['score'])
+
+        # Validate basic mv information
+        self.assertEquals(mv.keyspace_name, self.ksname)
+        self.assertEquals(mv.name, "monthlyhigh")
+        self.assertEquals(mv.base_table_name, "scores")
+        self.assertFalse(mv.include_all_columns)
+
+        # Validate that all columns are preset and correct
+        mv_columns = mv.columns.values()
+        self.assertEquals(len(mv_columns), 6)
+
+        game_column = mv_columns[0]
+        self.assertIsNotNone(game_column)
+        self.assertEquals(game_column.name, 'game')
+        self.assertEquals(game_column, mv.partition_key[0])
+
+        year_column = mv_columns[1]
+        self.assertIsNotNone(year_column)
+        self.assertEquals(year_column.name, 'year')
+        self.assertEquals(year_column, mv.partition_key[1])
+
+        month_column = mv_columns[2]
+        self.assertIsNotNone(month_column)
+        self.assertEquals(month_column.name, 'month')
+        self.assertEquals(month_column, mv.partition_key[2])
+
+        score_column = mv_columns[3]
+        self.assertIsNotNone(score_column)
+        self.assertEquals(score_column.name, 'score')
+        self.assertEquals(score_column.name, mv.clustering_key[0].name)
+        self.assertEquals(score_column.table, mv.clustering_key[0].table)
+        self.assertEquals(score_column.data_type, mv.clustering_key[0].data_type)
+        self.assertEquals(score_column.index, mv.clustering_key[0].index)
+        self.assertEquals(score_column.is_static, mv.clustering_key[0].is_static)
+        self.assertEquals(score_column.is_reversed, mv.clustering_key[0].is_reversed)
+
+        user_column = mv_columns[4]
+        self.assertIsNotNone(user_column)
+        self.assertEquals(user_column.name, 'user')
+        self.assertEquals(user_column.name, mv.clustering_key[1].name)
+        self.assertEquals(user_column.table, mv.clustering_key[1].table)
+        self.assertEquals(user_column.data_type, mv.clustering_key[1].data_type)
+        self.assertEquals(user_column.index, mv.clustering_key[1].index)
+        self.assertEquals(user_column.is_static, mv.clustering_key[1].is_static)
+        self.assertEquals(user_column.is_reversed, mv.clustering_key[1].is_reversed)
+
+        day_column = mv_columns[5]
+        self.assertIsNotNone(day_column)
+        self.assertEquals(day_column.name, 'day')
+        self.assertEquals(day_column.name, mv.clustering_key[2].name)
+        self.assertEquals(day_column.table, mv.clustering_key[2].table)
+        self.assertEquals(day_column.data_type, mv.clustering_key[2].data_type)
+        self.assertEquals(day_column.index, mv.clustering_key[2].index)
+        self.assertEquals(day_column.is_static, mv.clustering_key[2].is_static)
+        self.assertEquals(day_column.is_reversed, mv.clustering_key[2].is_reversed)
+
+    def test_metadata_with_quoted_identifiers(self):
+        """
+        test to ensure that materialized view metadata is properly constructed when quoted identifiers are used
+
+        test_metadata_with_quoted_identifiers tests that materialized views metadata is properly constructed.
+        It runs a simple query to construct a materialized view, then proceeds to inspect the metadata associated with
+        that MV. The caveat here is that the tables and the materialized view both have quoted identifiers
+        Columns are inspected to insure that all are of the proper type, and in the proper type.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-371
+        @expected_result Materialized view metadata should be constructed appropriately even with quoted identifiers.
+
+        @test_category metadata
+        """
+        create_table = """CREATE TABLE {0}.t1 (
+                        "theKey" int,
+                        "the;Clustering" int,
+                        "the Value" int,
+                        PRIMARY KEY ("theKey", "the;Clustering"))""".format(self.ksname)
+
+        self.session.execute(create_table)
+
+        create_mv = """CREATE MATERIALIZED VIEW {0}.mv1 AS
+                    SELECT "theKey", "the;Clustering", "the Value"
+                    FROM {0}.t1
+                    WHERE "theKey" IS NOT NULL AND "the;Clustering" IS NOT NULL AND "the Value" IS NOT NULL
+                    PRIMARY KEY ("theKey", "the;Clustering")""".format(self.ksname)
+
+        self.session.execute(create_mv)
+
+        t1_table = self.cluster.metadata.keyspaces[self.ksname].tables['t1']
+        mv = self.cluster.metadata.keyspaces[self.ksname].views['mv1']
+
+        self.assertIsNotNone(t1_table.views["mv1"])
+        self.assertIsNotNone(len(t1_table.views), 1)
+
+        # Validate partition key, and not null
+        self.assertEqual(len(t1_table.partition_key), 1)
+        self.assertIsNotNone(t1_table.columns['theKey'])
+        self.assertTrue(t1_table.columns['theKey'], t1_table.partition_key[0])
+
+        # Validate clustering key column
+        self.assertEqual(len(t1_table.clustering_key), 1)
+        self.assertIsNotNone(t1_table.columns['the;Clustering'])
+        self.assertTrue(t1_table.columns['the;Clustering'], t1_table.clustering_key[0])
+
+        # Validate regular column
+        self.assertIsNotNone(t1_table.columns['the Value'])
+
+        # Validate basic mv information
+        self.assertEquals(mv.keyspace_name, self.ksname)
+        self.assertEquals(mv.name, "mv1")
+        self.assertEquals(mv.base_table_name, "t1")
+        self.assertFalse(mv.include_all_columns)
+
+        # Validate that all columns are preset and correct
+        mv_columns = mv.columns.values()
+        self.assertEquals(len(mv_columns), 3)
+
+        theKey_column = mv_columns[0]
+        self.assertIsNotNone(theKey_column)
+        self.assertEquals(theKey_column.name, 'theKey')
+        self.assertEquals(theKey_column, mv.partition_key[0])
+
+        cluster_column = mv_columns[1]
+        self.assertIsNotNone(cluster_column)
+        self.assertEquals(cluster_column.name, 'the;Clustering')
+        self.assertEquals(cluster_column.name, mv.clustering_key[0].name)
+        self.assertEquals(cluster_column.table, mv.clustering_key[0].table)
+        self.assertEquals(cluster_column.index, mv.clustering_key[0].index)
+        self.assertEquals(cluster_column.is_static, mv.clustering_key[0].is_static)
+        self.assertEquals(cluster_column.is_reversed, mv.clustering_key[0].is_reversed)
+
+        value_column = mv_columns[2]
+        self.assertIsNotNone(value_column)
+        self.assertEquals(value_column.name, 'the Value')
