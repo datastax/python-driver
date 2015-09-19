@@ -1804,14 +1804,14 @@ class BadMetaTest(unittest.TestCase):
         cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         cls.keyspace_name = cls.__name__.lower()
         cls.session = cls.cluster.connect()
-        cls.session.execute("CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}" % cls.keyspace_name)
+        cls.session.execute("CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}" % cls.keyspace_name)
         cls.session.set_keyspace(cls.keyspace_name)
         connection = cls.cluster.control_connection._connection
         cls.parser_class = get_schema_parser(connection, timeout=20).__class__
 
     @classmethod
     def teardown_class(cls):
-        cls.session.execute("DROP KEYSPACE IF EXISTS %s" % cls.keyspace_name)
+        cls.session.execute("DROP KEYSPACE %s" % cls.keyspace_name)
         cls.cluster.shutdown()
 
     def _skip_if_not_version(self, version):
