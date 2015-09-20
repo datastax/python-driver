@@ -59,7 +59,7 @@ def get_server_versions():
     if cass_version is not None:
         return (cass_version, cql_version)
 
-    c = Cluster()
+    c = Cluster(protocol_version=1)
     s = c.connect()
     row = s.execute('SELECT cql_version, release_version FROM system.local')[0]
 
