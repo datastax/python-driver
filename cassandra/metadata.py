@@ -2193,9 +2193,10 @@ class SchemaParserV3(SchemaParserV22):
         view_name = row["view_name"]
         base_table_name = row["base_table_name"]
         include_all_columns = row["include_all_columns"]
+        where_clause = row["where_clause"]
         col_rows = col_rows or self.keyspace_table_col_rows[keyspace_name][view_name]
         view_meta = MaterializedViewMetadata(keyspace_name, view_name, base_table_name,
-                                             include_all_columns, self._build_table_options(row))
+                                             include_all_columns, where_clause, self._build_table_options(row))
         self._build_table_columns(view_meta, col_rows)
 
         return view_meta
@@ -2396,8 +2397,11 @@ class MaterializedViewMetadata(object):
     A dict mapping column names to :class:`.ColumnMetadata` instances.
     """
 
-    include_all_columns = False
+    include_all_columns = None
     """ A flag indicating whether the view was created AS SELECT * """
+
+    where_clause = None
+    """ String WHERE clause for the view select statement. From server metadata """
 
     options = None
     """
@@ -2405,7 +2409,7 @@ class MaterializedViewMetadata(object):
     view.
     """
 
-    def __init__(self, keyspace_name, view_name, base_table_name, include_all_columns, options):
+    def __init__(self, keyspace_name, view_name, base_table_name, include_all_columns, where_clause, options):
         self.keyspace_name = keyspace_name
         self.name = view_name
         self.base_table_name = base_table_name
@@ -2413,6 +2417,7 @@ class MaterializedViewMetadata(object):
         self.clustering_key = []
         self.columns = OrderedDict()
         self.include_all_columns = include_all_columns
+        self.where_clause = where_clause
         self.options = options or {}
 
     def as_cql_query(self, formatted=False):
@@ -2427,7 +2432,7 @@ class MaterializedViewMetadata(object):
 
         selected_cols = '*' if self.include_all_columns else ', '.join(protect_name(col.name) for col in self.columns.values())
         base_table = protect_name(self.base_table_name)
-        where_clause = " AND ".join("%s IS NOT NULL" % protect_name(col.name) for col in self.partition_key + self.clustering_key)
+        where_clause = self.where_clause
 
         part_key = ', '.join(protect_name(col.name) for col in self.partition_key)
         if len(self.partition_key) > 1:
