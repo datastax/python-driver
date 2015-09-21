@@ -20,7 +20,7 @@ import six
 import warnings
 
 from cassandra import metadata
-from cassandra.cqlengine import CQLEngineException, SizeTieredCompactionStrategy, LeveledCompactionStrategy
+from cassandra.cqlengine import CQLEngineException
 from cassandra.cqlengine import columns
 from cassandra.cqlengine.connection import execute, get_cluster
 from cassandra.cqlengine.models import Model
@@ -247,11 +247,13 @@ def sync_table(model):
 
     indexes = [c for n, c in model._columns.items() if c.index]
 
+    # TODO: support multiple indexes in C* 3.0+
     for column in indexes:
-        if table.columns[column.db_field_name].index:
+        index_name = 'index_{0}_{1}'.format(raw_cf_name, column.db_field_name)
+        if table.indexes.get(index_name):
             continue
 
-        qs = ['CREATE INDEX index_{0}_{1}'.format(raw_cf_name, column.db_field_name)]
+        qs = ['CREATE INDEX {0}'.format(index_name)]
         qs += ['ON {0}'.format(cf_name)]
         qs += ['("{0}")'.format(column.db_field_name)]
         qs = ' '.join(qs)
@@ -334,11 +336,6 @@ def _get_create_table(model):
     ks_table_name = model.column_family_name()
     query_strings = ['CREATE TABLE {0}'.format(ks_table_name)]
 
-    # Need to use an existing table to make sure we're using the right
-    # metadata class
-    cluster = get_cluster()
-    existing_meta = cluster.metadata.keyspaces['system'].tables['local']
-
     # add column types
     pkeys = []  # primary keys
     ckeys = []  # clustering keys
@@ -364,7 +361,8 @@ def _get_create_table(model):
     if _order:
         property_strings.append('CLUSTERING ORDER BY ({0})'.format(', '.join(_order)))
 
-    property_strings += existing_meta._make_option_strings(model.__options__ or {})
+    # options strings use the V3 format, which matches CQL more closely and does not require mapping
+    property_strings += metadata.TableMetadataV3._make_option_strings(model.__options__ or {})
 
     if property_strings:
         query_strings += ['WITH {0}'.format(' AND '.join(property_strings))]
@@ -388,6 +386,21 @@ def _get_table_metadata(model):
     return table
 
 
+def _options_map_from_strings(option_strings):
+    # converts options strings to a mapping to strings or dict
+    options = {}
+    for option in option_strings:
+        name, value = option.split('=')
+        i = value.find('{')
+        if i >= 0:
+            value = value[i:value.rfind('}') + 1].replace("'", '"')  # from cql single quotes to json double; not aware of any values that would be escaped right now
+            value = json.loads(value)
+        else:
+            value = value.strip()
+        options[name.strip()] = value
+    return options
+
+
 def _update_options(model):
     """Updates the table options for the given model if necessary.
 
@@ -398,15 +411,32 @@ def _update_options(model):
     :rtype: bool
     """
     log.debug("Checking %s for option differences", model)
-    table_meta = _get_table_metadata(model)
-    existing_options = table_meta.options
-
     model_options = model.__options__ or {}
-    update_options = dict((k, v) for k, v in model_options if existing_options[k] != v)
+
+    table_meta = _get_table_metadata(model)
+    # go to CQL string first to normalize meta from different versions
+    existing_option_strings = set(table_meta._make_option_strings(table_meta.options))
+    existing_options = _options_map_from_strings(existing_option_strings)
+    model_option_strings = metadata.TableMetadataV3._make_option_strings(model_options)
+    model_options = _options_map_from_strings(model_option_strings)
+
+    update_options = {}
+    for name, value in model_options.items():
+        existing_value = existing_options[name]
+        if isinstance(existing_value, six.string_types):
+            if value != existing_value:
+                update_options[name] = value
+        else:
+            try:
+                for k, v in value.items():
+                    if existing_value[k] != v:
+                        update_options[name] = value
+                        break
+            except KeyError:
+                update_options[name] = value
 
     if update_options:
-        option_strings = table_meta._make_option_strings(update_options)
-        options = ' AND '.join(option_strings)
+        options = ' AND '.join(metadata.TableMetadataV3._make_option_strings(update_options))
         query = "ALTER TABLE {0} WITH {1}".format(model.column_family_name(), options)
         execute(query)
         return True

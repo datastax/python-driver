@@ -15,10 +15,6 @@
 import six
 
 
-# compaction
-SizeTieredCompactionStrategy = "SizeTieredCompactionStrategy"
-LeveledCompactionStrategy = "LeveledCompactionStrategy"
-
 # Caching constants.
 CACHING_ALL = "ALL"
 CACHING_KEYS_ONLY = "KEYS_ONLY"

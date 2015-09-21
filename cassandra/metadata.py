@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from bisect import bisect_right
-from collections import defaultdict
+from collections import defaultdict, Mapping
 from hashlib import md5
 from itertools import islice, cycle
 import json
@@ -1252,6 +1252,7 @@ class ColumnMetadata(object):
     the type classes in :mod:`cassandra.cqltypes`.
     """
 
+    # TODO: probably remove this in favor of the table level mapping
     index = None
     """
     If an index exists on this column, this is an instance of
@@ -2291,8 +2292,9 @@ class TableMetadataV3(TableMetadata):
         options_copy = dict(options_map.items())
 
         for option in cls.option_maps:
-            value = options_copy.pop(option, {})
-            if value:
+            value = options_copy.get(option)
+            if isinstance(value, Mapping):
+                del options_copy[option]
                 params = ("'%s': '%s'" % (k, v) for k, v in value.items())
                 ret.append("%s = {%s}" % (option, ', '.join(params)))
 
