@@ -2042,7 +2042,7 @@ class MaterializedViewMetadataTest(unittest.TestCase):
         self.assertFalse(mv.include_all_columns)
 
         # Validate that all columns are preset and correct
-        mv_columns = mv.columns.values()
+        mv_columns = list(mv.columns.values())
         self.assertEquals(len(mv_columns), 6)
 
         game_column = mv_columns[0]
@@ -2147,7 +2147,7 @@ class MaterializedViewMetadataTest(unittest.TestCase):
         self.assertFalse(mv.include_all_columns)
 
         # Validate that all columns are preset and correct
-        mv_columns = mv.columns.values()
+        mv_columns = list(mv.columns.values())
         self.assertEquals(len(mv_columns), 3)
 
         theKey_column = mv_columns[0]
