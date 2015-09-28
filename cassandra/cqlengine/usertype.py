@@ -27,7 +27,6 @@ class BaseUserType(object):
 
     def __init__(self, **values):
         self._values = {}
-
         for name, field in self._fields.items():
             value = values.get(name, None)
             if value is not None or isinstance(field, columns.BaseContainerColumn):
@@ -56,7 +55,13 @@ class BaseUserType(object):
         return not self.__eq__(other)
 
     def __str__(self):
-        return "{{{0}}}".format(', '.join("'{0}': {1}".format(k, getattr(self, k)) for k, v in six.iteritems(self._values)))
+        lst = []
+        for k, v in six.iteritems(self._values):
+            val = getattr(self, k)
+            if six.PY2 and isinstance(val, six.text_type):
+                val = val.encode('utf-8')
+            lst.append("'{0}': {1}".format(k, val))
+        return "{{{0}}}".format(', '.join(lst))
 
     def has_changed_fields(self):
         return any(v.changed for v in self._values.values())
@@ -145,7 +150,7 @@ class UserTypeMetaClass(type):
     def __new__(cls, name, bases, attrs):
         field_dict = OrderedDict()
 
-        field_defs = [(k, v) for k, v in attrs.items() if isinstance(v, columns.Column)]
+        field_defs = [(k.decode('utf-8'), v) for k, v in attrs.items() if isinstance(v, columns.Column)]
         field_defs = sorted(field_defs, key=lambda x: x[1].position)
 
         def _transform_column(field_name, field_obj):
