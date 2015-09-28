@@ -18,6 +18,8 @@ import logging
 import six
 import warnings
 
+import msgpack
+
 from cassandra import util
 from cassandra.cqltypes import DateType, SimpleDateType
 from cassandra.cqlengine import ValidationError
@@ -195,6 +197,8 @@ class Column(object):
         Converts data from the database into python values
         raises a ValidationError if the value can't be converted
         """
+        if value is None and self.has_default:
+            return self.get_default()
         return value
 
     def to_database(self, value):
@@ -313,7 +317,7 @@ class Text(Column):
         """
         :param int min_length: Sets the minimum length of this string, for validation purposes.
             Defaults to 1 if this is a ``required`` column. Otherwise, None.
-        :param int max_length: Sets the maximum length of this string, for validation purposes.
+        :param int max_lemgth: Sets the maximum length of this string, for validation purposes.
         """
         self.min_length = min_length or (1 if kwargs.get('required', False) else None)
         self.max_length = max_length
@@ -333,6 +337,11 @@ class Text(Column):
                 raise ValidationError('{0} is shorter than {1} characters'.format(self.column_name, self.min_length))
         return value
 
+    def to_python(self, value):
+        value = self.validate(value)
+        if value is None and self.has_default:
+            return self.get_default()
+        return value
 
 class Integer(Column):
     """
@@ -351,7 +360,10 @@ class Integer(Column):
             raise ValidationError("{0} {1} can't be converted to integral value".format(self.column_name, value))
 
     def to_python(self, value):
-        return self.validate(value)
+        value = self.validate(value)
+        if value is None and self.has_default:
+            return self.get_default()
+        return value
 
     def to_database(self, value):
         return self.validate(value)
@@ -897,3 +909,39 @@ class _PartitionKeysToken(Column):
 
     def get_cql(self):
         return "token({0})".format(", ".join(c.cql for c in self.partition_columns))
+
+
+def decode_datetime(obj):
+    if b'__datetime__' in obj:
+        obj = datetime.datetime.strptime(obj["as_str"], "%Y%m%dT%H:%M:%S.%f")
+    return obj
+
+
+def encode_datetime(obj):
+    if isinstance(obj, datetime.datetime):
+        return {'__datetime__': True, 'as_str': obj.strftime("%Y%m%dT%H:%M:%S.%f")}
+    return obj
+
+
+class Json(Blob):
+    def to_database(self, value):
+        if not value:
+            return None
+        value = Column.to_database(self, value)
+        ret = msgpack.packb(value, use_bin_type=True, default=encode_datetime)
+        return bytearray(ret)
+
+    def to_python(self, value):
+        if not value:
+            return {}
+        return msgpack.unpackb(value, object_hook=decode_datetime, encoding='utf-8')
+
+
+def to_python(self, value):
+    ret = {}
+    for k, v in value.items():
+        ret[k] = self.user_type._fields[k].to_python(v)
+    return self.user_type(**ret)
+
+
+UserDefinedType.to_python = to_python
