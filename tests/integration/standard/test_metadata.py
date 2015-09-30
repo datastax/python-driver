@@ -1963,11 +1963,11 @@ class MaterializedViewMetadataTest(unittest.TestCase):
         self.session.execute("CREATE TABLE {0}.table1 (pk int PRIMARY KEY, c int)".format(self.ksname))
         self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT c FROM {0}.table1 WHERE c IS NOT NULL PRIMARY KEY (pk, c)".format(self.ksname))
 
-        self.assertRegex(self.cluster.metadata.keyspaces[self.ksname].tables["table1"].views["mv1"].options["compaction"]["class"],
+        self.assertRegexpMatches(self.cluster.metadata.keyspaces[self.ksname].tables["table1"].views["mv1"].options["compaction"]["class"],
                          "SizeTieredCompactionStrategy")
 
         self.session.execute("ALTER MATERIALIZED VIEW {0}.mv1 WITH compaction = {{ 'class' : 'LeveledCompactionStrategy' }}".format(self.ksname))
-        self.assertRegex(self.cluster.metadata.keyspaces[self.ksname].tables["table1"].views["mv1"].options["compaction"]["class"],
+        self.assertRegexpMatches(self.cluster.metadata.keyspaces[self.ksname].tables["table1"].views["mv1"].options["compaction"]["class"],
                          "LeveledCompactionStrategy")
 
     def test_materialized_view_metadata_drop(self):
