@@ -2111,6 +2111,60 @@ class MaterializedViewMetadataTest(unittest.TestCase):
         self.assertEquals(day_column.is_static, mv.clustering_key[2].is_static)
         self.assertEquals(day_column.is_reversed, mv.clustering_key[2].is_reversed)
 
+    def test_create_mv_changes(self):
+        """
+        test to ensure that materialized view metadata is properly updated with base table changes
+
+        test_create_view_metadata tests that materialized views metadata is properly updated when corresponding changes
+        are made to the base table. We test adding a new column and changing base table columns types. We then ensure
+        that changes are surfaced in the MV accordingly.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-419
+        @expected_result Materialized view metadata should be update correctly
+
+        @test_category metadata
+        """
+        create_table = """CREATE TABLE {0}.scores(
+                        user TEXT,
+                        game TEXT,
+                        year INT,
+                        month INT,
+                        day INT,
+                        score TEXT,
+                        PRIMARY KEY (user, game, year, month, day)
+                        )""".format(self.ksname)
+
+        self.session.execute(create_table)
+
+        create_mv = """CREATE MATERIALIZED VIEW {0}.monthlyhigh AS
+                        SELECT game, year, month, score, user, day FROM {0}.scores
+                        WHERE game IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL AND day IS NOT NULL
+                        PRIMARY KEY ((game, year, month), score, user, day)
+                        WITH CLUSTERING ORDER BY (score DESC, user ASC, day ASC)""".format(self.ksname)
+
+        self.session.execute(create_mv)
+        score_table = self.cluster.metadata.keyspaces[self.ksname].tables['scores']
+
+        self.assertIsNotNone(score_table.views["monthlyhigh"])
+        self.assertEqual(len(self.cluster.metadata.keyspaces[self.ksname].views), 1)
+
+        insert_fouls = """ALTER TABLE {0}.scores ADD fouls INT""".format((self.ksname))
+
+        self.session.execute(insert_fouls)
+        self.assertEqual(len(self.cluster.metadata.keyspaces[self.ksname].views), 1)
+
+        alter_scores = """ALTER TABLE {0}.scores ALTER score blob""".format((self.ksname))
+
+        self.session.execute(alter_scores)
+        self.assertEqual(len(self.cluster.metadata.keyspaces[self.ksname].views), 1)
+
+        score_column = self.cluster.metadata.keyspaces[self.ksname].tables['scores'].columns['score']
+        self.assertEquals(score_column.typestring, 'blob')
+
+        score_mv_column = self.cluster.metadata.keyspaces[self.ksname].views["monthlyhigh"].columns['score']
+        self.assertEquals(score_mv_column.typestring, 'blob')
+
     def test_metadata_with_quoted_identifiers(self):
         """
         test to ensure that materialized view metadata is properly constructed when quoted identifiers are used
