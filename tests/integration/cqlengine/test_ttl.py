@@ -41,7 +41,7 @@ class BaseTTLTest(BaseCassEngTestCase):
 
 
 class TestDefaultTTLModel(Model):
-    __default_ttl__ = 20
+    __options__ = {'default_time_to_live': 20}
     id      = columns.UUID(primary_key=True, default=lambda:uuid4())
     count   = columns.Integer()
     text    = columns.Text(required=False)

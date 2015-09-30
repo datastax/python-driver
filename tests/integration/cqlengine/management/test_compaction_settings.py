@@ -13,12 +13,11 @@
 # limitations under the License.
 
 import copy
-import json
 from mock import patch
+import six
 
-from cassandra.cqlengine import columns, SizeTieredCompactionStrategy, LeveledCompactionStrategy
-from cassandra.cqlengine import CQLEngineException
-from cassandra.cqlengine.management import get_compaction_options, drop_table, sync_table, get_table_settings
+from cassandra.cqlengine import columns
+from cassandra.cqlengine.management import drop_table, sync_table, _get_table_metadata, _update_options
 from cassandra.cqlengine.models import Model
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase
@@ -31,68 +30,10 @@ class CompactionModel(Model):
     name = columns.Text()
 
 
-class BaseCompactionTest(BaseCassEngTestCase):
-    def assert_option_fails(self, key):
-        # key is a normal_key, converted to
-        # __compaction_key__
-
-        key = "__compaction_{0}__".format(key)
-
-        with patch.object(self.model, key, 10):
-            with self.assertRaises(CQLEngineException):
-                get_compaction_options(self.model)
-
-
-class SizeTieredCompactionTest(BaseCompactionTest):
-
-    def setUp(self):
-        self.model = copy.deepcopy(CompactionModel)
-        self.model.__compaction__ = SizeTieredCompactionStrategy
-
-    def test_size_tiered(self):
-        result = get_compaction_options(self.model)
-        assert result['class'] == SizeTieredCompactionStrategy
-
-    def test_min_threshold(self):
-        self.model.__compaction_min_threshold__ = 2
-        result = get_compaction_options(self.model)
-        assert result['min_threshold'] == '2'
-
-
-class LeveledCompactionTest(BaseCompactionTest):
-    def setUp(self):
-        self.model = copy.deepcopy(CompactionLeveledStrategyModel)
-
-    def test_simple_leveled(self):
-        result = get_compaction_options(self.model)
-        assert result['class'] == LeveledCompactionStrategy
-
-    def test_bucket_high_fails(self):
-        self.assert_option_fails('bucket_high')
-
-    def test_bucket_low_fails(self):
-        self.assert_option_fails('bucket_low')
-
-    def test_max_threshold_fails(self):
-        self.assert_option_fails('max_threshold')
-
-    def test_min_threshold_fails(self):
-        self.assert_option_fails('min_threshold')
-
-    def test_min_sstable_size_fails(self):
-        self.assert_option_fails('min_sstable_size')
-
-    def test_sstable_size_in_mb(self):
-        with patch.object(self.model, '__compaction_sstable_size_in_mb__', 32):
-            result = get_compaction_options(self.model)
-
-        assert result['sstable_size_in_mb'] == '32'
-
-
 class LeveledcompactionTestTable(Model):
 
-    __compaction__ = LeveledCompactionStrategy
-    __compaction_sstable_size_in_mb__ = 64
+    __options__ = {'compaction': {'class': 'org.apache.cassandra.db.compaction.LeveledCompactionStrategy',
+                                  'sstable_size_in_mb': '64'}}
 
     user_id = columns.UUID(primary_key=True)
     name = columns.Text()
@@ -103,113 +44,98 @@ class AlterTableTest(BaseCassEngTestCase):
     def test_alter_is_called_table(self):
         drop_table(LeveledcompactionTestTable)
         sync_table(LeveledcompactionTestTable)
-        with patch('cassandra.cqlengine.management.update_compaction') as mock:
+        with patch('cassandra.cqlengine.management._update_options') as mock:
             sync_table(LeveledcompactionTestTable)
         assert mock.called == 1
 
     def test_compaction_not_altered_without_changes_leveled(self):
-        from cassandra.cqlengine.management import update_compaction
 
         class LeveledCompactionChangesDetectionTest(Model):
 
-            __compaction__ = LeveledCompactionStrategy
-            __compaction_sstable_size_in_mb__ = 160
-            __compaction_tombstone_threshold__ = 0.125
-            __compaction_tombstone_compaction_interval__ = 3600
-
+            __options__ = {'compaction': {'class': 'org.apache.cassandra.db.compaction.LeveledCompactionStrategy',
+                                          'sstable_size_in_mb': '160',
+                                          'tombstone_threshold': '0.125',
+                                          'tombstone_compaction_interval': '3600'}}
             pk = columns.Integer(primary_key=True)
 
         drop_table(LeveledCompactionChangesDetectionTest)
         sync_table(LeveledCompactionChangesDetectionTest)
 
-        assert not update_compaction(LeveledCompactionChangesDetectionTest)
+        self.assertFalse(_update_options(LeveledCompactionChangesDetectionTest))
 
     def test_compaction_not_altered_without_changes_sizetiered(self):
-        from cassandra.cqlengine.management import update_compaction
-
         class SizeTieredCompactionChangesDetectionTest(Model):
 
-            __compaction__ = SizeTieredCompactionStrategy
-            __compaction_bucket_high__ = 20
-            __compaction_bucket_low__ = 10
-            __compaction_max_threshold__ = 200
-            __compaction_min_threshold__ = 100
-            __compaction_min_sstable_size__ = 1000
-            __compaction_tombstone_threshold__ = 0.125
-            __compaction_tombstone_compaction_interval__ = 3600
-
+            __options__ = {'compaction': {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy',
+                                          'bucket_high': '20',
+                                          'bucket_low': '10',
+                                          'max_threshold': '200',
+                                          'min_threshold': '100',
+                                          'min_sstable_size': '1000',
+                                          'tombstone_threshold': '0.125',
+                                          'tombstone_compaction_interval': '3600'}}
             pk = columns.Integer(primary_key=True)
 
         drop_table(SizeTieredCompactionChangesDetectionTest)
         sync_table(SizeTieredCompactionChangesDetectionTest)
 
-        assert not update_compaction(SizeTieredCompactionChangesDetectionTest)
+        self.assertFalse(_update_options(SizeTieredCompactionChangesDetectionTest))
 
     def test_alter_actually_alters(self):
         tmp = copy.deepcopy(LeveledcompactionTestTable)
         drop_table(tmp)
         sync_table(tmp)
-        tmp.__compaction__ = SizeTieredCompactionStrategy
-        tmp.__compaction_sstable_size_in_mb__ = None
+        tmp.__options__ = {'compaction': {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}}
         sync_table(tmp)
 
-        table_settings = get_table_settings(tmp)
+        table_meta = _get_table_metadata(tmp)
 
-        self.assertRegexpMatches(table_settings.options['compaction_strategy_class'], '.*SizeTieredCompactionStrategy$')
+        self.assertRegexpMatches(table_meta.export_as_string(), '.*SizeTieredCompactionStrategy.*')
 
     def test_alter_options(self):
 
         class AlterTable(Model):
 
-            __compaction__ = LeveledCompactionStrategy
-            __compaction_sstable_size_in_mb__ = 64
-
+            __options__ = {'compaction': {'class': 'org.apache.cassandra.db.compaction.LeveledCompactionStrategy',
+                                          'sstable_size_in_mb': '64'}}
             user_id = columns.UUID(primary_key=True)
             name = columns.Text()
 
         drop_table(AlterTable)
         sync_table(AlterTable)
-        AlterTable.__compaction_sstable_size_in_mb__ = 128
+        table_meta = _get_table_metadata(AlterTable)
+        self.assertRegexpMatches(table_meta.export_as_string(), ".*'sstable_size_in_mb': '64'.*")
+        AlterTable.__options__['compaction']['sstable_size_in_mb'] = '128'
         sync_table(AlterTable)
-
-
-class EmptyCompactionTest(BaseCassEngTestCase):
-    def test_empty_compaction(self):
-        class EmptyCompactionModel(Model):
-
-            __compaction__ = None
-            cid = columns.UUID(primary_key=True)
-            name = columns.Text()
-
-        result = get_compaction_options(EmptyCompactionModel)
-        self.assertEqual({}, result)
-
-
-class CompactionLeveledStrategyModel(Model):
-
-    __compaction__ = LeveledCompactionStrategy
-    cid = columns.UUID(primary_key=True)
-    name = columns.Text()
-
-
-class CompactionSizeTieredModel(Model):
-
-    __compaction__ = SizeTieredCompactionStrategy
-    cid = columns.UUID(primary_key=True)
-    name = columns.Text()
+        table_meta = _get_table_metadata(AlterTable)
+        self.assertRegexpMatches(table_meta.export_as_string(), ".*'sstable_size_in_mb': '128'.*")
 
 
 class OptionsTest(BaseCassEngTestCase):
 
+    def _verify_options(self, table_meta, expected_options):
+        cql = table_meta.export_as_string()
+
+        for name, value in expected_options.items():
+            if isinstance(value, six.string_types):
+                self.assertIn("%s = '%s'" % (name, value), cql)
+            else:
+                start = cql.find("%s = {" % (name,))
+                end = cql.find('}', start)
+                for subname, subvalue in value.items():
+                    attr = "'%s': '%s'" % (subname, subvalue)
+                    found_at = cql.find(attr, start)
+                    self.assertTrue(found_at > start)
+                    self.assertTrue(found_at < end)
+
     def test_all_size_tiered_options(self):
         class AllSizeTieredOptionsModel(Model):
-
-            __compaction__ = SizeTieredCompactionStrategy
-            __compaction_bucket_low__ = .3
-            __compaction_bucket_high__ = 2
-            __compaction_min_threshold__ = 2
-            __compaction_max_threshold__ = 64
-            __compaction_tombstone_compaction_interval__ = 86400
+            __options__ = {'compaction': {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy',
+                                          'bucket_low': '.3',
+                                          'bucket_high': '2',
+                                          'min_threshold': '2',
+                                          'max_threshold': '64',
+                                          'tombstone_compaction_interval': '86400'}}
 
             cid = columns.UUID(primary_key=True)
             name = columns.Text()
@@ -217,23 +143,14 @@ class OptionsTest(BaseCassEngTestCase):
         drop_table(AllSizeTieredOptionsModel)
         sync_table(AllSizeTieredOptionsModel)
 
-        options = get_table_settings(AllSizeTieredOptionsModel).options['compaction_strategy_options']
-        options = json.loads(options)
-
-        expected = {u'min_threshold': u'2',
-                    u'bucket_low': u'0.3',
-                    u'tombstone_compaction_interval': u'86400',
-                    u'bucket_high': u'2',
-                    u'max_threshold': u'64'}
-
-        self.assertDictEqual(options, expected)
+        table_meta = _get_table_metadata(AllSizeTieredOptionsModel)
+        self._verify_options(table_meta, AllSizeTieredOptionsModel.__options__)
 
     def test_all_leveled_options(self):
 
         class AllLeveledOptionsModel(Model):
-
-            __compaction__ = LeveledCompactionStrategy
-            __compaction_sstable_size_in_mb__ = 64
+            __options__ = {'compaction': {'class': 'org.apache.cassandra.db.compaction.LeveledCompactionStrategy',
+                                          'sstable_size_in_mb': '64'}}
 
             cid = columns.UUID(primary_key=True)
             name = columns.Text()
@@ -241,7 +158,5 @@ class OptionsTest(BaseCassEngTestCase):
         drop_table(AllLeveledOptionsModel)
         sync_table(AllLeveledOptionsModel)
 
-        settings = get_table_settings(AllLeveledOptionsModel).options
-
-        options = json.loads(settings['compaction_strategy_options'])
-        self.assertDictEqual(options, {u'sstable_size_in_mb': u'64'})
+        table_meta = _get_table_metadata(AllLeveledOptionsModel)
+        self._verify_options(table_meta, AllLeveledOptionsModel.__options__)

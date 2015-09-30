@@ -488,5 +488,5 @@ class TestIndexedInheritanceQuery(BaseCassEngTestCase):
         management.drop_table(IndexedInherit2)
 
     def test_success_case(self):
-        assert len(list(IndexedInherit1.objects(partition=self.p1.partition))) == 1
-        assert len(list(IndexedInherit2.objects(partition=self.p1.partition))) == 1
+        self.assertEqual(len(list(IndexedInherit1.objects(partition=self.p1.partition))), 1)
+        self.assertEqual(len(list(IndexedInherit2.objects(partition=self.p1.partition))), 1)

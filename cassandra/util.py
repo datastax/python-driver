@@ -512,6 +512,9 @@ except ImportError:
         def __len__(self):
             return len(self._items)
 
+        def __getitem__(self, i):
+            return self._items[i]
+
         def __iter__(self):
             return iter(self._items)
 

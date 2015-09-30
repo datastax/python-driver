@@ -184,6 +184,10 @@ def lookup_casstype(casstype):
         raise ValueError("Don't know how to parse type string %r: %s" % (casstype, e))
 
 
+def is_reversed_casstype(data_type):
+    return issubclass(data_type, ReversedType)
+
+
 class EmptyValue(object):
     """ See _CassandraType.support_empty_values """
 

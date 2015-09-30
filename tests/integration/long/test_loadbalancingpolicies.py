@@ -140,7 +140,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         wait_for_up(cluster, 2, wait=False)
         wait_for_up(cluster, 3)
 
-        create_schema(session, keyspace, replication_factor=3)
+        create_schema(cluster, session, keyspace, replication_factor=3)
         self._insert(session, keyspace)
         self._query(session, keyspace)
 
@@ -182,7 +182,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         wait_for_up(cluster, 3, wait=False)
         wait_for_up(cluster, 4)
 
-        create_schema(session, keyspace, replication_strategy=[2, 2])
+        create_schema(cluster, session, keyspace, replication_strategy=[2, 2])
         self._insert(session, keyspace)
         self._query(session, keyspace)
 
@@ -222,7 +222,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         wait_for_up(cluster, 3, wait=False)
         wait_for_up(cluster, 4)
 
-        create_schema(session, keyspace, replication_strategy=[2, 2])
+        create_schema(cluster, session, keyspace, replication_strategy=[2, 2])
         self._insert(session, keyspace)
         self._query(session, keyspace)
 
@@ -263,7 +263,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         wait_for_up(cluster, 4, wait=False)
         wait_for_up(cluster, 5)
 
-        create_schema(session, keyspace, replication_strategy=[2, 2])
+        create_schema(cluster, session, keyspace, replication_strategy=[2, 2])
         self._insert(session, keyspace)
         self._query(session, keyspace)
 
@@ -288,7 +288,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         wait_for_up(cluster, 4, wait=False)
         wait_for_up(cluster, 5)
 
-        create_schema(session, keyspace, replication_strategy=[2, 2])
+        create_schema(cluster, session, keyspace, replication_strategy=[2, 2])
         self._insert(session, keyspace)
         self._query(session, keyspace)
 
@@ -312,7 +312,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         wait_for_up(cluster, 3, wait=False)
         wait_for_up(cluster, 4)
 
-        create_schema(session, keyspace, replication_strategy=[2, 2])
+        create_schema(cluster, session, keyspace, replication_strategy=[2, 2])
         self._insert(session, keyspace)
         self._query(session, keyspace)
 
@@ -403,7 +403,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         wait_for_up(cluster, 2, wait=False)
         wait_for_up(cluster, 3)
 
-        create_schema(session, keyspace, replication_factor=1)
+        create_schema(cluster, session, keyspace, replication_factor=1)
         self._insert(session, keyspace)
         self._query(session, keyspace, use_prepared=use_prepared)
 
@@ -479,7 +479,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         wait_for_up(cluster, 2, wait=False)
         wait_for_up(cluster, 3)
 
-        create_schema(session, keyspace, replication_factor=2)
+        create_schema(cluster, session, keyspace, replication_factor=2)
         session.execute('CREATE TABLE %s ('
                         'k1 int, '
                         'k2 int, '
@@ -509,7 +509,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         wait_for_up(cluster, 2, wait=False)
         wait_for_up(cluster, 3)
 
-        create_schema(session, keyspace, replication_factor=2)
+        create_schema(cluster, session, keyspace, replication_factor=2)
         self._insert(session, keyspace)
         self._query(session, keyspace)
 
@@ -556,7 +556,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         wait_for_up(cluster, 2, wait=False)
         wait_for_up(cluster, 3)
 
-        create_schema(session, keyspace)
+        create_schema(cluster, session, keyspace)
         self._insert(session, keyspace)
         self._query(session, keyspace)
 

@@ -59,7 +59,7 @@ def get_server_versions():
     if cass_version is not None:
         return (cass_version, cql_version)
 
-    c = Cluster(protocol_version=1)
+    c = Cluster()
     s = c.connect()
     row = s.execute('SELECT cql_version, release_version FROM system.local')[0]
 
@@ -80,7 +80,7 @@ def _tuple_version(version_string):
 
 USE_CASS_EXTERNAL = bool(os.getenv('USE_CASS_EXTERNAL', False))
 
-default_cassandra_version = '2.1.6'
+default_cassandra_version = '2.2.0'
 
 if USE_CASS_EXTERNAL:
     if CCMClusterFactory:
@@ -209,6 +209,8 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True):
             CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
             if CASSANDRA_VERSION >= '2.2':
                 CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
+                if CASSANDRA_VERSION >= '3.0':
+                    CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
             common.switch_cluster(path, cluster_name)
             CCM_CLUSTER.populate(nodes, ipformat=ipformat)
     try:
@@ -280,10 +282,8 @@ def setup_keyspace(ipformat=None):
     session = cluster.connect()
 
     try:
-        results = execute_until_pass(session, "SELECT keyspace_name FROM system.schema_keyspaces")
-        existing_keyspaces = [row[0] for row in results]
         for ksname in ('test1rf', 'test2rf', 'test3rf'):
-            if ksname in existing_keyspaces:
+            if ksname in cluster.metadata.keyspaces:
                 execute_until_pass(session, "DROP KEYSPACE %s" % ksname)
 
         ddl = '''

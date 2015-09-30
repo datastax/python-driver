@@ -23,7 +23,7 @@ class NullHandler(logging.Handler):
 logging.getLogger('cassandra').addHandler(NullHandler())
 
 
-__version_info__ = (2, 7, 2, 'post0')
+__version_info__ = (3, 0, '0a3', 'post0')
 __version__ = '.'.join(map(str, __version_info__))
 
 
@@ -126,6 +126,20 @@ def consistency_value_to_name(value):
     return ConsistencyLevel.value_to_name[value] if value is not None else "Not Set"
 
 
+class SchemaChangeType(object):
+    DROPPED = 'DROPPED'
+    CREATED = 'CREATED'
+    UPDATED = 'UPDATED'
+
+
+class SchemaTargetType(object):
+    KEYSPACE = 'KEYSPACE'
+    TABLE = 'TABLE'
+    TYPE = 'TYPE'
+    FUNCTION = 'FUNCTION'
+    AGGREGATE = 'AGGREGATE'
+
+
 class SignatureDescriptor(object):
 
     def __init__(self, name, type_signature):
@@ -144,6 +158,9 @@ class SignatureDescriptor(object):
     @staticmethod
     def format_signature(name, type_signature):
         return "%s(%s)" % (name, ','.join(t for t in type_signature))
+
+    def __repr__(self):
+        return "%s(%s, %s)" % (self.__class__.__name__, self.name, self.type_signature)
 
 
 class UserFunctionDescriptor(SignatureDescriptor):

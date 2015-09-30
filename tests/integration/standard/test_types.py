@@ -677,9 +677,8 @@ class TypeTests(unittest.TestCase):
         Test to ensure unicode strings can be used in a query
         """
         s = self.session
-
-        query = u"SELECT * FROM system.schema_columnfamilies WHERE keyspace_name = 'ef\u2052ef' AND columnfamily_name = %s"
-        s.execute(query, (u"fe\u2051fe",))
+        s.execute(u"SELECT * FROM system.local WHERE key = 'ef\u2052ef'")
+        s.execute(u"SELECT * FROM system.local WHERE key = %s", (u"fe\u2051fe",))
 
     def test_can_read_composite_type(self):
         """

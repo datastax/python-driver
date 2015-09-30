@@ -314,13 +314,13 @@ class ClusterTests(unittest.TestCase):
 
         original_meta = cluster.metadata.keyspaces
         original_system_meta = original_meta['system']
-        original_system_schema_meta = original_system_meta.tables['schema_columnfamilies']
+        original_system_schema_meta = original_system_meta.tables['local']
 
         # only refresh one table
-        cluster.refresh_table_metadata('system', 'schema_columnfamilies')
+        cluster.refresh_table_metadata('system', 'local')
         current_meta = cluster.metadata.keyspaces
         current_system_meta = current_meta['system']
-        current_system_schema_meta = current_system_meta.tables['schema_columnfamilies']
+        current_system_schema_meta = current_system_meta.tables['local']
         self.assertIs(original_meta, current_meta)
         self.assertIs(original_system_meta, current_system_meta)
         self.assertIsNot(original_system_schema_meta, current_system_schema_meta)
@@ -365,9 +365,8 @@ class ClusterTests(unittest.TestCase):
         session = cluster.connect()
 
         schema_ver = session.execute("SELECT schema_version FROM system.local WHERE key='local'")[0][0]
-
-        # create a schema disagreement
-        session.execute("UPDATE system.local SET schema_version=%s WHERE key='local'", (uuid4(),))
+        new_schema_ver = uuid4()
+        session.execute("UPDATE system.local SET schema_version=%s WHERE key='local'", (new_schema_ver,))
 
         try:
             agreement_timeout = 1
@@ -422,9 +421,10 @@ class ClusterTests(unittest.TestCase):
             end_time = time.time()
             self.assertGreaterEqual(end_time - start_time, agreement_timeout)
             self.assertIs(original_meta, c.metadata.keyspaces)
-
             c.shutdown()
         finally:
+            # TODO once fixed this connect call
+            session = cluster.connect()
             session.execute("UPDATE system.local SET schema_version=%s WHERE key='local'", (schema_ver,))
 
         cluster.shutdown()
