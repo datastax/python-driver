@@ -352,8 +352,14 @@ class Connection(object):
                 return
             self.is_defunct = True
 
-        log.debug("Defuncting connection (%s) to %s:",
-                  id(self), self.host, exc_info=exc)
+        exc_info = sys.exc_info()
+        # if we are not handling an exception, just use the passed exception, and don't try to format exc_info with the message
+        if any(exc_info):
+            log.debug("Defuncting connection (%s) to %s:",
+                      id(self), self.host, exc_info=exc_info)
+        else:
+            log.debug("Defuncting connection (%s) to %s: %s",
+                      id(self), self.host, exc)
 
         self.last_error = exc
         self.close()
