@@ -23,14 +23,7 @@ from cassandra.cqlengine.models import Model
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 
 
-class CompactionModel(Model):
-
-    __compaction__ = None
-    cid = columns.UUID(primary_key=True)
-    name = columns.Text()
-
-
-class LeveledcompactionTestTable(Model):
+class LeveledCompactionTestTable(Model):
 
     __options__ = {'compaction': {'class': 'org.apache.cassandra.db.compaction.LeveledCompactionStrategy',
                                   'sstable_size_in_mb': '64'}}
@@ -42,10 +35,10 @@ class LeveledcompactionTestTable(Model):
 class AlterTableTest(BaseCassEngTestCase):
 
     def test_alter_is_called_table(self):
-        drop_table(LeveledcompactionTestTable)
-        sync_table(LeveledcompactionTestTable)
+        drop_table(LeveledCompactionTestTable)
+        sync_table(LeveledCompactionTestTable)
         with patch('cassandra.cqlengine.management._update_options') as mock:
-            sync_table(LeveledcompactionTestTable)
+            sync_table(LeveledCompactionTestTable)
         assert mock.called == 1
 
     def test_compaction_not_altered_without_changes_leveled(self):
@@ -82,7 +75,7 @@ class AlterTableTest(BaseCassEngTestCase):
         self.assertFalse(_update_options(SizeTieredCompactionChangesDetectionTest))
 
     def test_alter_actually_alters(self):
-        tmp = copy.deepcopy(LeveledcompactionTestTable)
+        tmp = copy.deepcopy(LeveledCompactionTestTable)
         drop_table(tmp)
         sync_table(tmp)
         tmp.__options__ = {'compaction': {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}}
