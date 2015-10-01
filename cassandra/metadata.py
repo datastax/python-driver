@@ -672,7 +672,7 @@ class KeyspaceMetadata(object):
         for field_type in user_type.field_types:
             if field_type.cassname == 'UserType' and field_type.typename in types:
                 self.resolve_user_types(field_type.typename, types, user_type_strings)
-        user_type_strings.append(user_type.as_cql_query(formatted=True))
+        user_type_strings.append(user_type.export_as_string())
 
     def _add_table_metadata(self, table_metadata):
         self._drop_table_metadata(table_metadata.name)
@@ -765,8 +765,11 @@ class UserType(object):
             fields.append("%s %s" % (protect_name(field_name), field_type.cql_parameterized_type()))
 
         ret += field_join.join("%s%s" % (padding, field) for field in fields)
-        ret += "\n);" if formatted else ");"
+        ret += "\n)" if formatted else ")"
         return ret
+
+    def export_as_string(self):
+        return self.as_cql_query(formatted=True) + ';'
 
 
 class Aggregate(object):
