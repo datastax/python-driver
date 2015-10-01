@@ -1963,11 +1963,11 @@ class MaterializedViewMetadataTest(unittest.TestCase):
         self.session.execute("CREATE TABLE {0}.table1 (pk int PRIMARY KEY, c int)".format(self.ksname))
         self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT c FROM {0}.table1 WHERE c IS NOT NULL PRIMARY KEY (pk, c)".format(self.ksname))
 
-        self.assertRegex(self.cluster.metadata.keyspaces[self.ksname].tables["table1"].views["mv1"].options["compaction"]["class"],
+        self.assertRegexpMatches(self.cluster.metadata.keyspaces[self.ksname].tables["table1"].views["mv1"].options["compaction"]["class"],
                          "SizeTieredCompactionStrategy")
 
         self.session.execute("ALTER MATERIALIZED VIEW {0}.mv1 WITH compaction = {{ 'class' : 'LeveledCompactionStrategy' }}".format(self.ksname))
-        self.assertRegex(self.cluster.metadata.keyspaces[self.ksname].tables["table1"].views["mv1"].options["compaction"]["class"],
+        self.assertRegexpMatches(self.cluster.metadata.keyspaces[self.ksname].tables["table1"].views["mv1"].options["compaction"]["class"],
                          "LeveledCompactionStrategy")
 
     def test_materialized_view_metadata_drop(self):
@@ -2137,27 +2137,28 @@ class MaterializedViewMetadataTest(unittest.TestCase):
 
         self.session.execute(create_table)
 
-        create_mv = """CREATE MATERIALIZED VIEW {0}.monthlyhigh AS
+        view_name = 'monthlyhigh'
+        create_mv = """CREATE MATERIALIZED VIEW {0}.{1} AS
                         SELECT game, year, month, score, user, day FROM {0}.scores
                         WHERE game IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL AND day IS NOT NULL
                         PRIMARY KEY ((game, year, month), score, user, day)
-                        WITH CLUSTERING ORDER BY (score DESC, user ASC, day ASC)""".format(self.ksname)
+                        WITH CLUSTERING ORDER BY (score DESC, user ASC, day ASC)""".format(self.ksname, view_name)
 
         self.session.execute(create_mv)
         score_table = self.cluster.metadata.keyspaces[self.ksname].tables['scores']
 
-        self.assertIsNotNone(score_table.views["monthlyhigh"])
-        self.assertEqual(len(self.cluster.metadata.keyspaces[self.ksname].views), 1)
+        self.assertIn(view_name, score_table.views)
+        self.assertIn(view_name, self.cluster.metadata.keyspaces[self.ksname].views)
 
-        insert_fouls = """ALTER TABLE {0}.scores ADD fouls INT""".format((self.ksname))
+        insert_fouls = """ALTER TABLE {0}.scores ADD fouls INT""".format(self.ksname)
 
         self.session.execute(insert_fouls)
-        self.assertEqual(len(self.cluster.metadata.keyspaces[self.ksname].views), 1)
+        self.assertIn(view_name, self.cluster.metadata.keyspaces[self.ksname].views)
 
-        alter_scores = """ALTER TABLE {0}.scores ALTER score blob""".format((self.ksname))
+        alter_scores = """ALTER TABLE {0}.scores ALTER score TYPE blob""".format(self.ksname)
 
-        self.session.execute(alter_scores)
-        self.assertEqual(len(self.cluster.metadata.keyspaces[self.ksname].views), 1)
+        self.session.execute(alter_scores)  # ERROR https://issues.apache.org/jira/browse/CASSANDRA-10424
+        self.assertIn(view_name, self.cluster.metadata.keyspaces[self.ksname].views)
 
         score_column = self.cluster.metadata.keyspaces[self.ksname].tables['scores'].columns['score']
         self.assertEquals(score_column.typestring, 'blob')
