@@ -838,7 +838,7 @@ class Aggregate(object):
         If `formatted` is set to :const:`True`, extra whitespace will
         be added to make the query more readable.
         """
-        sep = '\n' if formatted else ' '
+        sep = '\n    ' if formatted else ' '
         keyspace = protect_name(self.keyspace)
         name = protect_name(self.name)
         type_list = ', '.join(self.type_signature)
@@ -932,7 +932,7 @@ class Function(object):
         If `formatted` is set to :const:`True`, extra whitespace will
         be added to make the query more readable.
         """
-        sep = '\n' if formatted else ' '
+        sep = '\n    ' if formatted else ' '
         keyspace = protect_name(self.keyspace)
         name = protect_name(self.name)
         arg_list = ', '.join(["%s %s" % (protect_name(n), t)
