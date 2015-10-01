@@ -635,8 +635,8 @@ class KeyspaceMetadata(object):
         """
         cql = "\n\n".join([self.as_cql_query()]
                          + self.user_type_strings()
-                         + [f.as_cql_query(True) for f in self.functions.values()]
-                         + [a.as_cql_query(True) for a in self.aggregates.values()]
+                         + [f.export_as_string() for f in self.functions.values()]
+                         + [a.export_as_string() for a in self.aggregates.values()]
                          + [t.export_as_string() for t in self.tables.values()])
         if self._exc_info:
             import traceback
@@ -855,6 +855,9 @@ class Aggregate(object):
 
         return ret
 
+    def export_as_string(self):
+        return self.as_cql_query(formatted=True) + ';'
+
     @property
     def signature(self):
         return SignatureDescriptor.format_signature(self.name, self.type_signature)
@@ -943,7 +946,10 @@ class Function(object):
                "%(on_null)s ON NULL INPUT%(sep)s" \
                "RETURNS %(typ)s%(sep)s" \
                "LANGUAGE %(lang)s%(sep)s" \
-               "AS $$%(body)s$$;" % locals()
+               "AS $$%(body)s$$" % locals()
+
+    def export_as_string(self):
+        return self.as_cql_query(formatted=True) + ';'
 
     @property
     def signature(self):
