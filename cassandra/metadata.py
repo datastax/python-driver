@@ -1571,6 +1571,9 @@ class TriggerMetadata(object):
         )
         return ret
 
+    def export_as_string(self):
+        return self.as_cql_query() + ';'
+
 
 class _SchemaParser(object):
 
