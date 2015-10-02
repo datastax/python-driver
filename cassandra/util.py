@@ -788,6 +788,14 @@ class OrderedMap(Mapping):
     def __str__(self):
         return '{%s}' % ', '.join("%r: %r" % (k, v) for k, v in self._items)
 
+    def popitem(self):
+        try:
+            kv = self._items.pop()
+            del self._index[self._serialize_key(kv[0])]
+            return kv
+        except IndexError:
+            raise KeyError()
+
     def _serialize_key(self, key):
         return cPickle.dumps(key)
 
