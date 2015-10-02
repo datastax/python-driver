@@ -271,6 +271,7 @@ def execute_until_pass(session, query):
 
     raise RuntimeError("Failed to execute query after 100 attempts: {0}".format(query))
 
+
 def setup_keyspace(ipformat=None):
     # wait for nodes to startup
     time.sleep(10)
@@ -332,3 +333,149 @@ class UpDownWaiter(object):
 
     def wait_for_up(self):
         self.up_event.wait()
+
+
+class BasicKeyspaceUnitTestCase(unittest.TestCase):
+    """
+    This is basic unit test case that provides various utility methods that can be leveraged for testcase setup and tear
+    down
+    """
+    @property
+    def keyspace_name(self):
+        return self.ks_name
+
+    @property
+    def class_table_name(self):
+        return self.ks_name
+
+    @property
+    def function_table_name(self):
+        return self._testMethodName.lower()
+
+    @classmethod
+    def drop_keyspace(cls):
+        execute_until_pass(cls.session, "DROP KEYSPACE {0}".format(cls.ks_name))
+
+    @classmethod
+    def create_keyspace(cls, rf):
+        ddl = "CREATE KEYSPACE {0} WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': '{1}'}}".format(cls.ks_name, rf)
+        execute_until_pass(cls.session, ddl)
+
+    @classmethod
+    def common_setup(cls, rf, create_class_table=False, skip_if_cass_version_less_than=None):
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.session = cls.cluster.connect()
+        cls.ks_name = cls.__name__.lower()
+        cls.create_keyspace(rf)
+
+        if create_class_table:
+
+            ddl = '''
+                CREATE TABLE {0}.{1} (
+                    k int PRIMARY KEY,
+                    v int )'''.format(cls.ks_name, cls.ks_name)
+            execute_until_pass(cls.session, ddl)
+
+    def create_function_table(self):
+            ddl = '''
+                CREATE TABLE {0}.{1} (
+                    k int PRIMARY KEY,
+                    v int )'''.format(self.keyspace_name, self.function_table_name)
+            execute_until_pass(self.session, ddl)
+
+    def drop_function_table(self):
+            ddl = "DROP TABLE {0}.{1} ".format(self.keyspace_name, self.function_table_name)
+            execute_until_pass(self.session, ddl)
+
+
+class BasicSharedKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):
+    """
+    This is basic unit test case that can be leveraged to scope a keyspace to a specific test class.
+    creates a keyspace named after the testclass with a rf of 1.
+    """
+    @classmethod
+    def setUpClass(cls):
+        cls.common_setup(1)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.drop_keyspace()
+        cls.cluster.shutdown()
+
+
+class BasicSharedKeyspaceUnitTestCaseWTable(BasicSharedKeyspaceUnitTestCase):
+    """
+    This is basic unit test case that can be leveraged to scope a keyspace to a specific test class.
+    creates a keyspace named after the testclass with a rf of 1, and a table named after the class
+    """
+    @classmethod
+    def setUpClass(self):
+        self.common_setup(1, True)
+
+
+class BasicSharedKeyspaceUnitTestCaseRF2(BasicSharedKeyspaceUnitTestCase):
+    """
+    This is basic unit test case that can be leveraged to scope a keyspace to a specific test class.
+    creates a keyspace named after the test class with a rf of 2, and a table named after the class
+    """
+    @classmethod
+    def setUpClass(self):
+        self.common_setup(2)
+
+
+class BasicSharedKeyspaceUnitTestCaseWTable(BasicSharedKeyspaceUnitTestCase):
+    """
+    This is basic unit test case that can be leveraged to scope a keyspace to a specific test class.
+    creates a keyspace named after the testc lass with a rf of 2, and a table named after the class
+    """
+    @classmethod
+    def setUpClass(self):
+        self.common_setup(2, True)
+
+
+class BasicSharedKeyspaceUnitTestCaseRF3(BasicSharedKeyspaceUnitTestCase):
+    """
+    This is basic unit test case that can be leveraged to scope a keyspace to a specific test class.
+    creates a keyspace named after the test class with a rf of 3
+    """
+    @classmethod
+    def setUpClass(self):
+        self.common_setup(3)
+
+
+class BasicSharedKeyspaceUnitTestCaseRF3WTable(BasicSharedKeyspaceUnitTestCase):
+    """
+    This is basic unit test case that can be leveraged to scope a keyspace to a specific test class.
+    creates a keyspace named after the test class with a rf of 3 and a table named after the class
+    """
+    @classmethod
+    def setUpClass(self):
+        self.common_setup(3, True)
+
+
+class BasicSharedKeyspaceUnitTestCaseWFunctionTable(BasicSharedKeyspaceUnitTestCase):
+    """"
+    This is basic unit test case that can be leveraged to scope a keyspace to a specific test class.
+    creates a keyspace named after the test class with a rf of 3 and a table named after the class
+    the table is scoped to just the unit test and will be removed.
+
+    """
+    def setUp(self):
+        self.create_function_table()
+
+    def tearDown(self):
+        self.drop_function_table()
+
+
+class BasicSegregatedKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):
+    """
+    This unit test will create and teardown a keyspace for each individual unit tests.
+    It has overhead and should only be used with complex unit test were sharing a keyspace will
+    cause issues.
+    """
+    def setUp(self):
+        self.common_setup(1)
+
+    def tearDown(self):
+        self.drop_keyspace()
+        self.cluster.shutdown()

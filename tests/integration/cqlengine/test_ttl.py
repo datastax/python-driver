@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
+
 from cassandra.cqlengine.management import sync_table, drop_table
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from cassandra.cqlengine.models import Model
@@ -19,12 +25,13 @@ from uuid import uuid4
 from cassandra.cqlengine import columns
 import mock
 from cassandra.cqlengine.connection import get_session
+from tests.integration import CASSANDRA_VERSION
 
 
 class TestTTLModel(Model):
-    id      = columns.UUID(primary_key=True, default=lambda:uuid4())
-    count   = columns.Integer()
-    text    = columns.Text(required=False)
+    id = columns.UUID(primary_key=True, default=lambda: uuid4())
+    count = columns.Integer()
+    text = columns.Text(required=False)
 
 
 class BaseTTLTest(BaseCassEngTestCase):
@@ -42,24 +49,26 @@ class BaseTTLTest(BaseCassEngTestCase):
 
 class TestDefaultTTLModel(Model):
     __options__ = {'default_time_to_live': 20}
-    id      = columns.UUID(primary_key=True, default=lambda:uuid4())
-    count   = columns.Integer()
-    text    = columns.Text(required=False)
+    id = columns.UUID(primary_key=True, default=lambda:uuid4())
+    count = columns.Integer()
+    text = columns.Text(required=False)
 
 
 class BaseDefaultTTLTest(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(BaseDefaultTTLTest, cls).setUpClass()
-        sync_table(TestDefaultTTLModel)
-        sync_table(TestTTLModel)
+        if CASSANDRA_VERSION >= '2.0':
+            super(BaseDefaultTTLTest, cls).setUpClass()
+            sync_table(TestDefaultTTLModel)
+            sync_table(TestTTLModel)
 
     @classmethod
     def tearDownClass(cls):
-        super(BaseDefaultTTLTest, cls).tearDownClass()
-        drop_table(TestDefaultTTLModel)
-        drop_table(TestTTLModel)
+        if CASSANDRA_VERSION >= '2.0':
+            super(BaseDefaultTTLTest, cls).tearDownClass()
+            drop_table(TestDefaultTTLModel)
+            drop_table(TestTTLModel)
 
 
 class TTLQueryTests(BaseTTLTest):
@@ -91,7 +100,6 @@ class TTLModelTests(BaseTTLTest):
         self.assertTrue(isinstance(qs, TestTTLModel.__queryset__), type(qs))
 
 
-
 class TTLInstanceUpdateTest(BaseTTLTest):
     def test_update_includes_ttl(self):
         session = get_session()
@@ -107,9 +115,6 @@ class TTLInstanceUpdateTest(BaseTTLTest):
         # sanity test that ensures the TTL syntax is accepted by cassandra
         model = TestTTLModel.create(text="goodbye blake")
         model.ttl(60).update(text="goodbye forever")
-
-
-
 
 
 class TTLInstanceTest(BaseTTLTest):
@@ -151,6 +156,7 @@ class TTLBlindUpdateTest(BaseTTLTest):
         self.assertIn("USING TTL", query)
 
 
+@unittest.skipIf(CASSANDRA_VERSION < '2.0', "default_time_to_Live was introduce in C* 2.0, currently running {0}".format(CASSANDRA_VERSION))
 class TTLDefaultTest(BaseDefaultTTLTest):
     def test_default_ttl_not_set(self):
         session = get_session()
