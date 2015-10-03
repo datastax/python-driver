@@ -36,7 +36,8 @@ log = logging.getLogger(__name__)
 def is_timeout(err):
     return (
         err in (EINPROGRESS, EALREADY, EWOULDBLOCK) or
-        (err == EINVAL and os.name in ('nt', 'ce'))
+        (err == EINVAL and os.name in ('nt', 'ce')) or
+	isinstance(err, socket.timeout)
     )
 
 
