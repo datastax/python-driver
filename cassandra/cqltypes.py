@@ -929,7 +929,7 @@ class UserType(TupleType):
         qualified_name = "%s_%s" % (keyspace, name)
         t = getattr(cls._module, qualified_name, None)
         if not t:
-            t = cls._make_udt_tuple_type(qualified_name, field_names)
+            t = cls._make_udt_tuple_type(name, field_names)
             setattr(cls._module, qualified_name, t)
         return t
 
@@ -941,7 +941,7 @@ class UserType(TupleType):
             t = namedtuple(name, field_names)
         except ValueError:
             try:
-                t = namedtuple(name, field_names, rename=True)
+                t = namedtuple(name, util._positional_rename_invalid_identifiers(field_names))
                 log.warn("could not create a namedtuple for '%s' because one or more field names are not valid Python identifiers (%s); " \
                          "returning positionally-named fields" % (name, field_names))
             except ValueError:

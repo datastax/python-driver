@@ -821,7 +821,7 @@ CREATE TABLE export_udts.users (
         self.assertEqual(v, 1)
         self.assertNotEqual(k.__class__, tuple)  # should be the namedtuple type
         self.assertEqual(k[0], 'alphanum')
-        self.assertEqual(k._0, 'alphanum')  # named tuple with positional field name
+        self.assertEqual(k.field_0_, 'alphanum')  # named tuple with positional field name
 
     def test_case_sensitivity(self):
         """

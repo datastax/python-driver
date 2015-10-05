@@ -31,7 +31,7 @@ from cassandra.util import unix_time_from_uuid1
 from cassandra.encoder import Encoder
 import cassandra.encoder
 from cassandra.protocol import _UNSET_VALUE
-from cassandra.util import OrderedDict
+from cassandra.util import OrderedDict, _positional_rename_invalid_identifiers
 
 import logging
 log = logging.getLogger(__name__)
@@ -123,7 +123,7 @@ def named_tuple_factory(colnames, rows):
                     "Avoid this by choosing different names, using SELECT \"<col name>\" AS aliases, "
                     "or specifying a different row_factory on your Session" %
                     (colnames, clean_column_names))
-        Row = namedtuple('Row', clean_column_names, rename=True)
+        Row = namedtuple('Row', _positional_rename_invalid_identifiers(clean_column_names))
 
     return [Row(*row) for row in rows]
 
