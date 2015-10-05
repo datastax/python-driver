@@ -688,3 +688,35 @@ class UDTTests(unittest.TestCase):
         self.assertNotEqual(k.__class__, tuple)  # should be the namedtuple type
         self.assertEqual(k[0], 'alphanum')
         self.assertEqual(k.field_0_, 'alphanum')  # named tuple with positional field name
+
+    def test_type_alteration(self):
+        s = self.session
+        type_name = "type_name"
+        self.assertNotIn(type_name, s.cluster.metadata.keyspaces['udttests'].user_types)
+        s.execute('CREATE TYPE %s (v0 int)' % (type_name,))
+        self.assertIn(type_name, s.cluster.metadata.keyspaces['udttests'].user_types)
+
+        s.execute('CREATE TABLE %s (k int PRIMARY KEY, v frozen<%s>)' % (self.table_name, type_name))
+        s.execute('INSERT INTO %s (k, v) VALUES (0, 1)' % (self.table_name,))
+
+        s.cluster.register_user_type('udttests', type_name, dict)
+
+        val = s.execute('SELECT v FROM %s' % self.table_name)[0][0]
+        self.assertEqual(val['v0'], 1)
+
+        # add field
+        s.execute('ALTER TYPE %s ADD v1 text' % (type_name,))
+        val = s.execute('SELECT v FROM %s' % self.table_name)[0][0]
+        self.assertEqual(val['v0'], 1)
+        self.assertIsNone(val['v1'])
+        s.execute("INSERT INTO %s (k, v) VALUES (0, (2, 'sometext'))" % (self.table_name,))
+        val = s.execute('SELECT v FROM %s' % self.table_name)[0][0]
+        self.assertEqual(val['v0'], 2)
+        self.assertEqual(val['v1'], 'sometext')
+
+        # alter field type
+        s.execute('ALTER TYPE %s ALTER v1 TYPE blob' % (type_name,))
+        s.execute("INSERT INTO %s (k, v) VALUES (0, (3, 0xdeadbeef))" % (self.table_name,))
+        val = s.execute('SELECT v FROM %s' % self.table_name)[0][0]
+        self.assertEqual(val['v0'], 3)
+        self.assertEqual(val['v1'], six.b('\xde\xad\xbe\xef'))
