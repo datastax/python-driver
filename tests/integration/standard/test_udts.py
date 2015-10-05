@@ -101,6 +101,8 @@ class UDTTests(unittest.TestCase):
         self.assertEqual(True, row.b.is_cool)
         self.assertTrue(type(row.b) is User)
 
+        s.execute("DROP KEYSPACE udt_test_unprepared_registered2")
+
         c.shutdown()
 
     def test_can_register_udt_before_connecting(self):
@@ -158,6 +160,9 @@ class UDTTests(unittest.TestCase):
         self.assertEqual(True, row.b.is_cool)
         self.assertTrue(type(row.b) is User2)
 
+        s.execute("DROP KEYSPACE udt_test_register_before_connecting")
+        s.execute("DROP KEYSPACE udt_test_register_before_connecting2")
+
         c.shutdown()
 
     def test_can_insert_prepared_unregistered_udts(self):
@@ -201,6 +206,8 @@ class UDTTests(unittest.TestCase):
         row = result[0]
         self.assertEqual('Texas', row.b.state)
         self.assertEqual(True, row.b.is_cool)
+
+        s.execute("DROP KEYSPACE udt_test_prepared_unregistered2")
 
         c.shutdown()
 
@@ -251,6 +258,8 @@ class UDTTests(unittest.TestCase):
         self.assertEqual('Texas', row.b.state)
         self.assertEqual(True, row.b.is_cool)
         self.assertTrue(type(row.b) is User)
+
+        s.execute("DROP KEYSPACE udt_test_prepared_registered2")
 
         c.shutdown()
 
