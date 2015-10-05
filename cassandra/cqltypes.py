@@ -883,7 +883,7 @@ class UserType(TupleType):
 
     @classmethod
     def apply_parameters(cls, subtypes, names):
-        keyspace = subtypes[0]
+        keyspace = subtypes[0].cass_parameterized_type()  # when parsed from cassandra type, the keyspace is created as an unrecognized cass type; This gets the name back
         udt_name = _name_from_hex_string(subtypes[1].cassname)
         field_names = [_name_from_hex_string(encoded_name) for encoded_name in names[2:]]
         return cls.make_udt_class(keyspace, udt_name, field_names, subtypes[2:])
