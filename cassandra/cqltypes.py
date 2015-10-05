@@ -842,26 +842,14 @@ class UserType(TupleType):
     _module = sys.modules[__name__]
 
     @classmethod
-    def get_udt_class(cls, keyspace, udt_name):
-        # this is split from make_udt_class to allow protocol read_type
-        # to get the type without having to read and form all inputs for make_udt_class
-        if six.PY2 and isinstance(udt_name, unicode):
-            udt_name = udt_name.encode('utf-8')
-        try:
-            return cls._cache[(keyspace, udt_name)]
-        except KeyError:
-            pass
-
-    @classmethod
     def make_udt_class(cls, keyspace, udt_name, field_names, field_types):
         assert len(field_names) == len(field_types)
 
         if six.PY2 and isinstance(udt_name, unicode):
             udt_name = udt_name.encode('utf-8')
 
-        instance = cls.get_udt_class(keyspace, udt_name)
-
-        if not instance:
+        instance = cls._cache.get((keyspace, udt_name))
+        if not instance or instance.fieldnames != field_names or instance.subtypes != field_types:
             instance = type(udt_name, (cls,), {'subtypes': field_types,
                                                'cassname': cls.cassname,
                                                'typename': udt_name,
@@ -885,8 +873,8 @@ class UserType(TupleType):
     def apply_parameters(cls, subtypes, names):
         keyspace = subtypes[0].cass_parameterized_type()  # when parsed from cassandra type, the keyspace is created as an unrecognized cass type; This gets the name back
         udt_name = _name_from_hex_string(subtypes[1].cassname)
-        field_names = [_name_from_hex_string(encoded_name) for encoded_name in names[2:]]
-        return cls.make_udt_class(keyspace, udt_name, field_names, subtypes[2:])
+        field_names = tuple(_name_from_hex_string(encoded_name) for encoded_name in names[2:])  # using tuple here to match what comes into make_udt_class from other sources (for caching equality test)
+        return cls.make_udt_class(keyspace, udt_name, field_names, tuple(subtypes[2:]))
 
     @classmethod
     def cql_parameterized_type(cls):
@@ -926,11 +914,9 @@ class UserType(TupleType):
         # this is required to make the type resolvable via this module...
         # required when unregistered udts are pickled for use as keys in
         # util.OrderedMap
-        qualified_name = "%s_%s" % (keyspace, name)
-        try:
-            t = getattr(cls._module, qualified_name)
-        except AttributeError:
-            t = cls._make_udt_tuple_type(name, field_names)
+        t = cls._make_udt_tuple_type(name, field_names)
+        if t:
+            qualified_name = "%s_%s" % (keyspace, name)
             setattr(cls._module, qualified_name, t)
         return t
 
