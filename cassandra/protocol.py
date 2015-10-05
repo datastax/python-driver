@@ -685,8 +685,8 @@ class ResultMessage(_MessageType):
             specialized_type = typeclass.get_udt_class(ks, udt_name)
             if not specialized_type:
                 names, types = zip(*names_and_types)
-                mapped_class = user_type_map.get(ks, {}).get(udt_name)
-                specialized_type = typeclass.make_udt_class(ks, udt_name, names, types, mapped_class)
+                specialized_type = typeclass.make_udt_class(ks, udt_name, names, types)
+            specialized_type.mapped_class = user_type_map.get(ks, {}).get(udt_name)
             typeclass = specialized_type
         elif typeclass == CUSTOM_TYPE:
             classname = read_string(f)

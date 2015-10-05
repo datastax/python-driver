@@ -853,7 +853,7 @@ class UserType(TupleType):
             pass
 
     @classmethod
-    def make_udt_class(cls, keyspace, udt_name, field_names, field_types, mapped_class=None):
+    def make_udt_class(cls, keyspace, udt_name, field_names, field_types):
         assert len(field_names) == len(field_types)
 
         if six.PY2 and isinstance(udt_name, unicode):
@@ -867,7 +867,7 @@ class UserType(TupleType):
                                                'typename': udt_name,
                                                'fieldnames': field_names,
                                                'keyspace': keyspace,
-                                               'mapped_class': mapped_class,
+                                               'mapped_class': None,
                                                'tuple_type': cls._make_registered_udt_namedtuple(keyspace, udt_name, field_names)})
             cls._cache[(keyspace, udt_name)] = instance
         return instance
