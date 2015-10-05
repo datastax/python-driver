@@ -927,8 +927,9 @@ class UserType(TupleType):
         # required when unregistered udts are pickled for use as keys in
         # util.OrderedMap
         qualified_name = "%s_%s" % (keyspace, name)
-        t = getattr(cls._module, qualified_name, None)
-        if not t:
+        try:
+            t = getattr(cls._module, qualified_name)
+        except AttributeError:
             t = cls._make_udt_tuple_type(name, field_names)
             setattr(cls._module, qualified_name, t)
         return t
