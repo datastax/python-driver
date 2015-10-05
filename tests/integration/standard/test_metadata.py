@@ -675,10 +675,6 @@ class SchemaMetadataTests(unittest.TestCase):
 
 class TestCodeCoverage(unittest.TestCase):
 
-    @property
-    def table_name(self):
-        return self._testMethodName.lower()
-
     def test_export_schema(self):
         """
         Test export schema functionality
@@ -797,31 +793,6 @@ CREATE TABLE export_udts.users (
         self.assert_startswith_diff(table_meta.export_as_string(), expected_prefix)
 
         cluster.shutdown()
-
-    def test_udt_non_alphanum(self):
-        """
-        PYTHON-413
-        """
-        s = Cluster(protocol_version=PROTOCOL_VERSION).connect()
-        non_alphanum_name = 'test.field@#$%@%#!'
-        type_name = 'type2'
-        s.execute('CREATE TYPE IF NOT EXISTS test1rf."%s" ("%s" text)' % (non_alphanum_name, non_alphanum_name))
-        s.execute('CREATE TYPE IF NOT EXISTS test1rf.%s ("%s" text)' % (type_name, non_alphanum_name))
-        # table with types as map keys to make sure the tuple lookup works
-        s.execute('CREATE TABLE IF NOT EXISTS test1rf.%s (k int PRIMARY KEY, non_alphanum_type_map map<frozen<"%s">, int>, alphanum_type_map map<frozen<%s>, int>)' % (self.table_name, non_alphanum_name, type_name))
-        s.execute('INSERT INTO test1rf.%s (k, non_alphanum_type_map, alphanum_type_map) VALUES (%s, {{"%s": \'nonalphanum\'}: 0}, {{"%s": \'alphanum\'}: 1})' % (self.table_name, 0, non_alphanum_name, non_alphanum_name))
-        row = s.execute('SELECT * FROM test1rf.%s' % (self.table_name,))[0]
-        print row
-        k, v = row.non_alphanum_type_map.popitem()
-        self.assertEqual(v, 0)
-        self.assertEqual(k.__class__, tuple)
-        self.assertEqual(k[0], 'nonalphanum')
-
-        k, v = row.alphanum_type_map.popitem()
-        self.assertEqual(v, 1)
-        self.assertNotEqual(k.__class__, tuple)  # should be the namedtuple type
-        self.assertEqual(k[0], 'alphanum')
-        self.assertEqual(k.field_0_, 'alphanum')  # named tuple with positional field name
 
     def test_case_sensitivity(self):
         """

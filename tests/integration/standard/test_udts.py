@@ -41,6 +41,10 @@ def setup_module():
 
 class UDTTests(unittest.TestCase):
 
+    @property
+    def table_name(self):
+        return self._testMethodName.lower()
+
     def setUp(self):
         self._cass_version, self._cql_version = get_server_versions()
 
@@ -51,11 +55,9 @@ class UDTTests(unittest.TestCase):
         self.session = self.cluster.connect()
         execute_until_pass(self.session,
                            "CREATE KEYSPACE udttests WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}")
-        self.cluster.shutdown()
+        self.session.set_keyspace("udttests")
 
     def tearDown(self):
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        self.session = self.cluster.connect()
         execute_until_pass(self.session, "DROP KEYSPACE udttests")
         self.cluster.shutdown()
 
@@ -661,3 +663,28 @@ class UDTTests(unittest.TestCase):
         validate('map_udt', OrderedMap([(key, value), (key2, value)]))
 
         c.shutdown()
+
+    def test_non_alphanum_identifiers(self):
+        """
+        PYTHON-413
+        """
+        s = self.session
+        non_alphanum_name = 'test.field@#$%@%#!'
+        type_name = 'type2'
+        s.execute('CREATE TYPE "%s" ("%s" text)' % (non_alphanum_name, non_alphanum_name))
+        s.execute('CREATE TYPE %s ("%s" text)' % (type_name, non_alphanum_name))
+        # table with types as map keys to make sure the tuple lookup works
+        s.execute('CREATE TABLE %s (k int PRIMARY KEY, non_alphanum_type_map map<frozen<"%s">, int>, alphanum_type_map map<frozen<%s>, int>)' % (self.table_name, non_alphanum_name, type_name))
+        s.execute('INSERT INTO %s (k, non_alphanum_type_map, alphanum_type_map) VALUES (%s, {{"%s": \'nonalphanum\'}: 0}, {{"%s": \'alphanum\'}: 1})' % (self.table_name, 0, non_alphanum_name, non_alphanum_name))
+        row = s.execute('SELECT * FROM %s' % (self.table_name,))[0]
+
+        k, v = row.non_alphanum_type_map.popitem()
+        self.assertEqual(v, 0)
+        self.assertEqual(k.__class__, tuple)
+        self.assertEqual(k[0], 'nonalphanum')
+
+        k, v = row.alphanum_type_map.popitem()
+        self.assertEqual(v, 1)
+        self.assertNotEqual(k.__class__, tuple)  # should be the namedtuple type
+        self.assertEqual(k[0], 'alphanum')
+        self.assertEqual(k.field_0_, 'alphanum')  # named tuple with positional field name
