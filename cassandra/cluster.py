@@ -1225,24 +1225,6 @@ class Cluster(object):
             return SchemaTargetType.KEYSPACE
         return None
 
-    def submit_schema_refresh(self, keyspace=None, table=None, usertype=None, function=None, aggregate=None):
-        """
-        .. deprecated:: 2.6.0
-            Use refresh_*_metadata instead
-
-        Schedule a refresh of the internal representation of the current
-        schema for this cluster.  See :meth:`~.refresh_schema` for description of parameters.
-        """
-        msg = "submit_schema_refresh is deprecated. Use Cluster.refresh_*_metadata instead."
-        warnings.warn(msg, DeprecationWarning)
-        log.warning(msg)
-
-        self._validate_refresh_schema(keyspace, table, usertype, function, aggregate)
-        target_type = self._target_type_from_refresh_args(keyspace, table, usertype, function, aggregate)
-        return self.executor.submit(
-            self.control_connection.refresh_schema, target_type=target_type, keyspace=keyspace, table=table,
-            type=usertype, function=function, aggregate=aggregate)
-
     def refresh_schema_metadata(self, max_schema_agreement_wait=None):
         """
         Synchronously refresh all schema metadata.
