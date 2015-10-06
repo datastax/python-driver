@@ -310,7 +310,6 @@ class BaseModel(object):
 
     __keyspace__ = None
 
-    __polymorphic_key__ = None  # DEPRECATED
     __discriminator_value__ = None
 
     __options__ = None
@@ -753,14 +752,7 @@ class ModelMetaClass(type):
         is_abstract = attrs['__abstract__'] = attrs.get('__abstract__', False)
 
         # short circuit __discriminator_value__ inheritance
-        # __polymorphic_key__ is deprecated
-        poly_key = attrs.get('__polymorphic_key__', None)
-        if poly_key:
-            msg = '__polymorphic_key__ is deprecated. Use __discriminator_value__ instead'
-            warnings.warn(msg, DeprecationWarning)
-            log.warning(msg)
-        attrs['__discriminator_value__'] = attrs.get('__discriminator_value__', poly_key)
-        attrs['__polymorphic_key__'] = attrs['__discriminator_value__']
+        attrs['__discriminator_value__'] = attrs.get('__discriminator_value__')
 
         options = attrs.get('__options__') or {}
         attrs['__default_ttl__'] = options.get('default_time_to_live')
@@ -782,7 +774,7 @@ class ModelMetaClass(type):
         discriminator_columns = [c for c in column_definitions if c[1].discriminator_column]
         is_polymorphic = len(discriminator_columns) > 0
         if len(discriminator_columns) > 1:
-            raise ModelDefinitionException('only one discriminator_column (polymorphic_key (deprecated)) can be defined in a model, {0} found'.format(len(discriminator_columns)))
+            raise ModelDefinitionException('only one discriminator_column can be defined in a model, {0} found'.format(len(discriminator_columns)))
 
         if attrs['__discriminator_value__'] and not is_polymorphic:
             raise ModelDefinitionException('__discriminator_value__ specified, but no base columns defined with discriminator_column=True')
@@ -790,7 +782,7 @@ class ModelMetaClass(type):
         discriminator_column_name, discriminator_column = discriminator_columns[0] if discriminator_columns else (None, None)
 
         if isinstance(discriminator_column, (columns.BaseContainerColumn, columns.Counter)):
-            raise ModelDefinitionException('counter and container columns cannot be used as discriminator columns (polymorphic_key (deprecated)) ')
+            raise ModelDefinitionException('counter and container columns cannot be used as discriminator columns')
 
         # find polymorphic base class
         polymorphic_base = None
@@ -944,13 +936,6 @@ class Model(BaseModel):
     *Optional* Table options applied with this model
 
     (e.g. compaction, default ttl, cache settings, tec.)
-    """
-
-    __polymorphic_key__ = None
-    """
-    *Deprecated.*
-
-    see :attr:`~.__discriminator_value__`
     """
 
     __discriminator_value__ = None

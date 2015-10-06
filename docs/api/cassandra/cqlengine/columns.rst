@@ -29,8 +29,6 @@ Columns
 
     .. autoattribute:: clustering_order
 
-    .. autoattribute:: polymorphic_key
-
     .. autoattribute:: discriminator_column
 
     .. autoattribute:: static

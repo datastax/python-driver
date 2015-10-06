@@ -120,13 +120,6 @@ class Column(object):
     determines the order that the clustering keys are sorted on disk
     """
 
-    polymorphic_key = False
-    """
-    *Deprecated*
-
-    see :attr:`~.discriminator_column`
-    """
-
     discriminator_column = False
     """
     boolean, if set to True, this column will be used for discriminating records
@@ -151,7 +144,6 @@ class Column(object):
                  default=None,
                  required=False,
                  clustering_order=None,
-                 polymorphic_key=False,
                  discriminator_column=False,
                  static=False):
         self.partition_key = partition_key
@@ -161,14 +153,7 @@ class Column(object):
         self.default = default
         self.required = required
         self.clustering_order = clustering_order
-
-        if polymorphic_key:
-            msg = "polymorphic_key is deprecated. Use discriminator_column instead."
-            warnings.warn(msg, DeprecationWarning)
-            log.warning(msg)
-
-        self.discriminator_column = discriminator_column or polymorphic_key
-        self.polymorphic_key = self.discriminator_column
+        self.discriminator_column = discriminator_column
 
         # the column name in the model definition
         self.column_name = None

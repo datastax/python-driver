@@ -33,8 +33,6 @@ Model
     .. _ttl-change:
     .. autoattribute:: __default_ttl__
 
-    .. autoattribute:: __polymorphic_key__
-
     .. autoattribute:: __discriminator_value__
 
         See :ref:`model_inheritance` for usage examples.
