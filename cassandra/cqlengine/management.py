@@ -37,58 +37,6 @@ log = logging.getLogger(__name__)
 schema_columnfamilies = NamedTable('system', 'schema_columnfamilies')
 
 
-def create_keyspace(name, strategy_class, replication_factor, durable_writes=True, **replication_values):
-    """
-    *Deprecated - use :func:`create_keyspace_simple` or :func:`create_keyspace_network_topology` instead*
-
-    Creates a keyspace
-
-    If the keyspace already exists, it will not be modified.
-
-    **This function should be used with caution, especially in production environments.
-    Take care to execute schema modifications in a single context (i.e. not concurrently with other clients).**
-
-    *There are plans to guard schema-modifying functions with an environment-driven conditional.*
-
-    :param str name: name of keyspace to create
-    :param str strategy_class: keyspace replication strategy class (:attr:`~.SimpleStrategy` or :attr:`~.NetworkTopologyStrategy`
-    :param int replication_factor: keyspace replication factor, used with :attr:`~.SimpleStrategy`
-    :param bool durable_writes: Write log is bypassed if set to False
-    :param \*\*replication_values: Additional values to ad to the replication options map
-    """
-    if not _allow_schema_modification():
-        return
-
-    msg = "Deprecated. Use create_keyspace_simple or create_keyspace_network_topology instead"
-    warnings.warn(msg, DeprecationWarning)
-    log.warning(msg)
-
-    cluster = get_cluster()
-
-    if name not in cluster.metadata.keyspaces:
-        # try the 1.2 method
-        replication_map = {
-            'class': strategy_class,
-            'replication_factor': replication_factor
-        }
-        replication_map.update(replication_values)
-        if strategy_class.lower() != 'simplestrategy':
-            # Although the Cassandra documentation states for `replication_factor`
-            # that it is "Required if class is SimpleStrategy; otherwise,
-            # not used." we get an error if it is present.
-            replication_map.pop('replication_factor', None)
-
-        query = """
-        CREATE KEYSPACE {0}
-        WITH REPLICATION = {1}
-        """.format(metadata.protect_name(name), json.dumps(replication_map).replace('"', "'"))
-
-        if strategy_class != 'SimpleStrategy':
-            query += " AND DURABLE_WRITES = {0}".format('true' if durable_writes else 'false')
-
-        execute(query)
-
-
 def create_keyspace_simple(name, replication_factor, durable_writes=True):
     """
     Creates a keyspace with SimpleStrategy for replica placement
@@ -138,13 +86,6 @@ def _create_keyspace(name, durable_writes, strategy_class, strategy_options):
         execute(ks_meta.as_cql_query())
     else:
         log.info("Not creating keyspace %s because it already exists", name)
-
-
-def delete_keyspace(name):
-    msg = "Deprecated. Use drop_keyspace instead"
-    warnings.warn(msg, DeprecationWarning)
-    log.warning(msg)
-    drop_keyspace(name)
 
 
 def drop_keyspace(name):
