@@ -1225,46 +1225,6 @@ class Cluster(object):
             return SchemaTargetType.KEYSPACE
         return None
 
-    def refresh_schema(self, keyspace=None, table=None, usertype=None, function=None, aggregate=None, max_schema_agreement_wait=None):
-        """
-        .. deprecated:: 2.6.0
-            Use refresh_*_metadata instead
-
-        Synchronously refresh schema metadata.
-
-        {keyspace, table, usertype} are string names of the respective entities.
-        ``function`` is a :class:`cassandra.UserFunctionDescriptor`.
-        ``aggregate`` is a :class:`cassandra.UserAggregateDescriptor`.
-
-        If none of ``{keyspace, table, usertype, function, aggregate}`` are specified, the entire schema is refreshed.
-
-        If any of ``{keyspace, table, usertype, function, aggregate}`` are specified, ``keyspace`` is required.
-
-        If only ``keyspace`` is specified, just the top-level keyspace metadata is refreshed (e.g. replication).
-
-        The remaining arguments ``{table, usertype, function, aggregate}``
-        are mutually exclusive -- only one may be specified.
-
-        By default, the timeout for this operation is governed by :attr:`~.Cluster.max_schema_agreement_wait`
-        and :attr:`~.Cluster.control_connection_timeout`.
-
-        Passing max_schema_agreement_wait here overrides :attr:`~.Cluster.max_schema_agreement_wait`.
-
-        Setting max_schema_agreement_wait <= 0 will bypass schema agreement and refresh schema immediately.
-
-        An Exception is raised if schema refresh fails for any reason.
-        """
-        msg = "refresh_schema is deprecated. Use Cluster.refresh_*_metadata instead."
-        warnings.warn(msg, DeprecationWarning)
-        log.warning(msg)
-
-        self._validate_refresh_schema(keyspace, table, usertype, function, aggregate)
-        target_type = self._target_type_from_refresh_args(keyspace, table, usertype, function, aggregate)
-        if not self.control_connection.refresh_schema(target_type=target_type, keyspace=keyspace, table=table,
-                                                      type=usertype, function=function, aggregate=aggregate,
-                                                      schema_agreement_wait=max_schema_agreement_wait):
-            raise Exception("Schema was not refreshed. See log for details.")
-
     def submit_schema_refresh(self, keyspace=None, table=None, usertype=None, function=None, aggregate=None):
         """
         .. deprecated:: 2.6.0
