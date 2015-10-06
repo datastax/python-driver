@@ -73,20 +73,6 @@ def trim_if_startswith(s, prefix):
     return s
 
 
-def unix_time_from_uuid1(u):
-    msg = "'cassandra.cqltypes.unix_time_from_uuid1' has moved to 'cassandra.util'. This entry point will be removed in the next major version."
-    warnings.warn(msg, DeprecationWarning)
-    log.warning(msg)
-    return util.unix_time_from_uuid1(u)
-
-
-def datetime_from_timestamp(timestamp):
-    msg = "'cassandra.cqltypes.datetime_from_timestamp' has moved to 'cassandra.util'. This entry point will be removed in the next major version."
-    warnings.warn(msg, DeprecationWarning)
-    log.warning(msg)
-    return util.datetime_from_timestamp(timestamp)
-
-
 _casstypes = {}
 
 
@@ -538,7 +524,6 @@ class DateType(_CassandraType):
 
     @staticmethod
     def interpret_datestring(val):
-        # not used internally. deprecate?
         if val[-5] in ('+', '-'):
             offset = (int(val[-4:-2]) * 3600 + int(val[-2:]) * 60) * int(val[-5] + '1')
             val = val[:-5]
@@ -582,7 +567,7 @@ class TimeUUIDType(DateType):
     typename = 'timeuuid'
 
     def my_timestamp(self):
-        return unix_time_from_uuid1(self.val)
+        return util.unix_time_from_uuid1(self.val)
 
     @staticmethod
     def deserialize(byts, protocol_version):
