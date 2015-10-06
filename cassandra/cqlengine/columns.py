@@ -594,17 +594,6 @@ class Float(BaseFloat):
     """
     db_type = 'float'
 
-    def __init__(self, double_precision=None, **kwargs):
-        if double_precision is None or bool(double_precision):
-            msg = "Float(double_precision=True) is deprecated. Use Double() type instead."
-            double_precision = True
-            warnings.warn(msg, DeprecationWarning)
-            log.warning(msg)
-
-        self.db_type = 'double' if double_precision else 'float'
-
-        super(Float, self).__init__(**kwargs)
-
 
 class Double(BaseFloat):
     """

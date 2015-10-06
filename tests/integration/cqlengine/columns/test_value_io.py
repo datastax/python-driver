@@ -175,15 +175,9 @@ class TestTimeUUID(BaseColumnIOTest):
         return val if isinstance(val, UUID) else UUID(val)
 
 
-# until Floats are implicitly single:
-class FloatSingle(columns.Float):
-    def __init__(self, **kwargs):
-        super(FloatSingle, self).__init__(double_precision=False, **kwargs)
-
-
 class TestFloatIO(BaseColumnIOTest):
 
-    column = FloatSingle
+    column = columns.Float
 
     pkey_val = 4.75
     data_val = -1.5
