@@ -162,6 +162,6 @@ class CustomPayloadTests(unittest.TestCase):
         # Submit the statement with our custom payload. Validate the one
         # we receive from the server matches
         response_future = self.session.execute_async(statement, custom_payload=custom_payload)
-        response_future.result(timeout=10.0)
+        response_future.result()
         returned_custom_payload = response_future.custom_payload
         self.assertEqual(custom_payload, returned_custom_payload)

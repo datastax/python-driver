@@ -137,7 +137,7 @@ class QueryTests(unittest.TestCase):
         query = "SELECT * FROM system.local"
         statement = SimpleStatement(query)
         response_future = session.execute_async(statement, trace=True)
-        response_future.result(timeout=10.0)
+        response_future.result()
 
         # Fetch the client_ip from the trace.
         trace = response_future.get_query_trace(max_wait=2.0)

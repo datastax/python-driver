@@ -3147,26 +3147,14 @@ class ResponseFuture(object):
         # otherwise, move onto another host
         self.send_request()
 
-    def result(self, timeout=_NOT_SET):
+    def result(self):
         """
         Return the final result or raise an Exception if errors were
         encountered.  If the final result or error has not been set
-        yet, this method will block until that time.
+        yet, this method will block until it is set, or the timeout
+        set for the request expires.
 
-        .. versionchanged:: 2.6.0
-
-        **`timeout` is deprecated. Use timeout in the Session execute functions instead.
-        The following description applies to deprecated behavior:**
-
-        You may set a timeout (in seconds) with the `timeout` parameter.
-        By default, the :attr:`~.default_timeout` for the :class:`.Session`
-        this was created through will be used for the timeout on this
-        operation.
-
-        This timeout applies to the entire request, including any retries
-        (decided internally by the :class:`.policies.RetryPolicy` used with
-        the request).
-
+        Timeout is specified in the Session request execution functions.
         If the timeout is exceeded, an :exc:`cassandra.OperationTimedOut` will be raised.
         This is a client-side timeout. For more information
         about server-side coordinator timeouts, see :class:`.policies.RetryPolicy`.
@@ -3184,18 +3172,7 @@ class ResponseFuture(object):
             ...     log.exception("Operation failed:")
 
         """
-        if timeout is not _NOT_SET and not ResponseFuture._warned_timeout:
-            msg = "ResponseFuture.result timeout argument is deprecated. Specify the request timeout via Session.execute[_async]."
-            warnings.warn(msg, DeprecationWarning)
-            log.warning(msg)
-            ResponseFuture._warned_timeout = True
-        else:
-            timeout = None
-
-        self._event.wait(timeout)
-        # TODO: remove this conditional when deprecated timeout parameter is removed
-        if not self._event.is_set():
-            self._on_timeout()
+        self._event.wait()
         if self._final_result is not _NOT_SET:
             if self._paging_state is None:
                 return self._final_result
