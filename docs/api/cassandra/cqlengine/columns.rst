@@ -78,8 +78,6 @@ Columns of all types are initialized by passing :class:`.Column` attributes to t
 
 .. autoclass:: TimeUUID(**kwargs)
 
-    .. automethod:: from_datetime
-
 .. autoclass:: TinyInt(**kwargs)
 
 .. autoclass:: UserDefinedType

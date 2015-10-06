@@ -540,6 +540,7 @@ class UUID(Column):
     def to_database(self, value):
         return self.validate(value)
 
+
 from uuid import UUID as pyUUID, getnode
 
 
@@ -549,25 +550,6 @@ class TimeUUID(UUID):
     """
 
     db_type = 'timeuuid'
-
-    @classmethod
-    def from_datetime(self, dt):
-        """
-        generates a UUID for a given datetime
-
-        :param dt: datetime
-        :type dt: datetime
-        :return: uuid1
-
-        .. deprecated:: 2.6.0
-
-            Use :func:`cassandra.util.uuid_from_time`
-
-        """
-        msg = "cqlengine.columns.TimeUUID.from_datetime is deprecated. Use cassandra.util.uuid_from_time instead."
-        warnings.warn(msg, DeprecationWarning)
-        log.warning(msg)
-        return util.uuid_from_time(dt)
 
 
 class Boolean(Column):
