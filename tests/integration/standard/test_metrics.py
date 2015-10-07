@@ -77,7 +77,7 @@ class MetricsTests(unittest.TestCase):
         # Assert read
         query = SimpleStatement("SELECT * FROM test WHERE k=1", consistency_level=ConsistencyLevel.ALL)
         results = execute_until_pass(session, query)
-        self.assertEqual(1, len(results))
+        self.assertTrue(results)
 
         # Pause node so it shows as unreachable to coordinator
         get_node(1).pause()
@@ -110,7 +110,7 @@ class MetricsTests(unittest.TestCase):
         # Assert read
         query = SimpleStatement("SELECT * FROM test WHERE k=1", consistency_level=ConsistencyLevel.ALL)
         results = execute_until_pass(session, query)
-        self.assertEqual(1, len(results))
+        self.assertTrue(results)
 
         # Pause node so it shows as unreachable to coordinator
         get_node(1).pause()
@@ -143,7 +143,7 @@ class MetricsTests(unittest.TestCase):
         # Assert read
         query = SimpleStatement("SELECT * FROM test WHERE k=1", consistency_level=ConsistencyLevel.ALL)
         results = execute_until_pass(session, query)
-        self.assertEqual(1, len(results))
+        self.assertTrue(results)
 
         # Stop node gracefully
         get_node(1).stop(wait=True, wait_other_notice=True)

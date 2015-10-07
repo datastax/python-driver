@@ -75,7 +75,6 @@ class UDTTests(unittest.TestCase):
 
         s.execute("INSERT INTO mytable (a, b) VALUES (%s, %s)", (0, User(42, 'bob')))
         result = s.execute("SELECT b FROM mytable WHERE a=0")
-        self.assertEqual(1, len(result))
         row = result[0]
         self.assertEqual(42, row.b.age)
         self.assertEqual('bob', row.b.name)
@@ -95,7 +94,6 @@ class UDTTests(unittest.TestCase):
 
         s.execute("INSERT INTO mytable (a, b) VALUES (%s, %s)", (0, User('Texas', True)))
         result = s.execute("SELECT b FROM mytable WHERE a=0")
-        self.assertEqual(1, len(result))
         row = result[0]
         self.assertEqual('Texas', row.b.state)
         self.assertEqual(True, row.b.is_cool)
@@ -142,7 +140,6 @@ class UDTTests(unittest.TestCase):
         s.set_keyspace("udt_test_register_before_connecting")
         s.execute("INSERT INTO mytable (a, b) VALUES (%s, %s)", (0, User1(42, 'bob')))
         result = s.execute("SELECT b FROM mytable WHERE a=0")
-        self.assertEqual(1, len(result))
         row = result[0]
         self.assertEqual(42, row.b.age)
         self.assertEqual('bob', row.b.name)
@@ -152,7 +149,6 @@ class UDTTests(unittest.TestCase):
         s.set_keyspace("udt_test_register_before_connecting2")
         s.execute("INSERT INTO mytable (a, b) VALUES (%s, %s)", (0, User2('Texas', True)))
         result = s.execute("SELECT b FROM mytable WHERE a=0")
-        self.assertEqual(1, len(result))
         row = result[0]
         self.assertEqual('Texas', row.b.state)
         self.assertEqual(True, row.b.is_cool)
@@ -177,7 +173,6 @@ class UDTTests(unittest.TestCase):
 
         select = s.prepare("SELECT b FROM mytable WHERE a=?")
         result = s.execute(select, (0,))
-        self.assertEqual(1, len(result))
         row = result[0]
         self.assertEqual(42, row.b.age)
         self.assertEqual('bob', row.b.name)
@@ -197,7 +192,6 @@ class UDTTests(unittest.TestCase):
 
         select = s.prepare("SELECT b FROM mytable WHERE a=?")
         result = s.execute(select, (0,))
-        self.assertEqual(1, len(result))
         row = result[0]
         self.assertEqual('Texas', row.b.state)
         self.assertEqual(True, row.b.is_cool)
@@ -223,7 +217,6 @@ class UDTTests(unittest.TestCase):
 
         select = s.prepare("SELECT b FROM mytable WHERE a=?")
         result = s.execute(select, (0,))
-        self.assertEqual(1, len(result))
         row = result[0]
         self.assertEqual(42, row.b.age)
         self.assertEqual('bob', row.b.name)
@@ -246,7 +239,6 @@ class UDTTests(unittest.TestCase):
 
         select = s.prepare("SELECT b FROM mytable WHERE a=?")
         result = s.execute(select, (0,))
-        self.assertEqual(1, len(result))
         row = result[0]
         self.assertEqual('Texas', row.b.state)
         self.assertEqual(True, row.b.is_cool)
@@ -528,7 +520,6 @@ class UDTTests(unittest.TestCase):
 
         # retrieve and verify data
         results = s.execute("SELECT * FROM mytable")
-        self.assertEqual(1, len(results))
 
         row = results[0].b
         for expected, actual in zip(params, row):
@@ -587,7 +578,6 @@ class UDTTests(unittest.TestCase):
 
         # retrieve and verify data
         results = s.execute("SELECT * FROM mytable")
-        self.assertEqual(1, len(results))
 
         row = results[0].b
         for expected, actual in zip(params, row):

@@ -20,7 +20,7 @@ from six.moves import xrange, zip
 from threading import Condition
 import sys
 
-from cassandra.cluster import PagedResult
+from cassandra.cluster import ResultSet
 
 import logging
 log = logging.getLogger(__name__)
@@ -134,8 +134,8 @@ class _ConcurrentExecutor(object):
             self._put_result(e, idx, False)
 
     def _on_success(self, result, future, idx):
-        if future.has_more_pages:
-            result = PagedResult(future, result)
+        if future._is_result_kind_rows:
+            result = ResultSet(future, result)
             future.clear_callbacks()
         self._put_result(result, idx, True)
 

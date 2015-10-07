@@ -493,7 +493,6 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         session.execute(prepared.bind((1, 2, 3)))
 
         results = session.execute('SELECT * FROM %s WHERE k1 = 1 AND k2 = 2' % table)
-        self.assertTrue(len(results) == 1)
         self.assertTrue(results[0].i)
 
         cluster.shutdown()
@@ -539,7 +538,6 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         p = session.prepare("SELECT * FROM system.local WHERE key=?")
         # this would blow up prior to 61b4fad
         r = session.execute(p, ('local',))
-        self.assertEqual(len(r), 1)
         self.assertEqual(r[0].key, 'local')
 
         cluster.shutdown()

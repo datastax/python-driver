@@ -2720,6 +2720,7 @@ class ResponseFuture(object):
     _start_time = None
     _metrics = None
     _paging_state = None
+    _is_result_kind_rows = False
     _custom_payload = None
     _warnings = None
     _timer = None
@@ -2930,7 +2931,8 @@ class ResponseFuture(object):
                         self, **response.results)
                 else:
                     results = getattr(response, 'results', None)
-                    if results is not None and response.kind == RESULT_KIND_ROWS:
+                    self._is_result_kind_rows = response.kind ==RESULT_KIND_ROWS
+                    if results is not None and self._is_result_kind_rows:
                         self._paging_state = response.paging_state
                         results = self.row_factory(*results)
                     self._set_final_result(results)
@@ -3197,10 +3199,10 @@ class ResponseFuture(object):
         if not self._event.is_set():
             self._on_timeout()
         if self._final_result is not _NOT_SET:
-            if self._paging_state is None:
-                return self._final_result
+            if self._is_result_kind_rows:
+                return ResultSet(self, self._final_result)
             else:
-                return PagedResult(self, self._final_result)
+                return self._final_result
         else:
             raise self._final_exception
 
@@ -3333,51 +3335,74 @@ class QueryExhausted(Exception):
     pass
 
 
-class PagedResult(object):
+class ResultSet(object):
     """
-    An iterator over the rows from a paged query result.  Whenever the number
-    of result rows for a query exceed the :attr:`~.query.Statement.fetch_size`
-    (or :attr:`~.Session.default_fetch_size`, if not set) an instance of this
-    class will be returned.
+    An iterator over the rows from a query result. Also supplies basic equality
+    and indexing methods for backward-compatability. These methods materialize
+    the entire result set (loading all pages), and should only be used if the
+    total result size is understood. Warnings are emitted when paged results
+    are materialized in this fashion.
 
     You can treat this as a normal iterator over rows::
 
         >>> from cassandra.query import SimpleStatement
         >>> statement = SimpleStatement("SELECT * FROM users", fetch_size=10)
         >>> for user_row in session.execute(statement):
-        ...     process_user(user_row)
+        ...     process_user(user_rowt
 
     Whenever there are no more rows in the current page, the next page will
     be fetched transparently.  However, note that it *is* possible for
     an :class:`Exception` to be raised while fetching the next page, just
     like you might see on a normal call to ``session.execute()``.
-
-    .. versionadded: 2.0.0
     """
-
-    response_future = None
 
     def __init__(self, response_future, initial_response):
         self.response_future = response_future
-        self.current_response = iter(initial_response)
+        self._had_pages = response_future.has_more_pages
+        self._current_rows = initial_response
+        self._page_iter = None
+
+    @property
+    def has_more_pages(self):
+        return self.response_future.has_more_pages
 
     def __iter__(self):
+        self._page_iter = iter(self._current_rows)
         return self
 
     def next(self):
         try:
-            return next(self.current_response)
+            return next(self._page_iter)
         except StopIteration:
             if not self.response_future.has_more_pages:
                 raise
 
         self.response_future.start_fetching_next_page()
         result = self.response_future.result()
-        if self.response_future.has_more_pages:
-            self.current_response = result.current_response
-        else:
-            self.current_response = iter(result)
+        self._current_rows = result._current_rows
+        self._page_iter = iter(self._current_rows)
 
-        return next(self.current_response)
+        return next(self._page_iter)
 
     __next__ = next
+
+    def __eq__(self, other):
+        if self._page_iter and self._had_pages:
+            raise RuntimeError("Cannot test equality when paged results have been consumed.")
+        if self.response_future.has_more_pages:
+            log.warning("Using equality operator on paged results causes entire result set to be materialized.")
+            self._current_rows = list(self)
+        return self._current_rows == other
+
+    def __getitem__(self, i):
+        if self._page_iter and self._had_pages:
+            raise RuntimeError("Cannot index when paged results have been consumed.")
+        if self.response_future.has_more_pages:
+            log.warning("Using indexing on paged results causes entire result set to be materialized.")
+            self._current_rows = list(self)
+        return self._current_rows[i]
+
+    def __nonzero__(self):
+        return bool(self._current_rows)
+
+    __bool__ = __nonzero__

@@ -19,7 +19,7 @@ try:
 except ImportError:
     import unittest # noqa
 
-from cassandra.cluster import Cluster
+from cassandra.cluster import Cluster, ResultSet
 from cassandra.query import tuple_factory, named_tuple_factory, dict_factory, ordered_dict_factory
 from cassandra.util import OrderedDict
 
@@ -72,7 +72,7 @@ class RowFactoryTests(unittest.TestCase):
 
         result = session.execute(self.select)
 
-        self.assertIsInstance(result, list)
+        self.assertIsInstance(result, ResultSet)
         self.assertIsInstance(result[0], tuple)
 
         for row in result:
@@ -93,7 +93,7 @@ class RowFactoryTests(unittest.TestCase):
 
         result = session.execute(self.select)
 
-        self.assertIsInstance(result, list)
+        self.assertIsInstance(result, ResultSet)
 
         for row in result:
             self.assertEqual(row.k, row.v)
@@ -113,7 +113,7 @@ class RowFactoryTests(unittest.TestCase):
 
         result = session.execute(self.select)
 
-        self.assertIsInstance(result, list)
+        self.assertIsInstance(result, ResultSet)
         self.assertIsInstance(result[0], dict)
 
         for row in result:
@@ -134,7 +134,7 @@ class RowFactoryTests(unittest.TestCase):
 
         result = session.execute(self.select)
 
-        self.assertIsInstance(result, list)
+        self.assertIsInstance(result, ResultSet)
         self.assertIsInstance(result[0], OrderedDict)
 
         for row in result:

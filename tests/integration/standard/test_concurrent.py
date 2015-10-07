@@ -18,7 +18,7 @@ import sys, logging, traceback
 
 from cassandra import InvalidRequest, ConsistencyLevel, ReadTimeout, WriteTimeout, OperationTimedOut, \
     ReadFailure, WriteFailure
-from cassandra.cluster import Cluster, PagedResult
+from cassandra.cluster import Cluster
 from cassandra.concurrent import execute_concurrent, execute_concurrent_with_args
 from cassandra.policies import HostDistance
 from cassandra.query import tuple_factory, SimpleStatement
@@ -184,7 +184,7 @@ class ClusterTests(unittest.TestCase):
         self.assertEqual(1, len(results))
         self.assertTrue(results[0][0])
         result = results[0][1]
-        self.assertIsInstance(result, PagedResult)
+        self.assertTrue(result.has_more_pages)
         self.assertEqual(num_statements, sum(1 for _ in result))
 
     def test_execute_concurrent_paged_result_generator(self):
