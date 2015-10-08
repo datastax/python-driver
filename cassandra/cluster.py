@@ -3358,15 +3358,17 @@ class ResultSet(object):
 
     def __init__(self, response_future, initial_response):
         self.response_future = response_future
-        self._had_pages = response_future.has_more_pages
         self._current_rows = initial_response
         self._page_iter = None
+        self._list_mode = False
 
     @property
     def has_more_pages(self):
         return self.response_future.has_more_pages
 
     def __iter__(self):
+        if self._list_mode:
+            return iter(self._current_rows)
         self._page_iter = iter(self._current_rows)
         return self
 
@@ -3375,6 +3377,8 @@ class ResultSet(object):
             return next(self._page_iter)
         except StopIteration:
             if not self.response_future.has_more_pages:
+                if not self._list_mode:
+                    self._current_rows = []
                 raise
 
         self.response_future.start_fetching_next_page()
@@ -3386,20 +3390,26 @@ class ResultSet(object):
 
     __next__ = next
 
-    def __eq__(self, other):
-        if self._page_iter and self._had_pages:
-            raise RuntimeError("Cannot test equality when paged results have been consumed.")
+    def _fetch_all(self):
+        self._current_rows = list(self)
+        self._page_iter = None
+
+    def _enter_list_mode(self, operator):
+        if self._list_mode:
+            return
+        if self._page_iter:
+            raise RuntimeError("Cannot use %s when results have been iterated." % operator)
         if self.response_future.has_more_pages:
-            log.warning("Using equality operator on paged results causes entire result set to be materialized.")
-            self._current_rows = list(self)
+            log.warning("Using %s on paged results causes entire result set to be materialized.", operator)
+            self._fetch_all()
+        self._list_mode = True
+
+    def __eq__(self, other):
+        self._enter_list_mode("equality operator")
         return self._current_rows == other
 
     def __getitem__(self, i):
-        if self._page_iter and self._had_pages:
-            raise RuntimeError("Cannot index when paged results have been consumed.")
-        if self.response_future.has_more_pages:
-            log.warning("Using indexing on paged results causes entire result set to be materialized.")
-            self._current_rows = list(self)
+        self._enter_list_mode("index operator")
         return self._current_rows[i]
 
     def __nonzero__(self):
