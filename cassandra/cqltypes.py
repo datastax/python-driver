@@ -842,22 +842,23 @@ class UserType(TupleType):
     _module = sys.modules[__name__]
 
     @classmethod
-    def make_udt_class(cls, keyspace, udt_name, names_and_types, mapped_class):
+    def make_udt_class(cls, keyspace, udt_name, field_names, field_types):
+        assert len(field_names) == len(field_types)
+
         if six.PY2 and isinstance(udt_name, unicode):
             udt_name = udt_name.encode('utf-8')
-        try:
-            return cls._cache[(keyspace, udt_name)]
-        except KeyError:
-            field_names, types = zip(*names_and_types)
-            instance = type(udt_name, (cls,), {'subtypes': types,
+
+        instance = cls._cache.get((keyspace, udt_name))
+        if not instance or instance.fieldnames != field_names or instance.subtypes != field_types:
+            instance = type(udt_name, (cls,), {'subtypes': field_types,
                                                'cassname': cls.cassname,
                                                'typename': udt_name,
                                                'fieldnames': field_names,
                                                'keyspace': keyspace,
-                                               'mapped_class': mapped_class,
+                                               'mapped_class': None,
                                                'tuple_type': cls._make_registered_udt_namedtuple(keyspace, udt_name, field_names)})
             cls._cache[(keyspace, udt_name)] = instance
-            return instance
+        return instance
 
     @classmethod
     def evict_udt_class(cls, keyspace, udt_name):
@@ -870,17 +871,10 @@ class UserType(TupleType):
 
     @classmethod
     def apply_parameters(cls, subtypes, names):
-        keyspace = subtypes[0]
+        keyspace = subtypes[0].cass_parameterized_type()  # when parsed from cassandra type, the keyspace is created as an unrecognized cass type; This gets the name back
         udt_name = _name_from_hex_string(subtypes[1].cassname)
-        field_names = [_name_from_hex_string(encoded_name) for encoded_name in names[2:]]
-        assert len(field_names) == len(subtypes[2:])
-        return type(udt_name, (cls,), {'subtypes': subtypes[2:],
-                                       'cassname': cls.cassname,
-                                       'typename': udt_name,
-                                       'fieldnames': field_names,
-                                       'keyspace': keyspace,
-                                       'mapped_class': None,
-                                       'tuple_type': namedtuple(udt_name, field_names)})
+        field_names = tuple(_name_from_hex_string(encoded_name) for encoded_name in names[2:])  # using tuple here to match what comes into make_udt_class from other sources (for caching equality test)
+        return cls.make_udt_class(keyspace, udt_name, field_names, tuple(subtypes[2:]))
 
     @classmethod
     def cql_parameterized_type(cls):
@@ -891,17 +885,24 @@ class UserType(TupleType):
         values = super(UserType, cls).deserialize_safe(byts, protocol_version)
         if cls.mapped_class:
             return cls.mapped_class(**dict(zip(cls.fieldnames, values)))
-        else:
+        elif cls.tuple_type:
             return cls.tuple_type(*values)
+        else:
+            return tuple(values)
 
     @classmethod
     def serialize_safe(cls, val, protocol_version):
         proto_version = max(3, protocol_version)
         buf = io.BytesIO()
-        for fieldname, subtype in zip(cls.fieldnames, cls.subtypes):
-            item = getattr(val, fieldname)
+        for i, (fieldname, subtype) in enumerate(zip(cls.fieldnames, cls.subtypes)):
+            # first treat as a tuple, else by custom type
+            try:
+                item = val[i]
+            except TypeError:
+                item = getattr(val, fieldname)
+
             if item is not None:
-                packed_item = subtype.to_binary(getattr(val, fieldname), proto_version)
+                packed_item = subtype.to_binary(item, proto_version)
                 buf.write(int32_pack(len(packed_item)))
                 buf.write(packed_item)
             else:
@@ -913,12 +914,28 @@ class UserType(TupleType):
         # this is required to make the type resolvable via this module...
         # required when unregistered udts are pickled for use as keys in
         # util.OrderedMap
-        qualified_name = "%s_%s" % (keyspace, name)
-        nt = getattr(cls._module, qualified_name, None)
-        if not nt:
-            nt = namedtuple(qualified_name, field_names)
-            setattr(cls._module, qualified_name, nt)
-        return nt
+        t = cls._make_udt_tuple_type(name, field_names)
+        if t:
+            qualified_name = "%s_%s" % (keyspace, name)
+            setattr(cls._module, qualified_name, t)
+        return t
+
+    @classmethod
+    def _make_udt_tuple_type(cls, name, field_names):
+        # fallback to positional named, then unnamed tuples
+        # for CQL identifiers that aren't valid in Python,
+        try:
+            t = namedtuple(name, field_names)
+        except ValueError:
+            try:
+                t = namedtuple(name, util._positional_rename_invalid_identifiers(field_names))
+                log.warn("could not create a namedtuple for '%s' because one or more field names are not valid Python identifiers (%s); " \
+                         "returning positionally-named fields" % (name, field_names))
+            except ValueError:
+                t = None
+                log.warn("could not create a namedtuple for '%s' because the name is not a valid Python identifier; " \
+                         "will return tuples in its place" % (name,))
+        return t
 
 
 class CompositeType(_ParameterizedType):

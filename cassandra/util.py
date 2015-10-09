@@ -788,6 +788,14 @@ class OrderedMap(Mapping):
     def __str__(self):
         return '{%s}' % ', '.join("%r: %r" % (k, v) for k, v in self._items)
 
+    def popitem(self):
+        try:
+            kv = self._items.pop()
+            del self._index[self._serialize_key(kv[0])]
+            return kv
+        except IndexError:
+            raise KeyError()
+
     def _serialize_key(self, key):
         return cPickle.dumps(key)
 
@@ -1108,3 +1116,19 @@ else:
             raise socket.error(ctypes.FormatError())
 
         return ip_string[:ip_string_size.value - 1]
+
+
+import keyword
+
+
+# similar to collections.namedtuple, reproduced here because Python 2.6 did not have the rename logic
+def _positional_rename_invalid_identifiers(field_names):
+    names_out = list(field_names)
+    for index, name in enumerate(field_names):
+        if (not all(c.isalnum() or c == '_' for c in name)
+            or keyword.iskeyword(name)
+            or not name
+            or name[0].isdigit()
+            or name.startswith('_')):
+            names_out[index] = 'field_%d_' % index
+    return names_out

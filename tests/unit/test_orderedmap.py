@@ -146,6 +146,12 @@ class OrderedMapTest(unittest.TestCase):
         self.assertEqual(str(OrderedMap([('two', 2), ('one', 1), (d, 'value'), (s, 'another')])),
                          "{'two': 2, 'one': 1, %r: 'value', %r: 'another'}" % (d, s))
 
+    def test_popitem(self):
+        item = (1, 2)
+        om = OrderedMap((item,))
+        self.assertEqual(om.popitem(), item)
+        self.assertRaises(KeyError, om.popitem)
+
 
 class OrderedMapSerializedKeyTest(unittest.TestCase):
     def test_init(self):

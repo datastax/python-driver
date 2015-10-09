@@ -526,11 +526,11 @@ class TypeTests(unittest.TestCase):
 
         # create list values
         for datatype in PRIMITIVE_DATATYPES:
-            values.append('v_{} frozen<tuple<list<{}>>>'.format(len(values), datatype))
+            values.append('v_{0} frozen<tuple<list<{1}>>>'.format(len(values), datatype))
 
         # create set values
         for datatype in PRIMITIVE_DATATYPES:
-            values.append('v_{} frozen<tuple<set<{}>>>'.format(len(values), datatype))
+            values.append('v_{0} frozen<tuple<set<{1}>>>'.format(len(values), datatype))
 
         # create map values
         for datatype in PRIMITIVE_DATATYPES:
@@ -538,7 +538,7 @@ class TypeTests(unittest.TestCase):
             if datatype == 'blob':
                 # unhashable type: 'bytearray'
                 datatype_1 = 'ascii'
-            values.append('v_{} frozen<tuple<map<{}, {}>>>'.format(len(values), datatype_1, datatype_2))
+            values.append('v_{0} frozen<tuple<map<{1}, {2}>>>'.format(len(values), datatype_1, datatype_2))
 
         # make sure we're testing all non primitive data types in the future
         if set(COLLECTION_TYPES) != set(['tuple', 'list', 'map', 'set']):
