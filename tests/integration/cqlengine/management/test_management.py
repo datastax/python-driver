@@ -217,6 +217,15 @@ class TablePropertiesTests(BaseCassEngTestCase):
 
         self.assertDictContainsSubset(ModelWithTableProperties.__options__, table_options)
 
+    def test_bogus_option_update(self):
+        sync_table(ModelWithTableProperties)
+        option = 'no way will this ever be an option'
+        try:
+            ModelWithTableProperties.__options__[option] = 'what was I thinking?'
+            self.assertRaisesRegexp(KeyError, "Invalid table option.*%s.*" % option, sync_table, ModelWithTableProperties)
+        finally:
+            ModelWithTableProperties.__options__.pop(option, None)
+
 
 class SyncTableTests(BaseCassEngTestCase):
 

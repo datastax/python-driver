@@ -422,7 +422,10 @@ def _update_options(model):
 
     update_options = {}
     for name, value in model_options.items():
-        existing_value = existing_options[name]
+        try:
+            existing_value = existing_options[name]
+        except KeyError:
+            raise KeyError("Invalid table option: '%s'; known options: %s" % (name, existing_options.keys()))
         if isinstance(existing_value, six.string_types):
             if value != existing_value:
                 update_options[name] = value
