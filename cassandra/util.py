@@ -1121,7 +1121,7 @@ else:
 import keyword
 
 
-# similar tot a collections.namedtuple, reproduced here because Python 2.6 did not have the rename logic
+# similar to collections.namedtuple, reproduced here because Python 2.6 did not have the rename logic
 def _positional_rename_invalid_identifiers(field_names):
     names_out = list(field_names)
     for index, name in enumerate(field_names):
