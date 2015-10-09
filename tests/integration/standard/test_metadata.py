@@ -20,6 +20,7 @@ except ImportError:
 import difflib
 import six
 import sys
+import time
 from mock import Mock, patch
 
 from cassandra import AlreadyExists, SignatureDescriptor, UserFunctionDescriptor, UserAggregateDescriptor
@@ -2105,17 +2106,16 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         self.assertEquals(day_column.is_static, mv.clustering_key[2].is_static)
         self.assertEquals(day_column.is_reversed, mv.clustering_key[2].is_reversed)
 
-    def test_base_table_mv_changes(self):
+    def test_base_table_column_addition_mv(self):
         """
-        test to ensure that materialized view metadata is properly updated with base table changes
+        test to ensure that materialized view metadata is properly updated with base columns are added
 
-        test_create_view_metadata tests that materialized views metadata is properly updated when corresponding changes
-        are made to the base table. We test adding a new column and changing base table columns types. We then ensure
-        that changes are surfaced in the MV accordingly.
+        test_create_view_metadata tests that materialized views metadata is properly updated when columns are added to
+        the base table.
 
         @since 3.0.0
         @jira_ticket PYTHON-419
-        @expected_result Materialized view metadata should be update correctly
+        @expected_result Materialized view metadata should be updated correctly
 
         @test_category metadata
         """
@@ -2150,6 +2150,7 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         score_table = self.cluster.metadata.keyspaces[self.keyspace_name].tables['scores']
 
         self.assertIsNotNone(score_table.views["monthlyhigh"])
+        self.assertIsNotNone(score_table.views["alltimehigh"])
         self.assertEqual(len(self.cluster.metadata.keyspaces[self.keyspace_name].views), 2)
 
         insert_fouls = """ALTER TABLE {0}.scores ADD fouls INT""".format((self.keyspace_name))
@@ -2157,22 +2158,65 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         self.session.execute(insert_fouls)
         self.assertEqual(len(self.cluster.metadata.keyspaces[self.keyspace_name].views), 2)
 
-        alter_scores = """ALTER TABLE {0}.scores ALTER score blob""".format((self.keyspace_name))
+        score_table = self.cluster.metadata.keyspaces[self.keyspace_name].tables['scores']
+        self.assertIn("fouls", score_table.columns)
 
+        # This is a workaround for mv notifications being separate from base table schema responses.
+        # This maybe fixed with future protocol changes
+        for i in range(10):
+            mv_alltime = self.cluster.metadata.keyspaces[self.keyspace_name].views["alltimehigh"]
+            if("fouls" in mv_alltime.columns):
+                break
+            time.sleep(.2)
+
+        self.assertIn("fouls", mv_alltime.columns)
+
+        mv_alltime_fouls_comumn = self.cluster.metadata.keyspaces[self.keyspace_name].views["alltimehigh"].columns['fouls']
+        self.assertEquals(mv_alltime_fouls_comumn.typestring, 'int')
+
+    def test_base_table_type_alter_mv(self):
+        """
+        test to ensure that materialized view metadata is properly updated when a type in the base table
+        is updated.
+
+        test_create_view_metadata tests that materialized views metadata is properly updated when the type of base table
+        column is changed.
+
+        @since 3.0.0
+        @jira_ticket CASSANDRA-10424
+        @expected_result Materialized view metadata should be updated correctly
+
+        @test_category metadata
+        """
+        create_table = """CREATE TABLE {0}.scores(
+                        user TEXT,
+                        game TEXT,
+                        year INT,
+                        month INT,
+                        day INT,
+                        score TEXT,
+                        PRIMARY KEY (user, game, year, month, day)
+                        )""".format(self.keyspace_name)
+
+        self.session.execute(create_table)
+
+        create_mv = """CREATE MATERIALIZED VIEW {0}.monthlyhigh AS
+                        SELECT game, year, month, score, user, day FROM {0}.scores
+                        WHERE game IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL AND day IS NOT NULL
+                        PRIMARY KEY ((game, year, month), score, user, day)
+                        WITH CLUSTERING ORDER BY (score DESC, user ASC, day ASC)""".format(self.keyspace_name)
+
+        self.session.execute(create_mv)
+        self.assertEqual(len(self.cluster.metadata.keyspaces[self.keyspace_name].views), 1)
+        alter_scores = """ALTER TABLE {0}.scores ALTER score TYPE blob""".format((self.keyspace_name))
         self.session.execute(alter_scores)
-        self.assertEqual(len(self.cluster.metadata.keyspaces[self.keyspace_name].views), 2)
+        self.assertEqual(len(self.cluster.metadata.keyspaces[self.keyspace_name].views), 1)
 
         score_column = self.cluster.metadata.keyspaces[self.keyspace_name].tables['scores'].columns['score']
         self.assertEquals(score_column.typestring, 'blob')
 
         score_mv_column = self.cluster.metadata.keyspaces[self.keyspace_name].views["monthlyhigh"].columns['score']
         self.assertEquals(score_mv_column.typestring, 'blob')
-
-        mv_alltime = self.cluster.metadata.keyspaces[self.keyspace_name].views["alltimehigh"]
-        self.assertIn("fouls", mv_alltime.columns)
-
-        mv_alltime_fouls_comumn = self.cluster.metadata.keyspaces[self.keyspace_name].views["alltimehigh"].columns['fouls']
-        self.assertEquals(mv_alltime_fouls_comumn.typestring, 'int')
 
     def test_metadata_with_quoted_identifiers(self):
         """
