@@ -98,6 +98,9 @@
 
    .. autoattribute:: default_timeout
 
+   .. autoattribute:: default_consistency_level
+      :annotation: = LOCAL_QUORUM
+
    .. autoattribute:: row_factory
 
    .. autoattribute:: default_fetch_size
