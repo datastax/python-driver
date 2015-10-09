@@ -503,7 +503,7 @@ class ClusterTests(unittest.TestCase):
         cluster.shutdown()
 
     def test_idle_heartbeat(self):
-        interval = 1
+        interval = 2
         cluster = Cluster(protocol_version=PROTOCOL_VERSION, idle_heartbeat_interval=interval)
         if PROTOCOL_VERSION < 3:
             cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
@@ -520,7 +520,7 @@ class ClusterTests(unittest.TestCase):
                     connection_request_ids[id(c)] = deque(c.request_ids)  # copy of request ids
 
         # let two heatbeat intervals pass (first one had startup messages in it)
-        time.sleep(2 * interval + interval/10.)
+        time.sleep(2 * interval + interval/2)
 
         connections = [c for holders in cluster.get_connection_holders() for c in holders.get_connections()]
 

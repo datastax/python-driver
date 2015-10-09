@@ -32,8 +32,10 @@ from cassandra.metadata import (Metadata, KeyspaceMetadata, IndexMetadata, Index
                                 get_schema_parser)
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
+from cassandra.query import SimpleStatement, ConsistencyLevel
 
-from tests.integration import get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass
+from tests.integration import get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass, \
+    BasicSharedKeyspaceUnitTestCase, BasicSegregatedKeyspaceUnitTestCase
 
 
 def setup_module():
@@ -307,8 +309,8 @@ class SchemaMetadataTests(unittest.TestCase):
         statements = [s.strip() for s in statements.split(';')]
         statements = list(filter(bool, statements))
         self.assertEqual(3, len(statements))
-        self.assertEqual(d_index, statements[1])
-        self.assertEqual(e_index, statements[2])
+        self.assertIn(d_index, statements)
+        self.assertIn(e_index, statements)
 
         # make sure indexes are included in KeyspaceMetadata.export_as_string()
         ksmeta = self.cluster.metadata.keyspaces[self.ksname]
@@ -1901,23 +1903,17 @@ class BadMetaTest(unittest.TestCase):
             self.assertIn("/*\nWarning:", m.export_as_string())
 
 
-class MaterializedViewMetadataTest(unittest.TestCase):
-
-    ksname = "materialized_view_test"
+class MaterializedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
 
     def setUp(self):
         if CASS_SERVER_VERSION < (3, 0):
             raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
-
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        self.session = self.cluster.connect()
-        execute_until_pass(self.session,
-                           "CREATE KEYSPACE {0} WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': '1'}}"
-                           .format(self.ksname))
+        self.session.execute("CREATE TABLE {0}.{1} (pk int PRIMARY KEY, c int)".format(self.keyspace_name, self.function_table_name))
+        self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT c FROM {0}.{1} WHERE c IS NOT NULL PRIMARY KEY (pk, c)".format(self.keyspace_name, self.function_table_name))
 
     def tearDown(self):
-        execute_until_pass(self.session, "DROP KEYSPACE {0}".format(self.ksname))
-        self.cluster.shutdown()
+        self.session.execute("DROP MATERIALIZED VIEW {0}.mv1".format(self.keyspace_name))
+        self.session.execute("DROP TABLE {0}.{1}".format(self.keyspace_name, self.function_table_name))
 
     def test_materialized_view_metadata_creation(self):
         """
@@ -1935,14 +1931,11 @@ class MaterializedViewMetadataTest(unittest.TestCase):
         @test_category metadata
         """
 
-        self.session.execute("CREATE TABLE {0}.table1 (pk int PRIMARY KEY, c int)".format(self.ksname))
-        self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT c FROM {0}.table1 WHERE c IS NOT NULL PRIMARY KEY (pk, c)".format(self.ksname))
+        self.assertIn("mv1", self.cluster.metadata.keyspaces[self.keyspace_name].views)
+        self.assertIn("mv1", self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
 
-        self.assertIn("mv1", self.cluster.metadata.keyspaces[self.ksname].views)
-        self.assertIn("mv1", self.cluster.metadata.keyspaces[self.ksname].tables["table1"].views)
-
-        self.assertEqual(self.ksname, self.cluster.metadata.keyspaces[self.ksname].tables["table1"].views["mv1"].keyspace_name)
-        self.assertEqual("table1", self.cluster.metadata.keyspaces[self.ksname].tables["table1"].views["mv1"].base_table_name)
+        self.assertEqual(self.keyspace_name, self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].keyspace_name)
+        self.assertEqual(self.function_table_name, self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].base_table_name)
 
     def test_materialized_view_metadata_alter(self):
         """
@@ -1959,15 +1952,10 @@ class MaterializedViewMetadataTest(unittest.TestCase):
 
         @test_category metadata
         """
+        self.assertIn("SizeTieredCompactionStrategy", self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].options["compaction"]["class"] )
 
-        self.session.execute("CREATE TABLE {0}.table1 (pk int PRIMARY KEY, c int)".format(self.ksname))
-        self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT c FROM {0}.table1 WHERE c IS NOT NULL PRIMARY KEY (pk, c)".format(self.ksname))
-
-        self.assertIn("SizeTieredCompactionStrategy", self.cluster.metadata.keyspaces[self.ksname].tables["table1"].views["mv1"].options["compaction"]["class"])
-
-        self.session.execute("ALTER MATERIALIZED VIEW {0}.mv1 WITH compaction = {{ 'class' : 'LeveledCompactionStrategy' }}".format(self.ksname))
-        self.assertIn("LeveledCompactionStrategy", self.cluster.metadata.keyspaces[self.ksname].tables["table1"].views["mv1"].options["compaction"]["class"])
-
+        self.session.execute("ALTER MATERIALIZED VIEW {0}.mv1 WITH compaction = {{ 'class' : 'LeveledCompactionStrategy' }}".format(self.keyspace_name))
+        self.assertIn("LeveledCompactionStrategy", self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].options["compaction"]["class"])
 
     def test_materialized_view_metadata_drop(self):
         """
@@ -1985,14 +1973,21 @@ class MaterializedViewMetadataTest(unittest.TestCase):
         @test_category metadata
         """
 
-        self.session.execute("CREATE TABLE {0}.table1 (pk int PRIMARY KEY, c int)".format(self.ksname))
-        self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT c FROM {0}.table1 WHERE c IS NOT NULL PRIMARY KEY (pk, c)".format(self.ksname))
-        self.session.execute("DROP MATERIALIZED VIEW {0}.mv1".format(self.ksname))
+        self.session.execute("DROP MATERIALIZED VIEW {0}.mv1".format(self.keyspace_name))
 
-        self.assertNotIn("mv1", self.cluster.metadata.keyspaces[self.ksname].tables["table1"].views)
-        self.assertNotIn("mv1", self.cluster.metadata.keyspaces[self.ksname].views)
-        self.assertDictEqual({}, self.cluster.metadata.keyspaces[self.ksname].tables["table1"].views)
-        self.assertDictEqual({}, self.cluster.metadata.keyspaces[self.ksname].views)
+        self.assertNotIn("mv1", self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+        self.assertNotIn("mv1", self.cluster.metadata.keyspaces[self.keyspace_name].views)
+        self.assertDictEqual({}, self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+        self.assertDictEqual({}, self.cluster.metadata.keyspaces[self.keyspace_name].views)
+
+        self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT c FROM {0}.{1} WHERE c IS NOT NULL PRIMARY KEY (pk, c)".format(self.keyspace_name, self.function_table_name))
+
+
+class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
+    def setUp(self):
+        if CASS_SERVER_VERSION < (3, 0):
+            raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
+        super(MaterializedViewMetadataTestComplex, self).setUp()
 
     def test_create_view_metadata(self):
         """
@@ -2016,7 +2011,7 @@ class MaterializedViewMetadataTest(unittest.TestCase):
                         day INT,
                         score INT,
                         PRIMARY KEY (user, game, year, month, day)
-                        )""".format(self.ksname)
+                        )""".format(self.keyspace_name)
 
         self.session.execute(create_table)
 
@@ -2024,11 +2019,11 @@ class MaterializedViewMetadataTest(unittest.TestCase):
                         SELECT game, year, month, score, user, day FROM {0}.scores
                         WHERE game IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL AND day IS NOT NULL
                         PRIMARY KEY ((game, year, month), score, user, day)
-                        WITH CLUSTERING ORDER BY (score DESC, user ASC, day ASC)""".format(self.ksname)
+                        WITH CLUSTERING ORDER BY (score DESC, user ASC, day ASC)""".format(self.keyspace_name)
 
         self.session.execute(create_mv)
-        score_table = self.cluster.metadata.keyspaces[self.ksname].tables['scores']
-        mv = self.cluster.metadata.keyspaces[self.ksname].views['monthlyhigh']
+        score_table = self.cluster.metadata.keyspaces[self.keyspace_name].tables['scores']
+        mv = self.cluster.metadata.keyspaces[self.keyspace_name].views['monthlyhigh']
 
         self.assertIsNotNone(score_table.views["monthlyhigh"])
         self.assertIsNotNone(len(score_table.views), 1)
@@ -2056,7 +2051,7 @@ class MaterializedViewMetadataTest(unittest.TestCase):
         self.assertIsNotNone(score_table.columns['score'])
 
         # Validate basic mv information
-        self.assertEquals(mv.keyspace_name, self.ksname)
+        self.assertEquals(mv.keyspace_name, self.keyspace_name)
         self.assertEquals(mv.name, "monthlyhigh")
         self.assertEquals(mv.base_table_name, "scores")
         self.assertFalse(mv.include_all_columns)
@@ -2110,7 +2105,7 @@ class MaterializedViewMetadataTest(unittest.TestCase):
         self.assertEquals(day_column.is_static, mv.clustering_key[2].is_static)
         self.assertEquals(day_column.is_reversed, mv.clustering_key[2].is_reversed)
 
-    def test_create_mv_changes(self):
+    def test_base_table_mv_changes(self):
         """
         test to ensure that materialized view metadata is properly updated with base table changes
 
@@ -2132,38 +2127,52 @@ class MaterializedViewMetadataTest(unittest.TestCase):
                         day INT,
                         score TEXT,
                         PRIMARY KEY (user, game, year, month, day)
-                        )""".format(self.ksname)
+                        )""".format(self.keyspace_name)
 
         self.session.execute(create_table)
 
-        view_name = 'monthlyhigh'
-        create_mv = """CREATE MATERIALIZED VIEW {0}.{1} AS
+        create_mv = """CREATE MATERIALIZED VIEW {0}.monthlyhigh AS
                         SELECT game, year, month, score, user, day FROM {0}.scores
                         WHERE game IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL AND day IS NOT NULL
                         PRIMARY KEY ((game, year, month), score, user, day)
-                        WITH CLUSTERING ORDER BY (score DESC, user ASC, day ASC)""".format(self.ksname, view_name)
+                        WITH CLUSTERING ORDER BY (score DESC, user ASC, day ASC)""".format(self.keyspace_name)
+
+        create_mv_alltime = """CREATE MATERIALIZED VIEW {0}.alltimehigh AS
+                        SELECT * FROM {0}.scores
+                        WHERE game IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND day IS NOT NULL
+                        PRIMARY KEY (game, score, user, year, month, day)
+                        WITH CLUSTERING ORDER BY (score DESC)""".format(self.keyspace_name)
 
         self.session.execute(create_mv)
-        score_table = self.cluster.metadata.keyspaces[self.ksname].tables['scores']
 
-        self.assertIn(view_name, score_table.views)
-        self.assertIn(view_name, self.cluster.metadata.keyspaces[self.ksname].views)
+        self.session.execute(create_mv_alltime)
 
-        insert_fouls = """ALTER TABLE {0}.scores ADD fouls INT""".format(self.ksname)
+        score_table = self.cluster.metadata.keyspaces[self.keyspace_name].tables['scores']
+
+        self.assertIsNotNone(score_table.views["monthlyhigh"])
+        self.assertEqual(len(self.cluster.metadata.keyspaces[self.keyspace_name].views), 2)
+
+        insert_fouls = """ALTER TABLE {0}.scores ADD fouls INT""".format((self.keyspace_name))
 
         self.session.execute(insert_fouls)
-        self.assertIn(view_name, self.cluster.metadata.keyspaces[self.ksname].views)
+        self.assertEqual(len(self.cluster.metadata.keyspaces[self.keyspace_name].views), 2)
 
-        alter_scores = """ALTER TABLE {0}.scores ALTER score TYPE blob""".format(self.ksname)
+        alter_scores = """ALTER TABLE {0}.scores ALTER score blob""".format((self.keyspace_name))
 
-        self.session.execute(alter_scores)  # ERROR https://issues.apache.org/jira/browse/CASSANDRA-10424
-        self.assertIn(view_name, self.cluster.metadata.keyspaces[self.ksname].views)
+        self.session.execute(alter_scores)
+        self.assertEqual(len(self.cluster.metadata.keyspaces[self.keyspace_name].views), 2)
 
-        score_column = self.cluster.metadata.keyspaces[self.ksname].tables['scores'].columns['score']
+        score_column = self.cluster.metadata.keyspaces[self.keyspace_name].tables['scores'].columns['score']
         self.assertEquals(score_column.typestring, 'blob')
 
-        score_mv_column = self.cluster.metadata.keyspaces[self.ksname].views["monthlyhigh"].columns['score']
+        score_mv_column = self.cluster.metadata.keyspaces[self.keyspace_name].views["monthlyhigh"].columns['score']
         self.assertEquals(score_mv_column.typestring, 'blob')
+
+        mv_alltime = self.cluster.metadata.keyspaces[self.keyspace_name].views["alltimehigh"]
+        self.assertIn("fouls", mv_alltime.columns)
+
+        mv_alltime_fouls_comumn = self.cluster.metadata.keyspaces[self.keyspace_name].views["alltimehigh"].columns['fouls']
+        self.assertEquals(mv_alltime_fouls_comumn.typestring, 'int')
 
     def test_metadata_with_quoted_identifiers(self):
         """
@@ -2184,7 +2193,7 @@ class MaterializedViewMetadataTest(unittest.TestCase):
                         "theKey" int,
                         "the;Clustering" int,
                         "the Value" int,
-                        PRIMARY KEY ("theKey", "the;Clustering"))""".format(self.ksname)
+                        PRIMARY KEY ("theKey", "the;Clustering"))""".format(self.keyspace_name)
 
         self.session.execute(create_table)
 
@@ -2192,12 +2201,12 @@ class MaterializedViewMetadataTest(unittest.TestCase):
                     SELECT "theKey", "the;Clustering", "the Value"
                     FROM {0}.t1
                     WHERE "theKey" IS NOT NULL AND "the;Clustering" IS NOT NULL AND "the Value" IS NOT NULL
-                    PRIMARY KEY ("theKey", "the;Clustering")""".format(self.ksname)
+                    PRIMARY KEY ("theKey", "the;Clustering")""".format(self.keyspace_name)
 
         self.session.execute(create_mv)
 
-        t1_table = self.cluster.metadata.keyspaces[self.ksname].tables['t1']
-        mv = self.cluster.metadata.keyspaces[self.ksname].views['mv1']
+        t1_table = self.cluster.metadata.keyspaces[self.keyspace_name].tables['t1']
+        mv = self.cluster.metadata.keyspaces[self.keyspace_name].views['mv1']
 
         self.assertIsNotNone(t1_table.views["mv1"])
         self.assertIsNotNone(len(t1_table.views), 1)
@@ -2216,7 +2225,7 @@ class MaterializedViewMetadataTest(unittest.TestCase):
         self.assertIsNotNone(t1_table.columns['the Value'])
 
         # Validate basic mv information
-        self.assertEquals(mv.keyspace_name, self.ksname)
+        self.assertEquals(mv.keyspace_name, self.keyspace_name)
         self.assertEquals(mv.name, "mv1")
         self.assertEquals(mv.base_table_name, "t1")
         self.assertFalse(mv.include_all_columns)
