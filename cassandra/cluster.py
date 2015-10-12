@@ -2720,7 +2720,6 @@ class ResponseFuture(object):
     _start_time = None
     _metrics = None
     _paging_state = None
-    _is_result_kind_rows = False
     _custom_payload = None
     _warnings = None
     _timer = None
@@ -2931,8 +2930,7 @@ class ResponseFuture(object):
                         self, **response.results)
                 else:
                     results = getattr(response, 'results', None)
-                    self._is_result_kind_rows = response.kind ==RESULT_KIND_ROWS
-                    if results is not None and self._is_result_kind_rows:
+                    if results is not None and response.kind ==RESULT_KIND_ROWS:
                         self._paging_state = response.paging_state
                         results = self.row_factory(*results)
                     self._set_final_result(results)
@@ -3199,10 +3197,7 @@ class ResponseFuture(object):
         if not self._event.is_set():
             self._on_timeout()
         if self._final_result is not _NOT_SET:
-            if self._is_result_kind_rows:
-                return ResultSet(self, self._final_result)
-            else:
-                return self._final_result
+            return ResultSet(self, self._final_result)
         else:
             raise self._final_exception
 
@@ -3359,7 +3354,7 @@ class ResultSet(object):
 
     def __init__(self, response_future, initial_response):
         self.response_future = response_future
-        self._current_rows = initial_response
+        self._current_rows = initial_response or []
         self._page_iter = None
         self._list_mode = False
         self._traces = [response_future._query_trace] if response_future._query_trace else []
