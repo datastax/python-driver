@@ -93,19 +93,6 @@ support this::
 
     pip install scales
 
-(*Optional*) blist for Sorted Sets
-----------------------------------
-Cassandra can store entire collections within a column.  One of those
-collection types is a set.  Cassandra's sets are actually ordered
-sets.  By default, the driver will use a pure Python ordered sets to represent
-these collections.  If you would like to use an optimized implementation,
-install the ``blist`` library::
-
-    pip install blist
-
-**Note**: This optional dependency is likely to be removed in favor of the internal
-implementation in the next major version.
-
 
 (*Optional*) Non-python Dependencies
 ------------------------------------
