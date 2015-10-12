@@ -3218,7 +3218,8 @@ class ResponseFuture(object):
         if not self._query_trace:
             return None
 
-        self._query_trace.populate(max_wait)
+        if not self._query_trace.events:
+            self._query_trace.populate(max_wait)
         return self._query_trace
 
     def add_callback(self, fn, *args, **kwargs):
@@ -3361,9 +3362,13 @@ class ResultSet(object):
         self._current_rows = initial_response
         self._page_iter = None
         self._list_mode = False
+        self._traces = [response_future._query_trace] if response_future._query_trace else []
 
     @property
     def has_more_pages(self):
+        """
+        True if the last response indicated more pages; False otherwise
+        """
         return self.response_future.has_more_pages
 
     def __iter__(self):
@@ -3383,6 +3388,8 @@ class ResultSet(object):
 
         self.response_future.start_fetching_next_page()
         result = self.response_future.result()
+        if self.response_future._query_trace:
+            self._traces.append(self.response_future._query_trace)
         self._current_rows = result._current_rows
         self._page_iter = iter(self._current_rows)
 
@@ -3416,3 +3423,29 @@ class ResultSet(object):
         return bool(self._current_rows)
 
     __bool__ = __nonzero__
+
+    def get_query_trace(self, max_wait_sec=None):
+        """
+        Fetches and returns the query trace of the last response, or `None` if tracing was
+        not enabled.
+
+        Note that this may raise an exception if there are problems retrieving the trace
+        details from Cassandra. If the trace is not available after `max_wait_sec`,
+        :exc:`cassandra.query.TraceUnavailable` will be raised.
+        """
+        if self._traces:
+            self._get_trace(0, max_wait_sec)
+
+    def get_all_query_traces(self, max_wait_sec=None):
+        """
+        Fetches and returns the query traces for all query pages, if tracing was enabled.
+
+        See note in :meth:`~.get_current_query_trace` regarding possible exceptions.
+        """
+        return [self._get_trace(i, max_wait_sec) for i in range(len(self._traces))]
+
+    def _get_trace(self, i, max_wait):
+        trace = self._traces[i]
+        if not trace.events:
+            trace.populate(max_wait=max_wait)
+        return trace
