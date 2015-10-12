@@ -1312,64 +1312,51 @@ class IndexMetadata(object):
     """
     A representation of a secondary index on a column.
     """
+    keyspace_name = None
+    """ A string name of the keyspace. """
 
-    column = None
-    """
-    The column (:class:`.ColumnMetadata`) this index is on.
-    """
+    table_name = None
+    """ A string name of the table this index is on. """
 
     name = None
     """ A string name for the index. """
 
-    index_type = None
-    """ A string representing the type of index. """
+    kind = None
+    """ A string representing the kind of index (COMPOSITE, CUSTOM,...). """
 
     index_options = {}
     """ A dict of index options. """
 
-    def __init__(self, column_metadata, index_name=None, index_type=None, index_options={}):
-        self.column = column_metadata
+    def __init__(self, keyspace_name, table_name, index_name, kind, index_options):
+        self.keyspace_name = keyspace_name
+        self.table_name = table_name
         self.name = index_name
-        self.index_type = index_type
+        self.kind = kind
         self.index_options = index_options
 
     def as_cql_query(self):
         """
         Returns a CQL query that can be used to recreate this index.
         """
-        table = self.column.table
-        if self.index_type != "CUSTOM":
-            index_target = protect_name(self.column.name)
-            if self.index_options is not None:
-                option_keys = self.index_options.keys()
-                if "index_keys" in option_keys:
-                    index_target = 'keys(%s)' % (index_target,)
-                elif "index_values" in option_keys:
-                    # don't use any "function" for collection values
-                    pass
-                else:
-                    # it might be a "full" index on a frozen collection, but
-                    # we need to check the data type to verify that, because
-                    # there is no special index option for full-collection
-                    # indexes.
-                    data_type = self.column.data_type
-                    collection_types = ('map', 'set', 'list')
-                    if data_type.typename == "frozen" and data_type.subtypes[0].typename in collection_types:
-                        # no index option for full-collection index
-                        index_target = 'full(%s)' % (index_target,)
-
+        options = dict(self.index_options)
+        index_target = options.pop("target")
+        if self.kind != "CUSTOM":
             return "CREATE INDEX %s ON %s.%s (%s)" % (
                 self.name,  # Cassandra doesn't like quoted index names for some reason
-                protect_name(table.keyspace.name),
-                protect_name(table.name),
+                protect_name(self.keyspace_name),
+                protect_name(self.table_name),
                 index_target)
         else:
-            return "CREATE CUSTOM INDEX %s ON %s.%s (%s) USING '%s'" % (
+            class_name = options.pop("class_name")
+            ret = "CREATE CUSTOM INDEX %s ON %s.%s (%s) USING '%s'" % (
                 self.name,  # Cassandra doesn't like quoted index names for some reason
-                protect_name(table.keyspace.name),
-                protect_name(table.name),
-                protect_name(self.column.name),
-                self.index_options["class_name"])
+                protect_name(self.keyspace_name),
+                protect_name(self.table_name),
+                index_target,
+                class_name)
+            if options:
+                ret += " WITH OPTIONS = %s" % Encoder().cql_encode_all_types(options)
+            return ret
 
     def export_as_string(self):
         """
@@ -1944,13 +1931,32 @@ class SchemaParserV22(_SchemaParser):
     @staticmethod
     def _build_index_metadata(column_metadata, row):
         index_name = row.get("index_name")
-        index_type = row.get("index_type")
-        if index_name or index_type:
+        kind = row.get("index_type")
+        if index_name or kind:
             options = row.get("index_options")
-            index_options = json.loads(options) if options else None
-            return IndexMetadata(column_metadata, index_name, index_type, index_options)
-        else:
-            return None
+            options = json.loads(options) if options else {}
+            options = options or {}  # if the json parsed to None, init empty dict
+
+            # generate a CQL index identity string
+            target = protect_name(column_metadata.name)
+            if kind != "CUSTOM":
+                if "index_keys" in options:
+                    target = 'keys(%s)' % (target,)
+                elif "index_values" in options:
+                    # don't use any "function" for collection values
+                    pass
+                else:
+                    # it might be a "full" index on a frozen collection, but
+                    # we need to check the data type to verify that, because
+                    # there is no special index option for full-collection
+                    # indexes.
+                    data_type = column_metadata.data_type
+                    collection_types = ('map', 'set', 'list')
+                    if data_type.typename == "frozen" and data_type.subtypes[0].typename in collection_types:
+                        # no index option for full-collection index
+                        target = 'full(%s)' % (target,)
+            options['target'] = target
+            return IndexMetadata(column_metadata.table.keyspace_name, column_metadata.table.name, index_name, kind, options)
 
     @staticmethod
     def _build_trigger_metadata(table_metadata, row):
@@ -2232,7 +2238,7 @@ class SchemaParserV3(SchemaParserV22):
         kind = row.get("kind")
         if index_name or kind:
             index_options = row.get("options")
-            return IndexMetadataV3(table_metadata.keyspace_name, table_metadata.name, index_name, kind, index_options)
+            return IndexMetadata(table_metadata.keyspace_name, table_metadata.name, index_name, kind, index_options)
         else:
             return None
 
@@ -2320,63 +2326,6 @@ class TableMetadataV3(TableMetadata):
                 ret.append("%s = %s" % (name, protect_value(value)))
 
         return list(sorted(ret))
-
-
-class IndexMetadataV3(object):
-    """
-    A representation of a secondary index on a column.
-    """
-    keyspace_name = None
-    """ A string name of the keyspace. """
-
-    table_name = None
-    """ A string name of the table this index is on. """
-
-    name = None
-    """ A string name for the index. """
-
-    kind = None
-    """ A string representing the kind of index (COMPOSITE, CUSTOM,...). """
-
-    index_options = {}
-    """ A dict of index options. """
-
-    def __init__(self, keyspace_name, table_name, index_name, kind, index_options):
-        self.keyspace_name = keyspace_name
-        self.table_name = table_name
-        self.name = index_name
-        self.kind = kind
-        self.index_options = index_options
-
-    def as_cql_query(self):
-        """
-        Returns a CQL query that can be used to recreate this index.
-        """
-        options = dict(self.index_options)
-        index_target = options.pop("target")
-        if self.kind != "CUSTOM":
-            return "CREATE INDEX %s ON %s.%s (%s)" % (
-                self.name,  # Cassandra doesn't like quoted index names for some reason
-                protect_name(self.keyspace_name),
-                protect_name(self.table_name),
-                index_target)
-        else:
-            class_name = options.pop("class_name")
-            ret = "CREATE CUSTOM INDEX %s ON %s.%s (%s) USING '%s'" % (
-                self.name,  # Cassandra doesn't like quoted index names for some reason
-                protect_name(self.keyspace_name),
-                protect_name(self.table_name),
-                index_target,
-                class_name)
-            if options:
-                ret += " WITH OPTIONS = %s" % Encoder().cql_encode_all_types(options)
-            return ret
-
-    def export_as_string(self):
-        """
-        Returns a CQL query string that can be used to recreate this index.
-        """
-        return self.as_cql_query() + ';'
 
 
 class MaterializedViewMetadata(object):

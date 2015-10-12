@@ -40,6 +40,9 @@ Schemas
 .. autoclass:: IndexMetadata ()
    :members:
 
+.. autoclass:: MaterializedViewMetadata ()
+   :members:
+
 Tokens and Ring Topology
 ------------------------
 
