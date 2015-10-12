@@ -348,7 +348,7 @@ class IndexTest(unittest.TestCase):
         column_meta = Mock()
         column_meta.name = 'column_name_here'
         column_meta.table.name = 'table_name_here'
-        column_meta.table.keyspace.name = 'keyspace_name_here'
+        column_meta.table.keyspace_name = 'keyspace_name_here'
         column_meta.table.columns = {column_meta.name: column_meta}
         connection = Mock()
         connection.server_version = '2.1.0'
