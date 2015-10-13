@@ -1619,7 +1619,7 @@ class Session(object):
         any time.
 
         If `trace` is set to :const:`True`, you may get the query trace descriptors using
-        :meth:`.ResultSet.get_query_trace()` or :meth:`.ResultSet.get_all_query_traces()`
+        :meth:`.ResponseFuture.get_query_trace()` or :meth:`.ResponseFuture.get_all_query_traces()`
         on the future result.
 
         `custom_payload` is a :ref:`custom_payload` dict to be passed to the server.
@@ -2689,7 +2689,7 @@ class ResponseFuture(object):
     _req_id = None
     _final_result = _NOT_SET
     _final_exception = None
-    _query_trace = None
+    _query_traces = None
     _callbacks = None
     _errbacks = None
     _current_host = None
@@ -2880,7 +2880,9 @@ class ResponseFuture(object):
 
             trace_id = getattr(response, 'trace_id', None)
             if trace_id:
-                self._query_trace = QueryTrace(trace_id, self.session)
+                if not self._query_traces:
+                    self._query_traces = []
+                self._query_traces.append(QueryTrace(trace_id, self.session))
 
             self._warnings = getattr(response, 'warnings', None)
             self._custom_payload = getattr(response, 'custom_payload', None)
@@ -3180,19 +3182,31 @@ class ResponseFuture(object):
 
     def get_query_trace(self, max_wait=None):
         """
-        Returns the :class:`~.query.QueryTrace` instance representing a trace
-        of the last attempt for this operation, or :const:`None` if tracing was
-        not enabled for this query.  Note that this may raise an exception if
-        there are problems retrieving the trace details from Cassandra. If the
-        trace is not available after `max_wait` seconds,
+        Fetches and returns the query trace of the last response, or `None` if tracing was
+        not enabled.
+
+        Note that this may raise an exception if there are problems retrieving the trace
+        details from Cassandra. If the trace is not available after `max_wait_sec`,
         :exc:`cassandra.query.TraceUnavailable` will be raised.
         """
-        if not self._query_trace:
-            return None
+        if self._query_traces:
+            return self._get_query_trace(len(self._query_traces) - 1, max_wait)
 
-        if not self._query_trace.events:
-            self._query_trace.populate(max_wait)
-        return self._query_trace
+    def get_all_query_traces(self, max_wait_per=None):
+        """
+        Fetches and returns the query traces for all query pages, if tracing was enabled.
+
+        See note in :meth:`~.get_current_query_trace` regarding possible exceptions.
+        """
+        if self._query_traces:
+            return [self._get_query_trace(i, max_wait_per) for i in range(len(self._query_traces))]
+        return []
+
+    def _get_query_trace(self, i, max_wait):
+        trace = self._query_traces[i]
+        if not trace.events:
+            trace.populate(max_wait=max_wait)
+        return trace
 
     def add_callback(self, fn, *args, **kwargs):
         """
@@ -3334,7 +3348,6 @@ class ResultSet(object):
         self._current_rows = initial_response or []
         self._page_iter = None
         self._list_mode = False
-        self._traces = [response_future._query_trace] if response_future._query_trace else []
 
     @property
     def has_more_pages(self):
@@ -3342,6 +3355,10 @@ class ResultSet(object):
         True if the last response indicated more pages; False otherwise
         """
         return self.response_future.has_more_pages
+
+    @property
+    def current_rows(self):
+        return self._current_rows or []
 
     def __iter__(self):
         if self._list_mode:
@@ -3358,16 +3375,18 @@ class ResultSet(object):
                     self._current_rows = []
                 raise
 
-        self.response_future.start_fetching_next_page()
-        result = self.response_future.result()
-        if self.response_future._query_trace:
-            self._traces.append(self.response_future._query_trace)
-        self._current_rows = result._current_rows
+        self.fetch_next_page()
         self._page_iter = iter(self._current_rows)
 
         return next(self._page_iter)
 
     __next__ = next
+
+    def fetch_next_page(self):
+        if self.response_future.has_more_pages:
+            self.response_future.start_fetching_next_page()
+            result = self.response_future.result()
+            self._current_rows = result._current_rows
 
     def _fetch_all(self):
         self._current_rows = list(self)
@@ -3395,29 +3414,3 @@ class ResultSet(object):
         return bool(self._current_rows)
 
     __bool__ = __nonzero__
-
-    def get_query_trace(self, max_wait_sec=None):
-        """
-        Fetches and returns the query trace of the last response, or `None` if tracing was
-        not enabled.
-
-        Note that this may raise an exception if there are problems retrieving the trace
-        details from Cassandra. If the trace is not available after `max_wait_sec`,
-        :exc:`cassandra.query.TraceUnavailable` will be raised.
-        """
-        if self._traces:
-            return self._get_trace(0, max_wait_sec)
-
-    def get_all_query_traces(self, max_wait_sec=None):
-        """
-        Fetches and returns the query traces for all query pages, if tracing was enabled.
-
-        See note in :meth:`~.get_current_query_trace` regarding possible exceptions.
-        """
-        return [self._get_trace(i, max_wait_sec) for i in range(len(self._traces))]
-
-    def _get_trace(self, i, max_wait):
-        trace = self._traces[i]
-        if not trace.events:
-            trace.populate(max_wait=max_wait)
-        return trace
