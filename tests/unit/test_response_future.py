@@ -94,7 +94,7 @@ class ResponseFutureTests(unittest.TestCase):
                       results="keyspace1")
         rf._set_result(result)
         rf._set_keyspace_completed({})
-        self.assertEqual(None, rf.result())
+        self.assertFalse(rf.result())
 
     def test_schema_change_result(self):
         session = self.make_session()
@@ -113,9 +113,9 @@ class ResponseFutureTests(unittest.TestCase):
         session = self.make_session()
         rf = self.make_response_future(session)
         rf.send_request()
-        result = object()
+        result = [1, 2, 3]
         rf._set_result(Mock(spec=ResultMessage, kind=999, results=result))
-        self.assertIs(result, rf.result())
+        self.assertListEqual(list(rf.result()), result)
 
     def test_read_timeout_error_message(self):
         session = self.make_session()
@@ -172,7 +172,7 @@ class ResponseFutureTests(unittest.TestCase):
 
         result = Mock(spec=UnavailableErrorMessage, info={})
         rf._set_result(result)
-        self.assertEqual(None, rf.result())
+        self.assertFalse(rf.result())
 
     def test_retry_policy_says_retry(self):
         session = self.make_session()

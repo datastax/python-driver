@@ -1601,34 +1601,14 @@ class Session(object):
         no timeout. Please see :meth:`.ResponseFuture.result` for details on
         the scope and effect of this timeout.
 
-        If `trace` is set to :const:`True`, an attempt will be made to
-        fetch the trace details and attach them to the `query`'s
-        :attr:`~.Statement.trace` attribute in the form of a :class:`.QueryTrace`
-        instance.  This requires that `query` be a :class:`.Statement` subclass
-        instance and not just a string.  If there is an error fetching the
-        trace details, the :attr:`~.Statement.trace` attribute will be left as
-        :const:`None`.
+        If `trace` is set to :const:`True`, the query will be sent with tracing enabled.
+        The trace details can be obtained using the returned :class:`.ResultSet` object.
 
         `custom_payload` is a :ref:`custom_payload` dict to be passed to the server.
         If `query` is a Statement with its own custom_payload. The message payload
         will be a union of the two, with the values specified here taking precedence.
         """
-        if trace and not isinstance(query, Statement):
-            raise TypeError(
-                "The query argument must be an instance of a subclass of "
-                "cassandra.query.Statement when trace=True")
-
-        future = self.execute_async(query, parameters, trace, custom_payload, timeout)
-        try:
-            result = future.result()
-        finally:
-            if trace:
-                try:
-                    query.trace = future.get_query_trace(self.max_trace_wait)
-                except Exception:
-                    log.exception("Unable to fetch query trace:")
-
-        return result
+        return self.execute_async(query, parameters, trace, custom_payload, timeout).result()
 
     def execute_async(self, query, parameters=None, trace=False, custom_payload=None, timeout=_NOT_SET):
         """
@@ -1638,9 +1618,9 @@ class Session(object):
         on the :class:`.ResponseFuture` to syncronously block for results at
         any time.
 
-        If `trace` is set to :const:`True`, you may call
-        :meth:`.ResponseFuture.get_query_trace()` after the request
-        completes to retrieve a :class:`.QueryTrace` instance.
+        If `trace` is set to :const:`True`, you may get the query trace descriptors using
+        :meth:`.ResultSet.get_query_trace()` or :meth:`.ResultSet.get_all_query_traces()`
+        on the future result.
 
         `custom_payload` is a :ref:`custom_payload` dict to be passed to the server.
         If `query` is a Statement with its own custom_payload. The message payload
@@ -1730,8 +1710,7 @@ class Session(object):
                 query.batch_type, query._statements_and_parameters, cl,
                 query.serial_consistency_level, timestamp)
 
-        if trace:
-            message.tracing = True
+        message.tracing = trace
 
         message.update_custom_payload(query.custom_payload)
         message.update_custom_payload(custom_payload)
@@ -3429,7 +3408,7 @@ class ResultSet(object):
         :exc:`cassandra.query.TraceUnavailable` will be raised.
         """
         if self._traces:
-            self._get_trace(0, max_wait_sec)
+            return self._get_trace(0, max_wait_sec)
 
     def get_all_query_traces(self, max_wait_sec=None):
         """

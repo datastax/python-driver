@@ -32,7 +32,7 @@ class MockResponseResponseFuture():
     and invoke callback with various timing.
     """
 
-    _is_result_kind_rows = False
+    _query_trace = None
 
     # a list pending callbacks, these will be prioritized in reverse or normal orderd
     pending_callbacks = PriorityQueue()
@@ -106,7 +106,7 @@ class TimedCallableInvoker(threading.Thread):
                     self._stopper.wait(.1)
                 callback_args = pending_callback[1]
                 fn, args, kwargs, time_added = callback_args
-                fn(time_added, *args, **kwargs)
+                fn([time_added], *args, **kwargs)
             self._stopper.wait(.001)
         return
 
@@ -222,8 +222,8 @@ class ConcurrencyTest((unittest.TestCase)):
         :param results:
         """
         last_time_added = 0
-        for result in results:
-            current_time_added = result[1]
+        for success, result in results:
+            self.assertTrue(success)
+            current_time_added = list(result)[0]
             self.assertLess(last_time_added, current_time_added)
             last_time_added = current_time_added
-

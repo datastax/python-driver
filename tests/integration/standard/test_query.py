@@ -65,27 +65,34 @@ class QueryTests(unittest.TestCase):
 
         query = "SELECT * FROM system.local"
         statement = SimpleStatement(query)
-        session.execute(statement, trace=True)
+        rs = session.execute(statement, trace=True)
 
         # Ensure this does not throw an exception
-        str(statement.trace)
-        for event in statement.trace.events:
+        trace = rs.get_query_trace()
+        self.assertTrue(trace.events)
+        str(trace)
+        for event in trace.events:
             str(event)
 
         cluster.shutdown()
 
-    def test_trace_id_to_query(self):
+    def test_trace_id_to_resultset(self):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
-        query = "SELECT * FROM system.local"
-        statement = SimpleStatement(query)
-        self.assertIsNone(statement.trace_id)
-        future = session.execute_async(statement, trace=True)
+        future = session.execute_async("SELECT * FROM system.local", trace=True)
 
-        # query should have trace_id, even before trace is obtained
-        future.result()
-        self.assertIsNotNone(statement.trace_id)
+        # future should have the current trace
+        rs = future.result()
+        future_trace = future.get_query_trace()
+        self.assertIsNotNone(future_trace)
+
+        rs_trace = rs.get_query_trace()
+        self.assertEqual(rs_trace, future_trace)
+        self.assertTrue(rs_trace.events)
+        self.assertEqual(len(rs_trace.events), len(future_trace.events))
+
+        self.assertListEqual([rs_trace], rs.get_all_query_traces())
 
         cluster.shutdown()
 
@@ -96,11 +103,13 @@ class QueryTests(unittest.TestCase):
 
         query = "SELECT * FROM system.local"
         statement = SimpleStatement(query)
-        session.execute(statement, trace=True)
+        rs = session.execute(statement, trace=True)
 
         # Ensure this does not throw an exception
-        str(statement.trace)
-        for event in statement.trace.events:
+        trace = rs.get_query_trace()
+        self.assertTrue(trace.events)
+        str(trace)
+        for event in trace.events:
             str(event)
 
         cluster.shutdown()

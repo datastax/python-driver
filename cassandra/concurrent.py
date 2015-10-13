@@ -134,10 +134,8 @@ class _ConcurrentExecutor(object):
             self._put_result(e, idx, False)
 
     def _on_success(self, result, future, idx):
-        if future._is_result_kind_rows:
-            result = ResultSet(future, result)
-            future.clear_callbacks()
-        self._put_result(result, idx, True)
+        future.clear_callbacks()
+        self._put_result(ResultSet(future, result), idx, True)
 
     def _on_error(self, result, future, idx):
         self._put_result(result, idx, False)

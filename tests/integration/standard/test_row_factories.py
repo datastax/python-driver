@@ -94,6 +94,7 @@ class RowFactoryTests(unittest.TestCase):
         result = session.execute(self.select)
 
         self.assertIsInstance(result, ResultSet)
+        result = list(result)
 
         for row in result:
             self.assertEqual(row.k, row.v)
