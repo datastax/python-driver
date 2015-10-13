@@ -2880,8 +2880,6 @@ class ResponseFuture(object):
 
             trace_id = getattr(response, 'trace_id', None)
             if trace_id:
-                if self.query:
-                    self.query.trace_id = trace_id
                 self._query_trace = QueryTrace(trace_id, self.session)
 
             self._warnings = getattr(response, 'warnings', None)
