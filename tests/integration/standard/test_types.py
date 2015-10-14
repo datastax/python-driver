@@ -18,10 +18,12 @@ except ImportError:
     import unittest  # noqa
 
 from datetime import datetime
+import math
 import six
 
 from cassandra import InvalidRequest
 from cassandra.cluster import Cluster
+from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.cqltypes import Int32Type, EMPTY
 from cassandra.query import dict_factory, ordered_dict_factory
 from cassandra.util import sortedset
@@ -703,3 +705,38 @@ class TypeTests(unittest.TestCase):
         result = s.execute("SELECT * FROM composites WHERE a = 0")[0]
         self.assertEqual(0, result.a)
         self.assertEqual(('abc',), result.b)
+
+    def test_special_float_cql_encoding(self):
+        """
+        PYTHON-282
+        """
+        s = self.session
+
+        s.execute("""
+            CREATE TABLE float_cql_encoding (
+                f float PRIMARY KEY,
+                d double
+            )""")
+        items = (float('nan'), float('inf'), float('-inf'))
+
+        def verify_insert_select(ins_statement, sel_statement):
+            execute_concurrent_with_args(s, ins_statement, ((f, f) for f in items))
+            for f in items:
+                row = s.execute(sel_statement, (f,))[0]
+                print row
+                if math.isnan(f):
+                    self.assertTrue(math.isnan(row.f))
+                    self.assertTrue(math.isnan(row.d))
+                else:
+                    self.assertEqual(row.f, f)
+                    self.assertEqual(row.d, f)
+
+        # cql encoding
+        verify_insert_select('INSERT INTO float_cql_encoding (f, d) VALUES (%s, %s)',
+                             'SELECT * FROM float_cql_encoding WHERE f=%s')
+
+        s.execute("TRUNCATE float_cql_encoding")
+
+        # prepared binding
+        verify_insert_select(s.prepare('INSERT INTO float_cql_encoding (f, d) VALUES (?, ?)'),
+                             s.prepare('SELECT * FROM float_cql_encoding WHERE f=?'))
