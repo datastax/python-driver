@@ -23,6 +23,7 @@ log = logging.getLogger(__name__)
 from binascii import hexlify
 import calendar
 import datetime
+import math
 import sys
 import types
 from uuid import UUID
@@ -145,7 +146,12 @@ class Encoder(object):
         """
         Encode floats using repr to preserve precision
         """
-        return repr(val)
+        if math.isinf(val):
+            return 'Infinity' if val > 0 else '-Infinity'
+        elif math.isnan(val):
+            return 'NaN'
+        else:
+            return repr(val)
 
     def cql_encode_datetime(self, val):
         """
