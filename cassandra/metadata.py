@@ -656,7 +656,7 @@ class KeyspaceMetadata(object):
         ret = "CREATE KEYSPACE %s WITH replication = %s " % (
             protect_name(self.name),
             self.replication_strategy.export_for_schema())
-        return ret + (' AND durable_writes = %s;' % ("true" if self.durable_writes else "false"))
+        return ret + (' AND durable_writes = %s' % ("true" if self.durable_writes else "false"))
 
     def user_type_strings(self):
         user_type_strings = []
@@ -1079,18 +1079,18 @@ class TableMetadata(object):
                   (self.keyspace_name, self.name)
             for line in traceback.format_exception(*self._exc_info):
                 ret += line
-            ret += "\nApproximate structure, for reference:\n(this should not be used to reproduce this schema)\n\n%s\n*/" % self.all_as_cql()
+            ret += "\nApproximate structure, for reference:\n(this should not be used to reproduce this schema)\n\n%s\n*/" % self._all_as_cql()
         elif not self.is_cql_compatible:
             # If we can't produce this table with CQL, comment inline
             ret = "/*\nWarning: Table %s.%s omitted because it has constructs not compatible with CQL (was created via legacy API).\n" % \
                   (self.keyspace_name, self.name)
-            ret += "\nApproximate structure, for reference:\n(this should not be used to reproduce this schema)\n\n%s\n*/" % self.all_as_cql()
+            ret += "\nApproximate structure, for reference:\n(this should not be used to reproduce this schema)\n\n%s\n*/" % self._all_as_cql()
         else:
-            ret = self.all_as_cql()
+            ret = self._all_as_cql()
 
         return ret
 
-    def all_as_cql(self):
+    def _all_as_cql(self):
         ret = self.as_cql_query(formatted=True)
         ret += ";"
 
