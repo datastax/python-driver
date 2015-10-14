@@ -3196,7 +3196,7 @@ class ResponseFuture(object):
         """
         Fetches and returns the query traces for all query pages, if tracing was enabled.
 
-        See note in :meth:`~.get_current_query_trace` regarding possible exceptions.
+        See note in :meth:`~.get_query_trace` regarding possible exceptions.
         """
         if self._query_traces:
             return [self._get_query_trace(i, max_wait_per) for i in range(len(self._query_traces))]
@@ -3387,6 +3387,8 @@ class ResultSet(object):
             self.response_future.start_fetching_next_page()
             result = self.response_future.result()
             self._current_rows = result._current_rows
+        else:
+            self._current_rows = []
 
     def _fetch_all(self):
         self._current_rows = list(self)
@@ -3414,3 +3416,17 @@ class ResultSet(object):
         return bool(self._current_rows)
 
     __bool__ = __nonzero__
+
+    def get_query_trace(self, max_wait_sec=None):
+        """
+        Gets the last query trace from the associated future.
+        See :meth:`.ResponseFuture.get_query_trace` for details.
+        """
+        return self.response_future.get_query_trace(max_wait_sec)
+
+    def get_all_query_traces(self, max_wait_sec_per=None):
+        """
+        Gets all query traces from the associated future.
+        See :meth:`.ResponseFuture.get_all_query_traces` for details.
+        """
+        return self.response_future.get_all_query_traces(max_wait_sec_per)
