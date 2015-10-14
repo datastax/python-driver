@@ -126,6 +126,8 @@
 
    .. automethod:: get_query_trace()
 
+   .. automethod:: get_all_query_traces()
+
    .. autoattribute:: custom_payload()
 
    .. autoattribute:: has_more_pages
