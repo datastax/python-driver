@@ -37,7 +37,8 @@ class ResultSetTests(unittest.TestCase):
         response_future.result.side_effect = (ResultSet(Mock(), expected[-5:]), )  # ResultSet is iterable, so it must be protected in order to be returned whole by the Mock
         rs = ResultSet(response_future, expected[:5])
         itr = iter(rs)
-        type(response_future).has_more_pages = PropertyMock(side_effect=(True, False))  # after init to avoid side effects being consumed by init
+        # this is brittle, depends on internal impl details. Would like to find a better way
+        type(response_future).has_more_pages = PropertyMock(side_effect=(True, True, False))  # after init to avoid side effects being consumed by init
         self.assertListEqual(list(itr), expected)
 
     def test_list_non_paged(self):
@@ -54,7 +55,8 @@ class ResultSetTests(unittest.TestCase):
         response_future = Mock(has_more_pages=True)
         response_future.result.side_effect = (ResultSet(Mock(), expected[-5:]), )  # ResultSet is iterable, so it must be protected in order to be returned whole by the Mock
         rs = ResultSet(response_future, expected[:5])
-        type(response_future).has_more_pages = PropertyMock(side_effect=(True, True, False))  # one True for getitem check/warn, then True, False for two pages
+        # this is brittle, depends on internal impl details. Would like to find a better way
+        type(response_future).has_more_pages = PropertyMock(side_effect=(True, True, True, False))  # First two True are consumed on check entering list mode
         self.assertEqual(rs[9], expected[9])
         self.assertEqual(list(rs), expected)
 
@@ -119,7 +121,8 @@ class ResultSetTests(unittest.TestCase):
         response_future = Mock(has_more_pages=True)
         response_future.result.side_effect = (ResultSet(Mock(), expected[-5:]), )  # ResultSet is iterable, so it must be protected in order to be returned whole by the Mock
         rs = ResultSet(response_future, expected[:5])
-        type(response_future).has_more_pages = PropertyMock(side_effect=(True, True, False))  # First True is consumed on check entering list mode
+        # this is brittle, depends on internal impl details. Would like to find a better way
+        type(response_future).has_more_pages = PropertyMock(side_effect=(True, True, True, False))  # First two True are consumed on check entering list mode
         # index access before iteration causes list to be materialized
         self.assertEqual(rs[0], expected[0])
         self.assertEqual(rs[9], expected[9])
@@ -146,7 +149,7 @@ class ResultSetTests(unittest.TestCase):
         response_future = Mock(has_more_pages=True)
         response_future.result.side_effect = (ResultSet(Mock(), expected[-5:]), )  # ResultSet is iterable, so it must be protected in order to be returned whole by the Mock
         rs = ResultSet(response_future, expected[:5])
-        type(response_future).has_more_pages = PropertyMock(side_effect=(True, True, False))
+        type(response_future).has_more_pages = PropertyMock(side_effect=(True, True, True, False))
         # eq before iteration causes list to be materialized
         self.assertEqual(rs, expected)
 

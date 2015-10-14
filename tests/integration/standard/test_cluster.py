@@ -438,11 +438,11 @@ class ClusterTests(unittest.TestCase):
         session = cluster.connect()
 
         def check_trace(trace):
-            self.assertIsNot(None, trace.request_type)
-            self.assertIsNot(None, trace.duration)
-            self.assertIsNot(None, trace.started_at)
-            self.assertIsNot(None, trace.coordinator)
-            self.assertIsNot(None, trace.events)
+            self.assertIsNotNone(trace.request_type)
+            self.assertIsNotNone(trace.duration)
+            self.assertIsNotNone(trace.started_at)
+            self.assertIsNotNone(trace.coordinator)
+            self.assertIsNotNone(trace.events)
 
         result = session.execute( "SELECT * FROM system.local", trace=True)
         check_trace(result.get_query_trace())
