@@ -263,7 +263,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
             self.table.objects.get(test_id=1)
 
 
-class TestQuerySetCountSelectionAndIteration(BasicSharedKeyspaceUnitTestCase):
+class TestTableWithMV(BasicSharedKeyspaceUnitTestCase):
 
     def test_named_table_with_mv(self):
         """
@@ -338,9 +338,9 @@ class TestQuerySetCountSelectionAndIteration(BasicSharedKeyspaceUnitTestCase):
         self.assertEqual(len(mv_all_objects), len(parameters))
 
         filtered_mv_monthly_objects = mv_monthly.objects.filter(game='Chess', year=2015, month=6)
-        self.assertEquals(len(filtered_mv_monthly_objects), 1)
-        self.assertEquals(filtered_mv_monthly_objects[0]['score'], 3500)
-        self.assertEquals(filtered_mv_monthly_objects[0]['user'], 'jbellis')
+        self.assertEqual(len(filtered_mv_monthly_objects), 1)
+        self.assertEqual(filtered_mv_monthly_objects[0]['score'], 3500)
+        self.assertEqual(filtered_mv_monthly_objects[0]['user'], 'jbellis')
         filtered_mv_alltime_objects = mv_all_time.objects.filter(game='Chess')
-        self.assertEquals(len(filtered_mv_alltime_objects), 2)
-        self.assertEquals(filtered_mv_alltime_objects[0]['score'], 3500)
+        self.assertEqual(len(filtered_mv_alltime_objects), 2)
+        self.assertEqual(filtered_mv_alltime_objects[0]['score'], 3500)
