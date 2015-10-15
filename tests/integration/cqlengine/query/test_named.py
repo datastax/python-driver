@@ -17,6 +17,7 @@ from cassandra.cqlengine.named import NamedKeyspace
 from cassandra.cqlengine.operators import EqualsOperator, GreaterThanOrEqualOperator
 from cassandra.cqlengine.query import ResultObject
 from cassandra.concurrent import execute_concurrent_with_args
+from cassandra.cqlengine import models
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine.query.test_queryset import BaseQuerySetUsage
@@ -263,7 +264,13 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
             self.table.objects.get(test_id=1)
 
 
-class TestTableWithMV(BasicSharedKeyspaceUnitTestCase):
+class TestAlpha(BasicSharedKeyspaceUnitTestCase):
+
+    def setUp(self):
+        self.default_keyspace = models.DEFAULT_KEYSPACE
+
+    def tearDown(self):
+        models.DEFAULT_KEYSPACE = self.default_keyspace
 
     def test_named_table_with_mv(self):
         """
