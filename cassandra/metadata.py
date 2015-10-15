@@ -633,7 +633,7 @@ class KeyspaceMetadata(object):
         Returns a CQL query string that can be used to recreate the entire keyspace,
         including user-defined types and tables.
         """
-        cql = "\n\n".join([self.as_cql_query()]
+        cql = "\n\n".join([self.as_cql_query() + ';']
                          + self.user_type_strings()
                          + [f.export_as_string() for f in self.functions.values()]
                          + [a.export_as_string() for a in self.aggregates.values()]
