@@ -681,6 +681,37 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         cluster2.shutdown()
 
+    def test_multiple_indices(self):
+        """
+        test multiple indices on the same column.
+
+        Creates a table and two indices. Ensures that both indices metatdata is surface appropriately.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-276
+        @expected_result IndexMetadata is appropriately surfaced
+
+        @test_category metadata
+        """
+        self.session.execute("CREATE TABLE {0}.{1} (a int PRIMARY KEY, b map<text, int>)".format(self.keyspace_name, self.function_table_name))
+        self.session.execute("CREATE INDEX index_1 ON {0}.{1}(b)".format(self.keyspace_name, self.function_table_name))
+        self.session.execute("CREATE INDEX index_2 ON {0}.{1}(keys(b))".format(self.keyspace_name, self.function_table_name))
+
+        indices = self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].indexes
+        self.assertEqual(len(indices), 2)
+        index_1 = indices["index_1"]
+        index_2 = indices['index_2']
+        self.assertEqual(index_1.table_name, "test_multiple_indices")
+        self.assertEqual(index_1.name, "index_1")
+        self.assertEqual(index_1.kind, "COMPOSITES")
+        self.assertEqual(index_1.index_options["target"], "values(b)")
+        self.assertEqual(index_1.keyspace_name, "schemametadatatests")
+        self.assertEqual(index_2.table_name, "test_multiple_indices")
+        self.assertEqual(index_2.name, "index_2")
+        self.assertEqual(index_2.kind, "COMPOSITES")
+        self.assertEqual(index_2.index_options["target"], "keys(b)")
+        self.assertEqual(index_2.keyspace_name, "schemametadatatests")
+
 
 class TestCodeCoverage(unittest.TestCase):
 
