@@ -633,10 +633,10 @@ class KeyspaceMetadata(object):
         Returns a CQL query string that can be used to recreate the entire keyspace,
         including user-defined types and tables.
         """
-        cql = "\n\n".join([self.as_cql_query()]
+        cql = "\n\n".join([self.as_cql_query() + ';']
                          + self.user_type_strings()
-                         + [f.as_cql_query(True) for f in self.functions.values()]
-                         + [a.as_cql_query(True) for a in self.aggregates.values()]
+                         + [f.export_as_string() for f in self.functions.values()]
+                         + [a.export_as_string() for a in self.aggregates.values()]
                          + [t.export_as_string() for t in self.tables.values()])
         if self._exc_info:
             import traceback
@@ -656,7 +656,7 @@ class KeyspaceMetadata(object):
         ret = "CREATE KEYSPACE %s WITH replication = %s " % (
             protect_name(self.name),
             self.replication_strategy.export_for_schema())
-        return ret + (' AND durable_writes = %s;' % ("true" if self.durable_writes else "false"))
+        return ret + (' AND durable_writes = %s' % ("true" if self.durable_writes else "false"))
 
     def user_type_strings(self):
         user_type_strings = []
@@ -672,7 +672,7 @@ class KeyspaceMetadata(object):
         for field_type in user_type.field_types:
             if field_type.cassname == 'UserType' and field_type.typename in types:
                 self.resolve_user_types(field_type.typename, types, user_type_strings)
-        user_type_strings.append(user_type.as_cql_query(formatted=True))
+        user_type_strings.append(user_type.export_as_string())
 
     def _add_table_metadata(self, table_metadata):
         old_indexes = {}
@@ -777,8 +777,11 @@ class UserType(object):
             fields.append("%s %s" % (protect_name(field_name), field_type.cql_parameterized_type()))
 
         ret += field_join.join("%s%s" % (padding, field) for field in fields)
-        ret += "\n);" if formatted else ");"
+        ret += "\n)" if formatted else ")"
         return ret
+
+    def export_as_string(self):
+        return self.as_cql_query(formatted=True) + ';'
 
 
 class Aggregate(object):
@@ -847,7 +850,7 @@ class Aggregate(object):
         If `formatted` is set to :const:`True`, extra whitespace will
         be added to make the query more readable.
         """
-        sep = '\n' if formatted else ' '
+        sep = '\n    ' if formatted else ' '
         keyspace = protect_name(self.keyspace)
         name = protect_name(self.name)
         type_list = ', '.join(self.type_signature)
@@ -863,6 +866,9 @@ class Aggregate(object):
                if self.initial_condition is not None else ''
 
         return ret
+
+    def export_as_string(self):
+        return self.as_cql_query(formatted=True) + ';'
 
     @property
     def signature(self):
@@ -938,7 +944,7 @@ class Function(object):
         If `formatted` is set to :const:`True`, extra whitespace will
         be added to make the query more readable.
         """
-        sep = '\n' if formatted else ' '
+        sep = '\n    ' if formatted else ' '
         keyspace = protect_name(self.keyspace)
         name = protect_name(self.name)
         arg_list = ', '.join(["%s %s" % (protect_name(n), t)
@@ -952,7 +958,10 @@ class Function(object):
                "%(on_null)s ON NULL INPUT%(sep)s" \
                "RETURNS %(typ)s%(sep)s" \
                "LANGUAGE %(lang)s%(sep)s" \
-               "AS $$%(body)s$$;" % locals()
+               "AS $$%(body)s$$" % locals()
+
+    def export_as_string(self):
+        return self.as_cql_query(formatted=True) + ';'
 
     @property
     def signature(self):
@@ -1082,18 +1091,18 @@ class TableMetadata(object):
                   (self.keyspace_name, self.name)
             for line in traceback.format_exception(*self._exc_info):
                 ret += line
-            ret += "\nApproximate structure, for reference:\n(this should not be used to reproduce this schema)\n\n%s\n*/" % self.all_as_cql()
+            ret += "\nApproximate structure, for reference:\n(this should not be used to reproduce this schema)\n\n%s\n*/" % self._all_as_cql()
         elif not self.is_cql_compatible:
             # If we can't produce this table with CQL, comment inline
             ret = "/*\nWarning: Table %s.%s omitted because it has constructs not compatible with CQL (was created via legacy API).\n" % \
                   (self.keyspace_name, self.name)
-            ret += "\nApproximate structure, for reference:\n(this should not be used to reproduce this schema)\n\n%s\n*/" % self.all_as_cql()
+            ret += "\nApproximate structure, for reference:\n(this should not be used to reproduce this schema)\n\n%s\n*/" % self._all_as_cql()
         else:
-            ret = self.all_as_cql()
+            ret = self._all_as_cql()
 
         return ret
 
-    def all_as_cql(self):
+    def _all_as_cql(self):
         ret = self.as_cql_query(formatted=True)
         ret += ";"
 
@@ -1560,6 +1569,9 @@ class TriggerMetadata(object):
             protect_value(self.options['class'])
         )
         return ret
+
+    def export_as_string(self):
+        return self.as_cql_query() + ';'
 
 
 class _SchemaParser(object):
