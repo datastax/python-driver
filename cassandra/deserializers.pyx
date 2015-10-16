@@ -378,8 +378,10 @@ cdef class DesUserType(DesTupleType):
         values = DesTupleType.deserialize(self, buf, protocol_version)
         if typ.mapped_class:
             return typ.mapped_class(**dict(zip(typ.fieldnames, values)))
-        else:
+        elif typ.tuple_type:
             return typ.tuple_type(*values)
+        else:
+            return tuple(values)
 
 
 cdef class DesCompositeType(_DesParameterizedType):
