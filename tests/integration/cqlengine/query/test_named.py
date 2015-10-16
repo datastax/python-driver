@@ -12,6 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
+
 from cassandra.cqlengine import operators, connection
 from cassandra.cqlengine.named import NamedKeyspace
 from cassandra.cqlengine.operators import EqualsOperator, GreaterThanOrEqualOperator
@@ -23,7 +28,7 @@ from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine.query.test_queryset import BaseQuerySetUsage
 
 
-from tests.integration import BasicSharedKeyspaceUnitTestCase
+from tests.integration import BasicSharedKeyspaceUnitTestCase, get_server_versions
 
 
 class TestQuerySetOperation(BaseCassEngTestCase):
@@ -264,10 +269,14 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
             self.table.objects.get(test_id=1)
 
 
-class TestAlpha(BasicSharedKeyspaceUnitTestCase):
+class TestNamedWithMV(BasicSharedKeyspaceUnitTestCase):
 
     def setUp(self):
         self.default_keyspace = models.DEFAULT_KEYSPACE
+        cass_version = get_server_versions()[0]
+        if cass_version < (3, 0):
+            raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
+        super(TestNamedWithMV, self).setUp()
 
     def tearDown(self):
         models.DEFAULT_KEYSPACE = self.default_keyspace
