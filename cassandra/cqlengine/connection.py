@@ -33,7 +33,7 @@ Host = namedtuple('Host', ['name', 'port'])
 cluster = None
 session = None
 lazy_connect_args = None
-default_consistency_level = ConsistencyLevel.ONE
+default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
 
 # Because type models may be registered before a connection is present,
