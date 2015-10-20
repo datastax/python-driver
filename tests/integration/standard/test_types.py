@@ -723,7 +723,6 @@ class TypeTests(unittest.TestCase):
             execute_concurrent_with_args(s, ins_statement, ((f, f) for f in items))
             for f in items:
                 row = s.execute(sel_statement, (f,))[0]
-                print row
                 if math.isnan(f):
                     self.assertTrue(math.isnan(row.f))
                     self.assertTrue(math.isnan(row.d))
