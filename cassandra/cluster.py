@@ -61,7 +61,7 @@ from cassandra.protocol import (QueryMessage, ResultMessage,
                                 BatchMessage, RESULT_KIND_PREPARED,
                                 RESULT_KIND_SET_KEYSPACE, RESULT_KIND_ROWS,
                                 RESULT_KIND_SCHEMA_CHANGE, MIN_SUPPORTED_VERSION,
-                                ProtocolHandler)
+                                ProtocolHandler, _RESULT_SEQUENCE_TYPES)
 from cassandra.metadata import Metadata, protect_name, murmur3
 from cassandra.policies import (TokenAwarePolicy, DCAwareRoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
@@ -3349,7 +3349,7 @@ class ResultSet(object):
 
     def __init__(self, response_future, initial_response):
         self.response_future = response_future
-        self._current_rows = initial_response or []
+        self._set_current_rows(initial_response)
         self._page_iter = None
         self._list_mode = False
 
@@ -3390,9 +3390,15 @@ class ResultSet(object):
         if self.response_future.has_more_pages:
             self.response_future.start_fetching_next_page()
             result = self.response_future.result()
-            self._current_rows = result._current_rows
+            self._current_rows = result._current_rows  # ResultSet has already _set_current_rows to the appropriate form
         else:
             self._current_rows = []
+
+    def _set_current_rows(self, result):
+        if isinstance(result, _RESULT_SEQUENCE_TYPES):
+            self._current_rows = result
+        else:
+            self._current_rows = [result] if result else []
 
     def _fetch_all(self):
         self._current_rows = list(self)
