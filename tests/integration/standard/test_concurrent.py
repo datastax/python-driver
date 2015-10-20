@@ -89,7 +89,9 @@ class ClusterTests(unittest.TestCase):
 
             results = self.execute_concurrent_helper(self.session, list(zip(statements, parameters)))
             self.assertEqual(num_statements, len(results))
-            self.assertEqual([(True, None)] * num_statements, results)
+            for success, result in results:
+                self.assertTrue(success)
+                self.assertFalse(result)
 
             # read
             statement = SimpleStatement(
@@ -111,7 +113,9 @@ class ClusterTests(unittest.TestCase):
 
             results = self.execute_concurrent_args_helper(self.session, statement, parameters)
             self.assertEqual(num_statements, len(results))
-            self.assertEqual([(True, None)] * num_statements, results)
+            for success, result in results:
+                self.assertTrue(success)
+                self.assertFalse(result)
 
             # read
             statement = SimpleStatement(
@@ -143,8 +147,9 @@ class ClusterTests(unittest.TestCase):
             parameters = [(i, i) for i in range(num_statements)]
 
             results = self.execute_concurrent_args_helper(self.session, statement, parameters, results_generator=True)
-            for result in results:
-                self.assertEqual((True, None), result)
+            for success, result in results:
+                self.assertTrue(success)
+                self.assertFalse(result)
 
             # read
             statement = SimpleStatement(
@@ -172,7 +177,9 @@ class ClusterTests(unittest.TestCase):
 
         results = self.execute_concurrent_args_helper(self.session, statement, parameters)
         self.assertEqual(num_statements, len(results))
-        self.assertEqual([(True, None)] * num_statements, results)
+        for success, result in results:
+            self.assertTrue(success)
+            self.assertFalse(result)
 
         # read
         statement = SimpleStatement(
@@ -273,7 +280,7 @@ class ClusterTests(unittest.TestCase):
                 self.assertIsInstance(result, InvalidRequest)
             else:
                 self.assertTrue(success)
-                self.assertEqual(None, result)
+                self.assertFalse(result)
 
     def test_no_raise_on_first_failure_client_side(self):
         statement = SimpleStatement(
@@ -292,4 +299,4 @@ class ClusterTests(unittest.TestCase):
                 self.assertIsInstance(result, TypeError)
             else:
                 self.assertTrue(success)
-                self.assertEqual(None, result)
+                self.assertFalse(result)

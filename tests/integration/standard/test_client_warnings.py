@@ -91,7 +91,7 @@ class ClientWarningTests(unittest.TestCase):
         future.result()
         self.assertEqual(len(future.warnings), 1)
         self.assertRegexpMatches(future.warnings[0], 'Batch.*exceeding.*')
-        self.assertIsNotNone(future._query_trace)
+        self.assertIsNotNone(future.get_query_trace())
 
     def test_warning_with_custom_payload(self):
         """
@@ -127,5 +127,5 @@ class ClientWarningTests(unittest.TestCase):
         future.result()
         self.assertEqual(len(future.warnings), 1)
         self.assertRegexpMatches(future.warnings[0], 'Batch.*exceeding.*')
-        self.assertIsNotNone(future._query_trace)
+        self.assertIsNotNone(future.get_query_trace())
         self.assertDictEqual(future.custom_payload, payload)
