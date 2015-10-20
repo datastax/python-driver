@@ -2909,7 +2909,7 @@ class ResponseFuture(object):
                         self, **response.results)
                 else:
                     results = getattr(response, 'results', None)
-                    if results is not None and response.kind ==RESULT_KIND_ROWS:
+                    if results is not None and response.kind == RESULT_KIND_ROWS:
                         self._paging_state = response.paging_state
                         results = self.row_factory(*results)
                     self._set_final_result(results)
