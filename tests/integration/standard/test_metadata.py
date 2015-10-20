@@ -113,7 +113,8 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         self.assertTrue(self.function_table_name in ksmeta.tables)
         tablemeta = ksmeta.tables[self.function_table_name]
-        self.assertEqual(tablemeta.keyspace, ksmeta)  # tablemeta.keyspace is deprecated
+        self.assertEqual(tablemeta.keyspace_name, ksmeta.name)
+        self.assertEqual(tablemeta.name, self.function_table_name)
         self.assertEqual(tablemeta.name, self.function_table_name)
 
         self.assertEqual([u'a'], [c.name for c in tablemeta.partition_key])

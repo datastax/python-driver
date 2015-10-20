@@ -185,7 +185,6 @@ class Metadata(object):
             # return one or the other based on the query results.
             # Here we deal with that.
             if isinstance(meta, TableMetadata):
-                meta.keyspace = keyspace_meta  # temporary while TableMetadata.keyspace is deprecated
                 keyspace_meta._add_table_metadata(meta)
             else:
                 keyspace_meta._add_view_metadata(meta)
@@ -973,14 +972,6 @@ class TableMetadata(object):
     A representation of the schema for a single table.
     """
 
-    keyspace = None
-    """
-    An instance of :class:`~.KeyspaceMetadata`.
-
-    .. deprecated:: 2.7.0
-
-    """
-
     keyspace_name = None
     """ String name of this Table's keyspace """
 
@@ -1564,7 +1555,7 @@ class TriggerMetadata(object):
     def as_cql_query(self):
         ret = "CREATE TRIGGER %s ON %s.%s USING %s" % (
             protect_name(self.name),
-            protect_name(self.table.keyspace.name),
+            protect_name(self.table.keyspace_name),
             protect_name(self.table.name),
             protect_value(self.options['class'])
         )
@@ -1655,7 +1646,6 @@ class SchemaParserV22(_SchemaParser):
             try:
                 for table_row in self.keyspace_table_rows.get(keyspace_meta.name, []):
                     table_meta = self._build_table_metadata(table_row)
-                    table_meta.keyspace = keyspace_meta  # temporary while TableMetadata.keyspace is deprecated
                     keyspace_meta._add_table_metadata(table_meta)
 
                 for usertype_row in self.keyspace_type_rows.get(keyspace_meta.name, []):

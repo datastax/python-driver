@@ -1225,64 +1225,6 @@ class Cluster(object):
             return SchemaTargetType.KEYSPACE
         return None
 
-    def refresh_schema(self, keyspace=None, table=None, usertype=None, function=None, aggregate=None, max_schema_agreement_wait=None):
-        """
-        .. deprecated:: 2.6.0
-            Use refresh_*_metadata instead
-
-        Synchronously refresh schema metadata.
-
-        {keyspace, table, usertype} are string names of the respective entities.
-        ``function`` is a :class:`cassandra.UserFunctionDescriptor`.
-        ``aggregate`` is a :class:`cassandra.UserAggregateDescriptor`.
-
-        If none of ``{keyspace, table, usertype, function, aggregate}`` are specified, the entire schema is refreshed.
-
-        If any of ``{keyspace, table, usertype, function, aggregate}`` are specified, ``keyspace`` is required.
-
-        If only ``keyspace`` is specified, just the top-level keyspace metadata is refreshed (e.g. replication).
-
-        The remaining arguments ``{table, usertype, function, aggregate}``
-        are mutually exclusive -- only one may be specified.
-
-        By default, the timeout for this operation is governed by :attr:`~.Cluster.max_schema_agreement_wait`
-        and :attr:`~.Cluster.control_connection_timeout`.
-
-        Passing max_schema_agreement_wait here overrides :attr:`~.Cluster.max_schema_agreement_wait`.
-
-        Setting max_schema_agreement_wait <= 0 will bypass schema agreement and refresh schema immediately.
-
-        An Exception is raised if schema refresh fails for any reason.
-        """
-        msg = "refresh_schema is deprecated. Use Cluster.refresh_*_metadata instead."
-        warnings.warn(msg, DeprecationWarning)
-        log.warning(msg)
-
-        self._validate_refresh_schema(keyspace, table, usertype, function, aggregate)
-        target_type = self._target_type_from_refresh_args(keyspace, table, usertype, function, aggregate)
-        if not self.control_connection.refresh_schema(target_type=target_type, keyspace=keyspace, table=table,
-                                                      type=usertype, function=function, aggregate=aggregate,
-                                                      schema_agreement_wait=max_schema_agreement_wait):
-            raise Exception("Schema was not refreshed. See log for details.")
-
-    def submit_schema_refresh(self, keyspace=None, table=None, usertype=None, function=None, aggregate=None):
-        """
-        .. deprecated:: 2.6.0
-            Use refresh_*_metadata instead
-
-        Schedule a refresh of the internal representation of the current
-        schema for this cluster.  See :meth:`~.refresh_schema` for description of parameters.
-        """
-        msg = "submit_schema_refresh is deprecated. Use Cluster.refresh_*_metadata instead."
-        warnings.warn(msg, DeprecationWarning)
-        log.warning(msg)
-
-        self._validate_refresh_schema(keyspace, table, usertype, function, aggregate)
-        target_type = self._target_type_from_refresh_args(keyspace, table, usertype, function, aggregate)
-        return self.executor.submit(
-            self.control_connection.refresh_schema, target_type=target_type, keyspace=keyspace, table=table,
-            type=usertype, function=function, aggregate=aggregate)
-
     def refresh_schema_metadata(self, max_schema_agreement_wait=None):
         """
         Synchronously refresh all schema metadata.
@@ -3130,26 +3072,14 @@ class ResponseFuture(object):
         # otherwise, move onto another host
         self.send_request()
 
-    def result(self, timeout=_NOT_SET):
+    def result(self):
         """
         Return the final result or raise an Exception if errors were
         encountered.  If the final result or error has not been set
-        yet, this method will block until that time.
+        yet, this method will block until it is set, or the timeout
+        set for the request expires.
 
-        .. versionchanged:: 2.6.0
-
-        **`timeout` is deprecated. Use timeout in the Session execute functions instead.
-        The following description applies to deprecated behavior:**
-
-        You may set a timeout (in seconds) with the `timeout` parameter.
-        By default, the :attr:`~.default_timeout` for the :class:`.Session`
-        this was created through will be used for the timeout on this
-        operation.
-
-        This timeout applies to the entire request, including any retries
-        (decided internally by the :class:`.policies.RetryPolicy` used with
-        the request).
-
+        Timeout is specified in the Session request execution functions.
         If the timeout is exceeded, an :exc:`cassandra.OperationTimedOut` will be raised.
         This is a client-side timeout. For more information
         about server-side coordinator timeouts, see :class:`.policies.RetryPolicy`.
@@ -3167,18 +3097,7 @@ class ResponseFuture(object):
             ...     log.exception("Operation failed:")
 
         """
-        if timeout is not _NOT_SET and not ResponseFuture._warned_timeout:
-            msg = "ResponseFuture.result timeout argument is deprecated. Specify the request timeout via Session.execute[_async]."
-            warnings.warn(msg, DeprecationWarning)
-            log.warning(msg)
-            ResponseFuture._warned_timeout = True
-        else:
-            timeout = None
-
-        self._event.wait(timeout)
-        # TODO: remove this conditional when deprecated timeout parameter is removed
-        if not self._event.is_set():
-            self._on_timeout()
+        self._event.wait()
         if self._final_result is not _NOT_SET:
             return ResultSet(self, self._final_result)
         else:

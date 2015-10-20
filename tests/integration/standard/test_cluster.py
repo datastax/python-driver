@@ -254,32 +254,6 @@ class ClusterTests(unittest.TestCase):
         cluster.set_max_connections_per_host(HostDistance.LOCAL, max_connections_per_host + 1)
         self.assertEqual(cluster.get_max_connections_per_host(HostDistance.LOCAL), max_connections_per_host + 1)
 
-    def test_submit_schema_refresh(self):
-        """
-        Ensure new new schema is refreshed after submit_schema_refresh()
-        """
-
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        cluster.connect()
-        self.assertNotIn("newkeyspace", cluster.metadata.keyspaces)
-
-        other_cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = other_cluster.connect()
-        execute_until_pass(session,
-            """
-            CREATE KEYSPACE newkeyspace
-            WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
-            """)
-
-        future = cluster.submit_schema_refresh()
-        future.result()
-
-        self.assertIn("newkeyspace", cluster.metadata.keyspaces)
-
-        execute_until_pass(session, "DROP KEYSPACE newkeyspace")
-        cluster.shutdown()
-        other_cluster.shutdown()
-
     def test_refresh_schema(self):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
@@ -605,10 +579,6 @@ class ClusterTests(unittest.TestCase):
         # refresh schema
         cluster.refresh_schema_metadata()
         cluster.refresh_schema_metadata(max_schema_agreement_wait=0)
-
-        # submit schema refresh
-        future = cluster.submit_schema_refresh()
-        future.result()
 
         assert_quiescent_pool_state(self, cluster)
 

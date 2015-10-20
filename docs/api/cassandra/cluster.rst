@@ -87,8 +87,6 @@
 
    .. automethod:: refresh_user_aggregate_metadata
 
-   .. automethod:: refresh_schema
-
    .. automethod:: refresh_nodes
 
    .. automethod:: set_meta_refresh_enabled

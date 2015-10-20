@@ -37,33 +37,20 @@ class KeyspaceManagementTest(BaseCassEngTestCase):
         cluster = get_cluster()
 
         keyspace_ss = 'test_ks_ss'
-        self.assertFalse(keyspace_ss in cluster.metadata.keyspaces)
+        self.assertNotIn(keyspace_ss, cluster.metadata.keyspaces)
         management.create_keyspace_simple(keyspace_ss, 2)
-        self.assertTrue(keyspace_ss in cluster.metadata.keyspaces)
+        self.assertIn(keyspace_ss, cluster.metadata.keyspaces)
 
         management.drop_keyspace(keyspace_ss)
-
-        self.assertFalse(keyspace_ss in cluster.metadata.keyspaces)
-        with warnings.catch_warnings(record=True) as w:
-            management.create_keyspace(keyspace_ss, strategy_class="SimpleStrategy", replication_factor=1)
-            self.assertEqual(len(w), 1)
-            self.assertEqual(w[-1].category, DeprecationWarning)
-        self.assertTrue(keyspace_ss in cluster.metadata.keyspaces)
-
-        management.drop_keyspace(keyspace_ss)
-        self.assertFalse(keyspace_ss in cluster.metadata.keyspaces)
+        self.assertNotIn(keyspace_ss, cluster.metadata.keyspaces)
 
         keyspace_nts = 'test_ks_nts'
-        self.assertFalse(keyspace_nts in cluster.metadata.keyspaces)
-        management.create_keyspace_simple(keyspace_nts, 2)
-        self.assertTrue(keyspace_nts in cluster.metadata.keyspaces)
+        self.assertNotIn(keyspace_nts, cluster.metadata.keyspaces)
+        management.create_keyspace_network_topology(keyspace_nts, {'dc1': 1})
+        self.assertIn(keyspace_nts, cluster.metadata.keyspaces)
 
-        with warnings.catch_warnings(record=True) as w:
-            management.delete_keyspace(keyspace_nts)
-            self.assertEqual(len(w), 1)
-            self.assertEqual(w[-1].category, DeprecationWarning)
-
-        self.assertFalse(keyspace_nts in cluster.metadata.keyspaces)
+        management.drop_keyspace(keyspace_nts)
+        self.assertNotIn(keyspace_nts, cluster.metadata.keyspaces)
 
 
 class DropTableTest(BaseCassEngTestCase):

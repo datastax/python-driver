@@ -120,13 +120,6 @@ class Column(object):
     determines the order that the clustering keys are sorted on disk
     """
 
-    polymorphic_key = False
-    """
-    *Deprecated*
-
-    see :attr:`~.discriminator_column`
-    """
-
     discriminator_column = False
     """
     boolean, if set to True, this column will be used for discriminating records
@@ -151,7 +144,6 @@ class Column(object):
                  default=None,
                  required=False,
                  clustering_order=None,
-                 polymorphic_key=False,
                  discriminator_column=False,
                  static=False):
         self.partition_key = partition_key
@@ -161,14 +153,7 @@ class Column(object):
         self.default = default
         self.required = required
         self.clustering_order = clustering_order
-
-        if polymorphic_key:
-            msg = "polymorphic_key is deprecated. Use discriminator_column instead."
-            warnings.warn(msg, DeprecationWarning)
-            log.warning(msg)
-
-        self.discriminator_column = discriminator_column or polymorphic_key
-        self.polymorphic_key = self.discriminator_column
+        self.discriminator_column = discriminator_column
 
         # the column name in the model definition
         self.column_name = None
@@ -540,6 +525,7 @@ class UUID(Column):
     def to_database(self, value):
         return self.validate(value)
 
+
 from uuid import UUID as pyUUID, getnode
 
 
@@ -549,25 +535,6 @@ class TimeUUID(UUID):
     """
 
     db_type = 'timeuuid'
-
-    @classmethod
-    def from_datetime(self, dt):
-        """
-        generates a UUID for a given datetime
-
-        :param dt: datetime
-        :type dt: datetime
-        :return: uuid1
-
-        .. deprecated:: 2.6.0
-
-            Use :func:`cassandra.util.uuid_from_time`
-
-        """
-        msg = "cqlengine.columns.TimeUUID.from_datetime is deprecated. Use cassandra.util.uuid_from_time instead."
-        warnings.warn(msg, DeprecationWarning)
-        log.warning(msg)
-        return util.uuid_from_time(dt)
 
 
 class Boolean(Column):
@@ -611,17 +578,6 @@ class Float(BaseFloat):
     Stores a single-precision floating-point value
     """
     db_type = 'float'
-
-    def __init__(self, double_precision=None, **kwargs):
-        if double_precision is None or bool(double_precision):
-            msg = "Float(double_precision=True) is deprecated. Use Double() type instead."
-            double_precision = True
-            warnings.warn(msg, DeprecationWarning)
-            log.warning(msg)
-
-        self.db_type = 'double' if double_precision else 'float'
-
-        super(Float, self).__init__(**kwargs)
 
 
 class Double(BaseFloat):
