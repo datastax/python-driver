@@ -486,23 +486,24 @@ class BoundStatement(Statement):
             * short sequences will be extended to match bind parameters with UNSET_VALUE
             * names may be omitted from a dict with UNSET_VALUE implied.
 
+        .. versionchanged:: 3.0.0
+
+            method will not throw if extra keys are present in bound dict (PYTHON-178)
         """
         if values is None:
             values = ()
         proto_version = self.prepared_statement.protocol_version
         col_meta = self.prepared_statement.column_metadata
-        col_meta_len = len(col_meta)
-        value_len = len(values)
 
         # special case for binding dicts
         if isinstance(values, dict):
-            unbound_values = values.copy()
+            values_dict = values
             values = []
 
             # sort values accordingly
             for col in col_meta:
                 try:
-                    values.append(unbound_values.pop(col.name))
+                    values.append(values_dict[col.name])
                 except KeyError:
                     if proto_version >= 4:
                         values.append(UNSET_VALUE)
@@ -511,10 +512,8 @@ class BoundStatement(Statement):
                             'Column name `%s` not found in bound dict.' %
                             (col.name))
 
-            value_len = len(values)
-
-            if unbound_values:
-                raise ValueError("Unexpected arguments provided to bind(): %s" % unbound_values.keys())
+        value_len = len(values)
+        col_meta_len = len(col_meta)
 
         if value_len > col_meta_len:
             raise ValueError(
