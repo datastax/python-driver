@@ -29,6 +29,9 @@ class SortedSetTest(unittest.TestCase):
         self.assertEqual(len(ss), len(expected))
         self.assertEqual(list(ss), expected)
 
+    def test_repr(self):
+        self.assertEqual(repr(sortedset([1, 2, 3, 4])), "SortedSet([1, 2, 3, 4])")
+
     def test_contains(self):
         input = [5, 4, 3, 2, 1, 1, 1]
         expected = sorted(set(input))
@@ -62,6 +65,8 @@ class SortedSetTest(unittest.TestCase):
 
         self.assertEqual(ss1, s1)
         self.assertEqual(ss12, s12)
+        self.assertEqual(ss12, s12)
+        self.assertEqual(ss1.__eq__(None), NotImplemented)
         self.assertNotEqual(ss1, ss12)
         self.assertNotEqual(ss12, ss1)
         self.assertNotEqual(ss1, s12)
@@ -198,6 +203,40 @@ class SortedSetTest(unittest.TestCase):
         self.assertRaises(KeyError, ss.remove, 2)
         self.assertFalse(ss)
 
+    def test_getitem(self):
+        ss = sortedset(range(3))
+        for i in range(len(ss)):
+            self.assertEqual(ss[i], i)
+        with self.assertRaises(IndexError):
+            ss[len(ss)]
+
+    def test_delitem(self):
+        expected = [1,2,3,4]
+        ss = sortedset(expected)
+        for i in range(len(ss)):
+            self.assertListEqual(list(ss), expected[i:])
+            del ss[0]
+        with self.assertRaises(IndexError):
+            ss[0]
+
+    def test_delslice(self):
+        expected = [1, 2, 3, 4, 5]
+        ss = sortedset(expected)
+        del ss[1:3]
+        self.assertListEqual(list(ss), [1, 4, 5])
+        del ss[-1:]
+        self.assertListEqual(list(ss), [1, 4])
+        del ss[1:]
+        self.assertListEqual(list(ss), [1])
+        del ss[:]
+        self.assertFalse(ss)
+        with self.assertRaises(IndexError):
+            del ss[0]
+
+    def test_reversed(self):
+        expected = range(10)
+        self.assertListEqual(list(reversed(sortedset(expected))), list(reversed(expected)))
+
     def test_operators(self):
 
         ss1 = sortedset([1])
@@ -232,11 +271,46 @@ class SortedSetTest(unittest.TestCase):
         self.assertEqual(ss12 & ss12, ss12)
         self.assertEqual(ss12 & set(), sortedset())
 
+        # __iand__
+        tmp = sortedset(ss12)
+        tmp &= ss1
+        self.assertEqual(tmp, ss1)
+        tmp = sortedset(ss1)
+        tmp &= ss12
+        self.assertEqual(tmp, ss1)
+        tmp = sortedset(ss12)
+        tmp &= ss12
+        self.assertEqual(tmp, ss12)
+        tmp = sortedset(ss12)
+        tmp &= set()
+        self.assertEqual(tmp, sortedset())
+
+        # __rand__
+        self.assertEqual(set([1]) & ss12, ss1)
+
         # __or__
         self.assertEqual(ss1 | ss12, ss12)
         self.assertEqual(ss12 | ss12, ss12)
         self.assertEqual(ss12 | set(), ss12)
         self.assertEqual(sortedset() | ss1 | ss12, ss12)
+
+        # __ior__
+        tmp = sortedset(ss1)
+        tmp |= ss12
+        self.assertEqual(tmp, ss12)
+        tmp = sortedset(ss12)
+        tmp |= ss12
+        self.assertEqual(tmp, ss12)
+        tmp = sortedset(ss12)
+        tmp |= set()
+        self.assertEqual(tmp, ss12)
+        tmp = sortedset()
+        tmp |= ss1
+        tmp |= ss12
+        self.assertEqual(tmp, ss12)
+
+        # __ror__
+        self.assertEqual(set([1]) | ss12, ss12)
 
         # __sub__
         self.assertEqual(ss1 - ss12, set())
@@ -244,8 +318,49 @@ class SortedSetTest(unittest.TestCase):
         self.assertEqual(ss12 - set(), ss12)
         self.assertEqual(ss12 - ss1, sortedset([2]))
 
+        # __isub__
+        tmp = sortedset(ss1)
+        tmp -= ss12
+        self.assertEqual(tmp, set())
+        tmp = sortedset(ss12)
+        tmp -= ss12
+        self.assertEqual(tmp, set())
+        tmp = sortedset(ss12)
+        tmp -= set()
+        self.assertEqual(tmp, ss12)
+        tmp = sortedset(ss12)
+        tmp -= ss1
+        self.assertEqual(tmp, sortedset([2]))
+
+        # __rsub__
+        self.assertEqual(set((1,2,3)) - ss12, set((3,)))
+
         # __xor__
         self.assertEqual(ss1 ^ ss12, set([2]))
         self.assertEqual(ss12 ^ ss1, set([2]))
         self.assertEqual(ss12 ^ ss12, set())
         self.assertEqual(ss12 ^ set(), ss12)
+
+        # __ixor__
+        tmp = sortedset(ss1)
+        tmp ^= ss12
+        self.assertEqual(tmp, set([2]))
+        tmp = sortedset(ss12)
+        tmp ^= ss1
+        self.assertEqual(tmp, set([2]))
+        tmp = sortedset(ss12)
+        tmp ^= ss12
+        self.assertEqual(tmp, set())
+        tmp = sortedset(ss12)
+        tmp ^= set()
+        self.assertEqual(tmp, ss12)
+
+        # __rxor__
+        self.assertEqual(set([1, 2]) ^ ss1, (set([2])))
+
+    def test_reduce_pickle(self):
+        ss = sortedset((4,3,2,1))
+        import pickle
+        s = pickle.dumps(ss)
+        self.assertEqual(pickle.loads(s), ss)
+
