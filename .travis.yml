@@ -1,5 +1,6 @@
 language: python
 python: 2.7
+sudo: false
 env:
   - TOX_ENV=py26 CASS_VER=21 CASS_DRIVER_NO_CYTHON=1
   - TOX_ENV=py26 CASS_VER=21
@@ -14,11 +15,14 @@ env:
   - TOX_ENV=pypy CASS_VER=21 CASS_DRIVER_NO_CYTHON=1
   - TOX_ENV=pypy3 CASS_VER=21 CASS_DRIVER_NO_CYTHON=1
 
-before_install:
-  - sudo apt-get update -y
-  - sudo apt-get install -y build-essential python-dev
-  - sudo apt-get install -y pypy-dev
-  - sudo apt-get install -y libev4 libev-dev
+addons:
+  apt:
+    packages:
+    - build-essential
+    - python-dev
+    - pypy-dev
+    - libev4
+    - libev-dev
 
 install:
   - pip install tox
