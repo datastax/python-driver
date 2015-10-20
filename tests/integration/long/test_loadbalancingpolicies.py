@@ -16,7 +16,7 @@ import struct, time, logging, sys, traceback
 
 from cassandra import ConsistencyLevel, Unavailable, OperationTimedOut, ReadTimeout, ReadFailure, \
     WriteTimeout, WriteFailure
-from cassandra.cluster import Cluster, NoHostAvailable
+from cassandra.cluster import Cluster, NoHostAvailable, Session
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.metadata import murmur3
 from cassandra.policies import (RoundRobinPolicy, DCAwareRoundRobinPolicy,
@@ -426,7 +426,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
             self._query(session, keyspace, use_prepared=use_prepared)
             self.fail()
         except Unavailable as e:
-            self.assertEqual(e.consistency, 1)
+            self.assertEqual(e.consistency, Session.default_consistency_level)
             self.assertEqual(e.required_replicas, 1)
             self.assertEqual(e.alive_replicas, 0)
 
