@@ -29,7 +29,6 @@ from cassandra.marshal import uint8_pack, uint32_pack, int32_pack
 from cassandra.protocol import (write_stringmultimap, write_int, write_string,
                                 SupportedMessage, ProtocolHandler)
 
-import cassandra.cqlengine.connection
 
 class ConnectionTest(unittest.TestCase):
 
@@ -414,21 +413,3 @@ class ConnectionHeartbeatTest(unittest.TestCase):
         self.assertIsInstance(exc, Exception)
         self.assertEqual(exc.args, Exception('Connection heartbeat failure').args)
         holder.return_connection.assert_has_calls([call(connection)] * get_holders.call_count)
-
-
-class ConnectionDefaultTest(unittest.TestCase):
-        """
-        Test to ensure object mapper and base driver default cl's are the same.
-
-
-        @since 3.0.0
-        @jira_ticket PYTHON-416
-        @expected_result cl's matchy between object mapper and base driver.
-
-        @test_category consistency
-        """
-        def test_default_cl(self, *args):
-            base_driver_cl = Session.default_consistency_level
-            cqlengine_cl = cassandra.cqlengine.connection.default_consistency_level
-            self.assertEqual(base_driver_cl, cqlengine_cl)
-

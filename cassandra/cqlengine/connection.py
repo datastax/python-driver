@@ -16,7 +16,6 @@ from collections import namedtuple
 import logging
 import six
 
-from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster, _NOT_SET, NoHostAvailable, UserTypeDoesNotExist
 from cassandra.query import SimpleStatement, Statement, dict_factory
 
@@ -33,7 +32,6 @@ Host = namedtuple('Host', ['name', 'port'])
 cluster = None
 session = None
 lazy_connect_args = None
-default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
 
 # Because type models may be registered before a connection is present,
@@ -95,7 +93,7 @@ def set_session(s):
 def setup(
         hosts,
         default_keyspace,
-        consistency=ConsistencyLevel.ONE,
+        consistency=None,
         lazy_connect=False,
         retry_connect=False,
         **kwargs):
@@ -104,12 +102,12 @@ def setup(
 
     :param list hosts: list of hosts, (``contact_points`` for :class:`cassandra.cluster.Cluster`)
     :param str default_keyspace: The default keyspace to use
-    :param int consistency: The global default :class:`~.ConsistencyLevel`
+    :param int consistency: The global default :class:`~.ConsistencyLevel` - default is the same as :attr:`.Session.default_consistency_level`
     :param bool lazy_connect: True if should not connect until first use
     :param bool retry_connect: True if we should retry to connect even if there was a connection failure initially
     :param \*\*kwargs: Pass-through keyword arguments for :class:`cassandra.cluster.Cluster`
     """
-    global cluster, session, default_consistency_level, lazy_connect_args
+    global cluster, session, lazy_connect_args
 
     if 'username' in kwargs or 'password' in kwargs:
         raise CQLEngineException("Username & Password are now handled by using the native driver's auth_provider")
@@ -117,7 +115,6 @@ def setup(
     from cassandra.cqlengine import models
     models.DEFAULT_KEYSPACE = default_keyspace
 
-    default_consistency_level = consistency
     if lazy_connect:
         kwargs['default_keyspace'] = default_keyspace
         kwargs['consistency'] = consistency
@@ -139,6 +136,8 @@ def setup(
             kwargs['retry_connect'] = retry_connect
             lazy_connect_args = (hosts, kwargs)
         raise
+    if consistency is not None:
+        session.default_consistency_level = consistency
     session.row_factory = dict_factory
 
     _register_known_types(cluster)
@@ -150,9 +149,6 @@ def execute(query, params=None, consistency_level=None, timeout=NOT_SET):
 
     if not session:
         raise CQLEngineException("It is required to setup() cqlengine before executing queries")
-
-    if consistency_level is None:
-        consistency_level = default_consistency_level
 
     if isinstance(query, Statement):
         pass
