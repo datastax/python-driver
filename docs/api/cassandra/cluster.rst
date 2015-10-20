@@ -143,7 +143,7 @@
 
    .. automethod:: add_callbacks(callback, errback, callback_args=(), callback_kwargs=None, errback_args=(), errback_args=None)
 
-.. autoclass:: PagedResult ()
+.. autoclass:: ResultSet ()
    :members:
 
 .. autoexception:: QueryExhausted ()

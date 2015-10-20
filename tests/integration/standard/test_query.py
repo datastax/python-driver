@@ -404,7 +404,7 @@ class SerialConsistencyTests(unittest.TestCase):
         future = self.session.execute_async(statement)
         result = future.result()
         self.assertEqual(future.message.serial_consistency_level, ConsistencyLevel.SERIAL)
-        self.assertEqual(1, len(result))
+        self.assertTrue(result)
         self.assertFalse(result[0].applied)
 
         statement = SimpleStatement(
@@ -414,7 +414,7 @@ class SerialConsistencyTests(unittest.TestCase):
         future = self.session.execute_async(statement)
         result = future.result()
         self.assertEqual(future.message.serial_consistency_level, ConsistencyLevel.LOCAL_SERIAL)
-        self.assertEqual(1, len(result))
+        self.assertTrue(result)
         self.assertTrue(result[0].applied)
 
     def test_conditional_update_with_prepared_statements(self):
@@ -426,7 +426,7 @@ class SerialConsistencyTests(unittest.TestCase):
         future = self.session.execute_async(statement)
         result = future.result()
         self.assertEqual(future.message.serial_consistency_level, ConsistencyLevel.SERIAL)
-        self.assertEqual(1, len(result))
+        self.assertTrue(result)
         self.assertFalse(result[0].applied)
 
         statement = self.session.prepare(
@@ -436,7 +436,7 @@ class SerialConsistencyTests(unittest.TestCase):
         future = self.session.execute_async(bound)
         result = future.result()
         self.assertEqual(future.message.serial_consistency_level, ConsistencyLevel.LOCAL_SERIAL)
-        self.assertEqual(1, len(result))
+        self.assertTrue(result)
         self.assertTrue(result[0].applied)
 
     def test_conditional_update_with_batch_statements(self):
@@ -447,7 +447,7 @@ class SerialConsistencyTests(unittest.TestCase):
         future = self.session.execute_async(statement)
         result = future.result()
         self.assertEqual(future.message.serial_consistency_level, ConsistencyLevel.SERIAL)
-        self.assertEqual(1, len(result))
+        self.assertTrue(result)
         self.assertFalse(result[0].applied)
 
         statement = BatchStatement(serial_consistency_level=ConsistencyLevel.LOCAL_SERIAL)
@@ -456,7 +456,7 @@ class SerialConsistencyTests(unittest.TestCase):
         future = self.session.execute_async(statement)
         result = future.result()
         self.assertEqual(future.message.serial_consistency_level, ConsistencyLevel.LOCAL_SERIAL)
-        self.assertEqual(1, len(result))
+        self.assertTrue(result)
         self.assertTrue(result[0].applied)
 
     def test_bad_consistency_level(self):

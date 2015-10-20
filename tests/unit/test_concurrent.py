@@ -32,6 +32,8 @@ class MockResponseResponseFuture():
     and invoke callback with various timing.
     """
 
+    _is_result_kind_rows = False
+
     # a list pending callbacks, these will be prioritized in reverse or normal orderd
     pending_callbacks = PriorityQueue()
 
