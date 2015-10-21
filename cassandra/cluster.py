@@ -407,18 +407,17 @@ class Cluster(object):
 
     * :class:`cassandra.io.asyncorereactor.AsyncoreConnection`
     * :class:`cassandra.io.libevreactor.LibevConnection`
-    * :class:`cassandra.io.geventreactor.GeventConnection` (requires monkey-patching)
+    * :class:`cassandra.io.eventletreactor.EventletConnection` (requires monkey-patching - see doc for details)
+    * :class:`cassandra.io.geventreactor.GeventConnection` (requires monkey-patching - see doc for details)
     * :class:`cassandra.io.twistedreactor.TwistedConnection`
 
     By default, ``AsyncoreConnection`` will be used, which uses
-    the ``asyncore`` module in the Python standard library.  The
-    performance is slightly worse than with ``libev``, but it is
-    supported on a wider range of systems.
+    the ``asyncore`` module in the Python standard library.
 
     If ``libev`` is installed, ``LibevConnection`` will be used instead.
 
-    If gevent monkey-patching of the standard library is detected,
-    GeventConnection will be used automatically.
+    If ``gevent`` or ``eventlet`` monkey-patching is detected, the corresponding
+    connection class will be used automatically.
     """
 
     control_connection_timeout = 2.0

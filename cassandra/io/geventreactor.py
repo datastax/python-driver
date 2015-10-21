@@ -17,7 +17,6 @@ from gevent.queue import Queue
 from gevent import select, socket
 import gevent.ssl
 
-from collections import defaultdict
 from functools import partial
 import logging
 import os
@@ -44,6 +43,8 @@ def is_timeout(err):
 class GeventConnection(Connection):
     """
     An implementation of :class:`.Connection` that utilizes ``gevent``.
+
+    This implementation assumes all gevent monkey patching is active. It is not tested with partial patching.
     """
 
     _read_watcher = None
