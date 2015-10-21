@@ -104,6 +104,23 @@ class DocCommand(Command):
                 pass
 
         if has_subprocess:
+            # Prevent run with in-place extensions because cython-generated objects do not carry docstrings
+            # http://docs.cython.org/src/userguide/special_methods.html#docstrings
+            import glob
+            for f in glob.glob("cassandra/*.so"):
+                print("Removing '%s' to allow docs to run on pure python modules." %(f,))
+                os.unlink(f)
+
+            # Build murmur and io extensions to make import and docstrings work
+            try:
+                output = subprocess.check_output(
+                    ["python", "setup.py", "build_ext", "--inplace", "--force", "--no-murmur3", "--no-cython"],
+                    stderr=subprocess.STDOUT)
+            except subprocess.CalledProcessError as exc:
+                raise RuntimeError("Documentation step '%s' failed: %s: %s" % ("build_ext", exc, exc.output))
+            else:
+                print(output)
+
             try:
                 output = subprocess.check_output(
                     ["sphinx-build", "-b", mode, "docs", path],
