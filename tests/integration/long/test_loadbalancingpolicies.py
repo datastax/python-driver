@@ -72,7 +72,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
             query_string = 'SELECT * FROM %s.cf WHERE k = ?' % keyspace
             if not self.prepared or self.prepared.query_string != query_string:
                 self.prepared = session.prepare(query_string)
-
+                self.prepared.consistency_level=consistency_level
             for i in range(count):
                 tries = 0
                 while True:
@@ -426,7 +426,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
             self._query(session, keyspace, use_prepared=use_prepared)
             self.fail()
         except Unavailable as e:
-            self.assertEqual(e.consistency, Session.default_consistency_level)
+            self.assertEqual(e.consistency, 1)
             self.assertEqual(e.required_replicas, 1)
             self.assertEqual(e.alive_replicas, 0)
 
