@@ -15,7 +15,7 @@
 import time
 
 
-class TimerCallback():
+class TimerCallback(object):
 
     invoked = False
     created_time = 0
@@ -39,7 +39,7 @@ class TimerCallback():
         return elapsed_time
 
     def wait_match_excepted(self):
-        if self.expected_wait-.01 <= self.get_wait_time() <= self.expected_wait+.01:
+        if self.expected_wait - .01 <= self.get_wait_time() <= self.expected_wait + .01:
             return True
         return False
 
@@ -54,16 +54,16 @@ def get_timeout(gross_time, start, end, precision, split_range):
     :param split_range: generate values from both ends
     :return: a timeout value to use
     """
-    if(split_range):
-            top_num = float(end)/precision
-            bottom_num = float(start)/precision
+    if split_range:
+            top_num = float(end) / precision
+            bottom_num = float(start) / precision
             if gross_time % 2 == 0:
-                timeout = top_num - float(gross_time)/precision
+                timeout = top_num - float(gross_time) / precision
             else:
-                timeout = bottom_num + float(gross_time)/precision
+                timeout = bottom_num + float(gross_time) / precision
 
     else:
-        timeout = float(gross_time)/precision
+        timeout = float(gross_time) / precision
 
     return timeout
 
@@ -102,6 +102,4 @@ def submit_and_wait_for_completion(unit_test, connection, start, end, increment,
 
     # ensure they are all called back in a timely fashion
     for callback in completed_callbacks:
-        unit_test.assertAlmostEqual(callback.expected_wait, callback.get_wait_time(), delta=.1)
-
-
+        unit_test.assertAlmostEqual(callback.expected_wait, callback.get_wait_time(), delta=.15)
