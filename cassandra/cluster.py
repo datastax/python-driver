@@ -3263,7 +3263,7 @@ class ResultSet(object):
         >>> from cassandra.query import SimpleStatement
         >>> statement = SimpleStatement("SELECT * FROM users", fetch_size=10)
         >>> for user_row in session.execute(statement):
-        ...     process_user(user_rowt
+        ...     process_user(user_row)
 
     Whenever there are no more rows in the current page, the next page will
     be fetched transparently.  However, note that it *is* possible for
