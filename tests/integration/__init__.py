@@ -126,6 +126,8 @@ else:
 
 PROTOCOL_VERSION = int(os.getenv('PROTOCOL_VERSION', default_protocol_version))
 
+notprotocolv1 = unittest.skipUnless(PROTOCOL_VERSION > 1, 'Protocol v1 not supported')
+
 
 def get_cluster():
     return CCM_CLUSTER

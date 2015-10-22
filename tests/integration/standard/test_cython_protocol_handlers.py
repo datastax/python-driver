@@ -11,7 +11,7 @@ from cassandra.query import tuple_factory
 from cassandra.cluster import Cluster
 from cassandra.protocol import ProtocolHandler, LazyProtocolHandler, NumpyProtocolHandler
 
-from tests.integration import use_singledc, PROTOCOL_VERSION
+from tests.integration import use_singledc, PROTOCOL_VERSION, notprotocolv1
 from tests.integration.datatype_utils import update_datatypes
 from tests.integration.standard.utils import (
     create_table_with_all_types, get_all_primitive_params, get_primitive_datatypes)
@@ -55,6 +55,7 @@ class CythonProtocolHandlerTest(unittest.TestCase):
         """
         verify_iterator_data(self.assertEqual, get_data(LazyProtocolHandler))
 
+    @notprotocolv1
     @numpytest
     def test_cython_lazy_results_paged(self):
         """
