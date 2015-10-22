@@ -111,7 +111,7 @@ class DocCommand(Command):
                 print("Removing '%s' to allow docs to run on pure python modules." %(f,))
                 os.unlink(f)
 
-            # Build murmur and io extensions to make import and docstrings work
+            # Build io extension to make import and docstrings work
             try:
                 output = subprocess.check_output(
                     ["python", "setup.py", "build_ext", "--inplace", "--force", "--no-murmur3", "--no-cython"],
