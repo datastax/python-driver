@@ -708,7 +708,13 @@ class TypeTests(unittest.TestCase):
 
     def test_special_float_cql_encoding(self):
         """
-        PYTHON-282
+        Test to insure that Infinity -Infinity and NaN are supported by the python driver.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-282
+        @expected_result nan, inf and -inf can be inserted and selected correctly.
+
+        @test_category data_types
         """
         s = self.session
 
