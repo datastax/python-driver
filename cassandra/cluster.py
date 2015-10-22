@@ -3102,6 +3102,12 @@ class ResponseFuture(object):
         else:
             raise self._final_exception
 
+    def get_query_trace_ids(self):
+        """
+        Returns the trace session ids for this future, if tracing was enabled (does not fetch trace data).
+        """
+        return [trace.trace_id for trace in self._query_traces]
+
     def get_query_trace(self, max_wait=None):
         """
         Fetches and returns the query trace of the last response, or `None` if tracing was
