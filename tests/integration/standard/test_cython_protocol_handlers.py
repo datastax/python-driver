@@ -77,6 +77,7 @@ class CythonProtocolHandlerTest(unittest.TestCase):
 
         cluster.shutdown()
 
+    @notprotocolv1
     @numpytest
     def test_numpy_parser(self):
         """
