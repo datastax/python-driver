@@ -1888,11 +1888,12 @@ class SchemaParserV22(_SchemaParser):
             # other normal columns
             for col_row in col_rows:
                 column_meta = self._build_column_metadata(table_meta, col_row)
-                table_meta.columns[column_meta.name] = column_meta
-                index_meta = self._build_index_metadata(column_meta, col_row)
-                column_meta.index = index_meta
-                if index_meta:
-                    table_meta.indexes[index_meta.name] = index_meta
+                if column_meta.name:
+                    table_meta.columns[column_meta.name] = column_meta
+                    index_meta = self._build_index_metadata(column_meta, col_row)
+                    column_meta.index = index_meta
+                    if index_meta:
+                        table_meta.indexes[index_meta.name] = index_meta
 
             for trigger_row in trigger_rows:
                 trigger_meta = self._build_trigger_metadata(table_meta, trigger_row)
