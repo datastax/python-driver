@@ -2153,12 +2153,13 @@ class SchemaParserV3(SchemaParserV22):
             if flags:
                 compact_static = False
                 table_meta.is_compact_storage = 'dense' in flags or 'super' in flags or 'compound' not in flags
+                is_dense = 'dense' in flags
             else:
-                # example: create table t (a int, b int, c int, primary key((a,b))) with compact storage
                 compact_static = True
                 table_meta.is_compact_storage = True
+                is_dense = False
 
-            self._build_table_columns(table_meta, col_rows, compact_static)
+            self._build_table_columns(table_meta, col_rows, compact_static, is_dense)
 
             for trigger_row in trigger_rows:
                 trigger_meta = self._build_trigger_metadata(table_meta, trigger_row)
@@ -2178,7 +2179,7 @@ class SchemaParserV3(SchemaParserV22):
         """ Setup the mostly-non-schema table options, like caching settings """
         return dict((o, row.get(o)) for o in self.recognized_table_options if o in row)
 
-    def _build_table_columns(self, meta, col_rows, compact_static=False):
+    def _build_table_columns(self, meta, col_rows, compact_static=False, is_dense=False):
         # partition key
         partition_rows = [r for r in col_rows
                           if r.get('kind', None) == "partition_key"]
@@ -2205,12 +2206,15 @@ class SchemaParserV3(SchemaParserV22):
         for col_row in (r for r in col_rows
                         if r.get('kind', None) not in ('partition_key', 'clustering_key')):
             column_meta = self._build_column_metadata(meta, col_row)
-            if not compact_static or column_meta.is_static:
+            if is_dense and column_meta.data_type.cassname.endswith(types.cassandra_empty_type):
+                continue
+            if compact_static and not column_meta.is_static:
                 # for compact static tables, we omit the clustering key and value, and only add the logical columns.
                 # They are marked not static so that it generates appropriate CQL
-                if compact_static:
-                    column_meta.is_static = False
-                meta.columns[column_meta.name] = column_meta
+                continue
+            if compact_static:
+                column_meta.is_static = False
+            meta.columns[column_meta.name] = column_meta
 
     def _build_view_metadata(self, row, col_rows=None):
         keyspace_name = row["keyspace_name"]

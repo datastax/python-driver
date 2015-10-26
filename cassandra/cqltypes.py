@@ -53,6 +53,8 @@ from cassandra import util
 
 apache_cassandra_type_prefix = 'org.apache.cassandra.db.marshal.'
 
+cassandra_empty_type = 'org.apache.cassandra.db.marshal.EmptyType'
+
 log = logging.getLogger(__name__)
 
 if six.PY3:
