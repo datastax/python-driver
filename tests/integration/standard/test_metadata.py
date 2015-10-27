@@ -2256,7 +2256,12 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         score_column = self.cluster.metadata.keyspaces[self.keyspace_name].tables['scores'].columns['score']
         self.assertEquals(score_column.typestring, 'blob')
 
-        score_mv_column = self.cluster.metadata.keyspaces[self.keyspace_name].views["monthlyhigh"].columns['score']
+        for i in range(10):
+            score_mv_column = self.cluster.metadata.keyspaces[self.keyspace_name].views["monthlyhigh"].columns['score']
+            if("blob" == score_mv_column.typestring):
+                break
+            time.sleep(.2)
+
         self.assertEquals(score_mv_column.typestring, 'blob')
 
     def test_metadata_with_quoted_identifiers(self):
