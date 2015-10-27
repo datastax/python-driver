@@ -26,17 +26,15 @@ from mock import Mock, patch
 from cassandra import AlreadyExists, SignatureDescriptor, UserFunctionDescriptor, UserAggregateDescriptor
 
 from cassandra.cluster import Cluster
-from cassandra.cqltypes import DoubleType, Int32Type, ListType, UTF8Type, MapType, LongType
 from cassandra.encoder import Encoder
 from cassandra.metadata import (Metadata, KeyspaceMetadata, IndexMetadata,
                                 Token, MD5Token, TokenMap, murmur3, Function, Aggregate, protect_name, protect_names,
                                 get_schema_parser)
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
-from cassandra.query import SimpleStatement, ConsistencyLevel
 
 from tests.integration import get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass, \
-    BasicSharedKeyspaceUnitTestCase, BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase
+    BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase
 
 
 def setup_module():
@@ -753,7 +751,7 @@ class TestCodeCoverage(unittest.TestCase):
 
     def assert_startswith_diff(self, received, prefix):
         if not received.startswith(prefix):
-            prefix_lines = previx.split('\n')
+            prefix_lines = prefix.split('\n')
             diff_string = '\n'.join(difflib.unified_diff(prefix_lines,
                                                          received.split('\n')[:len(prefix_lines)],
                                                          'EXPECTED', 'RECEIVED',
@@ -1450,7 +1448,7 @@ class FunctionTest(unittest.TestCase):
         @property
         def signature(self):
             return SignatureDescriptor.format_signature(self.function_kwargs['name'],
-                                                        self.function_kwargs['type_signature'])
+                                                        self.function_kwargs['argument_types'])
 
     class VerifiedFunction(Verified):
         def __init__(self, test_case, **kwargs):
@@ -1466,9 +1464,9 @@ class FunctionMetadata(FunctionTest):
     def make_function_kwargs(self, called_on_null=True):
         return {'keyspace': self.keyspace_name,
                 'name': self.function_name,
-                'type_signature': ['double', 'int'],
+                'argument_types': ['double', 'int'],
                 'argument_names': ['d', 'i'],
-                'return_type': DoubleType,
+                'return_type': 'double',
                 'language': 'java',
                 'body': 'return new Double(0.0);',
                 'called_on_null_input': called_on_null}
@@ -1485,7 +1483,7 @@ class FunctionMetadata(FunctionTest):
         SEE https://issues.apache.org/jira/browse/CASSANDRA-9186
         Maybe update this after release
         kwargs = self.make_function_kwargs()
-        kwargs['type_signature'][0] = "frozen<%s>" % udt_name
+        kwargs['argument_types'][0] = "frozen<%s>" % udt_name
         expected_meta = Function(**kwargs)
         with self.VerifiedFunction(self, **kwargs):
 
@@ -1526,16 +1524,16 @@ class FunctionMetadata(FunctionTest):
         with self.VerifiedFunction(self, **kwargs):
 
             # another function: same name, different type sig.
-            self.assertGreater(len(kwargs['type_signature']), 1)
+            self.assertGreater(len(kwargs['argument_types']), 1)
             self.assertGreater(len(kwargs['argument_names']), 1)
-            kwargs['type_signature'] = kwargs['type_signature'][:1]
+            kwargs['argument_types'] = kwargs['argument_types'][:1]
             kwargs['argument_names'] = kwargs['argument_names'][:1]
 
             # Ensure they are surfaced separately
             with self.VerifiedFunction(self, **kwargs):
                 functions = [f for f in self.keyspace_function_meta.values() if f.name == self.function_name]
                 self.assertEqual(len(functions), 2)
-                self.assertNotEqual(functions[0].type_signature, functions[1].type_signature)
+                self.assertNotEqual(functions[0].argument_types, functions[1].argument_types)
 
     def test_function_no_parameters(self):
         """
@@ -1549,9 +1547,9 @@ class FunctionMetadata(FunctionTest):
         @test_category function
         """
         kwargs = self.make_function_kwargs()
-        kwargs['type_signature'] = []
+        kwargs['argument_types'] = []
         kwargs['argument_names'] = []
-        kwargs['return_type'] = LongType
+        kwargs['return_type'] = 'bigint'
         kwargs['body'] = 'return System.currentTimeMillis() / 1000L;'
 
         with self.VerifiedFunction(self, **kwargs) as vf:
@@ -1648,7 +1646,7 @@ class AggregateMetadata(FunctionTest):
     def make_aggregate_kwargs(self, state_func, state_type, final_func=None, init_cond=None):
         return {'keyspace': self.keyspace_name,
                 'name': self.function_name + '_aggregate',
-                'type_signature': ['int'],
+                'argument_types': ['int'],
                 'state_func': state_func,
                 'state_type': state_type,
                 'final_func': final_func,
@@ -1669,8 +1667,8 @@ class AggregateMetadata(FunctionTest):
         @test_category aggregate
         """
 
-        with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('sum_int', Int32Type, init_cond=1)) as va:
-            self.assertIs(self.keyspace_aggregate_meta[va.signature].return_type, Int32Type)
+        with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('sum_int', 'int', init_cond=1)) as va:
+            self.assertEqual(self.keyspace_aggregate_meta[va.signature].return_type, 'int')
 
     def test_init_cond(self):
         """
@@ -1694,13 +1692,13 @@ class AggregateMetadata(FunctionTest):
 
         # int32
         for init_cond in (-1, 0, 1):
-            with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('sum_int', Int32Type, init_cond=init_cond)) as va:
+            with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('sum_int', 'int', init_cond=init_cond)) as va:
                 sum_res = s.execute("SELECT %s(v) AS sum FROM t" % va.function_kwargs['name'])[0].sum
                 self.assertEqual(sum_res, init_cond + sum(expected_values))
 
         # list<text>
         for init_cond in ([], ['1', '2']):
-            with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('extend_list', ListType.apply_parameters([UTF8Type]), init_cond=init_cond)) as va:
+            with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('extend_list', 'list<text>', init_cond=init_cond)) as va:
                 list_res = s.execute("SELECT %s(v) AS list_res FROM t" % va.function_kwargs['name'])[0].list_res
                 self.assertListEqual(list_res[:len(init_cond)], init_cond)
                 self.assertEqual(set(i for i in list_res[len(init_cond):]),
@@ -1710,7 +1708,7 @@ class AggregateMetadata(FunctionTest):
         expected_map_values = dict((i, i) for i in expected_values)
         expected_key_set = set(expected_values)
         for init_cond in ({}, {1: 2, 3: 4}, {5: 5}):
-            with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('update_map', MapType.apply_parameters([Int32Type, Int32Type]), init_cond=init_cond)) as va:
+            with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('update_map', 'map<int, int>', init_cond=init_cond)) as va:
                 map_res = s.execute("SELECT %s(v) AS map_res FROM t" % va.function_kwargs['name'])[0].map_res
                 self.assertDictContainsSubset(expected_map_values, map_res)
                 init_not_updated = dict((k, init_cond[k]) for k in set(init_cond) - expected_key_set)
@@ -1732,7 +1730,7 @@ class AggregateMetadata(FunctionTest):
         """
 
         # functions must come before functions in keyspace dump
-        with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('extend_list', ListType.apply_parameters([UTF8Type]))):
+        with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('extend_list', 'list<text>')):
             keyspace_cql = self.cluster.metadata.keyspaces[self.keyspace_name].export_as_string()
             func_idx = keyspace_cql.find("CREATE FUNCTION")
             aggregate_idx = keyspace_cql.rfind("CREATE AGGREGATE")
@@ -1752,14 +1750,14 @@ class AggregateMetadata(FunctionTest):
         @test_category function
         """
 
-        kwargs = self.make_aggregate_kwargs('sum_int', Int32Type, init_cond=0)
+        kwargs = self.make_aggregate_kwargs('sum_int', 'int', init_cond=0)
         with self.VerifiedAggregate(self, **kwargs):
             kwargs['state_func'] = 'sum_int_two'
-            kwargs['type_signature'] = ['int', 'int']
+            kwargs['argument_types'] = ['int', 'int']
             with self.VerifiedAggregate(self, **kwargs):
                 aggregates = [a for a in self.keyspace_aggregate_meta.values() if a.name == kwargs['name']]
                 self.assertEqual(len(aggregates), 2)
-                self.assertNotEqual(aggregates[0].type_signature, aggregates[1].type_signature)
+                self.assertNotEqual(aggregates[0].argument_types, aggregates[1].argument_types)
 
     def test_aggregates_follow_keyspace_alter(self):
         """
@@ -1775,7 +1773,7 @@ class AggregateMetadata(FunctionTest):
         @test_category function
         """
 
-        with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('sum_int', Int32Type, init_cond=0)):
+        with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('sum_int', 'int', init_cond=0)):
             original_keyspace_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
             self.session.execute('ALTER KEYSPACE %s WITH durable_writes = false' % self.keyspace_name)
             try:
@@ -1799,7 +1797,7 @@ class AggregateMetadata(FunctionTest):
         @test_category function
         """
 
-        kwargs = self.make_aggregate_kwargs('extend_list', ListType.apply_parameters([UTF8Type]))
+        kwargs = self.make_aggregate_kwargs('extend_list', 'list<text>')
 
         # no initial condition, final func
         self.assertIsNone(kwargs['initial_condition'])
@@ -2117,35 +2115,23 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         self.assertEquals(month_column.name, 'month')
         self.assertEquals(month_column, mv.partition_key[2])
 
+        def compare_columns(a, b, name):
+            self.assertEquals(a.name, name)
+            self.assertEquals(a.name, b.name)
+            self.assertEquals(a.table, b.table)
+            self.assertEquals(a.cql_type, b.cql_type)
+            self.assertEquals(a.index, b.index)
+            self.assertEquals(a.is_static, b.is_static)
+            self.assertEquals(a.is_reversed, b.is_reversed)
+
         score_column = mv_columns[3]
-        self.assertIsNotNone(score_column)
-        self.assertEquals(score_column.name, 'score')
-        self.assertEquals(score_column.name, mv.clustering_key[0].name)
-        self.assertEquals(score_column.table, mv.clustering_key[0].table)
-        self.assertEquals(score_column.data_type, mv.clustering_key[0].data_type)
-        self.assertEquals(score_column.index, mv.clustering_key[0].index)
-        self.assertEquals(score_column.is_static, mv.clustering_key[0].is_static)
-        self.assertEquals(score_column.is_reversed, mv.clustering_key[0].is_reversed)
+        compare_columns(score_column, mv.clustering_key[0], 'score')
 
         user_column = mv_columns[4]
-        self.assertIsNotNone(user_column)
-        self.assertEquals(user_column.name, 'user')
-        self.assertEquals(user_column.name, mv.clustering_key[1].name)
-        self.assertEquals(user_column.table, mv.clustering_key[1].table)
-        self.assertEquals(user_column.data_type, mv.clustering_key[1].data_type)
-        self.assertEquals(user_column.index, mv.clustering_key[1].index)
-        self.assertEquals(user_column.is_static, mv.clustering_key[1].is_static)
-        self.assertEquals(user_column.is_reversed, mv.clustering_key[1].is_reversed)
+        compare_columns(user_column, mv.clustering_key[1], 'user')
 
         day_column = mv_columns[5]
-        self.assertIsNotNone(day_column)
-        self.assertEquals(day_column.name, 'day')
-        self.assertEquals(day_column.name, mv.clustering_key[2].name)
-        self.assertEquals(day_column.table, mv.clustering_key[2].table)
-        self.assertEquals(day_column.data_type, mv.clustering_key[2].data_type)
-        self.assertEquals(day_column.index, mv.clustering_key[2].index)
-        self.assertEquals(day_column.is_static, mv.clustering_key[2].is_static)
-        self.assertEquals(day_column.is_reversed, mv.clustering_key[2].is_reversed)
+        compare_columns(day_column, mv.clustering_key[2], 'day')
 
     def test_base_table_column_addition_mv(self):
         """
@@ -2213,7 +2199,7 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         self.assertIn("fouls", mv_alltime.columns)
 
         mv_alltime_fouls_comumn = self.cluster.metadata.keyspaces[self.keyspace_name].views["alltimehigh"].columns['fouls']
-        self.assertEquals(mv_alltime_fouls_comumn.typestring, 'int')
+        self.assertEquals(mv_alltime_fouls_comumn.cql_type, 'int')
 
     def test_base_table_type_alter_mv(self):
         """
@@ -2254,15 +2240,16 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         self.assertEqual(len(self.cluster.metadata.keyspaces[self.keyspace_name].views), 1)
 
         score_column = self.cluster.metadata.keyspaces[self.keyspace_name].tables['scores'].columns['score']
-        self.assertEquals(score_column.typestring, 'blob')
+        self.assertEquals(score_column.cql_type, 'blob')
 
+        # until CASSANDRA-9920+CASSANDRA-10500 MV updates are only available later with an async event
         for i in range(10):
             score_mv_column = self.cluster.metadata.keyspaces[self.keyspace_name].views["monthlyhigh"].columns['score']
-            if("blob" == score_mv_column.typestring):
+            if "blob" == score_mv_column.cql_type:
                 break
             time.sleep(.2)
 
-        self.assertEquals(score_mv_column.typestring, 'blob')
+        self.assertEquals(score_mv_column.cql_type, 'blob')
 
     def test_metadata_with_quoted_identifiers(self):
         """
