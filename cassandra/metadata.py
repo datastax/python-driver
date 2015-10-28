@@ -79,6 +79,8 @@ cql_keywords_reserved = cql_keywords - cql_keywords_unreserved
 Set of reserved keywords in CQL.
 """
 
+_encoder = Encoder()
+
 
 class Metadata(object):
     """
@@ -862,7 +864,7 @@ class Aggregate(object):
               "STYPE %(state_type)s" % locals()
 
         ret += ''.join((sep, 'FINALFUNC ', protect_name(self.final_func))) if self.final_func else ''
-        ret += ''.join((sep, 'INITCOND ', Encoder().cql_encode_all_types(self.initial_condition)))\
+        ret += ''.join((sep, 'INITCOND ', _encoder.cql_encode_all_types(self.initial_condition)))\
                if self.initial_condition is not None else ''
 
         return ret
@@ -1612,8 +1614,6 @@ class SchemaParserV22(_SchemaParser):
         "compression",
         "default_time_to_live")
 
-    _encoder = Encoder()
-
     def __init__(self, connection, timeout):
         super(SchemaParserV22, self).__init__(connection, timeout)
         self.keyspaces_result = []
@@ -1661,7 +1661,7 @@ class SchemaParserV22(_SchemaParser):
 
     def get_table(self, keyspaces, keyspace, table):
         cl = ConsistencyLevel.ONE
-        where_clause = bind_params(" WHERE keyspace_name = %%s AND %s = %%s" % (self._table_name_col,), (keyspace, table), self._encoder)
+        where_clause = bind_params(" WHERE keyspace_name = %%s AND %s = %%s" % (self._table_name_col,), (keyspace, table), _encoder)
         cf_query = QueryMessage(query=self._SELECT_COLUMN_FAMILIES + where_clause, consistency_level=cl)
         col_query = QueryMessage(query=self._SELECT_COLUMNS + where_clause, consistency_level=cl)
         triggers_query = QueryMessage(query=self._SELECT_TRIGGERS + where_clause, consistency_level=cl)
@@ -1680,24 +1680,22 @@ class SchemaParserV22(_SchemaParser):
             return self._build_table_metadata(table_result[0], col_result, triggers_result)
 
     def get_type(self, keyspaces, keyspace, type):
-        where_clause = bind_params(" WHERE keyspace_name = %s AND type_name = %s", (keyspace, type), self._encoder)
+        where_clause = bind_params(" WHERE keyspace_name = %s AND type_name = %s", (keyspace, type), _encoder)
         return self._query_build_row(self._SELECT_TYPES + where_clause, self._build_user_type)
 
     def get_function(self, keyspaces, keyspace, function):
         where_clause = bind_params(" WHERE keyspace_name = %%s AND function_name = %%s AND %s = %%s" % (self._function_agg_arument_type_col,),
-                                   (keyspace, function.name, function.argument_types),
-                                   self._encoder)
+                                   (keyspace, function.name, function.argument_types), _encoder)
         return self._query_build_row(self._SELECT_FUNCTIONS + where_clause, self._build_function)
 
     def get_aggregate(self, keyspaces, keyspace, aggregate):
         where_clause = bind_params(" WHERE keyspace_name = %%s AND aggregate_name = %%s AND %s = %%s" % (self._function_agg_arument_type_col,),
-                                   (keyspace, aggregate.name, aggregate.argument_types),
-                                   self._encoder)
+                                   (keyspace, aggregate.name, aggregate.argument_types), _encoder)
 
         return self._query_build_row(self._SELECT_AGGREGATES + where_clause, self._build_aggregate)
 
     def get_keyspace(self, keyspaces, keyspace):
-        where_clause = bind_params(" WHERE keyspace_name = %s", (keyspace,), self._encoder)
+        where_clause = bind_params(" WHERE keyspace_name = %s", (keyspace,), _encoder)
         return self._query_build_row(self._SELECT_KEYSPACES + where_clause, self._build_keyspace_metadata)
 
     @classmethod
@@ -2123,14 +2121,14 @@ class SchemaParserV3(SchemaParserV22):
 
     def get_table(self, keyspaces, keyspace, table):
         cl = ConsistencyLevel.ONE
-        where_clause = bind_params(" WHERE keyspace_name = %%s AND %s = %%s" % (self._table_name_col), (keyspace, table), self._encoder)
+        where_clause = bind_params(" WHERE keyspace_name = %%s AND %s = %%s" % (self._table_name_col), (keyspace, table), _encoder)
         cf_query = QueryMessage(query=self._SELECT_TABLES + where_clause, consistency_level=cl)
         col_query = QueryMessage(query=self._SELECT_COLUMNS + where_clause, consistency_level=cl)
         indexes_query = QueryMessage(query=self._SELECT_INDEXES + where_clause, consistency_level=cl)
         triggers_query = QueryMessage(query=self._SELECT_TRIGGERS + where_clause, consistency_level=cl)
 
         # in protocol v4 we don't know if this event is a view or a table, so we look for both
-        where_clause = bind_params(" WHERE keyspace_name = %s AND view_name = %s", (keyspace, table), self._encoder)
+        where_clause = bind_params(" WHERE keyspace_name = %s AND view_name = %s", (keyspace, table), _encoder)
         view_query = QueryMessage(query=self._SELECT_VIEWS + where_clause,
                                   consistency_level=cl)
         (cf_success, cf_result), (col_success, col_result), (indexes_sucess, indexes_result), \
