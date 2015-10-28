@@ -1261,6 +1261,15 @@ class Cluster(object):
         if not self.control_connection.refresh_schema(target_type=SchemaTargetType.TABLE, keyspace=keyspace, table=table, schema_agreement_wait=max_schema_agreement_wait):
             raise Exception("Table metadata was not refreshed. See log for details.")
 
+    def refresh_materialized_view_metadata(self, keyspace, view, max_schema_agreement_wait=None):
+        """
+        Synchronously refresh materialized view metadata.
+
+        See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
+        """
+        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.TABLE, keyspace=keyspace, table=view, schema_agreement_wait=max_schema_agreement_wait):
+            raise Exception("View metadata was not refreshed. See log for details.")
+
     def refresh_user_type_metadata(self, keyspace, user_type, max_schema_agreement_wait=None):
         """
         Synchronously refresh user defined type metadata.
