@@ -32,11 +32,8 @@ class BaseValueManager(object):
         self.instance = instance
         self.column = column
         self.value = value
-
-        # Brand new instances do no have previous value yet.
-        self.previous_value = None
-        if self.instance._is_persisted:
-            self.previous_value = deepcopy(value)
+        self.previous_value = deepcopy(value) if instance._is_persisted else None
+        self.explicit = False
 
     @property
     def deleted(self):

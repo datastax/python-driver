@@ -345,6 +345,7 @@ class BaseModel(object):
             if value is not None or isinstance(column, columns.BaseContainerColumn):
                 value = column.to_python(value)
             value_mngr = column.value_manager(self, column, value)
+            value_mngr.explicit = name in values
             self._values[name] = value_mngr
 
     def __repr__(self):
@@ -509,7 +510,7 @@ class BaseModel(object):
         """
         for name, col in self._columns.items():
             v = getattr(self, name)
-            if v is None and col.has_default:
+            if v is None and not self._values[name].explicit and col.has_default:
                 v = col.get_default()
             val = col.validate(v)
             setattr(self, name, val)
