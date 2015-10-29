@@ -269,17 +269,13 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
             self.table.objects.get(test_id=1)
 
 
-class TestNamedWithMV(BasicSharedKeyspaceUnitTestCase):
+class TestNamedWithMV(BaseCassEngTestCase):
 
     def setUp(self):
-        self.default_keyspace = models.DEFAULT_KEYSPACE
         cass_version = get_server_versions()[0]
         if cass_version < (3, 0):
             raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
         super(TestNamedWithMV, self).setUp()
-
-    def tearDown(self):
-        models.DEFAULT_KEYSPACE = self.default_keyspace
 
     def test_named_table_with_mv(self):
         """
@@ -294,9 +290,10 @@ class TestNamedWithMV(BasicSharedKeyspaceUnitTestCase):
 
         @test_category materialized_view
         """
-        connection.setup(['127.0.0.1'], self.keyspace_name)
-
-        # Create a base table and two materialized views
+        ks = models.DEFAULT_KEYSPACE
+        self.session.execute("DROP MATERIALIZED VIEW IF EXISTS {0}.alltimehigh".format(ks))
+        self.session.execute("DROP MATERIALIZED VIEW IF EXISTS {0}.monthlyhigh".format(ks))
+        self.session.execute("DROP TABLE IF EXISTS {0}.scores".format(ks))
         create_table = """CREATE TABLE {0}.scores(
                         user TEXT,
                         game TEXT,
@@ -305,14 +302,14 @@ class TestNamedWithMV(BasicSharedKeyspaceUnitTestCase):
                         day INT,
                         score INT,
                         PRIMARY KEY (user, game, year, month, day)
-                        )""".format(self.keyspace_name)
+                        )""".format(ks)
 
         self.session.execute(create_table)
         create_mv = """CREATE MATERIALIZED VIEW {0}.monthlyhigh AS
                         SELECT game, year, month, score, user, day FROM {0}.scores
                         WHERE game IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL AND day IS NOT NULL
                         PRIMARY KEY ((game, year, month), score, user, day)
-                        WITH CLUSTERING ORDER BY (score DESC, user ASC, day ASC)""".format(self.keyspace_name)
+                        WITH CLUSTERING ORDER BY (score DESC, user ASC, day ASC)""".format(ks)
 
         self.session.execute(create_mv)
 
@@ -320,12 +317,12 @@ class TestNamedWithMV(BasicSharedKeyspaceUnitTestCase):
                         SELECT * FROM {0}.scores
                         WHERE game IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND day IS NOT NULL
                         PRIMARY KEY (game, score, user, year, month, day)
-                        WITH CLUSTERING ORDER BY (score DESC)""".format(self.keyspace_name)
+                        WITH CLUSTERING ORDER BY (score DESC)""".format(ks)
 
         self.session.execute(create_mv_alltime)
 
         # Populate the base table with data
-        prepared_insert = self.session.prepare("""INSERT INTO {0}.scores (user, game, year, month, day, score) VALUES  (?, ?, ? ,? ,?, ?)""".format(self.keyspace_name))
+        prepared_insert = self.session.prepare("""INSERT INTO {0}.scores (user, game, year, month, day, score) VALUES  (?, ?, ? ,? ,?, ?)""".format(ks))
         parameters = {('pcmanus', 'Coup', 2015, 5, 1, 4000),
                       ('jbellis', 'Coup', 2015, 5, 3, 1750),
                       ('yukim', 'Coup', 2015, 5, 3, 2250),
@@ -342,7 +339,7 @@ class TestNamedWithMV(BasicSharedKeyspaceUnitTestCase):
 
         # Attempt to query the data using Named Table interface
         # Also test filtering on mv's
-        key_space = NamedKeyspace(self.keyspace_name)
+        key_space = NamedKeyspace(ks)
         table = key_space.table("scores")
         mv_monthly = key_space.table("monthlyhigh")
         table_objects = table.objects.all()
