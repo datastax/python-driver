@@ -393,7 +393,7 @@ class TestUpdating(BaseCassEngTestCase):
         assert self.instance.get_changed_columns() == []
         assert self.instance._values['count'].previous_value == 3
 
-    def test_previous_value_tracking_on_instanciation(self):
+    def test_previous_value_tracking_on_instantiation(self):
         self.instance = TestMultiKeyModel(
             partition=random.randint(0, 1000),
             cluster=random.randint(0, 1000),

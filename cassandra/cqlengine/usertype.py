@@ -27,7 +27,6 @@ class BaseUserType(object):
 
     def __init__(self, **values):
         self._values = {}
-        self._is_persisted = False
 
         for name, field in self._fields.items():
             value = values.get(name, None)

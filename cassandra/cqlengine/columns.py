@@ -16,7 +16,6 @@ from copy import deepcopy, copy
 from datetime import date, datetime
 import logging
 import six
-import warnings
 
 from cassandra import util
 from cassandra.cqltypes import DateType, SimpleDateType
@@ -32,7 +31,7 @@ class BaseValueManager(object):
         self.instance = instance
         self.column = column
         self.value = value
-        self.previous_value = deepcopy(value) if instance._is_persisted else None
+        self.previous_value = None
         self.explicit = False
 
     @property
@@ -50,7 +49,7 @@ class BaseValueManager(object):
         return self.value != self.previous_value
 
     def reset_previous_value(self):
-        self.previous_value = copy(self.value)
+        self.previous_value = deepcopy(self.value)
 
     def getval(self):
         return self.value

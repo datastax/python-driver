@@ -332,16 +332,11 @@ class BaseModel(object):
         self._transaction = None
         self._batch = None
         self._timeout = connection.NOT_SET
+        self._is_persisted = False
 
-        # A flag set by the deserializer to indicate that update should be used
-        # when persisting changes.
-        self._is_persisted = values.pop('_is_persisted', False)
-
-        # Initialize each volumn to its provided or default right at
-        # instanciation. See PYTHON-348.
         self._values = {}
         for name, column in self._columns.items():
-            value = values.get(name, None)
+            value = values.get(name)
             if value is not None or isinstance(column, columns.BaseContainerColumn):
                 value = column.to_python(value)
             value_mngr = column.value_manager(self, column, value)
@@ -418,7 +413,14 @@ class BaseModel(object):
         else:
             klass = cls
 
-        return klass(_is_persisted=True, **field_dict)
+        instance = klass(**field_dict)
+        instance._set_persisted()
+        return instance
+
+    def _set_persisted(self):
+        for v in self._values.values():
+            v.reset_previous_value()
+        self._is_persisted = True
 
     def _can_update(self):
         """
@@ -645,10 +647,7 @@ class BaseModel(object):
                           transaction=self._transaction,
                           timeout=self._timeout).save()
 
-        # reset the value managers
-        for v in self._values.values():
-            v.reset_previous_value()
-        self._is_persisted = True
+        self._set_persisted()
 
         self._ttl = self.__default_ttl__
         self._timestamp = None
@@ -694,10 +693,7 @@ class BaseModel(object):
                           transaction=self._transaction,
                           timeout=self._timeout).update()
 
-        # reset the value managers
-        for v in self._values.values():
-            v.reset_previous_value()
-        self._is_persisted = True
+        self._set_persisted()
 
         self._ttl = self.__default_ttl__
         self._timestamp = None
