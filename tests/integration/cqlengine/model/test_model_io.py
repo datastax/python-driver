@@ -183,6 +183,21 @@ class TestModelIO(BaseCassEngTestCase):
         for i, i_char in enumerate(range(ord('a'), ord('a') + 14)):
             self.assertEqual(input[i], output[chr(i_char)])
 
+    def test_can_specify_none_instead_of_default(self):
+        self.assertIsNotNone(TestModel.a_bool.column.default)
+
+        # override default
+        inst = TestModel.create(a_bool=None)
+        self.assertIsNone(inst.a_bool)
+        queried = TestModel.objects(id=inst.id).first()
+        self.assertIsNone(queried.a_bool)
+
+        # letting default be set
+        inst = TestModel.create()
+        self.assertEqual(inst.a_bool, TestModel.a_bool.column.default)
+        queried = TestModel.objects(id=inst.id).first()
+        self.assertEqual(queried.a_bool, TestModel.a_bool.column.default)
+
     def test_can_insert_model_with_all_protocol_v4_column_types(self):
         """
         Test for inserting all protocol v4 column types into a Model
