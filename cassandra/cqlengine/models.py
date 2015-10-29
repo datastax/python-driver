@@ -327,25 +327,25 @@ class BaseModel(object):
     _table_name = None  # used internally to cache a derived table name
 
     def __init__(self, **values):
-        self._values = {}
         self._ttl = self.__default_ttl__
         self._timestamp = None
         self._transaction = None
+        self._batch = None
+        self._timeout = connection.NOT_SET
 
+        # A flag set by the deserializer to indicate that update should be used
+        # when persisting changes.
+        self._is_persisted = values.pop('_is_persisted', False)
+
+        # Initialize each volumn to its provided or default right at
+        # instanciation. See PYTHON-348.
+        self._values = {}
         for name, column in self._columns.items():
             value = values.get(name, None)
             if value is not None or isinstance(column, columns.BaseContainerColumn):
                 value = column.to_python(value)
             value_mngr = column.value_manager(self, column, value)
-            if name in values:
-                value_mngr.explicit = True
             self._values[name] = value_mngr
-
-        # a flag set by the deserializer to indicate
-        # that update should be used when persisting changes
-        self._is_persisted = False
-        self._batch = None
-        self._timeout = connection.NOT_SET
 
     def __repr__(self):
         return '{0}({1})'.format(self.__class__.__name__,
@@ -417,9 +417,7 @@ class BaseModel(object):
         else:
             klass = cls
 
-        instance = klass(**field_dict)
-        instance._is_persisted = True
-        return instance
+        return klass(_is_persisted=True, **field_dict)
 
     def _can_update(self):
         """
@@ -511,7 +509,7 @@ class BaseModel(object):
         """
         for name, col in self._columns.items():
             v = getattr(self, name)
-            if v is None and not self._values[name].explicit and col.has_default:
+            if v is None and col.has_default:
                 v = col.get_default()
             val = col.validate(v)
             setattr(self, name, val)
