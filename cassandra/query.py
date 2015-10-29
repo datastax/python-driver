@@ -780,6 +780,8 @@ For example::
 
 
 def bind_params(query, params, encoder):
+    if six.PY2 and isinstance(query, six.text_type):
+        query = query.encode('utf-8')
     if isinstance(params, dict):
         return query % dict((k, encoder.cql_encode_all_types(v)) for k, v in six.iteritems(params))
     else:
