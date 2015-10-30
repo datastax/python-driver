@@ -1667,7 +1667,7 @@ class AggregateMetadata(FunctionTest):
         @test_category aggregate
         """
 
-        with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('sum_int', 'int', init_cond=1)) as va:
+        with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('sum_int', 'int', init_cond='1')) as va:
             self.assertEqual(self.keyspace_aggregate_meta[va.signature].return_type, 'int')
 
     def test_init_cond(self):
@@ -1688,17 +1688,21 @@ class AggregateMetadata(FunctionTest):
         c = Cluster(protocol_version=3)
         s = c.connect(self.keyspace_name)
 
+        encoder = Encoder()
+
         expected_values = range(4)
 
         # int32
         for init_cond in (-1, 0, 1):
-            with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('sum_int', 'int', init_cond=init_cond)) as va:
+            cql_init = encoder.cql_encode_all_types(init_cond)
+            with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('sum_int', 'int', init_cond=cql_init)) as va:
                 sum_res = s.execute("SELECT %s(v) AS sum FROM t" % va.function_kwargs['name'])[0].sum
-                self.assertEqual(sum_res, init_cond + sum(expected_values))
+                self.assertEqual(sum_res, int(init_cond) + sum(expected_values))
 
         # list<text>
         for init_cond in ([], ['1', '2']):
-            with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('extend_list', 'list<text>', init_cond=init_cond)) as va:
+            cql_init = encoder.cql_encode_all_types(init_cond)
+            with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('extend_list', 'list<text>', init_cond=cql_init)) as va:
                 list_res = s.execute("SELECT %s(v) AS list_res FROM t" % va.function_kwargs['name'])[0].list_res
                 self.assertListEqual(list_res[:len(init_cond)], init_cond)
                 self.assertEqual(set(i for i in list_res[len(init_cond):]),
@@ -1708,7 +1712,8 @@ class AggregateMetadata(FunctionTest):
         expected_map_values = dict((i, i) for i in expected_values)
         expected_key_set = set(expected_values)
         for init_cond in ({}, {1: 2, 3: 4}, {5: 5}):
-            with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('update_map', 'map<int, int>', init_cond=init_cond)) as va:
+            cql_init = encoder.cql_encode_all_types(init_cond)
+            with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('update_map', 'map<int, int>', init_cond=cql_init)) as va:
                 map_res = s.execute("SELECT %s(v) AS map_res FROM t" % va.function_kwargs['name'])[0].map_res
                 self.assertDictContainsSubset(expected_map_values, map_res)
                 init_not_updated = dict((k, init_cond[k]) for k in set(init_cond) - expected_key_set)
@@ -1750,7 +1755,7 @@ class AggregateMetadata(FunctionTest):
         @test_category function
         """
 
-        kwargs = self.make_aggregate_kwargs('sum_int', 'int', init_cond=0)
+        kwargs = self.make_aggregate_kwargs('sum_int', 'int', init_cond='0')
         with self.VerifiedAggregate(self, **kwargs):
             kwargs['state_func'] = 'sum_int_two'
             kwargs['argument_types'] = ['int', 'int']
@@ -1773,7 +1778,7 @@ class AggregateMetadata(FunctionTest):
         @test_category function
         """
 
-        with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('sum_int', 'int', init_cond=0)):
+        with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('sum_int', 'int', init_cond='0')):
             original_keyspace_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
             self.session.execute('ALTER KEYSPACE %s WITH durable_writes = false' % self.keyspace_name)
             try:
@@ -1798,6 +1803,7 @@ class AggregateMetadata(FunctionTest):
         """
 
         kwargs = self.make_aggregate_kwargs('extend_list', 'list<text>')
+        encoder = Encoder()
 
         # no initial condition, final func
         self.assertIsNone(kwargs['initial_condition'])
@@ -1811,13 +1817,13 @@ class AggregateMetadata(FunctionTest):
             self.assertEqual(cql.find('FINALFUNC'), -1)
 
         # initial condition, no final func
-        kwargs['initial_condition'] = ['init', 'cond']
+        kwargs['initial_condition'] = encoder.cql_encode_all_types(['init', 'cond'])
         with self.VerifiedAggregate(self, **kwargs) as va:
             meta = self.keyspace_aggregate_meta[va.signature]
-            self.assertListEqual(meta.initial_condition, kwargs['initial_condition'])
+            self.assertEqual(meta.initial_condition, kwargs['initial_condition'])
             self.assertIsNone(meta.final_func)
             cql = meta.as_cql_query()
-            search_string = "INITCOND %s" % Encoder().cql_encode_all_types(kwargs['initial_condition'])
+            search_string = "INITCOND %s" % kwargs['initial_condition']
             self.assertGreater(cql.find(search_string), 0, '"%s" search string not found in cql:\n%s' % (search_string, cql))
             self.assertEqual(cql.find('FINALFUNC'), -1)
 
@@ -1834,14 +1840,14 @@ class AggregateMetadata(FunctionTest):
             self.assertGreater(cql.find(search_string), 0, '"%s" search string not found in cql:\n%s' % (search_string, cql))
 
         # both
-        kwargs['initial_condition'] = ['init', 'cond']
+        kwargs['initial_condition'] = encoder.cql_encode_all_types(['init', 'cond'])
         kwargs['final_func'] = 'List_As_String'
         with self.VerifiedAggregate(self, **kwargs) as va:
             meta = self.keyspace_aggregate_meta[va.signature]
-            self.assertListEqual(meta.initial_condition, kwargs['initial_condition'])
+            self.assertEqual(meta.initial_condition, kwargs['initial_condition'])
             self.assertEqual(meta.final_func, kwargs['final_func'])
             cql = meta.as_cql_query()
-            init_cond_idx = cql.find("INITCOND %s" % Encoder().cql_encode_all_types(kwargs['initial_condition']))
+            init_cond_idx = cql.find("INITCOND %s" % kwargs['initial_condition'])
             final_func_idx = cql.find('FINALFUNC "%s"' % kwargs['final_func'])
             self.assertNotIn(-1, (init_cond_idx, final_func_idx))
             self.assertGreater(init_cond_idx, final_func_idx)

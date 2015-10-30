@@ -864,8 +864,7 @@ class Aggregate(object):
               "STYPE %(state_type)s" % locals()
 
         ret += ''.join((sep, 'FINALFUNC ', protect_name(self.final_func))) if self.final_func else ''
-        ret += ''.join((sep, 'INITCOND ', _encoder.cql_encode_all_types(self.initial_condition)))\
-               if self.initial_condition is not None else ''
+        ret += ''.join((sep, 'INITCOND ', self.initial_condition)) if self.initial_condition is not None else ''
 
         return ret
 
@@ -1733,20 +1732,14 @@ class SchemaParserV22(_SchemaParser):
 
     @classmethod
     def _build_aggregate(cls, aggregate_row):
-        state_data_type = aggregate_row['state_type']
+        cass_state_type = types.lookup_casstype(aggregate_row['state_type'])
         initial_condition = aggregate_row['initcond']
-        try:
-            # TODO: asking if initcond can be the CQL literal in 3.0
-            # this is a stopgap pending ^ or developing type parsing
-            cass_type = types.lookup_casstype(state_data_type)
-            if initial_condition is not None:
-                initial_condition = cass_type.deserialize(initial_condition, 3)
-        except ValueError:
-            pass
-        state_type = cls._schema_type_to_cql(state_data_type)
+        if initial_condition is not None:
+            initial_condition = _encoder.cql_encode_all_types(cass_state_type.deserialize(initial_condition, 3))
+        state_type = _cql_from_cass_type(cass_state_type)
         return_type = cls._schema_type_to_cql(aggregate_row['return_type'])
         return Aggregate(aggregate_row['keyspace_name'], aggregate_row['aggregate_name'],
-                         aggregate_row[cls._function_agg_arument_type_col], aggregate_row['state_func'], state_type,
+                         aggregate_row['signature'], aggregate_row['state_func'], state_type,
                          aggregate_row['final_func'], initial_condition, return_type)
 
     def _build_table_metadata(self, row, col_rows=None, trigger_rows=None):
@@ -2153,6 +2146,12 @@ class SchemaParserV3(SchemaParserV22):
         strategy_options = dict(row["replication"])
         strategy_class = strategy_options.pop("class")
         return KeyspaceMetadata(name, durable_writes, strategy_class, strategy_options)
+
+    @staticmethod
+    def _build_aggregate(aggregate_row):
+        return Aggregate(aggregate_row['keyspace_name'], aggregate_row['aggregate_name'],
+                         aggregate_row['argument_types'], aggregate_row['state_func'], aggregate_row['state_type'],
+                         aggregate_row['final_func'], aggregate_row['initcond'], aggregate_row['return_type'])
 
     def _build_table_metadata(self, row, col_rows=None, trigger_rows=None, index_rows=None):
         keyspace_name = row["keyspace_name"]
