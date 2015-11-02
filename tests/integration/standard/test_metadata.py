@@ -556,7 +556,6 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         if CASS_SERVER_VERSION < (3, 0):
             raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
 
-        table_name = "test"
         self.session.execute("CREATE TABLE {0}.{1} (a int PRIMARY KEY, b text)".format(self.keyspace_name, self.function_table_name))
 
         cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
@@ -571,6 +570,15 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertIn("mv1", cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
 
         cluster2.shutdown()
+
+        original_meta = self.cluster.metadata.keyspaces[self.keyspace_name].views['mv1']
+        self.assertIs(original_meta, self.session.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views['mv1'])
+        self.cluster.refresh_materialized_view_metadata(self.keyspace_name, 'mv1')
+
+        current_meta = self.cluster.metadata.keyspaces[self.keyspace_name].views['mv1']
+        self.assertIsNot(current_meta, original_meta)
+        self.assertIsNot(original_meta, self.session.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views['mv1'])
+        self.assertEqual(original_meta.as_cql_query(), current_meta.as_cql_query())
 
     def test_refresh_user_type_metadata(self):
         """
