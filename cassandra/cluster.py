@@ -1632,8 +1632,6 @@ class Session(object):
 
         if isinstance(query, SimpleStatement):
             query_string = query.query_string
-            if six.PY2 and isinstance(query_string, six.text_type):
-                query_string = query_string.encode('utf-8')
             if parameters:
                 query_string = bind_params(query_string, parameters, self.encoder)
             message = QueryMessage(
@@ -1898,11 +1896,17 @@ class Session(object):
             raise UserTypeDoesNotExist(
                 'User type %s does not exist in keyspace %s' % (user_type, keyspace))
 
+        field_names = type_meta.field_names
+        if six.PY2:
+            # go from unicode to string to avoid decode errors from implicit
+            # decode when formatting non-ascii values
+            field_names = [fn.encode('utf-8') for fn in field_names]
+
         def encode(val):
             return '{ %s }' % ' , '.join('%s : %s' % (
                 field_name,
                 self.encoder.cql_encode_all_types(getattr(val, field_name, None))
-            ) for field_name in type_meta.field_names)
+            ) for field_name in field_names)
 
         self.encoder.mapping[klass] = encode
 
