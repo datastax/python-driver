@@ -475,14 +475,16 @@ class NetworkTopologyStrategy(ReplicationStrategy):
         ring_len_range = range(ring_len)
         dc_rf_map = dict((dc, int(rf))
                          for dc, rf in self.dc_replication_factors.items() if rf > 0)
-        dcs = dict((h, h.datacenter) for h in set(token_to_host_owner.values()))
 
         # build a map of DCs to lists of indexes into `ring` for tokens that
         # belong to that DC
         dc_to_token_offset = defaultdict(list)
+        dc_racks = defaultdict(set)
         for i, token in enumerate(ring):
             host = token_to_host_owner[token]
-            dc_to_token_offset[dcs[host]].append(i)
+            dc_to_token_offset[host.datacenter].append(i)
+            if host.datacenter and host.rack:
+                dc_racks[host.datacenter].add(host.rack)
 
         # A map of DCs to an index into the dc_to_token_offset value for that dc.
         # This is how we keep track of advancing around the ring for each DC.
@@ -506,20 +508,33 @@ class NetworkTopologyStrategy(ReplicationStrategy):
                     index += 1
                 dc_to_current_index[dc] = index
 
-                # now add the next RF distinct token owners to the set of
-                # replicas for this DC
+                replicas_remaining = remaining[dc]
+                skipped_hosts = []
+                racks_placed = set()
+                racks_this_dc = dc_racks[dc]
                 for token_offset in islice(cycle(token_offsets), index, index + num_tokens):
                     host = token_to_host_owner[ring[token_offset]]
+                    if replicas_remaining == 0:
+                        break
+
                     if host in replicas:
                         continue
 
+                    if host.rack in racks_placed and len(racks_placed) < len(racks_this_dc):
+                        skipped_hosts.append(host)
+                        continue
+
                     replicas.append(host)
-                    dc_remaining = remaining[dc] - 1
-                    if dc_remaining == 0:
-                        del remaining[dc]
-                        break
-                    else:
-                        remaining[dc] = dc_remaining
+                    replicas_remaining -= 1
+                    racks_placed.add(host.rack)
+
+                    if len(racks_placed) == len(racks_this_dc):
+                        for host in skipped_hosts:
+                            if replicas_remaining == 0:
+                                break
+                            replicas.append(host)
+                            replicas_remaining -= 1
+                        del skipped_hosts[:]
 
         return replica_map
 
