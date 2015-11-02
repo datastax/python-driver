@@ -553,10 +553,13 @@ class DateType(_CassandraType):
             timestamp_seconds = calendar.timegm(v.utctimetuple())
             timestamp = timestamp_seconds * 1e3 + getattr(v, 'microsecond', 0) / 1e3
         except AttributeError:
-            # Ints and floats are valid timestamps too
-            if type(v) not in _number_types:
-                raise TypeError('DateType arguments must be a datetime or timestamp')
-            timestamp = v
+            try:
+                timestamp = calendar.timegm(v.timetuple()) * 1e3
+            except AttributeError:
+                # Ints and floats are valid timestamps too
+                if type(v) not in _number_types:
+                    raise TypeError('DateType arguments must be a datetime, date, or timestamp')
+                timestamp = v
 
         return int64_pack(long(timestamp))
 
