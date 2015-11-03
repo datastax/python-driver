@@ -2646,6 +2646,7 @@ class ResponseFuture(object):
 
     _req_id = None
     _final_result = _NOT_SET
+    _col_names = None
     _final_exception = None
     _query_traces = None
     _callbacks = None
@@ -2869,6 +2870,7 @@ class ResponseFuture(object):
                     results = getattr(response, 'results', None)
                     if results is not None and response.kind == RESULT_KIND_ROWS:
                         self._paging_state = response.paging_state
+                        self._col_names = results[0]
                         results = self.row_factory(*results)
                     self._set_final_result(results)
             elif isinstance(response, ErrorMessage):
@@ -3286,6 +3288,7 @@ class ResultSet(object):
 
     def __init__(self, response_future, initial_response):
         self.response_future = response_future
+        self.column_names = response_future._col_names
         self._set_current_rows(initial_response)
         self._page_iter = None
         self._list_mode = False
