@@ -687,12 +687,13 @@ class _SimpleParameterizedType(_ParameterizedType):
         numelements = unpack(byts[:length])
         p = length
         result = []
+        inner_proto = max(3, protocol_version)
         for _ in range(numelements):
             itemlen = unpack(byts[p:p + length])
             p += length
             item = byts[p:p + itemlen]
             p += itemlen
-            result.append(subtype.from_binary(item, protocol_version))
+            result.append(subtype.from_binary(item, inner_proto))
         return cls.adapter(result)
 
     @classmethod
@@ -704,8 +705,9 @@ class _SimpleParameterizedType(_ParameterizedType):
         pack = int32_pack if protocol_version >= 3 else uint16_pack
         buf = io.BytesIO()
         buf.write(pack(len(items)))
+        inner_proto = max(3, protocol_version)
         for item in items:
-            itembytes = subtype.to_binary(item, protocol_version)
+            itembytes = subtype.to_binary(item, inner_proto)
             buf.write(pack(len(itembytes)))
             buf.write(itembytes)
         return buf.getvalue()
@@ -739,6 +741,7 @@ class MapType(_ParameterizedType):
         numelements = unpack(byts[:length])
         p = length
         themap = util.OrderedMapSerializedKey(key_type, protocol_version)
+        inner_proto = max(3, protocol_version)
         for _ in range(numelements):
             key_len = unpack(byts[p:p + length])
             p += length
@@ -748,8 +751,8 @@ class MapType(_ParameterizedType):
             p += length
             valbytes = byts[p:p + val_len]
             p += val_len
-            key = key_type.from_binary(keybytes, protocol_version)
-            val = value_type.from_binary(valbytes, protocol_version)
+            key = key_type.from_binary(keybytes, inner_proto)
+            val = value_type.from_binary(valbytes, inner_proto)
             themap._insert_unchecked(key, keybytes, val)
         return themap
 
@@ -763,9 +766,10 @@ class MapType(_ParameterizedType):
             items = six.iteritems(themap)
         except AttributeError:
             raise TypeError("Got a non-map object for a map value")
+        inner_proto = max(3, protocol_version)
         for key, val in items:
-            keybytes = key_type.to_binary(key, protocol_version)
-            valbytes = value_type.to_binary(val, protocol_version)
+            keybytes = key_type.to_binary(key, inner_proto)
+            valbytes = value_type.to_binary(val, inner_proto)
             buf.write(pack(len(keybytes)))
             buf.write(keybytes)
             buf.write(pack(len(valbytes)))
