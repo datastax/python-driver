@@ -24,6 +24,7 @@ from cassandra.cqlengine.query import ResultObject
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.cqlengine import models
 
+from tests.integration.cqlengine import setup_connection
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine.query.test_queryset import BaseQuerySetUsage
 
@@ -280,6 +281,7 @@ class TestNamedWithMV(BasicSharedKeyspaceUnitTestCase):
 
     def tearDown(self):
         models.DEFAULT_KEYSPACE = self.default_keyspace
+        setup_connection(models.DEFAULT_KEYSPACE)
 
     def test_named_table_with_mv(self):
         """

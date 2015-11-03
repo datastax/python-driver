@@ -68,7 +68,6 @@ class TestConsistency(BaseConsistencyTest):
         args = m.call_args
         self.assertEqual(CL.ALL, args[0][0].consistency_level)
 
-
     def test_batch_consistency(self):
 
         with mock.patch.object(self.session, 'execute') as m:
@@ -96,7 +95,6 @@ class TestConsistency(BaseConsistencyTest):
 
         args = m.call_args
         self.assertEqual(CL.ALL, args[0][0].consistency_level)
-
 
     def test_delete(self):
         # ensures we always carry consistency through on delete statements

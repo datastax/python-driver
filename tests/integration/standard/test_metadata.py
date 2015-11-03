@@ -25,6 +25,7 @@ from mock import Mock, patch
 
 from cassandra import AlreadyExists, SignatureDescriptor, UserFunctionDescriptor, UserAggregateDescriptor
 
+
 from cassandra.cluster import Cluster
 from cassandra.cqltypes import DoubleType, Int32Type, ListType, UTF8Type, MapType, LongType
 from cassandra.encoder import Encoder
@@ -33,10 +34,10 @@ from cassandra.metadata import (Metadata, KeyspaceMetadata, IndexMetadata,
                                 get_schema_parser)
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
-from cassandra.query import SimpleStatement, ConsistencyLevel
 
+from cassandra.cython_deps import HAVE_CYTHON
 from tests.integration import get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass, \
-    BasicSharedKeyspaceUnitTestCase, BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase
+    BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase, CASSANDRA_VERSION
 
 
 def setup_module():
@@ -1680,6 +1681,7 @@ class AggregateMetadata(FunctionTest):
         with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('sum_int', Int32Type, init_cond=1)) as va:
             self.assertIs(self.keyspace_aggregate_meta[va.signature].return_type, Int32Type)
 
+    @unittest.skipUnless(CASSANDRA_VERSION >= '3.0.0', "Skiping until CASSANDRA-10365 is resolved")
     def test_init_cond(self):
         """
         Test to verify that various initial conditions are correctly surfaced in various aggregate functions
@@ -1891,6 +1893,7 @@ class BadMetaTest(unittest.TestCase):
         if CASS_SERVER_VERSION < version:
             raise unittest.SkipTest("Requires server version >= %s" % (version,))
 
+    @unittest.skipIf(CASSANDRA_VERSION >= '3.0.0' and HAVE_CYTHON, "Skiping test due to python-422")
     def test_bad_keyspace(self):
         with patch.object(self.parser_class, '_build_keyspace_metadata_internal', side_effect=self.BadMetaException):
             self.cluster.refresh_keyspace_metadata(self.keyspace_name)

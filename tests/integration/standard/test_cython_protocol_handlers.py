@@ -88,6 +88,7 @@ class CythonProtocolHandlerTest(unittest.TestCase):
         self.assertFalse(result.has_more_pages)
         self._verify_numpy_page(result[0])
 
+    @notprotocolv1
     @numpytest
     def test_numpy_results_paged(self):
         """
