@@ -142,9 +142,9 @@ class SchemaTargetType(object):
 
 class SignatureDescriptor(object):
 
-    def __init__(self, name, type_signature):
+    def __init__(self, name, argument_types):
         self.name = name
-        self.type_signature = type_signature
+        self.argument_types = argument_types
 
     @property
     def signature(self):
@@ -153,14 +153,14 @@ class SignatureDescriptor(object):
 
         can be used to uniquely identify overloaded function names within a keyspace
         """
-        return self.format_signature(self.name, self.type_signature)
+        return self.format_signature(self.name, self.argument_types)
 
     @staticmethod
-    def format_signature(name, type_signature):
-        return "%s(%s)" % (name, ','.join(t for t in type_signature))
+    def format_signature(name, argument_types):
+        return "%s(%s)" % (name, ','.join(t for t in argument_types))
 
     def __repr__(self):
-        return "%s(%s, %s)" % (self.__class__.__name__, self.name, self.type_signature)
+        return "%s(%s, %s)" % (self.__class__.__name__, self.name, self.argument_types)
 
 
 class UserFunctionDescriptor(SignatureDescriptor):
@@ -173,7 +173,7 @@ class UserFunctionDescriptor(SignatureDescriptor):
     name of the function
     """
 
-    type_signature = None
+    argument_types = None
     """
     Ordered list of CQL argument type names comprising the type signature
     """
@@ -189,7 +189,7 @@ class UserAggregateDescriptor(SignatureDescriptor):
     name of the aggregate
     """
 
-    type_signature = None
+    argument_types = None
     """
     Ordered list of CQL argument type names comprising the type signature
     """
