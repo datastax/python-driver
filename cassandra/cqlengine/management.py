@@ -269,7 +269,7 @@ def get_create_type(type_model, keyspace):
     type_meta = metadata.UserType(keyspace,
                                   type_model.type_name(),
                                   (f.db_field_name for f in type_model._fields.values()),
-                                  type_model._fields.values())
+                                  (v.db_type for v in type_model._fields.values()))
     return type_meta.as_cql_query()
 
 
