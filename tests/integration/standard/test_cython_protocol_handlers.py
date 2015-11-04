@@ -11,7 +11,7 @@ from cassandra.query import tuple_factory
 from cassandra.cluster import Cluster
 from cassandra.protocol import ProtocolHandler, LazyProtocolHandler, NumpyProtocolHandler
 
-from tests.integration import use_singledc, PROTOCOL_VERSION
+from tests.integration import use_singledc, PROTOCOL_VERSION, notprotocolv1
 from tests.integration.datatype_utils import update_datatypes
 from tests.integration.standard.utils import (
     create_table_with_all_types, get_all_primitive_params, get_primitive_datatypes)
@@ -55,21 +55,81 @@ class CythonProtocolHandlerTest(unittest.TestCase):
         """
         verify_iterator_data(self.assertEqual, get_data(LazyProtocolHandler))
 
+    @notprotocolv1
+    @numpytest
+    def test_cython_lazy_results_paged(self):
+        """
+        Test Cython-based parser that returns an iterator, over multiple pages
+        """
+        # arrays = { 'a': arr1, 'b': arr2, ... }
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        session = cluster.connect(keyspace="testspace")
+        session.row_factory = tuple_factory
+        session.client_protocol_handler = LazyProtocolHandler
+        session.default_fetch_size = 2
+
+        self.assertLess(session.default_fetch_size, self.N_ITEMS)
+
+        results = session.execute("SELECT * FROM test_table")
+
+        self.assertTrue(results.has_more_pages)
+        self.assertEqual(verify_iterator_data(self.assertEqual, results), self.N_ITEMS)  # make sure we see all rows
+
+        cluster.shutdown()
+
+    @notprotocolv1
     @numpytest
     def test_numpy_parser(self):
         """
         Test Numpy-based parser that returns a NumPy array
         """
         # arrays = { 'a': arr1, 'b': arr2, ... }
-        arrays = get_data(NumpyProtocolHandler)
+        result = get_data(NumpyProtocolHandler)
+        self.assertFalse(result.has_more_pages)
+        self._verify_numpy_page(result[0])
 
+    @numpytest
+    def test_numpy_results_paged(self):
+        """
+        Test Numpy-based parser that returns a NumPy array
+        """
+        # arrays = { 'a': arr1, 'b': arr2, ... }
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        session = cluster.connect(keyspace="testspace")
+        session.row_factory = tuple_factory
+        session.client_protocol_handler = NumpyProtocolHandler
+        session.default_fetch_size = 2
+
+        expected_pages = (self.N_ITEMS + session.default_fetch_size - 1) // session.default_fetch_size
+
+        self.assertLess(session.default_fetch_size, self.N_ITEMS)
+
+        results = session.execute("SELECT * FROM test_table")
+
+        self.assertTrue(results.has_more_pages)
+        for count, page in enumerate(results, 1):
+            self.assertIsInstance(page, dict)
+            for colname, arr in page.items():
+                if count <= expected_pages:
+                    self.assertGreater(len(arr), 0, "page count: %d" % (count,))
+                    self.assertLessEqual(len(arr), session.default_fetch_size)
+                else:
+                    # we get one extra item out of this iteration because of the way NumpyParser returns results
+                    # The last page is returned as a dict with zero-length arrays
+                    self.assertEqual(len(arr), 0)
+            self.assertEqual(self._verify_numpy_page(page), len(arr))
+        self.assertEqual(count, expected_pages + 1)  # see note about extra 'page' above
+
+        cluster.shutdown()
+
+    def _verify_numpy_page(self, page):
         colnames = self.colnames
         datatypes = get_primitive_datatypes()
         for colname, datatype in zip(colnames, datatypes):
-            arr = arrays[colname]
+            arr = page[colname]
             self.match_dtype(datatype, arr.dtype)
 
-        verify_iterator_data(self.assertEqual, arrays_to_list_of_tuples(arrays, colnames))
+        return verify_iterator_data(self.assertEqual, arrays_to_list_of_tuples(page, colnames))
 
     def match_dtype(self, datatype, dtype):
         """Match a string cqltype (e.g. 'int' or 'blob') with a numpy dtype"""
@@ -100,9 +160,7 @@ def arrays_to_list_of_tuples(arrays, colnames):
 
 def get_data(protocol_handler):
     """
-    Get some data from the test table.
-
-    :param key: if None, get all results (100.000 results), otherwise get only one result
+    Get data from the test table.
     """
     cluster = Cluster(protocol_version=PROTOCOL_VERSION)
     session = cluster.connect(keyspace="testspace")
@@ -121,9 +179,11 @@ def verify_iterator_data(assertEqual, results):
     Check the result of get_data() when this is a list or
     iterator of tuples
     """
-    for result in results:
+    count = 0
+    for count, result in enumerate(results, 1):
         params = get_all_primitive_params(result[0])
         assertEqual(len(params), len(result),
                     msg="Not the right number of columns?")
         for expected, actual in zip(params, result):
             assertEqual(actual, expected)
+    return count

@@ -20,20 +20,21 @@ except ImportError:
 import difflib
 import six
 import sys
+import time
 from mock import Mock, patch
 
 from cassandra import AlreadyExists, SignatureDescriptor, UserFunctionDescriptor, UserAggregateDescriptor
 
 from cassandra.cluster import Cluster
-from cassandra.cqltypes import DoubleType, Int32Type, ListType, UTF8Type, MapType
 from cassandra.encoder import Encoder
-from cassandra.metadata import (Metadata, KeyspaceMetadata, IndexMetadata, IndexMetadataV3,
+from cassandra.metadata import (Metadata, KeyspaceMetadata, IndexMetadata,
                                 Token, MD5Token, TokenMap, murmur3, Function, Aggregate, protect_name, protect_names,
                                 get_schema_parser)
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
-from tests.integration import get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass
+from tests.integration import get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass, \
+    BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase
 
 
 def setup_module():
@@ -42,29 +43,13 @@ def setup_module():
     CASS_SERVER_VERSION = get_server_versions()[0]
 
 
-class SchemaMetadataTests(unittest.TestCase):
-
-    ksname = "schemametadatatest"
-
-    @property
-    def cfname(self):
-        return self._testMethodName.lower()
-
-    def setUp(self):
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        self.session = self.cluster.connect()
-        execute_until_pass(self.session,
-                           "CREATE KEYSPACE schemametadatatest WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}")
-
-    def tearDown(self):
-        execute_until_pass(self.session, "DROP KEYSPACE schemametadatatest")
-        self.cluster.shutdown()
+class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
     def make_create_statement(self, partition_cols, clustering_cols=None, other_cols=None, compact=False):
         clustering_cols = clustering_cols or []
         other_cols = other_cols or []
 
-        statement = "CREATE TABLE %s.%s (" % (self.ksname, self.cfname)
+        statement = "CREATE TABLE %s.%s (" % (self.keyspace_name, self.function_table_name)
         if len(partition_cols) == 1 and not clustering_cols:
             statement += "%s text PRIMARY KEY, " % protect_name(partition_cols[0])
         else:
@@ -96,17 +81,17 @@ class SchemaMetadataTests(unittest.TestCase):
     def check_create_statement(self, tablemeta, original):
         recreate = tablemeta.as_cql_query(formatted=False)
         self.assertEqual(original, recreate[:len(original)])
-        execute_until_pass(self.session, "DROP TABLE {0}.{1}".format(self.ksname, self.cfname))
+        execute_until_pass(self.session, "DROP TABLE {0}.{1}".format(self.keyspace_name, self.function_table_name))
         execute_until_pass(self.session, recreate)
 
         # create the table again, but with formatting enabled
-        execute_until_pass(self.session, "DROP TABLE {0}.{1}".format(self.ksname, self.cfname))
+        execute_until_pass(self.session, "DROP TABLE {0}.{1}".format(self.keyspace_name, self.function_table_name))
         recreate = tablemeta.as_cql_query(formatted=True)
         execute_until_pass(self.session, recreate)
 
     def get_table_metadata(self):
-        self.cluster.refresh_table_metadata(self.ksname, self.cfname)
-        return self.cluster.metadata.keyspaces[self.ksname].tables[self.cfname]
+        self.cluster.refresh_table_metadata(self.keyspace_name, self.function_table_name)
+        return self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name]
 
     def test_basic_table_meta_properties(self):
         create_statement = self.make_create_statement(["a"], [], ["b", "c"])
@@ -116,18 +101,19 @@ class SchemaMetadataTests(unittest.TestCase):
 
         meta = self.cluster.metadata
         self.assertNotEqual(meta.cluster_name, None)
-        self.assertTrue(self.ksname in meta.keyspaces)
-        ksmeta = meta.keyspaces[self.ksname]
+        self.assertTrue(self.keyspace_name in meta.keyspaces)
+        ksmeta = meta.keyspaces[self.keyspace_name]
 
-        self.assertEqual(ksmeta.name, self.ksname)
+        self.assertEqual(ksmeta.name, self.keyspace_name)
         self.assertTrue(ksmeta.durable_writes)
         self.assertEqual(ksmeta.replication_strategy.name, 'SimpleStrategy')
         self.assertEqual(ksmeta.replication_strategy.replication_factor, 1)
 
-        self.assertTrue(self.cfname in ksmeta.tables)
-        tablemeta = ksmeta.tables[self.cfname]
-        self.assertEqual(tablemeta.keyspace, ksmeta)  # tablemeta.keyspace is deprecated
-        self.assertEqual(tablemeta.name, self.cfname)
+        self.assertTrue(self.function_table_name in ksmeta.tables)
+        tablemeta = ksmeta.tables[self.function_table_name]
+        self.assertEqual(tablemeta.keyspace_name, ksmeta.name)
+        self.assertEqual(tablemeta.name, self.function_table_name)
+        self.assertEqual(tablemeta.name, self.function_table_name)
 
         self.assertEqual([u'a'], [c.name for c in tablemeta.partition_key])
         self.assertEqual([], tablemeta.clustering_key)
@@ -213,6 +199,28 @@ class SchemaMetadataTests(unittest.TestCase):
 
         self.check_create_statement(tablemeta, create_statement)
 
+    def test_cluster_column_ordering_reversed_metadata(self):
+        """
+        Simple test to ensure that the metatdata associated with cluster ordering is surfaced is surfaced correctly.
+
+        Creates a table with a few clustering keys. Then checks the clustering order associated with clustering columns
+        and ensure it's set correctly.
+        @since 3.0.0
+        @jira_ticket PYTHON-402
+        @expected_result is_reversed is set on DESC order, and is False on ASC
+
+        @test_category metadata
+        """
+
+        create_statement = self.make_create_statement(["a"], ["b", "c"], ["d"], compact=True)
+        create_statement += " AND CLUSTERING ORDER BY (b ASC, c DESC)"
+        self.session.execute(create_statement)
+        tablemeta = self.get_table_metadata()
+        b_column = tablemeta.columns['b']
+        self.assertFalse(b_column.is_reversed)
+        c_column = tablemeta.columns['c']
+        self.assertTrue(c_column.is_reversed)
+
     def test_compound_primary_keys_more_columns_compact(self):
         create_statement = self.make_create_statement(["a"], ["b", "c"], ["d"], compact=True)
         create_statement += " AND CLUSTERING ORDER BY (b ASC, c ASC)"
@@ -297,8 +305,8 @@ class SchemaMetadataTests(unittest.TestCase):
         create_statement += " WITH CLUSTERING ORDER BY (b ASC, c ASC)"
         execute_until_pass(self.session, create_statement)
 
-        d_index = "CREATE INDEX d_index ON %s.%s (d)" % (self.ksname, self.cfname)
-        e_index = "CREATE INDEX e_index ON %s.%s (e)" % (self.ksname, self.cfname)
+        d_index = "CREATE INDEX d_index ON %s.%s (d)" % (self.keyspace_name, self.function_table_name)
+        e_index = "CREATE INDEX e_index ON %s.%s (e)" % (self.keyspace_name, self.function_table_name)
         execute_until_pass(self.session, d_index)
         execute_until_pass(self.session, e_index)
 
@@ -307,11 +315,11 @@ class SchemaMetadataTests(unittest.TestCase):
         statements = [s.strip() for s in statements.split(';')]
         statements = list(filter(bool, statements))
         self.assertEqual(3, len(statements))
-        self.assertEqual(d_index, statements[1])
-        self.assertEqual(e_index, statements[2])
+        self.assertIn(d_index, statements)
+        self.assertIn(e_index, statements)
 
         # make sure indexes are included in KeyspaceMetadata.export_as_string()
-        ksmeta = self.cluster.metadata.keyspaces[self.ksname]
+        ksmeta = self.cluster.metadata.keyspaces[self.keyspace_name]
         statement = ksmeta.export_as_string()
         self.assertIn('CREATE INDEX d_index', statement)
         self.assertIn('CREATE INDEX e_index', statement)
@@ -321,16 +329,16 @@ class SchemaMetadataTests(unittest.TestCase):
             raise unittest.SkipTest("Secondary index on collections were introduced in Cassandra 2.1")
 
         self.session.execute("CREATE TABLE %s.%s (a int PRIMARY KEY, b map<text, text>)"
-                             % (self.ksname, self.cfname))
+                             % (self.keyspace_name, self.function_table_name))
         self.session.execute("CREATE INDEX index1 ON %s.%s (keys(b))"
-                             % (self.ksname, self.cfname))
+                             % (self.keyspace_name, self.function_table_name))
 
         tablemeta = self.get_table_metadata()
         self.assertIn('(keys(b))', tablemeta.export_as_string())
 
-        self.session.execute("DROP INDEX %s.index1" % (self.ksname,))
+        self.session.execute("DROP INDEX %s.index1" % (self.keyspace_name,))
         self.session.execute("CREATE INDEX index2 ON %s.%s (b)"
-                             % (self.ksname, self.cfname))
+                             % (self.keyspace_name, self.function_table_name))
 
         tablemeta = self.get_table_metadata()
         target = ' (b)' if CASS_SERVER_VERSION < (3, 0) else 'values(b))'  # explicit values in C* 3+
@@ -338,11 +346,11 @@ class SchemaMetadataTests(unittest.TestCase):
 
         # test full indexes on frozen collections, if available
         if CASS_SERVER_VERSION >= (2, 1, 3):
-            self.session.execute("DROP TABLE %s.%s" % (self.ksname, self.cfname))
+            self.session.execute("DROP TABLE %s.%s" % (self.keyspace_name, self.function_table_name))
             self.session.execute("CREATE TABLE %s.%s (a int PRIMARY KEY, b frozen<map<text, text>>)"
-                                 % (self.ksname, self.cfname))
+                                 % (self.keyspace_name, self.function_table_name))
             self.session.execute("CREATE INDEX index3 ON %s.%s (full(b))"
-                                 % (self.ksname, self.cfname))
+                                 % (self.keyspace_name, self.function_table_name))
 
             tablemeta = self.get_table_metadata()
             self.assertIn('(full(b))', tablemeta.export_as_string())
@@ -411,49 +419,49 @@ class SchemaMetadataTests(unittest.TestCase):
         self.assertIn("new_keyspace", cluster2.metadata.keyspaces)
 
         # Keyspace metadata modification
-        self.session.execute("ALTER KEYSPACE {0} WITH durable_writes = false".format(self.ksname))
-        self.assertTrue(cluster2.metadata.keyspaces[self.ksname].durable_writes)
+        self.session.execute("ALTER KEYSPACE {0} WITH durable_writes = false".format(self.keyspace_name))
+        self.assertTrue(cluster2.metadata.keyspaces[self.keyspace_name].durable_writes)
         cluster2.refresh_schema_metadata()
-        self.assertFalse(cluster2.metadata.keyspaces[self.ksname].durable_writes)
+        self.assertFalse(cluster2.metadata.keyspaces[self.keyspace_name].durable_writes)
 
         # Table metadata modification
         table_name = "test"
-        self.session.execute("CREATE TABLE {0}.{1} (a int PRIMARY KEY, b text)".format(self.ksname, table_name))
+        self.session.execute("CREATE TABLE {0}.{1} (a int PRIMARY KEY, b text)".format(self.keyspace_name, table_name))
         cluster2.refresh_schema_metadata()
 
-        self.session.execute("ALTER TABLE {0}.{1} ADD c double".format(self.ksname, table_name))
-        self.assertNotIn("c", cluster2.metadata.keyspaces[self.ksname].tables[table_name].columns)
+        self.session.execute("ALTER TABLE {0}.{1} ADD c double".format(self.keyspace_name, table_name))
+        self.assertNotIn("c", cluster2.metadata.keyspaces[self.keyspace_name].tables[table_name].columns)
         cluster2.refresh_schema_metadata()
-        self.assertIn("c", cluster2.metadata.keyspaces[self.ksname].tables[table_name].columns)
+        self.assertIn("c", cluster2.metadata.keyspaces[self.keyspace_name].tables[table_name].columns)
 
         if PROTOCOL_VERSION >= 3:
             # UDT metadata modification
-            self.session.execute("CREATE TYPE {0}.user (age int, name text)".format(self.ksname))
-            self.assertEqual(cluster2.metadata.keyspaces[self.ksname].user_types, {})
+            self.session.execute("CREATE TYPE {0}.user (age int, name text)".format(self.keyspace_name))
+            self.assertEqual(cluster2.metadata.keyspaces[self.keyspace_name].user_types, {})
             cluster2.refresh_schema_metadata()
-            self.assertIn("user", cluster2.metadata.keyspaces[self.ksname].user_types)
+            self.assertIn("user", cluster2.metadata.keyspaces[self.keyspace_name].user_types)
 
         if PROTOCOL_VERSION >= 4:
             # UDF metadata modification
             self.session.execute("""CREATE FUNCTION {0}.sum_int(key int, val int)
                                 RETURNS NULL ON NULL INPUT
                                 RETURNS int
-                                LANGUAGE javascript AS 'key + val';""".format(self.ksname))
+                                LANGUAGE javascript AS 'key + val';""".format(self.keyspace_name))
 
-            self.assertEqual(cluster2.metadata.keyspaces[self.ksname].functions, {})
+            self.assertEqual(cluster2.metadata.keyspaces[self.keyspace_name].functions, {})
             cluster2.refresh_schema_metadata()
-            self.assertIn("sum_int(int,int)", cluster2.metadata.keyspaces[self.ksname].functions)
+            self.assertIn("sum_int(int,int)", cluster2.metadata.keyspaces[self.keyspace_name].functions)
 
             # UDA metadata modification
             self.session.execute("""CREATE AGGREGATE {0}.sum_agg(int)
                                  SFUNC sum_int
                                  STYPE int
                                  INITCOND 0"""
-                                 .format(self.ksname))
+                                 .format(self.keyspace_name))
 
-            self.assertEqual(cluster2.metadata.keyspaces[self.ksname].aggregates, {})
+            self.assertEqual(cluster2.metadata.keyspaces[self.keyspace_name].aggregates, {})
             cluster2.refresh_schema_metadata()
-            self.assertIn("sum_agg(int)", cluster2.metadata.keyspaces[self.ksname].aggregates)
+            self.assertIn("sum_agg(int)", cluster2.metadata.keyspaces[self.keyspace_name].aggregates)
 
         # Cluster metadata modification
         self.session.execute("DROP KEYSPACE new_keyspace")
@@ -484,15 +492,15 @@ class SchemaMetadataTests(unittest.TestCase):
         cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
         cluster2.connect()
 
-        self.assertTrue(cluster2.metadata.keyspaces[self.ksname].durable_writes)
-        self.session.execute("ALTER KEYSPACE {0} WITH durable_writes = false".format(self.ksname))
-        self.assertTrue(cluster2.metadata.keyspaces[self.ksname].durable_writes)
-        cluster2.refresh_keyspace_metadata(self.ksname)
-        self.assertFalse(cluster2.metadata.keyspaces[self.ksname].durable_writes)
+        self.assertTrue(cluster2.metadata.keyspaces[self.keyspace_name].durable_writes)
+        self.session.execute("ALTER KEYSPACE {0} WITH durable_writes = false".format(self.keyspace_name))
+        self.assertTrue(cluster2.metadata.keyspaces[self.keyspace_name].durable_writes)
+        cluster2.refresh_keyspace_metadata(self.keyspace_name)
+        self.assertFalse(cluster2.metadata.keyspaces[self.keyspace_name].durable_writes)
 
         cluster2.shutdown()
 
-    def test_refresh_table_metatadata(self):
+    def test_refresh_table_metadata(self):
         """
         test for synchronously refreshing table metadata
 
@@ -510,17 +518,55 @@ class SchemaMetadataTests(unittest.TestCase):
         """
 
         table_name = "test"
-        self.session.execute("CREATE TABLE {0}.{1} (a int PRIMARY KEY, b text)".format(self.ksname, table_name))
+        self.session.execute("CREATE TABLE {0}.{1} (a int PRIMARY KEY, b text)".format(self.keyspace_name, table_name))
 
         cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
         cluster2.connect()
 
-        self.assertNotIn("c", cluster2.metadata.keyspaces[self.ksname].tables[table_name].columns)
-        self.session.execute("ALTER TABLE {0}.{1} ADD c double".format(self.ksname, table_name))
-        self.assertNotIn("c", cluster2.metadata.keyspaces[self.ksname].tables[table_name].columns)
+        self.assertNotIn("c", cluster2.metadata.keyspaces[self.keyspace_name].tables[table_name].columns)
+        self.session.execute("ALTER TABLE {0}.{1} ADD c double".format(self.keyspace_name, table_name))
+        self.assertNotIn("c", cluster2.metadata.keyspaces[self.keyspace_name].tables[table_name].columns)
 
-        cluster2.refresh_table_metadata(self.ksname, table_name)
-        self.assertIn("c", cluster2.metadata.keyspaces[self.ksname].tables[table_name].columns)
+        cluster2.refresh_table_metadata(self.keyspace_name, table_name)
+        self.assertIn("c", cluster2.metadata.keyspaces[self.keyspace_name].tables[table_name].columns)
+
+        cluster2.shutdown()
+
+    def test_refresh_metadata_for_mv(self):
+        """
+        test for synchronously refreshing materialized view metadata
+
+        test_refresh_table_metadata_for_materialized_views tests that materialized view metadata is refreshed when calling
+        test_refresh_table_metatadata() with the materialized view name as the table. It creates a second cluster object
+        with schema_event_refresh_window=-1 such that schema refreshes are disabled for schema change push events.
+        It then creates a new materialized view , using the first cluster object, and verifies that the materialized view
+        metadata has not changed in the second cluster object. Finally, it calls test_refresh_table_metatadata() with the
+        materialized view name as the table name, and verifies that the materialized view metadata is updated in the
+        second cluster object.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-371
+        @expected_result Materialized view metadata should be refreshed when refresh_table_metadata() is called.
+
+        @test_category metadata
+        """
+
+        if CASS_SERVER_VERSION < (3, 0):
+            raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
+
+        table_name = "test"
+        self.session.execute("CREATE TABLE {0}.{1} (a int PRIMARY KEY, b text)".format(self.keyspace_name, self.function_table_name))
+
+        cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
+        cluster2.connect()
+
+        self.assertNotIn("mv1", cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+        self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT b FROM {0}.{1} WHERE b IS NOT NULL PRIMARY KEY (a, b)"
+                             .format(self.keyspace_name, self.function_table_name))
+        self.assertNotIn("mv1", cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+
+        cluster2.refresh_table_metadata(self.keyspace_name, "mv1")
+        self.assertIn("mv1", cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
 
         cluster2.shutdown()
 
@@ -547,12 +593,12 @@ class SchemaMetadataTests(unittest.TestCase):
         cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
         cluster2.connect()
 
-        self.assertEqual(cluster2.metadata.keyspaces[self.ksname].user_types, {})
-        self.session.execute("CREATE TYPE {0}.user (age int, name text)".format(self.ksname))
-        self.assertEqual(cluster2.metadata.keyspaces[self.ksname].user_types, {})
+        self.assertEqual(cluster2.metadata.keyspaces[self.keyspace_name].user_types, {})
+        self.session.execute("CREATE TYPE {0}.user (age int, name text)".format(self.keyspace_name))
+        self.assertEqual(cluster2.metadata.keyspaces[self.keyspace_name].user_types, {})
 
-        cluster2.refresh_user_type_metadata(self.ksname, "user")
-        self.assertIn("user", cluster2.metadata.keyspaces[self.ksname].user_types)
+        cluster2.refresh_user_type_metadata(self.keyspace_name, "user")
+        self.assertIn("user", cluster2.metadata.keyspaces[self.keyspace_name].user_types)
 
         cluster2.shutdown()
 
@@ -580,15 +626,15 @@ class SchemaMetadataTests(unittest.TestCase):
         cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
         cluster2.connect()
 
-        self.assertEqual(cluster2.metadata.keyspaces[self.ksname].functions, {})
+        self.assertEqual(cluster2.metadata.keyspaces[self.keyspace_name].functions, {})
         self.session.execute("""CREATE FUNCTION {0}.sum_int(key int, val int)
                             RETURNS NULL ON NULL INPUT
                             RETURNS int
-                            LANGUAGE javascript AS 'key + val';""".format(self.ksname))
+                            LANGUAGE javascript AS 'key + val';""".format(self.keyspace_name))
 
-        self.assertEqual(cluster2.metadata.keyspaces[self.ksname].functions, {})
-        cluster2.refresh_user_function_metadata(self.ksname, UserFunctionDescriptor("sum_int", ["int", "int"]))
-        self.assertIn("sum_int(int,int)", cluster2.metadata.keyspaces[self.ksname].functions)
+        self.assertEqual(cluster2.metadata.keyspaces[self.keyspace_name].functions, {})
+        cluster2.refresh_user_function_metadata(self.keyspace_name, UserFunctionDescriptor("sum_int", ["int", "int"]))
+        self.assertIn("sum_int(int,int)", cluster2.metadata.keyspaces[self.keyspace_name].functions)
 
         cluster2.shutdown()
 
@@ -616,23 +662,57 @@ class SchemaMetadataTests(unittest.TestCase):
         cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
         cluster2.connect()
 
-        self.assertEqual(cluster2.metadata.keyspaces[self.ksname].aggregates, {})
+        self.assertEqual(cluster2.metadata.keyspaces[self.keyspace_name].aggregates, {})
         self.session.execute("""CREATE FUNCTION {0}.sum_int(key int, val int)
                             RETURNS NULL ON NULL INPUT
                             RETURNS int
-                            LANGUAGE javascript AS 'key + val';""".format(self.ksname))
+                            LANGUAGE javascript AS 'key + val';""".format(self.keyspace_name))
 
         self.session.execute("""CREATE AGGREGATE {0}.sum_agg(int)
                              SFUNC sum_int
                              STYPE int
                              INITCOND 0"""
-                             .format(self.ksname))
+                             .format(self.keyspace_name))
 
-        self.assertEqual(cluster2.metadata.keyspaces[self.ksname].aggregates, {})
-        cluster2.refresh_user_aggregate_metadata(self.ksname, UserAggregateDescriptor("sum_agg", ["int"]))
-        self.assertIn("sum_agg(int)", cluster2.metadata.keyspaces[self.ksname].aggregates)
+        self.assertEqual(cluster2.metadata.keyspaces[self.keyspace_name].aggregates, {})
+        cluster2.refresh_user_aggregate_metadata(self.keyspace_name, UserAggregateDescriptor("sum_agg", ["int"]))
+        self.assertIn("sum_agg(int)", cluster2.metadata.keyspaces[self.keyspace_name].aggregates)
 
         cluster2.shutdown()
+
+    def test_multiple_indices(self):
+        """
+        test multiple indices on the same column.
+
+        Creates a table and two indices. Ensures that both indices metatdata is surface appropriately.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-276
+        @expected_result IndexMetadata is appropriately surfaced
+
+        @test_category metadata
+        """
+        if CASS_SERVER_VERSION < (3, 0):
+            raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
+
+        self.session.execute("CREATE TABLE {0}.{1} (a int PRIMARY KEY, b map<text, int>)".format(self.keyspace_name, self.function_table_name))
+        self.session.execute("CREATE INDEX index_1 ON {0}.{1}(b)".format(self.keyspace_name, self.function_table_name))
+        self.session.execute("CREATE INDEX index_2 ON {0}.{1}(keys(b))".format(self.keyspace_name, self.function_table_name))
+
+        indices = self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].indexes
+        self.assertEqual(len(indices), 2)
+        index_1 = indices["index_1"]
+        index_2 = indices['index_2']
+        self.assertEqual(index_1.table_name, "test_multiple_indices")
+        self.assertEqual(index_1.name, "index_1")
+        self.assertEqual(index_1.kind, "COMPOSITES")
+        self.assertEqual(index_1.index_options["target"], "values(b)")
+        self.assertEqual(index_1.keyspace_name, "schemametadatatests")
+        self.assertEqual(index_2.table_name, "test_multiple_indices")
+        self.assertEqual(index_2.name, "index_2")
+        self.assertEqual(index_2.kind, "COMPOSITES")
+        self.assertEqual(index_2.index_options["target"], "keys(b)")
+        self.assertEqual(index_2.keyspace_name, "schemametadatatests")
 
 
 class TestCodeCoverage(unittest.TestCase):
@@ -671,7 +751,7 @@ class TestCodeCoverage(unittest.TestCase):
 
     def assert_startswith_diff(self, received, prefix):
         if not received.startswith(prefix):
-            prefix_lines = previx.split('\n')
+            prefix_lines = prefix.split('\n')
             diff_string = '\n'.join(difflib.unified_diff(prefix_lines,
                                                          received.split('\n')[:len(prefix_lines)],
                                                          'EXPECTED', 'RECEIVED',
@@ -1263,10 +1343,10 @@ class IndexMapTests(unittest.TestCase):
 
         ks_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
         table_meta = ks_meta.tables[self.table_name]
-        self.assertIsInstance(ks_meta.indexes['a_idx'], (IndexMetadata, IndexMetadataV3))
-        self.assertIsInstance(ks_meta.indexes['b_idx'], (IndexMetadata, IndexMetadataV3))
-        self.assertIsInstance(table_meta.indexes['a_idx'], (IndexMetadata, IndexMetadataV3))
-        self.assertIsInstance(table_meta.indexes['b_idx'], (IndexMetadata, IndexMetadataV3))
+        self.assertIsInstance(ks_meta.indexes['a_idx'], IndexMetadata)
+        self.assertIsInstance(ks_meta.indexes['b_idx'], IndexMetadata)
+        self.assertIsInstance(table_meta.indexes['a_idx'], IndexMetadata)
+        self.assertIsInstance(table_meta.indexes['b_idx'], IndexMetadata)
 
         # both indexes updated when index dropped
         self.session.execute("DROP INDEX a_idx")
@@ -1277,9 +1357,9 @@ class IndexMapTests(unittest.TestCase):
         ks_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
         table_meta = ks_meta.tables[self.table_name]
         self.assertNotIn('a_idx', ks_meta.indexes)
-        self.assertIsInstance(ks_meta.indexes['b_idx'], (IndexMetadata, IndexMetadataV3))
+        self.assertIsInstance(ks_meta.indexes['b_idx'], IndexMetadata)
         self.assertNotIn('a_idx', table_meta.indexes)
-        self.assertIsInstance(table_meta.indexes['b_idx'], (IndexMetadata, IndexMetadataV3))
+        self.assertIsInstance(table_meta.indexes['b_idx'], IndexMetadata)
 
         # keyspace index updated when table dropped
         self.drop_basic_table()
@@ -1295,15 +1375,15 @@ class IndexMapTests(unittest.TestCase):
         self.session.execute("CREATE INDEX %s ON %s (a)" % (idx, self.table_name))
         ks_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
         table_meta = ks_meta.tables[self.table_name]
-        self.assertIsInstance(ks_meta.indexes[idx], (IndexMetadata, IndexMetadataV3))
-        self.assertIsInstance(table_meta.indexes[idx], (IndexMetadata, IndexMetadataV3))
+        self.assertIsInstance(ks_meta.indexes[idx], IndexMetadata)
+        self.assertIsInstance(table_meta.indexes[idx], IndexMetadata)
         self.session.execute('ALTER KEYSPACE %s WITH durable_writes = false' % self.keyspace_name)
         old_meta = ks_meta
         ks_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
         self.assertIsNot(ks_meta, old_meta)
         table_meta = ks_meta.tables[self.table_name]
-        self.assertIsInstance(ks_meta.indexes[idx], (IndexMetadata, IndexMetadataV3))
-        self.assertIsInstance(table_meta.indexes[idx], (IndexMetadata, IndexMetadataV3))
+        self.assertIsInstance(ks_meta.indexes[idx], IndexMetadata)
+        self.assertIsInstance(table_meta.indexes[idx], IndexMetadata)
         self.drop_basic_table()
 
 
@@ -1368,7 +1448,7 @@ class FunctionTest(unittest.TestCase):
         @property
         def signature(self):
             return SignatureDescriptor.format_signature(self.function_kwargs['name'],
-                                                        self.function_kwargs['type_signature'])
+                                                        self.function_kwargs['argument_types'])
 
     class VerifiedFunction(Verified):
         def __init__(self, test_case, **kwargs):
@@ -1384,9 +1464,9 @@ class FunctionMetadata(FunctionTest):
     def make_function_kwargs(self, called_on_null=True):
         return {'keyspace': self.keyspace_name,
                 'name': self.function_name,
-                'type_signature': ['double', 'int'],
+                'argument_types': ['double', 'int'],
                 'argument_names': ['d', 'i'],
-                'return_type': DoubleType,
+                'return_type': 'double',
                 'language': 'java',
                 'body': 'return new Double(0.0);',
                 'called_on_null_input': called_on_null}
@@ -1403,7 +1483,7 @@ class FunctionMetadata(FunctionTest):
         SEE https://issues.apache.org/jira/browse/CASSANDRA-9186
         Maybe update this after release
         kwargs = self.make_function_kwargs()
-        kwargs['type_signature'][0] = "frozen<%s>" % udt_name
+        kwargs['argument_types'][0] = "frozen<%s>" % udt_name
         expected_meta = Function(**kwargs)
         with self.VerifiedFunction(self, **kwargs):
 
@@ -1444,16 +1524,37 @@ class FunctionMetadata(FunctionTest):
         with self.VerifiedFunction(self, **kwargs):
 
             # another function: same name, different type sig.
-            self.assertGreater(len(kwargs['type_signature']), 1)
+            self.assertGreater(len(kwargs['argument_types']), 1)
             self.assertGreater(len(kwargs['argument_names']), 1)
-            kwargs['type_signature'] = kwargs['type_signature'][:1]
+            kwargs['argument_types'] = kwargs['argument_types'][:1]
             kwargs['argument_names'] = kwargs['argument_names'][:1]
 
             # Ensure they are surfaced separately
             with self.VerifiedFunction(self, **kwargs):
                 functions = [f for f in self.keyspace_function_meta.values() if f.name == self.function_name]
                 self.assertEqual(len(functions), 2)
-                self.assertNotEqual(functions[0].type_signature, functions[1].type_signature)
+                self.assertNotEqual(functions[0].argument_types, functions[1].argument_types)
+
+    def test_function_no_parameters(self):
+        """
+        Test to verify CQL output for functions with zero parameters
+
+        Creates a function with no input parameters, verify that CQL output is correct.
+
+        @since 2.7.1
+        @jira_ticket PYTHON-392
+        @expected_result function with no parameters should generate proper CQL
+        @test_category function
+        """
+        kwargs = self.make_function_kwargs()
+        kwargs['argument_types'] = []
+        kwargs['argument_names'] = []
+        kwargs['return_type'] = 'bigint'
+        kwargs['body'] = 'return System.currentTimeMillis() / 1000L;'
+
+        with self.VerifiedFunction(self, **kwargs) as vf:
+            fn_meta = self.keyspace_function_meta[vf.signature]
+            self.assertRegexpMatches(fn_meta.as_cql_query(), "CREATE FUNCTION.*%s\(\) .*" % kwargs['name'])
 
     def test_functions_follow_keyspace_alter(self):
         """
@@ -1545,7 +1646,7 @@ class AggregateMetadata(FunctionTest):
     def make_aggregate_kwargs(self, state_func, state_type, final_func=None, init_cond=None):
         return {'keyspace': self.keyspace_name,
                 'name': self.function_name + '_aggregate',
-                'type_signature': ['int'],
+                'argument_types': ['int'],
                 'state_func': state_func,
                 'state_type': state_type,
                 'final_func': final_func,
@@ -1566,8 +1667,8 @@ class AggregateMetadata(FunctionTest):
         @test_category aggregate
         """
 
-        with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('sum_int', Int32Type, init_cond=1)) as va:
-            self.assertIs(self.keyspace_aggregate_meta[va.signature].return_type, Int32Type)
+        with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('sum_int', 'int', init_cond='1')) as va:
+            self.assertEqual(self.keyspace_aggregate_meta[va.signature].return_type, 'int')
 
     def test_init_cond(self):
         """
@@ -1587,17 +1688,21 @@ class AggregateMetadata(FunctionTest):
         c = Cluster(protocol_version=3)
         s = c.connect(self.keyspace_name)
 
+        encoder = Encoder()
+
         expected_values = range(4)
 
         # int32
         for init_cond in (-1, 0, 1):
-            with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('sum_int', Int32Type, init_cond=init_cond)) as va:
+            cql_init = encoder.cql_encode_all_types(init_cond)
+            with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('sum_int', 'int', init_cond=cql_init)) as va:
                 sum_res = s.execute("SELECT %s(v) AS sum FROM t" % va.function_kwargs['name'])[0].sum
-                self.assertEqual(sum_res, init_cond + sum(expected_values))
+                self.assertEqual(sum_res, int(init_cond) + sum(expected_values))
 
         # list<text>
         for init_cond in ([], ['1', '2']):
-            with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('extend_list', ListType.apply_parameters([UTF8Type]), init_cond=init_cond)) as va:
+            cql_init = encoder.cql_encode_all_types(init_cond)
+            with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('extend_list', 'list<text>', init_cond=cql_init)) as va:
                 list_res = s.execute("SELECT %s(v) AS list_res FROM t" % va.function_kwargs['name'])[0].list_res
                 self.assertListEqual(list_res[:len(init_cond)], init_cond)
                 self.assertEqual(set(i for i in list_res[len(init_cond):]),
@@ -1607,7 +1712,8 @@ class AggregateMetadata(FunctionTest):
         expected_map_values = dict((i, i) for i in expected_values)
         expected_key_set = set(expected_values)
         for init_cond in ({}, {1: 2, 3: 4}, {5: 5}):
-            with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('update_map', MapType.apply_parameters([Int32Type, Int32Type]), init_cond=init_cond)) as va:
+            cql_init = encoder.cql_encode_all_types(init_cond)
+            with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('update_map', 'map<int, int>', init_cond=cql_init)) as va:
                 map_res = s.execute("SELECT %s(v) AS map_res FROM t" % va.function_kwargs['name'])[0].map_res
                 self.assertDictContainsSubset(expected_map_values, map_res)
                 init_not_updated = dict((k, init_cond[k]) for k in set(init_cond) - expected_key_set)
@@ -1629,7 +1735,7 @@ class AggregateMetadata(FunctionTest):
         """
 
         # functions must come before functions in keyspace dump
-        with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('extend_list', ListType.apply_parameters([UTF8Type]))):
+        with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('extend_list', 'list<text>')):
             keyspace_cql = self.cluster.metadata.keyspaces[self.keyspace_name].export_as_string()
             func_idx = keyspace_cql.find("CREATE FUNCTION")
             aggregate_idx = keyspace_cql.rfind("CREATE AGGREGATE")
@@ -1649,14 +1755,14 @@ class AggregateMetadata(FunctionTest):
         @test_category function
         """
 
-        kwargs = self.make_aggregate_kwargs('sum_int', Int32Type, init_cond=0)
+        kwargs = self.make_aggregate_kwargs('sum_int', 'int', init_cond='0')
         with self.VerifiedAggregate(self, **kwargs):
             kwargs['state_func'] = 'sum_int_two'
-            kwargs['type_signature'] = ['int', 'int']
+            kwargs['argument_types'] = ['int', 'int']
             with self.VerifiedAggregate(self, **kwargs):
                 aggregates = [a for a in self.keyspace_aggregate_meta.values() if a.name == kwargs['name']]
                 self.assertEqual(len(aggregates), 2)
-                self.assertNotEqual(aggregates[0].type_signature, aggregates[1].type_signature)
+                self.assertNotEqual(aggregates[0].argument_types, aggregates[1].argument_types)
 
     def test_aggregates_follow_keyspace_alter(self):
         """
@@ -1672,7 +1778,7 @@ class AggregateMetadata(FunctionTest):
         @test_category function
         """
 
-        with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('sum_int', Int32Type, init_cond=0)):
+        with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('sum_int', 'int', init_cond='0')):
             original_keyspace_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
             self.session.execute('ALTER KEYSPACE %s WITH durable_writes = false' % self.keyspace_name)
             try:
@@ -1696,7 +1802,8 @@ class AggregateMetadata(FunctionTest):
         @test_category function
         """
 
-        kwargs = self.make_aggregate_kwargs('extend_list', ListType.apply_parameters([UTF8Type]))
+        kwargs = self.make_aggregate_kwargs('extend_list', 'list<text>')
+        encoder = Encoder()
 
         # no initial condition, final func
         self.assertIsNone(kwargs['initial_condition'])
@@ -1710,13 +1817,13 @@ class AggregateMetadata(FunctionTest):
             self.assertEqual(cql.find('FINALFUNC'), -1)
 
         # initial condition, no final func
-        kwargs['initial_condition'] = ['init', 'cond']
+        kwargs['initial_condition'] = encoder.cql_encode_all_types(['init', 'cond'])
         with self.VerifiedAggregate(self, **kwargs) as va:
             meta = self.keyspace_aggregate_meta[va.signature]
-            self.assertListEqual(meta.initial_condition, kwargs['initial_condition'])
+            self.assertEqual(meta.initial_condition, kwargs['initial_condition'])
             self.assertIsNone(meta.final_func)
             cql = meta.as_cql_query()
-            search_string = "INITCOND %s" % Encoder().cql_encode_all_types(kwargs['initial_condition'])
+            search_string = "INITCOND %s" % kwargs['initial_condition']
             self.assertGreater(cql.find(search_string), 0, '"%s" search string not found in cql:\n%s' % (search_string, cql))
             self.assertEqual(cql.find('FINALFUNC'), -1)
 
@@ -1733,14 +1840,14 @@ class AggregateMetadata(FunctionTest):
             self.assertGreater(cql.find(search_string), 0, '"%s" search string not found in cql:\n%s' % (search_string, cql))
 
         # both
-        kwargs['initial_condition'] = ['init', 'cond']
+        kwargs['initial_condition'] = encoder.cql_encode_all_types(['init', 'cond'])
         kwargs['final_func'] = 'List_As_String'
         with self.VerifiedAggregate(self, **kwargs) as va:
             meta = self.keyspace_aggregate_meta[va.signature]
-            self.assertListEqual(meta.initial_condition, kwargs['initial_condition'])
+            self.assertEqual(meta.initial_condition, kwargs['initial_condition'])
             self.assertEqual(meta.final_func, kwargs['final_func'])
             cql = meta.as_cql_query()
-            init_cond_idx = cql.find("INITCOND %s" % Encoder().cql_encode_all_types(kwargs['initial_condition']))
+            init_cond_idx = cql.find("INITCOND %s" % kwargs['initial_condition'])
             final_func_idx = cql.find('FINALFUNC "%s"' % kwargs['final_func'])
             self.assertNotIn(-1, (init_cond_idx, final_func_idx))
             self.assertGreater(init_cond_idx, final_func_idx)
@@ -1766,14 +1873,14 @@ class BadMetaTest(unittest.TestCase):
         cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         cls.keyspace_name = cls.__name__.lower()
         cls.session = cls.cluster.connect()
-        cls.session.execute("CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}" % cls.keyspace_name)
+        cls.session.execute("CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}" % cls.keyspace_name)
         cls.session.set_keyspace(cls.keyspace_name)
         connection = cls.cluster.control_connection._connection
         cls.parser_class = get_schema_parser(connection, timeout=20).__class__
 
     @classmethod
     def teardown_class(cls):
-        cls.session.execute("DROP KEYSPACE IF EXISTS %s" % cls.keyspace_name)
+        cls.session.execute("DROP KEYSPACE %s" % cls.keyspace_name)
         cls.cluster.shutdown()
 
     def _skip_if_not_version(self, version):
@@ -1840,3 +1947,390 @@ class BadMetaTest(unittest.TestCase):
             m = self.cluster.metadata.keyspaces[self.keyspace_name]
             self.assertIs(m._exc_info[0], self.BadMetaException)
             self.assertIn("/*\nWarning:", m.export_as_string())
+
+
+class MaterializedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
+
+    def setUp(self):
+        if CASS_SERVER_VERSION < (3, 0):
+            raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
+        self.session.execute("CREATE TABLE {0}.{1} (pk int PRIMARY KEY, c int)".format(self.keyspace_name, self.function_table_name))
+        self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT c FROM {0}.{1} WHERE c IS NOT NULL PRIMARY KEY (pk, c)".format(self.keyspace_name, self.function_table_name))
+
+    def tearDown(self):
+        self.session.execute("DROP MATERIALIZED VIEW {0}.mv1".format(self.keyspace_name))
+        self.session.execute("DROP TABLE {0}.{1}".format(self.keyspace_name, self.function_table_name))
+
+    def test_materialized_view_metadata_creation(self):
+        """
+        test for materialized view metadata creation
+
+        test_materialized_view_metadata_creation tests that materialized view metadata properly created implicitly in
+        both keyspace and table metadata under "views". It creates a simple base table and then creates a view based
+        on that table. It then checks that the materialized view metadata is contained in the keyspace and table
+        metadata. Finally, it checks that the keyspace_name and the base_table_name in the view metadata is properly set.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-371
+        @expected_result Materialized view metadata in both the ks and table should be created with a new view is created.
+
+        @test_category metadata
+        """
+
+        self.assertIn("mv1", self.cluster.metadata.keyspaces[self.keyspace_name].views)
+        self.assertIn("mv1", self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+
+        self.assertEqual(self.keyspace_name, self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].keyspace_name)
+        self.assertEqual(self.function_table_name, self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].base_table_name)
+
+    def test_materialized_view_metadata_alter(self):
+        """
+        test for materialized view metadata alteration
+
+        test_materialized_view_metadata_alter tests that materialized view metadata is properly updated implicitly in the
+        table metadata once that view is updated. It creates a simple base table and then creates a view based
+        on that table. It then alters that materalized view and checks that the materialized view metadata is altered in
+        the table metadata.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-371
+        @expected_result Materialized view metadata should be updated with the view is altered.
+
+        @test_category metadata
+        """
+        self.assertIn("SizeTieredCompactionStrategy", self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].options["compaction"]["class"] )
+
+        self.session.execute("ALTER MATERIALIZED VIEW {0}.mv1 WITH compaction = {{ 'class' : 'LeveledCompactionStrategy' }}".format(self.keyspace_name))
+        self.assertIn("LeveledCompactionStrategy", self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].options["compaction"]["class"])
+
+    def test_materialized_view_metadata_drop(self):
+        """
+        test for materialized view metadata dropping
+
+        test_materialized_view_metadata_drop tests that materialized view metadata is properly removed implicitly in
+        both keyspace and table metadata once that view is dropped. It creates a simple base table and then creates a view
+        based on that table. It then drops that materalized view and checks that the materialized view metadata is removed
+        from the keyspace and table metadata.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-371
+        @expected_result Materialized view metadata in both the ks and table should be removed with the view is dropped.
+
+        @test_category metadata
+        """
+
+        self.session.execute("DROP MATERIALIZED VIEW {0}.mv1".format(self.keyspace_name))
+
+        self.assertNotIn("mv1", self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+        self.assertNotIn("mv1", self.cluster.metadata.keyspaces[self.keyspace_name].views)
+        self.assertDictEqual({}, self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+        self.assertDictEqual({}, self.cluster.metadata.keyspaces[self.keyspace_name].views)
+
+        self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT c FROM {0}.{1} WHERE c IS NOT NULL PRIMARY KEY (pk, c)".format(self.keyspace_name, self.function_table_name))
+
+
+class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
+    def setUp(self):
+        if CASS_SERVER_VERSION < (3, 0):
+            raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
+        super(MaterializedViewMetadataTestComplex, self).setUp()
+
+    def test_create_view_metadata(self):
+        """
+        test to ensure that materialized view metadata is properly constructed
+
+        test_create_view_metadata tests that materialized views metadata is properly constructed. It runs a simple
+        query to construct a materialized view, then proceeds to inspect the metadata associated with that MV.
+        Columns are inspected to insure that all are of the proper type, and in the proper type.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-371
+        @expected_result Materialized view metadata should be constructed appropriately.
+
+        @test_category metadata
+        """
+        create_table = """CREATE TABLE {0}.scores(
+                        user TEXT,
+                        game TEXT,
+                        year INT,
+                        month INT,
+                        day INT,
+                        score INT,
+                        PRIMARY KEY (user, game, year, month, day)
+                        )""".format(self.keyspace_name)
+
+        self.session.execute(create_table)
+
+        create_mv = """CREATE MATERIALIZED VIEW {0}.monthlyhigh AS
+                        SELECT game, year, month, score, user, day FROM {0}.scores
+                        WHERE game IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL AND day IS NOT NULL
+                        PRIMARY KEY ((game, year, month), score, user, day)
+                        WITH CLUSTERING ORDER BY (score DESC, user ASC, day ASC)""".format(self.keyspace_name)
+
+        self.session.execute(create_mv)
+        score_table = self.cluster.metadata.keyspaces[self.keyspace_name].tables['scores']
+        mv = self.cluster.metadata.keyspaces[self.keyspace_name].views['monthlyhigh']
+
+        self.assertIsNotNone(score_table.views["monthlyhigh"])
+        self.assertIsNotNone(len(score_table.views), 1)
+
+        # Make sure user is a partition key, and not null
+        self.assertEqual(len(score_table.partition_key), 1)
+        self.assertIsNotNone(score_table.columns['user'])
+        self.assertTrue(score_table.columns['user'], score_table.partition_key[0])
+
+        # Validate clustering keys
+        self.assertEqual(len(score_table.clustering_key), 4)
+
+        self.assertIsNotNone(score_table.columns['game'])
+        self.assertTrue(score_table.columns['game'], score_table.clustering_key[0])
+
+        self.assertIsNotNone(score_table.columns['year'])
+        self.assertTrue(score_table.columns['year'], score_table.clustering_key[1])
+
+        self.assertIsNotNone(score_table.columns['month'])
+        self.assertTrue(score_table.columns['month'], score_table.clustering_key[2])
+
+        self.assertIsNotNone(score_table.columns['day'])
+        self.assertTrue(score_table.columns['day'], score_table.clustering_key[3])
+
+        self.assertIsNotNone(score_table.columns['score'])
+
+        # Validate basic mv information
+        self.assertEquals(mv.keyspace_name, self.keyspace_name)
+        self.assertEquals(mv.name, "monthlyhigh")
+        self.assertEquals(mv.base_table_name, "scores")
+        self.assertFalse(mv.include_all_columns)
+
+        # Validate that all columns are preset and correct
+        mv_columns = list(mv.columns.values())
+        self.assertEquals(len(mv_columns), 6)
+
+        game_column = mv_columns[0]
+        self.assertIsNotNone(game_column)
+        self.assertEquals(game_column.name, 'game')
+        self.assertEquals(game_column, mv.partition_key[0])
+
+        year_column = mv_columns[1]
+        self.assertIsNotNone(year_column)
+        self.assertEquals(year_column.name, 'year')
+        self.assertEquals(year_column, mv.partition_key[1])
+
+        month_column = mv_columns[2]
+        self.assertIsNotNone(month_column)
+        self.assertEquals(month_column.name, 'month')
+        self.assertEquals(month_column, mv.partition_key[2])
+
+        def compare_columns(a, b, name):
+            self.assertEquals(a.name, name)
+            self.assertEquals(a.name, b.name)
+            self.assertEquals(a.table, b.table)
+            self.assertEquals(a.cql_type, b.cql_type)
+            self.assertEquals(a.index, b.index)
+            self.assertEquals(a.is_static, b.is_static)
+            self.assertEquals(a.is_reversed, b.is_reversed)
+
+        score_column = mv_columns[3]
+        compare_columns(score_column, mv.clustering_key[0], 'score')
+
+        user_column = mv_columns[4]
+        compare_columns(user_column, mv.clustering_key[1], 'user')
+
+        day_column = mv_columns[5]
+        compare_columns(day_column, mv.clustering_key[2], 'day')
+
+    def test_base_table_column_addition_mv(self):
+        """
+        test to ensure that materialized view metadata is properly updated with base columns are added
+
+        test_create_view_metadata tests that materialized views metadata is properly updated when columns are added to
+        the base table.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-419
+        @expected_result Materialized view metadata should be updated correctly
+
+        @test_category metadata
+        """
+        create_table = """CREATE TABLE {0}.scores(
+                        user TEXT,
+                        game TEXT,
+                        year INT,
+                        month INT,
+                        day INT,
+                        score TEXT,
+                        PRIMARY KEY (user, game, year, month, day)
+                        )""".format(self.keyspace_name)
+
+        self.session.execute(create_table)
+
+        create_mv = """CREATE MATERIALIZED VIEW {0}.monthlyhigh AS
+                        SELECT game, year, month, score, user, day FROM {0}.scores
+                        WHERE game IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL AND day IS NOT NULL
+                        PRIMARY KEY ((game, year, month), score, user, day)
+                        WITH CLUSTERING ORDER BY (score DESC, user ASC, day ASC)""".format(self.keyspace_name)
+
+        create_mv_alltime = """CREATE MATERIALIZED VIEW {0}.alltimehigh AS
+                        SELECT * FROM {0}.scores
+                        WHERE game IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND day IS NOT NULL
+                        PRIMARY KEY (game, score, user, year, month, day)
+                        WITH CLUSTERING ORDER BY (score DESC)""".format(self.keyspace_name)
+
+        self.session.execute(create_mv)
+
+        self.session.execute(create_mv_alltime)
+
+        score_table = self.cluster.metadata.keyspaces[self.keyspace_name].tables['scores']
+
+        self.assertIsNotNone(score_table.views["monthlyhigh"])
+        self.assertIsNotNone(score_table.views["alltimehigh"])
+        self.assertEqual(len(self.cluster.metadata.keyspaces[self.keyspace_name].views), 2)
+
+        insert_fouls = """ALTER TABLE {0}.scores ADD fouls INT""".format((self.keyspace_name))
+
+        self.session.execute(insert_fouls)
+        self.assertEqual(len(self.cluster.metadata.keyspaces[self.keyspace_name].views), 2)
+
+        score_table = self.cluster.metadata.keyspaces[self.keyspace_name].tables['scores']
+        self.assertIn("fouls", score_table.columns)
+
+        # This is a workaround for mv notifications being separate from base table schema responses.
+        # This maybe fixed with future protocol changes
+        for i in range(10):
+            mv_alltime = self.cluster.metadata.keyspaces[self.keyspace_name].views["alltimehigh"]
+            if("fouls" in mv_alltime.columns):
+                break
+            time.sleep(.2)
+
+        self.assertIn("fouls", mv_alltime.columns)
+
+        mv_alltime_fouls_comumn = self.cluster.metadata.keyspaces[self.keyspace_name].views["alltimehigh"].columns['fouls']
+        self.assertEquals(mv_alltime_fouls_comumn.cql_type, 'int')
+
+    def test_base_table_type_alter_mv(self):
+        """
+        test to ensure that materialized view metadata is properly updated when a type in the base table
+        is updated.
+
+        test_create_view_metadata tests that materialized views metadata is properly updated when the type of base table
+        column is changed.
+
+        @since 3.0.0
+        @jira_ticket CASSANDRA-10424
+        @expected_result Materialized view metadata should be updated correctly
+
+        @test_category metadata
+        """
+        create_table = """CREATE TABLE {0}.scores(
+                        user TEXT,
+                        game TEXT,
+                        year INT,
+                        month INT,
+                        day INT,
+                        score TEXT,
+                        PRIMARY KEY (user, game, year, month, day)
+                        )""".format(self.keyspace_name)
+
+        self.session.execute(create_table)
+
+        create_mv = """CREATE MATERIALIZED VIEW {0}.monthlyhigh AS
+                        SELECT game, year, month, score, user, day FROM {0}.scores
+                        WHERE game IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL AND day IS NOT NULL
+                        PRIMARY KEY ((game, year, month), score, user, day)
+                        WITH CLUSTERING ORDER BY (score DESC, user ASC, day ASC)""".format(self.keyspace_name)
+
+        self.session.execute(create_mv)
+        self.assertEqual(len(self.cluster.metadata.keyspaces[self.keyspace_name].views), 1)
+        alter_scores = """ALTER TABLE {0}.scores ALTER score TYPE blob""".format((self.keyspace_name))
+        self.session.execute(alter_scores)
+        self.assertEqual(len(self.cluster.metadata.keyspaces[self.keyspace_name].views), 1)
+
+        score_column = self.cluster.metadata.keyspaces[self.keyspace_name].tables['scores'].columns['score']
+        self.assertEquals(score_column.cql_type, 'blob')
+
+        # until CASSANDRA-9920+CASSANDRA-10500 MV updates are only available later with an async event
+        for i in range(10):
+            score_mv_column = self.cluster.metadata.keyspaces[self.keyspace_name].views["monthlyhigh"].columns['score']
+            if "blob" == score_mv_column.cql_type:
+                break
+            time.sleep(.2)
+
+        self.assertEquals(score_mv_column.cql_type, 'blob')
+
+    def test_metadata_with_quoted_identifiers(self):
+        """
+        test to ensure that materialized view metadata is properly constructed when quoted identifiers are used
+
+        test_metadata_with_quoted_identifiers tests that materialized views metadata is properly constructed.
+        It runs a simple query to construct a materialized view, then proceeds to inspect the metadata associated with
+        that MV. The caveat here is that the tables and the materialized view both have quoted identifiers
+        Columns are inspected to insure that all are of the proper type, and in the proper type.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-371
+        @expected_result Materialized view metadata should be constructed appropriately even with quoted identifiers.
+
+        @test_category metadata
+        """
+        create_table = """CREATE TABLE {0}.t1 (
+                        "theKey" int,
+                        "the;Clustering" int,
+                        "the Value" int,
+                        PRIMARY KEY ("theKey", "the;Clustering"))""".format(self.keyspace_name)
+
+        self.session.execute(create_table)
+
+        create_mv = """CREATE MATERIALIZED VIEW {0}.mv1 AS
+                    SELECT "theKey", "the;Clustering", "the Value"
+                    FROM {0}.t1
+                    WHERE "theKey" IS NOT NULL AND "the;Clustering" IS NOT NULL AND "the Value" IS NOT NULL
+                    PRIMARY KEY ("theKey", "the;Clustering")""".format(self.keyspace_name)
+
+        self.session.execute(create_mv)
+
+        t1_table = self.cluster.metadata.keyspaces[self.keyspace_name].tables['t1']
+        mv = self.cluster.metadata.keyspaces[self.keyspace_name].views['mv1']
+
+        self.assertIsNotNone(t1_table.views["mv1"])
+        self.assertIsNotNone(len(t1_table.views), 1)
+
+        # Validate partition key, and not null
+        self.assertEqual(len(t1_table.partition_key), 1)
+        self.assertIsNotNone(t1_table.columns['theKey'])
+        self.assertTrue(t1_table.columns['theKey'], t1_table.partition_key[0])
+
+        # Validate clustering key column
+        self.assertEqual(len(t1_table.clustering_key), 1)
+        self.assertIsNotNone(t1_table.columns['the;Clustering'])
+        self.assertTrue(t1_table.columns['the;Clustering'], t1_table.clustering_key[0])
+
+        # Validate regular column
+        self.assertIsNotNone(t1_table.columns['the Value'])
+
+        # Validate basic mv information
+        self.assertEquals(mv.keyspace_name, self.keyspace_name)
+        self.assertEquals(mv.name, "mv1")
+        self.assertEquals(mv.base_table_name, "t1")
+        self.assertFalse(mv.include_all_columns)
+
+        # Validate that all columns are preset and correct
+        mv_columns = list(mv.columns.values())
+        self.assertEquals(len(mv_columns), 3)
+
+        theKey_column = mv_columns[0]
+        self.assertIsNotNone(theKey_column)
+        self.assertEquals(theKey_column.name, 'theKey')
+        self.assertEquals(theKey_column, mv.partition_key[0])
+
+        cluster_column = mv_columns[1]
+        self.assertIsNotNone(cluster_column)
+        self.assertEquals(cluster_column.name, 'the;Clustering')
+        self.assertEquals(cluster_column.name, mv.clustering_key[0].name)
+        self.assertEquals(cluster_column.table, mv.clustering_key[0].table)
+        self.assertEquals(cluster_column.index, mv.clustering_key[0].index)
+        self.assertEquals(cluster_column.is_static, mv.clustering_key[0].is_static)
+        self.assertEquals(cluster_column.is_reversed, mv.clustering_key[0].is_reversed)
+
+        value_column = mv_columns[2]
+        self.assertIsNotNone(value_column)
+        self.assertEquals(value_column.name, 'the Value')

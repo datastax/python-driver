@@ -18,15 +18,17 @@ except ImportError:
     import unittest  # noqa
 
 from datetime import datetime
+import math
 import six
 
 from cassandra import InvalidRequest
 from cassandra.cluster import Cluster
+from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.cqltypes import Int32Type, EMPTY
 from cassandra.query import dict_factory, ordered_dict_factory
 from cassandra.util import sortedset
 
-from tests.integration import get_server_versions, use_singledc, PROTOCOL_VERSION, execute_until_pass
+from tests.integration import get_server_versions, use_singledc, PROTOCOL_VERSION, execute_until_pass, notprotocolv1
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, COLLECTION_TYPES, \
     get_sample, get_collection_sample
 
@@ -526,11 +528,11 @@ class TypeTests(unittest.TestCase):
 
         # create list values
         for datatype in PRIMITIVE_DATATYPES:
-            values.append('v_{} frozen<tuple<list<{}>>>'.format(len(values), datatype))
+            values.append('v_{0} frozen<tuple<list<{1}>>>'.format(len(values), datatype))
 
         # create set values
         for datatype in PRIMITIVE_DATATYPES:
-            values.append('v_{} frozen<tuple<set<{}>>>'.format(len(values), datatype))
+            values.append('v_{0} frozen<tuple<set<{1}>>>'.format(len(values), datatype))
 
         # create map values
         for datatype in PRIMITIVE_DATATYPES:
@@ -538,7 +540,7 @@ class TypeTests(unittest.TestCase):
             if datatype == 'blob':
                 # unhashable type: 'bytearray'
                 datatype_1 = 'ascii'
-            values.append('v_{} frozen<tuple<map<{}, {}>>>'.format(len(values), datatype_1, datatype_2))
+            values.append('v_{0} frozen<tuple<map<{1}, {2}>>>'.format(len(values), datatype_1, datatype_2))
 
         # make sure we're testing all non primitive data types in the future
         if set(COLLECTION_TYPES) != set(['tuple', 'list', 'map', 'set']):
@@ -703,3 +705,44 @@ class TypeTests(unittest.TestCase):
         result = s.execute("SELECT * FROM composites WHERE a = 0")[0]
         self.assertEqual(0, result.a)
         self.assertEqual(('abc',), result.b)
+
+    @notprotocolv1
+    def test_special_float_cql_encoding(self):
+        """
+        Test to insure that Infinity -Infinity and NaN are supported by the python driver.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-282
+        @expected_result nan, inf and -inf can be inserted and selected correctly.
+
+        @test_category data_types
+        """
+        s = self.session
+
+        s.execute("""
+            CREATE TABLE float_cql_encoding (
+                f float PRIMARY KEY,
+                d double
+            )""")
+        items = (float('nan'), float('inf'), float('-inf'))
+
+        def verify_insert_select(ins_statement, sel_statement):
+            execute_concurrent_with_args(s, ins_statement, ((f, f) for f in items))
+            for f in items:
+                row = s.execute(sel_statement, (f,))[0]
+                if math.isnan(f):
+                    self.assertTrue(math.isnan(row.f))
+                    self.assertTrue(math.isnan(row.d))
+                else:
+                    self.assertEqual(row.f, f)
+                    self.assertEqual(row.d, f)
+
+        # cql encoding
+        verify_insert_select('INSERT INTO float_cql_encoding (f, d) VALUES (%s, %s)',
+                             'SELECT * FROM float_cql_encoding WHERE f=%s')
+
+        s.execute("TRUNCATE float_cql_encoding")
+
+        # prepared binding
+        verify_insert_select(s.prepare('INSERT INTO float_cql_encoding (f, d) VALUES (?, ?)'),
+                             s.prepare('SELECT * FROM float_cql_encoding WHERE f=?'))

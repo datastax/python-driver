@@ -680,11 +680,11 @@ class ResultMessage(_MessageType):
             ks = read_string(f)
             udt_name = read_string(f)
             num_fields = read_short(f)
-            names_and_types = tuple((read_string(f), cls.read_type(f, user_type_map))
-                                    for _ in range(num_fields))
-            mapped_class = user_type_map.get(ks, {}).get(udt_name)
-            typeclass = typeclass.make_udt_class(
-                ks, udt_name, names_and_types, mapped_class)
+            names, types = zip(*((read_string(f), cls.read_type(f, user_type_map))
+                                 for _ in range(num_fields)))
+            specialized_type = typeclass.make_udt_class(ks, udt_name, names, types)
+            specialized_type.mapped_class = user_type_map.get(ks, {}).get(udt_name)
+            typeclass = specialized_type
         elif typeclass == CUSTOM_TYPE:
             classname = read_string(f)
             typeclass = lookup_casstype(classname)
@@ -1000,6 +1000,7 @@ class ProtocolHandler(object):
 
         return msg
 
+_RESULT_SEQUENCE_TYPES = (list, tuple)  # types retuned by ResultMessages
 
 def cython_protocol_handler(colparser):
     """
@@ -1045,6 +1046,9 @@ def cython_protocol_handler(colparser):
 if HAVE_CYTHON:
     from cassandra.obj_parser import ListParser, LazyParser
     ProtocolHandler = cython_protocol_handler(ListParser())
+
+    lazy_parser = LazyParser()
+    _RESULT_SEQUENCE_TYPES += (lazy_parser.get_cython_generator_type(),)
     LazyProtocolHandler = cython_protocol_handler(LazyParser())
 else:
     # Use Python-based ProtocolHandler

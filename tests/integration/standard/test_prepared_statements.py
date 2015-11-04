@@ -173,7 +173,7 @@ class PreparedStatementTests(unittest.TestCase):
             self.assertIsInstance(prepared, PreparedStatement)
             self.assertRaises(ValueError, prepared.bind, (1, 2))
 
-    def test_too_many_bind_values_dicts(self):
+    def test_imprecise_bind_values_dicts(self):
         """
         Ensure an error is thrown when attempting to bind the wrong values
         with dict bindings
@@ -189,16 +189,16 @@ class PreparedStatementTests(unittest.TestCase):
 
         self.assertIsInstance(prepared, PreparedStatement)
 
-        # too many values
-        self.assertRaises(ValueError, prepared.bind, {'k': 1, 'v': 2, 'v2': 3})
+        # too many values is ok - others are ignored
+        prepared.bind({'k': 1, 'v': 2, 'v2': 3})
 
         # right number, but one does not belong
         if PROTOCOL_VERSION < 4:
             # pre v4, the driver bails with key error when 'v' is found missing
             self.assertRaises(KeyError, prepared.bind, {'k': 1, 'v2': 3})
         else:
-            # post v4, the driver uses UNSET_VALUE for 'v' and bails when 'v2' is unbound
-            self.assertRaises(ValueError, prepared.bind, {'k': 1, 'v2': 3})
+            # post v4, the driver uses UNSET_VALUE for 'v' and 'v2' is ignored
+            prepared.bind({'k': 1, 'v2': 3})
 
         # also catch too few variables with dicts
         self.assertIsInstance(prepared, PreparedStatement)

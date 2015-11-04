@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from bisect import bisect_right
-from collections import defaultdict
+from collections import defaultdict, Mapping
 from hashlib import md5
 from itertools import islice, cycle
 import json
@@ -35,7 +35,7 @@ import cassandra.cqltypes as types
 from cassandra.encoder import Encoder
 from cassandra.marshal import varint_unpack
 from cassandra.protocol import QueryMessage
-from cassandra.query import dict_factory
+from cassandra.query import dict_factory, bind_params
 from cassandra.util import OrderedDict
 
 log = logging.getLogger(__name__)
@@ -78,6 +78,8 @@ cql_keywords_reserved = cql_keywords - cql_keywords_unreserved
 """
 Set of reserved keywords in CQL.
 """
+
+_encoder = Encoder()
 
 
 class Metadata(object):
@@ -185,7 +187,6 @@ class Metadata(object):
             # return one or the other based on the query results.
             # Here we deal with that.
             if isinstance(meta, TableMetadata):
-                meta.keyspace = keyspace_meta  # temporary while TableMetadata.keyspace is deprecated
                 keyspace_meta._add_table_metadata(meta)
             else:
                 keyspace_meta._add_view_metadata(meta)
@@ -633,10 +634,10 @@ class KeyspaceMetadata(object):
         Returns a CQL query string that can be used to recreate the entire keyspace,
         including user-defined types and tables.
         """
-        cql = "\n\n".join([self.as_cql_query()]
+        cql = "\n\n".join([self.as_cql_query() + ';']
                          + self.user_type_strings()
-                         + [f.as_cql_query(True) for f in self.functions.values()]
-                         + [a.as_cql_query(True) for a in self.aggregates.values()]
+                         + [f.export_as_string() for f in self.functions.values()]
+                         + [a.export_as_string() for a in self.aggregates.values()]
                          + [t.export_as_string() for t in self.tables.values()])
         if self._exc_info:
             import traceback
@@ -656,30 +657,43 @@ class KeyspaceMetadata(object):
         ret = "CREATE KEYSPACE %s WITH replication = %s " % (
             protect_name(self.name),
             self.replication_strategy.export_for_schema())
-        return ret + (' AND durable_writes = %s;' % ("true" if self.durable_writes else "false"))
+        return ret + (' AND durable_writes = %s' % ("true" if self.durable_writes else "false"))
 
     def user_type_strings(self):
         user_type_strings = []
-        types = self.user_types.copy()
-        keys = sorted(types.keys())
+        user_types = self.user_types.copy()
+        keys = sorted(user_types.keys())
         for k in keys:
-            if k in types:
-                self.resolve_user_types(k, types, user_type_strings)
+            if k in user_types:
+                self.resolve_user_types(k, user_types, user_type_strings)
         return user_type_strings
 
-    def resolve_user_types(self, key, types, user_type_strings):
-        user_type = types.pop(key)
-        for field_type in user_type.field_types:
-            if field_type.cassname == 'UserType' and field_type.typename in types:
-                self.resolve_user_types(field_type.typename, types, user_type_strings)
-        user_type_strings.append(user_type.as_cql_query(formatted=True))
+    def resolve_user_types(self, key, user_types, user_type_strings):
+        user_type = user_types.pop(key)
+        for type_name in user_type.field_types:
+            for sub_type in types.cql_types_from_string(type_name):
+                if sub_type in user_types:
+                    self.resolve_user_types(sub_type, user_types, user_type_strings)
+        user_type_strings.append(user_type.export_as_string())
 
     def _add_table_metadata(self, table_metadata):
-        self._drop_table_metadata(table_metadata.name)
+        old_indexes = {}
+        old_meta = self.tables.get(table_metadata.name, None)
+        if old_meta:
+            # views are not queried with table, so they must be transferred to new
+            table_metadata.views = old_meta.views
+            # indexes will be updated with what is on the new metadata
+            old_indexes = old_meta.indexes
 
-        self.tables[table_metadata.name] = table_metadata
+        # note the intentional order of add before remove
+        # this makes sure the maps are never absent something that existed before this update
         for index_name, index_metadata in six.iteritems(table_metadata.indexes):
             self.indexes[index_name] = index_metadata
+
+        for index_name in (n for n in old_indexes if n not in table_metadata.indexes):
+            self.indexes.pop(index_name, None)
+
+        self.tables[table_metadata.name] = table_metadata
 
     def _drop_table_metadata(self, table_name):
         table_meta = self.tables.pop(table_name, None)
@@ -738,8 +752,9 @@ class UserType(object):
     def __init__(self, keyspace, name, field_names, field_types):
         self.keyspace = keyspace
         self.name = name
-        self.field_names = field_names
-        self.field_types = field_types
+        # non-frozen collections can return None
+        self.field_names = field_names or []
+        self.field_types = field_types or []
 
     def as_cql_query(self, formatted=False):
         """
@@ -761,11 +776,14 @@ class UserType(object):
 
         fields = []
         for field_name, field_type in zip(self.field_names, self.field_types):
-            fields.append("%s %s" % (protect_name(field_name), field_type.cql_parameterized_type()))
+            fields.append("%s %s" % (protect_name(field_name), field_type))
 
         ret += field_join.join("%s%s" % (padding, field) for field in fields)
-        ret += "\n);" if formatted else ");"
+        ret += "\n)" if formatted else ")"
         return ret
+
+    def export_as_string(self):
+        return self.as_cql_query(formatted=True) + ';'
 
 
 class Aggregate(object):
@@ -787,7 +805,7 @@ class Aggregate(object):
     The name of this aggregate
     """
 
-    type_signature = None
+    argument_types = None
     """
     An ordered list of the types for each argument to the aggregate
     """
@@ -817,11 +835,11 @@ class Aggregate(object):
     Type of the aggregate state
     """
 
-    def __init__(self, keyspace, name, type_signature, state_func,
+    def __init__(self, keyspace, name, argument_types, state_func,
                  state_type, final_func, initial_condition, return_type):
         self.keyspace = keyspace
         self.name = name
-        self.type_signature = type_signature
+        self.argument_types = argument_types
         self.state_func = state_func
         self.state_type = state_type
         self.final_func = final_func
@@ -834,26 +852,28 @@ class Aggregate(object):
         If `formatted` is set to :const:`True`, extra whitespace will
         be added to make the query more readable.
         """
-        sep = '\n' if formatted else ' '
+        sep = '\n    ' if formatted else ' '
         keyspace = protect_name(self.keyspace)
         name = protect_name(self.name)
-        type_list = ', '.join(self.type_signature)
+        type_list = ', '.join(self.argument_types)
         state_func = protect_name(self.state_func)
-        state_type = self.state_type.cql_parameterized_type()
+        state_type = self.state_type
 
         ret = "CREATE AGGREGATE %(keyspace)s.%(name)s(%(type_list)s)%(sep)s" \
               "SFUNC %(state_func)s%(sep)s" \
               "STYPE %(state_type)s" % locals()
 
         ret += ''.join((sep, 'FINALFUNC ', protect_name(self.final_func))) if self.final_func else ''
-        ret += ''.join((sep, 'INITCOND ', Encoder().cql_encode_all_types(self.initial_condition)))\
-               if self.initial_condition is not None else ''
+        ret += ''.join((sep, 'INITCOND ', self.initial_condition)) if self.initial_condition is not None else ''
 
         return ret
 
+    def export_as_string(self):
+        return self.as_cql_query(formatted=True) + ';'
+
     @property
     def signature(self):
-        return SignatureDescriptor.format_signature(self.name, self.type_signature)
+        return SignatureDescriptor.format_signature(self.name, self.argument_types)
 
 
 class Function(object):
@@ -875,7 +895,7 @@ class Function(object):
     The name of this function
     """
 
-    type_signature = None
+    argument_types = None
     """
     An ordered list of the types for each argument to the function
     """
@@ -906,12 +926,14 @@ class Function(object):
     (convenience function to avoid handling nulls explicitly if the result will just be null)
     """
 
-    def __init__(self, keyspace, name, type_signature, argument_names,
+    def __init__(self, keyspace, name, argument_types, argument_names,
                  return_type, language, body, called_on_null_input):
         self.keyspace = keyspace
         self.name = name
-        self.type_signature = type_signature
-        self.argument_names = argument_names
+        self.argument_types = argument_types
+        # argument_types (frozen<list<>>) will always be a list
+        # argument_name is not frozen in C* < 3.0 and may return None
+        self.argument_names = argument_names or []
         self.return_type = return_type
         self.language = language
         self.body = body
@@ -923,12 +945,12 @@ class Function(object):
         If `formatted` is set to :const:`True`, extra whitespace will
         be added to make the query more readable.
         """
-        sep = '\n' if formatted else ' '
+        sep = '\n    ' if formatted else ' '
         keyspace = protect_name(self.keyspace)
         name = protect_name(self.name)
         arg_list = ', '.join(["%s %s" % (protect_name(n), t)
-                             for n, t in zip(self.argument_names, self.type_signature)])
-        typ = self.return_type.cql_parameterized_type()
+                             for n, t in zip(self.argument_names, self.argument_types)])
+        typ = self.return_type
         lang = self.language
         body = self.body
         on_null = "CALLED" if self.called_on_null_input else "RETURNS NULL"
@@ -937,24 +959,19 @@ class Function(object):
                "%(on_null)s ON NULL INPUT%(sep)s" \
                "RETURNS %(typ)s%(sep)s" \
                "LANGUAGE %(lang)s%(sep)s" \
-               "AS $$%(body)s$$;" % locals()
+               "AS $$%(body)s$$" % locals()
+
+    def export_as_string(self):
+        return self.as_cql_query(formatted=True) + ';'
 
     @property
     def signature(self):
-        return SignatureDescriptor.format_signature(self.name, self.type_signature)
+        return SignatureDescriptor.format_signature(self.name, self.argument_types)
 
 
 class TableMetadata(object):
     """
     A representation of the schema for a single table.
-    """
-
-    keyspace = None
-    """
-    An instance of :class:`~.KeyspaceMetadata`.
-
-    .. deprecated:: 2.7.0
-
     """
 
     keyspace_name = None
@@ -1067,18 +1084,18 @@ class TableMetadata(object):
                   (self.keyspace_name, self.name)
             for line in traceback.format_exception(*self._exc_info):
                 ret += line
-            ret += "\nApproximate structure, for reference:\n(this should not be used to reproduce this schema)\n\n%s\n*/" % self.all_as_cql()
+            ret += "\nApproximate structure, for reference:\n(this should not be used to reproduce this schema)\n\n%s\n*/" % self._all_as_cql()
         elif not self.is_cql_compatible:
             # If we can't produce this table with CQL, comment inline
             ret = "/*\nWarning: Table %s.%s omitted because it has constructs not compatible with CQL (was created via legacy API).\n" % \
                   (self.keyspace_name, self.name)
-            ret += "\nApproximate structure, for reference:\n(this should not be used to reproduce this schema)\n\n%s\n*/" % self.all_as_cql()
+            ret += "\nApproximate structure, for reference:\n(this should not be used to reproduce this schema)\n\n%s\n*/" % self._all_as_cql()
         else:
-            ret = self.all_as_cql()
+            ret = self._all_as_cql()
 
         return ret
 
-    def all_as_cql(self):
+    def _all_as_cql(self):
         ret = self.as_cql_query(formatted=True)
         ret += ";"
 
@@ -1113,7 +1130,7 @@ class TableMetadata(object):
 
         columns = []
         for col in self.columns.values():
-            columns.append("%s %s%s" % (protect_name(col.name), col.typestring, ' static' if col.is_static else ''))
+            columns.append("%s %s%s" % (protect_name(col.name), col.cql_type, ' static' if col.is_static else ''))
 
         if len(self.partition_key) == 1 and not self.clustering_key:
             columns[0] += " PRIMARY KEY"
@@ -1246,12 +1263,12 @@ class ColumnMetadata(object):
     name = None
     """ The string name of this column. """
 
-    data_type = None
+    cql_type = None
     """
-    The data type for the column in the form of an instance of one of
-    the type classes in :mod:`cassandra.cqltypes`.
+    The CQL type for the column.
     """
 
+    # TODO: probably remove this in favor of the table level mapping
     index = None
     """
     If an index exists on this column, this is an instance of
@@ -1269,91 +1286,68 @@ class ColumnMetadata(object):
     If this column is reversed (DESC) as in clustering order
     """
 
-    def __init__(self, table_metadata, column_name, data_type, index_metadata=None, is_static=False, is_reversed=False):
+    _cass_type = None
+
+    def __init__(self, table_metadata, column_name, cql_type, is_static=False, is_reversed=False):
         self.table = table_metadata
         self.name = column_name
-        self.data_type = data_type
-        self.index = index_metadata
+        self.cql_type = cql_type
         self.is_static = is_static
         self.is_reversed = is_reversed
 
-    @property
-    def typestring(self):
-        """
-        A string representation of the type for this column, such as "varchar"
-        or "map<string, int>".
-        """
-        if issubclass(self.data_type, types.ReversedType):
-            return self.data_type.subtypes[0].cql_parameterized_type()
-        else:
-            return self.data_type.cql_parameterized_type()
-
     def __str__(self):
-        return "%s %s" % (self.name, self.data_type)
+        return "%s %s" % (self.name, self.cql_type)
 
 
 class IndexMetadata(object):
     """
     A representation of a secondary index on a column.
     """
+    keyspace_name = None
+    """ A string name of the keyspace. """
 
-    column = None
-    """
-    The column (:class:`.ColumnMetadata`) this index is on.
-    """
+    table_name = None
+    """ A string name of the table this index is on. """
 
     name = None
     """ A string name for the index. """
 
-    index_type = None
-    """ A string representing the type of index. """
+    kind = None
+    """ A string representing the kind of index (COMPOSITE, CUSTOM,...). """
 
     index_options = {}
     """ A dict of index options. """
 
-    def __init__(self, column_metadata, index_name=None, index_type=None, index_options={}):
-        self.column = column_metadata
+    def __init__(self, keyspace_name, table_name, index_name, kind, index_options):
+        self.keyspace_name = keyspace_name
+        self.table_name = table_name
         self.name = index_name
-        self.index_type = index_type
+        self.kind = kind
         self.index_options = index_options
 
     def as_cql_query(self):
         """
         Returns a CQL query that can be used to recreate this index.
         """
-        table = self.column.table
-        if self.index_type != "CUSTOM":
-            index_target = protect_name(self.column.name)
-            if self.index_options is not None:
-                option_keys = self.index_options.keys()
-                if "index_keys" in option_keys:
-                    index_target = 'keys(%s)' % (index_target,)
-                elif "index_values" in option_keys:
-                    # don't use any "function" for collection values
-                    pass
-                else:
-                    # it might be a "full" index on a frozen collection, but
-                    # we need to check the data type to verify that, because
-                    # there is no special index option for full-collection
-                    # indexes.
-                    data_type = self.column.data_type
-                    collection_types = ('map', 'set', 'list')
-                    if data_type.typename == "frozen" and data_type.subtypes[0].typename in collection_types:
-                        # no index option for full-collection index
-                        index_target = 'full(%s)' % (index_target,)
-
+        options = dict(self.index_options)
+        index_target = options.pop("target")
+        if self.kind != "CUSTOM":
             return "CREATE INDEX %s ON %s.%s (%s)" % (
                 self.name,  # Cassandra doesn't like quoted index names for some reason
-                protect_name(table.keyspace.name),
-                protect_name(table.name),
+                protect_name(self.keyspace_name),
+                protect_name(self.table_name),
                 index_target)
         else:
-            return "CREATE CUSTOM INDEX %s ON %s.%s (%s) USING '%s'" % (
+            class_name = options.pop("class_name")
+            ret = "CREATE CUSTOM INDEX %s ON %s.%s (%s) USING '%s'" % (
                 self.name,  # Cassandra doesn't like quoted index names for some reason
-                protect_name(table.keyspace.name),
-                protect_name(table.name),
-                protect_name(self.column.name),
-                self.index_options["class_name"])
+                protect_name(self.keyspace_name),
+                protect_name(self.table_name),
+                index_target,
+                class_name)
+            if options:
+                ret += " WITH OPTIONS = %s" % Encoder().cql_encode_all_types(options)
+            return ret
 
     def export_as_string(self):
         """
@@ -1552,11 +1546,14 @@ class TriggerMetadata(object):
     def as_cql_query(self):
         ret = "CREATE TRIGGER %s ON %s.%s USING %s" % (
             protect_name(self.name),
-            protect_name(self.table.keyspace.name),
+            protect_name(self.table.keyspace_name),
             protect_name(self.table.name),
             protect_value(self.options['class'])
         )
         return ret
+
+    def export_as_string(self):
+        return self.as_cql_query() + ';'
 
 
 class _SchemaParser(object):
@@ -1589,6 +1586,8 @@ class SchemaParserV22(_SchemaParser):
     _SELECT_AGGREGATES = "SELECT * FROM system.schema_aggregates"
 
     _table_name_col = 'columnfamily_name'
+
+    _function_agg_arument_type_col = 'signature'
 
     recognized_table_options = (
         "comment",
@@ -1640,7 +1639,6 @@ class SchemaParserV22(_SchemaParser):
             try:
                 for table_row in self.keyspace_table_rows.get(keyspace_meta.name, []):
                     table_meta = self._build_table_metadata(table_row)
-                    table_meta.keyspace = keyspace_meta  # temporary while TableMetadata.keyspace is deprecated
                     keyspace_meta._add_table_metadata(table_meta)
 
                 for usertype_row in self.keyspace_type_rows.get(keyspace_meta.name, []):
@@ -1662,7 +1660,7 @@ class SchemaParserV22(_SchemaParser):
 
     def get_table(self, keyspaces, keyspace, table):
         cl = ConsistencyLevel.ONE
-        where_clause = " WHERE keyspace_name = '%s' AND %s = '%s'" % (keyspace, self._table_name_col, table)
+        where_clause = bind_params(" WHERE keyspace_name = %%s AND %s = %%s" % (self._table_name_col,), (keyspace, table), _encoder)
         cf_query = QueryMessage(query=self._SELECT_COLUMN_FAMILIES + where_clause, consistency_level=cl)
         col_query = QueryMessage(query=self._SELECT_COLUMNS + where_clause, consistency_level=cl)
         triggers_query = QueryMessage(query=self._SELECT_TRIGGERS + where_clause, consistency_level=cl)
@@ -1681,21 +1679,22 @@ class SchemaParserV22(_SchemaParser):
             return self._build_table_metadata(table_result[0], col_result, triggers_result)
 
     def get_type(self, keyspaces, keyspace, type):
-        where_clause = " WHERE keyspace_name = '%s' AND type_name = '%s'" % (keyspace, type)
+        where_clause = bind_params(" WHERE keyspace_name = %s AND type_name = %s", (keyspace, type), _encoder)
         return self._query_build_row(self._SELECT_TYPES + where_clause, self._build_user_type)
 
     def get_function(self, keyspaces, keyspace, function):
-        where_clause = " WHERE keyspace_name = '%s' AND function_name = '%s' AND signature = [%s]" \
-                       % (keyspace, function.name, ','.join("'%s'" % t for t in function.type_signature))
+        where_clause = bind_params(" WHERE keyspace_name = %%s AND function_name = %%s AND %s = %%s" % (self._function_agg_arument_type_col,),
+                                   (keyspace, function.name, function.argument_types), _encoder)
         return self._query_build_row(self._SELECT_FUNCTIONS + where_clause, self._build_function)
 
     def get_aggregate(self, keyspaces, keyspace, aggregate):
-        where_clause = " WHERE keyspace_name = '%s' AND aggregate_name = '%s' AND signature = [%s]" \
-                       % (keyspace, aggregate.name, ','.join("'%s'" % t for t in aggregate.type_signature))
+        where_clause = bind_params(" WHERE keyspace_name = %%s AND aggregate_name = %%s AND %s = %%s" % (self._function_agg_arument_type_col,),
+                                   (keyspace, aggregate.name, aggregate.argument_types), _encoder)
+
         return self._query_build_row(self._SELECT_AGGREGATES + where_clause, self._build_aggregate)
 
     def get_keyspace(self, keyspaces, keyspace):
-        where_clause = " WHERE keyspace_name = '%s'" % (keyspace,)
+        where_clause = bind_params(" WHERE keyspace_name = %s", (keyspace,), _encoder)
         return self._query_build_row(self._SELECT_KEYSPACES + where_clause, self._build_keyspace_metadata)
 
     @classmethod
@@ -1717,27 +1716,28 @@ class SchemaParserV22(_SchemaParser):
         strategy_options = json.loads(row["strategy_options"])
         return KeyspaceMetadata(name, durable_writes, strategy_class, strategy_options)
 
-    @staticmethod
-    def _build_user_type(usertype_row):
-        type_classes = list(map(types.lookup_casstype, usertype_row['field_types']))
+    @classmethod
+    def _build_user_type(cls, usertype_row):
+        field_types = list(map(cls._schema_type_to_cql, usertype_row['field_types']))
         return UserType(usertype_row['keyspace_name'], usertype_row['type_name'],
-                        usertype_row['field_names'], type_classes)
+                        usertype_row['field_names'], field_types)
 
-    @staticmethod
-    def _build_function(function_row):
-        return_type = types.lookup_casstype(function_row['return_type'])
+    @classmethod
+    def _build_function(cls, function_row):
+        return_type = cls._schema_type_to_cql(function_row['return_type'])
         return Function(function_row['keyspace_name'], function_row['function_name'],
-                        function_row['signature'], function_row['argument_names'],
+                        function_row[cls._function_agg_arument_type_col], function_row['argument_names'],
                         return_type, function_row['language'], function_row['body'],
                         function_row['called_on_null_input'])
 
-    @staticmethod
-    def _build_aggregate(aggregate_row):
-        state_type = types.lookup_casstype(aggregate_row['state_type'])
+    @classmethod
+    def _build_aggregate(cls, aggregate_row):
+        cass_state_type = types.lookup_casstype(aggregate_row['state_type'])
         initial_condition = aggregate_row['initcond']
         if initial_condition is not None:
-            initial_condition = state_type.deserialize(initial_condition, 3)
-        return_type = types.lookup_casstype(aggregate_row['return_type'])
+            initial_condition = _encoder.cql_encode_all_types(cass_state_type.deserialize(initial_condition, 3))
+        state_type = _cql_from_cass_type(cass_state_type)
+        return_type = cls._schema_type_to_cql(aggregate_row['return_type'])
         return Aggregate(aggregate_row['keyspace_name'], aggregate_row['aggregate_name'],
                          aggregate_row['signature'], aggregate_row['state_func'], state_type,
                          aggregate_row['final_func'], initial_condition, return_type)
@@ -1840,7 +1840,7 @@ class SchemaParserV22(_SchemaParser):
                 else:
                     column_name = "key%d" % i
 
-                col = ColumnMetadata(table_meta, column_name, col_type)
+                col = ColumnMetadata(table_meta, column_name, col_type.cql_parameterized_type())
                 table_meta.columns[column_name] = col
                 table_meta.partition_key.append(col)
 
@@ -1852,7 +1852,9 @@ class SchemaParserV22(_SchemaParser):
                     column_name = "column%d" % i
 
                 data_type = column_name_types[i]
-                col = ColumnMetadata(table_meta, column_name, data_type, is_reversed=types.is_reversed_casstype(data_type))
+                cql_type = _cql_from_cass_type(data_type)
+                is_reversed = types.is_reversed_casstype(data_type)
+                col = ColumnMetadata(table_meta, column_name, cql_type, is_reversed=is_reversed)
                 table_meta.columns[column_name] = col
                 table_meta.clustering_key.append(col)
 
@@ -1883,11 +1885,12 @@ class SchemaParserV22(_SchemaParser):
             # other normal columns
             for col_row in col_rows:
                 column_meta = self._build_column_metadata(table_meta, col_row)
-                table_meta.columns[column_meta.name] = column_meta
-                index_meta = self._build_index_metadata(column_meta, col_row)
-                column_meta.index = index_meta
-                if index_meta:
-                    table_meta.indexes[index_meta.name] = index_meta
+                if column_meta.name:
+                    table_meta.columns[column_meta.name] = column_meta
+                    index_meta = self._build_index_metadata(column_meta, col_row)
+                    column_meta.index = index_meta
+                    if index_meta:
+                        table_meta.indexes[index_meta.name] = index_meta
 
             for trigger_row in trigger_rows:
                 trigger_meta = self._build_trigger_metadata(table_meta, trigger_row)
@@ -1916,25 +1919,47 @@ class SchemaParserV22(_SchemaParser):
 
         return options
 
-    @staticmethod
-    def _build_column_metadata(table_metadata, row):
+    @classmethod
+    def _build_column_metadata(cls, table_metadata, row):
         name = row["column_name"]
-        data_type = types.lookup_casstype(row["validator"])
+        type_string = row["validator"]
+        data_type = types.lookup_casstype(type_string)
+        cql_type = _cql_from_cass_type(data_type)
         is_static = row.get("type", None) == "static"
         is_reversed = types.is_reversed_casstype(data_type)
-        column_meta = ColumnMetadata(table_metadata, name, data_type, is_static=is_static, is_reversed=is_reversed)
+        column_meta = ColumnMetadata(table_metadata, name, cql_type, is_static, is_reversed)
+        column_meta._cass_type = data_type
         return column_meta
 
     @staticmethod
     def _build_index_metadata(column_metadata, row):
         index_name = row.get("index_name")
-        index_type = row.get("index_type")
-        if index_name or index_type:
+        kind = row.get("index_type")
+        if index_name or kind:
             options = row.get("index_options")
-            index_options = json.loads(options) if options else None
-            return IndexMetadata(column_metadata, index_name, index_type, index_options)
-        else:
-            return None
+            options = json.loads(options) if options else {}
+            options = options or {}  # if the json parsed to None, init empty dict
+
+            # generate a CQL index identity string
+            target = protect_name(column_metadata.name)
+            if kind != "CUSTOM":
+                if "index_keys" in options:
+                    target = 'keys(%s)' % (target,)
+                elif "index_values" in options:
+                    # don't use any "function" for collection values
+                    pass
+                else:
+                    # it might be a "full" index on a frozen collection, but
+                    # we need to check the data type to verify that, because
+                    # there is no special index option for full-collection
+                    # indexes.
+                    data_type = column_metadata._cass_type
+                    collection_types = ('map', 'set', 'list')
+                    if data_type.typename == "frozen" and data_type.subtypes[0].typename in collection_types:
+                        # no index option for full-collection index
+                        target = 'full(%s)' % (target,)
+            options['target'] = target
+            return IndexMetadata(column_metadata.table.keyspace_name, column_metadata.table.name, index_name, kind, options)
 
     @staticmethod
     def _build_trigger_metadata(table_metadata, row):
@@ -2037,6 +2062,11 @@ class SchemaParserV22(_SchemaParser):
             cfname = row[self._table_name_col]
             m[ksname][cfname].append(row)
 
+    @staticmethod
+    def _schema_type_to_cql(type_string):
+        cass_type = types.lookup_casstype(type_string)
+        return _cql_from_cass_type(cass_type)
+
 
 class SchemaParserV3(SchemaParserV22):
     _SELECT_KEYSPACES = "SELECT * FROM system_schema.keyspaces"
@@ -2050,6 +2080,8 @@ class SchemaParserV3(SchemaParserV22):
     _SELECT_VIEWS = "SELECT * FROM system_schema.views"
 
     _table_name_col = 'table_name'
+
+    _function_agg_arument_type_col = 'argument_types'
 
     recognized_table_options = (
         'bloom_filter_fp_chance',
@@ -2082,14 +2114,15 @@ class SchemaParserV3(SchemaParserV22):
 
     def get_table(self, keyspaces, keyspace, table):
         cl = ConsistencyLevel.ONE
-        where_clause = " WHERE keyspace_name = '%s' AND %s = '%s'" % (keyspace, self._table_name_col, table)
+        where_clause = bind_params(" WHERE keyspace_name = %%s AND %s = %%s" % (self._table_name_col), (keyspace, table), _encoder)
         cf_query = QueryMessage(query=self._SELECT_TABLES + where_clause, consistency_level=cl)
         col_query = QueryMessage(query=self._SELECT_COLUMNS + where_clause, consistency_level=cl)
         indexes_query = QueryMessage(query=self._SELECT_INDEXES + where_clause, consistency_level=cl)
         triggers_query = QueryMessage(query=self._SELECT_TRIGGERS + where_clause, consistency_level=cl)
 
         # in protocol v4 we don't know if this event is a view or a table, so we look for both
-        view_query = QueryMessage(query=self._SELECT_VIEWS + " WHERE keyspace_name = '%s' AND view_name = '%s'" % (keyspace, table),
+        where_clause = bind_params(" WHERE keyspace_name = %s AND view_name = %s", (keyspace, table), _encoder)
+        view_query = QueryMessage(query=self._SELECT_VIEWS + where_clause,
                                   consistency_level=cl)
         (cf_success, cf_result), (col_success, col_result), (indexes_sucess, indexes_result), \
         (triggers_success, triggers_result), (view_success, view_result) \
@@ -2114,6 +2147,12 @@ class SchemaParserV3(SchemaParserV22):
         strategy_class = strategy_options.pop("class")
         return KeyspaceMetadata(name, durable_writes, strategy_class, strategy_options)
 
+    @staticmethod
+    def _build_aggregate(aggregate_row):
+        return Aggregate(aggregate_row['keyspace_name'], aggregate_row['aggregate_name'],
+                         aggregate_row['argument_types'], aggregate_row['state_func'], aggregate_row['state_type'],
+                         aggregate_row['final_func'], aggregate_row['initcond'], aggregate_row['return_type'])
+
     def _build_table_metadata(self, row, col_rows=None, trigger_rows=None, index_rows=None):
         keyspace_name = row["keyspace_name"]
         table_name = row[self._table_name_col]
@@ -2129,12 +2168,13 @@ class SchemaParserV3(SchemaParserV22):
             if flags:
                 compact_static = False
                 table_meta.is_compact_storage = 'dense' in flags or 'super' in flags or 'compound' not in flags
+                is_dense = 'dense' in flags
             else:
-                # example: create table t (a int, b int, c int, primary key((a,b))) with compact storage
                 compact_static = True
                 table_meta.is_compact_storage = True
+                is_dense = False
 
-            self._build_table_columns(table_meta, col_rows, compact_static)
+            self._build_table_columns(table_meta, col_rows, compact_static, is_dense)
 
             for trigger_row in trigger_rows:
                 trigger_meta = self._build_trigger_metadata(table_meta, trigger_row)
@@ -2154,7 +2194,7 @@ class SchemaParserV3(SchemaParserV22):
         """ Setup the mostly-non-schema table options, like caching settings """
         return dict((o, row.get(o)) for o in self.recognized_table_options if o in row)
 
-    def _build_table_columns(self, meta, col_rows, compact_static=False):
+    def _build_table_columns(self, meta, col_rows, compact_static=False, is_dense=False):
         # partition key
         partition_rows = [r for r in col_rows
                           if r.get('kind', None) == "partition_key"]
@@ -2181,12 +2221,15 @@ class SchemaParserV3(SchemaParserV22):
         for col_row in (r for r in col_rows
                         if r.get('kind', None) not in ('partition_key', 'clustering_key')):
             column_meta = self._build_column_metadata(meta, col_row)
-            if not compact_static or column_meta.is_static:
+            if is_dense and column_meta.cql_type == types.cql_empty_type:
+                continue
+            if compact_static and not column_meta.is_static:
                 # for compact static tables, we omit the clustering key and value, and only add the logical columns.
                 # They are marked not static so that it generates appropriate CQL
-                if compact_static:
-                    column_meta.is_static = False
-                meta.columns[column_meta.name] = column_meta
+                continue
+            if compact_static:
+                column_meta.is_static = False
+            meta.columns[column_meta.name] = column_meta
 
     def _build_view_metadata(self, row, col_rows=None):
         keyspace_name = row["keyspace_name"]
@@ -2204,10 +2247,10 @@ class SchemaParserV3(SchemaParserV22):
     @staticmethod
     def _build_column_metadata(table_metadata, row):
         name = row["column_name"]
-        data_type = types.lookup_casstype(row["type"])
+        cql_type = row["type"]
         is_static = row.get("kind", None) == "static"
         is_reversed = row["clustering_order"].upper() == "DESC"
-        column_meta = ColumnMetadata(table_metadata, name, data_type, is_static=is_static, is_reversed=is_reversed)
+        column_meta = ColumnMetadata(table_metadata, name, cql_type, is_static, is_reversed)
         return column_meta
 
     @staticmethod
@@ -2216,7 +2259,7 @@ class SchemaParserV3(SchemaParserV22):
         kind = row.get("kind")
         if index_name or kind:
             index_options = row.get("options")
-            return IndexMetadataV3(table_metadata.keyspace_name, table_metadata.name, index_name, kind, index_options)
+            return IndexMetadata(table_metadata.keyspace_name, table_metadata.name, index_name, kind, index_options)
         else:
             return None
 
@@ -2275,6 +2318,10 @@ class SchemaParserV3(SchemaParserV22):
         for row in self.views_result:
             m[row["keyspace_name"]].append(row)
 
+    @staticmethod
+    def _schema_type_to_cql(type_string):
+        return type_string
+
 
 class TableMetadataV3(TableMetadata):
     compaction_options = {}
@@ -2291,9 +2338,11 @@ class TableMetadataV3(TableMetadata):
         options_copy = dict(options_map.items())
 
         for option in cls.option_maps:
-            value = options_copy.pop(option, {})
-            params = ("'%s': '%s'" % (k, v) for k, v in value.items())
-            ret.append("%s = {%s}" % (option, ', '.join(params)))
+            value = options_copy.get(option)
+            if isinstance(value, Mapping):
+                del options_copy[option]
+                params = ("'%s': '%s'" % (k, v) for k, v in value.items())
+                ret.append("%s = {%s}" % (option, ', '.join(params)))
 
         for name, value in options_copy.items():
             if value is not None:
@@ -2302,63 +2351,6 @@ class TableMetadataV3(TableMetadata):
                 ret.append("%s = %s" % (name, protect_value(value)))
 
         return list(sorted(ret))
-
-
-class IndexMetadataV3(object):
-    """
-    A representation of a secondary index on a column.
-    """
-    keyspace_name = None
-    """ A string name of the keyspace. """
-
-    table_name = None
-    """ A string name of the table this index is on. """
-
-    name = None
-    """ A string name for the index. """
-
-    kind = None
-    """ A string representing the kind of index (COMPOSITE, CUSTOM,...). """
-
-    index_options = {}
-    """ A dict of index options. """
-
-    def __init__(self, keyspace_name, table_name, index_name, kind, index_options):
-        self.keyspace_name = keyspace_name
-        self.table_name = table_name
-        self.name = index_name
-        self.kind = kind
-        self.index_options = index_options
-
-    def as_cql_query(self):
-        """
-        Returns a CQL query that can be used to recreate this index.
-        """
-        options = dict(self.index_options)
-        index_target = options.pop("target")
-        if self.kind != "CUSTOM":
-            return "CREATE INDEX %s ON %s.%s (%s)" % (
-                self.name,  # Cassandra doesn't like quoted index names for some reason
-                protect_name(self.keyspace_name),
-                protect_name(self.table_name),
-                index_target)
-        else:
-            class_name = options.pop("class_name")
-            ret = "CREATE CUSTOM INDEX %s ON %s.%s (%s) USING '%s'" % (
-                self.name,  # Cassandra doesn't like quoted index names for some reason
-                protect_name(self.keyspace_name),
-                protect_name(self.table_name),
-                index_target,
-                class_name)
-            if options:
-                ret += " WITH OPTIONS = %s" % Encoder().cql_encode_all_types(options)
-            return ret
-
-    def export_as_string(self):
-        """
-        Returns a CQL query string that can be used to recreate this index.
-        """
-        return self.as_cql_query() + ';'
 
 
 class MaterializedViewMetadata(object):
@@ -2464,3 +2456,13 @@ def get_schema_parser(connection, timeout):
         # we could further specialize by version. Right now just refactoring the
         # multi-version parser we have as of C* 2.2.0rc1.
         return SchemaParserV22(connection, timeout)
+
+def _cql_from_cass_type(cass_type):
+    """
+    A string representation of the type for this column, such as "varchar"
+    or "map<string, int>".
+    """
+    if issubclass(cass_type, types.ReversedType):
+        return cass_type.subtypes[0].cql_parameterized_type()
+    else:
+        return cass_type.cql_parameterized_type()

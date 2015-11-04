@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests.integration import get_server_versions, use_singledc, PROTOCOL_VERSION
+from tests.integration import get_server_versions, use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCaseWFunctionTable
 
 try:
     import unittest2 as unittest
 except ImportError:
     import unittest # noqa
 
-from cassandra.cluster import Cluster
+from cassandra.cluster import Cluster, ResultSet
 from cassandra.query import tuple_factory, named_tuple_factory, dict_factory, ordered_dict_factory
 from cassandra.util import OrderedDict
 
@@ -28,51 +28,43 @@ def setup_module():
     use_singledc()
 
 
-class RowFactoryTests(unittest.TestCase):
+class RowFactoryTests(BasicSharedKeyspaceUnitTestCaseWFunctionTable):
     """
     Test different row_factories and access code
     """
-
     def setUp(self):
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        self.session = self.cluster.connect()
+        super(RowFactoryTests, self).setUp()
+        self.insert1 = '''
+            INSERT INTO {0}.{1}
+                ( k , v )
+            VALUES
+                ( 1 , 1 )
+        '''.format(self.keyspace_name, self.function_table_name)
+
+        self.insert2 = '''
+            INSERT INTO {0}.{1}
+                ( k , v )
+            VALUES
+                ( 2 , 2 )
+        '''.format(self.keyspace_name, self.function_table_name)
+
+        self.select = '''
+            SELECT * FROM {0}.{1}
+        '''.format(self.keyspace_name, self.function_table_name)
 
     def tearDown(self):
-        self.cluster.shutdown()
-
-    truncate = '''
-        TRUNCATE test3rf.test
-    '''
-
-    insert1 = '''
-        INSERT INTO test3rf.test
-            ( k , v )
-        VALUES
-            ( 1 , 1 )
-    '''
-
-    insert2 = '''
-        INSERT INTO test3rf.test
-            ( k , v )
-        VALUES
-            ( 2 , 2 )
-    '''
-
-    select = '''
-        SELECT * FROM test3rf.test
-    '''
+        self.drop_function_table()
 
     def test_tuple_factory(self):
         session = self.session
         session.row_factory = tuple_factory
 
-        session.execute(self.truncate)
         session.execute(self.insert1)
         session.execute(self.insert2)
 
         result = session.execute(self.select)
 
-        self.assertIsInstance(result, list)
+        self.assertIsInstance(result, ResultSet)
         self.assertIsInstance(result[0], tuple)
 
         for row in result:
@@ -87,13 +79,13 @@ class RowFactoryTests(unittest.TestCase):
         session = self.session
         session.row_factory = named_tuple_factory
 
-        session.execute(self.truncate)
         session.execute(self.insert1)
         session.execute(self.insert2)
 
         result = session.execute(self.select)
 
-        self.assertIsInstance(result, list)
+        self.assertIsInstance(result, ResultSet)
+        result = list(result)
 
         for row in result:
             self.assertEqual(row.k, row.v)
@@ -107,13 +99,12 @@ class RowFactoryTests(unittest.TestCase):
         session = self.session
         session.row_factory = dict_factory
 
-        session.execute(self.truncate)
         session.execute(self.insert1)
         session.execute(self.insert2)
 
         result = session.execute(self.select)
 
-        self.assertIsInstance(result, list)
+        self.assertIsInstance(result, ResultSet)
         self.assertIsInstance(result[0], dict)
 
         for row in result:
@@ -128,13 +119,12 @@ class RowFactoryTests(unittest.TestCase):
         session = self.session
         session.row_factory = ordered_dict_factory
 
-        session.execute(self.truncate)
         session.execute(self.insert1)
         session.execute(self.insert2)
 
         result = session.execute(self.select)
 
-        self.assertIsInstance(result, list)
+        self.assertIsInstance(result, ResultSet)
         self.assertIsInstance(result[0], OrderedDict)
 
         for row in result:
@@ -154,7 +144,6 @@ class NamedTupleFactoryAndNumericColNamesTests(unittest.TestCase):
     def setup_class(cls):
         cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         cls.session = cls.cluster.connect()
-
         cls._cass_version, cls._cql_version = get_server_versions()
         ddl = '''
             CREATE TABLE test1rf.table_num_col ( key blob PRIMARY KEY, "626972746864617465" blob )

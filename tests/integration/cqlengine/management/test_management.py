@@ -23,9 +23,9 @@ from cassandra.cqlengine import CACHING_ALL, CACHING_NONE
 from cassandra.cqlengine.connection import get_session, get_cluster
 from cassandra.cqlengine import CQLEngineException
 from cassandra.cqlengine import management
-from cassandra.cqlengine.management import get_fields, sync_table, drop_table
+from cassandra.cqlengine.management import _get_non_pk_field_names, _get_table_metadata, sync_table, drop_table
 from cassandra.cqlengine.models import Model
-from cassandra.cqlengine import columns, SizeTieredCompactionStrategy, LeveledCompactionStrategy
+from cassandra.cqlengine import columns
 
 from tests.integration import CASSANDRA_VERSION, PROTOCOL_VERSION
 from tests.integration.cqlengine.base import BaseCassEngTestCase
@@ -37,33 +37,20 @@ class KeyspaceManagementTest(BaseCassEngTestCase):
         cluster = get_cluster()
 
         keyspace_ss = 'test_ks_ss'
-        self.assertFalse(keyspace_ss in cluster.metadata.keyspaces)
+        self.assertNotIn(keyspace_ss, cluster.metadata.keyspaces)
         management.create_keyspace_simple(keyspace_ss, 2)
-        self.assertTrue(keyspace_ss in cluster.metadata.keyspaces)
+        self.assertIn(keyspace_ss, cluster.metadata.keyspaces)
 
         management.drop_keyspace(keyspace_ss)
-
-        self.assertFalse(keyspace_ss in cluster.metadata.keyspaces)
-        with warnings.catch_warnings(record=True) as w:
-            management.create_keyspace(keyspace_ss, strategy_class="SimpleStrategy", replication_factor=1)
-            self.assertEqual(len(w), 1)
-            self.assertEqual(w[-1].category, DeprecationWarning)
-        self.assertTrue(keyspace_ss in cluster.metadata.keyspaces)
-
-        management.drop_keyspace(keyspace_ss)
-        self.assertFalse(keyspace_ss in cluster.metadata.keyspaces)
+        self.assertNotIn(keyspace_ss, cluster.metadata.keyspaces)
 
         keyspace_nts = 'test_ks_nts'
-        self.assertFalse(keyspace_nts in cluster.metadata.keyspaces)
-        management.create_keyspace_simple(keyspace_nts, 2)
-        self.assertTrue(keyspace_nts in cluster.metadata.keyspaces)
+        self.assertNotIn(keyspace_nts, cluster.metadata.keyspaces)
+        management.create_keyspace_network_topology(keyspace_nts, {'dc1': 1})
+        self.assertIn(keyspace_nts, cluster.metadata.keyspaces)
 
-        with warnings.catch_warnings(record=True) as w:
-            management.delete_keyspace(keyspace_nts)
-            self.assertEqual(len(w), 1)
-            self.assertEqual(w[-1].category, DeprecationWarning)
-
-        self.assertFalse(keyspace_nts in cluster.metadata.keyspaces)
+        management.drop_keyspace(keyspace_nts)
+        self.assertNotIn(keyspace_nts, cluster.metadata.keyspaces)
 
 
 class DropTableTest(BaseCassEngTestCase):
@@ -91,7 +78,7 @@ class CapitalizedKeyModel(Model):
 
 class PrimaryKeysOnlyModel(Model):
 
-    __compaction__ = LeveledCompactionStrategy
+    __options__ = {'compaction': {'class': 'LeveledCompactionStrategy'}}
 
     first_ey = columns.Integer(primary_key=True)
     second_key = columns.Integer(primary_key=True)
@@ -151,44 +138,34 @@ class AddColumnTest(BaseCassEngTestCase):
 
     def test_add_column(self):
         sync_table(FirstModel)
-        fields = get_fields(FirstModel)
+        fields = _get_non_pk_field_names(_get_table_metadata(FirstModel))
 
         # this should contain the second key
         self.assertEqual(len(fields), 2)
         # get schema
         sync_table(SecondModel)
 
-        fields = get_fields(FirstModel)
+        fields = _get_non_pk_field_names(_get_table_metadata(FirstModel))
         self.assertEqual(len(fields), 3)
 
         sync_table(ThirdModel)
-        fields = get_fields(FirstModel)
+        fields = _get_non_pk_field_names(_get_table_metadata(FirstModel))
         self.assertEqual(len(fields), 4)
 
         sync_table(FourthModel)
-        fields = get_fields(FirstModel)
+        fields = _get_non_pk_field_names(_get_table_metadata(FirstModel))
         self.assertEqual(len(fields), 4)
 
 
 class ModelWithTableProperties(Model):
 
-    # Set random table properties
-    __bloom_filter_fp_chance__ = 0.76328
-    __caching__ = CACHING_ALL
-    __comment__ = 'TxfguvBdzwROQALmQBOziRMbkqVGFjqcJfVhwGR'
-    __gc_grace_seconds__ = 2063
-    __populate_io_cache_on_flush__ = True
-    __read_repair_chance__ = 0.17985
-    __replicate_on_write__ = False
-    __dclocal_read_repair_chance__ = 0.50811
+    __options__ = {'bloom_filter_fp_chance': '0.76328',
+                   'comment': 'TxfguvBdzwROQALmQBOziRMbkqVGFjqcJfVhwGR',
+                   'gc_grace_seconds': '2063',
+                   'read_repair_chance': '0.17985',
+                   'dclocal_read_repair_chance': '0.50811'}
 
     key = columns.UUID(primary_key=True)
-
-# kind of a hack, but we only test this property on C >= 2.0
-if CASSANDRA_VERSION >= '2.0.0':
-    ModelWithTableProperties.__memtable_flush_period_in_ms__ = 43681
-    ModelWithTableProperties.__index_interval__ = 98706
-    ModelWithTableProperties.__default_time_to_live__ = 4756
 
 
 class TablePropertiesTests(BaseCassEngTestCase):
@@ -209,63 +186,32 @@ class TablePropertiesTests(BaseCassEngTestCase):
                      #  TODO: due to a bug in the native driver i'm not seeing the local read repair chance show up
                      # 'local_read_repair_chance': 0.50811,
                     }
-        if CASSANDRA_VERSION <= '2.0.0':
-            expected['caching'] = CACHING_ALL
-            expected['replicate_on_write'] = False
-
-        if CASSANDRA_VERSION == '2.0.0':
-            expected['populate_io_cache_on_flush'] = True
-            expected['index_interval'] = 98706
-
-        if CASSANDRA_VERSION >= '2.0.0':
-            expected['default_time_to_live'] = 4756
-            expected['memtable_flush_period_in_ms'] = 43681
-
-        options = management.get_table_settings(ModelWithTableProperties).options
+        options = management._get_table_metadata(ModelWithTableProperties).options
         self.assertEqual(dict([(k, options.get(k)) for k in expected.keys()]),
                          expected)
 
     def test_table_property_update(self):
-        ModelWithTableProperties.__bloom_filter_fp_chance__ = 0.66778
-        ModelWithTableProperties.__caching__ = CACHING_NONE
-        ModelWithTableProperties.__comment__ = 'xirAkRWZVVvsmzRvXamiEcQkshkUIDINVJZgLYSdnGHweiBrAiJdLJkVohdRy'
-        ModelWithTableProperties.__gc_grace_seconds__ = 96362
+        ModelWithTableProperties.__options__['bloom_filter_fp_chance'] = 0.66778
+        ModelWithTableProperties.__options__['comment'] = 'xirAkRWZVVvsmzRvXamiEcQkshkUIDINVJZgLYSdnGHweiBrAiJdLJkVohdRy'
+        ModelWithTableProperties.__options__['gc_grace_seconds'] = 96362
 
-        ModelWithTableProperties.__populate_io_cache_on_flush__ = False
-        ModelWithTableProperties.__read_repair_chance__ = 0.2989
-        ModelWithTableProperties.__replicate_on_write__ = True
-        ModelWithTableProperties.__dclocal_read_repair_chance__ = 0.12732
-
-        if CASSANDRA_VERSION >= '2.0.0':
-            ModelWithTableProperties.__default_time_to_live__ = 65178
-            ModelWithTableProperties.__memtable_flush_period_in_ms__ = 60210
-            ModelWithTableProperties.__index_interval__ = 94207
+        ModelWithTableProperties.__options__['read_repair_chance'] = 0.2989
+        ModelWithTableProperties.__options__['dclocal_read_repair_chance'] = 0.12732
 
         sync_table(ModelWithTableProperties)
 
-        table_settings = management.get_table_settings(ModelWithTableProperties).options
+        table_options = management._get_table_metadata(ModelWithTableProperties).options
 
-        expected = {'bloom_filter_fp_chance': 0.66778,
-                    'comment': 'xirAkRWZVVvsmzRvXamiEcQkshkUIDINVJZgLYSdnGHweiBrAiJdLJkVohdRy',
-                    'gc_grace_seconds': 96362,
-                    'read_repair_chance': 0.2989,
-                    # 'local_read_repair_chance': 0.12732,
-                    }
-        if CASSANDRA_VERSION >= '2.0.0':
-            expected['memtable_flush_period_in_ms'] = 60210
-            expected['default_time_to_live'] = 65178
+        self.assertDictContainsSubset(ModelWithTableProperties.__options__, table_options)
 
-        if CASSANDRA_VERSION == '2.0.0':
-            expected['index_interval'] = 94207
-
-        # these featuers removed in cassandra 2.1
-        if CASSANDRA_VERSION <= '2.0.0':
-            expected['caching'] = CACHING_NONE
-            expected['replicate_on_write'] = True
-            expected['populate_io_cache_on_flush'] = False
-
-        self.assertEqual(dict([(k, table_settings.get(k)) for k in expected.keys()]),
-                         expected)
+    def test_bogus_option_update(self):
+        sync_table(ModelWithTableProperties)
+        option = 'no way will this ever be an option'
+        try:
+            ModelWithTableProperties.__options__[option] = 'what was I thinking?'
+            self.assertRaisesRegexp(KeyError, "Invalid table option.*%s.*" % option, sync_table, ModelWithTableProperties)
+        finally:
+            ModelWithTableProperties.__options__.pop(option, None)
 
 
 class SyncTableTests(BaseCassEngTestCase):
@@ -275,32 +221,18 @@ class SyncTableTests(BaseCassEngTestCase):
 
     def test_sync_table_works_with_primary_keys_only_tables(self):
 
-        # This is "create table":
-
         sync_table(PrimaryKeysOnlyModel)
-
-        # let's make sure settings persisted correctly:
-
-        assert PrimaryKeysOnlyModel.__compaction__ == LeveledCompactionStrategy
         # blows up with DoesNotExist if table does not exist
-        table_settings = management.get_table_settings(PrimaryKeysOnlyModel)
-        # let make sure the flag we care about
+        table_meta = management._get_table_metadata(PrimaryKeysOnlyModel)
 
-        assert LeveledCompactionStrategy in table_settings.options['compaction_strategy_class']
+        self.assertIn('LeveledCompactionStrategy', table_meta.as_cql_query())
 
-        # Now we are "updating" the table:
-        # setting up something to change
-        PrimaryKeysOnlyModel.__compaction__ = SizeTieredCompactionStrategy
+        PrimaryKeysOnlyModel.__options__['compaction']['class'] = 'SizeTieredCompactionStrategy'
 
-        # primary-keys-only tables do not create entries in system.schema_columns
-        # table. Only non-primary keys are added to that table.
-        # Our code must deal with that eventuality properly (not crash)
-        # on subsequent runs of sync_table (which runs get_fields internally)
-        get_fields(PrimaryKeysOnlyModel)
         sync_table(PrimaryKeysOnlyModel)
 
-        table_settings = management.get_table_settings(PrimaryKeysOnlyModel)
-        assert SizeTieredCompactionStrategy in table_settings.options['compaction_strategy_class']
+        table_meta = management._get_table_metadata(PrimaryKeysOnlyModel)
+        self.assertIn('SizeTieredCompactionStrategy', table_meta.as_cql_query())
 
 
 class NonModelFailureTest(BaseCassEngTestCase):
@@ -328,9 +260,9 @@ class StaticColumnTests(BaseCassEngTestCase):
         with mock.patch.object(session, "execute", wraps=session.execute) as m:
             sync_table(StaticModel)
 
-        assert m.call_count > 0
+        self.assertGreater(m.call_count, 0)
         statement = m.call_args[0][0].query_string
-        assert '"name" text static' in statement, statement
+        self.assertIn('"name" text static', statement)
 
         # if we sync again, we should not apply an alter w/ a static
         sync_table(StaticModel)
@@ -338,5 +270,4 @@ class StaticColumnTests(BaseCassEngTestCase):
         with mock.patch.object(session, "execute", wraps=session.execute) as m2:
             sync_table(StaticModel)
 
-        assert len(m2.call_args_list) == 1
-        assert "ALTER" not in m2.call_args[0][0].query_string
+        self.assertEqual(len(m2.call_args_list), 0)

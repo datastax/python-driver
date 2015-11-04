@@ -310,45 +310,15 @@ class BaseModel(object):
 
     __keyspace__ = None
 
-    __default_ttl__ = None
-
-    __polymorphic_key__ = None  # DEPRECATED
     __discriminator_value__ = None
 
-    # compaction options
-    __compaction__ = None
-    __compaction_tombstone_compaction_interval__ = None
-    __compaction_tombstone_threshold__ = None
+    __options__ = None
 
-    # compaction - size tiered options
-    __compaction_bucket_high__ = None
-    __compaction_bucket_low__ = None
-    __compaction_max_threshold__ = None
-    __compaction_min_threshold__ = None
-    __compaction_min_sstable_size__ = None
-
-    # compaction - leveled options
-    __compaction_sstable_size_in_mb__ = None
-
-    # end compaction
     # the queryset class used for this class
     __queryset__ = query.ModelQuerySet
     __dmlquery__ = query.DMLQuery
 
     __consistency__ = None  # can be set per query
-
-    # Additional table properties
-    __bloom_filter_fp_chance__ = None
-    __caching__ = None
-    __comment__ = None
-    __dclocal_read_repair_chance__ = None
-    __default_time_to_live__ = None
-    __gc_grace_seconds__ = None
-    __index_interval__ = None
-    __memtable_flush_period_in_ms__ = None
-    __populate_io_cache_on_flush__ = None
-    __read_repair_chance__ = None
-    __replicate_on_write__ = None
 
     _timestamp = None  # optional timestamp to include with the operation (USING TIMESTAMP)
 
@@ -782,14 +752,10 @@ class ModelMetaClass(type):
         is_abstract = attrs['__abstract__'] = attrs.get('__abstract__', False)
 
         # short circuit __discriminator_value__ inheritance
-        # __polymorphic_key__ is deprecated
-        poly_key = attrs.get('__polymorphic_key__', None)
-        if poly_key:
-            msg = '__polymorphic_key__ is deprecated. Use __discriminator_value__ instead'
-            warnings.warn(msg, DeprecationWarning)
-            log.warning(msg)
-        attrs['__discriminator_value__'] = attrs.get('__discriminator_value__', poly_key)
-        attrs['__polymorphic_key__'] = attrs['__discriminator_value__']
+        attrs['__discriminator_value__'] = attrs.get('__discriminator_value__')
+
+        options = attrs.get('__options__') or {}
+        attrs['__default_ttl__'] = options.get('default_time_to_live')
 
         def _transform_column(col_name, col_obj):
             column_dict[col_name] = col_obj
@@ -808,7 +774,7 @@ class ModelMetaClass(type):
         discriminator_columns = [c for c in column_definitions if c[1].discriminator_column]
         is_polymorphic = len(discriminator_columns) > 0
         if len(discriminator_columns) > 1:
-            raise ModelDefinitionException('only one discriminator_column (polymorphic_key (deprecated)) can be defined in a model, {0} found'.format(len(discriminator_columns)))
+            raise ModelDefinitionException('only one discriminator_column can be defined in a model, {0} found'.format(len(discriminator_columns)))
 
         if attrs['__discriminator_value__'] and not is_polymorphic:
             raise ModelDefinitionException('__discriminator_value__ specified, but no base columns defined with discriminator_column=True')
@@ -816,7 +782,7 @@ class ModelMetaClass(type):
         discriminator_column_name, discriminator_column = discriminator_columns[0] if discriminator_columns else (None, None)
 
         if isinstance(discriminator_column, (columns.BaseContainerColumn, columns.Counter)):
-            raise ModelDefinitionException('counter and container columns cannot be used as discriminator columns (polymorphic_key (deprecated)) ')
+            raise ModelDefinitionException('counter and container columns cannot be used as discriminator columns')
 
         # find polymorphic base class
         polymorphic_base = None
@@ -965,18 +931,11 @@ class Model(BaseModel):
     Sets the name of the keyspace used by this model.
     """
 
-    __default_ttl__ = None
+    __options__ = None
     """
-    *Optional* The default ttl used by this model.
+    *Optional* Table options applied with this model
 
-    This can be overridden by using the :meth:`~.ttl` method.
-    """
-
-    __polymorphic_key__ = None
-    """
-    *Deprecated.*
-
-    see :attr:`~.__discriminator_value__`
+    (e.g. compaction, default ttl, cache settings, tec.)
     """
 
     __discriminator_value__ = None

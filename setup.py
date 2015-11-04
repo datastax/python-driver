@@ -37,6 +37,8 @@ from distutils.errors import (CCompilerError, DistutilsPlatformError,
                               DistutilsExecError)
 from distutils.cmd import Command
 
+PY3 = sys.version_info[0] == 3
+
 try:
     import subprocess
     has_subprocess = True
@@ -102,6 +104,23 @@ class DocCommand(Command):
                 pass
 
         if has_subprocess:
+            # Prevent run with in-place extensions because cython-generated objects do not carry docstrings
+            # http://docs.cython.org/src/userguide/special_methods.html#docstrings
+            import glob
+            for f in glob.glob("cassandra/*.so"):
+                print("Removing '%s' to allow docs to run on pure python modules." %(f,))
+                os.unlink(f)
+
+            # Build io extension to make import and docstrings work
+            try:
+                output = subprocess.check_output(
+                    ["python", "setup.py", "build_ext", "--inplace", "--force", "--no-murmur3", "--no-cython"],
+                    stderr=subprocess.STDOUT)
+            except subprocess.CalledProcessError as exc:
+                raise RuntimeError("Documentation step '%s' failed: %s: %s" % ("build_ext", exc, exc.output))
+            else:
+                print(output)
+
             try:
                 output = subprocess.check_output(
                     ["sphinx-build", "-b", mode, "docs", path],
@@ -175,6 +194,25 @@ sys.argv = [a for a in sys.argv if a not in ("--no-murmur3", "--no-libev", "--no
 
 build_concurrency = int(os.environ.get('CASS_DRIVER_BUILD_CONCURRENCY', '0'))
 
+
+class NoPatchExtension(Extension):
+
+    # Older versions of setuptools.extension has a static flag which is set False before our
+    # setup_requires lands Cython. It causes our *.pyx sources to be renamed to *.c in
+    # the initializer.
+    # The other workaround would be to manually generate sources, but that bypasses a lot
+    # of the niceness cythonize embodies (setup build dir, conditional build, etc).
+    # Newer setuptools does not have this problem because it checks for cython dynamically.
+    # https://bitbucket.org/pypa/setuptools/commits/714c3144e08fd01a9f61d1c88411e76d2538b2e4
+
+    def __init__(self, *args, **kwargs):
+        # bypass the patched init if possible
+        if Extension.__bases__:
+            base, = Extension.__bases__
+            base.__init__(self, *args, **kwargs)
+        else:
+            Extension.__init__(self, *args, **kwargs)
+        
 
 class build_extensions(build_ext):
 
@@ -277,9 +315,11 @@ On OSX, via homebrew:
                         for m in cython_candidates],
                     nthreads=build_concurrency,
                     exclude_failures=True))
-                self.extensions.extend(cythonize("cassandra/*.pyx", nthreads=build_concurrency))
+
+                self.extensions.extend(cythonize(NoPatchExtension("*", ["cassandra/*.pyx"], extra_compile_args=compile_args),
+                                                 nthreads=build_concurrency))
             except Exception:
-                sys.stderr.write("Cython is not available. Not compiling core driver files as extensions (optional).")
+                sys.stderr.write("Failed to cythonize one or more modules. These will not be compiled as extensions (optional).\n")
 
 
 def run_setup(extensions):
@@ -295,9 +335,12 @@ def run_setup(extensions):
     kw['ext_modules'] = [Extension('DUMMY', [])]  # dummy extension makes sure build_ext is called for install
 
     if try_cython:
-        kw['setup_requires'] = ['Cython']
+        kw['setup_requires'] = ['Cython>=0.20']
 
-    dependencies = ['futures', 'six >=1.6']
+    dependencies = ['six >=1.6']
+
+    if not PY3:
+        dependencies.append('futures')
 
     setup(
         name='cassandra-driver',

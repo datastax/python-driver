@@ -41,6 +41,10 @@ def setup_module():
 
 class UDTTests(unittest.TestCase):
 
+    @property
+    def table_name(self):
+        return self._testMethodName.lower()
+
     def setUp(self):
         self._cass_version, self._cql_version = get_server_versions()
 
@@ -51,11 +55,9 @@ class UDTTests(unittest.TestCase):
         self.session = self.cluster.connect()
         execute_until_pass(self.session,
                            "CREATE KEYSPACE udttests WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}")
-        self.cluster.shutdown()
+        self.session.set_keyspace("udttests")
 
     def tearDown(self):
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        self.session = self.cluster.connect()
         execute_until_pass(self.session, "DROP KEYSPACE udttests")
         self.cluster.shutdown()
 
@@ -75,7 +77,6 @@ class UDTTests(unittest.TestCase):
 
         s.execute("INSERT INTO mytable (a, b) VALUES (%s, %s)", (0, User(42, 'bob')))
         result = s.execute("SELECT b FROM mytable WHERE a=0")
-        self.assertEqual(1, len(result))
         row = result[0]
         self.assertEqual(42, row.b.age)
         self.assertEqual('bob', row.b.name)
@@ -95,11 +96,12 @@ class UDTTests(unittest.TestCase):
 
         s.execute("INSERT INTO mytable (a, b) VALUES (%s, %s)", (0, User('Texas', True)))
         result = s.execute("SELECT b FROM mytable WHERE a=0")
-        self.assertEqual(1, len(result))
         row = result[0]
         self.assertEqual('Texas', row.b.state)
         self.assertEqual(True, row.b.is_cool)
         self.assertTrue(type(row.b) is User)
+
+        s.execute("DROP KEYSPACE udt_test_unprepared_registered2")
 
         c.shutdown()
 
@@ -142,7 +144,6 @@ class UDTTests(unittest.TestCase):
         s.set_keyspace("udt_test_register_before_connecting")
         s.execute("INSERT INTO mytable (a, b) VALUES (%s, %s)", (0, User1(42, 'bob')))
         result = s.execute("SELECT b FROM mytable WHERE a=0")
-        self.assertEqual(1, len(result))
         row = result[0]
         self.assertEqual(42, row.b.age)
         self.assertEqual('bob', row.b.name)
@@ -152,11 +153,13 @@ class UDTTests(unittest.TestCase):
         s.set_keyspace("udt_test_register_before_connecting2")
         s.execute("INSERT INTO mytable (a, b) VALUES (%s, %s)", (0, User2('Texas', True)))
         result = s.execute("SELECT b FROM mytable WHERE a=0")
-        self.assertEqual(1, len(result))
         row = result[0]
         self.assertEqual('Texas', row.b.state)
         self.assertEqual(True, row.b.is_cool)
         self.assertTrue(type(row.b) is User2)
+
+        s.execute("DROP KEYSPACE udt_test_register_before_connecting")
+        s.execute("DROP KEYSPACE udt_test_register_before_connecting2")
 
         c.shutdown()
 
@@ -177,7 +180,6 @@ class UDTTests(unittest.TestCase):
 
         select = s.prepare("SELECT b FROM mytable WHERE a=?")
         result = s.execute(select, (0,))
-        self.assertEqual(1, len(result))
         row = result[0]
         self.assertEqual(42, row.b.age)
         self.assertEqual('bob', row.b.name)
@@ -197,10 +199,11 @@ class UDTTests(unittest.TestCase):
 
         select = s.prepare("SELECT b FROM mytable WHERE a=?")
         result = s.execute(select, (0,))
-        self.assertEqual(1, len(result))
         row = result[0]
         self.assertEqual('Texas', row.b.state)
         self.assertEqual(True, row.b.is_cool)
+
+        s.execute("DROP KEYSPACE udt_test_prepared_unregistered2")
 
         c.shutdown()
 
@@ -223,7 +226,6 @@ class UDTTests(unittest.TestCase):
 
         select = s.prepare("SELECT b FROM mytable WHERE a=?")
         result = s.execute(select, (0,))
-        self.assertEqual(1, len(result))
         row = result[0]
         self.assertEqual(42, row.b.age)
         self.assertEqual('bob', row.b.name)
@@ -246,11 +248,12 @@ class UDTTests(unittest.TestCase):
 
         select = s.prepare("SELECT b FROM mytable WHERE a=?")
         result = s.execute(select, (0,))
-        self.assertEqual(1, len(result))
         row = result[0]
         self.assertEqual('Texas', row.b.state)
         self.assertEqual(True, row.b.is_cool)
         self.assertTrue(type(row.b) is User)
+
+        s.execute("DROP KEYSPACE udt_test_prepared_registered2")
 
         c.shutdown()
 
@@ -528,7 +531,6 @@ class UDTTests(unittest.TestCase):
 
         # retrieve and verify data
         results = s.execute("SELECT * FROM mytable")
-        self.assertEqual(1, len(results))
 
         row = results[0].b
         for expected, actual in zip(params, row):
@@ -587,7 +589,6 @@ class UDTTests(unittest.TestCase):
 
         # retrieve and verify data
         results = s.execute("SELECT * FROM mytable")
-        self.assertEqual(1, len(results))
 
         row = results[0].b
         for expected, actual in zip(params, row):
@@ -652,3 +653,60 @@ class UDTTests(unittest.TestCase):
         validate('map_udt', OrderedMap([(key, value), (key2, value)]))
 
         c.shutdown()
+
+    def test_non_alphanum_identifiers(self):
+        """
+        PYTHON-413
+        """
+        s = self.session
+        non_alphanum_name = 'test.field@#$%@%#!'
+        type_name = 'type2'
+        s.execute('CREATE TYPE "%s" ("%s" text)' % (non_alphanum_name, non_alphanum_name))
+        s.execute('CREATE TYPE %s ("%s" text)' % (type_name, non_alphanum_name))
+        # table with types as map keys to make sure the tuple lookup works
+        s.execute('CREATE TABLE %s (k int PRIMARY KEY, non_alphanum_type_map map<frozen<"%s">, int>, alphanum_type_map map<frozen<%s>, int>)' % (self.table_name, non_alphanum_name, type_name))
+        s.execute('INSERT INTO %s (k, non_alphanum_type_map, alphanum_type_map) VALUES (%s, {{"%s": \'nonalphanum\'}: 0}, {{"%s": \'alphanum\'}: 1})' % (self.table_name, 0, non_alphanum_name, non_alphanum_name))
+        row = s.execute('SELECT * FROM %s' % (self.table_name,))[0]
+
+        k, v = row.non_alphanum_type_map.popitem()
+        self.assertEqual(v, 0)
+        self.assertEqual(k.__class__, tuple)
+        self.assertEqual(k[0], 'nonalphanum')
+
+        k, v = row.alphanum_type_map.popitem()
+        self.assertEqual(v, 1)
+        self.assertNotEqual(k.__class__, tuple)  # should be the namedtuple type
+        self.assertEqual(k[0], 'alphanum')
+        self.assertEqual(k.field_0_, 'alphanum')  # named tuple with positional field name
+
+    def test_type_alteration(self):
+        s = self.session
+        type_name = "type_name"
+        self.assertNotIn(type_name, s.cluster.metadata.keyspaces['udttests'].user_types)
+        s.execute('CREATE TYPE %s (v0 int)' % (type_name,))
+        self.assertIn(type_name, s.cluster.metadata.keyspaces['udttests'].user_types)
+
+        s.execute('CREATE TABLE %s (k int PRIMARY KEY, v frozen<%s>)' % (self.table_name, type_name))
+        s.execute('INSERT INTO %s (k, v) VALUES (0, 1)' % (self.table_name,))
+
+        s.cluster.register_user_type('udttests', type_name, dict)
+
+        val = s.execute('SELECT v FROM %s' % self.table_name)[0][0]
+        self.assertEqual(val['v0'], 1)
+
+        # add field
+        s.execute('ALTER TYPE %s ADD v1 text' % (type_name,))
+        val = s.execute('SELECT v FROM %s' % self.table_name)[0][0]
+        self.assertEqual(val['v0'], 1)
+        self.assertIsNone(val['v1'])
+        s.execute("INSERT INTO %s (k, v) VALUES (0, (2, 'sometext'))" % (self.table_name,))
+        val = s.execute('SELECT v FROM %s' % self.table_name)[0][0]
+        self.assertEqual(val['v0'], 2)
+        self.assertEqual(val['v1'], 'sometext')
+
+        # alter field type
+        s.execute('ALTER TYPE %s ALTER v1 TYPE blob' % (type_name,))
+        s.execute("INSERT INTO %s (k, v) VALUES (0, (3, 0xdeadbeef))" % (self.table_name,))
+        val = s.execute('SELECT v FROM %s' % self.table_name)[0][0]
+        self.assertEqual(val['v0'], 3)
+        self.assertEqual(val['v1'], six.b('\xde\xad\xbe\xef'))

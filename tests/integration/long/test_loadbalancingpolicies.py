@@ -16,7 +16,7 @@ import struct, time, logging, sys, traceback
 
 from cassandra import ConsistencyLevel, Unavailable, OperationTimedOut, ReadTimeout, ReadFailure, \
     WriteTimeout, WriteFailure
-from cassandra.cluster import Cluster, NoHostAvailable
+from cassandra.cluster import Cluster, NoHostAvailable, Session
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.metadata import murmur3
 from cassandra.policies import (RoundRobinPolicy, DCAwareRoundRobinPolicy,
@@ -72,7 +72,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
             query_string = 'SELECT * FROM %s.cf WHERE k = ?' % keyspace
             if not self.prepared or self.prepared.query_string != query_string:
                 self.prepared = session.prepare(query_string)
-
+                self.prepared.consistency_level=consistency_level
             for i in range(count):
                 tries = 0
                 while True:
@@ -493,7 +493,6 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         session.execute(prepared.bind((1, 2, 3)))
 
         results = session.execute('SELECT * FROM %s WHERE k1 = 1 AND k2 = 2' % table)
-        self.assertTrue(len(results) == 1)
         self.assertTrue(results[0].i)
 
         cluster.shutdown()
@@ -539,7 +538,6 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         p = session.prepare("SELECT * FROM system.local WHERE key=?")
         # this would blow up prior to 61b4fad
         r = session.execute(p, ('local',))
-        self.assertEqual(len(r), 1)
         self.assertEqual(r[0].key, 'local')
 
         cluster.shutdown()

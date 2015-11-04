@@ -44,6 +44,8 @@ def is_timeout(err):
 class EventletConnection(Connection):
     """
     An implementation of :class:`.Connection` that utilizes ``eventlet``.
+
+    This implementation assumes all eventlet monkey patching is active. It is not tested with partial patching.
     """
 
     _read_watcher = None

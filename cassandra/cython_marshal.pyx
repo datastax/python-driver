@@ -107,7 +107,7 @@ cdef varint_unpack(Buffer *term):
 cdef varint_unpack_py3(bytes term):
     cdef int64_t one = 1L
 
-    val = int(''.join("%02x" % i for i in term), 16)
+    val = int(''.join(["%02x" % i for i in term]), 16)
     if (term[0] & 128) != 0:
         # There is a bug in Cython (0.20 - 0.22), where if we do
         # '1 << (len(term) * 8)' Cython generates '1' directly into the

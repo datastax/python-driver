@@ -1,5 +1,6 @@
 language: python
 python: 2.7
+sudo: false
 env:
   - TOX_ENV=py26 CASS_VER=21 CASS_DRIVER_NO_CYTHON=1
   - TOX_ENV=py26 CASS_VER=21
@@ -14,25 +15,14 @@ env:
   - TOX_ENV=pypy CASS_VER=21 CASS_DRIVER_NO_CYTHON=1
   - TOX_ENV=pypy3 CASS_VER=21 CASS_DRIVER_NO_CYTHON=1
 
-before_install:
-  - sudo apt-get update -y
-  - sudo apt-get install -y build-essential python-dev
-  - sudo apt-get install -y pypy-dev
-  - sudo apt-get install -y libev4 libev-dev
-  - sudo echo "deb http://www.apache.org/dist/cassandra/debian ${CASS_VER}x main" | sudo tee -a /etc/apt/sources.list
-  - sudo echo "deb-src http://www.apache.org/dist/cassandra/debian ${CASS_VER}x main" | sudo tee -a /etc/apt/sources.list
-  - sudo rm -rf ~/.gnupg
-  - sudo gpg --keyserver pgp.mit.edu --recv-keys F758CE318D77295D
-  - sudo gpg --export --armor F758CE318D77295D | sudo apt-key add -
-  - sudo gpg --keyserver pgp.mit.edu --recv-keys 2B5C1B00
-  - sudo gpg --export --armor 2B5C1B00 | sudo apt-key add -
-  - sudo gpg --keyserver pgp.mit.edu --recv-keys 0353B12C
-  - sudo gpg --export --armor 0353B12C | sudo apt-key add -
-  - sudo apt-get update
-  - sudo apt-get -o Dpkg::Options::="--force-confnew" install -y cassandra
-  - sudo rm -rf /var/lib/cassandra/*
-  - sudo sh -c "echo 'JVM_OPTS=\"\${JVM_OPTS} -Djava.net.preferIPv4Stack=false\"' >> /etc/cassandra/cassandra-env.sh"
-  - sudo service cassandra start
+addons:
+  apt:
+    packages:
+    - build-essential
+    - python-dev
+    - pypy-dev
+    - libev4
+    - libev-dev
 
 install:
   - pip install tox

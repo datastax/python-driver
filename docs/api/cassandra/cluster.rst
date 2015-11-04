@@ -87,8 +87,6 @@
 
    .. automethod:: refresh_user_aggregate_metadata
 
-   .. automethod:: refresh_schema
-
    .. automethod:: refresh_nodes
 
    .. automethod:: set_meta_refresh_enabled
@@ -97,6 +95,9 @@
 .. autoclass:: Session ()
 
    .. autoattribute:: default_timeout
+
+   .. autoattribute:: default_consistency_level
+      :annotation: = LOCAL_QUORUM
 
    .. autoattribute:: row_factory
 
@@ -126,6 +127,8 @@
 
    .. automethod:: get_query_trace()
 
+   .. automethod:: get_all_query_traces()
+
    .. autoattribute:: custom_payload()
 
    .. autoattribute:: has_more_pages
@@ -140,7 +143,7 @@
 
    .. automethod:: add_callbacks(callback, errback, callback_args=(), callback_kwargs=None, errback_args=(), errback_args=None)
 
-.. autoclass:: PagedResult ()
+.. autoclass:: ResultSet ()
    :members:
 
 .. autoexception:: QueryExhausted ()

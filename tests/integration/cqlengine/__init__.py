@@ -14,6 +14,7 @@
 
 import os
 import warnings
+from cassandra import ConsistencyLevel
 
 from cassandra.cqlengine import connection
 from cassandra.cqlengine.management import create_keyspace_simple, CQLENG_ALLOW_SCHEMA_MANAGEMENT
@@ -29,6 +30,7 @@ def setup_package():
 
     keyspace = 'cqlengine_test'
     connection.setup(['127.0.0.1'],
+                     consistency=ConsistencyLevel.ONE,
                      protocol_version=PROTOCOL_VERSION,
                      default_keyspace=keyspace)
 

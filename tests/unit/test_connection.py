@@ -22,7 +22,7 @@ from six import BytesIO
 import time
 from threading import Lock
 
-from cassandra.cluster import Cluster
+from cassandra.cluster import Cluster, Session
 from cassandra.connection import (Connection, HEADER_DIRECTION_TO_CLIENT, ProtocolError,
                                   locally_supported_compressions, ConnectionHeartbeat, _Frame)
 from cassandra.marshal import uint8_pack, uint32_pack, int32_pack

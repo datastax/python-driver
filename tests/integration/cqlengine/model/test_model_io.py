@@ -156,7 +156,7 @@ class TestModelIO(BaseCassEngTestCase):
             e = columns.DateTime()
             f = columns.Decimal()
             g = columns.Double()
-            h = columns.Float(double_precision=False)
+            h = columns.Float()
             i = columns.Inet()
             j = columns.Integer()
             k = columns.Text()
@@ -225,13 +225,8 @@ class TestModelIO(BaseCassEngTestCase):
         """
         Test for inserting single-precision and double-precision values into a Float and Double columns
 
-        test_can_insert_double_and_float tests a Float can only hold a single-precision value, unless
-        "double_precision" attribute is specified as True or is unspecified. This test first tests that an AttributeError
-        is raised when attempting to input a double-precision value into a single-precision Float. It then verifies that
-        Double, Float(double_precision=True) and Float() can hold double-precision values by default. It also verifies that
-        columns.Float(double_precision=False) can hold a single-precision value, and a Double can hold a single-precision value.
-
         @since 2.6.0
+        @changed 3.0.0 removed deprecated Float(double_precision) parameter
         @jira_ticket PYTHON-246
         @expected_result Each floating point column type is able to hold their respective precision values.
 
@@ -240,24 +235,19 @@ class TestModelIO(BaseCassEngTestCase):
 
         class FloatingPointModel(Model):
             id = columns.Integer(primary_key=True)
-            a = columns.Float(double_precision=False)
-            b = columns.Float(double_precision=True)
-            c = columns.Float()
+            f = columns.Float()
             d = columns.Double()
 
         sync_table(FloatingPointModel)
 
-        FloatingPointModel.create(id=0, a=2.39)
+        FloatingPointModel.create(id=0, f=2.39)
         output = FloatingPointModel.objects().first()
-        self.assertEqual(2.390000104904175, output.a)
+        self.assertEqual(2.390000104904175, output.f)  # float loses precision
 
-        FloatingPointModel.create(id=0, a=3.4028234663852886e+38, b=2.39, c=2.39, d=2.39)
+        FloatingPointModel.create(id=0, f=3.4028234663852886e+38, d=2.39)
         output = FloatingPointModel.objects().first()
-
-        self.assertEqual(3.4028234663852886e+38, output.a)
-        self.assertEqual(2.39, output.b)
-        self.assertEqual(2.39, output.c)
-        self.assertEqual(2.39, output.d)
+        self.assertEqual(3.4028234663852886e+38, output.f)
+        self.assertEqual(2.39, output.d)  # double retains precision
 
         FloatingPointModel.create(id=0, d=3.4028234663852886e+38)
         output = FloatingPointModel.objects().first()

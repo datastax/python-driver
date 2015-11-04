@@ -78,7 +78,7 @@ class ClusterTests(unittest.TestCase):
             CREATE KEYSPACE clustertests
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
             """)
-        self.assertEqual(None, result)
+        self.assertFalse(result)
 
         result = execute_until_pass(session,
             """
@@ -89,13 +89,13 @@ class ClusterTests(unittest.TestCase):
                 PRIMARY KEY (a, b)
             )
             """)
-        self.assertEqual(None, result)
+        self.assertFalse(result)
 
         result = session.execute(
             """
             INSERT INTO clustertests.cf0 (a, b, c) VALUES ('a', 'b', 'c')
             """)
-        self.assertEqual(None, result)
+        self.assertFalse(result)
 
         result = session.execute("SELECT * FROM clustertests.cf0")
         self.assertEqual([('a', 'b', 'c')], result)
@@ -152,7 +152,7 @@ class ClusterTests(unittest.TestCase):
             """
             INSERT INTO test3rf.test (k, v) VALUES (8889, 8889)
             """)
-        self.assertEqual(None, result)
+        self.assertFalse(result)
 
         result = session.execute("SELECT * FROM test3rf.test")
         self.assertEqual([(8889, 8889)], result)
@@ -253,32 +253,6 @@ class ClusterTests(unittest.TestCase):
         self.assertEqual(cassandra.cluster.DEFAULT_MAX_CONNECTIONS_PER_LOCAL_HOST, max_connections_per_host)
         cluster.set_max_connections_per_host(HostDistance.LOCAL, max_connections_per_host + 1)
         self.assertEqual(cluster.get_max_connections_per_host(HostDistance.LOCAL), max_connections_per_host + 1)
-
-    def test_submit_schema_refresh(self):
-        """
-        Ensure new new schema is refreshed after submit_schema_refresh()
-        """
-
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        cluster.connect()
-        self.assertNotIn("newkeyspace", cluster.metadata.keyspaces)
-
-        other_cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = other_cluster.connect()
-        execute_until_pass(session,
-            """
-            CREATE KEYSPACE newkeyspace
-            WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
-            """)
-
-        future = cluster.submit_schema_refresh()
-        future.result()
-
-        self.assertIn("newkeyspace", cluster.metadata.keyspaces)
-
-        execute_until_pass(session, "DROP KEYSPACE newkeyspace")
-        cluster.shutdown()
-        other_cluster.shutdown()
 
     def test_refresh_schema(self):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
@@ -437,24 +411,25 @@ class ClusterTests(unittest.TestCase):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
-        self.assertRaises(TypeError, session.execute, "SELECT * FROM system.local", trace=True)
-
         def check_trace(trace):
-            self.assertIsNot(None, trace.request_type)
-            self.assertIsNot(None, trace.duration)
-            self.assertIsNot(None, trace.started_at)
-            self.assertIsNot(None, trace.coordinator)
-            self.assertIsNot(None, trace.events)
+            self.assertIsNotNone(trace.request_type)
+            self.assertIsNotNone(trace.duration)
+            self.assertIsNotNone(trace.started_at)
+            self.assertIsNotNone(trace.coordinator)
+            self.assertIsNotNone(trace.events)
+
+        result = session.execute( "SELECT * FROM system.local", trace=True)
+        check_trace(result.get_query_trace())
 
         query = "SELECT * FROM system.local"
         statement = SimpleStatement(query)
-        session.execute(statement, trace=True)
-        check_trace(statement.trace)
+        result = session.execute(statement, trace=True)
+        check_trace(result.get_query_trace())
 
         query = "SELECT * FROM system.local"
         statement = SimpleStatement(query)
-        session.execute(statement)
-        self.assertEqual(None, statement.trace)
+        result = session.execute(statement)
+        self.assertIsNone(result.get_query_trace())
 
         statement2 = SimpleStatement(query)
         future = session.execute_async(statement2, trace=True)
@@ -464,7 +439,7 @@ class ClusterTests(unittest.TestCase):
         statement2 = SimpleStatement(query)
         future = session.execute_async(statement2)
         future.result()
-        self.assertEqual(None, future.get_query_trace())
+        self.assertIsNone(future.get_query_trace())
 
         prepared = session.prepare("SELECT * FROM system.local")
         future = session.execute_async(prepared, parameters=(), trace=True)
@@ -503,7 +478,7 @@ class ClusterTests(unittest.TestCase):
         cluster.shutdown()
 
     def test_idle_heartbeat(self):
-        interval = 1
+        interval = 2
         cluster = Cluster(protocol_version=PROTOCOL_VERSION, idle_heartbeat_interval=interval)
         if PROTOCOL_VERSION < 3:
             cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
@@ -520,7 +495,7 @@ class ClusterTests(unittest.TestCase):
                     connection_request_ids[id(c)] = deque(c.request_ids)  # copy of request ids
 
         # let two heatbeat intervals pass (first one had startup messages in it)
-        time.sleep(2 * interval + interval/10.)
+        time.sleep(2 * interval + interval/2)
 
         connections = [c for holders in cluster.get_connection_holders() for c in holders.get_connections()]
 
@@ -604,10 +579,6 @@ class ClusterTests(unittest.TestCase):
         # refresh schema
         cluster.refresh_schema_metadata()
         cluster.refresh_schema_metadata(max_schema_agreement_wait=0)
-
-        # submit schema refresh
-        future = cluster.submit_schema_refresh()
-        future.result()
 
         assert_quiescent_pool_state(self, cluster)
 

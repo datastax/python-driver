@@ -31,7 +31,7 @@ from cassandra.util import unix_time_from_uuid1
 from cassandra.encoder import Encoder
 import cassandra.encoder
 from cassandra.protocol import _UNSET_VALUE
-from cassandra.util import OrderedDict
+from cassandra.util import OrderedDict, _positional_rename_invalid_identifiers
 
 import logging
 log = logging.getLogger(__name__)
@@ -123,7 +123,7 @@ def named_tuple_factory(colnames, rows):
                     "Avoid this by choosing different names, using SELECT \"<col name>\" AS aliases, "
                     "or specifying a different row_factory on your Session" %
                     (colnames, clean_column_names))
-        Row = namedtuple('Row', clean_column_names, rename=True)
+        Row = namedtuple('Row', _positional_rename_invalid_identifiers(clean_column_names))
 
     return [Row(*row) for row in rows]
 
@@ -173,18 +173,6 @@ class Statement(object):
     An instance of a :class:`cassandra.policies.RetryPolicy` or one of its
     subclasses.  This controls when a query will be retried and how it
     will be retried.
-    """
-
-    trace = None
-    """
-    If :meth:`.Session.execute()` is run with `trace` set to :const:`True`,
-    this will be set to a :class:`.QueryTrace` instance.
-    """
-
-    trace_id = None
-    """
-    If :meth:`.Session.execute()` is run with `trace` set to :const:`True`,
-    this will be set to the tracing ID from the server.
     """
 
     consistency_level = None
@@ -486,23 +474,24 @@ class BoundStatement(Statement):
             * short sequences will be extended to match bind parameters with UNSET_VALUE
             * names may be omitted from a dict with UNSET_VALUE implied.
 
+        .. versionchanged:: 3.0.0
+
+            method will not throw if extra keys are present in bound dict (PYTHON-178)
         """
         if values is None:
             values = ()
         proto_version = self.prepared_statement.protocol_version
         col_meta = self.prepared_statement.column_metadata
-        col_meta_len = len(col_meta)
-        value_len = len(values)
 
         # special case for binding dicts
         if isinstance(values, dict):
-            unbound_values = values.copy()
+            values_dict = values
             values = []
 
             # sort values accordingly
             for col in col_meta:
                 try:
-                    values.append(unbound_values.pop(col.name))
+                    values.append(values_dict[col.name])
                 except KeyError:
                     if proto_version >= 4:
                         values.append(UNSET_VALUE)
@@ -511,10 +500,8 @@ class BoundStatement(Statement):
                             'Column name `%s` not found in bound dict.' %
                             (col.name))
 
-            value_len = len(values)
-
-            if unbound_values:
-                raise ValueError("Unexpected arguments provided to bind(): %s" % unbound_values.keys())
+        value_len = len(values)
+        col_meta_len = len(col_meta)
 
         if value_len > col_meta_len:
             raise ValueError(

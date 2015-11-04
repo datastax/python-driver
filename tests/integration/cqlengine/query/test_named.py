@@ -12,13 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from cassandra.cqlengine import operators
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
+
+from cassandra.cqlengine import operators, connection
 from cassandra.cqlengine.named import NamedKeyspace
 from cassandra.cqlengine.operators import EqualsOperator, GreaterThanOrEqualOperator
 from cassandra.cqlengine.query import ResultObject
+from cassandra.concurrent import execute_concurrent_with_args
+from cassandra.cqlengine import models
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine.query.test_queryset import BaseQuerySetUsage
+
+
+from tests.integration import BasicSharedKeyspaceUnitTestCase, get_server_versions
 
 
 class TestQuerySetOperation(BaseCassEngTestCase):
@@ -259,3 +269,94 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
             self.table.objects.get(test_id=1)
 
 
+class TestNamedWithMV(BasicSharedKeyspaceUnitTestCase):
+
+    def setUp(self):
+        self.default_keyspace = models.DEFAULT_KEYSPACE
+        cass_version = get_server_versions()[0]
+        if cass_version < (3, 0):
+            raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
+        super(TestNamedWithMV, self).setUp()
+
+    def tearDown(self):
+        models.DEFAULT_KEYSPACE = self.default_keyspace
+
+    def test_named_table_with_mv(self):
+        """
+        Test NamedTable access to materialized views
+
+        Creates some materialized views using Traditional CQL. Then ensures we can access those materialized view using
+        the NamedKeyspace, and NamedTable interfaces. Tests basic filtering as well.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-406
+        @expected_result Named Tables should have access to materialized views
+
+        @test_category materialized_view
+        """
+        connection.setup(['127.0.0.1'], self.keyspace_name)
+
+        # Create a base table and two materialized views
+        create_table = """CREATE TABLE {0}.scores(
+                        user TEXT,
+                        game TEXT,
+                        year INT,
+                        month INT,
+                        day INT,
+                        score INT,
+                        PRIMARY KEY (user, game, year, month, day)
+                        )""".format(self.keyspace_name)
+
+        self.session.execute(create_table)
+        create_mv = """CREATE MATERIALIZED VIEW {0}.monthlyhigh AS
+                        SELECT game, year, month, score, user, day FROM {0}.scores
+                        WHERE game IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL AND day IS NOT NULL
+                        PRIMARY KEY ((game, year, month), score, user, day)
+                        WITH CLUSTERING ORDER BY (score DESC, user ASC, day ASC)""".format(self.keyspace_name)
+
+        self.session.execute(create_mv)
+
+        create_mv_alltime = """CREATE MATERIALIZED VIEW {0}.alltimehigh AS
+                        SELECT * FROM {0}.scores
+                        WHERE game IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND day IS NOT NULL
+                        PRIMARY KEY (game, score, user, year, month, day)
+                        WITH CLUSTERING ORDER BY (score DESC)""".format(self.keyspace_name)
+
+        self.session.execute(create_mv_alltime)
+
+        # Populate the base table with data
+        prepared_insert = self.session.prepare("""INSERT INTO {0}.scores (user, game, year, month, day, score) VALUES  (?, ?, ? ,? ,?, ?)""".format(self.keyspace_name))
+        parameters = {('pcmanus', 'Coup', 2015, 5, 1, 4000),
+                      ('jbellis', 'Coup', 2015, 5, 3, 1750),
+                      ('yukim', 'Coup', 2015, 5, 3, 2250),
+                      ('tjake', 'Coup', 2015, 5, 3, 500),
+                      ('iamaleksey', 'Coup', 2015, 6, 1, 2500),
+                      ('tjake', 'Coup', 2015, 6, 2, 1000),
+                      ('pcmanus', 'Coup', 2015, 6, 2, 2000),
+                      ('jmckenzie', 'Coup', 2015, 6, 9, 2700),
+                      ('jbellis', 'Coup', 2015, 6, 20, 3500),
+                      ('jbellis', 'Checkers', 2015, 6, 20, 1200),
+                      ('jbellis', 'Chess', 2015, 6, 21, 3500),
+                      ('pcmanus', 'Chess', 2015, 1, 25, 3200)}
+        execute_concurrent_with_args(self.session, prepared_insert, parameters)
+
+        # Attempt to query the data using Named Table interface
+        # Also test filtering on mv's
+        key_space = NamedKeyspace(self.keyspace_name)
+        table = key_space.table("scores")
+        mv_monthly = key_space.table("monthlyhigh")
+        table_objects = table.objects.all()
+        mv_monthly_objects = mv_monthly.objects.all()
+        mv_all_time = key_space.table("alltimehigh")
+        mv_all_objects = mv_all_time.objects.all()
+        self.assertEqual(len(table_objects), len(parameters))
+        self.assertEqual(len(mv_monthly_objects), len(parameters))
+        self.assertEqual(len(mv_all_objects), len(parameters))
+
+        filtered_mv_monthly_objects = mv_monthly.objects.filter(game='Chess', year=2015, month=6)
+        self.assertEqual(len(filtered_mv_monthly_objects), 1)
+        self.assertEqual(filtered_mv_monthly_objects[0]['score'], 3500)
+        self.assertEqual(filtered_mv_monthly_objects[0]['user'], 'jbellis')
+        filtered_mv_alltime_objects = mv_all_time.objects.filter(game='Chess')
+        self.assertEqual(len(filtered_mv_alltime_objects), 2)
+        self.assertEqual(filtered_mv_alltime_objects[0]['score'], 3500)

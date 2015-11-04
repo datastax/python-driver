@@ -61,7 +61,7 @@ from cassandra.protocol import (QueryMessage, ResultMessage,
                                 BatchMessage, RESULT_KIND_PREPARED,
                                 RESULT_KIND_SET_KEYSPACE, RESULT_KIND_ROWS,
                                 RESULT_KIND_SCHEMA_CHANGE, MIN_SUPPORTED_VERSION,
-                                ProtocolHandler)
+                                ProtocolHandler, _RESULT_SEQUENCE_TYPES)
 from cassandra.metadata import Metadata, protect_name, murmur3
 from cassandra.policies import (TokenAwarePolicy, DCAwareRoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
@@ -407,18 +407,17 @@ class Cluster(object):
 
     * :class:`cassandra.io.asyncorereactor.AsyncoreConnection`
     * :class:`cassandra.io.libevreactor.LibevConnection`
-    * :class:`cassandra.io.geventreactor.GeventConnection` (requires monkey-patching)
+    * :class:`cassandra.io.eventletreactor.EventletConnection` (requires monkey-patching - see doc for details)
+    * :class:`cassandra.io.geventreactor.GeventConnection` (requires monkey-patching - see doc for details)
     * :class:`cassandra.io.twistedreactor.TwistedConnection`
 
     By default, ``AsyncoreConnection`` will be used, which uses
-    the ``asyncore`` module in the Python standard library.  The
-    performance is slightly worse than with ``libev``, but it is
-    supported on a wider range of systems.
+    the ``asyncore`` module in the Python standard library.
 
     If ``libev`` is installed, ``LibevConnection`` will be used instead.
 
-    If gevent monkey-patching of the standard library is detected,
-    GeventConnection will be used automatically.
+    If ``gevent`` or ``eventlet`` monkey-patching is detected, the corresponding
+    connection class will be used automatically.
     """
 
     control_connection_timeout = 2.0
@@ -1225,64 +1224,6 @@ class Cluster(object):
             return SchemaTargetType.KEYSPACE
         return None
 
-    def refresh_schema(self, keyspace=None, table=None, usertype=None, function=None, aggregate=None, max_schema_agreement_wait=None):
-        """
-        .. deprecated:: 2.6.0
-            Use refresh_*_metadata instead
-
-        Synchronously refresh schema metadata.
-
-        {keyspace, table, usertype} are string names of the respective entities.
-        ``function`` is a :class:`cassandra.UserFunctionDescriptor`.
-        ``aggregate`` is a :class:`cassandra.UserAggregateDescriptor`.
-
-        If none of ``{keyspace, table, usertype, function, aggregate}`` are specified, the entire schema is refreshed.
-
-        If any of ``{keyspace, table, usertype, function, aggregate}`` are specified, ``keyspace`` is required.
-
-        If only ``keyspace`` is specified, just the top-level keyspace metadata is refreshed (e.g. replication).
-
-        The remaining arguments ``{table, usertype, function, aggregate}``
-        are mutually exclusive -- only one may be specified.
-
-        By default, the timeout for this operation is governed by :attr:`~.Cluster.max_schema_agreement_wait`
-        and :attr:`~.Cluster.control_connection_timeout`.
-
-        Passing max_schema_agreement_wait here overrides :attr:`~.Cluster.max_schema_agreement_wait`.
-
-        Setting max_schema_agreement_wait <= 0 will bypass schema agreement and refresh schema immediately.
-
-        An Exception is raised if schema refresh fails for any reason.
-        """
-        msg = "refresh_schema is deprecated. Use Cluster.refresh_*_metadata instead."
-        warnings.warn(msg, DeprecationWarning)
-        log.warning(msg)
-
-        self._validate_refresh_schema(keyspace, table, usertype, function, aggregate)
-        target_type = self._target_type_from_refresh_args(keyspace, table, usertype, function, aggregate)
-        if not self.control_connection.refresh_schema(target_type=target_type, keyspace=keyspace, table=table,
-                                                      type=usertype, function=function, aggregate=aggregate,
-                                                      schema_agreement_wait=max_schema_agreement_wait):
-            raise Exception("Schema was not refreshed. See log for details.")
-
-    def submit_schema_refresh(self, keyspace=None, table=None, usertype=None, function=None, aggregate=None):
-        """
-        .. deprecated:: 2.6.0
-            Use refresh_*_metadata instead
-
-        Schedule a refresh of the internal representation of the current
-        schema for this cluster.  See :meth:`~.refresh_schema` for description of parameters.
-        """
-        msg = "submit_schema_refresh is deprecated. Use Cluster.refresh_*_metadata instead."
-        warnings.warn(msg, DeprecationWarning)
-        log.warning(msg)
-
-        self._validate_refresh_schema(keyspace, table, usertype, function, aggregate)
-        target_type = self._target_type_from_refresh_args(keyspace, table, usertype, function, aggregate)
-        return self.executor.submit(
-            self.control_connection.refresh_schema, target_type=target_type, keyspace=keyspace, table=table,
-            type=usertype, function=function, aggregate=aggregate)
-
     def refresh_schema_metadata(self, max_schema_agreement_wait=None):
         """
         Synchronously refresh all schema metadata.
@@ -1474,13 +1415,17 @@ class Session(object):
     .. versionadded:: 2.0.0
     """
 
-    default_consistency_level = ConsistencyLevel.ONE
+    default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
     """
     The default :class:`~ConsistencyLevel` for operations executed through
     this session.  This default may be overridden by setting the
     :attr:`~.Statement.consistency_level` on individual statements.
 
     .. versionadded:: 1.2.0
+
+    .. versionchanged:: 3.0.0
+
+        default changed from ONE to LOCAL_QUORUM
     """
 
     max_trace_wait = 2.0
@@ -1601,34 +1546,14 @@ class Session(object):
         no timeout. Please see :meth:`.ResponseFuture.result` for details on
         the scope and effect of this timeout.
 
-        If `trace` is set to :const:`True`, an attempt will be made to
-        fetch the trace details and attach them to the `query`'s
-        :attr:`~.Statement.trace` attribute in the form of a :class:`.QueryTrace`
-        instance.  This requires that `query` be a :class:`.Statement` subclass
-        instance and not just a string.  If there is an error fetching the
-        trace details, the :attr:`~.Statement.trace` attribute will be left as
-        :const:`None`.
+        If `trace` is set to :const:`True`, the query will be sent with tracing enabled.
+        The trace details can be obtained using the returned :class:`.ResultSet` object.
 
         `custom_payload` is a :ref:`custom_payload` dict to be passed to the server.
         If `query` is a Statement with its own custom_payload. The message payload
         will be a union of the two, with the values specified here taking precedence.
         """
-        if trace and not isinstance(query, Statement):
-            raise TypeError(
-                "The query argument must be an instance of a subclass of "
-                "cassandra.query.Statement when trace=True")
-
-        future = self.execute_async(query, parameters, trace, custom_payload, timeout)
-        try:
-            result = future.result()
-        finally:
-            if trace:
-                try:
-                    query.trace = future.get_query_trace(self.max_trace_wait)
-                except Exception:
-                    log.exception("Unable to fetch query trace:")
-
-        return result
+        return self.execute_async(query, parameters, trace, custom_payload, timeout).result()
 
     def execute_async(self, query, parameters=None, trace=False, custom_payload=None, timeout=_NOT_SET):
         """
@@ -1638,9 +1563,9 @@ class Session(object):
         on the :class:`.ResponseFuture` to syncronously block for results at
         any time.
 
-        If `trace` is set to :const:`True`, you may call
-        :meth:`.ResponseFuture.get_query_trace()` after the request
-        completes to retrieve a :class:`.QueryTrace` instance.
+        If `trace` is set to :const:`True`, you may get the query trace descriptors using
+        :meth:`.ResponseFuture.get_query_trace()` or :meth:`.ResponseFuture.get_all_query_traces()`
+        on the future result.
 
         `custom_payload` is a :ref:`custom_payload` dict to be passed to the server.
         If `query` is a Statement with its own custom_payload. The message payload
@@ -1730,8 +1655,7 @@ class Session(object):
                 query.batch_type, query._statements_and_parameters, cl,
                 query.serial_consistency_level, timestamp)
 
-        if trace:
-            message.tracing = True
+        message.tracing = trace
 
         message.update_custom_payload(query.custom_payload)
         message.update_custom_payload(custom_payload)
@@ -2710,7 +2634,7 @@ class ResponseFuture(object):
     _req_id = None
     _final_result = _NOT_SET
     _final_exception = None
-    _query_trace = None
+    _query_traces = None
     _callbacks = None
     _errbacks = None
     _current_host = None
@@ -2901,9 +2825,9 @@ class ResponseFuture(object):
 
             trace_id = getattr(response, 'trace_id', None)
             if trace_id:
-                if self.query:
-                    self.query.trace_id = trace_id
-                self._query_trace = QueryTrace(trace_id, self.session)
+                if not self._query_traces:
+                    self._query_traces = []
+                self._query_traces.append(QueryTrace(trace_id, self.session))
 
             self._warnings = getattr(response, 'warnings', None)
             self._custom_payload = getattr(response, 'custom_payload', None)
@@ -3147,26 +3071,14 @@ class ResponseFuture(object):
         # otherwise, move onto another host
         self.send_request()
 
-    def result(self, timeout=_NOT_SET):
+    def result(self):
         """
         Return the final result or raise an Exception if errors were
         encountered.  If the final result or error has not been set
-        yet, this method will block until that time.
+        yet, this method will block until it is set, or the timeout
+        set for the request expires.
 
-        .. versionchanged:: 2.6.0
-
-        **`timeout` is deprecated. Use timeout in the Session execute functions instead.
-        The following description applies to deprecated behavior:**
-
-        You may set a timeout (in seconds) with the `timeout` parameter.
-        By default, the :attr:`~.default_timeout` for the :class:`.Session`
-        this was created through will be used for the timeout on this
-        operation.
-
-        This timeout applies to the entire request, including any retries
-        (decided internally by the :class:`.policies.RetryPolicy` used with
-        the request).
-
+        Timeout is specified in the Session request execution functions.
         If the timeout is exceeded, an :exc:`cassandra.OperationTimedOut` will be raised.
         This is a client-side timeout. For more information
         about server-side coordinator timeouts, see :class:`.policies.RetryPolicy`.
@@ -3184,40 +3096,45 @@ class ResponseFuture(object):
             ...     log.exception("Operation failed:")
 
         """
-        if timeout is not _NOT_SET and not ResponseFuture._warned_timeout:
-            msg = "ResponseFuture.result timeout argument is deprecated. Specify the request timeout via Session.execute[_async]."
-            warnings.warn(msg, DeprecationWarning)
-            log.warning(msg)
-            ResponseFuture._warned_timeout = True
-        else:
-            timeout = None
-
-        self._event.wait(timeout)
-        # TODO: remove this conditional when deprecated timeout parameter is removed
-        if not self._event.is_set():
-            self._on_timeout()
+        self._event.wait()
         if self._final_result is not _NOT_SET:
-            if self._paging_state is None:
-                return self._final_result
-            else:
-                return PagedResult(self, self._final_result)
+            return ResultSet(self, self._final_result)
         else:
             raise self._final_exception
 
+    def get_query_trace_ids(self):
+        """
+        Returns the trace session ids for this future, if tracing was enabled (does not fetch trace data).
+        """
+        return [trace.trace_id for trace in self._query_traces]
+
     def get_query_trace(self, max_wait=None):
         """
-        Returns the :class:`~.query.QueryTrace` instance representing a trace
-        of the last attempt for this operation, or :const:`None` if tracing was
-        not enabled for this query.  Note that this may raise an exception if
-        there are problems retrieving the trace details from Cassandra. If the
-        trace is not available after `max_wait` seconds,
+        Fetches and returns the query trace of the last response, or `None` if tracing was
+        not enabled.
+
+        Note that this may raise an exception if there are problems retrieving the trace
+        details from Cassandra. If the trace is not available after `max_wait_sec`,
         :exc:`cassandra.query.TraceUnavailable` will be raised.
         """
-        if not self._query_trace:
-            return None
+        if self._query_traces:
+            return self._get_query_trace(len(self._query_traces) - 1, max_wait)
 
-        self._query_trace.populate(max_wait)
-        return self._query_trace
+    def get_all_query_traces(self, max_wait_per=None):
+        """
+        Fetches and returns the query traces for all query pages, if tracing was enabled.
+
+        See note in :meth:`~.get_query_trace` regarding possible exceptions.
+        """
+        if self._query_traces:
+            return [self._get_query_trace(i, max_wait_per) for i in range(len(self._query_traces))]
+        return []
+
+    def _get_query_trace(self, i, max_wait):
+        trace = self._query_traces[i]
+        if not trace.events:
+            trace.populate(max_wait=max_wait)
+        return trace
 
     def add_callback(self, fn, *args, **kwargs):
         """
@@ -3333,12 +3250,13 @@ class QueryExhausted(Exception):
     pass
 
 
-class PagedResult(object):
+class ResultSet(object):
     """
-    An iterator over the rows from a paged query result.  Whenever the number
-    of result rows for a query exceed the :attr:`~.query.Statement.fetch_size`
-    (or :attr:`~.Session.default_fetch_size`, if not set) an instance of this
-    class will be returned.
+    An iterator over the rows from a query result. Also supplies basic equality
+    and indexing methods for backward-compatability. These methods materialize
+    the entire result set (loading all pages), and should only be used if the
+    total result size is understood. Warnings are emitted when paged results
+    are materialized in this fashion.
 
     You can treat this as a normal iterator over rows::
 
@@ -3351,33 +3269,98 @@ class PagedResult(object):
     be fetched transparently.  However, note that it *is* possible for
     an :class:`Exception` to be raised while fetching the next page, just
     like you might see on a normal call to ``session.execute()``.
-
-    .. versionadded: 2.0.0
     """
-
-    response_future = None
 
     def __init__(self, response_future, initial_response):
         self.response_future = response_future
-        self.current_response = iter(initial_response)
+        self._set_current_rows(initial_response)
+        self._page_iter = None
+        self._list_mode = False
+
+    @property
+    def has_more_pages(self):
+        """
+        True if the last response indicated more pages; False otherwise
+        """
+        return self.response_future.has_more_pages
+
+    @property
+    def current_rows(self):
+        return self._current_rows or []
 
     def __iter__(self):
+        if self._list_mode:
+            return iter(self._current_rows)
+        self._page_iter = iter(self._current_rows)
         return self
 
     def next(self):
         try:
-            return next(self.current_response)
+            return next(self._page_iter)
         except StopIteration:
             if not self.response_future.has_more_pages:
+                if not self._list_mode:
+                    self._current_rows = []
                 raise
 
-        self.response_future.start_fetching_next_page()
-        result = self.response_future.result()
-        if self.response_future.has_more_pages:
-            self.current_response = result.current_response
-        else:
-            self.current_response = iter(result)
+        self.fetch_next_page()
+        self._page_iter = iter(self._current_rows)
 
-        return next(self.current_response)
+        return next(self._page_iter)
 
     __next__ = next
+
+    def fetch_next_page(self):
+        if self.response_future.has_more_pages:
+            self.response_future.start_fetching_next_page()
+            result = self.response_future.result()
+            self._current_rows = result._current_rows  # ResultSet has already _set_current_rows to the appropriate form
+        else:
+            self._current_rows = []
+
+    def _set_current_rows(self, result):
+        if isinstance(result, _RESULT_SEQUENCE_TYPES):
+            self._current_rows = result
+        else:
+            self._current_rows = [result] if result else []
+
+    def _fetch_all(self):
+        self._current_rows = list(self)
+        self._page_iter = None
+
+    def _enter_list_mode(self, operator):
+        if self._list_mode:
+            return
+        if self._page_iter:
+            raise RuntimeError("Cannot use %s when results have been iterated." % operator)
+        if self.response_future.has_more_pages:
+            log.warning("Using %s on paged results causes entire result set to be materialized.", operator)
+            self._fetch_all()
+        self._list_mode = True
+
+    def __eq__(self, other):
+        self._enter_list_mode("equality operator")
+        return self._current_rows == other
+
+    def __getitem__(self, i):
+        self._enter_list_mode("index operator")
+        return self._current_rows[i]
+
+    def __nonzero__(self):
+        return bool(self._current_rows)
+
+    __bool__ = __nonzero__
+
+    def get_query_trace(self, max_wait_sec=None):
+        """
+        Gets the last query trace from the associated future.
+        See :meth:`.ResponseFuture.get_query_trace` for details.
+        """
+        return self.response_future.get_query_trace(max_wait_sec)
+
+    def get_all_query_traces(self, max_wait_sec_per=None):
+        """
+        Gets all query traces from the associated future.
+        See :meth:`.ResponseFuture.get_all_query_traces` for details.
+        """
+        return self.response_future.get_all_query_traces(max_wait_sec_per)

@@ -26,13 +26,15 @@ from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
 from cassandra.cluster import Cluster
 from cassandra.policies import HostDistance
 
-from tests.integration import use_singledc, PROTOCOL_VERSION
+from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions
 
 import re
 
 
 def setup_module():
     use_singledc()
+    global CASS_SERVER_VERSION
+    CASS_SERVER_VERSION = get_server_versions()[0]
 
 
 class QueryTests(unittest.TestCase):
@@ -65,27 +67,34 @@ class QueryTests(unittest.TestCase):
 
         query = "SELECT * FROM system.local"
         statement = SimpleStatement(query)
-        session.execute(statement, trace=True)
+        rs = session.execute(statement, trace=True)
 
         # Ensure this does not throw an exception
-        str(statement.trace)
-        for event in statement.trace.events:
+        trace = rs.get_query_trace()
+        self.assertTrue(trace.events)
+        str(trace)
+        for event in trace.events:
             str(event)
 
         cluster.shutdown()
 
-    def test_trace_id_to_query(self):
+    def test_trace_id_to_resultset(self):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
-        query = "SELECT * FROM system.local"
-        statement = SimpleStatement(query)
-        self.assertIsNone(statement.trace_id)
-        future = session.execute_async(statement, trace=True)
+        future = session.execute_async("SELECT * FROM system.local", trace=True)
 
-        # query should have trace_id, even before trace is obtained
-        future.result()
-        self.assertIsNotNone(statement.trace_id)
+        # future should have the current trace
+        rs = future.result()
+        future_trace = future.get_query_trace()
+        self.assertIsNotNone(future_trace)
+
+        rs_trace = rs.get_query_trace()
+        self.assertEqual(rs_trace, future_trace)
+        self.assertTrue(rs_trace.events)
+        self.assertEqual(len(rs_trace.events), len(future_trace.events))
+
+        self.assertListEqual([rs_trace], rs.get_all_query_traces())
 
         cluster.shutdown()
 
@@ -96,11 +105,13 @@ class QueryTests(unittest.TestCase):
 
         query = "SELECT * FROM system.local"
         statement = SimpleStatement(query)
-        session.execute(statement, trace=True)
+        rs = session.execute(statement, trace=True)
 
         # Ensure this does not throw an exception
-        str(statement.trace)
-        for event in statement.trace.events:
+        trace = rs.get_query_trace()
+        self.assertTrue(trace.events)
+        str(trace)
+        for event in trace.events:
             str(event)
 
         cluster.shutdown()
@@ -137,7 +148,7 @@ class QueryTests(unittest.TestCase):
         query = "SELECT * FROM system.local"
         statement = SimpleStatement(query)
         response_future = session.execute_async(statement, trace=True)
-        response_future.result(timeout=10.0)
+        response_future.result()
 
         # Fetch the client_ip from the trace.
         trace = response_future.get_query_trace(max_wait=2.0)
@@ -402,7 +413,7 @@ class SerialConsistencyTests(unittest.TestCase):
         future = self.session.execute_async(statement)
         result = future.result()
         self.assertEqual(future.message.serial_consistency_level, ConsistencyLevel.SERIAL)
-        self.assertEqual(1, len(result))
+        self.assertTrue(result)
         self.assertFalse(result[0].applied)
 
         statement = SimpleStatement(
@@ -412,7 +423,7 @@ class SerialConsistencyTests(unittest.TestCase):
         future = self.session.execute_async(statement)
         result = future.result()
         self.assertEqual(future.message.serial_consistency_level, ConsistencyLevel.LOCAL_SERIAL)
-        self.assertEqual(1, len(result))
+        self.assertTrue(result)
         self.assertTrue(result[0].applied)
 
     def test_conditional_update_with_prepared_statements(self):
@@ -424,7 +435,7 @@ class SerialConsistencyTests(unittest.TestCase):
         future = self.session.execute_async(statement)
         result = future.result()
         self.assertEqual(future.message.serial_consistency_level, ConsistencyLevel.SERIAL)
-        self.assertEqual(1, len(result))
+        self.assertTrue(result)
         self.assertFalse(result[0].applied)
 
         statement = self.session.prepare(
@@ -434,7 +445,7 @@ class SerialConsistencyTests(unittest.TestCase):
         future = self.session.execute_async(bound)
         result = future.result()
         self.assertEqual(future.message.serial_consistency_level, ConsistencyLevel.LOCAL_SERIAL)
-        self.assertEqual(1, len(result))
+        self.assertTrue(result)
         self.assertTrue(result[0].applied)
 
     def test_conditional_update_with_batch_statements(self):
@@ -445,7 +456,7 @@ class SerialConsistencyTests(unittest.TestCase):
         future = self.session.execute_async(statement)
         result = future.result()
         self.assertEqual(future.message.serial_consistency_level, ConsistencyLevel.SERIAL)
-        self.assertEqual(1, len(result))
+        self.assertTrue(result)
         self.assertFalse(result[0].applied)
 
         statement = BatchStatement(serial_consistency_level=ConsistencyLevel.LOCAL_SERIAL)
@@ -454,7 +465,7 @@ class SerialConsistencyTests(unittest.TestCase):
         future = self.session.execute_async(statement)
         result = future.result()
         self.assertEqual(future.message.serial_consistency_level, ConsistencyLevel.LOCAL_SERIAL)
-        self.assertEqual(1, len(result))
+        self.assertTrue(result)
         self.assertTrue(result[0].applied)
 
     def test_bad_consistency_level(self):
@@ -617,3 +628,163 @@ class BatchStatementDefaultRoutingKeyTests(unittest.TestCase):
 
         self.assertIsNotNone(batch.routing_key)
         self.assertEqual(batch.routing_key, self.prepared.bind((1, 0)).routing_key)
+
+
+class MaterializedViewQueryTest(BasicSharedKeyspaceUnitTestCase):
+
+    def setUp(self):
+        if CASS_SERVER_VERSION < (3, 0):
+            raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
+
+    def test_mv_filtering(self):
+        """
+        Test to ensure that cql filtering where clauses are properly supported in the python driver.
+
+        test_mv_filtering Tests that various complex MV where clauses produce the correct results. It also validates that
+        these results and the grammar is supported appropriately.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-399
+        @expected_result Materialized view where clauses should produce the appropriate results.
+
+        @test_category materialized_view
+        """
+        create_table = """CREATE TABLE {0}.scores(
+                        user TEXT,
+                        game TEXT,
+                        year INT,
+                        month INT,
+                        day INT,
+                        score INT,
+                        PRIMARY KEY (user, game, year, month, day)
+                        )""".format(self.keyspace_name)
+
+        self.session.execute(create_table)
+
+        create_mv_alltime = """CREATE MATERIALIZED VIEW {0}.alltimehigh AS
+                        SELECT * FROM {0}.scores
+                        WHERE game IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND day IS NOT NULL
+                        PRIMARY KEY (game, score, user, year, month, day)
+                        WITH CLUSTERING ORDER BY (score DESC)""".format(self.keyspace_name)
+
+        create_mv_dailyhigh = """CREATE MATERIALIZED VIEW {0}.dailyhigh AS
+                        SELECT * FROM {0}.scores
+                        WHERE game IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND day IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL
+                        PRIMARY KEY ((game, year, month, day), score, user)
+                        WITH CLUSTERING ORDER BY (score DESC)""".format(self.keyspace_name)
+
+        create_mv_monthlyhigh = """CREATE MATERIALIZED VIEW {0}.monthlyhigh AS
+                        SELECT * FROM {0}.scores
+                        WHERE game IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL AND day IS NOT NULL
+                        PRIMARY KEY ((game, year, month), score, user, day)
+                        WITH CLUSTERING ORDER BY (score DESC)""".format(self.keyspace_name)
+
+        create_mv_filtereduserhigh = """CREATE MATERIALIZED VIEW {0}.filtereduserhigh AS
+                        SELECT * FROM {0}.scores
+                        WHERE user in ('jbellis', 'pcmanus') AND game IS NOT NULL AND score IS NOT NULL AND year is NOT NULL AND day is not NULL and month IS NOT NULL
+                        PRIMARY KEY (game, score, user, year, month, day)
+                        WITH CLUSTERING ORDER BY (score DESC)""".format(self.keyspace_name)
+
+        self.session.execute(create_mv_alltime)
+        self.session.execute(create_mv_dailyhigh)
+        self.session.execute(create_mv_monthlyhigh)
+        self.session.execute(create_mv_filtereduserhigh)
+
+        prepared_insert = self.session.prepare("""INSERT INTO {0}.scores (user, game, year, month, day, score) VALUES  (?, ?, ? ,? ,?, ?)""".format(self.keyspace_name))
+
+        bound = prepared_insert.bind(('pcmanus', 'Coup', 2015, 5, 1, 4000))
+        self.session.execute(bound)
+        bound = prepared_insert.bind(('jbellis', 'Coup', 2015, 5, 3, 1750))
+        self.session.execute(bound)
+        bound = prepared_insert.bind(('yukim', 'Coup', 2015, 5, 3, 2250))
+        self.session.execute(bound)
+        bound = prepared_insert.bind(('tjake', 'Coup', 2015, 5, 3, 500))
+        self.session.execute(bound)
+        bound = prepared_insert.bind(('iamaleksey', 'Coup', 2015, 6, 1, 2500))
+        self.session.execute(bound)
+        bound = prepared_insert.bind(('tjake', 'Coup', 2015, 6, 2, 1000))
+        self.session.execute(bound)
+        bound = prepared_insert.bind(('pcmanus', 'Coup', 2015, 6, 2, 2000))
+        self.session.execute(bound)
+        bound = prepared_insert.bind(('jmckenzie', 'Coup', 2015, 6, 9, 2700))
+        self.session.execute(bound)
+        bound = prepared_insert.bind(('jbellis', 'Coup', 2015, 6, 20, 3500))
+        self.session.execute(bound)
+        bound = prepared_insert.bind(('jbellis', 'Checkers', 2015, 6, 20, 1200))
+        self.session.execute(bound)
+        bound = prepared_insert.bind(('jbellis', 'Chess', 2015, 6, 21, 3500))
+        self.session.execute(bound)
+        bound = prepared_insert.bind(('pcmanus', 'Chess', 2015, 1, 25, 3200))
+        self.session.execute(bound)
+
+        # Test simple statement and alltime high filtering
+        query_statement = SimpleStatement("SELECT * FROM {0}.alltimehigh WHERE game='Coup'".format(self.keyspace_name),
+                                          consistency_level=ConsistencyLevel.QUORUM)
+        results = self.session.execute(query_statement)
+        self.assertEquals(results[0].game, 'Coup')
+        self.assertEquals(results[0].year, 2015)
+        self.assertEquals(results[0].month, 5)
+        self.assertEquals(results[0].day, 1)
+        self.assertEquals(results[0].score, 4000)
+        self.assertEquals(results[0].user, "pcmanus")
+
+        # Test prepared statement and daily high filtering
+        prepared_query = self.session.prepare("SELECT * FROM {0}.dailyhigh WHERE game=? AND year=? AND month=? and day=?".format(self.keyspace_name))
+        bound_query = prepared_query.bind(("Coup", 2015, 6, 2))
+        results = self.session.execute(bound_query)
+        self.assertEquals(results[0].game, 'Coup')
+        self.assertEquals(results[0].year, 2015)
+        self.assertEquals(results[0].month, 6)
+        self.assertEquals(results[0].day, 2)
+        self.assertEquals(results[0].score, 2000)
+        self.assertEquals(results[0].user, "pcmanus")
+
+        self.assertEquals(results[1].game, 'Coup')
+        self.assertEquals(results[1].year, 2015)
+        self.assertEquals(results[1].month, 6)
+        self.assertEquals(results[1].day, 2)
+        self.assertEquals(results[1].score, 1000)
+        self.assertEquals(results[1].user, "tjake")
+
+        # Test montly high range queries
+        prepared_query = self.session.prepare("SELECT * FROM {0}.monthlyhigh WHERE game=? AND year=? AND month=? and score >= ? and score <= ?".format(self.keyspace_name))
+        bound_query = prepared_query.bind(("Coup", 2015, 6, 2500, 3500))
+        results = self.session.execute(bound_query)
+        self.assertEquals(results[0].game, 'Coup')
+        self.assertEquals(results[0].year, 2015)
+        self.assertEquals(results[0].month, 6)
+        self.assertEquals(results[0].day, 20)
+        self.assertEquals(results[0].score, 3500)
+        self.assertEquals(results[0].user, "jbellis")
+
+        self.assertEquals(results[1].game, 'Coup')
+        self.assertEquals(results[1].year, 2015)
+        self.assertEquals(results[1].month, 6)
+        self.assertEquals(results[1].day, 9)
+        self.assertEquals(results[1].score, 2700)
+        self.assertEquals(results[1].user, "jmckenzie")
+
+        self.assertEquals(results[2].game, 'Coup')
+        self.assertEquals(results[2].year, 2015)
+        self.assertEquals(results[2].month, 6)
+        self.assertEquals(results[2].day, 1)
+        self.assertEquals(results[2].score, 2500)
+        self.assertEquals(results[2].user, "iamaleksey")
+
+        # Test filtered user high scores
+        query_statement = SimpleStatement("SELECT * FROM {0}.filtereduserhigh WHERE game='Chess'".format(self.keyspace_name),
+                                          consistency_level=ConsistencyLevel.QUORUM)
+        results = self.session.execute(query_statement)
+        self.assertEquals(results[0].game, 'Chess')
+        self.assertEquals(results[0].year, 2015)
+        self.assertEquals(results[0].month, 6)
+        self.assertEquals(results[0].day, 21)
+        self.assertEquals(results[0].score, 3500)
+        self.assertEquals(results[0].user, "jbellis")
+
+        self.assertEquals(results[1].game, 'Chess')
+        self.assertEquals(results[1].year, 2015)
+        self.assertEquals(results[1].month, 1)
+        self.assertEquals(results[1].day, 25)
+        self.assertEquals(results[1].score, 3200)
+        self.assertEquals(results[1].user, "pcmanus")

@@ -1,0 +1,49 @@
+python:
+  - 2.7
+  - 3.4
+os:
+  - ubuntu/trusty64
+cassandra:
+  - 1.2
+  - 2.0
+  - 2.1
+  - 2.2
+  - 3.0
+env:
+  EVENT_LOOP_MANAGER:
+    - libev
+  CYTHON:
+    - CYTHON
+    - NO_CYTHON
+build:
+  - script: |
+      export JAVA_HOME=$CCM_JAVA_HOME
+      export PATH=$JAVA_HOME/bin:$PATH
+
+      # Install dependencies
+      if [[ $EVENT_LOOP_MANAGER == 'libev' ]]; then
+        sudo apt-get install -y libev4 libev-dev
+      fi
+      pip install -r test-requirements.txt
+      pip install nose-ignore-docstring
+
+      if [[ $CYTHON == 'CYTHON' ]]; then
+        pip install cython
+        pip install numpy
+        # Install the driver & compile C extensions
+        python setup.py build_ext --inplace
+      else
+        # Install the driver & compile C extensions with no cython
+        python setup.py build_ext --inplace --no-cython
+      fi
+
+      echo "==========RUNNING CQLENGINE TESTS=========="
+      CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=cqle_results.xml tests/integration/cqlengine/ || true
+
+      echo "==========RUNNING INTEGRATION TESTS=========="
+      CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=standard_results.xml tests/integration/standard/ || true
+
+      echo "==========RUNNING LONG INTEGRATION TESTS=========="
+      CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=long_results.xml tests/integration/long/ || true
+  - xunit:
+    - "*_results.xml"

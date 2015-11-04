@@ -18,7 +18,7 @@ import sys, logging, traceback
 
 from cassandra import InvalidRequest, ConsistencyLevel, ReadTimeout, WriteTimeout, OperationTimedOut, \
     ReadFailure, WriteFailure
-from cassandra.cluster import Cluster, PagedResult
+from cassandra.cluster import Cluster
 from cassandra.concurrent import execute_concurrent, execute_concurrent_with_args
 from cassandra.policies import HostDistance
 from cassandra.query import tuple_factory, SimpleStatement
@@ -89,7 +89,9 @@ class ClusterTests(unittest.TestCase):
 
             results = self.execute_concurrent_helper(self.session, list(zip(statements, parameters)))
             self.assertEqual(num_statements, len(results))
-            self.assertEqual([(True, None)] * num_statements, results)
+            for success, result in results:
+                self.assertTrue(success)
+                self.assertFalse(result)
 
             # read
             statement = SimpleStatement(
@@ -111,7 +113,9 @@ class ClusterTests(unittest.TestCase):
 
             results = self.execute_concurrent_args_helper(self.session, statement, parameters)
             self.assertEqual(num_statements, len(results))
-            self.assertEqual([(True, None)] * num_statements, results)
+            for success, result in results:
+                self.assertTrue(success)
+                self.assertFalse(result)
 
             # read
             statement = SimpleStatement(
@@ -143,8 +147,9 @@ class ClusterTests(unittest.TestCase):
             parameters = [(i, i) for i in range(num_statements)]
 
             results = self.execute_concurrent_args_helper(self.session, statement, parameters, results_generator=True)
-            for result in results:
-                self.assertEqual((True, None), result)
+            for success, result in results:
+                self.assertTrue(success)
+                self.assertFalse(result)
 
             # read
             statement = SimpleStatement(
@@ -172,7 +177,9 @@ class ClusterTests(unittest.TestCase):
 
         results = self.execute_concurrent_args_helper(self.session, statement, parameters)
         self.assertEqual(num_statements, len(results))
-        self.assertEqual([(True, None)] * num_statements, results)
+        for success, result in results:
+            self.assertTrue(success)
+            self.assertFalse(result)
 
         # read
         statement = SimpleStatement(
@@ -184,7 +191,7 @@ class ClusterTests(unittest.TestCase):
         self.assertEqual(1, len(results))
         self.assertTrue(results[0][0])
         result = results[0][1]
-        self.assertIsInstance(result, PagedResult)
+        self.assertTrue(result.has_more_pages)
         self.assertEqual(num_statements, sum(1 for _ in result))
 
     def test_execute_concurrent_paged_result_generator(self):
@@ -273,7 +280,7 @@ class ClusterTests(unittest.TestCase):
                 self.assertIsInstance(result, InvalidRequest)
             else:
                 self.assertTrue(success)
-                self.assertEqual(None, result)
+                self.assertFalse(result)
 
     def test_no_raise_on_first_failure_client_side(self):
         statement = SimpleStatement(
@@ -292,4 +299,4 @@ class ClusterTests(unittest.TestCase):
                 self.assertIsInstance(result, TypeError)
             else:
                 self.assertTrue(success)
-                self.assertEqual(None, result)
+                self.assertFalse(result)
