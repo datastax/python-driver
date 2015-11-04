@@ -40,11 +40,11 @@ class ParamBindingTest(unittest.TestCase):
 
     def test_sequence_param(self):
         result = bind_params("%s", (ValueSequence((1, "a", 2.0)),), Encoder())
-        self.assertEqual(result, "( 1 , 'a' , 2.0 )")
+        self.assertEqual(result, "(1, 'a', 2.0)")
 
     def test_generator_param(self):
         result = bind_params("%s", ((i for i in xrange(3)),), Encoder())
-        self.assertEqual(result, "[ 0 , 1 , 2 ]")
+        self.assertEqual(result, "[0, 1, 2]")
 
     def test_none_param(self):
         result = bind_params("%s", (None,), Encoder())
@@ -52,11 +52,11 @@ class ParamBindingTest(unittest.TestCase):
 
     def test_list_collection(self):
         result = bind_params("%s", (['a', 'b', 'c'],), Encoder())
-        self.assertEqual(result, "[ 'a' , 'b' , 'c' ]")
+        self.assertEqual(result, "['a', 'b', 'c']")
 
     def test_set_collection(self):
         result = bind_params("%s", (set(['a', 'b']),), Encoder())
-        self.assertIn(result, ("{ 'a' , 'b' }", "{ 'b' , 'a' }"))
+        self.assertIn(result, ("{'a', 'b'}", "{'b', 'a'}"))
 
     def test_map_collection(self):
         vals = OrderedDict()
@@ -64,7 +64,7 @@ class ParamBindingTest(unittest.TestCase):
         vals['b'] = 'b'
         vals['c'] = 'c'
         result = bind_params("%s", (vals,), Encoder())
-        self.assertEqual(result, "{ 'a' : 'a' , 'b' : 'b' , 'c' : 'c' }")
+        self.assertEqual(result, "{'a': 'a', 'b': 'b', 'c': 'c'}")
 
     def test_quote_escaping(self):
         result = bind_params("%s", ("""'ef''ef"ef""ef'""",), Encoder())
