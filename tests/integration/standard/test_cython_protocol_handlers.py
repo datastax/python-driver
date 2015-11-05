@@ -11,7 +11,7 @@ from cassandra.query import tuple_factory
 from cassandra.cluster import Cluster
 from cassandra.protocol import ProtocolHandler, LazyProtocolHandler, NumpyProtocolHandler
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, notprotocolv1
+from tests.integration import use_singledc, PROTOCOL_VERSION, notprotocolv1, drop_keyspace_shutdown_cluster
 from tests.integration.datatype_utils import update_datatypes
 from tests.integration.standard.utils import (
     create_table_with_all_types, get_all_primitive_params, get_primitive_datatypes)
@@ -38,8 +38,7 @@ class CythonProtocolHandlerTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        cls.session.execute("DROP KEYSPACE testspace")
-        cls.cluster.shutdown()
+        drop_keyspace_shutdown_cluster("testspace", cls.session, cls.session)
 
     @cythontest
     def test_cython_parser(self):

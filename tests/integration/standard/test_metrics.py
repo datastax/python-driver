@@ -32,18 +32,23 @@ def setup_module():
 
 class MetricsTests(unittest.TestCase):
 
+    def setUp(self):
+        self.cluster = Cluster(metrics_enabled=True, protocol_version=PROTOCOL_VERSION)
+        self.session = self.cluster.connect("test3rf")
+
+    def tearDown(self):
+        self.cluster.shutdown()
+
     def test_connection_error(self):
         """
         Trigger and ensure connection_errors are counted
         Stop all node with the driver knowing about the "DOWN" states.
         """
 
-        cluster = Cluster(metrics_enabled=True, protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect("test3rf")
 
         # Test writes
         for i in range(0, 100):
-            session.execute_async("INSERT INTO test (k, v) VALUES ({0}, {1})".format(i, i))
+            self.session.execute_async("INSERT INTO test (k, v) VALUES ({0}, {1})".format(i, i))
 
         # Stop the cluster
         get_cluster().stop(wait=True, gently=False)
@@ -52,14 +57,13 @@ class MetricsTests(unittest.TestCase):
             # Ensure the nodes are actually down
             query = SimpleStatement("SELECT * FROM test", consistency_level=ConsistencyLevel.ALL)
             with self.assertRaises(NoHostAvailable):
-                session.execute(query)
+                self.session.execute(query)
         finally:
             get_cluster().start(wait_for_binary_proto=True, wait_other_notice=True)
             # Give some time for the cluster to come back up, for the next test
             time.sleep(5)
 
-        self.assertGreater(cluster.metrics.stats.connection_errors, 0)
-        cluster.shutdown()
+        self.assertGreater(self.cluster.metrics.stats.connection_errors, 0)
 
     def test_write_timeout(self):
         """
@@ -68,15 +72,12 @@ class MetricsTests(unittest.TestCase):
         Attempt a write at cl.ALL and receive a WriteTimeout.
         """
 
-        cluster = Cluster(metrics_enabled=True, protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect("test3rf")
-
         # Test write
-        session.execute("INSERT INTO test (k, v) VALUES (1, 1)")
+        self.session.execute("INSERT INTO test (k, v) VALUES (1, 1)")
 
         # Assert read
         query = SimpleStatement("SELECT * FROM test WHERE k=1", consistency_level=ConsistencyLevel.ALL)
-        results = execute_until_pass(session, query)
+        results = execute_until_pass(self.session, query)
         self.assertTrue(results)
 
         # Pause node so it shows as unreachable to coordinator
@@ -86,13 +87,11 @@ class MetricsTests(unittest.TestCase):
             # Test write
             query = SimpleStatement("INSERT INTO test (k, v) VALUES (2, 2)", consistency_level=ConsistencyLevel.ALL)
             with self.assertRaises(WriteTimeout):
-                session.execute(query, timeout=None)
-            self.assertEqual(1, cluster.metrics.stats.write_timeouts)
+                self.session.execute(query, timeout=None)
+            self.assertEqual(1, self.cluster.metrics.stats.write_timeouts)
 
         finally:
             get_node(1).resume()
-
-        cluster.shutdown()
 
     def test_read_timeout(self):
         """
@@ -101,15 +100,13 @@ class MetricsTests(unittest.TestCase):
         Attempt a read at cl.ALL and receive a ReadTimeout.
         """
 
-        cluster = Cluster(metrics_enabled=True, protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect("test3rf")
 
         # Test write
-        session.execute("INSERT INTO test (k, v) VALUES (1, 1)")
+        self.session.execute("INSERT INTO test (k, v) VALUES (1, 1)")
 
         # Assert read
         query = SimpleStatement("SELECT * FROM test WHERE k=1", consistency_level=ConsistencyLevel.ALL)
-        results = execute_until_pass(session, query)
+        results = execute_until_pass(self.session, query)
         self.assertTrue(results)
 
         # Pause node so it shows as unreachable to coordinator
@@ -119,13 +116,11 @@ class MetricsTests(unittest.TestCase):
             # Test read
             query = SimpleStatement("SELECT * FROM test", consistency_level=ConsistencyLevel.ALL)
             with self.assertRaises(ReadTimeout):
-                session.execute(query, timeout=None)
-            self.assertEqual(1, cluster.metrics.stats.read_timeouts)
+                self.session.execute(query, timeout=None)
+            self.assertEqual(1, self.cluster.metrics.stats.read_timeouts)
 
         finally:
             get_node(1).resume()
-
-        cluster.shutdown()
 
     def test_unavailable(self):
         """
@@ -134,15 +129,12 @@ class MetricsTests(unittest.TestCase):
         Attempt an insert/read at cl.ALL and receive a Unavailable Exception.
         """
 
-        cluster = Cluster(metrics_enabled=True, protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect("test3rf")
-
         # Test write
-        session.execute("INSERT INTO test (k, v) VALUES (1, 1)")
+        self.session.execute("INSERT INTO test (k, v) VALUES (1, 1)")
 
         # Assert read
         query = SimpleStatement("SELECT * FROM test WHERE k=1", consistency_level=ConsistencyLevel.ALL)
-        results = execute_until_pass(session, query)
+        results = execute_until_pass(self.session, query)
         self.assertTrue(results)
 
         # Stop node gracefully
@@ -152,20 +144,20 @@ class MetricsTests(unittest.TestCase):
             # Test write
             query = SimpleStatement("INSERT INTO test (k, v) VALUES (2, 2)", consistency_level=ConsistencyLevel.ALL)
             with self.assertRaises(Unavailable):
-                session.execute(query)
-            self.assertEqual(1, cluster.metrics.stats.unavailables)
+                self.session.execute(query)
+            self.assertEqual(1, self.cluster.metrics.stats.unavailables)
 
             # Test write
             query = SimpleStatement("SELECT * FROM test", consistency_level=ConsistencyLevel.ALL)
             with self.assertRaises(Unavailable):
-                session.execute(query, timeout=None)
-            self.assertEqual(2, cluster.metrics.stats.unavailables)
+                self.session.execute(query, timeout=None)
+            self.assertEqual(2, self.cluster.metrics.stats.unavailables)
         finally:
             get_node(1).start(wait_other_notice=True, wait_for_binary_proto=True)
             # Give some time for the cluster to come back up, for the next test
             time.sleep(5)
 
-        cluster.shutdown()
+        self.cluster.shutdown()
 
     # def test_other_error(self):
     #     # TODO: Bootstrapping or Overloaded cases
