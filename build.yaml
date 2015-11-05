@@ -4,7 +4,6 @@ python:
 os:
   - ubuntu/trusty64
 cassandra:
-  - 1.2
   - 2.0
   - 2.1
   - 2.2
@@ -43,7 +42,5 @@ build:
       echo "==========RUNNING INTEGRATION TESTS=========="
       CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=standard_results.xml tests/integration/standard/ || true
 
-      echo "==========RUNNING LONG INTEGRATION TESTS=========="
-      CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=long_results.xml tests/integration/long/ || true
   - xunit:
     - "*_results.xml"
