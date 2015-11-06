@@ -386,6 +386,10 @@ class Cluster(object):
     """
     An optional list of tuples which will be used as arguments to
     ``socket.setsockopt()`` for all created sockets.
+
+    Note: some drivers find setting TCPNODELAY beneficial in the context of
+    their execution model. It was not found generally beneficial for this driver.
+    To try with your own workload, set ``sockopts = [(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)]``
     """
 
     max_schema_agreement_wait = 10
