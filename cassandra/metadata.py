@@ -1878,7 +1878,8 @@ class SchemaParserV22(_SchemaParser):
                     if value_alias_rows:  # CASSANDRA-8487
                         validator = types.lookup_casstype(value_alias_rows[0].get('validator'))
 
-                col = ColumnMetadata(table_meta, value_alias, validator)
+                cql_type = _cql_from_cass_type(validator)
+                col = ColumnMetadata(table_meta, value_alias, cql_type)
                 if value_alias:  # CASSANDRA-8487
                     table_meta.columns[value_alias] = col
 
