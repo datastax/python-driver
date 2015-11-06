@@ -1268,13 +1268,6 @@ class ColumnMetadata(object):
     The CQL type for the column.
     """
 
-    # TODO: probably remove this in favor of the table level mapping
-    index = None
-    """
-    If an index exists on this column, this is an instance of
-    :class:`.IndexMetadata`, otherwise :const:`None`.
-    """
-
     is_static = False
     """
     If this column is static (available in Cassandra 2.1+), this will
@@ -1889,7 +1882,6 @@ class SchemaParserV22(_SchemaParser):
                 if column_meta.name:
                     table_meta.columns[column_meta.name] = column_meta
                     index_meta = self._build_index_metadata(column_meta, col_row)
-                    column_meta.index = index_meta
                     if index_meta:
                         table_meta.indexes[index_meta.name] = index_meta
 

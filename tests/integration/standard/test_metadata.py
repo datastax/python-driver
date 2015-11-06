@@ -2126,7 +2126,6 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
             self.assertEquals(a.name, b.name)
             self.assertEquals(a.table, b.table)
             self.assertEquals(a.cql_type, b.cql_type)
-            self.assertEquals(a.index, b.index)
             self.assertEquals(a.is_static, b.is_static)
             self.assertEquals(a.is_reversed, b.is_reversed)
 
@@ -2327,7 +2326,6 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         self.assertEquals(cluster_column.name, 'the;Clustering')
         self.assertEquals(cluster_column.name, mv.clustering_key[0].name)
         self.assertEquals(cluster_column.table, mv.clustering_key[0].table)
-        self.assertEquals(cluster_column.index, mv.clustering_key[0].index)
         self.assertEquals(cluster_column.is_static, mv.clustering_key[0].is_static)
         self.assertEquals(cluster_column.is_reversed, mv.clustering_key[0].is_reversed)
 
