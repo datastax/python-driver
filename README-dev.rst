@@ -5,7 +5,7 @@ Releasing
 * Update the version in ``cassandra/__init__.py``
 
   * For beta releases, use a version like ``(2, 1, '0b1')``
-  * For release candidates, use a version like ``(2, 1, '0c1')``
+  * For release candidates, use a version like ``(2, 1, '0rc1')``
   * When in doubt, follow PEP 440 versioning
 
 * Commit the changelog and version changes
