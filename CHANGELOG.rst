@@ -1,3 +1,26 @@
+3.0.0c1
+=======
+November 9, 2015
+
+Features
+--------
+* Process Modernized Schema Tables for Cassandra 3.0 (PYTHON-276, PYTHON-408, PYTHON-400, PYTHON-422)
+* Remove deprecated features (PYTHON-292)
+* Don't assign trace data to Statements (PYTHON-318)
+* Normalize results return (PYTHON-368)
+* Process Materialized View Metadata/Events (PYTHON-371)
+* Remove blist as soft dependency (PYTHON-385)
+* Change default consistency level to LOCAL_QUORUM (PYTHON-416)
+* Normalize CQL query/export in metadata model (PYTHON-405)
+
+Bug Fixes
+---------
+* Implementation of named arguments bind is non-pythonic (PYTHON-178)
+* CQL encoding is incorrect for NaN and Infinity floats (PYTHON-282)
+* Protocol downgrade issue with C* 2.0.x, 2.1.x, and python3, with non-default logging (PYTHON-409)
+* ValueError when accessing usertype with non-alphanumeric field names (PYTHON-413)
+* NumpyProtocolHandler does not play well with PagedResult (PYTHON-430)
+
 2.7.2
 =====
 Setpember 14, 2015

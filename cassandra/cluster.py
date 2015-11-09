@@ -386,6 +386,10 @@ class Cluster(object):
     """
     An optional list of tuples which will be used as arguments to
     ``socket.setsockopt()`` for all created sockets.
+
+    Note: some drivers find setting TCPNODELAY beneficial in the context of
+    their execution model. It was not found generally beneficial for this driver.
+    To try with your own workload, set ``sockopts = [(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)]``
     """
 
     max_schema_agreement_wait = 10
@@ -3302,6 +3306,10 @@ class ResultSet(object):
 
     @property
     def current_rows(self):
+        """
+        :return: the list of current page rows. May be empty if the result was empty,
+        or this is the last page.
+        """
         return self._current_rows or []
 
     def __iter__(self):
@@ -3327,6 +3335,11 @@ class ResultSet(object):
     __next__ = next
 
     def fetch_next_page(self):
+        """
+        Manually, synchronously fetch the next page. Supplied for manually retrieving pages
+        and inspecting :meth:`~.current_page`. It is not necessary to call this when iterating
+        through results; paging happens implicitly in iteration.
+        """
         if self.response_future.has_more_pages:
             self.response_future.start_fetching_next_page()
             result = self.response_future.result()

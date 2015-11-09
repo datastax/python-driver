@@ -22,7 +22,7 @@ from threading import Event
 from subprocess import call
 from itertools import groupby
 
-from cassandra import OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure
+from cassandra import OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure, AlreadyExists
 from cassandra.cluster import Cluster
 from cassandra.protocol import ConfigurationException
 
@@ -262,7 +262,8 @@ def execute_until_pass(session, query):
     while tries < 100:
         try:
             return session.execute(query)
-        except ConfigurationException:
+        except (ConfigurationException, AlreadyExists):
+            log.warn("Recieved already exists from query {0}   not exiting".format(query))
             # keyspace/table was already created/dropped
             return
         except (OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure):
@@ -272,6 +273,36 @@ def execute_until_pass(session, query):
             tries += 1
 
     raise RuntimeError("Failed to execute query after 100 attempts: {0}".format(query))
+
+
+def execute_with_long_wait_retry(session, query, timeout=30):
+    tries = 0
+    while tries < 10:
+        try:
+            return session.execute(query, timeout=timeout)
+        except (ConfigurationException, AlreadyExists):
+            log.warn("Recieved already exists from query {0}    not exiting".format(query))
+            # keyspace/table was already created/dropped
+            return
+        except (OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure):
+            ex_type, ex, tb = sys.exc_info()
+            log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+            del tb
+            tries += 1
+
+    raise RuntimeError("Failed to execute query after 100 attempts: {0}".format(query))
+
+
+def drop_keyspace_shutdown_cluster(keyspace_name, session, cluster):
+    try:
+        execute_with_long_wait_retry(session, "DROP KEYSPACE {0}".format(keyspace_name))
+    except:
+        log.warn("Error encountered when droping keyspace {0}".format(keyspace_name))
+        ex_type, ex, tb = sys.exc_info()
+        log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+        del tb
+    log.warn("Shutting down cluster")
+    cluster.shutdown()
 
 
 def setup_keyspace(ipformat=None):
@@ -292,23 +323,23 @@ def setup_keyspace(ipformat=None):
         ddl = '''
             CREATE KEYSPACE test3rf
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '3'}'''
-        execute_until_pass(session, ddl)
+        execute_with_long_wait_retry(session, ddl)
 
         ddl = '''
             CREATE KEYSPACE test2rf
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '2'}'''
-        execute_until_pass(session, ddl)
+        execute_with_long_wait_retry(session, ddl)
 
         ddl = '''
             CREATE KEYSPACE test1rf
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}'''
-        execute_until_pass(session, ddl)
+        execute_with_long_wait_retry(session, ddl)
 
         ddl = '''
             CREATE TABLE test3rf.test (
                 k int PRIMARY KEY,
                 v int )'''
-        execute_until_pass(session, ddl)
+        execute_with_long_wait_retry(session, ddl)
 
     except Exception:
         traceback.print_exc()
@@ -356,12 +387,12 @@ class BasicKeyspaceUnitTestCase(unittest.TestCase):
 
     @classmethod
     def drop_keyspace(cls):
-        execute_until_pass(cls.session, "DROP KEYSPACE {0}".format(cls.ks_name))
+        execute_with_long_wait_retry(cls.session, "DROP KEYSPACE {0}".format(cls.ks_name))
 
     @classmethod
     def create_keyspace(cls, rf):
         ddl = "CREATE KEYSPACE {0} WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': '{1}'}}".format(cls.ks_name, rf)
-        execute_until_pass(cls.session, ddl)
+        execute_with_long_wait_retry(cls.session, ddl)
 
     @classmethod
     def common_setup(cls, rf, create_class_table=False, skip_if_cass_version_less_than=None):
@@ -369,6 +400,7 @@ class BasicKeyspaceUnitTestCase(unittest.TestCase):
         cls.session = cls.cluster.connect()
         cls.ks_name = cls.__name__.lower()
         cls.create_keyspace(rf)
+        cls.cass_version = get_server_versions()
 
         if create_class_table:
 
@@ -401,8 +433,7 @@ class BasicSharedKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):
 
     @classmethod
     def tearDownClass(cls):
-        cls.drop_keyspace()
-        cls.cluster.shutdown()
+        drop_keyspace_shutdown_cluster(cls.keyspace_name, cls.session, cls.cluster)
 
 
 class BasicSharedKeyspaceUnitTestCaseWTable(BasicSharedKeyspaceUnitTestCase):
@@ -479,5 +510,4 @@ class BasicSegregatedKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):
         self.common_setup(1)
 
     def tearDown(self):
-        self.drop_keyspace()
-        self.cluster.shutdown()
+        drop_keyspace_shutdown_cluster(self.keyspace_name, self.session, self.cluster)

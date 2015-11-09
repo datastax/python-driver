@@ -54,6 +54,7 @@ from cassandra import util
 apache_cassandra_type_prefix = 'org.apache.cassandra.db.marshal.'
 
 cassandra_empty_type = 'org.apache.cassandra.db.marshal.EmptyType'
+cql_empty_type = 'empty'
 
 log = logging.getLogger(__name__)
 
@@ -76,6 +77,17 @@ def trim_if_startswith(s, prefix):
 
 
 _casstypes = {}
+
+
+cql_type_scanner = re.Scanner((
+    ('frozen', None),
+    (r'[a-zA-Z0-9_]+', lambda s, t: t),
+    (r'[\s,<>]', None),
+))
+
+
+def cql_types_from_string(cql_type):
+    return cql_type_scanner.scan(cql_type)[0]
 
 
 class CassandraTypeType(type):

@@ -31,7 +31,7 @@ from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
 from cassandra.protocol import MAX_SUPPORTED_VERSION
 from cassandra.query import SimpleStatement, TraceUnavailable
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, get_node, CASSANDRA_VERSION, execute_until_pass
+from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, get_node, CASSANDRA_VERSION, execute_until_pass, execute_with_long_wait_retry
 from tests.integration.util import assert_quiescent_pool_state
 
 
@@ -80,7 +80,7 @@ class ClusterTests(unittest.TestCase):
             """)
         self.assertFalse(result)
 
-        result = execute_until_pass(session,
+        result = execute_with_long_wait_retry(session,
             """
             CREATE TABLE clustertests.cf0 (
                 a text,
@@ -100,7 +100,7 @@ class ClusterTests(unittest.TestCase):
         result = session.execute("SELECT * FROM clustertests.cf0")
         self.assertEqual([('a', 'b', 'c')], result)
 
-        execute_until_pass(session, "DROP KEYSPACE clustertests")
+        execute_with_long_wait_retry(session, "DROP KEYSPACE clustertests")
 
         cluster.shutdown()
 

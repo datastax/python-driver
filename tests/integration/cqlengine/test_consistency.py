@@ -97,7 +97,6 @@ class TestConsistency(BaseConsistencyTest):
         args = m.call_args
         self.assertEqual(CL.ALL, args[0][0].consistency_level)
 
-
     def test_delete(self):
         # ensures we always carry consistency through on delete statements
         t = TestConsistencyModel.create(text="bacon and eggs")

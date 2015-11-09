@@ -4,6 +4,122 @@ Upgrading
 .. toctree::
    :maxdepth: 1
 
+Upgrading to 3.0
+----------------
+Version 3.0 of the DataStax Python driver for Apache Cassandra
+adds support for Cassandra 3.0 while maintaining support for
+all earlier versions. In addition to substantial internal rework,
+there are several updates to the API that integrators will need
+to consider:
+
+Default consistency is now ``LOCAL_QUORUM``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Previous value was ``ONE``. ``ONE`` (or ``LOCAL_ONE``) is still appropriate for
+many applications, but the new default was chosen to be least surprising for
+new users not specifying a consistency level.
+
+Execution API Updates
+^^^^^^^^^^^^^^^^^^^^^
+Result return normalization
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+`PYTHON-368 <https://datastax-oss.atlassian.net/browse/PYTHON-368>`_
+Previously results would be returned as a ``list`` of rows for result rows
+up to ``fetch_size``, and ``PagedResult`` afterward. This could break
+application code that assumed one type and got another.
+
+Now, all results are returned as an iterable :class:`~.ResultSet`.
+
+The preferred way to consume results of unknown size is to iterate through
+them, letting automatic paging occur as they are consumed.
+
+.. code-block:: python
+
+    results = session.execute("SELECT * FROM system.local")
+    for row in results:
+        process(row)
+
+If the expected size of the results is known, it is still possible to
+materialize a list using the iterator:
+
+.. code-block:: python
+
+    results = session.execute("SELECT * FROM system.local")
+    row_list = list(results)
+
+For backward compatability, :class:`~.ResultSet` supports indexing. If
+the result is paged, all pages will be materialized. A warning will
+be logged if a paged query is implicitly materialized.
+
+Trace information is not attached to executed Statements
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+`PYTHON-318 <https://datastax-oss.atlassian.net/browse/PYTHON-318>`_
+Previously trace data was attached to Statements if tracing was enabled. This
+could lead to confusion if the same statement was used for multiple executions.
+
+Now, trace data is associated with the ``ResponseFuture`` and ``ResultSet``
+returned for each query:
+
+:meth:`.ResponseFuture.get_query_trace()`
+
+:meth:`.ResponseFuture.get_all_query_traces()`
+
+:meth:`.ResultSet.get_query_trace()`
+
+:meth:`.ResultSet.get_all_query_traces()`
+
+Binding named parameters now ignores extra names
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+`PYTHON-178 <https://datastax-oss.atlassian.net/browse/PYTHON-178Cassadfasdf>`_
+Previously, :meth:`.BoundStatement.bind()` would raise if a mapping
+was passed with extra names not found in the prepared statement.
+
+Behavior in 3.0+ is to ignore extra names.
+
+blist removed as soft dependency
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+`PYTHON-385 <https://datastax-oss.atlassian.net/browse/PYTHON-385>`_
+Previously the driver had a soft dependency on ``blist sortedset``, using
+that where available and using an internal fallback where possible.
+
+Now, the driver never chooses the ``blist`` variant, instead returning the
+internal :class:`.util.SortedSet` for all ``set`` results. The class implements
+all standard set operations, so no integration code should need to change unless
+it explicitly checks for ``sortedset`` type.
+
+Metadata API Updates
+^^^^^^^^^^^^^^^^^^^^
+`PYTHON-276 <https://datastax-oss.atlassian.net/browse/PYTHON-276>`_, `PYTHON-408 <https://datastax-oss.atlassian.net/browse/PYTHON-408>`_, `PYTHON-400 <https://datastax-oss.atlassian.net/browse/PYTHON-400>`_, `PYTHON-422 <https://datastax-oss.atlassian.net/browse/PYTHON-422>`_
+
+Cassandra 3.0 brought a substantial overhaul to the internal schema metadata representation.
+This version of the driver supports that metadata in addition to the legacy version. Doing so
+also brought some changes to the metadata model.
+
+The present API is documented: :any:`cassandra.metadata`. Changes highlighted below:
+
+* All types are now exposed as CQL types instead of types derived from the internal server implementation
+* Some metadata attributes have changed names to match current nomenclature (for example, :attr:`.Index.kind` in place of ``Index.type``).
+* Some metadata attributes removed
+
+  * ``TableMetadata.keyspace`` reference replaced with :attr:`.TableMetadata.keyspace_name`
+  * ``ColumnMetadata.index`` is removed table- and keyspace-level mappings are still maintained
+
+Several deprecated features are removed
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+`PYTHON-292 <https://datastax-oss.atlassian.net/browse/PYTHON-292>`_
+
+* ``ResponseFuture.result`` timeout parameter is removed, use ``Session.execute`` timeout instead (`031ebb0 <https://github.com/datastax/python-driver/commit/031ebb0>`_)
+* ``Cluster.refresh_schema`` removed, use ``Cluster.refresh_*_metadata`` instead (`419fcdf <https://github.com/datastax/python-driver/commit/419fcdf>`_)
+* ``Cluster.submit_schema_refresh`` removed (`574266d <https://github.com/datastax/python-driver/commit/574266d>`_)
+* ``cqltypes`` time/date functions removed, use ``util`` entry points instead (`bb984ee <https://github.com/datastax/python-driver/commit/bb984ee>`_)
+* ``decoder`` module removed (`e16a073 <https://github.com/datastax/python-driver/commit/e16a073>`_)
+* ``TableMetadata.keyspace`` attribute replaced with ``keyspace_name`` (`cc94073 <https://github.com/datastax/python-driver/commit/cc94073>`_)
+* ``cqlengine.columns.TimeUUID.from_datetime`` removed, use ``util`` variant instead (`96489cc <https://github.com/datastax/python-driver/commit/96489cc>`_)
+* ``cqlengine.columns.Float(double_precision)`` parameter removed, use ``columns.Double`` instead (`a2d3a98 <https://github.com/datastax/python-driver/commit/a2d3a98>`_)
+* ``cqlengine`` keyspace management functions are removed in favor of the strategy-specific entry points (`4bd5909 <https://github.com/datastax/python-driver/commit/4bd5909>`_)
+* ``cqlengine.Model.__polymorphic_*__`` attributes removed, use ``__discriminator*`` attributes instead (`9d98c8e <https://github.com/datastax/python-driver/commit/9d98c8e>`_)
+* ``cqlengine.statements`` will no longer warn about list list prepend behavior (`79efe97 <https://github.com/datastax/python-driver/commit/79efe97>`_)
+
+
 Upgrading to 2.1 from 2.0
 -------------------------
 Version 2.1 of the DataStax Python driver for Apache Cassandra
