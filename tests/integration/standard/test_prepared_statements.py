@@ -36,21 +36,26 @@ class PreparedStatementTests(unittest.TestCase):
     def setUpClass(cls):
         cls.cass_version = get_server_versions()
 
+    def setUp(self):
+        self.cluster = Cluster(metrics_enabled=True, protocol_version=PROTOCOL_VERSION)
+        self.session = self.cluster.connect()
+
+    def tearDown(self):
+        self.cluster.shutdown()
+
     def test_basic(self):
         """
         Test basic PreparedStatement usage
         """
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
-        session.execute(
+        self.session.execute(
             """
             CREATE KEYSPACE preparedtests
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
             """)
 
-        session.set_keyspace("preparedtests")
-        session.execute(
+        self.session.set_keyspace("preparedtests")
+        self.session.execute(
             """
             CREATE TABLE cf0 (
                 a text,
@@ -60,7 +65,7 @@ class PreparedStatementTests(unittest.TestCase):
             )
             """)
 
-        prepared = session.prepare(
+        prepared = self.session.prepare(
             """
             INSERT INTO cf0 (a, b, c) VALUES  (?, ?, ?)
             """)
@@ -68,20 +73,20 @@ class PreparedStatementTests(unittest.TestCase):
         self.assertIsInstance(prepared, PreparedStatement)
         bound = prepared.bind(('a', 'b', 'c'))
 
-        session.execute(bound)
+        self.session.execute(bound)
 
-        prepared = session.prepare(
+        prepared = self.session.prepare(
             """
             SELECT * FROM cf0 WHERE a=?
             """)
         self.assertIsInstance(prepared, PreparedStatement)
 
         bound = prepared.bind(('a'))
-        results = session.execute(bound)
+        results = self.session.execute(bound)
         self.assertEqual(results, [('a', 'b', 'c')])
 
         # test with new dict binding
-        prepared = session.prepare(
+        prepared = self.session.prepare(
             """
             INSERT INTO cf0 (a, b, c) VALUES  (?, ?, ?)
             """)
@@ -93,9 +98,9 @@ class PreparedStatementTests(unittest.TestCase):
             'c': 'z'
         })
 
-        session.execute(bound)
+        self.session.execute(bound)
 
-        prepared = session.prepare(
+        prepared = self.session.prepare(
             """
             SELECT * FROM cf0 WHERE a=?
             """)
@@ -103,10 +108,8 @@ class PreparedStatementTests(unittest.TestCase):
         self.assertIsInstance(prepared, PreparedStatement)
 
         bound = prepared.bind({'a': 'x'})
-        results = session.execute(bound)
+        results = self.session.execute(bound)
         self.assertEqual(results, [('x', 'y', 'z')])
-
-        cluster.shutdown()
 
     def test_missing_primary_key(self):
         """
@@ -114,11 +117,7 @@ class PreparedStatementTests(unittest.TestCase):
         when prepared statements are missing the primary key
         """
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
-        self._run_missing_primary_key(session)
-
-        cluster.shutdown()
+        self._run_missing_primary_key(self.session)
 
     def _run_missing_primary_key(self, session):
         statement_to_prepare = """INSERT INTO test3rf.test (v) VALUES  (?)"""
@@ -137,11 +136,7 @@ class PreparedStatementTests(unittest.TestCase):
         when prepared statements are missing the primary key
         with dict bindings
         """
-
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
-        self._run_missing_primary_key_dicts(session)
-        cluster.shutdown()
+        self._run_missing_primary_key_dicts(self.session)
 
     def _run_missing_primary_key_dicts(self, session):
         statement_to_prepare = """ INSERT INTO test3rf.test (v) VALUES  (?)"""
@@ -158,10 +153,7 @@ class PreparedStatementTests(unittest.TestCase):
         """
         Ensure a ValueError is thrown when attempting to bind too many variables
         """
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
-        self._run_too_many_bind_values(session)
-        cluster.shutdown()
+        self._run_too_many_bind_values(self.session)
 
     def _run_too_many_bind_values(self, session):
         statement_to_prepare = """ INSERT INTO test3rf.test (v) VALUES  (?)"""
@@ -179,10 +171,7 @@ class PreparedStatementTests(unittest.TestCase):
         with dict bindings
         """
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
-
-        prepared = session.prepare(
+        prepared = self.session.prepare(
             """
             INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
             """)
@@ -208,36 +197,29 @@ class PreparedStatementTests(unittest.TestCase):
             # post v4, the driver attempts to use UNSET_VALUE for unspecified keys
             self.assertRaises(ValueError, prepared.bind, {})
 
-        cluster.shutdown()
-
     def test_none_values(self):
         """
         Ensure binding None is handled correctly
         """
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
-
-        prepared = session.prepare(
+        prepared = self.session.prepare(
             """
             INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
             """)
 
         self.assertIsInstance(prepared, PreparedStatement)
         bound = prepared.bind((1, None))
-        session.execute(bound)
+        self.session.execute(bound)
 
-        prepared = session.prepare(
+        prepared = self.session.prepare(
             """
             SELECT * FROM test3rf.test WHERE k=?
             """)
         self.assertIsInstance(prepared, PreparedStatement)
 
         bound = prepared.bind((1,))
-        results = session.execute(bound)
+        results = self.session.execute(bound)
         self.assertEqual(results[0].v, None)
-
-        cluster.shutdown()
 
     def test_unset_values(self):
         """
@@ -256,13 +238,10 @@ class PreparedStatementTests(unittest.TestCase):
         if PROTOCOL_VERSION < 4:
             raise unittest.SkipTest("Binding UNSET values is not supported in protocol version < 4")
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
-
         # table with at least two values so one can be used as a marker
-        session.execute("CREATE TABLE IF NOT EXISTS test1rf.test_unset_values (k int PRIMARY KEY, v0 int, v1 int)")
-        insert = session.prepare("INSERT INTO test1rf.test_unset_values (k, v0, v1) VALUES  (?, ?, ?)")
-        select = session.prepare("SELECT * FROM test1rf.test_unset_values WHERE k=?")
+        self.session.execute("CREATE TABLE IF NOT EXISTS test1rf.test_unset_values (k int PRIMARY KEY, v0 int, v1 int)")
+        insert = self.session.prepare("INSERT INTO test1rf.test_unset_values (k, v0, v1) VALUES  (?, ?, ?)")
+        select = self.session.prepare("SELECT * FROM test1rf.test_unset_values WHERE k=?")
 
         bind_expected = [
             # initial condition
@@ -281,126 +260,104 @@ class PreparedStatementTests(unittest.TestCase):
         ]
 
         for params, expected in bind_expected:
-            session.execute(insert, params)
-            results = session.execute(select, (0,))
+            self.session.execute(insert, params)
+            results = self.session.execute(select, (0,))
             self.assertEqual(results[0], expected)
 
-        self.assertRaises(ValueError, session.execute, select, (UNSET_VALUE, 0, 0))
-
-        cluster.shutdown()
+        self.assertRaises(ValueError, self.session.execute, select, (UNSET_VALUE, 0, 0))
 
     def test_no_meta(self):
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
 
-        prepared = session.prepare(
+        prepared = self.session.prepare(
             """
             INSERT INTO test3rf.test (k, v) VALUES  (0, 0)
             """)
 
         self.assertIsInstance(prepared, PreparedStatement)
         bound = prepared.bind(None)
-        session.execute(bound)
+        self.session.execute(bound)
 
-        prepared = session.prepare(
+        prepared = self.session.prepare(
             """
             SELECT * FROM test3rf.test WHERE k=0
             """)
         self.assertIsInstance(prepared, PreparedStatement)
 
         bound = prepared.bind(None)
-        results = session.execute(bound)
+        results = self.session.execute(bound)
         self.assertEqual(results[0].v, 0)
-
-        cluster.shutdown()
 
     def test_none_values_dicts(self):
         """
         Ensure binding None is handled correctly with dict bindings
         """
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
-
         # test with new dict binding
-        prepared = session.prepare(
+        prepared = self.session.prepare(
             """
             INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
             """)
 
         self.assertIsInstance(prepared, PreparedStatement)
         bound = prepared.bind({'k': 1, 'v': None})
-        session.execute(bound)
+        self.session.execute(bound)
 
-        prepared = session.prepare(
+        prepared = self.session.prepare(
             """
             SELECT * FROM test3rf.test WHERE k=?
             """)
         self.assertIsInstance(prepared, PreparedStatement)
 
         bound = prepared.bind({'k': 1})
-        results = session.execute(bound)
+        results = self.session.execute(bound)
         self.assertEqual(results[0].v, None)
-
-        cluster.shutdown()
 
     def test_async_binding(self):
         """
         Ensure None binding over async queries
         """
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
-
-        prepared = session.prepare(
+        prepared = self.session.prepare(
             """
             INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
             """)
 
         self.assertIsInstance(prepared, PreparedStatement)
-        future = session.execute_async(prepared, (873, None))
+        future = self.session.execute_async(prepared, (873, None))
         future.result()
 
-        prepared = session.prepare(
+        prepared = self.session.prepare(
             """
             SELECT * FROM test3rf.test WHERE k=?
             """)
         self.assertIsInstance(prepared, PreparedStatement)
 
-        future = session.execute_async(prepared, (873,))
+        future = self.session.execute_async(prepared, (873,))
         results = future.result()
         self.assertEqual(results[0].v, None)
-
-        cluster.shutdown()
 
     def test_async_binding_dicts(self):
         """
         Ensure None binding over async queries with dict bindings
         """
-
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
-
-        prepared = session.prepare(
+        prepared = self.session.prepare(
             """
             INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
             """)
 
         self.assertIsInstance(prepared, PreparedStatement)
-        future = session.execute_async(prepared, {'k': 873, 'v': None})
+        future = self.session.execute_async(prepared, {'k': 873, 'v': None})
         future.result()
 
-        prepared = session.prepare(
+        prepared = self.session.prepare(
             """
             SELECT * FROM test3rf.test WHERE k=?
             """)
         self.assertIsInstance(prepared, PreparedStatement)
 
-        future = session.execute_async(prepared, {'k': 873})
+        future = self.session.execute_async(prepared, {'k': 873})
         results = future.result()
         self.assertEqual(results[0].v, None)
-
-        cluster.shutdown()
 
     def test_raise_error_on_prepared_statement_execution_dropped_table(self):
         """
@@ -418,14 +375,10 @@ class PreparedStatementTests(unittest.TestCase):
 
         @test_category prepared_statements
         """
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect("test3rf")
 
-        session.execute("CREATE TABLE error_test (k int PRIMARY KEY, v int)")
-        prepared = session.prepare("SELECT * FROM error_test WHERE k=?")
-        session.execute("DROP TABLE error_test")
+        self.session.execute("CREATE TABLE test3rf.error_test (k int PRIMARY KEY, v int)")
+        prepared = self.session.prepare("SELECT * FROM test3rf.error_test WHERE k=?")
+        self.session.execute("DROP TABLE test3rf.error_test")
 
         with self.assertRaises(InvalidRequest):
-            session.execute(prepared, [0])
-
-        cluster.shutdown()
+            self.session.execute(prepared, [0])

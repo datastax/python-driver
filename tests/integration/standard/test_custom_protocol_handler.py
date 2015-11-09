@@ -20,7 +20,7 @@ except ImportError:
 from cassandra.protocol import ProtocolHandler, ResultMessage, UUIDType, read_int, EventMessage
 from cassandra.query import tuple_factory
 from cassandra.cluster import Cluster
-from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass
+from tests.integration import use_singledc, PROTOCOL_VERSION, drop_keyspace_shutdown_cluster
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES
 from tests.integration.standard.utils import create_table_with_all_types, get_all_primitive_params
 from six import binary_type
@@ -44,8 +44,7 @@ class CustomProtocolHandlerTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        cls.session.execute("DROP KEYSPACE custserdes")
-        cls.cluster.shutdown()
+        drop_keyspace_shutdown_cluster("custserdes", cls.session, cls.cluster)
 
     def test_custom_raw_uuid_row_results(self):
         """

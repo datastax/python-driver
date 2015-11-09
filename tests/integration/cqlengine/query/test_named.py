@@ -24,6 +24,7 @@ from cassandra.cqlengine.query import ResultObject
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.cqlengine import models
 
+from tests.integration.cqlengine import setup_connection
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine.query.test_queryset import BaseQuerySetUsage
 
@@ -128,7 +129,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
 
         from tests.integration.cqlengine.query.test_queryset import TestModel
 
-        ks,tn = TestModel.column_family_name().split('.')
+        ks, tn = TestModel.column_family_name().split('.')
         cls.keyspace = NamedKeyspace(ks)
         cls.table = cls.keyspace.table(tn)
 
@@ -149,8 +150,8 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
     def test_iteration(self):
         """ Tests that iterating over a query set pulls back all of the expected results """
         q = self.table.objects(test_id=0)
-        #tuple of expected attempt_id, expected_result values
-        compare_set = set([(0,5), (1,10), (2,15), (3,20)])
+        # tuple of expected attempt_id, expected_result values
+        compare_set = set([(0, 5), (1, 10), (2, 15), (3, 20)])
         for t in q:
             val = t.attempt_id, t.expected_result
             assert val in compare_set
@@ -160,8 +161,8 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         # test with regular filtering
         q = self.table.objects(attempt_id=3).allow_filtering()
         assert len(q) == 3
-        #tuple of expected test_id, expected_result values
-        compare_set = set([(0,20), (1,20), (2,75)])
+        # tuple of expected test_id, expected_result values
+        compare_set = set([(0, 20), (1, 20), (2, 75)])
         for t in q:
             val = t.test_id, t.expected_result
             assert val in compare_set
@@ -171,8 +172,8 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         # test with query method
         q = self.table.objects(self.table.column('attempt_id') == 3).allow_filtering()
         assert len(q) == 3
-        #tuple of expected test_id, expected_result values
-        compare_set = set([(0,20), (1,20), (2,75)])
+        # tuple of expected test_id, expected_result values
+        compare_set = set([(0, 20), (1, 20), (2, 75)])
         for t in q:
             val = t.test_id, t.expected_result
             assert val in compare_set
@@ -183,16 +184,16 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         """ Tests that iterating over a query set more than once works """
         # test with both the filtering method and the query method
         for q in (self.table.objects(test_id=0), self.table.objects(self.table.column('test_id') == 0)):
-            #tuple of expected attempt_id, expected_result values
-            compare_set = set([(0,5), (1,10), (2,15), (3,20)])
+            # tuple of expected attempt_id, expected_result values
+            compare_set = set([(0, 5), (1, 10), (2, 15), (3, 20)])
             for t in q:
                 val = t.attempt_id, t.expected_result
                 assert val in compare_set
                 compare_set.remove(val)
             assert len(compare_set) == 0
 
-            #try it again
-            compare_set = set([(0,5), (1,10), (2,15), (3,20)])
+            # try it again
+            compare_set = set([(0, 5), (1, 10), (2, 15), (3, 20)])
             for t in q:
                 val = t.attempt_id, t.expected_result
                 assert val in compare_set
@@ -205,7 +206,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         """
         for q in (self.table.objects(test_id=0), self.table.objects(self.table.column('test_id') == 0)):
             q = q.order_by('attempt_id')
-            expected_order = [0,1,2,3]
+            expected_order = [0, 1, 2, 3]
             iter1 = iter(q)
             iter2 = iter(q)
             for attempt_id in expected_order:
@@ -280,6 +281,7 @@ class TestNamedWithMV(BasicSharedKeyspaceUnitTestCase):
 
     def tearDown(self):
         models.DEFAULT_KEYSPACE = self.default_keyspace
+        setup_connection(models.DEFAULT_KEYSPACE)
 
     def test_named_table_with_mv(self):
         """

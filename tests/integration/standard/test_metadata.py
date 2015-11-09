@@ -34,7 +34,7 @@ from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
 from tests.integration import get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass, \
-    BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase
+    BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster
 
 
 def setup_module():
@@ -1863,7 +1863,6 @@ class BadMetaTest(unittest.TestCase):
     class BadMetaException(Exception):
         pass
 
-
     @property
     def function_name(self):
         return self._testMethodName.lower()
@@ -1880,8 +1879,7 @@ class BadMetaTest(unittest.TestCase):
 
     @classmethod
     def teardown_class(cls):
-        cls.session.execute("DROP KEYSPACE %s" % cls.keyspace_name)
-        cls.cluster.shutdown()
+        drop_keyspace_shutdown_cluster(cls.keyspace_name, cls.session, cls.cluster)
 
     def _skip_if_not_version(self, version):
         if CASS_SERVER_VERSION < version:
