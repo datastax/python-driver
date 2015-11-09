@@ -6,7 +6,7 @@ Releasing
 
   * For beta releases, use a version like ``(2, 1, '0b1')``
   * For release candidates, use a version like ``(2, 1, '0c1')``
-  * When in doubt, follow PEP 386 versioning
+  * When in doubt, follow PEP 440 versioning
 
 * Commit the changelog and version changes
 * Tag the release.  For example: ``git tag -a 1.0.0 -m 'version 1.0.0'``
