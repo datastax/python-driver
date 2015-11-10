@@ -19,7 +19,7 @@ This module houses the main classes you will interact with,
 from __future__ import absolute_import
 
 import atexit
-from collections import defaultdict
+from collections import defaultdict, Mapping
 from concurrent.futures import ThreadPoolExecutor
 import logging
 from random import random
@@ -61,7 +61,7 @@ from cassandra.protocol import (QueryMessage, ResultMessage,
                                 BatchMessage, RESULT_KIND_PREPARED,
                                 RESULT_KIND_SET_KEYSPACE, RESULT_KIND_ROWS,
                                 RESULT_KIND_SCHEMA_CHANGE, MIN_SUPPORTED_VERSION,
-                                ProtocolHandler, _RESULT_SEQUENCE_TYPES)
+                                ProtocolHandler)
 from cassandra.metadata import Metadata, protect_name, murmur3
 from cassandra.policies import (TokenAwarePolicy, DCAwareRoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
@@ -3348,9 +3348,13 @@ class ResultSet(object):
             self._current_rows = []
 
     def _set_current_rows(self, result):
-        if isinstance(result, _RESULT_SEQUENCE_TYPES):
+        if isinstance(result, Mapping):
+            self._current_rows = [result] if result else []
+            return
+        try:
+            iter(result)  # can't check directly for generator types because cython generators are different
             self._current_rows = result
-        else:
+        except TypeError:
             self._current_rows = [result] if result else []
 
     def _fetch_all(self):
