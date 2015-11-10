@@ -4,10 +4,10 @@ python:
 os:
   - ubuntu/trusty64
 cassandra:
-  - 1.2
   - 2.0
   - 2.1
   - 2.2
+  - 3.0
 env:
   EVENT_LOOP_MANAGER:
     - libev
