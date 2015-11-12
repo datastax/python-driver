@@ -111,6 +111,48 @@ class StrategiesTest(unittest.TestCase):
 
         self.assertItemsEqual(replica_map[MD5Token(0)], (dc1_1, dc1_2, dc2_1, dc2_2, dc3_1))
 
+    def test_nts_make_token_replica_map_multi_rack(self):
+        token_to_host_owner = {}
+
+        # (A) not enough distinct racks, first skipped is used
+        dc1_1 = Host('dc1.1', SimpleConvictionPolicy)
+        dc1_2 = Host('dc1.2', SimpleConvictionPolicy)
+        dc1_3 = Host('dc1.3', SimpleConvictionPolicy)
+        dc1_4 = Host('dc1.4', SimpleConvictionPolicy)
+        dc1_1.set_location_info('dc1', 'rack1')
+        dc1_2.set_location_info('dc1', 'rack1')
+        dc1_3.set_location_info('dc1', 'rack2')
+        dc1_4.set_location_info('dc1', 'rack2')
+        token_to_host_owner[MD5Token(0)] = dc1_1
+        token_to_host_owner[MD5Token(100)] = dc1_2
+        token_to_host_owner[MD5Token(200)] = dc1_3
+        token_to_host_owner[MD5Token(300)] = dc1_4
+
+        # (B) distinct racks, but not contiguous
+        dc2_1 = Host('dc2.1', SimpleConvictionPolicy)
+        dc2_2 = Host('dc2.2', SimpleConvictionPolicy)
+        dc2_3 = Host('dc2.3', SimpleConvictionPolicy)
+        dc2_1.set_location_info('dc2', 'rack1')
+        dc2_2.set_location_info('dc2', 'rack1')
+        dc2_3.set_location_info('dc2', 'rack2')
+        token_to_host_owner[MD5Token(1)] = dc2_1
+        token_to_host_owner[MD5Token(101)] = dc2_2
+        token_to_host_owner[MD5Token(201)] = dc2_3
+
+        ring = [MD5Token(0),
+                MD5Token(1),
+                MD5Token(100),
+                MD5Token(101),
+                MD5Token(200),
+                MD5Token(201),
+                MD5Token(300)]
+
+        nts = NetworkTopologyStrategy({'dc1': 3, 'dc2': 2})
+        replica_map = nts.make_token_replica_map(token_to_host_owner, ring)
+
+        token_replicas = replica_map[MD5Token(0)]
+        self.assertItemsEqual(token_replicas, (dc1_1, dc1_2, dc1_3, dc2_1, dc2_3))
+
     def test_nts_make_token_replica_map_empty_dc(self):
         host = Host('1', SimpleConvictionPolicy)
         host.set_location_info('dc1', 'rack1')
