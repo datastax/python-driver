@@ -471,8 +471,6 @@ class NetworkTopologyStrategy(ReplicationStrategy):
     def make_token_replica_map(self, token_to_host_owner, ring):
         # note: this does not account for hosts having different racks
         replica_map = defaultdict(list)
-        ring_len = len(ring)
-        ring_len_range = range(ring_len)
         dc_rf_map = dict((dc, int(rf))
                          for dc, rf in self.dc_replication_factors.items() if rf > 0)
 
@@ -490,13 +488,12 @@ class NetworkTopologyStrategy(ReplicationStrategy):
         # This is how we keep track of advancing around the ring for each DC.
         dc_to_current_index = defaultdict(int)
 
-        for i in ring_len_range:
-            remaining = dc_rf_map.copy()
+        for i in range(len(ring)):
             replicas = replica_map[ring[i]]
 
             # go through each DC and find the replicas in that DC
             for dc in dc_to_token_offset.keys():
-                if dc not in remaining:
+                if dc not in dc_rf_map:
                     continue
 
                 # advance our per-DC index until we're up to at least the
@@ -508,7 +505,7 @@ class NetworkTopologyStrategy(ReplicationStrategy):
                     index += 1
                 dc_to_current_index[dc] = index
 
-                replicas_remaining = remaining[dc]
+                replicas_remaining = dc_rf_map[dc]
                 skipped_hosts = []
                 racks_placed = set()
                 racks_this_dc = dc_racks[dc]
