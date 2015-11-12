@@ -559,15 +559,16 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
         cluster2.connect()
 
-        self.assertNotIn("mv1", cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
-        self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT b FROM {0}.{1} WHERE b IS NOT NULL PRIMARY KEY (a, b)"
-                             .format(self.keyspace_name, self.function_table_name))
-        self.assertNotIn("mv1", cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+        try:
+            self.assertNotIn("mv1", cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+            self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT b FROM {0}.{1} WHERE b IS NOT NULL PRIMARY KEY (a, b)"
+                                 .format(self.keyspace_name, self.function_table_name))
+            self.assertNotIn("mv1", cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
 
-        cluster2.refresh_table_metadata(self.keyspace_name, "mv1")
-        self.assertIn("mv1", cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
-
-        cluster2.shutdown()
+            cluster2.refresh_table_metadata(self.keyspace_name, "mv1")
+            self.assertIn("mv1", cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+        finally:
+            cluster2.shutdown()
 
         original_meta = self.cluster.metadata.keyspaces[self.keyspace_name].views['mv1']
         self.assertIs(original_meta, self.session.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views['mv1'])
@@ -577,6 +578,18 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertIsNot(current_meta, original_meta)
         self.assertIsNot(original_meta, self.session.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views['mv1'])
         self.assertEqual(original_meta.as_cql_query(), current_meta.as_cql_query())
+
+        cluster3 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
+        cluster3.connect()
+        try:
+            self.assertNotIn("mv2", cluster3.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+            self.session.execute("CREATE MATERIALIZED VIEW {0}.mv2 AS SELECT b FROM {0}.{1} WHERE b IS NOT NULL PRIMARY KEY (a, b)"
+                                 .format(self.keyspace_name, self.function_table_name))
+            self.assertNotIn("mv2", cluster3.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+            cluster3.refresh_materialized_view_metadata(self.keyspace_name, 'mv2')
+            self.assertIn("mv2", cluster3.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+        finally:
+            cluster3.shutdown()
 
     def test_refresh_user_type_metadata(self):
         """
