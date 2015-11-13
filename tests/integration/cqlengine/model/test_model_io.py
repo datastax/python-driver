@@ -32,12 +32,13 @@ from cassandra.util import Date, Time
 from tests.integration import PROTOCOL_VERSION
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 
+
 class TestModel(Model):
 
-    id      = columns.UUID(primary_key=True, default=lambda: uuid4())
-    count   = columns.Integer()
-    text    = columns.Text(required=False)
-    a_bool  = columns.Boolean(default=False)
+    id = columns.UUID(primary_key=True, default=lambda: uuid4())
+    count = columns.Integer()
+    text = columns.Text(required=False)
+    a_bool = columns.Boolean(default=False)
 
 
 class TestModelIO(BaseCassEngTestCase):
@@ -122,8 +123,8 @@ class TestModelIO(BaseCassEngTestCase):
         tm2 = TestModel.objects(id=tm.pk).first()
         self.assertIsInstance(tm2, TestModel)
 
-        assert tm2.text is None
-        assert tm2._values['text'].previous_value is None
+        self.assertTrue(tm2.text is None)
+        self.assertTrue(tm2._values['text'].previous_value is None)
 
     def test_a_sensical_error_is_raised_if_you_try_to_create_a_table_twice(self):
         """
@@ -271,10 +272,10 @@ class TestModelIO(BaseCassEngTestCase):
 
 class TestMultiKeyModel(Model):
 
-    partition   = columns.Integer(primary_key=True)
-    cluster     = columns.Integer(primary_key=True)
-    count       = columns.Integer(required=False)
-    text        = columns.Text(required=False)
+    partition = columns.Integer(primary_key=True)
+    cluster = columns.Integer(primary_key=True)
+    count = columns.Integer(required=False)
+    text = columns.Text(required=False)
 
 
 class TestDeleting(BaseCassEngTestCase):
@@ -295,11 +296,11 @@ class TestDeleting(BaseCassEngTestCase):
         for i in range(5):
             TestMultiKeyModel.create(partition=partition, cluster=i, count=i, text=str(i))
 
-        assert TestMultiKeyModel.filter(partition=partition).count() == 5
+        self.assertTrue(TestMultiKeyModel.filter(partition=partition).count() == 5)
 
         TestMultiKeyModel.get(partition=partition, cluster=0).delete()
 
-        assert TestMultiKeyModel.filter(partition=partition).count() == 4
+        self.assertTrue(TestMultiKeyModel.filter(partition=partition).count() == 4)
 
         TestMultiKeyModel.filter(partition=partition).delete()
 
@@ -331,8 +332,8 @@ class TestUpdating(BaseCassEngTestCase):
         self.instance.save()
 
         check = TestMultiKeyModel.get(partition=self.instance.partition, cluster=self.instance.cluster)
-        assert check.count == 5
-        assert check.text == 'happy'
+        self.assertTrue(check.count == 5)
+        self.assertTrue(check.text == 'happy')
 
     def test_deleting_only(self):
         self.instance.count = None
@@ -340,58 +341,79 @@ class TestUpdating(BaseCassEngTestCase):
         self.instance.save()
 
         check = TestMultiKeyModel.get(partition=self.instance.partition, cluster=self.instance.cluster)
-        assert check.count is None
-        assert check.text is None
+        self.assertTrue(check.count is None)
+        self.assertTrue(check.text is None)
 
     def test_get_changed_columns(self):
-        assert self.instance.get_changed_columns() == []
+        self.assertTrue(self.instance.get_changed_columns() == [])
         self.instance.count = 1
         changes = self.instance.get_changed_columns()
-        assert len(changes) == 1
-        assert changes == ['count']
+        self.assertTrue(len(changes) == 1)
+        self.assertTrue(changes == ['count'])
         self.instance.save()
-        assert self.instance.get_changed_columns() == []
+        self.assertTrue(self.instance.get_changed_columns() == [])
 
     def test_previous_value_tracking_of_persisted_instance(self):
         # Check initial internal states.
-        assert self.instance.get_changed_columns() == []
-        assert self.instance._values['count'].previous_value == 0
+        self.assertTrue(self.instance.get_changed_columns() == [])
+        self.assertTrue(self.instance._values['count'].previous_value == 0)
 
         # Change value and check internal states.
         self.instance.count = 1
-        assert self.instance.get_changed_columns() == ['count']
-        assert self.instance._values['count'].previous_value == 0
+        self.assertTrue(self.instance.get_changed_columns() == ['count'])
+        self.assertTrue(self.instance._values['count'].previous_value == 0)
 
         # Internal states should be updated on save.
         self.instance.save()
-        assert self.instance.get_changed_columns() == []
-        assert self.instance._values['count'].previous_value == 1
+        self.assertTrue(self.instance.get_changed_columns() == [])
+        self.assertTrue(self.instance._values['count'].previous_value == 1)
 
         # Change value twice.
         self.instance.count = 2
-        assert self.instance.get_changed_columns() == ['count']
-        assert self.instance._values['count'].previous_value == 1
+        self.assertTrue(self.instance.get_changed_columns() == ['count'])
+        self.assertTrue(self.instance._values['count'].previous_value == 1)
         self.instance.count = 3
-        assert self.instance.get_changed_columns() == ['count']
-        assert self.instance._values['count'].previous_value == 1
+        self.assertTrue(self.instance.get_changed_columns() == ['count'])
+        self.assertTrue(self.instance._values['count'].previous_value == 1)
 
         # Internal states updated on save.
         self.instance.save()
-        assert self.instance.get_changed_columns() == []
-        assert self.instance._values['count'].previous_value == 3
+        self.assertTrue(self.instance.get_changed_columns() == [])
+        self.assertTrue(self.instance._values['count'].previous_value == 3)
 
         # Change value and reset it.
         self.instance.count = 2
-        assert self.instance.get_changed_columns() == ['count']
-        assert self.instance._values['count'].previous_value == 3
+        self.assertTrue(self.instance.get_changed_columns() == ['count'])
+        self.assertTrue(self.instance._values['count'].previous_value == 3)
         self.instance.count = 3
-        assert self.instance.get_changed_columns() == []
-        assert self.instance._values['count'].previous_value == 3
+        self.assertTrue(self.instance.get_changed_columns() == [])
+        self.assertTrue(self.instance._values['count'].previous_value == 3)
 
         # Nothing to save: values in initial conditions.
         self.instance.save()
-        assert self.instance.get_changed_columns() == []
-        assert self.instance._values['count'].previous_value == 3
+        self.assertTrue(self.instance.get_changed_columns() == [])
+        self.assertTrue(self.instance._values['count'].previous_value == 3)
+
+        # Change Multiple values
+        self.instance.count = 4
+        self.instance.text = "changed"
+        self.assertTrue(len(self.instance.get_changed_columns()) == 2)
+        self.assertTrue('text' in self.instance.get_changed_columns())
+        self.assertTrue('count' in self.instance.get_changed_columns())
+        self.instance.save()
+        self.assertTrue(self.instance.get_changed_columns() == [])
+
+        # Reset Multiple Values
+        self.instance.count = 5
+        self.instance.text = "changed"
+        self.assertTrue(self.instance.get_changed_columns() == ['count'])
+        self.instance.text = "changed2"
+        self.assertTrue(len(self.instance.get_changed_columns()) == 2)
+        self.assertTrue('text' in self.instance.get_changed_columns())
+        self.assertTrue('count' in self.instance.get_changed_columns())
+        self.instance.count = 4
+        self.instance.text = "changed"
+        self.assertTrue(self.instance.get_changed_columns() == [])
 
     def test_previous_value_tracking_on_instantiation(self):
         self.instance = TestMultiKeyModel(
@@ -401,30 +423,30 @@ class TestUpdating(BaseCassEngTestCase):
             text='happy')
 
         # Columns of instances not persisted yet should be marked as changed.
-        assert set(self.instance.get_changed_columns()) == set([
-            'partition', 'cluster', 'count', 'text'])
-        assert self.instance._values['partition'].previous_value is None
-        assert self.instance._values['cluster'].previous_value is None
-        assert self.instance._values['count'].previous_value is None
-        assert self.instance._values['text'].previous_value is None
+        self.assertTrue(set(self.instance.get_changed_columns()) == set([
+            'partition', 'cluster', 'count', 'text']))
+        self.assertTrue(self.instance._values['partition'].previous_value is None)
+        self.assertTrue(self.instance._values['cluster'].previous_value is None)
+        self.assertTrue(self.instance._values['count'].previous_value is None)
+        self.assertTrue(self.instance._values['text'].previous_value is None)
 
         # Value changes doesn't affect internal states.
         self.instance.count = 1
-        assert 'count' in self.instance.get_changed_columns()
-        assert self.instance._values['count'].previous_value is None
+        self.assertTrue('count' in self.instance.get_changed_columns())
+        self.assertTrue(self.instance._values['count'].previous_value is None)
         self.instance.count = 2
-        assert 'count' in self.instance.get_changed_columns()
-        assert self.instance._values['count'].previous_value is None
+        self.assertTrue('count' in self.instance.get_changed_columns())
+        self.assertTrue(self.instance._values['count'].previous_value is None)
 
         # Value reset is properly tracked.
         self.instance.count = None
-        assert 'count' not in self.instance.get_changed_columns()
-        assert self.instance._values['count'].previous_value == None
+        self.assertTrue('count' not in self.instance.get_changed_columns())
+        self.assertTrue(self.instance._values['count'].previous_value is None)
 
         self.instance.save()
-        assert self.instance.get_changed_columns() == []
-        assert self.instance._values['count'].previous_value == None
-        assert self.instance.count is None
+        self.assertTrue(self.instance.get_changed_columns() == [])
+        self.assertTrue(self.instance._values['count'].previous_value is None)
+        self.assertTrue(self.instance.count is None)
 
 
 class TestCanUpdate(BaseCassEngTestCase):
@@ -445,34 +467,34 @@ class TestCanUpdate(BaseCassEngTestCase):
 
         # object hasn't been saved,
         # shouldn't be able to update
-        assert not tm._is_persisted
-        assert not tm._can_update()
+        self.assertTrue(not tm._is_persisted)
+        self.assertTrue(not tm._can_update())
 
         tm.save()
 
         # object has been saved,
         # should be able to update
-        assert tm._is_persisted
-        assert tm._can_update()
+        self.assertTrue(tm._is_persisted)
+        self.assertTrue(tm._can_update())
 
         tm.count = 200
 
         # primary keys haven't changed,
         # should still be able to update
-        assert tm._can_update()
+        self.assertTrue(tm._can_update())
         tm.save()
 
         tm.id = uuid4()
 
         # primary keys have changed,
         # should not be able to update
-        assert not tm._can_update()
+        self.assertTrue(not tm._can_update())
 
 
 class IndexDefinitionModel(Model):
 
-    key     = columns.UUID(primary_key=True)
-    val     = columns.Text(index=True)
+    key = columns.UUID(primary_key=True)
+    val = columns.Text(index=True)
 
 
 class TestIndexedColumnDefinition(BaseCassEngTestCase):
@@ -484,8 +506,8 @@ class TestIndexedColumnDefinition(BaseCassEngTestCase):
 
 class ReservedWordModel(Model):
 
-    token   = columns.Text(primary_key=True)
-    insert  = columns.Integer(index=True)
+    token = columns.Text(primary_key=True)
+    insert = columns.Integer(index=True)
 
 
 class TestQueryQuoting(BaseCassEngTestCase):
@@ -499,9 +521,9 @@ class TestQueryQuoting(BaseCassEngTestCase):
 
         model2 = ReservedWordModel.filter(token='1')
 
-        assert len(model2) == 1
-        assert model1.token == model2[0].token
-        assert model1.insert == model2[0].insert
+        self.assertTrue(len(model2) == 1)
+        self.assertTrue(model1.token == model2[0].token)
+        self.assertTrue(model1.insert == model2[0].insert)
 
 
 class TestQueryModel(Model):
@@ -545,8 +567,8 @@ class TestQuerying(BaseCassEngTestCase):
             TestQueryModel.test_id == uid,
             TestQueryModel.date == day).limit(1).first()
 
-        assert inst.test_id == uid
-        assert inst.date == day
+        self.assertTrue(inst.test_id == uid)
+        self.assertTrue(inst.date == day)
 
 
 def test_none_filter_fails():
