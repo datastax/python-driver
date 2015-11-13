@@ -23,6 +23,7 @@ Execution API Updates
 Result return normalization
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 `PYTHON-368 <https://datastax-oss.atlassian.net/browse/PYTHON-368>`_
+
 Previously results would be returned as a ``list`` of rows for result rows
 up to ``fetch_size``, and ``PagedResult`` afterward. This could break
 application code that assumed one type and got another.
@@ -53,6 +54,7 @@ be logged if a paged query is implicitly materialized.
 Trace information is not attached to executed Statements
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 `PYTHON-318 <https://datastax-oss.atlassian.net/browse/PYTHON-318>`_
+
 Previously trace data was attached to Statements if tracing was enabled. This
 could lead to confusion if the same statement was used for multiple executions.
 
@@ -70,6 +72,7 @@ returned for each query:
 Binding named parameters now ignores extra names
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 `PYTHON-178 <https://datastax-oss.atlassian.net/browse/PYTHON-178Cassadfasdf>`_
+
 Previously, :meth:`.BoundStatement.bind()` would raise if a mapping
 was passed with extra names not found in the prepared statement.
 
@@ -78,6 +81,7 @@ Behavior in 3.0+ is to ignore extra names.
 blist removed as soft dependency
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 `PYTHON-385 <https://datastax-oss.atlassian.net/browse/PYTHON-385>`_
+
 Previously the driver had a soft dependency on ``blist sortedset``, using
 that where available and using an internal fallback where possible.
 
