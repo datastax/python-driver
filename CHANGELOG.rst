@@ -1,3 +1,24 @@
+3.0.0
+=====
+
+Features
+--------
+* Support datetime.date objects as a DateType (PYTHON-212)
+* Add Cluster.update_view_metadata (PYTHON-407)
+* QueryTrace option to populate partial trace sessions (PYTHON-438)
+* Attach column names to ResultSet (PYTHON-439)
+
+Bug Fixes
+---------
+* Properly SerDes nested collections when protocol_version < 3 (PYTHON-215)
+* Evict UDTs from UserType cache on change (PYTHON-226)
+* Make sure query strings are always encoded UTF-8 (PYTHON-334)
+* Track previous value of columns at instantiation in CQLengine (PYTHON-348)
+* UDT CQL encoding does not work for unicode values (PYTHON-353)
+* NetworkTopologyStrategy#make_token_replica_map does not account for multiple racks in a DC (PYTHON-378)
+* Cython integer overflow on decimal type deserialization (PYTHON-433)
+* Query trace: if session hasn't been logged, query trace can throw exception (PYTHON-442)
+
 3.0.0rc1
 ========
 November 9, 2015
