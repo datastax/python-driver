@@ -368,3 +368,38 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         self.assertEqual(1, Container.objects.count())
         names_output = Container.objects().first().names
         self.assertEqual(names_output, names)
+
+    def test_udts_with_unicode(self):
+        """
+        Test for inserting models with unicode and udt columns.
+
+        test_udts_with_unicode constructs a model with a user defined type. It then attempts to insert that model with
+        a unicode primary key. It will also attempt to upsert a udt that contains unicode text.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-353
+        @expected_result No exceptions thrown
+
+        @test_category data_types:udt
+        """
+        ascii_name = 'normal name'
+        unicode_name = u'Fran\u00E7ois'
+
+        class User(UserType):
+            age = columns.Integer()
+            name = columns.Text()
+
+        class UserModelText(Model):
+            id = columns.Text(primary_key=True)
+            info = columns.UserDefinedType(User)
+
+        sync_table(UserModelText)
+        # Two udt instances one with a unicode one with ascii
+        user_template_ascii = User(age=25, name=ascii_name)
+        user_template_unicode = User(age=25, name=unicode_name)
+
+        UserModelText.create(id=ascii_name, info=user_template_unicode)
+        UserModelText.create(id=unicode_name, info=user_template_ascii)
+        UserModelText.create(id=unicode_name, info=user_template_unicode)
+
+
