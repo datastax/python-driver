@@ -283,7 +283,7 @@ class PrintStatementTests(unittest.TestCase):
         cluster.shutdown()
 
 
-class BatchStatementTests(unittest.TestCase):
+class BatchStatementTests(BasicSharedKeyspaceUnitTestCase):
 
     def setUp(self):
         if PROTOCOL_VERSION < 2:
@@ -296,7 +296,6 @@ class BatchStatementTests(unittest.TestCase):
             self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         self.session = self.cluster.connect()
 
-        self.session.execute("TRUNCATE test3rf.test")
 
     def tearDown(self):
         self.cluster.shutdown()
@@ -385,6 +384,21 @@ class BatchStatementTests(unittest.TestCase):
         for i in range(1000):
             self.test_no_parameters()
             self.session.execute("TRUNCATE test3rf.test")
+
+    def test_unicode(self):
+        ddl = '''
+            CREATE TABLE test3rf.testtext (
+                k int PRIMARY KEY,
+                v text )'''
+        self.session.execute(ddl)
+        unicode_text = u'Fran\u00E7ois'
+        query = u'INSERT INTO test3rf.testtext (k, v) VALUES (%s, %s)'
+        try:
+            batch = BatchStatement(BatchType.LOGGED)
+            batch.add(u"INSERT INTO test3rf.testtext (k, v) VALUES (%s, %s)", (0, unicode_text))
+            self.session.execute(batch)
+        finally:
+            self.session.execute("DROP TABLE test3rf.testtext")
 
 
 class SerialConsistencyTests(unittest.TestCase):
@@ -788,3 +802,38 @@ class MaterializedViewQueryTest(BasicSharedKeyspaceUnitTestCase):
         self.assertEquals(results[1].day, 25)
         self.assertEquals(results[1].score, 3200)
         self.assertEquals(results[1].user, "pcmanus")
+
+
+class UnicodeQueryTest(BasicSharedKeyspaceUnitTestCase):
+
+    def setUp(self):
+        ddl = '''
+            CREATE TABLE {0}.{1} (
+            k int PRIMARY KEY,
+            v text )'''.format(self.keyspace_name, self.function_table_name)
+        self.session.execute(ddl)
+
+    def tearDown(self):
+        self.session.execute("DROP TABLE {0}.{1}".format(self.keyspace_name,self.function_table_name))
+
+    def test_unicode(self):
+        """
+        Test to validate that unicode query strings are handled appropriately by various query types
+
+        @since 3.0.0
+        @jira_ticket PYTHON-334
+        @expected_result no unicode exceptions are thrown
+
+        @test_category query
+        """
+
+        unicode_text = u'Fran\u00E7ois'
+        batch = BatchStatement(BatchType.LOGGED)
+        batch.add(u"INSERT INTO {0}.{1} (k, v) VALUES (%s, %s)".format(self.keyspace_name, self.function_table_name), (0, unicode_text))
+        self.session.execute(batch)
+        self.session.execute(u"INSERT INTO {0}.{1} (k, v) VALUES (%s, %s)".format(self.keyspace_name, self.function_table_name), (0, unicode_text))
+        prepared = self.session.prepare(u"INSERT INTO {0}.{1} (k, v) VALUES (?, ?)".format(self.keyspace_name, self.function_table_name))
+        bound = prepared.bind((1, unicode_text))
+        self.session.execute(bound)
+
+
