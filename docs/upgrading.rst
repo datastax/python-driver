@@ -8,7 +8,7 @@ Upgrading to 3.0
 ----------------
 Version 3.0 of the DataStax Python driver for Apache Cassandra
 adds support for Cassandra 3.0 while maintaining support for
-all earlier versions. In addition to substantial internal rework,
+previously supported versions. In addition to substantial internal rework,
 there are several updates to the API that integrators will need
 to consider:
 
