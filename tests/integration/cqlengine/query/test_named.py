@@ -29,7 +29,7 @@ from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine.query.test_queryset import BaseQuerySetUsage
 
 
-from tests.integration import BasicSharedKeyspaceUnitTestCase, get_server_versions
+from tests.integration import BasicSharedKeyspaceUnitTestCase, greaterthanorequalcass30
 
 
 class TestQuerySetOperation(BaseCassEngTestCase):
@@ -270,18 +270,21 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
             self.table.objects.get(test_id=1)
 
 
-class TestNamedWithMV(BaseCassEngTestCase):
+class TestNamedWithMV(BasicSharedKeyspaceUnitTestCase):
 
-    def setUp(self):
-        cass_version = get_server_versions()[0]
-        if cass_version < (3, 0):
-            raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
-        super(TestNamedWithMV, self).setUp()
+    @classmethod
+    def setUpClass(cls):
+        super(TestNamedWithMV, cls).setUpClass()
+        cls.default_keyspace = models.DEFAULT_KEYSPACE
+        models.DEFAULT_KEYSPACE = cls.ks_name
 
-    def tearDown(self):
-        models.DEFAULT_KEYSPACE = self.default_keyspace
+    @classmethod
+    def tearDownClass(cls):
+        models.DEFAULT_KEYSPACE = cls.default_keyspace
         setup_connection(models.DEFAULT_KEYSPACE)
+        super(TestNamedWithMV, cls).tearDownClass()
 
+    @greaterthanorequalcass30
     def test_named_table_with_mv(self):
         """
         Test NamedTable access to materialized views
