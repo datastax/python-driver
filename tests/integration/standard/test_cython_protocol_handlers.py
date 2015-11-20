@@ -18,6 +18,7 @@ from tests.integration.standard.utils import (
 
 from tests.unit.cython.utils import cythontest, numpytest
 
+
 def setup_module():
     use_singledc()
     update_datatypes()
