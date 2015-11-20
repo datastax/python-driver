@@ -335,6 +335,16 @@ class SimpleStatement(Statement):
                 (self.query_string, consistency))
     __repr__ = __str__
 
+class GraphStatement(SimpleStatement):
+    """
+    A simple, un-prepared graph query.
+    """
+
+    def __init__(self, query_string, *args, **kwargs):
+        """
+        """
+        SimpleStatement.__init__(self, query_string, *args, **kwargs)
+        self.graph_options = {}
 
 class PreparedStatement(object):
     """

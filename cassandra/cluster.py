@@ -19,7 +19,7 @@ This module houses the main classes you will interact with,
 from __future__ import absolute_import
 
 import atexit
-from collections import defaultdict, Mapping
+from collections import defaultdict, Mapping, namedtuple
 from concurrent.futures import ThreadPoolExecutor
 import logging
 from random import random
@@ -32,6 +32,8 @@ import warnings
 import six
 from six.moves import range
 from six.moves import queue as Queue
+
+import json
 
 import weakref
 from weakref import WeakValueDictionary
@@ -71,7 +73,7 @@ from cassandra.pool import (Host, _ReconnectionHandler, _HostReconnectionHandler
                             NoConnectionsAvailable)
 from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              BatchStatement, bind_params, QueryTrace, Statement,
-                             named_tuple_factory, dict_factory, FETCH_SIZE_UNSET)
+                             GraphStatement, named_tuple_factory, dict_factory, FETCH_SIZE_UNSET)
 
 
 def _is_eventlet_monkey_patched():
@@ -1934,6 +1936,22 @@ class Session(object):
     def get_pools(self):
         return self._pools.values()
 
+class GraphSession(object):
+
+    default_graph_options = {'graph-source':b'default', 'graph-language':b'gremlin-groovy'}
+
+    def __init__(self, session, default_graph_options=None):
+        self.session = session
+        if default_graph_options:
+            self.default_graph_options.update(default_graph_options)
+
+    def execute(self, query, *args, **kwargs):
+        if (isinstance(query, GraphStatement)):
+            z = self.default_graph_options.copy()
+            z.update(query.graph_options)
+            return GraphResultSet(self.session.execute(query, custom_payload=z))
+        else:
+            return GraphResultSet(self.session.execute(query, custom_payload=self.default_graph_options))
 
 class UserTypeDoesNotExist(Exception):
     """
@@ -3267,6 +3285,30 @@ class QueryExhausted(Exception):
     .. versionadded:: 2.0.0
     """
     pass
+
+class GraphResultSet(object):
+    wrapped_rs = None
+
+    def __init__(self, result_set):
+        self.wrapped_rs = result_set
+
+    def __iter__(self):
+        # Not great but doing iter(self.wrapped_rs); return self; Does not work-
+        # -with the paging and __getitem__ on the wrapped result set.
+        return GraphResultSet(iter(self.wrapped_rs))
+
+    def __getitem__(self, i):
+        return self._generate_traversal_result_tuple(self.wrapped_rs[i].gremlin)
+
+    def next(self):
+        return self._generate_traversal_result_tuple(self.wrapped_rs.next().gremlin)
+
+    __next__ = next
+
+    def _generate_traversal_result_tuple(self, result):
+        json_result = json.loads(result)['result']
+        GraphTraversalResult = namedtuple('GraphTraversalResult', json_result.keys())
+        return GraphTraversalResult(*json_result.values())
 
 
 class ResultSet(object):
