@@ -105,19 +105,21 @@ cdef varint_unpack(Buffer *term):
 
 # TODO: Optimize these two functions
 cdef varint_unpack_py3(bytes term):
-    cdef int64_t one = 1L
-
     val = int(''.join(["%02x" % i for i in term]), 16)
     if (term[0] & 128) != 0:
-        # There is a bug in Cython (0.20 - 0.22), where if we do
-        # '1 << (len(term) * 8)' Cython generates '1' directly into the
-        # C code, causing integer overflows
-        val -= one << (len(term) * 8)
+        shift = len(term) * 8  # * Note below
+        val -= 1 << shift
     return val
 
 cdef varint_unpack_py2(bytes term):  # noqa
-    cdef int64_t one = 1L
     val = int(term.encode('hex'), 16)
     if (ord(term[0]) & 128) != 0:
-        val = val - (one << (len(term) * 8))
+        shift = len(term) * 8  # * Note below
+        val = val - (1 << shift)
     return val
+
+# * Note *
+# '1 << (len(term) * 8)' Cython tries to do native
+# integer shifts, which overflows. We need this to
+# emulate Python shifting, which will expand the long
+# to accommodate

@@ -199,6 +199,8 @@ class ConcurrentExecutorListResults(_ConcurrentExecutor):
                 self._condition.wait()
                 if self._exception and self._fail_fast:
                     self._raise(self._exception)
+        if self._exception and self._fail_fast:  # raise the exception even if there was no wait
+            self._raise(self._exception)
         return [r[1] for r in sorted(self._results_queue)]
 
 

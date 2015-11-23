@@ -22,7 +22,7 @@ from threading import Event
 from subprocess import call
 from itertools import groupby
 
-from cassandra import OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure
+from cassandra import OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure, AlreadyExists
 from cassandra.cluster import Cluster
 from cassandra.protocol import ConfigurationException
 
@@ -127,6 +127,12 @@ else:
 PROTOCOL_VERSION = int(os.getenv('PROTOCOL_VERSION', default_protocol_version))
 
 notprotocolv1 = unittest.skipUnless(PROTOCOL_VERSION > 1, 'Protocol v1 not supported')
+lessthenprotocolv4 = unittest.skipUnless(PROTOCOL_VERSION < 4, 'Protocol versions 4 or greater not supported')
+greaterthanprotocolv3 = unittest.skipUnless(PROTOCOL_VERSION >= 4, 'Protocol versions less than 4 are not supported')
+
+greaterthancass20 = unittest.skipUnless(CASSANDRA_VERSION >= '2.1', 'Cassandra version 2.1 or greater required')
+greaterthanorequalcass30 = unittest.skipUnless(CASSANDRA_VERSION >= '3.0', 'Cassandra version 3.0 or greater required')
+lessthancass30 = unittest.skipUnless(CASSANDRA_VERSION < '3.0', 'Cassandra version less then 3.0 required')
 
 
 def get_cluster():
@@ -170,6 +176,7 @@ def remove_cluster():
                 time.sleep(1)
 
         raise RuntimeError("Failed to remove cluster after 100 attempts")
+
 
 def is_current_cluster(cluster_name, node_counts):
     global CCM_CLUSTER
@@ -262,7 +269,8 @@ def execute_until_pass(session, query):
     while tries < 100:
         try:
             return session.execute(query)
-        except ConfigurationException:
+        except (ConfigurationException, AlreadyExists):
+            log.warn("Recieved already exists from query {0}   not exiting".format(query))
             # keyspace/table was already created/dropped
             return
         except (OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure):
@@ -272,6 +280,36 @@ def execute_until_pass(session, query):
             tries += 1
 
     raise RuntimeError("Failed to execute query after 100 attempts: {0}".format(query))
+
+
+def execute_with_long_wait_retry(session, query, timeout=30):
+    tries = 0
+    while tries < 10:
+        try:
+            return session.execute(query, timeout=timeout)
+        except (ConfigurationException, AlreadyExists):
+            log.warn("Recieved already exists from query {0}    not exiting".format(query))
+            # keyspace/table was already created/dropped
+            return
+        except (OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure):
+            ex_type, ex, tb = sys.exc_info()
+            log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+            del tb
+            tries += 1
+
+    raise RuntimeError("Failed to execute query after 100 attempts: {0}".format(query))
+
+
+def drop_keyspace_shutdown_cluster(keyspace_name, session, cluster):
+    try:
+        execute_with_long_wait_retry(session, "DROP KEYSPACE {0}".format(keyspace_name))
+    except:
+        log.warn("Error encountered when droping keyspace {0}".format(keyspace_name))
+        ex_type, ex, tb = sys.exc_info()
+        log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+        del tb
+    log.warn("Shutting down cluster")
+    cluster.shutdown()
 
 
 def setup_keyspace(ipformat=None):
@@ -292,23 +330,23 @@ def setup_keyspace(ipformat=None):
         ddl = '''
             CREATE KEYSPACE test3rf
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '3'}'''
-        execute_until_pass(session, ddl)
+        execute_with_long_wait_retry(session, ddl)
 
         ddl = '''
             CREATE KEYSPACE test2rf
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '2'}'''
-        execute_until_pass(session, ddl)
+        execute_with_long_wait_retry(session, ddl)
 
         ddl = '''
             CREATE KEYSPACE test1rf
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}'''
-        execute_until_pass(session, ddl)
+        execute_with_long_wait_retry(session, ddl)
 
         ddl = '''
             CREATE TABLE test3rf.test (
                 k int PRIMARY KEY,
                 v int )'''
-        execute_until_pass(session, ddl)
+        execute_with_long_wait_retry(session, ddl)
 
     except Exception:
         traceback.print_exc()
@@ -356,19 +394,21 @@ class BasicKeyspaceUnitTestCase(unittest.TestCase):
 
     @classmethod
     def drop_keyspace(cls):
-        execute_until_pass(cls.session, "DROP KEYSPACE {0}".format(cls.ks_name))
+        execute_with_long_wait_retry(cls.session, "DROP KEYSPACE {0}".format(cls.ks_name))
 
     @classmethod
     def create_keyspace(cls, rf):
         ddl = "CREATE KEYSPACE {0} WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': '{1}'}}".format(cls.ks_name, rf)
-        execute_until_pass(cls.session, ddl)
+        execute_with_long_wait_retry(cls.session, ddl)
 
     @classmethod
-    def common_setup(cls, rf, create_class_table=False, skip_if_cass_version_less_than=None):
+    def common_setup(cls, rf, keyspace_creation=True, create_class_table=False):
         cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         cls.session = cls.cluster.connect()
         cls.ks_name = cls.__name__.lower()
-        cls.create_keyspace(rf)
+        if keyspace_creation:
+            cls.create_keyspace(rf)
+        cls.cass_version, cls.cql_version = get_server_versions()
 
         if create_class_table:
 
@@ -390,6 +430,19 @@ class BasicKeyspaceUnitTestCase(unittest.TestCase):
             execute_until_pass(self.session, ddl)
 
 
+class BasicExistingKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):
+    """
+    This is basic unit test defines class level teardown and setup methods. It assumes that keyspace is already defined, or created as part of the test.
+    """
+    @classmethod
+    def setUpClass(cls):
+        cls.common_setup(1, keyspace_creation=False)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.cluster.shutdown()
+
+
 class BasicSharedKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):
     """
     This is basic unit test case that can be leveraged to scope a keyspace to a specific test class.
@@ -401,8 +454,7 @@ class BasicSharedKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):
 
     @classmethod
     def tearDownClass(cls):
-        cls.drop_keyspace()
-        cls.cluster.shutdown()
+        drop_keyspace_shutdown_cluster(cls.ks_name, cls.session, cls.cluster)
 
 
 class BasicSharedKeyspaceUnitTestCaseWTable(BasicSharedKeyspaceUnitTestCase):
@@ -479,5 +531,17 @@ class BasicSegregatedKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):
         self.common_setup(1)
 
     def tearDown(self):
-        self.drop_keyspace()
+        drop_keyspace_shutdown_cluster(self.ks_name, self.session, self.cluster)
+
+
+class BasicExistingSegregatedKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):
+    """
+    This unit test will create and teardown or each individual unit tests. It assumes that keyspace is existing
+    or created as part of a test.
+    It has some overhead and should only be used when sharing cluster/session is not feasible.
+    """
+    def setUp(self):
+        self.common_setup(1, keyspace_creation=False)
+
+    def tearDown(self):
         self.cluster.shutdown()

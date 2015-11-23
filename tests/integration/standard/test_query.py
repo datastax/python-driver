@@ -26,48 +26,42 @@ from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
 from cassandra.cluster import Cluster
 from cassandra.policies import HostDistance
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions
+from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, greaterthanprotocolv3
 
 import re
 
 
 def setup_module():
+    print("Setting up module")
     use_singledc()
     global CASS_SERVER_VERSION
     CASS_SERVER_VERSION = get_server_versions()[0]
 
 
-class QueryTests(unittest.TestCase):
+class QueryTests(BasicSharedKeyspaceUnitTestCase):
 
     def test_query(self):
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
 
-        prepared = session.prepare(
+        prepared = self.session.prepare(
             """
             INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
-            """)
+            """.format(self.keyspace_name))
 
         self.assertIsInstance(prepared, PreparedStatement)
         bound = prepared.bind((1, None))
         self.assertIsInstance(bound, BoundStatement)
         self.assertEqual(2, len(bound.values))
-        session.execute(bound)
+        self.session.execute(bound)
         self.assertEqual(bound.routing_key, b'\x00\x00\x00\x01')
-
-        cluster.shutdown()
 
     def test_trace_prints_okay(self):
         """
         Code coverage to ensure trace prints to string without error
         """
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
-
         query = "SELECT * FROM system.local"
         statement = SimpleStatement(query)
-        rs = session.execute(statement, trace=True)
+        rs = self.session.execute(statement, trace=True)
 
         # Ensure this does not throw an exception
         trace = rs.get_query_trace()
@@ -76,13 +70,9 @@ class QueryTests(unittest.TestCase):
         for event in trace.events:
             str(event)
 
-        cluster.shutdown()
-
     def test_trace_id_to_resultset(self):
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
 
-        future = session.execute_async("SELECT * FROM system.local", trace=True)
+        future = self.session.execute_async("SELECT * FROM system.local", trace=True)
 
         # future should have the current trace
         rs = future.result()
@@ -96,16 +86,12 @@ class QueryTests(unittest.TestCase):
 
         self.assertListEqual([rs_trace], rs.get_all_query_traces())
 
-        cluster.shutdown()
-
     def test_trace_ignores_row_factory(self):
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
-        session.row_factory = dict_factory
+        self.session.row_factory = dict_factory
 
         query = "SELECT * FROM system.local"
         statement = SimpleStatement(query)
-        rs = session.execute(statement, trace=True)
+        rs = self.session.execute(statement, trace=True)
 
         # Ensure this does not throw an exception
         trace = rs.get_query_trace()
@@ -114,8 +100,7 @@ class QueryTests(unittest.TestCase):
         for event in trace.events:
             str(event)
 
-        cluster.shutdown()
-
+    @greaterthanprotocolv3
     def test_client_ip_in_trace(self):
         """
         Test to validate that client trace contains client ip information.
@@ -136,18 +121,10 @@ class QueryTests(unittest.TestCase):
         #   raise unittest.SkipTest("Client IP was not present in trace until C* 2.2")
         """
 
-        if PROTOCOL_VERSION < 4:
-            raise unittest.SkipTest(
-                "Protocol 4+ is required for client ip tracing, currently testing against %r"
-                % (PROTOCOL_VERSION,))
-
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
-
         # Make simple query with trace enabled
         query = "SELECT * FROM system.local"
         statement = SimpleStatement(query)
-        response_future = session.execute_async(statement, trace=True)
+        response_future = self.session.execute_async(statement, trace=True)
         response_future.result()
 
         # Fetch the client_ip from the trace.
@@ -161,7 +138,29 @@ class QueryTests(unittest.TestCase):
         self.assertIsNotNone(client_ip, "Client IP was not set in trace with C* >= 2.2")
         self.assertTrue(pat.match(client_ip), "Client IP from trace did not match the expected value")
 
-        cluster.shutdown()
+    def test_column_names(self):
+        """
+        Test to validate the columns are present on the result set.
+        Preforms a simple query against a table then checks to ensure column names are correct and present and correct.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-439
+        @expected_result column_names should be preset.
+
+        @test_category queries basic
+        """
+        create_table = """CREATE TABLE {0}.{1}(
+                        user TEXT,
+                        game TEXT,
+                        year INT,
+                        month INT,
+                        day INT,
+                        score INT,
+                        PRIMARY KEY (user, game, year, month, day)
+                        )""".format(self.keyspace_name, self.function_table_name)
+        self.session.execute(create_table)
+        result_set = self.session.execute("SELECT * FROM {0}.{1}".format(self.keyspace_name, self.function_table_name))
+        self.assertEqual(result_set.column_names, [u'user', u'game', u'year', u'month', u'day', u'score'])
 
 
 class PreparedStatementTests(unittest.TestCase):
@@ -283,7 +282,7 @@ class PrintStatementTests(unittest.TestCase):
         cluster.shutdown()
 
 
-class BatchStatementTests(unittest.TestCase):
+class BatchStatementTests(BasicSharedKeyspaceUnitTestCase):
 
     def setUp(self):
         if PROTOCOL_VERSION < 2:
@@ -296,7 +295,6 @@ class BatchStatementTests(unittest.TestCase):
             self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         self.session = self.cluster.connect()
 
-        self.session.execute("TRUNCATE test3rf.test")
 
     def tearDown(self):
         self.cluster.shutdown()
@@ -385,6 +383,21 @@ class BatchStatementTests(unittest.TestCase):
         for i in range(1000):
             self.test_no_parameters()
             self.session.execute("TRUNCATE test3rf.test")
+
+    def test_unicode(self):
+        ddl = '''
+            CREATE TABLE test3rf.testtext (
+                k int PRIMARY KEY,
+                v text )'''
+        self.session.execute(ddl)
+        unicode_text = u'Fran\u00E7ois'
+        query = u'INSERT INTO test3rf.testtext (k, v) VALUES (%s, %s)'
+        try:
+            batch = BatchStatement(BatchType.LOGGED)
+            batch.add(u"INSERT INTO test3rf.testtext (k, v) VALUES (%s, %s)", (0, unicode_text))
+            self.session.execute(batch)
+        finally:
+            self.session.execute("DROP TABLE test3rf.testtext")
 
 
 class SerialConsistencyTests(unittest.TestCase):
@@ -788,3 +801,38 @@ class MaterializedViewQueryTest(BasicSharedKeyspaceUnitTestCase):
         self.assertEquals(results[1].day, 25)
         self.assertEquals(results[1].score, 3200)
         self.assertEquals(results[1].user, "pcmanus")
+
+
+class UnicodeQueryTest(BasicSharedKeyspaceUnitTestCase):
+
+    def setUp(self):
+        ddl = '''
+            CREATE TABLE {0}.{1} (
+            k int PRIMARY KEY,
+            v text )'''.format(self.keyspace_name, self.function_table_name)
+        self.session.execute(ddl)
+
+    def tearDown(self):
+        self.session.execute("DROP TABLE {0}.{1}".format(self.keyspace_name,self.function_table_name))
+
+    def test_unicode(self):
+        """
+        Test to validate that unicode query strings are handled appropriately by various query types
+
+        @since 3.0.0
+        @jira_ticket PYTHON-334
+        @expected_result no unicode exceptions are thrown
+
+        @test_category query
+        """
+
+        unicode_text = u'Fran\u00E7ois'
+        batch = BatchStatement(BatchType.LOGGED)
+        batch.add(u"INSERT INTO {0}.{1} (k, v) VALUES (%s, %s)".format(self.keyspace_name, self.function_table_name), (0, unicode_text))
+        self.session.execute(batch)
+        self.session.execute(u"INSERT INTO {0}.{1} (k, v) VALUES (%s, %s)".format(self.keyspace_name, self.function_table_name), (0, unicode_text))
+        prepared = self.session.prepare(u"INSERT INTO {0}.{1} (k, v) VALUES (?, ?)".format(self.keyspace_name, self.function_table_name))
+        bound = prepared.bind((1, unicode_text))
+        self.session.execute(bound)
+
+

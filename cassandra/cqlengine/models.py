@@ -327,25 +327,21 @@ class BaseModel(object):
     _table_name = None  # used internally to cache a derived table name
 
     def __init__(self, **values):
-        self._values = {}
         self._ttl = self.__default_ttl__
         self._timestamp = None
         self._transaction = None
+        self._batch = None
+        self._timeout = connection.NOT_SET
+        self._is_persisted = False
 
+        self._values = {}
         for name, column in self._columns.items():
-            value = values.get(name, None)
+            value = values.get(name)
             if value is not None or isinstance(column, columns.BaseContainerColumn):
                 value = column.to_python(value)
             value_mngr = column.value_manager(self, column, value)
-            if name in values:
-                value_mngr.explicit = True
+            value_mngr.explicit = name in values
             self._values[name] = value_mngr
-
-        # a flag set by the deserializer to indicate
-        # that update should be used when persisting changes
-        self._is_persisted = False
-        self._batch = None
-        self._timeout = connection.NOT_SET
 
     def __repr__(self):
         return '{0}({1})'.format(self.__class__.__name__,
@@ -418,8 +414,13 @@ class BaseModel(object):
             klass = cls
 
         instance = klass(**field_dict)
-        instance._is_persisted = True
+        instance._set_persisted()
         return instance
+
+    def _set_persisted(self):
+        for v in self._values.values():
+            v.reset_previous_value()
+        self._is_persisted = True
 
     def _can_update(self):
         """
@@ -646,10 +647,7 @@ class BaseModel(object):
                           transaction=self._transaction,
                           timeout=self._timeout).save()
 
-        # reset the value managers
-        for v in self._values.values():
-            v.reset_previous_value()
-        self._is_persisted = True
+        self._set_persisted()
 
         self._ttl = self.__default_ttl__
         self._timestamp = None
@@ -695,10 +693,7 @@ class BaseModel(object):
                           transaction=self._transaction,
                           timeout=self._timeout).update()
 
-        # reset the value managers
-        for v in self._values.values():
-            v.reset_previous_value()
-        self._is_persisted = True
+        self._set_persisted()
 
         self._ttl = self.__default_ttl__
         self._timestamp = None

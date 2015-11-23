@@ -19,7 +19,7 @@ This module houses the main classes you will interact with,
 from __future__ import absolute_import
 
 import atexit
-from collections import defaultdict
+from collections import defaultdict, Mapping
 from concurrent.futures import ThreadPoolExecutor
 import logging
 from random import random
@@ -61,7 +61,7 @@ from cassandra.protocol import (QueryMessage, ResultMessage,
                                 BatchMessage, RESULT_KIND_PREPARED,
                                 RESULT_KIND_SET_KEYSPACE, RESULT_KIND_ROWS,
                                 RESULT_KIND_SCHEMA_CHANGE, MIN_SUPPORTED_VERSION,
-                                ProtocolHandler, _RESULT_SEQUENCE_TYPES)
+                                ProtocolHandler)
 from cassandra.metadata import Metadata, protect_name, murmur3
 from cassandra.policies import (TokenAwarePolicy, DCAwareRoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
@@ -386,6 +386,10 @@ class Cluster(object):
     """
     An optional list of tuples which will be used as arguments to
     ``socket.setsockopt()`` for all created sockets.
+
+    Note: some drivers find setting TCPNODELAY beneficial in the context of
+    their execution model. It was not found generally beneficial for this driver.
+    To try with your own workload, set ``sockopts = [(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)]``
     """
 
     max_schema_agreement_wait = 10
@@ -1261,6 +1265,15 @@ class Cluster(object):
         if not self.control_connection.refresh_schema(target_type=SchemaTargetType.TABLE, keyspace=keyspace, table=table, schema_agreement_wait=max_schema_agreement_wait):
             raise Exception("Table metadata was not refreshed. See log for details.")
 
+    def refresh_materialized_view_metadata(self, keyspace, view, max_schema_agreement_wait=None):
+        """
+        Synchronously refresh materialized view metadata.
+
+        See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
+        """
+        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.TABLE, keyspace=keyspace, table=view, schema_agreement_wait=max_schema_agreement_wait):
+            raise Exception("View metadata was not refreshed. See log for details.")
+
     def refresh_user_type_metadata(self, keyspace, user_type, max_schema_agreement_wait=None):
         """
         Synchronously refresh user defined type metadata.
@@ -1632,8 +1645,6 @@ class Session(object):
 
         if isinstance(query, SimpleStatement):
             query_string = query.query_string
-            if six.PY2 and isinstance(query_string, six.text_type):
-                query_string = query_string.encode('utf-8')
             if parameters:
                 query_string = bind_params(query_string, parameters, self.encoder)
             message = QueryMessage(
@@ -1898,11 +1909,17 @@ class Session(object):
             raise UserTypeDoesNotExist(
                 'User type %s does not exist in keyspace %s' % (user_type, keyspace))
 
+        field_names = type_meta.field_names
+        if six.PY2:
+            # go from unicode to string to avoid decode errors from implicit
+            # decode when formatting non-ascii values
+            field_names = [fn.encode('utf-8') for fn in field_names]
+
         def encode(val):
             return '{ %s }' % ' , '.join('%s : %s' % (
                 field_name,
                 self.encoder.cql_encode_all_types(getattr(val, field_name, None))
-            ) for field_name in type_meta.field_names)
+            ) for field_name in field_names)
 
         self.encoder.mapping[klass] = encode
 
@@ -2633,6 +2650,7 @@ class ResponseFuture(object):
 
     _req_id = None
     _final_result = _NOT_SET
+    _col_names = None
     _final_exception = None
     _query_traces = None
     _callbacks = None
@@ -2856,6 +2874,7 @@ class ResponseFuture(object):
                     results = getattr(response, 'results', None)
                     if results is not None and response.kind == RESULT_KIND_ROWS:
                         self._paging_state = response.paging_state
+                        self._col_names = results[0]
                         results = self.row_factory(*results)
                     self._set_final_result(results)
             elif isinstance(response, ErrorMessage):
@@ -3273,6 +3292,7 @@ class ResultSet(object):
 
     def __init__(self, response_future, initial_response):
         self.response_future = response_future
+        self.column_names = response_future._col_names
         self._set_current_rows(initial_response)
         self._page_iter = None
         self._list_mode = False
@@ -3286,6 +3306,10 @@ class ResultSet(object):
 
     @property
     def current_rows(self):
+        """
+        :return: the list of current page rows. May be empty if the result was empty,
+        or this is the last page.
+        """
         return self._current_rows or []
 
     def __iter__(self):
@@ -3311,6 +3335,11 @@ class ResultSet(object):
     __next__ = next
 
     def fetch_next_page(self):
+        """
+        Manually, synchronously fetch the next page. Supplied for manually retrieving pages
+        and inspecting :meth:`~.current_page`. It is not necessary to call this when iterating
+        through results; paging happens implicitly in iteration.
+        """
         if self.response_future.has_more_pages:
             self.response_future.start_fetching_next_page()
             result = self.response_future.result()
@@ -3319,9 +3348,13 @@ class ResultSet(object):
             self._current_rows = []
 
     def _set_current_rows(self, result):
-        if isinstance(result, _RESULT_SEQUENCE_TYPES):
+        if isinstance(result, Mapping):
+            self._current_rows = [result] if result else []
+            return
+        try:
+            iter(result)  # can't check directly for generator types because cython generators are different
             self._current_rows = result
-        else:
+        except TypeError:
             self._current_rows = [result] if result else []
 
     def _fetch_all(self):

@@ -34,7 +34,7 @@ from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
 from tests.integration import get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass, \
-    BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase
+    BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster
 
 
 def setup_module():
@@ -554,21 +554,42 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         if CASS_SERVER_VERSION < (3, 0):
             raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
 
-        table_name = "test"
         self.session.execute("CREATE TABLE {0}.{1} (a int PRIMARY KEY, b text)".format(self.keyspace_name, self.function_table_name))
 
         cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
         cluster2.connect()
 
-        self.assertNotIn("mv1", cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
-        self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT b FROM {0}.{1} WHERE b IS NOT NULL PRIMARY KEY (a, b)"
-                             .format(self.keyspace_name, self.function_table_name))
-        self.assertNotIn("mv1", cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+        try:
+            self.assertNotIn("mv1", cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+            self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT b FROM {0}.{1} WHERE b IS NOT NULL PRIMARY KEY (a, b)"
+                                 .format(self.keyspace_name, self.function_table_name))
+            self.assertNotIn("mv1", cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
 
-        cluster2.refresh_table_metadata(self.keyspace_name, "mv1")
-        self.assertIn("mv1", cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+            cluster2.refresh_table_metadata(self.keyspace_name, "mv1")
+            self.assertIn("mv1", cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+        finally:
+            cluster2.shutdown()
 
-        cluster2.shutdown()
+        original_meta = self.cluster.metadata.keyspaces[self.keyspace_name].views['mv1']
+        self.assertIs(original_meta, self.session.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views['mv1'])
+        self.cluster.refresh_materialized_view_metadata(self.keyspace_name, 'mv1')
+
+        current_meta = self.cluster.metadata.keyspaces[self.keyspace_name].views['mv1']
+        self.assertIsNot(current_meta, original_meta)
+        self.assertIsNot(original_meta, self.session.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views['mv1'])
+        self.assertEqual(original_meta.as_cql_query(), current_meta.as_cql_query())
+
+        cluster3 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
+        cluster3.connect()
+        try:
+            self.assertNotIn("mv2", cluster3.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+            self.session.execute("CREATE MATERIALIZED VIEW {0}.mv2 AS SELECT b FROM {0}.{1} WHERE b IS NOT NULL PRIMARY KEY (a, b)"
+                                 .format(self.keyspace_name, self.function_table_name))
+            self.assertNotIn("mv2", cluster3.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+            cluster3.refresh_materialized_view_metadata(self.keyspace_name, 'mv2')
+            self.assertIn("mv2", cluster3.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+        finally:
+            cluster3.shutdown()
 
     def test_refresh_user_type_metadata(self):
         """
@@ -1863,7 +1884,6 @@ class BadMetaTest(unittest.TestCase):
     class BadMetaException(Exception):
         pass
 
-
     @property
     def function_name(self):
         return self._testMethodName.lower()
@@ -1880,8 +1900,7 @@ class BadMetaTest(unittest.TestCase):
 
     @classmethod
     def teardown_class(cls):
-        cls.session.execute("DROP KEYSPACE %s" % cls.keyspace_name)
-        cls.cluster.shutdown()
+        drop_keyspace_shutdown_cluster(cls.keyspace_name, cls.session, cls.cluster)
 
     def _skip_if_not_version(self, version):
         if CASS_SERVER_VERSION < version:
@@ -2126,7 +2145,6 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
             self.assertEquals(a.name, b.name)
             self.assertEquals(a.table, b.table)
             self.assertEquals(a.cql_type, b.cql_type)
-            self.assertEquals(a.index, b.index)
             self.assertEquals(a.is_static, b.is_static)
             self.assertEquals(a.is_reversed, b.is_reversed)
 
@@ -2327,7 +2345,6 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         self.assertEquals(cluster_column.name, 'the;Clustering')
         self.assertEquals(cluster_column.name, mv.clustering_key[0].name)
         self.assertEquals(cluster_column.table, mv.clustering_key[0].table)
-        self.assertEquals(cluster_column.index, mv.clustering_key[0].index)
         self.assertEquals(cluster_column.is_static, mv.clustering_key[0].is_static)
         self.assertEquals(cluster_column.is_reversed, mv.clustering_key[0].is_reversed)
 

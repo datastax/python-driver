@@ -27,8 +27,10 @@ from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.cqltypes import Int32Type, EMPTY
 from cassandra.query import dict_factory, ordered_dict_factory
 from cassandra.util import sortedset
+from tests.unit.cython.utils import cythontest
 
-from tests.integration import get_server_versions, use_singledc, PROTOCOL_VERSION, execute_until_pass, notprotocolv1
+from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass, notprotocolv1, \
+    BasicSharedKeyspaceUnitTestCase, greaterthancass20, lessthancass30
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, COLLECTION_TYPES, \
     get_sample, get_collection_sample
 
@@ -38,21 +40,14 @@ def setup_module():
     update_datatypes()
 
 
-class TypeTests(unittest.TestCase):
+class TypeTests(BasicSharedKeyspaceUnitTestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls._cass_version, cls._cql_version = get_server_versions()
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        cls.session = cls.cluster.connect()
-        cls.session.execute("CREATE KEYSPACE typetests WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}")
-        cls.session.set_keyspace("typetests")
+        # cls._cass_version, cls. = get_server_versions()
+        super(TypeTests, cls).setUpClass()
+        cls.session.set_keyspace(cls.ks_name)
 
-    @classmethod
-    def tearDownClass(cls):
-        execute_until_pass(cls.session, "DROP KEYSPACE typetests")
-        cls.cluster.shutdown()
-                
     def test_can_insert_blob_type_as_string(self):
         """
         Tests that byte strings in Python maps to blob type in Cassandra
@@ -66,10 +61,10 @@ class TypeTests(unittest.TestCase):
 
         # In python2, with Cassandra > 2.0, we don't treat the 'byte str' type as a blob, so we'll encode it
         # as a string literal and have the following failure.
-        if six.PY2 and self._cql_version >= (3, 1, 0):
+        if six.PY2 and self.cql_version >= (3, 1, 0):
             # Blob values can't be specified using string notation in CQL 3.1.0 and
             # above which is used by default in Cassandra 2.0.
-            if self._cass_version >= (2, 1, 0):
+            if self.cass_version >= (2, 1, 0):
                 msg = r'.*Invalid STRING constant \(.*?\) for "b" of type blob.*'
             else:
                 msg = r'.*Invalid STRING constant \(.*?\) for b of type blob.*'
@@ -108,7 +103,7 @@ class TypeTests(unittest.TestCase):
         Test insertion of all datatype primitives
         """
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("typetests")
+        s = c.connect(self.keyspace_name)
 
         # create table
         alpha_type_list = ["zz int PRIMARY KEY"]
@@ -167,7 +162,7 @@ class TypeTests(unittest.TestCase):
         """
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("typetests")
+        s = c.connect(self.keyspace_name)
         # use tuple encoding, to convert native python tuple into raw CQL
         s.encoder.mapping[tuple] = s.encoder.cql_encode_tuple
 
@@ -394,11 +389,11 @@ class TypeTests(unittest.TestCase):
         Basic test of tuple functionality
         """
 
-        if self._cass_version < (2, 1, 0):
+        if self.cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("typetests")
+        s = c.connect(self.keyspace_name)
 
         # use this encoder in order to insert tuples
         s.encoder.mapping[tuple] = s.encoder.cql_encode_tuple
@@ -446,11 +441,11 @@ class TypeTests(unittest.TestCase):
         as expected.
         """
 
-        if self._cass_version < (2, 1, 0):
+        if self.cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("typetests")
+        s = c.connect(self.keyspace_name)
 
         # set the row_factory to dict_factory for programmatic access
         # set the encoder for tuples for the ability to write tuples
@@ -485,11 +480,11 @@ class TypeTests(unittest.TestCase):
         Ensure tuple subtypes are appropriately handled.
         """
 
-        if self._cass_version < (2, 1, 0):
+        if self.cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("typetests")
+        s = c.connect(self.keyspace_name)
         s.encoder.mapping[tuple] = s.encoder.cql_encode_tuple
 
         s.execute("CREATE TABLE tuple_primitive ("
@@ -513,11 +508,11 @@ class TypeTests(unittest.TestCase):
         Ensure tuple subtypes are appropriately handled for maps, sets, and lists.
         """
 
-        if self._cass_version < (2, 1, 0):
+        if self.cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("typetests")
+        s = c.connect(self.keyspace_name)
 
         # set the row_factory to dict_factory for programmatic access
         # set the encoder for tuples for the ability to write tuples
@@ -612,11 +607,11 @@ class TypeTests(unittest.TestCase):
         Ensure nested are appropriately handled.
         """
 
-        if self._cass_version < (2, 1, 0):
+        if self.cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("typetests")
+        s = c.connect(self.keyspace_name)
 
         # set the row_factory to dict_factory for programmatic access
         # set the encoder for tuples for the ability to write tuples
@@ -652,7 +647,7 @@ class TypeTests(unittest.TestCase):
         Test tuples with null and empty string fields.
         """
 
-        if self._cass_version < (2, 1, 0):
+        if self.cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
         s = self.session
@@ -746,3 +741,106 @@ class TypeTests(unittest.TestCase):
         # prepared binding
         verify_insert_select(s.prepare('INSERT INTO float_cql_encoding (f, d) VALUES (?, ?)'),
                              s.prepare('SELECT * FROM float_cql_encoding WHERE f=?'))
+
+    @cythontest
+    def test_cython_decimal(self):
+        """
+        Test to validate that decimal deserialization works correctly in with our cython extensions
+
+        @since 3.0.0
+        @jira_ticket PYTHON-212
+        @expected_result no exceptions are thrown, decimal is decoded correctly
+
+        @test_category data_types serialization
+        """
+
+        self.session.execute("CREATE TABLE {0} (dc decimal PRIMARY KEY)".format(self.function_table_name))
+        try:
+            self.session.execute("INSERT INTO {0} (dc) VALUES (-1.08430792318105707)".format(self.function_table_name))
+            results = self.session.execute("SELECT * FROM {0}".format(self.function_table_name))
+            self.assertTrue(str(results[0].dc) == '-1.08430792318105707')
+        finally:
+            self.session.execute("DROP TABLE {0}".format(self.function_table_name))
+
+
+class TypeTestsProtocol(BasicSharedKeyspaceUnitTestCase):
+
+    @greaterthancass20
+    @lessthancass30
+    def test_nested_types_with_protocol_version(self):
+        """
+        Test to validate that nested type serialization works on various protocol versions. Provided
+        the version of cassandra is greater the 2.1.3 we would expect to nested to types to work at all protocol versions.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-215
+        @expected_result no exceptions are thrown
+
+        @test_category data_types serialization
+        """
+        ddl = '''CREATE TABLE {0}.t (
+                k int PRIMARY KEY,
+                v list<frozen<set<int>>>)'''.format(self.keyspace_name)
+
+        self.session.execute(ddl)
+        ddl = '''CREATE TABLE {0}.u (
+                k int PRIMARY KEY,
+                v set<frozen<list<int>>>)'''.format(self.keyspace_name)
+        self.session.execute(ddl)
+        ddl = '''CREATE TABLE {0}.v (
+                k int PRIMARY KEY,
+                v map<frozen<set<int>>, frozen<list<int>>>,
+                v1 frozen<tuple<int, text>>)'''.format(self.keyspace_name)
+        self.session.execute(ddl)
+
+        self.session.execute("CREATE TYPE {0}.typ (v0 frozen<map<int, frozen<list<int>>>>, v1 frozen<list<int>>)".format(self.keyspace_name))
+
+        ddl = '''CREATE TABLE {0}.w (
+                k int PRIMARY KEY,
+                v frozen<typ>)'''.format(self.keyspace_name)
+
+        self.session.execute(ddl)
+
+        for pvi in range(1, 5):
+            self.run_inserts_at_version(pvi)
+            for pvr in range(1, 5):
+                self.read_inserts_at_level(pvr)
+
+    def read_inserts_at_level(self, proto_ver):
+        session = Cluster(protocol_version=proto_ver).connect(self.keyspace_name)
+        try:
+            results = session.execute('select * from t')[0]
+            self.assertEqual("[SortedSet([1, 2]), SortedSet([3, 5])]", str(results.v))
+
+            results = session.execute('select * from u')[0]
+            self.assertEqual("SortedSet([[1, 2], [3, 5]])", str(results.v))
+
+            results = session.execute('select * from v')[0]
+            self.assertEqual("{SortedSet([1, 2]): [1, 2, 3], SortedSet([3, 5]): [4, 5, 6]}", str(results.v))
+
+            results = session.execute('select * from w')[0]
+            self.assertEqual("typ(v0=OrderedMapSerializedKey([(1, [1, 2, 3]), (2, [4, 5, 6])]), v1=[7, 8, 9])", str(results.v))
+
+        finally:
+            session.cluster.shutdown()
+
+    def run_inserts_at_version(self, proto_ver):
+        session = Cluster(protocol_version=proto_ver).connect(self.keyspace_name)
+        try:
+            p = session.prepare('insert into t (k, v) values (?, ?)')
+            session.execute(p, (0, [{1, 2}, {3, 5}]))
+
+            p = session.prepare('insert into u (k, v) values (?, ?)')
+            session.execute(p, (0, {(1, 2), (3, 5)}))
+
+            p = session.prepare('insert into v (k, v, v1) values (?, ?, ?)')
+            session.execute(p, (0, {(1, 2): [1, 2, 3], (3, 5): [4, 5, 6]}, (123, 'four')))
+
+            p = session.prepare('insert into w (k, v) values (?, ?)')
+            session.execute(p, (0, ({1: [1, 2, 3], 2: [4, 5, 6]}, [7, 8, 9])))
+
+        finally:
+            session.cluster.shutdown()
+
+
+

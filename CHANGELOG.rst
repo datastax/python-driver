@@ -1,3 +1,47 @@
+3.0.0
+=====
+
+Features
+--------
+* Support datetime.date objects as a DateType (PYTHON-212)
+* Add Cluster.update_view_metadata (PYTHON-407)
+* QueryTrace option to populate partial trace sessions (PYTHON-438)
+* Attach column names to ResultSet (PYTHON-439)
+
+Bug Fixes
+---------
+* Properly SerDes nested collections when protocol_version < 3 (PYTHON-215)
+* Evict UDTs from UserType cache on change (PYTHON-226)
+* Make sure query strings are always encoded UTF-8 (PYTHON-334)
+* Track previous value of columns at instantiation in CQLengine (PYTHON-348)
+* UDT CQL encoding does not work for unicode values (PYTHON-353)
+* NetworkTopologyStrategy#make_token_replica_map does not account for multiple racks in a DC (PYTHON-378)
+* Cython integer overflow on decimal type deserialization (PYTHON-433)
+* Query trace: if session hasn't been logged, query trace can throw exception (PYTHON-442)
+
+3.0.0rc1
+========
+November 9, 2015
+
+Features
+--------
+* Process Modernized Schema Tables for Cassandra 3.0 (PYTHON-276, PYTHON-408, PYTHON-400, PYTHON-422)
+* Remove deprecated features (PYTHON-292)
+* Don't assign trace data to Statements (PYTHON-318)
+* Normalize results return (PYTHON-368)
+* Process Materialized View Metadata/Events (PYTHON-371)
+* Remove blist as soft dependency (PYTHON-385)
+* Change default consistency level to LOCAL_QUORUM (PYTHON-416)
+* Normalize CQL query/export in metadata model (PYTHON-405)
+
+Bug Fixes
+---------
+* Implementation of named arguments bind is non-pythonic (PYTHON-178)
+* CQL encoding is incorrect for NaN and Infinity floats (PYTHON-282)
+* Protocol downgrade issue with C* 2.0.x, 2.1.x, and python3, with non-default logging (PYTHON-409)
+* ValueError when accessing usertype with non-alphanumeric field names (PYTHON-413)
+* NumpyProtocolHandler does not play well with PagedResult (PYTHON-430)
+
 2.7.2
 =====
 Setpember 14, 2015

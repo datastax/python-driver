@@ -187,7 +187,7 @@ class Encoder(object):
         Converts a sequence to a string of the form ``(item1, item2, ...)``.  This
         is suitable for ``IN`` value lists.
         """
-        return '( %s )' % ' , '.join(self.mapping.get(type(v), self.cql_encode_object)(v)
+        return '(%s)' % ', '.join(self.mapping.get(type(v), self.cql_encode_object)(v)
                                      for v in val)
 
     cql_encode_tuple = cql_encode_sequence
@@ -201,7 +201,7 @@ class Encoder(object):
         Converts a dict into a string of the form ``{key1: val1, key2: val2, ...}``.
         This is suitable for ``map`` type columns.
         """
-        return '{ %s }' % ' , '.join('%s : %s' % (
+        return '{%s}' % ', '.join('%s: %s' % (
             self.mapping.get(type(k), self.cql_encode_object)(k),
             self.mapping.get(type(v), self.cql_encode_object)(v)
         ) for k, v in six.iteritems(val))
@@ -211,14 +211,14 @@ class Encoder(object):
         Converts a sequence to a string of the form ``[item1, item2, ...]``.  This
         is suitable for ``list`` type columns.
         """
-        return '[ %s ]' % ' , '.join(self.mapping.get(type(v), self.cql_encode_object)(v) for v in val)
+        return '[%s]' % ', '.join(self.mapping.get(type(v), self.cql_encode_object)(v) for v in val)
 
     def cql_encode_set_collection(self, val):
         """
         Converts a sequence to a string of the form ``{item1, item2, ...}``.  This
         is suitable for ``set`` type columns.
         """
-        return '{ %s }' % ' , '.join(self.mapping.get(type(v), self.cql_encode_object)(v) for v in val)
+        return '{%s}' % ', '.join(self.mapping.get(type(v), self.cql_encode_object)(v) for v in val)
 
     def cql_encode_all_types(self, val):
         """

@@ -26,7 +26,7 @@ from cassandra.cluster import Cluster, UserTypeDoesNotExist
 from cassandra.query import dict_factory
 from cassandra.util import OrderedMap
 
-from tests.integration import get_server_versions, use_singledc, PROTOCOL_VERSION, execute_until_pass
+from tests.integration import get_server_versions, use_singledc, PROTOCOL_VERSION, execute_until_pass, BasicSegregatedKeyspaceUnitTestCase, greaterthancass20
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, COLLECTION_TYPES, \
     get_sample, get_collection_sample
 
@@ -39,27 +39,16 @@ def setup_module():
     update_datatypes()
 
 
-class UDTTests(unittest.TestCase):
+@greaterthancass20
+class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
 
     @property
     def table_name(self):
         return self._testMethodName.lower()
 
     def setUp(self):
-        self._cass_version, self._cql_version = get_server_versions()
-
-        if self._cass_version < (2, 1, 0):
-            raise unittest.SkipTest("User Defined Types were introduced in Cassandra 2.1")
-
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        self.session = self.cluster.connect()
-        execute_until_pass(self.session,
-                           "CREATE KEYSPACE udttests WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}")
-        self.session.set_keyspace("udttests")
-
-    def tearDown(self):
-        execute_until_pass(self.session, "DROP KEYSPACE udttests")
-        self.cluster.shutdown()
+        super(UDTTests, self).setUp()
+        self.session.set_keyspace(self.keyspace_name)
 
     def test_can_insert_unprepared_registered_udts(self):
         """
@@ -67,13 +56,13 @@ class UDTTests(unittest.TestCase):
         """
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("udttests")
+        s = c.connect(self.keyspace_name)
 
         s.execute("CREATE TYPE user (age int, name text)")
         s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b frozen<user>)")
 
         User = namedtuple('user', ('age', 'name'))
-        c.register_user_type("udttests", "user", User)
+        c.register_user_type(self.keyspace_name, "user", User)
 
         s.execute("INSERT INTO mytable (a, b) VALUES (%s, %s)", (0, User(42, 'bob')))
         result = s.execute("SELECT b FROM mytable WHERE a=0")
@@ -169,7 +158,7 @@ class UDTTests(unittest.TestCase):
         """
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("udttests")
+        s = c.connect(self.keyspace_name)
 
         s.execute("CREATE TYPE user (age int, name text)")
         s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b frozen<user>)")
@@ -213,11 +202,11 @@ class UDTTests(unittest.TestCase):
         """
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("udttests")
+        s = c.connect(self.keyspace_name)
 
         s.execute("CREATE TYPE user (age int, name text)")
         User = namedtuple('user', ('age', 'name'))
-        c.register_user_type("udttests", "user", User)
+        c.register_user_type(self.keyspace_name, "user", User)
 
         s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b frozen<user>)")
 
@@ -263,11 +252,11 @@ class UDTTests(unittest.TestCase):
         """
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("udttests")
+        s = c.connect(self.keyspace_name)
 
         s.execute("CREATE TYPE user (a text, b int, c uuid, d blob)")
         User = namedtuple('user', ('a', 'b', 'c', 'd'))
-        c.register_user_type("udttests", "user", User)
+        c.register_user_type(self.keyspace_name, "user", User)
 
         s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b frozen<user>)")
 
@@ -293,7 +282,7 @@ class UDTTests(unittest.TestCase):
         """
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("udttests")
+        s = c.connect(self.keyspace_name)
 
         MAX_TEST_LENGTH = 254
 
@@ -310,7 +299,7 @@ class UDTTests(unittest.TestCase):
 
         # create and register the seed udt type
         udt = namedtuple('lengthy_udt', tuple(['v_{0}'.format(i) for i in range(MAX_TEST_LENGTH)]))
-        c.register_user_type("udttests", "lengthy_udt", udt)
+        c.register_user_type(self.keyspace_name, "lengthy_udt", udt)
 
         # verify inserts and reads
         for i in (0, 1, 2, 3, MAX_TEST_LENGTH):
@@ -377,7 +366,7 @@ class UDTTests(unittest.TestCase):
         """
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("udttests")
+        s = c.connect(self.keyspace_name)
         s.row_factory = dict_factory
 
         MAX_NESTING_DEPTH = 16
@@ -389,13 +378,13 @@ class UDTTests(unittest.TestCase):
         udts = []
         udt = namedtuple('depth_0', ('age', 'name'))
         udts.append(udt)
-        c.register_user_type("udttests", "depth_0", udts[0])
+        c.register_user_type(self.keyspace_name, "depth_0", udts[0])
 
         # create and register the nested udt types
         for i in range(MAX_NESTING_DEPTH):
             udt = namedtuple('depth_{0}'.format(i + 1), ('value'))
             udts.append(udt)
-            c.register_user_type("udttests", "depth_{0}".format(i + 1), udts[i + 1])
+            c.register_user_type(self.keyspace_name, "depth_{0}".format(i + 1), udts[i + 1])
 
         # insert udts and verify inserts with reads
         self.nested_udt_verification_helper(s, MAX_NESTING_DEPTH, udts)
@@ -408,7 +397,7 @@ class UDTTests(unittest.TestCase):
         """
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("udttests")
+        s = c.connect(self.keyspace_name)
         s.row_factory = dict_factory
 
         MAX_NESTING_DEPTH = 16
@@ -448,7 +437,7 @@ class UDTTests(unittest.TestCase):
         """
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("udttests")
+        s = c.connect(self.keyspace_name)
         s.row_factory = dict_factory
 
         MAX_NESTING_DEPTH = 16
@@ -460,13 +449,13 @@ class UDTTests(unittest.TestCase):
         udts = []
         udt = namedtuple('level_0', ('age', 'name'))
         udts.append(udt)
-        c.register_user_type("udttests", "depth_0", udts[0])
+        c.register_user_type(self.keyspace_name, "depth_0", udts[0])
 
         # create and register the nested udt types
         for i in range(MAX_NESTING_DEPTH):
             udt = namedtuple('level_{0}'.format(i + 1), ('value'))
             udts.append(udt)
-            c.register_user_type("udttests", "depth_{0}".format(i + 1), udts[i + 1])
+            c.register_user_type(self.keyspace_name, "depth_{0}".format(i + 1), udts[i + 1])
 
         # insert udts and verify inserts with reads
         self.nested_udt_verification_helper(s, MAX_NESTING_DEPTH, udts)
@@ -479,7 +468,7 @@ class UDTTests(unittest.TestCase):
         """
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("udttests")
+        s = c.connect(self.keyspace_name)
         User = namedtuple('user', ('age', 'name'))
 
         with self.assertRaises(UserTypeDoesNotExist):
@@ -499,7 +488,7 @@ class UDTTests(unittest.TestCase):
         """
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("udttests")
+        s = c.connect(self.keyspace_name)
 
         # create UDT
         alpha_type_list = []
@@ -510,7 +499,7 @@ class UDTTests(unittest.TestCase):
         s.execute("""
             CREATE TYPE alldatatypes ({0})
         """.format(', '.join(alpha_type_list))
-        )
+                  )
 
         s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b frozen<alldatatypes>)")
 
@@ -519,7 +508,7 @@ class UDTTests(unittest.TestCase):
         for i in range(ord('a'), ord('a') + len(PRIMITIVE_DATATYPES)):
             alphabet_list.append('{0}'.format(chr(i)))
         Alldatatypes = namedtuple("alldatatypes", alphabet_list)
-        c.register_user_type("udttests", "alldatatypes", Alldatatypes)
+        c.register_user_type(self.keyspace_name, "alldatatypes", Alldatatypes)
 
         # insert UDT data
         params = []
@@ -544,7 +533,7 @@ class UDTTests(unittest.TestCase):
         """
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("udttests")
+        s = c.connect(self.keyspace_name)
 
         # create UDT
         alpha_type_list = []
@@ -576,7 +565,7 @@ class UDTTests(unittest.TestCase):
                 alphabet_list.append('{0}_{1}'.format(chr(i), chr(j)))
 
         Alldatatypes = namedtuple("alldatatypes", alphabet_list)
-        c.register_user_type("udttests", "alldatatypes", Alldatatypes)
+        c.register_user_type(self.keyspace_name, "alldatatypes", Alldatatypes)
 
         # insert UDT data
         params = []
@@ -607,11 +596,11 @@ class UDTTests(unittest.TestCase):
         Test for inserting various types of nested COLLECTION_TYPES into tables and UDTs
         """
 
-        if self._cass_version < (2, 1, 3):
+        if self.cass_version < (2, 1, 3):
             raise unittest.SkipTest("Support for nested collections was introduced in Cassandra 2.1.3")
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect("udttests")
+        s = c.connect(self.keyspace_name)
         s.encoder.mapping[tuple] = s.encoder.cql_encode_tuple
 
         name = self._testMethodName
@@ -710,3 +699,36 @@ class UDTTests(unittest.TestCase):
         val = s.execute('SELECT v FROM %s' % self.table_name)[0][0]
         self.assertEqual(val['v0'], 3)
         self.assertEqual(val['v1'], six.b('\xde\xad\xbe\xef'))
+
+    def test_alter_udt(self):
+        """
+        Test to ensure that altered UDT's are properly surfaced without needing to restart the underlying session.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-226
+        @expected_result UDT's will reflect added columns without a session restart.
+
+        @test_category data_types, udt
+        """
+
+        # Create udt ensure it has the proper column names.
+        self.session.set_keyspace(self.keyspace_name)
+        self.session.execute("CREATE TYPE typetoalter (a int)")
+        typetoalter = namedtuple('typetoalter', ('a'))
+        self.session.execute("CREATE TABLE {0} (pk int primary key, typetoalter frozen<typetoalter>)".format(self.function_table_name))
+        insert_statement = self.session.prepare("INSERT INTO {0} (pk, typetoalter) VALUES (?, ?)".format(self.function_table_name))
+        self.session.execute(insert_statement, [1, typetoalter(1)])
+        results = self.session.execute("SELECT * from {0}".format(self.function_table_name))
+        for result in results:
+            self.assertTrue(hasattr(result.typetoalter, 'a'))
+            self.assertFalse(hasattr(result.typetoalter, 'b'))
+
+        # Alter UDT and ensure the alter is honored in results
+        self.session.execute("ALTER TYPE typetoalter add b int")
+        typetoalter = namedtuple('typetoalter', ('a', 'b'))
+        self.session.execute(insert_statement, [2, typetoalter(2, 2)])
+        results = self.session.execute("SELECT * from {0}".format(self.function_table_name))
+        for result in results:
+            self.assertTrue(hasattr(result.typetoalter, 'a'))
+            self.assertTrue(hasattr(result.typetoalter, 'b'))
+

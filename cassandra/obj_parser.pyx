@@ -38,8 +38,6 @@ cdef class LazyParser(ColumnParser):
         # supported in cpdef methods
         return parse_rows_lazy(reader, desc)
 
-    cpdef get_cython_generator_type(self):
-        return get_cython_generator_type()
 
 def parse_rows_lazy(BytesIOReader reader, ParseDesc desc):
     cdef Py_ssize_t i, rowcount
@@ -47,8 +45,6 @@ def parse_rows_lazy(BytesIOReader reader, ParseDesc desc):
     cdef RowParser rowparser = TupleRowParser()
     return (rowparser.unpack_row(reader, desc) for i in range(rowcount))
 
-def get_cython_generator_type():
-    return type((i for i in range(0)))
 
 cdef class TupleRowParser(RowParser):
     """

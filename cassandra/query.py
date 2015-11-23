@@ -780,6 +780,8 @@ For example::
 
 
 def bind_params(query, params, encoder):
+    if six.PY2 and isinstance(query, six.text_type):
+        query = query.encode('utf-8')
     if isinstance(params, dict):
         return query % dict((k, encoder.cql_encode_all_types(v)) for k, v in six.iteritems(params))
     else:
@@ -858,7 +860,7 @@ class QueryTrace(object):
         self.trace_id = trace_id
         self._session = session
 
-    def populate(self, max_wait=2.0):
+    def populate(self, max_wait=2.0, wait_for_complete=True):
         """
         Retrieves the actual tracing details from Cassandra and populates the
         attributes of this instance.  Because tracing details are stored
@@ -866,6 +868,9 @@ class QueryTrace(object):
         detail fetch.  If the trace is still not available after `max_wait`
         seconds, :exc:`.TraceUnavailable` will be raised; if `max_wait` is
         :const:`None`, this will retry forever.
+
+        `wait_for_complete=False` bypasses the wait for duration to be populated.
+        This can be used to query events from partial sessions.
         """
         attempt = 0
         start = time.time()
@@ -879,15 +884,19 @@ class QueryTrace(object):
             session_results = self._execute(
                 self._SELECT_SESSIONS_FORMAT, (self.trace_id,), time_spent, max_wait)
 
-            if not session_results or session_results[0].duration is None:
+            is_complete = session_results and session_results[0].duration is not None
+            if not session_results or (wait_for_complete and not is_complete):
                 time.sleep(self._BASE_RETRY_SLEEP * (2 ** attempt))
                 attempt += 1
                 continue
-            log.debug("Fetched trace info for trace ID: %s", self.trace_id)
+            if is_complete:
+                log.debug("Fetched trace info for trace ID: %s", self.trace_id)
+            else:
+                log.debug("Fetching parital trace info for trace ID: %s", self.trace_id)
 
             session_row = session_results[0]
             self.request_type = session_row.request
-            self.duration = timedelta(microseconds=session_row.duration)
+            self.duration = timedelta(microseconds=session_row.duration) if is_complete else None
             self.started_at = session_row.started_at
             self.coordinator = session_row.coordinator
             self.parameters = session_row.parameters

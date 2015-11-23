@@ -33,6 +33,7 @@ class MockResponseResponseFuture():
     """
 
     _query_trace = None
+    _col_names = None
 
     # a list pending callbacks, these will be prioritized in reverse or normal orderd
     pending_callbacks = PriorityQueue()
