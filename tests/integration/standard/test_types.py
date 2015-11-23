@@ -806,28 +806,19 @@ class TypeTestsProtocol(BasicSharedKeyspaceUnitTestCase):
             for pvr in range(1, 5):
                 self.read_inserts_at_level(pvr)
 
-    def print_results(self, results):
-        print("printing results")
-        print(str(results.v))
-
     def read_inserts_at_level(self, proto_ver):
         session = Cluster(protocol_version=proto_ver).connect(self.keyspace_name)
         try:
-            print("reading at version {0}".format(proto_ver))
             results = session.execute('select * from t')[0]
-            self.print_results(results)
             self.assertEqual("[SortedSet([1, 2]), SortedSet([3, 5])]", str(results.v))
 
             results = session.execute('select * from u')[0]
-            self.print_results(results)
             self.assertEqual("SortedSet([[1, 2], [3, 5]])", str(results.v))
 
             results = session.execute('select * from v')[0]
-            self.print_results(results)
             self.assertEqual("{SortedSet([1, 2]): [1, 2, 3], SortedSet([3, 5]): [4, 5, 6]}", str(results.v))
 
             results = session.execute('select * from w')[0]
-            self.print_results(results)
             self.assertEqual("typ(v0=OrderedMapSerializedKey([(1, [1, 2, 3]), (2, [4, 5, 6])]), v1=[7, 8, 9])", str(results.v))
 
         finally:
@@ -836,7 +827,6 @@ class TypeTestsProtocol(BasicSharedKeyspaceUnitTestCase):
     def run_inserts_at_version(self, proto_ver):
         session = Cluster(protocol_version=proto_ver).connect(self.keyspace_name)
         try:
-            print("running inserts with protocol version {0}".format(str(proto_ver)))
             p = session.prepare('insert into t (k, v) values (?, ?)')
             session.execute(p, (0, [{1, 2}, {3, 5}]))
 
