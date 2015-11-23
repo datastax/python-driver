@@ -238,7 +238,7 @@ cdef list _deserialize_list_or_set(itemlen_t dummy_version,
 
     _unpack_len[itemlen_t](0, &numelements, buf)
     idx = sizeof(itemlen_t)
-
+    protocol_version = max(3, protocol_version)
     for _ in range(numelements):
         subelem(buf, &elem_buf, &idx)
         result.append(from_binary(deserializer, &elem_buf, protocol_version))
@@ -325,6 +325,7 @@ cdef _deserialize_map(itemlen_t dummy_version,
     _unpack_len[itemlen_t](0, &numelements, buf)
     idx = sizeof(itemlen_t)
     themap = util.OrderedMapSerializedKey(key_type, protocol_version)
+    protocol_version = max(3, protocol_version)
     for _ in range(numelements):
         subelem(buf, &key_buf, &idx)
         subelem(buf, &val_buf, &idx)
