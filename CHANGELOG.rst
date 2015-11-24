@@ -7,6 +7,7 @@ Features
 * Add Cluster.update_view_metadata (PYTHON-407)
 * QueryTrace option to populate partial trace sessions (PYTHON-438)
 * Attach column names to ResultSet (PYTHON-439)
+* Change default consistency level to LOCAL_ONE
 
 Bug Fixes
 ---------
