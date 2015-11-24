@@ -392,6 +392,10 @@ class BasicKeyspaceUnitTestCase(unittest.TestCase):
     def function_table_name(self):
         return self._testMethodName.lower()
 
+    @property
+    def keyspace_table_name(self):
+        return "{0}.{1}".format(self.keyspace_name, self._testMethodName.lower())
+
     @classmethod
     def drop_keyspace(cls):
         execute_with_long_wait_retry(cls.session, "DROP KEYSPACE {0}".format(cls.ks_name))
