@@ -12,11 +12,10 @@ previously supported versions. In addition to substantial internal rework,
 there are several updates to the API that integrators will need
 to consider:
 
-Default consistency is now ``LOCAL_QUORUM``
+Default consistency is now ``LOCAL_ONE``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Previous value was ``ONE``. ``ONE`` (or ``LOCAL_ONE``) is still appropriate for
-many applications, but the new default was chosen to be least surprising for
-new users not specifying a consistency level.
+Previous value was ``ONE``. The new value is introduced to mesh with the default
+DC-aware load balancing policy and to match other drivers.
 
 Execution API Updates
 ^^^^^^^^^^^^^^^^^^^^^

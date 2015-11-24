@@ -327,12 +327,9 @@ The consistency level used for a query determines how many of the
 replicas of the data you are interacting with need to respond for
 the query to be considered a success.
 
-By default, :attr:`.ConsistencyLevel.LOCAL_QUORUM` will be used for all queries.
-This is to provide unsurprising default behavior with respect to read-after-write
-consistency. However, many applications will prefer :attr:`.ConsistencyLevel.ONE`
-to maximize performance and availability.
+By default, :attr:`.ConsistencyLevel.LOCAL_ONE` will be used for all queries.
 You can specify a different default for the session on :attr:`.Session.default_consistency_level`.
-To specify a different consistency level per request, you will need to wrap your queries
+To specify a different consistency level per request, wrap queries
 in a :class:`~.SimpleStatement`:
 
 .. code-block:: python

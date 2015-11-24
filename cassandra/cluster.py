@@ -1428,7 +1428,7 @@ class Session(object):
     .. versionadded:: 2.0.0
     """
 
-    default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
+    default_consistency_level = ConsistencyLevel.LOCAL_ONE
     """
     The default :class:`~ConsistencyLevel` for operations executed through
     this session.  This default may be overridden by setting the
@@ -1438,7 +1438,7 @@ class Session(object):
 
     .. versionchanged:: 3.0.0
 
-        default changed from ONE to LOCAL_QUORUM
+        default changed from ONE to LOCAL_ONE
     """
 
     max_trace_wait = 2.0

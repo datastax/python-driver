@@ -22,7 +22,7 @@ except ImportError:
 
 from cassandra import ConsistencyLevel
 from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
-                             BatchStatement, BatchType, dict_factory)
+                             BatchStatement, BatchType, dict_factory, TraceUnavailable)
 from cassandra.cluster import Cluster
 from cassandra.policies import HostDistance
 
@@ -32,7 +32,6 @@ import re
 
 
 def setup_module():
-    print("Setting up module")
     use_singledc()
     global CASS_SERVER_VERSION
     CASS_SERVER_VERSION = get_server_versions()[0]
@@ -137,6 +136,46 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         # Ensure that ip is set
         self.assertIsNotNone(client_ip, "Client IP was not set in trace with C* >= 2.2")
         self.assertTrue(pat.match(client_ip), "Client IP from trace did not match the expected value")
+
+    def test_incomplete_query_trace(self):
+        """
+        Tests to ensure that partial tracing works.
+
+        Creates a table and runs an insert. Then attempt a query with tracing enabled. After the query is run we delete the
+        duration information associated with the trace, and attempt to populate the tracing information.
+        Should fail with wait_for_complete=True, succeed for False.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-438
+        @expected_result tracing comes back sans duration
+
+        @test_category tracing
+        """
+
+        # Create table and run insert, then select
+        self.session.execute("CREATE TABLE {0} (k INT, i INT, PRIMARY KEY(k, i))".format(self.keyspace_table_name))
+        self.session.execute("INSERT INTO {0} (k, i) VALUES (0, 1)".format(self.keyspace_table_name))
+        response_future = self.session.execute_async("SELECT i FROM {0} WHERE k=0".format(self.keyspace_table_name), trace=True)
+        response_future.result()
+
+        self.assertEqual(len(response_future._query_traces), 1)
+        trace = response_future._query_traces[0]
+
+        # Delete trace duration from the session (this is what the driver polls for "complete")
+        self.session.execute("DELETE duration FROM system_traces.sessions WHERE session_id = %s", (trace.trace_id,))
+
+        # should raise because duration is not set
+        self.assertRaises(TraceUnavailable, trace.populate, max_wait=0.2, wait_for_complete=True)
+        self.assertFalse(trace.events)
+
+        # should get the events with wait False
+        trace.populate(wait_for_complete=False)
+        self.assertIsNone(trace.duration)
+        self.assertIsNotNone(trace.trace_id)
+        self.assertIsNotNone(trace.request_type)
+        self.assertIsNotNone(trace.parameters)
+        self.assertTrue(trace.events)  # non-zero list len
+        self.assertIsNotNone(trace.started_at)
 
     def test_column_names(self):
         """
@@ -294,7 +333,6 @@ class BatchStatementTests(BasicSharedKeyspaceUnitTestCase):
         if PROTOCOL_VERSION < 3:
             self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         self.session = self.cluster.connect()
-
 
     def tearDown(self):
         self.cluster.shutdown()
