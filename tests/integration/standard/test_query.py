@@ -32,7 +32,6 @@ import re
 
 
 def setup_module():
-    print("Setting up module")
     use_singledc()
     global CASS_SERVER_VERSION
     CASS_SERVER_VERSION = get_server_versions()[0]
@@ -143,8 +142,8 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         Tests to ensure that partial tracing works.
 
         Creates a table and runs an insert. Then attempt a query with tracing enabled. After the query is run we delete the
-        duration information associated with the trace, and attempt to populate the tracing information. We should receive tracing
-        information without any trace enabled.
+        duration information associated with the trace, and attempt to populate the tracing information.
+        Should fail with wait_for_complete=True, succeed for False.
 
         @since 3.0.0
         @jira_ticket PYTHON-438
@@ -159,18 +158,24 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         response_future = self.session.execute_async("SELECT i FROM {0} WHERE k=0".format(self.keyspace_table_name), trace=True)
         response_future.result()
 
-        # Delete trace duration from latest select session.
-        DELETE_TRACES = "DELETE duration FROM system_traces.sessions WHERE session_id = {0}"
+        self.assertEqual(len(response_future._query_traces), 1)
+        trace = response_future._query_traces[0]
 
-        for trace in response_future._query_traces:
-            self.session.execute(DELETE_TRACES.format(trace.trace_id))
-            self.assertRaises(TraceUnavailable,trace.populate(wait_for_complete=False))
-            self.assertIsNone(trace.duration)
-            self.assertIsNotNone(trace.trace_id)
-            self.assertIsNotNone(trace.request_type)
-            self.assertIsNotNone(trace.parameters)
-            self.assertIsNotNone(trace.events)
-            self.assertIsNotNone(trace.started_at)
+        # Delete trace duration from the session (this is what the driver polls for "complete")
+        self.session.execute("DELETE duration FROM system_traces.sessions WHERE session_id = %s", (trace.trace_id,))
+
+        # should raise because duration is not set
+        self.assertRaises(TraceUnavailable, trace.populate, max_wait=0.2, wait_for_complete=True)
+        self.assertFalse(trace.events)
+
+        # should get the events with wait False
+        trace.populate(wait_for_complete=False)
+        self.assertIsNone(trace.duration)
+        self.assertIsNotNone(trace.trace_id)
+        self.assertIsNotNone(trace.request_type)
+        self.assertIsNotNone(trace.parameters)
+        self.assertTrue(trace.events)  # non-zero list len
+        self.assertIsNotNone(trace.started_at)
 
     def test_column_names(self):
         """
