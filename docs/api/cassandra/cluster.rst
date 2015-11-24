@@ -97,7 +97,7 @@
    .. autoattribute:: default_timeout
 
    .. autoattribute:: default_consistency_level
-      :annotation: = LOCAL_QUORUM
+      :annotation: = LOCAL_ONE
 
    .. autoattribute:: row_factory
 
