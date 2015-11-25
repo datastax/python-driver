@@ -1907,7 +1907,6 @@ class BadMetaTest(unittest.TestCase):
         if CASS_SERVER_VERSION < version:
             raise unittest.SkipTest("Requires server version >= %s" % (version,))
 
-    @notcython
     def test_bad_keyspace(self):
         with patch.object(self.parser_class, '_build_keyspace_metadata_internal', side_effect=self.BadMetaException):
             self.cluster.refresh_keyspace_metadata(self.keyspace_name)

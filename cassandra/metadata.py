@@ -1708,9 +1708,9 @@ class SchemaParserV22(_SchemaParser):
             ksm = cls._build_keyspace_metadata_internal(row)
         except Exception:
             name = row["keyspace_name"]
-            log.exception("Error while parsing metadata for keyspace %s row(%s)", name, row)
             ksm = KeyspaceMetadata(name, False, 'UNKNOWN', {})
-            ksm._exc_info = sys.exc_info()
+            ksm._exc_info = sys.exc_info()  # capture exc_info before log because nose (test) logging clears it in certain circumstances
+            log.exception("Error while parsing metadata for keyspace %s row(%s)", name, row)
         return ksm
 
     @staticmethod
