@@ -35,4 +35,5 @@ def cyimport(import_path):
 # @cythontest
 # def test_something(self): ...
 cythontest = unittest.skipUnless(HAVE_CYTHON, 'Cython is not available')
-numpytest  = unittest.skipUnless(HAVE_CYTHON and HAVE_NUMPY, 'NumPy is not available')
+notcython = unittest.skipIf(HAVE_CYTHON, 'Cython not supported')
+numpytest = unittest.skipUnless(HAVE_CYTHON and HAVE_NUMPY, 'NumPy is not available')

@@ -36,6 +36,7 @@ from cassandra.pool import Host
 from tests.integration import get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass, \
     BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster
 
+from tests.unit.cython.utils import notcython
 
 def setup_module():
     use_singledc()
@@ -1906,6 +1907,7 @@ class BadMetaTest(unittest.TestCase):
         if CASS_SERVER_VERSION < version:
             raise unittest.SkipTest("Requires server version >= %s" % (version,))
 
+    @notcython
     def test_bad_keyspace(self):
         with patch.object(self.parser_class, '_build_keyspace_metadata_internal', side_effect=self.BadMetaException):
             self.cluster.refresh_keyspace_metadata(self.keyspace_name)
