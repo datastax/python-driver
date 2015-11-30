@@ -343,6 +343,31 @@ class Connection(object):
             for args in self.sockopts:
                 self._socket.setsockopt(*args)
 
+    def _read_socket(self):
+        try:
+            while True:
+                buf = self._socket.recv(self.in_buffer_size)
+                self._iobuf.write(buf)
+                if len(buf) < self.in_buffer_size:
+                    break
+        except socket.error as err:
+            if self._ssl_impl and isinstance(err, self._ssl_impl.SSLError):
+                if err.args[0] not in (self._ssl_impl.SSL_ERROR_WANT_READ,
+                                       self._ssl_impl.SSL_ERROR_WANT_WRITE):
+                    self.defunct(err)
+                    return False
+            elif err.args[0] not in NONBLOCKING:
+                self.defunct(err)
+                return False
+
+        if self._iobuf.tell():
+            self.process_io_buffer()
+            return True
+
+        log.debug("Connection %s closed by server", self)
+        self.close()
+        return False
+
     def close(self):
         raise NotImplementedError()
 

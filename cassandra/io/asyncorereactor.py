@@ -222,23 +222,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
                         return
 
     def handle_read(self):
-        try:
-            while True:
-                buf = self.recv(self.in_buffer_size)
-                self._iobuf.write(buf)
-                if len(buf) < self.in_buffer_size:
-                    break
-        except socket.error as err:
-            if ssl and isinstance(err, ssl.SSLError):
-                if err.args[0] not in (ssl.SSL_ERROR_WANT_READ, ssl.SSL_ERROR_WANT_WRITE):
-                    self.defunct(err)
-                    return
-            elif err.args[0] not in NONBLOCKING:
-                self.defunct(err)
-                return
-
-        if self._iobuf.tell():
-            self.process_io_buffer()
+        if self._read_socket():
             if not self._requests and not self.is_control_connection:
                 self._readable = False
 

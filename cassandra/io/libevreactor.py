@@ -331,26 +331,8 @@ class LibevConnection(Connection):
 
             self.defunct(exc)
             return
-        try:
-            while True:
-                buf = self._socket.recv(self.in_buffer_size)
-                self._iobuf.write(buf)
-                if len(buf) < self.in_buffer_size:
-                    break
-        except socket.error as err:
-            if ssl and isinstance(err, ssl.SSLError):
-                if err.args[0] not in (ssl.SSL_ERROR_WANT_READ, ssl.SSL_ERROR_WANT_WRITE):
-                    self.defunct(err)
-                    return
-            elif err.args[0] not in NONBLOCKING:
-                self.defunct(err)
-                return
 
-        if self._iobuf.tell():
-            self.process_io_buffer()
-        else:
-            log.debug("Connection %s closed by server", self)
-            self.close()
+        self._read_socket()
 
     def push(self, data):
         sabs = self.out_buffer_size
