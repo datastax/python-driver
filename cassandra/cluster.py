@@ -3307,7 +3307,7 @@ class ResultSet(object):
     @property
     def current_rows(self):
         """
-        :return: the list of current page rows. May be empty if the result was empty,
+        The list of current page rows. May be empty if the result was empty,
         or this is the last page.
         """
         return self._current_rows or []
