@@ -1,5 +1,4 @@
 -r requirements.txt
-blist
 scales
 nose
 mock<=1.0.1

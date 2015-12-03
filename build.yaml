@@ -19,7 +19,6 @@ build:
       export JAVA_HOME=$CCM_JAVA_HOME
       export PATH=$JAVA_HOME/bin:$PATH
 
-      sudo python /home/jenkins/ccm/setup.py install
       # Install dependencies
       if [[ $EVENT_LOOP_MANAGER == 'libev' ]]; then
         sudo apt-get install -y libev4 libev-dev
