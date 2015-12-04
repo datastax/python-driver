@@ -3,34 +3,61 @@ from collections import namedtuple
 
 import json
 
+class AbstractGraphStatement:
+    """
+    """
+    _wrapped = None
+    graph_options = {}
 
-class GraphStatement(SimpleStatement):
+    def __init__(self):
+        pass
+
+    def configure(self, session_graph_options):
+        """
+        Handles the general tranformations to apply on the wrapped statement.
+        """
+
+        merged_options = session_graph_options.copy()
+        merged_options.update(self.graph_options)
+        self._wrapped.custom_payload = merged_options
+
+    def configure_and_get_wrapped(self, graph_options):
+        raise NotImplementedError()
+
+
+class GraphStatement(AbstractGraphStatement):
     """
     A simple, un-prepared graph query.
     """
 
-    def __init__(self, query_string, *args, **kwargs):
-        """
-        """
-        SimpleStatement.__init__(self, query_string, *args, **kwargs)
-        self.graph_options = {}
+    def __init__(self, query_string, graph_options=None, *args, **kwargs):
+        AbstractGraphStatement.__init__(self)
+        self.query_string = query_string
+        self.args = args
+
+    def configure_and_get_wrapped(self, session_graph_options):
+        self._wrapped = SimpleStatement(self.query_string)
+        self.configure(session_graph_options)
+        return self._wrapped
+
 
 class GraphResultSet(object):
-    wrapped_rs = None
+    """
+    """
 
     def __init__(self, result_set):
-        self.wrapped_rs = result_set
+        self._wrapped_rs = result_set
 
     def __iter__(self):
-        # Not great but doing iter(self.wrapped_rs); return self; Does not work-
+        # Not great but doing iter(self._wrapped_rs); return self; Does not work-
         # -with the paging and __getitem__ on the wrapped result set.
-        return GraphResultSet(iter(self.wrapped_rs))
+        return GraphResultSet(iter(self._wrapped_rs))
 
     def __getitem__(self, i):
-        return self._generate_traversal_result_tuple(self.wrapped_rs[i].gremlin)
+        return self._generate_traversal_result_tuple(self._wrapped_rs[i].gremlin)
 
     def next(self):
-        return self._generate_traversal_result_tuple(self.wrapped_rs.next().gremlin)
+        return self._generate_traversal_result_tuple(self._wrapped_rs.next().gremlin)
 
     __next__ = next
 
@@ -40,6 +67,8 @@ class GraphResultSet(object):
         return GraphTraversalResult(*json_result.values())
 
 class GraphSession(object):
+    """
+    """
 
     default_graph_options = {'graph-source':b'default', 'graph-language':b'gremlin-groovy'}
 
@@ -49,9 +78,7 @@ class GraphSession(object):
             self.default_graph_options.update(default_graph_options)
 
     def execute(self, query, *args, **kwargs):
-        if (isinstance(query, GraphStatement)):
-            z = self.default_graph_options.copy()
-            z.update(query.graph_options)
-            return GraphResultSet(self.session.execute(query, custom_payload=z))
+        if (isinstance(query, AbstractGraphStatement)):
+            return GraphResultSet(self.session.execute(query.configure_and_get_wrapped(self.default_graph_options)))
         else:
             return GraphResultSet(self.session.execute(query, custom_payload=self.default_graph_options))
