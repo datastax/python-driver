@@ -397,6 +397,6 @@ level on that:
 .. code-block:: python
 
     # override the QUORUM default
-    user3_lookup = user_lookup_stmt.bind([user_id3]
+    user3_lookup = user_lookup_stmt.bind([user_id3])
     user3_lookup.consistency_level = ConsistencyLevel.ALL
     user3 = session.execute(user3_lookup)
