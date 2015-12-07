@@ -5,6 +5,11 @@ import json
 
 class AbstractGraphStatement:
     """
+    Parent implementation of the Graph specific statements. It encapsulate the necessary work
+    to produce a statement recognizable to the DSEQueryHandler.
+    Child implementations will contain the graph_options field and will have to call self.configure()
+    before being executed. They also need to implement the configure_and_get_wrapped() method that
+    will be called by the GraphSession to transparently execute the wrapped statement.
     """
     _wrapped = None
     graph_options = {}
@@ -16,7 +21,6 @@ class AbstractGraphStatement:
         """
         Handles the general tranformations to apply on the wrapped statement.
         """
-
         merged_options = session_graph_options.copy()
         merged_options.update(self.graph_options)
         self._wrapped.custom_payload = merged_options
@@ -43,6 +47,7 @@ class GraphStatement(AbstractGraphStatement):
 
 class GraphResultSet(object):
     """
+    A results set containing multiple GraphTraversalResult objects.
     """
 
     def __init__(self, result_set):
@@ -50,7 +55,7 @@ class GraphResultSet(object):
 
     def __iter__(self):
         # Not great but doing iter(self._wrapped_rs); return self; Does not work-
-        # -with the paging and __getitem__ on the wrapped result set.
+        # -because of the paging and __getitem__ on the wrapped result set.
         return GraphResultSet(iter(self._wrapped_rs))
 
     def __getitem__(self, i):
@@ -68,6 +73,7 @@ class GraphResultSet(object):
 
 class GraphSession(object):
     """
+    A session object allowing to execute statements against a DSEGraph cluster.
     """
 
     default_graph_options = {'graph-source':b'default', 'graph-language':b'gremlin-groovy'}
