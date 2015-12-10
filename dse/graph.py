@@ -99,6 +99,8 @@ class BoundGraphStatement(AbstractGraphStatement):
         self._graph_statement = graph_statement
         self.values = None
 
+        self.graph_options.update(graph_statement.graph_options)
+
     def bind(self, values_param=None):
         """
         Add values that values will be added to the execution of the previously prepared statement.
@@ -128,7 +130,7 @@ class BoundGraphStatement(AbstractGraphStatement):
         self._wrapped = self._prepared_statement.bind(values_list)
 
         # We want to propagate the options from the original GraphStatement.
-        self._configure(self._graph_statement.graph_options)
+        self._configure(graph_options)
 
         return self._wrapped
 
