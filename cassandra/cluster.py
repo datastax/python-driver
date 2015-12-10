@@ -1705,7 +1705,13 @@ class Session(object):
         message. See :ref:`custom_payload`.
         """
         message = PrepareMessage(query=query)
-        future = ResponseFuture(self, message, query=None, timeout=self.default_timeout)
+        future = ResponseFuture(
+            self,
+            message,
+            query=None,
+            timeout=self.default_timeout
+            metrics=self._metrics
+        )
         try:
             future.send_request()
             query_id, column_metadata, pk_indexes = future.result()
@@ -1734,7 +1740,13 @@ class Session(object):
         futures = []
         for host in self._pools.keys():
             if host != excluded_host and host.is_up:
-                future = ResponseFuture(self, PrepareMessage(query=query), None, self.default_timeout)
+                future = ResponseFuture(
+                    self,
+                    PrepareMessage(query=query),
+                    query=None,
+                    timeout=self.default_timeout,
+                    metrics=self._metrics
+                )
 
                 # we don't care about errors preparing against specific hosts,
                 # since we can always prepare them as needed when the prepared
