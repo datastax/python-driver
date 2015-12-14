@@ -123,7 +123,7 @@
 
    .. autoattribute:: query
 
-   .. automethod:: result([timeout])
+   .. automethod:: result()
 
    .. automethod:: get_query_trace()
 
