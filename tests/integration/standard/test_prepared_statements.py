@@ -21,6 +21,7 @@ except ImportError:
     import unittest  # noqa
 from cassandra import InvalidRequest
 
+from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster
 from cassandra.query import PreparedStatement, UNSET_VALUE
 from tests.integration import get_server_versions
@@ -275,6 +276,7 @@ class PreparedStatementTests(unittest.TestCase):
 
         self.assertIsInstance(prepared, PreparedStatement)
         bound = prepared.bind(None)
+        bound.consistency_level = ConsistencyLevel.ALL
         self.session.execute(bound)
 
         prepared = self.session.prepare(
@@ -284,6 +286,7 @@ class PreparedStatementTests(unittest.TestCase):
         self.assertIsInstance(prepared, PreparedStatement)
 
         bound = prepared.bind(None)
+        bound.consistency_level = ConsistencyLevel.ALL
         results = self.session.execute(bound)
         self.assertEqual(results[0].v, 0)
 
