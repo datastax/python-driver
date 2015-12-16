@@ -50,6 +50,8 @@ class GraphStatement(AbstractGraphStatement):
     def __init__(self, query_string, graph_options=None):
         AbstractGraphStatement.__init__(self)
         self.query_string = query_string
+        if graph_options:
+            self.graph_options = graph_options
 
     def _configure_and_get_wrapped(self, session_graph_options):
         self._wrapped = SimpleStatement(self.query_string)
