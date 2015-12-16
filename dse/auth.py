@@ -5,7 +5,8 @@ try:
 except ImportError:
     SASLClient = None
 
-class DseAuthProvider(AuthProvider):
+
+class DSEAuthProvider(AuthProvider):
     def __init__(self, username=None, password=None, service=None, qops=None):
         self.username = username
         self.password = password
@@ -20,7 +21,8 @@ class DseAuthProvider(AuthProvider):
             return PlainTextAuthenticator(self.username, self.password)
         return GSSAPIAuthenticator(host, self.service, self.qops)
 
-class BaseDseAuthenticator(Authenticator):
+
+class BaseDSEAuthenticator(Authenticator):
     def get_mechanism(self):
         raise NotImplementedError("get_mechanism not implemented")
 
@@ -28,12 +30,13 @@ class BaseDseAuthenticator(Authenticator):
         raise NotImplementedError("get_initial_challenge not implemented")
 
     def initial_response(self):
-        if (self.authenticator_class == "com.datastax.bdp.cassandra.auth.DseAuthenticator"):
+        if self.server_authenticator_class == "com.datastax.bdp.cassandra.auth.DseAuthenticator":
             return self.get_mechanism()
         else:
             return self.evaluate_challenge(self.get_initial_challenge())
 
-class PlainTextAuthenticator(BaseDseAuthenticator):
+
+class PlainTextAuthenticator(BaseDSEAuthenticator):
     def __init__(self, username, password):
         self.username = username
         self.password = password
@@ -49,7 +52,8 @@ class PlainTextAuthenticator(BaseDseAuthenticator):
             return "\x00%s\x00%s" % (self.username, self.password)
         raise Exception('Did not receive a valid challenge response from server')
 
-class GSSAPIAuthenticator(BaseDseAuthenticator):
+
+class GSSAPIAuthenticator(BaseDSEAuthenticator):
     def __init__(self, host, service, qops):
         self.sasl = SASLClient(host, service, 'GSSAPI', authorization_id=None, callback=None, qops=qops)
 
