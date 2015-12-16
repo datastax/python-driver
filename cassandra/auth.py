@@ -61,8 +61,9 @@ class Authenticator(object):
 
     .. versionadded:: 2.0.0
     """
-    def set_authenticator_class(self, authenticator_class):
-        self.authenticator_class = authenticator_class
+
+    server_authenticator_class = None
+    """ Set during the connection AUTHENTICATE phase """
 
     def initial_response(self):
         """

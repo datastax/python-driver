@@ -80,15 +80,22 @@ class AuthenticationTests(unittest.TestCase):
         root_session = self.cluster_as('cassandra', 'cassandra').connect()
         root_session.execute('CREATE USER %s WITH PASSWORD %s', (user, passwd))
 
-        cluster = self.cluster_as(user, passwd)
-        session = cluster.connect()
-        self.assertTrue(session.execute('SELECT release_version FROM system.local'))
-        assert_quiescent_pool_state(self, cluster)
-        cluster.shutdown()
-
-        root_session.execute('DROP USER %s', user)
-        assert_quiescent_pool_state(self, root_session.cluster)
-        root_session.cluster.shutdown()
+        try:
+            cluster = self.cluster_as(user, passwd)
+            session = cluster.connect()
+            try:
+                self.assertTrue(session.execute('SELECT release_version FROM system.local'))
+                assert_quiescent_pool_state(self, cluster)
+                for pool in session.get_pools():
+                    connection, _ = pool.borrow_connection(timeout=0)
+                    self.assertEqual(connection.authenticator.server_authenticator_class, 'org.apache.cassandra.auth.PasswordAuthenticator')
+                    pool.return_connection(connection)
+            finally:
+                cluster.shutdown()
+        finally:
+            root_session.execute('DROP USER %s', user)
+            assert_quiescent_pool_state(self, root_session.cluster)
+            root_session.cluster.shutdown()
 
     def test_connect_wrong_pwd(self):
         cluster = self.cluster_as('cassandra', 'wrong_pass')
