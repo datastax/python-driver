@@ -15,7 +15,6 @@ try:
 except ImportError:
     SASLClient = None
 
-
 class AuthProvider(object):
     """
     An abstract class that defines the interface that will be used for
@@ -62,6 +61,8 @@ class Authenticator(object):
 
     .. versionadded:: 2.0.0
     """
+    def set_authenticator_class(self, authenticator_class):
+        self.authenticator_class = authenticator_class
 
     def initial_response(self):
         """
