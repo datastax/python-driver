@@ -1,7 +1,8 @@
 from cassandra.query import SimpleStatement
-from collections import namedtuple
 
+from collections import namedtuple
 import json
+import six
 
 class AbstractGraphStatement:
     """
@@ -219,15 +220,8 @@ class GraphSession(object):
         statement = graph_statement._configure_and_get_wrapped(self.default_graph_options)
         return PreparedGraphStatement(self.session.prepare(statement), graph_statement)
 
+    # this may go away if we change parameter encoding
     def _transform_params(self, parameters):
         if not isinstance(parameters, dict):
             raise Exception('The values parameter can only be a dictionary, unnamed parameters are not authorized in Gremlin queries.')
-
-        values_list = []
-        for key, value in parameters.iteritems():
-            json_param = json.dumps({'name':key, 'value':value})
-            values_list.append(json_param)
-
-        return values_list
-
-
+        return [json.dumps({'name': name, 'value': value}) for name, value in six.iteritems(parameters)]
