@@ -484,13 +484,14 @@ class QueryMessage(_MessageType):
     name = 'QUERY'
 
     def __init__(self, query, consistency_level, serial_consistency_level=None,
-                 fetch_size=None, paging_state=None, timestamp=None):
+                 fetch_size=None, paging_state=None, timestamp=None, query_params=None):
         self.query = query
         self.consistency_level = consistency_level
         self.serial_consistency_level = serial_consistency_level
         self.fetch_size = fetch_size
         self.paging_state = paging_state
         self.timestamp = timestamp
+        self.query_params = query_params
 
     def send_body(self, f, protocol_version):
         write_longstring(f, self.query)
@@ -524,7 +525,16 @@ class QueryMessage(_MessageType):
         if self.timestamp is not None:
             flags |= _PROTOCOL_TIMESTAMP
 
+        if self.query_params is not None:
+            flags |= _VALUES_FLAG
+
         write_byte(f, flags)
+
+        if self.query_params is not None:
+            write_short(f, len(self.query_params))
+            for param in self.query_params:
+                write_value(f, param)
+
         if self.fetch_size:
             write_int(f, self.fetch_size)
         if self.paging_state:
