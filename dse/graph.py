@@ -6,7 +6,7 @@ import six
 
 # (attr, server option, description)
 _graph_options = (
-('graph_keyspace', 'define the keyspace the graph is defined with.', 'graph-keyspace'),
+('graph_namespace', 'define the namespace the graph is defined with.', 'graph-keyspace'),
 ('graph_source', 'choose the graph traversal source, configured on the server side.', 'graph-source'),
 ('graph_language', 'the language used in the queries (default "gremlin-groovy"', 'graph-language'),
 ('graph_rebinding', 'name of the graph in the query (default "g")', 'graph-rebinding')
@@ -88,6 +88,9 @@ class Result(object):
         return "%s(%r)" % (Result.__name__, json.dumps({'result': self.value}))
 
 
+_NOT_SET = object()
+
+
 class GraphSession(object):
     """
     A session object allowing to execute Gremlin queries against a DSEGraph cluster.
@@ -113,7 +116,7 @@ class GraphSession(object):
         if default_graph_options:
             self.default_graph_options.update(default_graph_options)
 
-    def execute(self, query, parameters=None, row_factory=None):
+    def execute(self, query, parameters=None, timeout=_NOT_SET, trace=False, row_factory=None):
         """
         Executes a Gremlin query string, a GraphStatement, or a BoundGraphStatement synchronously,
         and returns a GraphResultSet from this execution.
@@ -128,15 +131,15 @@ class GraphSession(object):
         if parameters:
             graph_parameters = self._transform_params(parameters)
 
-        row_factory = row_factory or self.default_graph_row_factory
-
         # TODO: pass down trace, timeout parameters
         # this is basically Session.execute_async, repeated here to customize the row factory. May want to add that
         # parameter to the session method
-        future = self.session._create_response_future(query, parameters=None, trace=False, custom_payload=options, timeout=self.session.default_timeout)
+        if timeout is _NOT_SET:
+            timeout = self.session.default_timeout
+        future = self.session._create_response_future(query, parameters=None, trace=trace, custom_payload=options, timeout=timeout)
         future.message._query_params = graph_parameters
         future._protocol_handler = self.session.client_protocol_handler
-        future.row_factory = row_factory
+        future.row_factory = row_factory or self.default_graph_row_factory
         future.send_request()
         return future.result()
 
@@ -145,3 +148,4 @@ class GraphSession(object):
         if not isinstance(parameters, dict):
             raise Exception('The values parameter can only be a dictionary, unnamed parameters are not authorized in Gremlin queries.')
         return [json.dumps({'name': name, 'value': value}) for name, value in six.iteritems(parameters)]
+
