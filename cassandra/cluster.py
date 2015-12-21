@@ -1645,9 +1645,11 @@ class Session(object):
 
         if isinstance(query, SimpleStatement):
             query_string = query.query_string
+            if parameters:
+                query_string = bind_params(query_string, parameters, self.encoder)
             message = QueryMessage(
                 query_string, cl, query.serial_consistency_level,
-                fetch_size, timestamp=timestamp, query_params=parameters)
+                fetch_size, timestamp=timestamp)
         elif isinstance(query, BoundStatement):
             message = ExecuteMessage(
                 query.prepared_statement.query_id, query.values, cl,
@@ -1931,6 +1933,7 @@ class Session(object):
 
     def get_pools(self):
         return self._pools.values()
+
 
 class UserTypeDoesNotExist(Exception):
     """

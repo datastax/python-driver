@@ -59,33 +59,33 @@ def graph_result_row_factory(column_names, rows):
 
 class Result(object):
 
-    _value = None
+    value = None
 
     def __init__(self, json_value):
-        self._value = json.loads(json_value)['result']
+        self.value = json.loads(json_value)['result']
 
     def __getattr__(self, attr):
-        if not isinstance(self._value, dict):
+        if not isinstance(self.value, dict):
             raise ValueError("Value cannot be accessed as a dict")
 
-        if attr in self._value:
-            return self._value[attr]
+        if attr in self.value:
+            return self.value[attr]
 
         raise AttributeError("Result has no top-level attribute %r" % (attr,))
 
     def __getitem__(self, item):
-        if isinstance(self._value, dict) and isinstance(key, six.string_types):
-            return self._value[item]
-        elif isinstance(self._value, list) and isinstance(key, int):
+        if isinstance(self.value, dict) and isinstance(key, six.string_types):
+            return self.value[item]
+        elif isinstance(self.value, list) and isinstance(key, int):
             raise TypeError("Key must be a string")
         else:
             raise ValueError("Result cannot be indexed by %r" %(item,))
 
     def __str__(self):
-        return self._value
+        return self.value
 
     def __repr__(self):
-        return "%s(%r)" % (Result.__name__, json.dumps({'result': self._value}))
+        return "%s(%r)" % (Result.__name__, json.dumps({'result': self.value}))
 
 
 class GraphSession(object):
@@ -133,7 +133,8 @@ class GraphSession(object):
         # TODO: pass down trace, timeout parameters
         # this is basically Session.execute_async, repeated here to customize the row factory. May want to add that
         # parameter to the session method
-        future = self.session._create_response_future(query, graph_parameters, trace=False, custom_payload=options, timeout=self.session.default_timeout)
+        future = self.session._create_response_future(query, parameters=None, trace=False, custom_payload=options, timeout=self.session.default_timeout)
+        future.message._query_params = graph_parameters
         future._protocol_handler = self.session.client_protocol_handler
         future.row_factory = row_factory
         future.send_request()
