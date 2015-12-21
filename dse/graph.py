@@ -4,138 +4,47 @@ from collections import namedtuple
 import json
 import six
 
-class AbstractGraphStatement:
-    """
-    Parent implementation of the Graph specific statements. It encapsulate the necessary work
-    to produce a statement recognizable to the DSEQueryHandler.
-    Child implementations will contain the graph_options field and will have to call self.configure()
-    before being executed. They also need to implement the _configure_and_get_wrapped() method that
-    will be called by the GraphSession to transparently execute the wrapped statement.
-    """
-    _wrapped = None
-
-    """
-    The graph specific options that will be included in the execution of the statement.
-    The 4 available graph options are : 
-        - graph-keyspace : define the keyspace the graph is defined with.
-        - graph-source : choose the graph traversal source, configured on the server side.
-        - graph-language : the language used in the queries.
-        - graph-rebinding : rename the traversal source.
-    """
-    graph_options = {}
-
-    def __init__(self):
-        pass
-
-    def _configure(self, session_graph_options):
-        # Handles the general tranformations to apply on the wrapped statement.
-        merged_options = session_graph_options.copy()
-        merged_options.update(self.graph_options)
-        self._wrapped.custom_payload = merged_options
-
-    def _configure_and_get_wrapped(self, graph_options):
-        raise NotImplementedError()
+# (attr, server option, description)
+_graph_options = (
+('graph_keyspace', 'define the keyspace the graph is defined with.', 'graph-keyspace'),
+('graph_source', 'choose the graph traversal source, configured on the server side.', 'graph-source'),
+('graph_language', 'the language used in the queries (default "gremlin-groovy"', 'graph-language'),
+('graph_rebinding', 'name of the graph in the query (default "g")', 'graph-rebinding')
+)
 
 
-class GraphStatement(AbstractGraphStatement):
-    """
-    A simple, un-prepared graph query.
-    """
+class GraphStatement(SimpleStatement):
 
-    """
-    The query string used in this statement.
-    """
-    query_string = None
+    def __init__(self, *args, **kwargs):
+        super(GraphStatement, self).__init__(*args, **kwargs)
+        self._graph_options = {}
 
-
-    def __init__(self, query_string, graph_options=None):
-        AbstractGraphStatement.__init__(self)
-        self.query_string = query_string
-        if graph_options:
-            self.graph_options = graph_options
-
-    def _configure_and_get_wrapped(self, session_graph_options):
-        self._wrapped = SimpleStatement(self.query_string)
-        self._configure(session_graph_options)
-        return self._wrapped
-
-
-class PreparedGraphStatement(object):
-    """
-    A prepared graph statement returned from the execution of a GraphSession.prepare()
-    method. This query corresponding to this statement is supposed to contain Gremlin 
-    parameters that will eventually be bound.
-    """
-
-    _prepared_statement = None
-    _graph_statement = None
-
-    def __init__(self, prepared_statement, graph_statement):
-        self._prepared_statement = prepared_statement
-        self._graph_statement = graph_statement
-
-    def bind(self, values=None):
-        """
-        Add parameters values to this prepared statement. This will create a BoundGraphStatement
-        instance. It is possible to not provide values for now, but call bind() later on the 
-        BoundGraphStatement.
-        """
-        return BoundGraphStatement(self._prepared_statement, self._graph_statement).bind(values)
-
-
-class BoundGraphStatement(AbstractGraphStatement):
-    """
-    A statement bound with values resulting from the preparation of a simple graph statement.
-    """
-
-    _prepared_statement = None
-    _graph_statement = None
-
-
-    """
-    The values of the parameters to be sent with the statement.
-    """
-    values = None
-
-    def __init__(self, prepared_statement, graph_statement):
-        self._prepared_statement = prepared_statement
-        self._graph_statement = graph_statement
-        self.values = None
-
-        self.graph_options.update(graph_statement.graph_options)
-
-    def bind(self, values_param=None):
-        """
-        Add values that values will be added to the execution of the previously prepared statement.
-        The values bound can only be in the form of a dictionary, meaning that each Gremlin parameter
-        must be named, and bound with its name as well.
-        """
-        values = None
-        if values_param is None:
-            values = {}
+    def get_options_map(self, base_options):
+        if self._graph_options:
+            options = base_options.copy()
+            options.update(self._graph_options)
+            return options
         else:
-            values = values_param
+            return base_options
 
-        if not isinstance(values, dict):
-            # TODO: change the exception class
-            raise Exception('The values parameter can only be a dictionary, unnamed parameters are not authorized in Gremlin queries.')
 
-        self.values = values
-        return self
+for opt in _graph_options:
 
-    def _configure_and_get_wrapped(self, graph_options):
-        # Transform the dict of parameters in a [{'name':name, 'value':value}] as imposed in the specs
-        values_list = []
-        for key, value in self.values.iteritems():
-            json_param = json.dumps({'name':key, 'value':value})
-            values_list.append(json_param)
+    key = opt[2]
 
-        self._wrapped = self._prepared_statement.bind(values_list)
+    def get(self):
+        return self._graph_options.get(key)
 
-        # We want to propagate the options from the original GraphStatement.
-        self._configure(graph_options)
+    def set(self, value):
+        if value:
+            self._graph_options[key] = value
+        else:
+            self._graph_options.pop(key)
 
-        return self._wrapped
+    def delete(self):
+        self._graph_options.pop(key)
+
+    setattr(GraphStatement, opt[0], property(get, set, delete, opt[1]))
 
 
 class GraphResultSet(object):
@@ -164,6 +73,7 @@ class GraphResultSet(object):
         GraphTraversalResult = namedtuple('GraphTraversalResult', json_result.keys())
         return GraphTraversalResult(*json_result.values())
 
+
 class GraphSession(object):
     """
     A session object allowing to execute Gremlin queries against a DSEGraph cluster.
@@ -176,13 +86,14 @@ class GraphSession(object):
 
     These options can be over redefined, or removed.  
     """
-    default_graph_options = {'graph-source':b'default', 'graph-language':b'gremlin-groovy'}
+    default_graph_options = None
 
     # Expose the session or private?
     session = None
 
     def __init__(self, session, default_graph_options=None):
         self.session = session
+        self.default_graph_options = {'graph-source': b'default', 'graph-language': b'gremlin-groovy'}
         if default_graph_options:
             self.default_graph_options.update(default_graph_options)
 
@@ -191,34 +102,17 @@ class GraphSession(object):
         Executes a Gremlin query string, a GraphStatement, or a BoundGraphStatement synchronously, 
         and returns a GraphResultSet from this execution.
         """
-        if isinstance(query, AbstractGraphStatement):
-            return self._execute(query, parameters)
+        if isinstance(query, GraphStatement):
+            return self._execute(query, query.get_options_map(self.default_graph_options), parameters)
         else:
             graph_statement = GraphStatement(query)
-            return self._execute(graph_statement, parameters)
+            return self._execute(graph_statement, self.default_graph_options, parameters)
 
-    def _execute(self, graph_statement, parameters):
-        statement = graph_statement._configure_and_get_wrapped(self.default_graph_options)
+    def _execute(self, statement, options, parameters):
         graph_parameters = None
         if parameters:
             graph_parameters = self._transform_params(parameters)
-        return GraphResultSet(self.session.execute(statement, parameters=graph_parameters))
-
-    def prepare(self, query):
-        """
-        Prepares a Gremlin query string, or a GraphStatement. This returns a PreparedGraphStatement
-        resulting of the Cassandra prepare phase.
-        """
-        # Should maybe only accept GraphStatement instances instead of AbstractGraphStatement.
-        if isinstance(query, AbstractGraphStatement):
-            return self._prepare(query)
-        else:
-            graph_statement = GraphStatement(query)
-            return self._prepare(graph_statement)
-
-    def _prepare(self, graph_statement):
-        statement = graph_statement._configure_and_get_wrapped(self.default_graph_options)
-        return PreparedGraphStatement(self.session.prepare(statement), graph_statement)
+        return GraphResultSet(self.session.execute(statement, graph_parameters, custom_payload=options))
 
     # this may go away if we change parameter encoding
     def _transform_params(self, parameters):
