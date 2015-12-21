@@ -47,31 +47,45 @@ for opt in _graph_options:
     setattr(GraphStatement, opt[0], property(get, set, delete, opt[1]))
 
 
-class GraphResultSet(object):
-    """
-    A results set containing multiple GraphTraversalResult objects.
-    """
+def single_object_row_factory(column_names, rows):
+    # returns the string value of graph results
+    return [row[0] for row in rows]
 
-    def __init__(self, result_set):
-        self._wrapped_rs = result_set
 
-    def __iter__(self):
-        # Not great but doing iter(self._wrapped_rs); return self; Does not work-
-        # -because of the paging and __getitem__ on the wrapped result set.
-        return GraphResultSet(iter(self._wrapped_rs))
+def graph_result_row_factory(column_names, rows):
+    # Returns an object that can load graph results and produce specific types
+    return [Result(row[0]) for row in rows]
 
-    def __getitem__(self, i):
-        return self._generate_traversal_result_tuple(self._wrapped_rs[i].gremlin)
 
-    def next(self):
-        return self._generate_traversal_result_tuple(self._wrapped_rs.next().gremlin)
+class Result(object):
 
-    __next__ = next
+    _value = None
 
-    def _generate_traversal_result_tuple(self, result):
-        json_result = json.loads(result)['result']
-        GraphTraversalResult = namedtuple('GraphTraversalResult', json_result.keys())
-        return GraphTraversalResult(*json_result.values())
+    def __init__(self, json_value):
+        self._value = json.loads(json_value)['result']
+
+    def __getattr__(self, attr):
+        if not isinstance(self._value, dict):
+            raise ValueError("Value cannot be accessed as a dict")
+
+        if attr in self._value:
+            return self._value[attr]
+
+        raise AttributeError("Result has no top-level attribute %r" % (attr,))
+
+    def __getitem__(self, item):
+        if isinstance(self._value, dict) and isinstance(key, six.string_types):
+            return self._value[item]
+        elif isinstance(self._value, list) and isinstance(key, int):
+            raise TypeError("Key must be a string")
+        else:
+            raise ValueError("Result cannot be indexed by %r" %(item,))
+
+    def __str__(self):
+        return self._value
+
+    def __repr__(self):
+        return "%s(%r)" % (Result.__name__, json.dumps({'result': self._value}))
 
 
 class GraphSession(object):
@@ -84,9 +98,11 @@ class GraphSession(object):
         - graph-source = 'default'
         - graph-language = 'gremlin-groovy'
 
-    These options can be over redefined, or removed.  
+    These options can be over redefined, or removed.
     """
     default_graph_options = None
+
+    default_graph_row_factory = staticmethod(graph_result_row_factory)
 
     # Expose the session or private?
     session = None
@@ -97,22 +113,31 @@ class GraphSession(object):
         if default_graph_options:
             self.default_graph_options.update(default_graph_options)
 
-    def execute(self, query, parameters=None):
+    def execute(self, query, parameters=None, row_factory=None):
         """
-        Executes a Gremlin query string, a GraphStatement, or a BoundGraphStatement synchronously, 
+        Executes a Gremlin query string, a GraphStatement, or a BoundGraphStatement synchronously,
         and returns a GraphResultSet from this execution.
         """
         if isinstance(query, GraphStatement):
-            return self._execute(query, query.get_options_map(self.default_graph_options), parameters)
+            options = query.get_options_map(self.default_graph_options)
         else:
-            graph_statement = GraphStatement(query)
-            return self._execute(graph_statement, self.default_graph_options, parameters)
+            query = GraphStatement(query)
+            options = self.default_graph_options
 
-    def _execute(self, statement, options, parameters):
         graph_parameters = None
         if parameters:
             graph_parameters = self._transform_params(parameters)
-        return GraphResultSet(self.session.execute(statement, graph_parameters, custom_payload=options))
+
+        row_factory = row_factory or self.default_graph_row_factory
+
+        # TODO: pass down trace, timeout parameters
+        # this is basically Session.execute_async, repeated here to customize the row factory. May want to add that
+        # parameter to the session method
+        future = self.session._create_response_future(query, graph_parameters, trace=False, custom_payload=options, timeout=self.session.default_timeout)
+        future._protocol_handler = self.session.client_protocol_handler
+        future.row_factory = row_factory
+        future.send_request()
+        return future.result()
 
     # this may go away if we change parameter encoding
     def _transform_params(self, parameters):
