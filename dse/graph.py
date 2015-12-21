@@ -1,15 +1,14 @@
 from cassandra.query import SimpleStatement
 
-from collections import namedtuple
 import json
 import six
 
 # (attr, server option, description)
 _graph_options = (
-('graph_namespace', 'define the namespace the graph is defined with.', 'graph-keyspace'),
-('graph_source', 'choose the graph traversal source, configured on the server side.', 'graph-source'),
-('graph_language', 'the language used in the queries (default "gremlin-groovy"', 'graph-language'),
-('graph_rebinding', 'name of the graph in the query (default "g")', 'graph-rebinding')
+    ('graph_namespace', 'define the namespace the graph is defined with.', 'graph-keyspace'),
+    ('graph_source', 'choose the graph traversal source, configured on the server side.', 'graph-source'),
+    ('graph_language', 'the language used in the queries (default "gremlin-groovy"', 'graph-language'),
+    ('graph_rebinding', 'name of the graph in the query (default "g")', 'graph-rebinding')
 )
 
 
@@ -79,7 +78,7 @@ class Result(object):
         elif isinstance(self.value, list) and isinstance(key, int):
             raise TypeError("Key must be a string")
         else:
-            raise ValueError("Result cannot be indexed by %r" %(item,))
+            raise ValueError("Result cannot be indexed by %r" % (item,))
 
     def __str__(self):
         return self.value
@@ -148,4 +147,3 @@ class GraphSession(object):
         if not isinstance(parameters, dict):
             raise Exception('The values parameter can only be a dictionary, unnamed parameters are not authorized in Gremlin queries.')
         return [json.dumps({'name': name, 'value': value}) for name, value in six.iteritems(parameters)]
-
