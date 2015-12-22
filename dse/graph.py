@@ -81,7 +81,7 @@ class Result(object):
             raise ValueError("Result cannot be indexed by %r" % (item,))
 
     def __str__(self):
-        return self.value
+        return str(self.value)
 
     def __repr__(self):
         return "%s(%r)" % (Result.__name__, json.dumps({'result': self.value}))
