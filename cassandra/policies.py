@@ -528,10 +528,14 @@ class ExponentialReconnectionPolicy(ReconnectionPolicy):
     a set maximum delay.
     """
 
-    def __init__(self, base_delay, max_delay):
+    def __init__(self, base_delay, max_delay, max_attempts=64):
         """
         `base_delay` and `max_delay` should be in floating point units of
         seconds.
+
+        `max_attempts` should be a total number of attempts to be made before
+        giving up, or :const:`None` to continue reconnection attempts forever.
+        The default is 64.
         """
         if base_delay < 0 or max_delay < 0:
             raise ValueError("Delays may not be negative")
@@ -539,11 +543,18 @@ class ExponentialReconnectionPolicy(ReconnectionPolicy):
         if max_delay < base_delay:
             raise ValueError("Max delay must be greater than base delay")
 
+        if max_attempts is not None and max_attempts < 0:
+            raise ValueError("max_attempts must not be negative")
+
         self.base_delay = base_delay
         self.max_delay = max_delay
+        self.max_attempts = max_attempts
 
     def new_schedule(self):
-        return (min(self.base_delay * (2 ** i), self.max_delay) for i in range(64))
+        i=0
+        while self.max_attempts == None or i < self.max_attempts:
+            yield min(self.base_delay * (2 ** i), self.max_delay)
+            i += 1
 
 
 class WriteType(object):

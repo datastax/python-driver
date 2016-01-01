@@ -814,9 +814,18 @@ class ExponentialReconnectionPolicyTest(unittest.TestCase):
         self.assertRaises(ValueError, ExponentialReconnectionPolicy, -1, 0)
         self.assertRaises(ValueError, ExponentialReconnectionPolicy, 0, -1)
         self.assertRaises(ValueError, ExponentialReconnectionPolicy, 9000, 1)
+        self.assertRaises(ValueError, ExponentialReconnectionPolicy, 1, 2,-1)
 
     def test_schedule(self):
-        policy = ExponentialReconnectionPolicy(base_delay=2, max_delay=100)
+        policy = ExponentialReconnectionPolicy(base_delay=2, max_delay=100, max_attempts=None)
+        i=0;
+        for delay in policy.new_schedule():
+            i += 1
+            if i > 10000:
+                break;
+        self.assertEqual(i, 10001)
+
+        policy = ExponentialReconnectionPolicy(base_delay=2, max_delay=100, max_attempts=64)
         schedule = list(policy.new_schedule())
         self.assertEqual(len(schedule), 64)
         for i, delay in enumerate(schedule):
