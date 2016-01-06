@@ -5,4 +5,3 @@ point_le = Struct('<dd')
 
 circle_be = Struct('>ddd')
 circle_le = Struct('<ddd')
-

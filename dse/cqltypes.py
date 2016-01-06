@@ -1,12 +1,30 @@
+import io
 from six.moves import range
 import struct
 from cassandra.cqltypes import CassandraType
+from cassandra.util import is_little_endian as _platform_is_le
 from dse.marshal import point_be, point_le, circle_be, circle_le
 from dse.util import Point, Circle, LineString, Polygon
 
+_endian_flag = 1 if _platform_is_le else 0
+
+
+class WKBGeometryType(object):
+    POINT = 1
+    LINESTRING = 2
+    POLYGON = 3
+    CIRCLE = 101  # DSE custom
+
 
 class PointType(CassandraType):
-    typename = 'org.apache.cassandra.db.marshal.PointType'
+    typename = 'PointType'
+
+    _platform_point = point_le if _platform_is_le else point_be
+    _type = struct.pack('=BI', _endian_flag, WKBGeometryType.POINT)
+
+    @staticmethod
+    def serialize(val, protocol_version):
+        return PointType._type + PointType._platform_point.pack(val.x, val.y)
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -16,7 +34,14 @@ class PointType(CassandraType):
 
 
 class CircleType(CassandraType):
-    typename = 'org.apache.cassandra.db.marshal.CircleType'
+    typename = 'CircleType'
+
+    _platform_circle = circle_le if _platform_is_le else circle_be
+    _type = struct.pack('=BI', _endian_flag, WKBGeometryType.CIRCLE)
+
+    @staticmethod
+    def serialize(val, protocol_version):
+        return CircleType._type + CircleType._platform_circle.pack(val.x, val.y, val.r)
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -26,7 +51,14 @@ class CircleType(CassandraType):
 
 
 class LineStringType(CassandraType):
-    typename = 'org.apache.cassandra.db.marshal.LineStringType'
+    typename = 'LineStringType'
+
+    _type = struct.pack('=BI', _endian_flag, WKBGeometryType.LINESTRING)
+
+    @staticmethod
+    def serialize(val, protocol_version):
+        num_points = len(val.points)
+        return LineStringType._type + struct.pack('=I' + 'dd' * num_points, num_points, *(d for point in val.points for d in point))
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -37,7 +69,22 @@ class LineStringType(CassandraType):
 
 
 class PolygonType(CassandraType):
-    typename = 'org.apache.cassandra.db.marshal.PolygonType'
+    typename = 'PolygonType'
+
+    _type = struct.pack('=BI', _endian_flag, WKBGeometryType.POLYGON)
+    _platform_ring_count = struct.Struct('=I').pack
+
+    @staticmethod
+    def serialize(val, protocol_version):
+        buf = io.BytesIO(PolygonType._type)
+        buf.seek(0, 2)
+
+        num_rings = len(val.rings)
+        buf.write(PolygonType._platform_ring_count(num_rings))
+        for ring in val.rings:
+            num_points = len(ring)
+            buf.write(struct.pack('=I' + 'dd' * num_points, num_points, *(d for point in ring for d in point)))
+        return buf.getvalue()
 
     @staticmethod
     def deserialize(byts, protocol_version):
