@@ -42,6 +42,8 @@ for opt in _graph_options:
 
     def set(self, value, key=opt[2]):
         if value:
+            if not isinstance(value, six.binary_type):
+                value = six.b(value)
             self._graph_options[key] = value
         else:
             self._graph_options.pop(key)
@@ -140,7 +142,6 @@ class GraphSession(object):
         :param default_graph_options: a GraphOptions object; options are merged with built-in defaults
         """
         self.session = session
-        # TODO: python 3
         self.default_graph_options = GraphOptions(graph_source=b'default',
                                                   graph_language=b'gremlin-groovy')
         if default_graph_options:
@@ -177,4 +178,4 @@ class GraphSession(object):
     def _transform_params(self, parameters):
         if not isinstance(parameters, dict):
             raise ValueError('The parameters must be a dictionary. Unnamed parameters are not allowed.')
-        return [json.dumps({'name': name, 'value': value}) for name, value in six.iteritems(parameters)]
+        return [json.dumps({'name': name, 'value': value}).encode('utf-8') for name, value in six.iteritems(parameters)]
