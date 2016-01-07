@@ -3,7 +3,7 @@ from cassandra.query import SimpleStatement
 import json
 import six
 
-# (attr, server option, description)
+# (attr, description, server option)
 _graph_options = (
     ('graph_namespace', 'define the namespace the graph is defined with.', 'graph-keyspace'),
     ('graph_source', 'choose the graph traversal source, configured on the server side.', 'graph-source'),
@@ -12,53 +12,79 @@ _graph_options = (
 )
 
 
-class GraphStatement(SimpleStatement):
+class GraphOptions(object):
 
-    def __init__(self, *args, **kwargs):
-        super(GraphStatement, self).__init__(*args, **kwargs)
+    def __init__(self, **kwargs):
         self._graph_options = {}
+        for attr, value in six.iteritems(kwargs):
+            setattr(self, attr, value)
+
+    def update(self, options):
+        self._graph_options.update(options._graph_options)
 
     def get_options_map(self, base_options):
+        """
+        Returns a map for base_options updated with options set on this object, or
+        base_options map if none were set.
+        """
         if self._graph_options:
-            options = base_options.copy()
+            options = base_options._graph_options.copy()
             options.update(self._graph_options)
             return options
         else:
-            return base_options
+            return base_options._graph_options
 
 
 for opt in _graph_options:
 
-    key = opt[2]
-
-    def get(self):
+    def get(self, key=opt[2]):
         return self._graph_options.get(key)
 
-    def set(self, value):
+    def set(self, value, key=opt[2]):
         if value:
             self._graph_options[key] = value
         else:
             self._graph_options.pop(key)
 
-    def delete(self):
+    def delete(self, key=opt[2]):
         self._graph_options.pop(key)
 
-    setattr(GraphStatement, opt[0], property(get, set, delete, opt[1]))
+    setattr(GraphOptions, opt[0], property(get, set, delete, opt[1]))
+
+
+class GraphStatement(SimpleStatement):
+
+    options = None
+    """
+    GraphOptions for this statement.
+    Any attributes set here override the GraphSession defaults.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(GraphStatement, self).__init__(*args, **kwargs)
+        self.options = GraphOptions()
 
 
 def single_object_row_factory(column_names, rows):
-    # returns the string value of graph results
+    """
+    returns the JSON string value of graph results
+    """
     return [row[0] for row in rows]
 
 
 def graph_result_row_factory(column_names, rows):
-    # Returns an object that can load graph results and produce specific types
+    """
+    Returns an object that can load graph results and produce specific types
+    """
     return [Result(row[0]) for row in rows]
 
 
 class Result(object):
 
     value = None
+    """
+    Deserialized value from the result
+    """
 
     def __init__(self, json_value):
         self.value = json.loads(json_value)['result']
@@ -92,17 +118,16 @@ _NOT_SET = object()
 
 class GraphSession(object):
     """
-    A session object allowing to execute Gremlin queries against a DSEGraph cluster.
+    A session wrapper for executing Gremlin queries against a DSE cluster
     """
 
-    """
-    The default options to be used for all graph statements executions. Is initialised with :
-        - graph-source = 'default'
-        - graph-language = 'gremlin-groovy'
-
-    These options can be over redefined, or removed.
-    """
     default_graph_options = None
+    """
+    Default options, initialized as follows if no additional options are provided
+    in init:
+    GraphOptions(graph_source=b'default',
+                 graph_language=b'gremlin-groovy')
+    """
 
     default_graph_row_factory = staticmethod(graph_result_row_factory)
 
@@ -110,8 +135,14 @@ class GraphSession(object):
     session = None
 
     def __init__(self, session, default_graph_options=None):
+        """
+        :param session: Session to use for graph queries
+        :param default_graph_options: a GraphOptions object; options are merged with built-in defaults
+        """
         self.session = session
-        self.default_graph_options = {'graph-source': b'default', 'graph-language': b'gremlin-groovy'}
+        # TODO: python 3
+        self.default_graph_options = GraphOptions(graph_source=b'default',
+                                                  graph_language=b'gremlin-groovy')
         if default_graph_options:
             self.default_graph_options.update(default_graph_options)
 
@@ -121,16 +152,16 @@ class GraphSession(object):
         and returns a GraphResultSet from this execution.
         """
         if isinstance(query, GraphStatement):
-            options = query.get_options_map(self.default_graph_options)
+            options = query.options.get_options_map(self.default_graph_options)
         else:
             query = GraphStatement(query)
-            options = self.default_graph_options
+            options = self.default_graph_options._graph_options
 
         graph_parameters = None
         if parameters:
             graph_parameters = self._transform_params(parameters)
 
-        # TODO: pass down trace, timeout parameters
+        # TODO:
         # this is basically Session.execute_async, repeated here to customize the row factory. May want to add that
         # parameter to the session method
         if timeout is _NOT_SET:
@@ -145,5 +176,5 @@ class GraphSession(object):
     # this may go away if we change parameter encoding
     def _transform_params(self, parameters):
         if not isinstance(parameters, dict):
-            raise Exception('The values parameter can only be a dictionary, unnamed parameters are not authorized in Gremlin queries.')
+            raise ValueError('The parameters must be a dictionary. Unnamed parameters are not allowed.')
         return [json.dumps({'name': name, 'value': value}) for name, value in six.iteritems(parameters)]
