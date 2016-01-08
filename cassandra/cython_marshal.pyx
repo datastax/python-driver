@@ -18,6 +18,7 @@ import six
 
 from libc.stdint cimport (int8_t, int16_t, int32_t, int64_t,
                           uint8_t, uint16_t, uint32_t, uint64_t)
+from libc.string cimport memcpy
 from cassandra.buffer cimport Buffer, buf_read, to_bytes
 
 cdef bint is_little_endian
@@ -32,7 +33,7 @@ cdef inline void swap_order(char *buf, Py_ssize_t size):
     (reverse all the bytes).
     There are functions ntohl etc, but these may be POSIX-dependent.
     """
-    cdef Py_ssize_t start, end, i
+    cdef Py_ssize_t end, i
     cdef char c
 
     if is_little_endian:
@@ -42,59 +43,76 @@ cdef inline void swap_order(char *buf, Py_ssize_t size):
             buf[i] = buf[end]
             buf[end] = c
 
+cdef inline void copy_maybe_swap(char *buf, void* dst, Py_ssize_t size):
+    """
+    Copy to aligned destination, conditionally swapping to native byte order
+    """
+    cdef Py_ssize_t start, end, i
+    cdef char* out = <char*> dst
+
+    if is_little_endian:
+        for i in range(size):
+            out[size - i - 1] = buf[i]
+    else:
+        memcpy(dst, buf, size)
+
 cdef inline Py_ssize_t div2(Py_ssize_t x):
     return x >> 1
 
-### Unpacking of signed integers
+# TODO: is there a way to make these from a macro?
+# tried fused types, but there are compiler errors requiring strange games
+# type as an arg instead of just templating based on return type
+# return unpack_x[int64_t](buf_read(buf, sizeof(int64_t)), <int64_t*>0)
 
 cdef inline int64_t int64_unpack(Buffer *buf) except ?0xDEAD:
-    cdef int64_t x = (<int64_t *> buf_read(buf, 8))[0]
-    cdef char *p = <char *> &x
-    swap_order(<char *> &x, 8)
-    return x
+    cdef int64_t out = 0
+    copy_maybe_swap(buf_read(buf, sizeof(out)), &out, sizeof(out))
+    return out
 
 cdef inline int32_t int32_unpack(Buffer *buf) except ?0xDEAD:
-    cdef int32_t x = (<int32_t *> buf_read(buf, 4))[0]
-    cdef char *p = <char *> &x
-    swap_order(<char *> &x, 4)
-    return x
+    cdef int32_t out = 0
+    copy_maybe_swap(buf_read(buf, sizeof(out)), &out, sizeof(out))
+    return out
 
 cdef inline int16_t int16_unpack(Buffer *buf) except ?0xDED:
-    cdef int16_t x = (<int16_t *> buf_read(buf, 2))[0]
-    swap_order(<char *> &x, 2)
-    return x
+    cdef int16_t out = 0
+    copy_maybe_swap(buf_read(buf, sizeof(out)), &out, sizeof(out))
+    return out
 
 cdef inline int8_t int8_unpack(Buffer *buf) except ?80:
-    return (<int8_t *> buf_read(buf, 1))[0]
+    cdef int8_t out = 0
+    copy_maybe_swap(buf_read(buf, sizeof(out)), &out, sizeof(out))
+    return out
 
 cdef inline uint64_t uint64_unpack(Buffer *buf) except ?0xDEAD:
-    cdef uint64_t x = (<uint64_t *> buf_read(buf, 8))[0]
-    swap_order(<char *> &x, 8)
-    return x
+    cdef uint64_t out = 0
+    copy_maybe_swap(buf_read(buf, sizeof(out)), &out, sizeof(out))
+    return out
 
 cdef inline uint32_t uint32_unpack(Buffer *buf) except ?0xDEAD:
-    cdef uint32_t x = (<uint32_t *> buf_read(buf, 4))[0]
-    swap_order(<char *> &x, 4)
-    return x
+    cdef uint32_t out = 0
+    copy_maybe_swap(buf_read(buf, sizeof(out)), &out, sizeof(out))
+    return out
 
 cdef inline uint16_t uint16_unpack(Buffer *buf) except ?0xDEAD:
-    cdef uint16_t x = (<uint16_t *> buf_read(buf, 2))[0]
-    swap_order(<char *> &x, 2)
-    return x
+    cdef uint16_t out = 0
+    copy_maybe_swap(buf_read(buf, sizeof(out)), &out, sizeof(out))
+    return out
 
 cdef inline uint8_t uint8_unpack(Buffer *buf) except ?0xff:
-    return (<uint8_t *> buf_read(buf, 1))[0]
+    cdef uint8_t out = 0
+    copy_maybe_swap(buf_read(buf, sizeof(out)), &out, sizeof(out))
+    return out
 
 cdef inline double double_unpack(Buffer *buf) except ?1.74:
-    cdef double x = (<double *> buf_read(buf, 8))[0]
-    swap_order(<char *> &x, 8)
-    return x
+    cdef double out = 0
+    copy_maybe_swap(buf_read(buf, sizeof(out)), &out, sizeof(out))
+    return out
 
 cdef inline float float_unpack(Buffer *buf) except ?1.74:
-    cdef float x = (<float *> buf_read(buf, 4))[0]
-    swap_order(<char *> &x, 4)
-    return x
-
+    cdef float out = 0
+    copy_maybe_swap(buf_read(buf, sizeof(out)), &out, sizeof(out))
+    return out
 
 cdef varint_unpack(Buffer *term):
     """Unpack a variable-sized integer"""
