@@ -26,23 +26,6 @@ from cassandra.util import is_little_endian
 
 cdef bint PY3 = six.PY3
 
-
-cdef inline void swap_order(char *buf, Py_ssize_t size):
-    """
-    Swap the byteorder of `buf` in-place on little-endian platforms
-    (reverse all the bytes).
-    There are functions ntohl etc, but these may be POSIX-dependent.
-    """
-    cdef Py_ssize_t end, i
-    cdef char c
-
-    if is_little_endian:
-        for i in range(div2(size)):
-            end = size - i - 1
-            c = buf[i]
-            buf[i] = buf[end]
-            buf[end] = c
-
 cdef inline void copy_maybe_swap(char *buf, void* dst, Py_ssize_t size):
     """
     Copy to aligned destination, conditionally swapping to native byte order
