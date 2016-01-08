@@ -26,76 +26,67 @@ from cassandra.util import is_little_endian
 
 cdef bint PY3 = six.PY3
 
-cdef inline void copy_maybe_swap(char *buf, void* dst, Py_ssize_t size):
+ctypedef fused num_t:
+    int64_t
+    int32_t
+    int16_t
+    int8_t
+    uint64_t
+    uint32_t
+    uint16_t
+    uint8_t
+    double
+    float
+
+cdef inline num_t copy_maybe_swap(char *buf, num_t *dummy=NULL): # dummy pointer because cython wants the fused type as an arg
     """
     Copy to aligned destination, conditionally swapping to native byte order
     """
+    cdef num_t ret = 0
     cdef Py_ssize_t start, end, i
-    cdef char* out = <char*> dst
+    cdef char* out = <char*> &ret
 
     if is_little_endian:
-        for i in range(size):
-            out[size - i - 1] = buf[i]
+        for i in range(sizeof(num_t)):
+            out[sizeof(num_t) - i - 1] = buf[i]
     else:
-        memcpy(dst, buf, size)
+        # TODO: use inline function as in numpy_parser
+        memcpy(out, buf, sizeof(num_t))
+
+    return ret
 
 cdef inline Py_ssize_t div2(Py_ssize_t x):
     return x >> 1
 
-# TODO: is there a way to make these from a macro?
-# tried fused types, but there are compiler errors requiring strange games
-# type as an arg instead of just templating based on return type
-# return unpack_x[int64_t](buf_read(buf, sizeof(int64_t)), <int64_t*>0)
-
 cdef inline int64_t int64_unpack(Buffer *buf) except ?0xDEAD:
-    cdef int64_t out = 0
-    copy_maybe_swap(buf_read(buf, sizeof(out)), &out, sizeof(out))
-    return out
+    return copy_maybe_swap[int64_t](buf_read(buf, sizeof(int64_t)))
 
 cdef inline int32_t int32_unpack(Buffer *buf) except ?0xDEAD:
-    cdef int32_t out = 0
-    copy_maybe_swap(buf_read(buf, sizeof(out)), &out, sizeof(out))
-    return out
+    return copy_maybe_swap[int32_t](buf_read(buf, sizeof(int32_t)))
 
 cdef inline int16_t int16_unpack(Buffer *buf) except ?0xDED:
-    cdef int16_t out = 0
-    copy_maybe_swap(buf_read(buf, sizeof(out)), &out, sizeof(out))
-    return out
+    return copy_maybe_swap[int16_t](buf_read(buf, sizeof(int16_t)))
 
 cdef inline int8_t int8_unpack(Buffer *buf) except ?80:
-    cdef int8_t out = 0
-    copy_maybe_swap(buf_read(buf, sizeof(out)), &out, sizeof(out))
-    return out
+    return copy_maybe_swap[int8_t](buf_read(buf, sizeof(int8_t)))
 
 cdef inline uint64_t uint64_unpack(Buffer *buf) except ?0xDEAD:
-    cdef uint64_t out = 0
-    copy_maybe_swap(buf_read(buf, sizeof(out)), &out, sizeof(out))
-    return out
+    return copy_maybe_swap[uint64_t](buf_read(buf, sizeof(uint64_t)))
 
 cdef inline uint32_t uint32_unpack(Buffer *buf) except ?0xDEAD:
-    cdef uint32_t out = 0
-    copy_maybe_swap(buf_read(buf, sizeof(out)), &out, sizeof(out))
-    return out
+    return copy_maybe_swap[uint32_t](buf_read(buf, sizeof(uint32_t)))
 
 cdef inline uint16_t uint16_unpack(Buffer *buf) except ?0xDEAD:
-    cdef uint16_t out = 0
-    copy_maybe_swap(buf_read(buf, sizeof(out)), &out, sizeof(out))
-    return out
+    return copy_maybe_swap[uint16_t](buf_read(buf, sizeof(uint16_t)))
 
 cdef inline uint8_t uint8_unpack(Buffer *buf) except ?0xff:
-    cdef uint8_t out = 0
-    copy_maybe_swap(buf_read(buf, sizeof(out)), &out, sizeof(out))
-    return out
+    return copy_maybe_swap[uint8_t](buf_read(buf, sizeof(uint8_t)))
 
 cdef inline double double_unpack(Buffer *buf) except ?1.74:
-    cdef double out = 0
-    copy_maybe_swap(buf_read(buf, sizeof(out)), &out, sizeof(out))
-    return out
+    return copy_maybe_swap[double](buf_read(buf, sizeof(double)))
 
 cdef inline float float_unpack(Buffer *buf) except ?1.74:
-    cdef float out = 0
-    copy_maybe_swap(buf_read(buf, sizeof(out)), &out, sizeof(out))
-    return out
+    return copy_maybe_swap[float](buf_read(buf, sizeof(float)))
 
 cdef varint_unpack(Buffer *term):
     """Unpack a variable-sized integer"""
