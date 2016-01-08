@@ -101,10 +101,10 @@ class Result(object):
         raise AttributeError("Result has no top-level attribute %r" % (attr,))
 
     def __getitem__(self, item):
-        if isinstance(self.value, dict) and isinstance(key, six.string_types):
+        if isinstance(self.value, dict) and isinstance(item, six.string_types):
             return self.value[item]
-        elif isinstance(self.value, list) and isinstance(key, int):
-            raise TypeError("Key must be a string")
+        elif isinstance(self.value, list) and isinstance(item, int):
+            return self.value[item]
         else:
             raise ValueError("Result cannot be indexed by %r" % (item,))
 
