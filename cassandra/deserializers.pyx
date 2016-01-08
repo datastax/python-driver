@@ -53,7 +53,7 @@ cdef class DesDecimalType(Deserializer):
         cdef Buffer varint_buf
         slice_buffer(buf, &varint_buf, 4, buf.size - 4)
 
-        scale = int32_unpack(buf)
+        scale = unpack_num[int32_t](buf)
         unscaled = varint_unpack(&varint_buf)
 
         return Decimal('%de%d' % (unscaled, -scale))
@@ -66,14 +66,14 @@ cdef class DesUUIDType(Deserializer):
 
 cdef class DesBooleanType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        if int8_unpack(buf):
+        if unpack_num[int8_t](buf):
             return True
         return False
 
 
 cdef class DesByteType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        return int8_unpack(buf)
+        return unpack_num[int8_t](buf)
 
 
 cdef class DesAsciiType(Deserializer):
@@ -85,22 +85,22 @@ cdef class DesAsciiType(Deserializer):
 
 cdef class DesFloatType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        return float_unpack(buf)
+        return unpack_num[float](buf)
 
 
 cdef class DesDoubleType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        return double_unpack(buf)
+        return unpack_num[double](buf)
 
 
 cdef class DesLongType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        return int64_unpack(buf)
+        return unpack_num[int64_t](buf)
 
 
 cdef class DesInt32Type(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        return int32_unpack(buf)
+        return unpack_num[int32_t](buf)
 
 
 cdef class DesIntegerType(Deserializer):
@@ -127,7 +127,7 @@ cdef class DesCounterColumnType(DesLongType):
 
 cdef class DesDateType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        cdef double timestamp = int64_unpack(buf) / 1000.0
+        cdef double timestamp = unpack_num[int64_t](buf) / 1000.0
         return datetime_from_timestamp(timestamp)
 
 
@@ -147,18 +147,18 @@ EPOCH_OFFSET_DAYS = 2 ** 31
 
 cdef class DesSimpleDateType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        days = uint32_unpack(buf) - EPOCH_OFFSET_DAYS
+        days = unpack_num[uint32_t](buf) - EPOCH_OFFSET_DAYS
         return util.Date(days)
 
 
 cdef class DesShortType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        return int16_unpack(buf)
+        return unpack_num[int16_t](buf)
 
 
 cdef class DesTimeType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        return util.Time(int64_unpack(buf))
+        return util.Time(unpack_num[int64_t](buf))
 
 
 cdef class DesUTF8Type(Deserializer):
@@ -273,9 +273,9 @@ cdef int _unpack_len(itemlen_t idx, itemlen_t *elemlen, Buffer *buf) except -1:
     slice_buffer(buf, &itemlen_buf, idx, sizeof(itemlen_t))
 
     if itemlen_t is uint16_t:
-        elemlen[0] = uint16_unpack(&itemlen_buf)
+        elemlen[0] = unpack_num[uint16_t](&itemlen_buf)
     else:
-        elemlen[0] = int32_unpack(&itemlen_buf)
+        elemlen[0] = unpack_num[int32_t](&itemlen_buf)
 
     return 0
 
@@ -359,7 +359,7 @@ cdef class DesTupleType(_DesParameterizedType):
             item = None
             if p < buf.size:
                 slice_buffer(buf, &itemlen_buf, p, 4)
-                itemlen = int32_unpack(&itemlen_buf)
+                itemlen = unpack_num[int32_t](&itemlen_buf)
                 p += 4
                 if itemlen >= 0:
                     slice_buffer(buf, &item_buf, p, itemlen)
@@ -407,7 +407,7 @@ cdef class DesCompositeType(_DesParameterizedType):
                 res = res[:i]
                 break
 
-            element_length = uint16_unpack(buf)
+            element_length = unpack_num[uint16_t](buf)
             slice_buffer(buf, &elem_buf, 2, element_length)
 
             deserializer = self.deserializers[i]
