@@ -18,7 +18,6 @@ import six
 
 from libc.stdint cimport (int8_t, int16_t, int32_t, int64_t,
                           uint8_t, uint16_t, uint32_t, uint64_t)
-from libc.string cimport memcpy
 from cassandra.buffer cimport Buffer, buf_read, to_bytes
 
 cdef bint is_little_endian
@@ -26,6 +25,14 @@ from cassandra.util import is_little_endian
 
 cdef bint PY3 = six.PY3
 
+cdef inline void memcopy(char *dst, char *src, Py_ssize_t size):
+    """
+    Our own simple memcopy which can be inlined. This is useful because our data types
+    are only a few bytes.
+    """
+    cdef Py_ssize_t i
+    for i in range(size):
+        dst[i] = src[i]
 
 ctypedef fused num_t:
     int64_t
@@ -52,8 +59,7 @@ cdef inline num_t unpack_num(Buffer *buf, num_t *dummy=NULL): # dummy pointer be
         for i in range(sizeof(num_t)):
             out[sizeof(num_t) - i - 1] = src[i]
     else:
-        # TODO: use inline function as in numpy_parser
-        memcpy(out, src, sizeof(num_t))
+        memcopy(out, src, sizeof(num_t))
 
     return ret
 
