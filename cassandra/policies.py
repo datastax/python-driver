@@ -528,6 +528,9 @@ class ExponentialReconnectionPolicy(ReconnectionPolicy):
     a set maximum delay.
     """
 
+    # TODO: max_attempts is 64 to preserve legacy default behavior
+    # consider changing to None in major release to prevent the policy
+    # giving up forever
     def __init__(self, base_delay, max_delay, max_attempts=64):
         """
         `base_delay` and `max_delay` should be in floating point units of
