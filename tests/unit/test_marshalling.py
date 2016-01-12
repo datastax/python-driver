@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from cassandra.marshal import bitlength
+from cassandra.protocol import MAX_SUPPORTED_VERSION
 
 try:
     import unittest2 as unittest
@@ -139,3 +140,11 @@ class UnmarshalTest(unittest.TestCase):
     def test_date(self):
         # separate test because it will deserialize as datetime
         self.assertEqual(DateType.from_binary(DateType.to_binary(date(2015, 11, 2), 1), 1), datetime(2015, 11, 2))
+
+    def test_decimal(self):
+        # testing implicit numeric conversion
+        # int, float, tuple(sign, digits, exp)
+        for proto_ver in range(1, MAX_SUPPORTED_VERSION + 1):
+            for n in (10001, 100.1, (0, (1, 0, 0, 0, 0, 1), -3)):
+                expected = Decimal(n)
+                self.assertEqual(DecimalType.from_binary(DecimalType.to_binary(n, proto_ver), proto_ver), expected)
