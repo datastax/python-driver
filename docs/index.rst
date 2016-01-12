@@ -33,6 +33,9 @@ Contents
 :doc:`query_paging`
     Notes on paging large query results.
 
+:doc:`lwt`
+    Working with results of conditional requests
+
 :doc:`user_defined_types`
     Working with Cassandra 2.1's user-defined types.
 
@@ -51,6 +54,7 @@ Contents
    upgrading
    performance
    query_paging
+   lwt
    security
    user_defined_types
    object_mapper
