@@ -2614,7 +2614,7 @@ def refresh_schema_and_set_result(control_conn, response_future, **kwargs):
         if control_conn._meta_refresh_enabled:
             log.debug("Refreshing schema in response to schema change. "
                       "%s", kwargs)
-            control_conn._refresh_schema(response_future._connection, **kwargs)
+            response_future.is_schema_agreed = control_conn._refresh_schema(response_future._connection, **kwargs)
         else:
             log.debug("Skipping schema refresh in response to schema change because meta refresh is disabled; "
                       "%s", kwargs)
@@ -2641,6 +2641,13 @@ class ResponseFuture(object):
     """
     The :class:`~.Statement` instance that is being executed through this
     :class:`.ResponseFuture`.
+    """
+
+    is_schema_agreed = True
+    """
+    For DDL requests, this may be set ``False`` if the schema agreement poll after the response fails.
+
+    Always ``True`` for non-DDL requests.
     """
 
     session = None
@@ -2866,6 +2873,7 @@ class ResponseFuture(object):
                 elif response.kind == RESULT_KIND_SCHEMA_CHANGE:
                     # refresh the schema before responding, but do it in another
                     # thread instead of the event loop thread
+                    self.is_schema_agreed = False
                     self.session.submit(
                         refresh_schema_and_set_result,
                         self.session.cluster.control_connection,
