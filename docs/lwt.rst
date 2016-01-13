@@ -29,7 +29,7 @@ executed:
 
 - ``UPDATE .. IF EXISTS`` never has additional columns, regardless of ``[applied]`` status.
 
-How the ``[applied]]`` column manifests depends on the row factory in use. Considering the following (initially empty) table::
+How the ``[applied]`` column manifests depends on the row factory in use. Considering the following (initially empty) table::
 
     CREATE TABLE test.t (
         k int PRIMARY KEY,
