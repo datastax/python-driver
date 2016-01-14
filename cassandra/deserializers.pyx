@@ -228,54 +228,47 @@ cdef list _deserialize_list_or_set(itemlen_t dummy_version,
     The 'dummy' parameter is needed to make fused types work, so that
     we can specialize on the protocol version.
     """
-    cdef itemlen_t itemlen
     cdef Buffer itemlen_buf
     cdef Buffer elem_buf
 
     cdef itemlen_t numelements
-    cdef itemlen_t idx
+    cdef int offset
     cdef list result = []
 
-    _unpack_len[itemlen_t](0, &numelements, buf)
-    idx = sizeof(itemlen_t)
+    _unpack_len[itemlen_t](buf, 0, &numelements)
+    offset = sizeof(itemlen_t)
     protocol_version = max(3, protocol_version)
     for _ in range(numelements):
-        subelem(buf, &elem_buf, &idx)
+        subelem[itemlen_t](buf, &elem_buf, &offset, dummy_version)
         result.append(from_binary(deserializer, &elem_buf, protocol_version))
 
     return result
 
 
 cdef inline int subelem(
-        Buffer *buf, Buffer *elem_buf, itemlen_t *idx_p) except -1:
+        Buffer *buf, Buffer *elem_buf, int* offset, itemlen_t dummy) except -1:
     """
     Read the next element from the buffer: first read the size (in bytes) of the
     element, then fill elem_buf with a newly sliced buffer of this size (and the
     right offset).
-
-    NOTE:   The handling of 'idx' is somewhat atrocious, as there is a Cython
-            bug with the combination fused types + 'except' clause.
-            So instead, we pass in a pointer to 'idx', namely 'idx_p', and write
-            to this instead.
     """
     cdef itemlen_t elemlen
 
-    _unpack_len[itemlen_t](idx_p[0], &elemlen, buf)
-    idx_p[0] += sizeof(itemlen_t)
-    slice_buffer(buf, elem_buf, idx_p[0], elemlen)
-    idx_p[0] += elemlen
+    _unpack_len[itemlen_t](buf, offset[0], &elemlen)
+    offset[0] += sizeof(itemlen_t)
+    slice_buffer(buf, elem_buf, offset[0], elemlen)
+    offset[0] += elemlen
     return 0
 
 
-cdef int _unpack_len(itemlen_t idx, itemlen_t *elemlen, Buffer *buf) except -1:
-    cdef itemlen_t result
+cdef int _unpack_len(Buffer *buf, int offset, itemlen_t *output) except -1:
     cdef Buffer itemlen_buf
-    slice_buffer(buf, &itemlen_buf, idx, sizeof(itemlen_t))
+    slice_buffer(buf, &itemlen_buf, offset, sizeof(itemlen_t))
 
     if itemlen_t is uint16_t:
-        elemlen[0] = uint16_unpack(&itemlen_buf)
+        output[0] = uint16_unpack(&itemlen_buf)
     else:
-        elemlen[0] = int32_unpack(&itemlen_buf)
+        output[0] = int32_unpack(&itemlen_buf)
 
     return 0
 
@@ -314,21 +307,20 @@ cdef _deserialize_map(itemlen_t dummy_version,
                       Buffer *buf, int protocol_version,
                       Deserializer key_deserializer, Deserializer val_deserializer,
                       key_type, val_type):
-    cdef itemlen_t itemlen, val_len, key_len
     cdef Buffer key_buf, val_buf
     cdef Buffer itemlen_buf
 
     cdef itemlen_t numelements
-    cdef itemlen_t idx = sizeof(itemlen_t)
+    cdef int offset
     cdef list result = []
 
-    _unpack_len[itemlen_t](0, &numelements, buf)
-    idx = sizeof(itemlen_t)
+    _unpack_len[itemlen_t](buf, 0, &numelements)
+    offset = sizeof(itemlen_t)
     themap = util.OrderedMapSerializedKey(key_type, protocol_version)
     protocol_version = max(3, protocol_version)
     for _ in range(numelements):
-        subelem(buf, &key_buf, &idx)
-        subelem(buf, &val_buf, &idx)
+        subelem[itemlen_t](buf, &key_buf, &offset, dummy_version)
+        subelem[itemlen_t](buf, &val_buf, &offset, numelements)
         key = from_binary(key_deserializer, &key_buf, protocol_version)
         val = from_binary(val_deserializer, &val_buf, protocol_version)
         themap._insert_unchecked(key, to_bytes(&key_buf), val)
