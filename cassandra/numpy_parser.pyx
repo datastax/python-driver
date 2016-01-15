@@ -153,7 +153,7 @@ cdef inline int unpack_row(
             Py_INCREF(val)
             (<PyObject **> arr.buf_ptr)[0] = <PyObject *> val
         else:
-            memcopy(<char *> arr.buf_ptr, buf.ptr, buf.size)
+            memcpy(<char *> arr.buf_ptr, buf.ptr, buf.size)
 
         # Update the pointer into the array for the next time
         arrays[i].buf_ptr += arr.stride
