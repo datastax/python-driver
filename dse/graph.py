@@ -149,7 +149,7 @@ class GraphSession(object):
 
     def execute(self, query, parameters=None, timeout=_NOT_SET, trace=False, row_factory=None):
         """
-        Executes a Gremlin query string, a GraphStatement, or a BoundGraphStatement synchronously,
+        Executes a Gremlin query string, a GraphStatement synchronously,
         and returns a GraphResultSet from this execution.
         """
         if isinstance(query, GraphStatement):
