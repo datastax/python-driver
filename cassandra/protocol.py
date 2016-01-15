@@ -491,11 +491,15 @@ class QueryMessage(_MessageType):
         self.fetch_size = fetch_size
         self.paging_state = paging_state
         self.timestamp = timestamp
+        self._query_params = None  # only used internally. May be set to a list of native-encoded values to have them sent with the request.
 
     def send_body(self, f, protocol_version):
         write_longstring(f, self.query)
         write_consistency_level(f, self.consistency_level)
         flags = 0x00
+        if self._query_params is not None:
+            flags |= _VALUES_FLAG  # also v2+, but we're only setting params internally right now
+
         if self.serial_consistency_level:
             if protocol_version >= 2:
                 flags |= _WITH_SERIAL_CONSISTENCY_FLAG
@@ -525,6 +529,12 @@ class QueryMessage(_MessageType):
             flags |= _PROTOCOL_TIMESTAMP
 
         write_byte(f, flags)
+
+        if self._query_params is not None:
+            write_short(f, len(self._query_params))
+            for param in self._query_params:
+                write_value(f, param)
+
         if self.fetch_size:
             write_int(f, self.fetch_size)
         if self.paging_state:
