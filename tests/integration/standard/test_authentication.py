@@ -17,7 +17,7 @@ import time
 
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.auth import PlainTextAuthProvider, SASLClient, SaslAuthProvider
-from dse.auth import DSEAuthProvider
+from dse.auth import DSEPlainTextAuthProvider
 
 from tests.integration import use_singledc, get_cluster, remove_cluster, PROTOCOL_VERSION
 from tests.integration.util import assert_quiescent_pool_state
@@ -169,7 +169,7 @@ class SaslAuthenticatorTests(AuthenticationTests):
 
 class DSEAuthenticatorTests(AuthenticationTests):
     """
-    Test SaslAuthProvider as PlainText
+    Test DSEPlainTextAuthProvider
     """
 
     def setUp(self):
@@ -179,4 +179,4 @@ class DSEAuthenticatorTests(AuthenticationTests):
             raise unittest.SkipTest('pure-sasl is not installed')
 
     def get_authentication_provider(self, username, password):
-        return DSEAuthProvider(username, password)
+        return DSEPlainTextAuthProvider(username, password)
