@@ -44,4 +44,4 @@ cdef inline int32_t read_int(BytesIOReader reader) except ?0xDEAD:
     cdef Buffer buf
     buf.ptr = reader.read(4)
     buf.size = 4
-    return int32_unpack(&buf)
+    return unpack_num[int32_t](&buf)
