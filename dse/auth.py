@@ -6,19 +6,23 @@ except ImportError:
     SASLClient = None
 
 
-class DSEAuthProvider(AuthProvider):
-    def __init__(self, username=None, password=None, service=None, qops=None):
+class DSEPlainTextAuthProvider(AuthProvider):
+    def __init__(self, username=None, password=None):
         self.username = username
         self.password = password
-        if username is None:
-            if SASLClient is None:
-                raise ImportError('The puresasl library has not been installed')
-            self.service = service
-            self.qops = qops
 
     def new_authenticator(self, host):
-        if self.username:
-            return PlainTextAuthenticator(self.username, self.password)
+        return PlainTextAuthenticator(self.username, self.password)
+
+
+class DSEGSSAPIAuthProvider(AuthProvider):
+    def __init__(self, service=None, qops=None):
+        if SASLClient is None:
+            raise ImportError('The puresasl library has not been installed')
+        self.service = service
+        self.qops = qops
+
+    def new_authenticator(self, host):
         return GSSAPIAuthenticator(host, self.service, self.qops)
 
 
