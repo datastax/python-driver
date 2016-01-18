@@ -1,9 +1,16 @@
 from cassandra.auth import AuthProvider, Authenticator
 
 try:
-    from puresasl.client import SASLClient
+    import kerberos
+    _have_kerberos = True
 except ImportError:
-    SASLClient = None
+    _have_kerberos = False
+
+try:
+    from puresasl.client import SASLClient
+    _have_puresasl = True
+except ImportError:
+    _have_puresasl = False
 
 
 class DSEPlainTextAuthProvider(AuthProvider):
@@ -17,8 +24,10 @@ class DSEPlainTextAuthProvider(AuthProvider):
 
 class DSEGSSAPIAuthProvider(AuthProvider):
     def __init__(self, service=None, qops=None):
-        if SASLClient is None:
+        if not _have_puresasl:
             raise ImportError('The puresasl library has not been installed')
+        if not _have_kerberos:
+            raise ImportError('The kerberos library has not been installed')
         self.service = service
         self.qops = qops
 
