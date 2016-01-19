@@ -1,3 +1,5 @@
+from itertools import chain
+
 class Point(object):
 
     def __init__(self, x, y):
@@ -27,24 +29,39 @@ class Circle(object):
 
 class LineString(object):
 
-    def __init__(self, points):
-        self.points = list(points)
+    def __init__(self, coords):
+        self.coords = list(coords)
 
     def __str__(self):
-        return "LINESTRING(%s)" % ', '.join("%f %f" % (x, y) for x, y in self.points)
+        return "LINESTRING(%s)" % ', '.join("%f %f" % (x, y) for x, y in self.coords)
 
     def __repr__(self):
-        return "%s(%r)" % (self.__class__.__name__, self.points)
+        return "%s(%r)" % (self.__class__.__name__, self.coords)
+
+
+class _LinearRing(object):
+    # no validation, no implicit closing; just used for poly composition, to
+    # mimic that of shapely.geometry.Polygon
+    def __init__(self, coords):
+        self.coords = list(coords)
+
+    def __str__(self):
+        return "LINEARRING(%s)" % ', '.join("%f %f" % (x, y) for x, y in self.coords)
+
+    def __repr__(self):
+        return "%s(%r)" % (self.__class__.__name__, self.coords)
 
 
 class Polygon(object):
 
-    def __init__(self, rings):
-        self.rings = list(rings)
+    def __init__(self, exterior, interiors=None):
+        self.exterior = _LinearRing(exterior)
+        self.interiors = [_LinearRing(e) for e in interiors] if interiors else []
 
     def __str__(self):
-        rings = ("(%s)" % ', '.join("%s %s" % (x, y) for x, y in ring) for ring in self.rings)
+        rings = (ring.coords for ring in chain((self.exterior,), self.interiors))
+        rings = ("(%s)" % ', '.join("%s %s" % (x, y) for x, y in ring) for ring in rings)
         return "POLYGON(%s)" % ', '.join(rings)
 
     def __repr__(self):
-        return "%s(%r)" % (self.__class__.__name__, self.rings)
+        return "%s(%r, %r)" % (self.__class__.__name__, self.exterior.coords, [ring.coords for ring in self.interiors])

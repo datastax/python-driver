@@ -1,4 +1,5 @@
 import io
+from itertools import chain
 from six.moves import range
 import struct
 from cassandra.cqltypes import CassandraType
@@ -57,15 +58,15 @@ class LineStringType(CassandraType):
 
     @staticmethod
     def serialize(val, protocol_version):
-        num_points = len(val.points)
-        return LineStringType._type + struct.pack('=I' + 'dd' * num_points, num_points, *(d for point in val.points for d in point))
+        num_points = len(val.coords)
+        return LineStringType._type + struct.pack('=I' + 'dd' * num_points, num_points, *(d for coords in val.coords for d in coords))
 
     @staticmethod
     def deserialize(byts, protocol_version):
         is_little_endian = bool(byts[0])
         point = point_le if is_little_endian else point_be
-        points = ((point.unpack_from(byts, offset) for offset in range(1 + 4 + 4, len(byts), point.size)))  # start = endian + int type + int count
-        return LineString(points)
+        coords = ((point.unpack_from(byts, offset) for offset in range(1 + 4 + 4, len(byts), point.size)))  # start = endian + int type + int count
+        return LineString(coords)
 
 
 class PolygonType(CassandraType):
@@ -79,11 +80,11 @@ class PolygonType(CassandraType):
         buf = io.BytesIO(PolygonType._type)
         buf.seek(0, 2)
 
-        num_rings = len(val.rings)
+        num_rings = 1 + len(val.interiors)
         buf.write(PolygonType._platform_ring_count(num_rings))
-        for ring in val.rings:
-            num_points = len(ring)
-            buf.write(struct.pack('=I' + 'dd' * num_points, num_points, *(d for point in ring for d in point)))
+        for ring in chain((val.exterior,), val.interiors):
+            num_points = len(ring.coords)
+            buf.write(struct.pack('=I' + 'dd' * num_points, num_points, *(d for coord in ring.coords for d in coord)))
         return buf.getvalue()
 
     @staticmethod
@@ -105,4 +106,4 @@ class PolygonType(CassandraType):
             end = p + point_count * point.size
             rings.append([point.unpack_from(byts, offset) for offset in range(p, end, point.size)])
             p = end
-        return Polygon(rings)
+        return Polygon(exterior=rings[0], interiors=rings[1:])
