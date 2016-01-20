@@ -142,7 +142,7 @@ class SaslAuthProvider(AuthProvider):
         from cassandra.cluster import Cluster
         from cassandra.auth import SaslAuthProvider
 
-        sasl_kwargs = {'service': 'dse',
+        sasl_kwargs = {'service': 'something',
                        'mechanism': 'GSSAPI',
                        'qops': 'auth'.split(',')}
         auth_provider = SaslAuthProvider(**sasl_kwargs)
