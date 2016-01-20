@@ -17,6 +17,7 @@ import time
 
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.auth import PlainTextAuthProvider, SASLClient, SaslAuthProvider
+from dse.auth import DSEPlainTextAuthProvider
 
 from tests.integration import use_singledc, get_cluster, remove_cluster, PROTOCOL_VERSION
 from tests.integration.util import assert_quiescent_pool_state
@@ -80,15 +81,22 @@ class AuthenticationTests(unittest.TestCase):
         root_session = self.cluster_as('cassandra', 'cassandra').connect()
         root_session.execute('CREATE USER %s WITH PASSWORD %s', (user, passwd))
 
-        cluster = self.cluster_as(user, passwd)
-        session = cluster.connect()
-        self.assertTrue(session.execute('SELECT release_version FROM system.local'))
-        assert_quiescent_pool_state(self, cluster)
-        cluster.shutdown()
-
-        root_session.execute('DROP USER %s', user)
-        assert_quiescent_pool_state(self, root_session.cluster)
-        root_session.cluster.shutdown()
+        try:
+            cluster = self.cluster_as(user, passwd)
+            session = cluster.connect()
+            try:
+                self.assertTrue(session.execute('SELECT release_version FROM system.local'))
+                assert_quiescent_pool_state(self, cluster)
+                for pool in session.get_pools():
+                    connection, _ = pool.borrow_connection(timeout=0)
+                    self.assertEqual(connection.authenticator.server_authenticator_class, 'org.apache.cassandra.auth.PasswordAuthenticator')
+                    pool.return_connection(connection)
+            finally:
+                cluster.shutdown()
+        finally:
+            root_session.execute('DROP USER %s', user)
+            assert_quiescent_pool_state(self, root_session.cluster)
+            root_session.cluster.shutdown()
 
     def test_connect_wrong_pwd(self):
         cluster = self.cluster_as('cassandra', 'wrong_pass')
@@ -157,3 +165,18 @@ class SaslAuthenticatorTests(AuthenticationTests):
     def test_host_rejected(self):
         sasl_kwargs = {'host': 'something'}
         self.assertRaises(ValueError, SaslAuthProvider, **sasl_kwargs)
+
+
+class DSEAuthenticatorTests(AuthenticationTests):
+    """
+    Test DSEPlainTextAuthProvider
+    """
+
+    def setUp(self):
+        if PROTOCOL_VERSION < 2:
+            raise unittest.SkipTest('Sasl authentication not available for protocol v1')
+        if SASLClient is None:
+            raise unittest.SkipTest('pure-sasl is not installed')
+
+    def get_authentication_provider(self, username, password):
+        return DSEPlainTextAuthProvider(username, password)

@@ -15,7 +15,6 @@ try:
 except ImportError:
     SASLClient = None
 
-
 class AuthProvider(object):
     """
     An abstract class that defines the interface that will be used for
@@ -62,6 +61,9 @@ class Authenticator(object):
 
     .. versionadded:: 2.0.0
     """
+
+    server_authenticator_class = None
+    """ Set during the connection AUTHENTICATE phase """
 
     def initial_response(self):
         """

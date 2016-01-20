@@ -895,11 +895,14 @@ class Cluster(object):
 
     def _new_session(self):
         session = Session(self, self.metadata.all_hosts())
+        self._session_register_user_types(session)
+        self.sessions.add(session)
+        return session
+
+    def _session_register_user_types(self, session):
         for keyspace, type_map in six.iteritems(self._user_types):
             for udt_name, klass in six.iteritems(type_map):
                 session.user_type_registered(keyspace, udt_name, klass)
-        self.sessions.add(session)
-        return session
 
     def _cleanup_failed_on_up_handling(self, host):
         self.load_balancing_policy.on_down(host)
