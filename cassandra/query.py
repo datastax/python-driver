@@ -338,6 +338,7 @@ class SimpleStatement(Statement):
                 (self.query_string, consistency))
     __repr__ = __str__
 
+
 class PreparedStatement(object):
     """
     A statement that has been prepared against at least one Cassandra node.
