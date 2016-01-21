@@ -28,6 +28,7 @@ from cassandra.protocol import ConfigurationException
 
 try:
     from ccmlib.cluster import Cluster as CCMCluster
+    from ccmlib.dse_cluster import DseCluster
     from ccmlib.cluster_factory import ClusterFactory as CCMClusterFactory
     from ccmlib import common
 except ImportError as e:
@@ -82,6 +83,18 @@ USE_CASS_EXTERNAL = bool(os.getenv('USE_CASS_EXTERNAL', False))
 
 default_cassandra_version = '2.2.0'
 
+
+def _get_cass_version_from_dse(dse_version):
+    if dse_version.startswith('4.6') or dse_version.startswith('4.5'):
+        cass_ver = "2.0"
+    elif dse_version.startswith('4.7') or dse_version.startswith('4.8'):
+        cass_ver = "2.1"
+    else:
+        log.error("Uknown dse version found {0}, defaulting to 2.1".format(dse_version))
+        cass_ver = "2.1"
+
+    return cass_ver
+
 if USE_CASS_EXTERNAL:
     if CCMClusterFactory:
         # see if the external instance is running in ccm
@@ -105,15 +118,26 @@ if USE_CASS_EXTERNAL:
 
 
 CASSANDRA_DIR = os.getenv('CASSANDRA_DIR', None)
-CASSANDRA_VERSION = os.getenv('CASSANDRA_VERSION', default_cassandra_version)
+DSE_VERSION = os.getenv('DSE_VERSION', None)
+DSE_CRED = os.getenv('DSE_CREDS', None)
+if DSE_VERSION:
+    CASSANDRA_VERSION = _get_cass_version_from_dse(DSE_VERSION)
+else:
+    CASSANDRA_VERSION = os.getenv('CASSANDRA_VERSION', default_cassandra_version)
 
 CCM_KWARGS = {}
 if CASSANDRA_DIR:
     log.info("Using Cassandra dir: %s", CASSANDRA_DIR)
     CCM_KWARGS['install_dir'] = CASSANDRA_DIR
-else:
-    log.info('Using Cassandra version: %s', CASSANDRA_VERSION)
-    CCM_KWARGS['version'] = CASSANDRA_VERSION
+
+if DSE_VERSION:
+    log.info('Using DSE version: %s', DSE_VERSION)
+    if not CASSANDRA_DIR:
+        CCM_KWARGS['version'] = DSE_VERSION
+        if DSE_CRED:
+            log.info("Using DSE credentials file located at {0}".format(DSE_CRED))
+            CCM_KWARGS['dse_credentials_file'] = DSE_CRED
+
 
 if CASSANDRA_VERSION >= '2.2':
     default_protocol_version = 4
@@ -214,7 +238,11 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True):
             del tb
 
             log.debug("Creating new CCM cluster, {0}, with args {1}".format(cluster_name, CCM_KWARGS))
-            CCM_CLUSTER = CCMCluster(path, cluster_name, **CCM_KWARGS)
+            if DSE_VERSION:
+                log.error("creating dse cluster")
+                CCM_CLUSTER = DseCluster(path, cluster_name, **CCM_KWARGS)
+            else:
+                CCM_CLUSTER = CCMCluster(path, cluster_name, **CCM_KWARGS)
             CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
             if CASSANDRA_VERSION >= '2.2':
                 CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
