@@ -95,22 +95,6 @@ def _get_cass_version_from_dse(dse_version):
 
     return cass_ver
 
-if USE_CASS_EXTERNAL:
-
-    # Not sure what's going on, but the server version query
-    # hangs in python3. This appears to be related to running inside of
-    # nosetests, and only for this query that would run while loading the
-    # module.
-    # This is a hack to make it run with default cassandra version for PY3.
-    # Not happy with it, but need to move on for now.
-    if not six.PY3:
-        cass_ver, _ = get_server_versions()
-        default_cassandra_version = '.'.join('%d' % i for i in cass_ver)
-    else:
-        if not os.getenv('CASSANDRA_VERSION'):
-            log.warning("Using default C* version %s because external server cannot be queried" % default_cassandra_version)
-
-
 CASSANDRA_DIR = os.getenv('CASSANDRA_DIR', None)
 DSE_VERSION = os.getenv('DSE_VERSION', None)
 DSE_CRED = os.getenv('DSE_CREDS', None)
