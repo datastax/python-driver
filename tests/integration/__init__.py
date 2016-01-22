@@ -96,12 +96,6 @@ def _get_cass_version_from_dse(dse_version):
     return cass_ver
 
 if USE_CASS_EXTERNAL:
-    if CCMClusterFactory:
-        # see if the external instance is running in ccm
-        path = common.get_default_path()
-        name = common.current_cluster_name(path)
-        CCM_CLUSTER = CCMClusterFactory.load(common.get_default_path(), name)
-        CCM_CLUSTER.start(wait_for_binary_proto=True, wait_other_notice=True)
 
     # Not sure what's going on, but the server version query
     # hangs in python3. This appears to be related to running inside of
