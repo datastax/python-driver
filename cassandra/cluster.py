@@ -2591,7 +2591,7 @@ class _Scheduler(object):
                         log.debug("Not executing scheduled task due to Scheduler shutdown")
                         return
                     if run_at <= time.time():
-                        self._scheduled_tasks.remove(task)
+                        self._scheduled_tasks.discard(task)
                         fn, args, kwargs = task
                         kwargs = dict(kwargs)
                         future = self._executor.submit(fn, *args, **kwargs)
