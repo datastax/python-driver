@@ -108,6 +108,10 @@ if CASSANDRA_DIR:
     log.info("Using Cassandra dir: %s", CASSANDRA_DIR)
     CCM_KWARGS['install_dir'] = CASSANDRA_DIR
 
+else:
+    log.info('Using Cassandra version: %s', CASSANDRA_VERSION)
+    CCM_KWARGS['version'] = CASSANDRA_VERSION
+
 if DSE_VERSION:
     log.info('Using DSE version: %s', DSE_VERSION)
     if not CASSANDRA_DIR:
