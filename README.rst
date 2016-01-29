@@ -52,7 +52,7 @@ community) is now maintained as an integral part of this package. Refer to
 
 Contributing
 ------------
-See `CONTRIBUTING.md <https://github.com/datastax/ruby-driver/blob/master/CONTRIBUTING.md>`_.
+See `CONTRIBUTING.md <https://github.com/datastax/python-driver/blob/master/CONTRIBUTING.rst>`_.
 
 Reporting Problems
 ------------------
