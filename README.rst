@@ -50,6 +50,10 @@ cqlengine (originally developed by Blake Eggleston and Jon Haddad, with contribu
 community) is now maintained as an integral part of this package. Refer to
 `documentation here <http://datastax.github.io/python-driver/object_mapper.html>`_.
 
+Contributing
+------------
+See `CONTRIBUTING.md <https://github.com/datastax/ruby-driver/blob/master/CONTRIBUTING.md>`_.
+
 Reporting Problems
 ------------------
 Please report any bugs and make any feature requests on the
