@@ -131,6 +131,8 @@
 
    .. autoattribute:: custom_payload()
 
+   .. autoattribute:: is_schema_agreed
+
    .. autoattribute:: has_more_pages
 
    .. autoattribute:: warnings
