@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -53,7 +53,7 @@ cdef class DesDecimalType(Deserializer):
         cdef Buffer varint_buf
         slice_buffer(buf, &varint_buf, 4, buf.size - 4)
 
-        scale = int32_unpack(buf)
+        scale = unpack_num[int32_t](buf)
         unscaled = varint_unpack(&varint_buf)
 
         return Decimal('%de%d' % (unscaled, -scale))
@@ -66,14 +66,14 @@ cdef class DesUUIDType(Deserializer):
 
 cdef class DesBooleanType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        if int8_unpack(buf):
+        if unpack_num[int8_t](buf):
             return True
         return False
 
 
 cdef class DesByteType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        return int8_unpack(buf)
+        return unpack_num[int8_t](buf)
 
 
 cdef class DesAsciiType(Deserializer):
@@ -85,22 +85,22 @@ cdef class DesAsciiType(Deserializer):
 
 cdef class DesFloatType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        return float_unpack(buf)
+        return unpack_num[float](buf)
 
 
 cdef class DesDoubleType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        return double_unpack(buf)
+        return unpack_num[double](buf)
 
 
 cdef class DesLongType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        return int64_unpack(buf)
+        return unpack_num[int64_t](buf)
 
 
 cdef class DesInt32Type(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        return int32_unpack(buf)
+        return unpack_num[int32_t](buf)
 
 
 cdef class DesIntegerType(Deserializer):
@@ -127,7 +127,7 @@ cdef class DesCounterColumnType(DesLongType):
 
 cdef class DesDateType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        cdef double timestamp = int64_unpack(buf) / 1000.0
+        cdef double timestamp = unpack_num[int64_t](buf) / 1000.0
         return datetime_from_timestamp(timestamp)
 
 
@@ -147,18 +147,18 @@ EPOCH_OFFSET_DAYS = 2 ** 31
 
 cdef class DesSimpleDateType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        days = uint32_unpack(buf) - EPOCH_OFFSET_DAYS
+        days = unpack_num[uint32_t](buf) - EPOCH_OFFSET_DAYS
         return util.Date(days)
 
 
 cdef class DesShortType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        return int16_unpack(buf)
+        return unpack_num[int16_t](buf)
 
 
 cdef class DesTimeType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        return util.Time(int64_unpack(buf))
+        return util.Time(unpack_num[int64_t](buf))
 
 
 cdef class DesUTF8Type(Deserializer):
@@ -228,54 +228,47 @@ cdef list _deserialize_list_or_set(itemlen_t dummy_version,
     The 'dummy' parameter is needed to make fused types work, so that
     we can specialize on the protocol version.
     """
-    cdef itemlen_t itemlen
     cdef Buffer itemlen_buf
     cdef Buffer elem_buf
 
     cdef itemlen_t numelements
-    cdef itemlen_t idx
+    cdef int offset
     cdef list result = []
 
-    _unpack_len[itemlen_t](0, &numelements, buf)
-    idx = sizeof(itemlen_t)
+    _unpack_len[itemlen_t](buf, 0, &numelements)
+    offset = sizeof(itemlen_t)
     protocol_version = max(3, protocol_version)
     for _ in range(numelements):
-        subelem(buf, &elem_buf, &idx)
+        subelem[itemlen_t](buf, &elem_buf, &offset, dummy_version)
         result.append(from_binary(deserializer, &elem_buf, protocol_version))
 
     return result
 
 
 cdef inline int subelem(
-        Buffer *buf, Buffer *elem_buf, itemlen_t *idx_p) except -1:
+        Buffer *buf, Buffer *elem_buf, int* offset, itemlen_t dummy) except -1:
     """
     Read the next element from the buffer: first read the size (in bytes) of the
     element, then fill elem_buf with a newly sliced buffer of this size (and the
     right offset).
-
-    NOTE:   The handling of 'idx' is somewhat atrocious, as there is a Cython
-            bug with the combination fused types + 'except' clause.
-            So instead, we pass in a pointer to 'idx', namely 'idx_p', and write
-            to this instead.
     """
     cdef itemlen_t elemlen
 
-    _unpack_len[itemlen_t](idx_p[0], &elemlen, buf)
-    idx_p[0] += sizeof(itemlen_t)
-    slice_buffer(buf, elem_buf, idx_p[0], elemlen)
-    idx_p[0] += elemlen
+    _unpack_len[itemlen_t](buf, offset[0], &elemlen)
+    offset[0] += sizeof(itemlen_t)
+    slice_buffer(buf, elem_buf, offset[0], elemlen)
+    offset[0] += elemlen
     return 0
 
 
-cdef int _unpack_len(itemlen_t idx, itemlen_t *elemlen, Buffer *buf) except -1:
-    cdef itemlen_t result
+cdef int _unpack_len(Buffer *buf, int offset, itemlen_t *output) except -1:
     cdef Buffer itemlen_buf
-    slice_buffer(buf, &itemlen_buf, idx, sizeof(itemlen_t))
+    slice_buffer(buf, &itemlen_buf, offset, sizeof(itemlen_t))
 
     if itemlen_t is uint16_t:
-        elemlen[0] = uint16_unpack(&itemlen_buf)
+        output[0] = unpack_num[uint16_t](&itemlen_buf)
     else:
-        elemlen[0] = int32_unpack(&itemlen_buf)
+        output[0] = unpack_num[int32_t](&itemlen_buf)
 
     return 0
 
@@ -314,21 +307,20 @@ cdef _deserialize_map(itemlen_t dummy_version,
                       Buffer *buf, int protocol_version,
                       Deserializer key_deserializer, Deserializer val_deserializer,
                       key_type, val_type):
-    cdef itemlen_t itemlen, val_len, key_len
     cdef Buffer key_buf, val_buf
     cdef Buffer itemlen_buf
 
     cdef itemlen_t numelements
-    cdef itemlen_t idx = sizeof(itemlen_t)
+    cdef int offset
     cdef list result = []
 
-    _unpack_len[itemlen_t](0, &numelements, buf)
-    idx = sizeof(itemlen_t)
+    _unpack_len[itemlen_t](buf, 0, &numelements)
+    offset = sizeof(itemlen_t)
     themap = util.OrderedMapSerializedKey(key_type, protocol_version)
     protocol_version = max(3, protocol_version)
     for _ in range(numelements):
-        subelem(buf, &key_buf, &idx)
-        subelem(buf, &val_buf, &idx)
+        subelem[itemlen_t](buf, &key_buf, &offset, dummy_version)
+        subelem[itemlen_t](buf, &val_buf, &offset, numelements)
         key = from_binary(key_deserializer, &key_buf, protocol_version)
         val = from_binary(val_deserializer, &val_buf, protocol_version)
         themap._insert_unchecked(key, to_bytes(&key_buf), val)
@@ -359,7 +351,7 @@ cdef class DesTupleType(_DesParameterizedType):
             item = None
             if p < buf.size:
                 slice_buffer(buf, &itemlen_buf, p, 4)
-                itemlen = int32_unpack(&itemlen_buf)
+                itemlen = unpack_num[int32_t](&itemlen_buf)
                 p += 4
                 if itemlen >= 0:
                     slice_buffer(buf, &item_buf, p, itemlen)
@@ -407,7 +399,7 @@ cdef class DesCompositeType(_DesParameterizedType):
                 res = res[:i]
                 break
 
-            element_length = uint16_unpack(buf)
+            element_length = unpack_num[uint16_t](buf)
             slice_buffer(buf, &elem_buf, 2, element_length)
 
             deserializer = self.deserializers[i]

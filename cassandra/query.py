@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -304,6 +304,9 @@ class Statement(object):
 
         Serial consistency levels may only be used against Cassandra 2.0+
         and the :attr:`~.Cluster.protocol_version` must be set to 2 or higher.
+
+        See :doc:`/lwt` for a discussion on how to work with results returned from
+        conditional statements.
 
         .. versionadded:: 2.0.0
         """)

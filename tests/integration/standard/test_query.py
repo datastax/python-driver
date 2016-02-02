@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -162,7 +162,8 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         trace = response_future._query_traces[0]
 
         # Delete trace duration from the session (this is what the driver polls for "complete")
-        self.session.execute("DELETE duration FROM system_traces.sessions WHERE session_id = %s", (trace.trace_id,))
+        delete_statement = SimpleStatement("DELETE duration FROM system_traces.sessions WHERE session_id = {}".format(trace.trace_id), consistency_level=ConsistencyLevel.ALL)
+        self.session.execute(delete_statement)
 
         # should raise because duration is not set
         self.assertRaises(TraceUnavailable, trace.populate, max_wait=0.2, wait_for_complete=True)

@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -814,18 +814,32 @@ class ExponentialReconnectionPolicyTest(unittest.TestCase):
         self.assertRaises(ValueError, ExponentialReconnectionPolicy, -1, 0)
         self.assertRaises(ValueError, ExponentialReconnectionPolicy, 0, -1)
         self.assertRaises(ValueError, ExponentialReconnectionPolicy, 9000, 1)
+        self.assertRaises(ValueError, ExponentialReconnectionPolicy, 1, 2,-1)
 
-    def test_schedule(self):
-        policy = ExponentialReconnectionPolicy(base_delay=2, max_delay=100)
+    def test_schedule_no_max(self):
+        base_delay = 2
+        max_delay = 100
+        test_iter = 10000
+        policy = ExponentialReconnectionPolicy(base_delay=base_delay, max_delay=max_delay, max_attempts=None)
+        sched_slice = list(islice(policy.new_schedule(), 0, test_iter))
+        self.assertEqual(sched_slice[0], base_delay)
+        self.assertEqual(sched_slice[-1], max_delay)
+        self.assertEqual(len(sched_slice), test_iter)
+
+    def test_schedule_with_max(self):
+        base_delay = 2
+        max_delay = 100
+        max_attempts = 64
+        policy = ExponentialReconnectionPolicy(base_delay=base_delay, max_delay=max_delay, max_attempts=max_attempts)
         schedule = list(policy.new_schedule())
-        self.assertEqual(len(schedule), 64)
+        self.assertEqual(len(schedule), max_attempts)
         for i, delay in enumerate(schedule):
             if i == 0:
-                self.assertEqual(delay, 2)
+                self.assertEqual(delay, base_delay)
             elif i < 6:
                 self.assertEqual(delay, schedule[i - 1] * 2)
             else:
-                self.assertEqual(delay, 100)
+                self.assertEqual(delay, max_delay)
 
 ONE = ConsistencyLevel.ONE
 

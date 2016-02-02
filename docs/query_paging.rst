@@ -3,8 +3,8 @@
 Paging Large Queries
 ====================
 Cassandra 2.0+ offers support for automatic query paging.  Starting with
-version 2.0 of the driver, if :attr:`~.Cluster.protocol_version` is set to
-:const:`4` (it is by default), queries returning large result sets will be
+version 2.0 of the driver, if :attr:`~.Cluster.protocol_version` is greater than 
+:const:`2` (it is by default), queries returning large result sets will be
 automatically paged.
 
 Controlling the Page Size

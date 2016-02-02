@@ -131,3 +131,17 @@ To run the benchmarks, pick one of the files under the ``benchmarks/`` dir and r
 There are a few options.  Use ``--help`` to see them all::
 
     python benchmarks/future_batches.py --help
+
+Packaging for Cassandra
+=======================
+A source distribution is included in Cassandra, which uses the driver internally for ``cqlsh``.
+To package a released version, checkout the tag and build a source zip archive::
+
+    python setup.py sdist --formats=zip
+
+If packaging a pre-release (untagged) version, it is useful to include a commit hash in the archive
+name to specify the built version::
+
+    python setup.py egg_info -b-`git rev-parse --short HEAD` sdist --formats=zip
+
+The file (``dist/cassandra-driver-<version spec>.zip``) is packaged with Cassandra in ``cassandra/lib/cassandra-driver-internal-only*zip``.

@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,4 +35,5 @@ def cyimport(import_path):
 # @cythontest
 # def test_something(self): ...
 cythontest = unittest.skipUnless(HAVE_CYTHON, 'Cython is not available')
-numpytest  = unittest.skipUnless(HAVE_CYTHON and HAVE_NUMPY, 'NumPy is not available')
+notcython = unittest.skipIf(HAVE_CYTHON, 'Cython not supported')
+numpytest = unittest.skipUnless(HAVE_CYTHON and HAVE_NUMPY, 'NumPy is not available')

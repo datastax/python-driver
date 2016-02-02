@@ -1,4 +1,4 @@
-# Copyright 2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -868,7 +868,7 @@ class ModelQuerySet(AbstractQuerySet):
 
     def if_not_exists(self):
         if self.model._has_counter:
-            raise IfNotExistsWithCounterColumn('if_not_exists cannot be used with tables containing columns')
+            raise IfNotExistsWithCounterColumn('if_not_exists cannot be used with tables containing counter columns')
         clone = copy.deepcopy(self)
         clone._if_not_exists = True
         return clone

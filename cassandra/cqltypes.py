@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -369,7 +369,10 @@ class DecimalType(_CassandraType):
         try:
             sign, digits, exponent = dec.as_tuple()
         except AttributeError:
-            raise TypeError("Non-Decimal type received for Decimal value")
+            try:
+                sign, digits, exponent = Decimal(dec).as_tuple()
+            except Exception:
+                raise TypeError("Invalid type for Decimal value: %r", dec)
         unscaled = int(''.join([str(digit) for digit in digits]))
         if sign:
             unscaled *= -1

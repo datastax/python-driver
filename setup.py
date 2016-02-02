@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -185,10 +185,11 @@ if not is_supported_platform:
 elif not is_supported_arch:
     sys.stderr.write(arch_unsupported_msg)
 
-try_extensions = "--no-extensions" not in sys.argv and is_supported_platform and is_supported_arch
+try_extensions = "--no-extensions" not in sys.argv and is_supported_platform and is_supported_arch and not os.environ.get('CASS_DRIVER_NO_EXTENSIONS')
 try_murmur3 = try_extensions and "--no-murmur3" not in sys.argv
 try_libev = try_extensions and "--no-libev" not in sys.argv and not is_pypy and not is_windows
 try_cython = try_extensions and "--no-cython" not in sys.argv and not is_pypy and not os.environ.get('CASS_DRIVER_NO_CYTHON')
+try_cython &= 'egg_info' not in sys.argv  # bypass setup_requires for pip egg_info calls, which will never have --install-option"--no-cython" coming fomr pip
 
 sys.argv = [a for a in sys.argv if a not in ("--no-murmur3", "--no-libev", "--no-cython", "--no-extensions")]
 

@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -895,11 +895,14 @@ class Cluster(object):
 
     def _new_session(self):
         session = Session(self, self.metadata.all_hosts())
+        self._session_register_user_types(session)
+        self.sessions.add(session)
+        return session
+
+    def _session_register_user_types(self, session):
         for keyspace, type_map in six.iteritems(self._user_types):
             for udt_name, klass in six.iteritems(type_map):
                 session.user_type_registered(keyspace, udt_name, klass)
-        self.sessions.add(session)
-        return session
 
     def _cleanup_failed_on_up_handling(self, host):
         self.load_balancing_policy.on_down(host)
@@ -2588,7 +2591,7 @@ class _Scheduler(object):
                         log.debug("Not executing scheduled task due to Scheduler shutdown")
                         return
                     if run_at <= time.time():
-                        self._scheduled_tasks.remove(task)
+                        self._scheduled_tasks.discard(task)
                         fn, args, kwargs = task
                         kwargs = dict(kwargs)
                         future = self._executor.submit(fn, *args, **kwargs)
@@ -2614,7 +2617,7 @@ def refresh_schema_and_set_result(control_conn, response_future, **kwargs):
         if control_conn._meta_refresh_enabled:
             log.debug("Refreshing schema in response to schema change. "
                       "%s", kwargs)
-            control_conn._refresh_schema(response_future._connection, **kwargs)
+            response_future.is_schema_agreed = control_conn._refresh_schema(response_future._connection, **kwargs)
         else:
             log.debug("Skipping schema refresh in response to schema change because meta refresh is disabled; "
                       "%s", kwargs)
@@ -2641,6 +2644,13 @@ class ResponseFuture(object):
     """
     The :class:`~.Statement` instance that is being executed through this
     :class:`.ResponseFuture`.
+    """
+
+    is_schema_agreed = True
+    """
+    For DDL requests, this may be set ``False`` if the schema agreement poll after the response fails.
+
+    Always ``True`` for non-DDL requests.
     """
 
     session = None
@@ -2866,6 +2876,7 @@ class ResponseFuture(object):
                 elif response.kind == RESULT_KIND_SCHEMA_CHANGE:
                     # refresh the schema before responding, but do it in another
                     # thread instead of the event loop thread
+                    self.is_schema_agreed = False
                     self.session.submit(
                         refresh_schema_and_set_result,
                         self.session.cluster.control_connection,
@@ -3307,7 +3318,7 @@ class ResultSet(object):
     @property
     def current_rows(self):
         """
-        :return: the list of current page rows. May be empty if the result was empty,
+        The list of current page rows. May be empty if the result was empty,
         or this is the last page.
         """
         return self._current_rows or []

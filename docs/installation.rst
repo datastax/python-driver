@@ -129,16 +129,33 @@ By default, this package uses `Cython <http://cython.org/>`_ to optimize core mo
 This is not a hard requirement, but is engaged by default to build extensions offering better performance than the
 pure Python implementation.
 
+This is a costly build phase, especially in clean environments where the Cython compiler must be built
 This build phase can be avoided using the build switch, or an environment variable::
 
     python setup.py install --no-cython
-    -or-
-    pip install --install-option="--no-cython" <spec-or-path>
 
 Alternatively, an environment variable can be used to switch this option regardless of
 context::
 
     CASS_DRIVER_NO_CYTHON=1 <your script here>
+    - or, to disable all extensions:
+    CASS_DRIVER_NO_EXTENSIONS=1 <your script here>
+
+This method is required when using pip, which provides no other way of injecting user options in a single command::
+
+    CASS_DRIVER_NO_CYTHON=1 pip install cassandra-driver
+    CASS_DRIVER_NO_CYTHON=1 sudo -E pip install ~/python-driver
+
+The environment variable is the preferred option because it spans all invocations of setup.py, and will
+prevent Cython from being materialized as a setup requirement.
+
+If your sudo configuration does not allow SETENV, you must push the option flag down via pip. However, pip
+applies these options to all dependencies (which break on the custom flag). Therefore, you must first install
+dependencies, then use install-option::
+
+    sudo pip install six futures
+    sudo pip install --install-option="--no-cython"
+
 
 libev support
 ^^^^^^^^^^^^^

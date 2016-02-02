@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ class NullHandler(logging.Handler):
 logging.getLogger('cassandra').addHandler(NullHandler())
 
 
-__version_info__ = (3, 0, 0)
+__version_info__ = (3, 1, '0a1')
 __version__ = '.'.join(map(str, __version_info__))
 
 

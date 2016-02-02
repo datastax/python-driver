@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -153,22 +153,12 @@ cdef inline int unpack_row(
             Py_INCREF(val)
             (<PyObject **> arr.buf_ptr)[0] = <PyObject *> val
         else:
-            memcopy(buf.ptr, <char *> arr.buf_ptr, buf.size)
+            memcpy(<char *> arr.buf_ptr, buf.ptr, buf.size)
 
         # Update the pointer into the array for the next time
         arrays[i].buf_ptr += arr.stride
 
     return 0
-
-
-cdef inline void memcopy(char *src, char *dst, Py_ssize_t size):
-    """
-    Our own simple memcopy which can be inlined. This is useful because our data types
-    are only a few bytes.
-    """
-    cdef Py_ssize_t i
-    for i in range(size):
-        dst[i] = src[i]
 
 
 def make_native_byteorder(arr):
