@@ -88,6 +88,17 @@ class TestDatetime(BaseCassEngTestCase):
         dts = self.DatetimeTest.objects.filter(test_id=1).values_list('created_at')
         assert dts[0][0] is None
 
+    def test_datetime_invalid(self):
+        dt_value= 'INVALID'
+        with self.assertRaises(TypeError):
+            self.DatetimeTest.objects.create(test_id=2, created_at=dt_value)
+
+    def test_datetime_timestamp(self):
+        dt_value = 1454520554
+        self.DatetimeTest.objects.create(test_id=2, created_at=dt_value)
+        dt2 = self.DatetimeTest.objects(test_id=2).first()
+        assert dt2.created_at == datetime.utcfromtimestamp(dt_value)
+
 
 class TestBoolDefault(BaseCassEngTestCase):
     class BoolDefaultValueTest(Model):
