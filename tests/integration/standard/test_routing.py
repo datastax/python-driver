@@ -38,7 +38,7 @@ class RoutingTests(unittest.TestCase):
 
     @classmethod
     def setup_class(cls):
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=['::1'])
         cls.session = cls.cluster.connect('test1rf')
 
     @classmethod

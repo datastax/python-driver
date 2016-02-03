@@ -59,7 +59,8 @@ class ClusterTests(unittest.TestCase):
         """
 
         get_node(1).pause()
-        cluster = Cluster(contact_points=['127.0.0.1'], protocol_version=PROTOCOL_VERSION, connect_timeout=1)
+        # cluster = Cluster(contact_points=['127.0.0.1'], protocol_version=PROTOCOL_VERSION, connect_timeout=1)
+        cluster = Cluster(contact_points=['::1'], protocol_version=PROTOCOL_VERSION, connect_timeout=1)
 
         with self.assertRaisesRegexp(NoHostAvailable, "OperationTimedOut\('errors=Timed out creating connection \(1 seconds\)"):
             cluster.connect()
@@ -71,7 +72,7 @@ class ClusterTests(unittest.TestCase):
         Test basic connection and usage
         """
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=['::1'])
         session = cluster.connect()
         result = execute_until_pass(session,
             """
@@ -120,7 +121,7 @@ class ClusterTests(unittest.TestCase):
         @test_category connection
         """
 
-        cluster = Cluster()
+        cluster = Cluster(contact_points=['::1'])
         self.assertEqual(cluster.protocol_version,  MAX_SUPPORTED_VERSION)
         session = cluster.connect()
         updated_protocol_version = session._protocol_version
@@ -146,7 +147,7 @@ class ClusterTests(unittest.TestCase):
         Ensure clusters that connect on a keyspace, do
         """
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=['::1'])
         session = cluster.connect()
         result = session.execute(
             """
@@ -164,7 +165,7 @@ class ClusterTests(unittest.TestCase):
         cluster.shutdown()
 
     def test_set_keyspace_twice(self):
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=['::1'])
         session = cluster.connect()
         session.execute("USE system")
         session.execute("USE system")
@@ -180,14 +181,15 @@ class ClusterTests(unittest.TestCase):
             reconnection_policy=ExponentialReconnectionPolicy(1.0, 600.0),
             default_retry_policy=RetryPolicy(),
             conviction_policy_factory=SimpleConvictionPolicy,
-            protocol_version=PROTOCOL_VERSION
+            protocol_version=PROTOCOL_VERSION,
+            contact_points=['::1']
         )
 
     def test_connect_to_already_shutdown_cluster(self):
         """
         Ensure you cannot connect to a cluster that's been shutdown
         """
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=['::1'])
         cluster.shutdown()
         self.assertRaises(Exception, cluster.connect)
 
@@ -196,7 +198,7 @@ class ClusterTests(unittest.TestCase):
         Ensure that auth_providers are always callable
         """
         self.assertRaises(TypeError, Cluster, auth_provider=1, protocol_version=1)
-        c = Cluster(protocol_version=1)
+        c = Cluster(protocol_version=1, contact_points=['::1'])
         self.assertRaises(TypeError, setattr, c, 'auth_provider', 1)
 
     def test_v2_auth_provider(self):
@@ -205,7 +207,7 @@ class ClusterTests(unittest.TestCase):
         """
         bad_auth_provider = lambda x: {'username': 'foo', 'password': 'bar'}
         self.assertRaises(TypeError, Cluster, auth_provider=bad_auth_provider, protocol_version=2)
-        c = Cluster(protocol_version=2)
+        c = Cluster(protocol_version=2, contact_points=['::1'])
         self.assertRaises(TypeError, setattr, c, 'auth_provider', bad_auth_provider)
 
     def test_conviction_policy_factory_is_callable(self):
@@ -221,7 +223,9 @@ class ClusterTests(unittest.TestCase):
         when a cluster cannot connect to given hosts
         """
 
-        cluster = Cluster(['127.1.2.9', '127.1.2.10'],
+        # cluster = Cluster(['127.1.2.9', '127.1.2.10'],
+        #                   protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(['::9', '::10'],
                           protocol_version=PROTOCOL_VERSION)
         self.assertRaises(NoHostAvailable, cluster.connect)
 
@@ -232,7 +236,7 @@ class ClusterTests(unittest.TestCase):
         if PROTOCOL_VERSION >= 3:
             raise unittest.SkipTest("min/max requests and core/max conns aren't used with v3 protocol")
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=['::1'])
 
         min_requests_per_connection = cluster.get_min_requests_per_connection(HostDistance.LOCAL)
         self.assertEqual(cassandra.cluster.DEFAULT_MIN_REQUESTS, min_requests_per_connection)
@@ -255,7 +259,7 @@ class ClusterTests(unittest.TestCase):
         self.assertEqual(cluster.get_max_connections_per_host(HostDistance.LOCAL), max_connections_per_host + 1)
 
     def test_refresh_schema(self):
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=['::1'])
         session = cluster.connect()
 
         original_meta = cluster.metadata.keyspaces
@@ -267,7 +271,7 @@ class ClusterTests(unittest.TestCase):
         cluster.shutdown()
 
     def test_refresh_schema_keyspace(self):
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=['::1'])
         session = cluster.connect()
 
         original_meta = cluster.metadata.keyspaces
@@ -283,7 +287,7 @@ class ClusterTests(unittest.TestCase):
         cluster.shutdown()
 
     def test_refresh_schema_table(self):
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=['::1'])
         session = cluster.connect()
 
         original_meta = cluster.metadata.keyspaces
@@ -309,7 +313,7 @@ class ClusterTests(unittest.TestCase):
             raise unittest.SkipTest('UDTs are not specified in change events for protocol v2')
             # We may want to refresh types on keyspace change events in that case(?)
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=['::1'])
         session = cluster.connect()
 
         keyspace_name = 'test1rf'
@@ -333,7 +337,8 @@ class ClusterTests(unittest.TestCase):
 
     def test_refresh_schema_no_wait(self):
 
-        contact_points = ['127.0.0.1']
+        # contact_points = ['127.0.0.1']
+        contact_points = ['::1']
         cluster = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=10,
                           contact_points=contact_points, load_balancing_policy=WhiteListRoundRobinPolicy(contact_points))
         session = cluster.connect()
@@ -346,7 +351,7 @@ class ClusterTests(unittest.TestCase):
             agreement_timeout = 1
 
             # cluster agreement wait exceeded
-            c = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=agreement_timeout)
+            c = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=agreement_timeout, contact_points=['::1'])
             c.connect()
             self.assertTrue(c.metadata.keyspaces)
 
@@ -371,7 +376,7 @@ class ClusterTests(unittest.TestCase):
 
             refresh_threshold = 0.5
             # cluster agreement bypass
-            c = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=0)
+            c = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=0, contact_points=['::1'])
             start_time = time.time()
             s = c.connect()
             end_time = time.time()
@@ -408,7 +413,7 @@ class ClusterTests(unittest.TestCase):
         Ensure trace can be requested for async and non-async queries
         """
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=['::1'])
         session = cluster.connect()
 
         def check_trace(trace):
@@ -448,7 +453,7 @@ class ClusterTests(unittest.TestCase):
         cluster.shutdown()
 
     def test_trace_timeout(self):
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=['::1'])
         session = cluster.connect()
 
         query = "SELECT * FROM system.local"
@@ -463,7 +468,7 @@ class ClusterTests(unittest.TestCase):
         Ensure str(future) returns without error
         """
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=['::1'])
         session = cluster.connect()
 
         query = "SELECT * FROM system.local"
@@ -479,7 +484,7 @@ class ClusterTests(unittest.TestCase):
 
     def test_idle_heartbeat(self):
         interval = 2
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION, idle_heartbeat_interval=interval)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, idle_heartbeat_interval=interval, contact_points=['::1'])
         if PROTOCOL_VERSION < 3:
             cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         session = cluster.connect()
@@ -541,7 +546,7 @@ class ClusterTests(unittest.TestCase):
         self.assertTrue(Cluster.idle_heartbeat_interval)
 
         # heartbeat disabled with '0'
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION, idle_heartbeat_interval=0)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, idle_heartbeat_interval=0, contact_points=['::1'])
         self.assertEqual(cluster.idle_heartbeat_interval, 0)
         session = cluster.connect()
 
@@ -557,7 +562,7 @@ class ClusterTests(unittest.TestCase):
 
     def test_pool_management(self):
         # Ensure that in_flight and request_ids quiesce after cluster operations
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION, idle_heartbeat_interval=0)  # no idle heartbeat here, pool management is tested in test_idle_heartbeat
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, idle_heartbeat_interval=0, contact_points=['::1'])  # no idle heartbeat here, pool management is tested in test_idle_heartbeat
         session = cluster.connect()
         session2 = cluster.connect()
 

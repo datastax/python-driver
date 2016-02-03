@@ -71,7 +71,8 @@ class AuthenticationTests(unittest.TestCase):
     def cluster_as(self, usr, pwd):
         return Cluster(protocol_version=PROTOCOL_VERSION,
                        idle_heartbeat_interval=0,
-                       auth_provider=self.get_authentication_provider(username=usr, password=pwd))
+                       auth_provider=self.get_authentication_provider(username=usr, password=pwd),
+                       contact_points=['::1'])
 
     def test_auth_connect(self):
         user = 'u'

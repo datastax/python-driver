@@ -35,7 +35,7 @@ class ClientWarningTests(unittest.TestCase):
         if PROTOCOL_VERSION < 4:
             return
 
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=['::1'])
         cls.session = cls.cluster.connect()
 
         cls.session.execute("CREATE TABLE IF NOT EXISTS test1rf.client_warning (k int, v0 int, v1 int, PRIMARY KEY (k, v0))")

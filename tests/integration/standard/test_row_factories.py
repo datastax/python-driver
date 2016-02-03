@@ -142,7 +142,7 @@ class NamedTupleFactoryAndNumericColNamesTests(unittest.TestCase):
     """
     @classmethod
     def setup_class(cls):
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=['::1'])
         cls.session = cls.cluster.connect()
         cls._cass_version, cls._cql_version = get_server_versions()
         ddl = '''
