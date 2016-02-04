@@ -11,6 +11,7 @@ Bug Fixes
 ---------
 * Bus error (alignment issues) when running cython on some ARM platforms (PYTHON-450)
 * Overflow when decoding large collections (cython) (PYTHON-459)
+* Crash when updating a UDT column with a None value (github #467)
 
 3.0.0
 =====

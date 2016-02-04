@@ -109,11 +109,35 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         self.assertEqual("John", john_info.name)
 
         created_user.info = User(age=22, name="Mary")
-        created_user.save()
+        created_user.update()
 
         mary_info = UserModel.objects().first().info
         self.assertEqual(22, mary_info.age)
         self.assertEqual("Mary", mary_info.name)
+
+    def test_can_update_udts_with_nones(self):
+        class User(UserType):
+            age = columns.Integer()
+            name = columns.Text()
+
+        class UserModel(Model):
+            id = columns.Integer(primary_key=True)
+            info = columns.UserDefinedType(User)
+
+        sync_table(UserModel)
+
+        user = User(age=42, name="John")
+        created_user = UserModel.create(id=0, info=user)
+
+        john_info = UserModel.objects().first().info
+        self.assertEqual(42, john_info.age)
+        self.assertEqual("John", john_info.name)
+
+        created_user.info = None
+        created_user.update()
+
+        john_info = UserModel.objects().first().info
+        self.assertIsNone(john_info)
 
     def test_can_create_same_udt_different_keyspaces(self):
         class User(UserType):
