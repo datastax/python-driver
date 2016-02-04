@@ -18,7 +18,7 @@ import logging
 import six
 
 from cassandra import util
-from cassandra.cqltypes import DateType, SimpleDateType
+from cassandra.cqltypes import SimpleDateType
 from cassandra.cqlengine import ValidationError
 from cassandra.cqlengine.functions import get_total_seconds
 
@@ -435,10 +435,8 @@ class DateTime(Column):
             return value
         elif isinstance(value, date):
             return datetime(*(value.timetuple()[:6]))
-        try:
-            return datetime.utcfromtimestamp(value)
-        except TypeError:
-            return datetime.utcfromtimestamp(DateType.deserialize(value))
+
+        return datetime.utcfromtimestamp(value)
 
     def to_database(self, value):
         value = super(DateTime, self).to_database(value)
