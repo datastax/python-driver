@@ -17,8 +17,12 @@ try:
 except ImportError:
     import unittest  # noqa
 
+import logging
+import os
 import socket
-import os, six, time, sys, logging, traceback
+import sys
+import time
+import traceback
 from threading import Event
 from subprocess import call
 from itertools import groupby
@@ -147,9 +151,9 @@ lessthancass30 = unittest.skipUnless(CASSANDRA_VERSION < '3.0', 'Cassandra versi
 def wait_for_node_socket(node, timeout):
     binary_itf = node.network_interfaces['binary']
     if not common.check_socket_listening(binary_itf, timeout=timeout):
-        print("Unable to connect to binary socket for node"+str(node))
+        log.warn("Unable to connect to binary socket for node " + node.name)
     else:
-        print("Node is up and listening "+str(node))
+        log.debug("Node %s is up and listening " % (node.name,))
 
 
 def check_socket_listening(itf, timeout=60):
@@ -267,13 +271,13 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True):
         if start:
             log.debug("Starting CCM cluster: {0}".format(cluster_name))
             CCM_CLUSTER.start(wait_for_binary_proto=True, wait_other_notice=True, jvm_args=jvm_args)
-            #Added to wait for slow nodes to start up
+            # Added to wait for slow nodes to start up
             for node in CCM_CLUSTER.nodes.values():
                 wait_for_node_socket(node, 120)
             setup_keyspace(ipformat=ipformat)
     except Exception:
         log.exception("Failed to start CCM cluster; removing cluster.")
-        
+
         if os.name == "nt":
             if CCM_CLUSTER:
                 for node in CCM_CLUSTER.nodes.itervalues():
@@ -588,5 +592,3 @@ class BasicExistingSegregatedKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):
 
     def tearDown(self):
         self.cluster.shutdown()
-
-
