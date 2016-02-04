@@ -322,29 +322,49 @@ On OSX, via homebrew:
                 sys.stderr.write("Failed to cythonize one or more modules. These will not be compiled as extensions (optional).\n")
 
 
-def precheck_compiler():
+def pre_build_check():
     """
     Try to verify build tools
     """
+    if os.environ.get('CASS_DRIVER_NO_PRE_BUILD_CHECK'):
+        return True
+
     try:
         from distutils.ccompiler import new_compiler
         from distutils.sysconfig import customize_compiler
         from distutils.dist import Distribution
-        from distutils.spawn import find_executable
 
         # base build_ext just to emulate compiler option setup
         be = build_ext(Distribution())
         be.initialize_options()
         be.finalize_options()
 
+        # First, make sure we have a Python include directory
+        have_python_include = any(os.path.isfile(os.path.join(p, 'Python.h')) for p in be.include_dirs)
+        if not have_python_include:
+            sys.stderr.write("Did not find 'Python.h' in %s.\n" % (be.include_dirs,))
+            return False
+
         compiler = new_compiler(compiler=be.compiler)
         customize_compiler(compiler)
+
+        executables = []
         if compiler.compiler_type in ('unix', 'cygwin'):
-            return all(find_executable(compiler.executables[exe][0]) for exe in ('compiler_so', 'linker_so'))
+            executables = [compiler.executables[exe][0] for exe in ('compiler_so', 'linker_so')]
         elif compiler.compiler_type == 'nt':
-            return all(find_executable(getattr(compiler, exe)) for exe in ('cc', 'linker'))
-    except Exception:
-        raise
+            executables = [getattr(compiler, exe) for exe in ('cc', 'linker')]
+
+        if executables:
+            from distutils.spawn import find_executable
+            for exe in executables:
+                if not find_executable(exe):
+                    sys.stderr.write("Failed to find %s for compiler type %s.\n" % (exe, compiler.compiler_type))
+                    return False
+
+    except Exception as exc:
+        sys.stderr.write('%s\n' % str(exc))
+        sys.stderr.write("Failed pre-build check. Attempting anyway.\n")
+
     # if we are unable to positively id the compiler type, or one of these assumptions fails,
     # just proceed as we would have without the check
     return True
@@ -362,12 +382,15 @@ def run_setup(extensions):
     kw['cmdclass']['build_ext'] = build_extensions
     kw['ext_modules'] = [Extension('DUMMY', [])]  # dummy extension makes sure build_ext is called for install
 
-    # precheck compiler before adding to setup_requires
-    # we don't actually negate try_cython because:
-    # 1.) build_ext eats errors at compile time, letting the install complete while producing useful feedback
-    # 2.) there could be a case where the python environment has cython installed but the system doesn't have build tools
-    if try_cython and precheck_compiler():
-        kw['setup_requires'] = ['Cython>=0.20']
+    if try_cython:
+        # precheck compiler before adding to setup_requires
+        # we don't actually negate try_cython because:
+        # 1.) build_ext eats errors at compile time, letting the install complete while producing useful feedback
+        # 2.) there could be a case where the python environment has cython installed but the system doesn't have build tools
+        if pre_build_check():
+            kw['setup_requires'] = ['Cython>=0.20']
+        else:
+            sys.stderr.write("Bypassing Cython setup requirement\n")
 
     dependencies = ['six >=1.6']
 
