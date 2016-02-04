@@ -171,7 +171,6 @@ Some optional C extensions are not supported in PyPy. Only murmur3 will be built
 =================================================================================
 """
 
-
 is_windows = os.name == 'nt'
 
 is_pypy = "PyPy" in sys.version
@@ -323,6 +322,34 @@ On OSX, via homebrew:
                 sys.stderr.write("Failed to cythonize one or more modules. These will not be compiled as extensions (optional).\n")
 
 
+def precheck_compiler():
+    """
+    Try to verify build tools
+    """
+    try:
+        from distutils.ccompiler import new_compiler
+        from distutils.sysconfig import customize_compiler
+        from distutils.dist import Distribution
+        from distutils.spawn import find_executable
+
+        # base build_ext just to emulate compiler option setup
+        be = build_ext(Distribution())
+        be.initialize_options()
+        be.finalize_options()
+
+        compiler = new_compiler(compiler=be.compiler)
+        customize_compiler(compiler)
+        if compiler.compiler_type in ('unix', 'cygwin'):
+            return all(find_executable(compiler.executables[exe][0]) for exe in ('compiler_so', 'linker_so'))
+        elif compiler.compiler_type == 'nt':
+            return all(find_executable(getattr(compiler, exe)) for exe in ('cc', 'linker'))
+    except Exception:
+        raise
+    # if we are unable to positively id the compiler type, or one of these assumptions fails,
+    # just proceed as we would have without the check
+    return True
+
+
 def run_setup(extensions):
 
     kw = {'cmdclass': {'doc': DocCommand}}
@@ -335,7 +362,11 @@ def run_setup(extensions):
     kw['cmdclass']['build_ext'] = build_extensions
     kw['ext_modules'] = [Extension('DUMMY', [])]  # dummy extension makes sure build_ext is called for install
 
-    if try_cython:
+    # precheck compiler before adding to setup_requires
+    # we don't actually negate try_cython because:
+    # 1.) build_ext eats errors at compile time, letting the install complete while producing useful feedback
+    # 2.) there could be a case where the python environment has cython installed but the system doesn't have build tools
+    if try_cython and precheck_compiler():
         kw['setup_requires'] = ['Cython>=0.20']
 
     dependencies = ['six >=1.6']
