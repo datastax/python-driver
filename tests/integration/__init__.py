@@ -175,16 +175,16 @@ def get_node(node_id):
     return CCM_CLUSTER.nodes['node%s' % node_id]
 
 
-def use_multidc(dc_list):
-    use_cluster(MULTIDC_CLUSTER_NAME, dc_list, start=True)
+def use_multidc(dc_list, workloads=[]):
+    use_cluster(MULTIDC_CLUSTER_NAME, dc_list, start=True, workloads=workloads)
 
 
-def use_singledc(start=True):
-    use_cluster(CLUSTER_NAME, [3], start=start)
+def use_singledc(start=True, workloads=[]):
+    use_cluster(CLUSTER_NAME, [3], start=start, workloads=workloads)
 
 
-def use_single_node(start=True):
-    use_cluster(SINGLE_NODE_CLUSTER_NAME, [1], start=start)
+def use_single_node(start=True, workloads=[]):
+    use_cluster(SINGLE_NODE_CLUSTER_NAME, [1], start=start, workloads=workloads)
 
 
 def remove_cluster():
@@ -219,7 +219,7 @@ def is_current_cluster(cluster_name, node_counts):
     return False
 
 
-def use_cluster(cluster_name, nodes, ipformat=None, start=True):
+def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[]):
     global CCM_CLUSTER
     if USE_CASS_EXTERNAL:
         if CCM_CLUSTER:
@@ -265,6 +265,9 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True):
             jvm_args = [" -Dcassandra.custom_query_handler_class=org.apache.cassandra.cql3.CustomPayloadMirroringQueryHandler"]
 
         if start:
+            if(len(workloads) > 0):
+                for node in CCM_CLUSTER.nodes.values():
+                    node.set_workloads(workloads)
             log.debug("Starting CCM cluster: {0}".format(cluster_name))
             CCM_CLUSTER.start(wait_for_binary_proto=True, wait_other_notice=True, jvm_args=jvm_args)
             #Added to wait for slow nodes to start up
