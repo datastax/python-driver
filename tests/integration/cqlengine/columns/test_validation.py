@@ -99,6 +99,12 @@ class TestDatetime(BaseCassEngTestCase):
         dt2 = self.DatetimeTest.objects(test_id=2).first()
         assert dt2.created_at == datetime.utcfromtimestamp(dt_value)
 
+    def test_datetime_large(self):
+        dt_value = datetime(2038, 12, 31, 10, 10, 10, 123000)
+        self.DatetimeTest.objects.create(test_id=2, created_at=dt_value)
+        dt2 = self.DatetimeTest.objects(test_id=2).first()
+        assert dt2.created_at == dt_value
+
 
 class TestBoolDefault(BaseCassEngTestCase):
     class BoolDefaultValueTest(Model):

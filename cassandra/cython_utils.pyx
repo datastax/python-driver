@@ -35,10 +35,19 @@ from cassandra.util import is_little_endian
 
 import_datetime()
 
+DEF DAY_IN_US = 86400000000
+DEF SECOND_IN_US = 1000000
+
 DATETIME_EPOC = datetime.datetime(1970, 1, 1)
 
 
-cdef datetime_from_timestamp(double timestamp):
-    cdef int seconds = <int> timestamp
-    cdef int microseconds = (<int64_t> (timestamp * 1000000)) % 1000000
-    return DATETIME_EPOC + timedelta_new(0, seconds, microseconds)
+cdef datetime_from_timestamp_in_us(int64_t timestamp_in_us):
+    cdef int days = <int> (timestamp_in_us / DAY_IN_US)
+    cdef int64_t days_in_us = ((<int64_t> days) * DAY_IN_US)
+
+    cdef int seconds = <int> ((timestamp_in_us - days_in_us) / SECOND_IN_US)
+    cdef int64_t seconds_in_us = ((<int64_t> seconds) * SECOND_IN_US)
+
+    cdef int microseconds = <int> ((timestamp_in_us - days_in_us - seconds_in_us))
+
+    return DATETIME_EPOC + timedelta_new(days, seconds, microseconds)
