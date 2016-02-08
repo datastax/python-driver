@@ -788,10 +788,10 @@ class Map(BaseContainerColumn):
 class UDTValueManager(BaseValueManager):
     @property
     def changed(self):
-        return self.value != self.previous_value or (None != self.value and self.value.has_changed_fields())
+        return self.value != self.previous_value or (self.value is not None and self.value.has_changed_fields())
 
     def reset_previous_value(self):
-        if None != self.value:
+        if self.value is not None:
             self.value.reset_changed_fields()
         self.previous_value = copy(self.value)
 
