@@ -36,6 +36,8 @@ class TimeUtilTest(unittest.TestCase):
 
         self.assertEqual(util.datetime_from_timestamp(0.123456), datetime.datetime(1970, 1, 1, 0, 0, 0, 123456))
 
+        self.assertEqual(util.datetime_from_timestamp(2177403010.123456), datetime.datetime(2038, 12, 31, 10, 10, 10, 123456))
+
     def test_times_from_uuid1(self):
         node = uuid.getnode()
         now = time.time()
