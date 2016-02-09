@@ -27,36 +27,21 @@ from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
 from cassandra.cluster import Cluster
 from cassandra.policies import HostDistance
 
-import nose
-from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, greaterthanprotocolv3, ParseArguments, test_args
+from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, greaterthanprotocolv3, CONTACT_POINTS, IP_FORMAT
 
 import time
 import re
-if __name__ == '__main__':
-    nose.main(addplugins=[test_args()])
 
 def setup_module():
     use_singledc()
-    print "Done setting up a singledc"
     global CASS_SERVER_VERSION
 
-    args = ParseArguments().args()
-
-    print "Setup Module"
-    print args
-
-    if args.ipv6:
-        CASS_SERVER_VERSION = get_server_versions(["::1"])[0]
-    else:
-        CASS_SERVER_VERSION = get_server_versions()[0]
-    print "Done getting server version"
+    CASS_SERVER_VERSION = get_server_versions()[0]
 
 
 class QueryTests(BasicSharedKeyspaceUnitTestCase):
 
     def test_query(self):
-
-        print "Entering test query"
         prepared = self.session.prepare(
             """
             INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
@@ -147,7 +132,12 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         client_ip = trace.client
 
         # Ip address should be in the local_host range
-        pat = re.compile("127.0.0.\d{1,3}")
+        if os.environ.get("IP") == "IPV6":
+            pat = re.compile("::\d{1,3}")
+
+        else:
+            pat = re.compile("127.0.0.\d{1,3}")
+
 
         # Ensure that ip is set
         self.assertIsNotNone(client_ip, "Client IP was not set in trace with C* >= 2.2")
@@ -177,11 +167,13 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
 
         self.assertEqual(len(response_future._query_traces), 1)
         trace = response_future._query_traces[0]
+
         self.assertTrue(self._wait_for_trace_to_populate(trace.trace_id))
 
         # Delete trace duration from the session (this is what the driver polls for "complete")
         delete_statement = SimpleStatement("DELETE duration FROM system_traces.sessions WHERE session_id = {}".format(trace.trace_id), consistency_level=ConsistencyLevel.ALL)
         self.session.execute(delete_statement)
+
         self.assertTrue(self._wait_for_trace_to_delete(trace.trace_id))
 
         # should raise because duration is not set
@@ -248,7 +240,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
 class PreparedStatementTests(unittest.TestCase):
 
     def setUp(self):
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         self.session = self.cluster.connect()
 
     def tearDown(self):
@@ -348,7 +340,8 @@ class PrintStatementTests(unittest.TestCase):
         Highlight the difference between Prepared and Bound statements
         """
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
+
         session = cluster.connect()
 
         prepared = session.prepare('INSERT INTO test3rf.test (k, v) VALUES (?, ?)')
@@ -372,7 +365,8 @@ class BatchStatementTests(BasicSharedKeyspaceUnitTestCase):
                 "Protocol 2.0+ is required for BATCH operations, currently testing against %r"
                 % (PROTOCOL_VERSION,))
 
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
+
         if PROTOCOL_VERSION < 3:
             self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         self.session = self.cluster.connect()
@@ -488,7 +482,8 @@ class SerialConsistencyTests(unittest.TestCase):
                 "Protocol 2.0+ is required for Serial Consistency, currently testing against %r"
                 % (PROTOCOL_VERSION,))
 
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
+
         if PROTOCOL_VERSION < 3:
             self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         self.session = self.cluster.connect()
@@ -579,7 +574,7 @@ class LightweightTransactionTests(unittest.TestCase):
                 "Protocol 2.0+ is required for Lightweight transactions, currently testing against %r"
                 % (PROTOCOL_VERSION,))
 
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         self.session = self.cluster.connect()
 
         ddl = '''
@@ -647,7 +642,8 @@ class BatchStatementDefaultRoutingKeyTests(unittest.TestCase):
             raise unittest.SkipTest(
                 "Protocol 2.0+ is required for BATCH operations, currently testing against %r"
                 % (PROTOCOL_VERSION,))
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         self.session = self.cluster.connect()
         query = """
                 INSERT INTO test3rf.test (k, v) VALUES  (?, ?)

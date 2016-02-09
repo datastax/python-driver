@@ -22,8 +22,6 @@ from threading import Event
 from subprocess import call
 from itertools import groupby
 
-from nose.plugins import Plugin
-import nose
 
 from cassandra import OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure, AlreadyExists
 from cassandra.cluster import Cluster
@@ -52,9 +50,17 @@ if not os.path.exists(path):
 cass_version = None
 cql_version = None
 
+if os.environ.get('IP') == "IPV6":
+    CONTACT_POINTS = ["::1"]
+    IP_FORMAT = "::%d"
+    print "Yooooo"
+else:
+    CONTACT_POINTS = ["127.0.0.1"]
+    IP_FORMAT = "127.0.0.%d"
+    print "Noooo"
 
 
-def get_server_versions(contact_points=None):
+def get_server_versions():
     """
     Probe system.local table to determine Cassandra and CQL version.
     Returns a tuple of (cassandra_version, cql_version).
@@ -64,7 +70,7 @@ def get_server_versions(contact_points=None):
     if cass_version is not None:
         return (cass_version, cql_version)
 
-    c = Cluster(contact_points)
+    c = Cluster(CONTACT_POINTS)
     s = c.connect()
     row = s.execute('SELECT cql_version, release_version FROM system.local')[0]
 
@@ -183,9 +189,8 @@ def use_multidc(dc_list, workloads=[]):
     use_cluster(MULTIDC_CLUSTER_NAME, dc_list, start=True, workloads=workloads)
 
 
-def use_singledc(start=True, workloads=[]):
-    use_cluster(CLUSTER_NAME, [3], start=start, workloads=workloads)
-
+def use_singledc(start=True):
+    use_cluster(CLUSTER_NAME, [3], start=start, ipformat=IP_FORMAT,  workloads=[])
 
 def use_single_node(start=True, workloads=[]):
     use_cluster(SINGLE_NODE_CLUSTER_NAME, [1], start=start, workloads=workloads)
@@ -261,8 +266,8 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[]):
                 if CASSANDRA_VERSION >= '3.0':
                     CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
             common.switch_cluster(path, cluster_name)
-            print "POPULATE"
-            CCM_CLUSTER.populate(nodes, ipformat=ipformat)
+
+            CCM_CLUSTER.populate(nodes, ipformat=IP_FORMAT)
     try:
         jvm_args = [""]
         # This will enable the Mirroring query handler which will echo our custom payload k,v pairs back
@@ -280,8 +285,8 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[]):
             for node in CCM_CLUSTER.nodes.values():
                 wait_for_node_socket(node, 120)
 
-            setup_keyspace(ipformat=ipformat)
-            print "Done setting up keyspace"
+            setup_keyspace(ipformat=IP_FORMAT)
+
     except Exception:
         log.exception("Failed to start CCM cluster; removing cluster.")
 
@@ -366,14 +371,7 @@ def setup_keyspace(ipformat=None):
     # wait for nodes to startup
     time.sleep(10)
 
-    print ipformat
-    if not ipformat:
-        print "NOT IPFORMAT"
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-    else:
-        print "IS IPFORMAT"
-        cluster = Cluster(contact_points=["::1"], protocol_version=PROTOCOL_VERSION)
-        print "DONE"
+    cluster = Cluster(contact_points=CONTACT_POINTS, protocol_version=PROTOCOL_VERSION)
     session = cluster.connect()
 
     try:
@@ -429,36 +427,6 @@ class UpDownWaiter(object):
         self.up_event.wait()
 
 
-# class MetaInit(type):
-    # def __call__(cls,):
-    #     return cls.__new__(cls)
-
-
-class ParseArguments:
-    def args(self):
-        parser = argparse.ArgumentParser()
-        parser.add_argument('--ipv6', action='store_true')
-        args, unknown = parser.parse_known_args()
-        print args
-        print args.ipv6
-        print "YSNSSNSNSNS"
-        return args
-
-
-class test_args(Plugin):
-    name = 'test_args'
-    enabled = True
-
-    def options(self, parser, env=os.environ):
-
-        super(test_args, self).options(parser, env)
-        parser.add_option('--ipv6',
-                    action='store_true')
-
-    def configure(self, options, conf):
-        global case_options
-        case_options = options
-
 
 class BasicKeyspaceUnitTestCase(unittest.TestCase):
     """
@@ -488,17 +456,14 @@ class BasicKeyspaceUnitTestCase(unittest.TestCase):
 
     @classmethod
     def create_keyspace(cls, rf):
-        print "CREATE KEYSPACEEEEE"
         ddl = "CREATE KEYSPACE {0} WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': '{1}'}}".format(cls.ks_name, rf)
         execute_with_long_wait_retry(cls.session, ddl)
 
     @classmethod
     def common_setup(cls, rf, keyspace_creation=True, create_class_table=False):
-        print "AYYY LMAO"
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=["::1"])
-        print "CREATED CLUSTER"
+
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         cls.session = cls.cluster.connect()
-        print "CONNECTEDDD"
         cls.ks_name = cls.__name__.lower()
         if keyspace_creation:
             cls.create_keyspace(rf)
@@ -530,7 +495,6 @@ class BasicExistingKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):
     """
     @classmethod
     def setUpClass(cls):
-        print "YOYOYOYO"
         cls.common_setup(1, keyspace_creation=False)
 
     @classmethod
@@ -545,7 +509,6 @@ class BasicSharedKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):
     """
     @classmethod
     def setUpClass(cls):
-        print "Ayyyy"
         cls.common_setup(1)
 
     @classmethod
@@ -598,6 +561,7 @@ class BasicSharedKeyspaceUnitTestCaseRF3WTable(BasicSharedKeyspaceUnitTestCase):
     This is basic unit test case that can be leveraged to scope a keyspace to a specific test class.
     creates a keyspace named after the test class with a rf of 3 and a table named after the class
     """
+
     @classmethod
     def setUpClass(self):
         self.common_setup(3, True)
