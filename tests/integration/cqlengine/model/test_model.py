@@ -16,7 +16,9 @@ try:
 except ImportError:
     import unittest  # noqa
 
-from cassandra.cqlengine import columns
+from mock import patch
+
+from cassandra.cqlengine import columns, CQLEngineException
 from cassandra.cqlengine.management import sync_table, drop_table, create_keyspace_simple, drop_keyspace
 from cassandra.cqlengine.models import Model, ModelDefinitionException
 
@@ -104,6 +106,25 @@ class TestModel(unittest.TestCase):
         self.assertEqual(created.where, selected.where)
 
         drop_keyspace('keyspace')
+
+    def test_column_family(self):
+        class TestModel(Model):
+            k = columns.Integer(primary_key=True)
+
+        from cassandra.cqlengine import models
+        # no model keyspace uses default
+        self.assertEqual(TestModel.column_family_name(), "%s.test_model" % (models.DEFAULT_KEYSPACE,))
+
+        # model keyspace overrides
+        TestModel.__keyspace__ = "my_test_keyspace"
+        self.assertEqual(TestModel.column_family_name(), "%s.test_model" % (TestModel.__keyspace__,))
+
+        # neither set should raise CQLEngineException before failing or formatting an invalid name
+        del TestModel.__keyspace__
+        with patch('cassandra.cqlengine.models.DEFAULT_KEYSPACE', None):
+            self.assertRaises(CQLEngineException, TestModel.column_family_name)
+            # .. but we can still get the bare CF name
+            self.assertEqual(TestModel.column_family_name(include_keyspace=False), "test_model")
 
 
 class BuiltInAttributeConflictTest(unittest.TestCase):
