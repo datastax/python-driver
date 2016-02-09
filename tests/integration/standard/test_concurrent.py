@@ -23,7 +23,7 @@ from cassandra.concurrent import execute_concurrent, execute_concurrent_with_arg
 from cassandra.policies import HostDistance
 from cassandra.query import tuple_factory, SimpleStatement
 
-from tests.integration import use_singledc, PROTOCOL_VERSION
+from tests.integration import use_singledc, PROTOCOL_VERSION, CONTACT_POINTS
 
 from six import next
 
@@ -43,7 +43,7 @@ class ClusterTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         if PROTOCOL_VERSION < 3:
             cls.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         cls.session = cls.cluster.connect()

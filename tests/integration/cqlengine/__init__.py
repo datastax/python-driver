@@ -19,7 +19,7 @@ from cassandra import ConsistencyLevel
 from cassandra.cqlengine import connection
 from cassandra.cqlengine.management import create_keyspace_simple, CQLENG_ALLOW_SCHEMA_MANAGEMENT
 
-from tests.integration import get_server_versions, use_single_node, PROTOCOL_VERSION
+from tests.integration import get_server_versions, use_single_node, PROTOCOL_VERSION, CONTACT_POINTS
 DEFAULT_KEYSPACE = 'cqlengine_test'
 
 
@@ -39,7 +39,7 @@ def is_prepend_reversed():
     return not (ver >= (2, 0, 13) or ver >= (2, 1, 3))
 
 def setup_connection(keyspace_name):
-    connection.setup(['127.0.0.1'],
+    connection.setup(CONTACT_POINTS,
                      consistency=ConsistencyLevel.ONE,
                      protocol_version=PROTOCOL_VERSION,
                      default_keyspace=keyspace_name)

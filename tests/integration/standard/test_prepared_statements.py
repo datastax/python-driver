@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from tests.integration import use_singledc, PROTOCOL_VERSION
+from tests.integration import use_singledc, PROTOCOL_VERSION, CONTACT_POINTS
 
 try:
     import unittest2 as unittest
@@ -38,7 +38,7 @@ class PreparedStatementTests(unittest.TestCase):
         cls.cass_version = get_server_versions()
 
     def setUp(self):
-        self.cluster = Cluster(metrics_enabled=True, protocol_version=PROTOCOL_VERSION)
+        self.cluster = Cluster(metrics_enabled=True, protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         self.session = self.cluster.connect()
 
     def tearDown(self):

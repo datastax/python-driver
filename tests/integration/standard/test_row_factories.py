@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests.integration import get_server_versions, use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCaseWFunctionTable
+from tests.integration import get_server_versions, use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCaseWFunctionTable, CONTACT_POINTS
 
 try:
     import unittest2 as unittest
@@ -142,7 +142,7 @@ class NamedTupleFactoryAndNumericColNamesTests(unittest.TestCase):
     """
     @classmethod
     def setup_class(cls):
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=['::1'])
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         cls.session = cls.cluster.connect()
         cls._cass_version, cls._cql_version = get_server_versions()
         ddl = '''

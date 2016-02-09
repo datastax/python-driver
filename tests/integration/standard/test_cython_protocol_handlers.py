@@ -11,7 +11,7 @@ from cassandra.query import tuple_factory
 from cassandra.cluster import Cluster
 from cassandra.protocol import ProtocolHandler, LazyProtocolHandler, NumpyProtocolHandler
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, notprotocolv1, drop_keyspace_shutdown_cluster
+from tests.integration import use_singledc, PROTOCOL_VERSION, notprotocolv1, drop_keyspace_shutdown_cluster, CONTACT_POINTS
 from tests.integration.datatype_utils import update_datatypes
 from tests.integration.standard.utils import (
     create_table_with_all_types, get_all_primitive_params, get_primitive_datatypes)
@@ -30,7 +30,7 @@ class CythonProtocolHandlerTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         cls.session = cls.cluster.connect()
         cls.session.execute("CREATE KEYSPACE testspace WITH replication = "
                             "{ 'class' : 'SimpleStrategy', 'replication_factor': '1'}")
@@ -62,7 +62,7 @@ class CythonProtocolHandlerTest(unittest.TestCase):
         Test Cython-based parser that returns an iterator, over multiple pages
         """
         # arrays = { 'a': arr1, 'b': arr2, ... }
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         session = cluster.connect(keyspace="testspace")
         session.row_factory = tuple_factory
         session.client_protocol_handler = LazyProtocolHandler
@@ -95,7 +95,7 @@ class CythonProtocolHandlerTest(unittest.TestCase):
         Test Numpy-based parser that returns a NumPy array
         """
         # arrays = { 'a': arr1, 'b': arr2, ... }
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         session = cluster.connect(keyspace="testspace")
         session.row_factory = tuple_factory
         session.client_protocol_handler = NumpyProtocolHandler
@@ -163,7 +163,7 @@ def get_data(protocol_handler):
     """
     Get data from the test table.
     """
-    cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+    cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
     session = cluster.connect(keyspace="testspace")
 
     # use our custom protocol handler

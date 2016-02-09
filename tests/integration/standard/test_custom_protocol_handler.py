@@ -20,7 +20,7 @@ except ImportError:
 from cassandra.protocol import ProtocolHandler, ResultMessage, UUIDType, read_int, EventMessage
 from cassandra.query import tuple_factory
 from cassandra.cluster import Cluster
-from tests.integration import use_singledc, PROTOCOL_VERSION, drop_keyspace_shutdown_cluster
+from tests.integration import use_singledc, PROTOCOL_VERSION, drop_keyspace_shutdown_cluster, CONTACT_POINTS
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES
 from tests.integration.standard.utils import create_table_with_all_types, get_all_primitive_params
 from six import binary_type
@@ -37,7 +37,7 @@ class CustomProtocolHandlerTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         cls.session = cls.cluster.connect()
         cls.session.execute("CREATE KEYSPACE custserdes WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}")
         cls.session.set_keyspace("custserdes")
@@ -62,7 +62,7 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         """
 
         # Ensure that we get normal uuid back first
-        session = Cluster(protocol_version=PROTOCOL_VERSION).connect(keyspace="custserdes")
+        session = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS).connect(keyspace="custserdes")
         session.row_factory = tuple_factory
         result = session.execute("SELECT schema_version FROM system.local")
         uuid_type = result[0][0]
@@ -99,7 +99,7 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         @test_category data_types:serialization
         """
         # Connect using a custom protocol handler that tracks the various types the result message is used with.
-        session = Cluster(protocol_version=PROTOCOL_VERSION).connect(keyspace="custserdes")
+        session = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS).connect(keyspace="custserdes")
         session.client_protocol_handler = CustomProtocolHandlerResultMessageTracked
         session.row_factory = tuple_factory
 

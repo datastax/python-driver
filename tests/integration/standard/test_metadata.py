@@ -34,7 +34,7 @@ from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
 from tests.integration import get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass, \
-    BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster
+    BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster, CONTACT_POINTS
 
 from tests.unit.cython.utils import notcython
 
@@ -407,7 +407,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         @test_category metadata
         """
 
-        cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
+        cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS, schema_event_refresh_window=-1)
         cluster2.connect()
 
         self.assertNotIn("new_keyspace", cluster2.metadata.keyspaces)
@@ -490,7 +490,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         @test_category metadata
         """
 
-        cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
+        cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS, schema_event_refresh_window=-1)
         cluster2.connect()
 
         self.assertTrue(cluster2.metadata.keyspaces[self.keyspace_name].durable_writes)
@@ -521,7 +521,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         table_name = "test"
         self.session.execute("CREATE TABLE {0}.{1} (a int PRIMARY KEY, b text)".format(self.keyspace_name, table_name))
 
-        cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
+        cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS, schema_event_refresh_window=-1)
         cluster2.connect()
 
         self.assertNotIn("c", cluster2.metadata.keyspaces[self.keyspace_name].tables[table_name].columns)
@@ -557,7 +557,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         self.session.execute("CREATE TABLE {0}.{1} (a int PRIMARY KEY, b text)".format(self.keyspace_name, self.function_table_name))
 
-        cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
+        cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS, schema_event_refresh_window=-1)
         cluster2.connect()
 
         try:
@@ -580,7 +580,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertIsNot(original_meta, self.session.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views['mv1'])
         self.assertEqual(original_meta.as_cql_query(), current_meta.as_cql_query())
 
-        cluster3 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
+        cluster3 = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS, schema_event_refresh_window=-1)
         cluster3.connect()
         try:
             self.assertNotIn("mv2", cluster3.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
@@ -612,7 +612,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         if PROTOCOL_VERSION < 3:
             raise unittest.SkipTest("Protocol 3+ is required for UDTs, currently testing against {0}".format(PROTOCOL_VERSION))
 
-        cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
+        cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS, schema_event_refresh_window=-1)
         cluster2.connect()
 
         self.assertEqual(cluster2.metadata.keyspaces[self.keyspace_name].user_types, {})
@@ -645,7 +645,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         if PROTOCOL_VERSION < 4:
             raise unittest.SkipTest("Protocol 4+ is required for UDFs, currently testing against {0}".format(PROTOCOL_VERSION))
 
-        cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
+        cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS, schema_event_refresh_window=-1)
         cluster2.connect()
 
         self.assertEqual(cluster2.metadata.keyspaces[self.keyspace_name].functions, {})
@@ -681,7 +681,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         if PROTOCOL_VERSION < 4:
             raise unittest.SkipTest("Protocol 4+ is required for UDAs, currently testing against {0}".format(PROTOCOL_VERSION))
 
-        cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
+        cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS, schema_event_refresh_window=-1)
         cluster2.connect()
 
         self.assertEqual(cluster2.metadata.keyspaces[self.keyspace_name].aggregates, {})
@@ -744,7 +744,7 @@ class TestCodeCoverage(unittest.TestCase):
         Test export schema functionality
         """
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         cluster.connect()
 
         self.assertIsInstance(cluster.metadata.export_schema_as_string(), six.string_types)
@@ -754,7 +754,7 @@ class TestCodeCoverage(unittest.TestCase):
         Test export keyspace schema functionality
         """
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         cluster.connect()
 
         for keyspace in cluster.metadata.keyspaces:
@@ -796,7 +796,7 @@ class TestCodeCoverage(unittest.TestCase):
         if sys.version_info[0:2] != (2, 7):
             raise unittest.SkipTest('This test compares static strings generated from dict items, which may change orders. Test with 2.7.')
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         session = cluster.connect()
 
         session.execute("""
@@ -863,7 +863,7 @@ CREATE TABLE export_udts.users (
         Test that names that need to be escaped in CREATE statements are
         """
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         session = cluster.connect()
 
         ksname = 'AnInterestingKeyspace'
@@ -903,7 +903,7 @@ CREATE TABLE export_udts.users (
         Ensure AlreadyExists exception is thrown when hit
         """
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         session = cluster.connect()
 
         ksname = 'test3rf'
@@ -928,7 +928,7 @@ CREATE TABLE export_udts.users (
         if murmur3 is None:
             raise unittest.SkipTest('the murmur3 extension is not available')
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         self.assertEqual(cluster.metadata.get_replicas('test3rf', 'key'), [])
 
         cluster.connect('test3rf')
@@ -944,7 +944,7 @@ CREATE TABLE export_udts.users (
         Test token mappings
         """
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         cluster.connect('test3rf')
         ring = cluster.metadata.token_map.ring
         owners = list(cluster.metadata.token_map.token_to_host_owner[token] for token in ring)
@@ -1218,7 +1218,7 @@ CREATE TABLE legacy.composite_comp_no_col (
         ccm = get_cluster()
         ccm.run_cli(cli_script)
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         session = cluster.connect()
 
         legacy_meta = cluster.metadata.keyspaces['legacy']
@@ -1237,7 +1237,7 @@ class TokenMetadataTest(unittest.TestCase):
     def test_token(self):
         expected_node_count = len(get_cluster().nodes)
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         cluster.connect()
         tmap = cluster.metadata.token_map
         self.assertTrue(issubclass(tmap.token_class, Token))
@@ -1275,7 +1275,7 @@ class KeyspaceAlterMetadata(unittest.TestCase):
     Test verifies that table metadata is preserved on keyspace alter
     """
     def setUp(self):
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         self.session = self.cluster.connect()
         name = self._testMethodName.lower()
         crt_ks = '''
@@ -1320,7 +1320,7 @@ class IndexMapTests(unittest.TestCase):
 
     @classmethod
     def setup_class(cls):
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         cls.session = cls.cluster.connect()
         try:
             if cls.keyspace_name in cls.cluster.metadata.keyspaces:
@@ -1429,7 +1429,7 @@ class FunctionTest(unittest.TestCase):
     @classmethod
     def setup_class(cls):
         if PROTOCOL_VERSION >= 4:
-            cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+            cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
             cls.keyspace_name = cls.__name__.lower()
             cls.session = cls.cluster.connect()
             cls.session.execute("CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}" % cls.keyspace_name)
@@ -1707,7 +1707,7 @@ class AggregateMetadata(FunctionTest):
         """
 
         # This is required until the java driver bundled with C* is updated to support v4
-        c = Cluster(protocol_version=3)
+        c = Cluster(protocol_version=3, contact_points=CONTACT_POINTS)
         s = c.connect(self.keyspace_name)
 
         encoder = Encoder()
@@ -1891,7 +1891,7 @@ class BadMetaTest(unittest.TestCase):
 
     @classmethod
     def setup_class(cls):
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         cls.keyspace_name = cls.__name__.lower()
         cls.session = cls.cluster.connect()
         cls.session.execute("CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}" % cls.keyspace_name)
