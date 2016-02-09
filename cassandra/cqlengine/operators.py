@@ -85,15 +85,3 @@ class LessThanOperator(BaseWhereOperator):
 class LessThanOrEqualOperator(BaseWhereOperator):
     symbol = "LTE"
     cql_symbol = '<='
-
-
-class BaseAssignmentOperator(BaseQueryOperator):
-    """ base operator used for insert and delete statements """
-
-
-class AssignmentOperator(BaseAssignmentOperator):
-    cql_symbol = "="
-
-
-class AddSymbol(BaseAssignmentOperator):
-    cql_symbol = "+"
