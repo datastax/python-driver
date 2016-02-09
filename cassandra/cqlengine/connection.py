@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 import logging
 import six
 
@@ -37,7 +37,7 @@ lazy_connect_args = None
 # Because type models may be registered before a connection is present,
 # and because sessions may be replaced, we must register UDTs here, in order
 # to have them registered when a new session is established.
-udt_by_keyspace = {}
+udt_by_keyspace = defaultdict(dict)
 
 
 class UndefinedKeyspaceException(CQLEngineException):
@@ -191,10 +191,7 @@ def handle_lazy_connect():
 
 
 def register_udt(keyspace, type_name, klass):
-    try:
-        udt_by_keyspace[keyspace][type_name] = klass
-    except KeyError:
-        udt_by_keyspace[keyspace] = {type_name: klass}
+    udt_by_keyspace[keyspace][type_name] = klass
 
     global cluster
     if cluster:
@@ -205,9 +202,10 @@ def register_udt(keyspace, type_name, klass):
 
 
 def _register_known_types(cluster):
+    from cassandra.cqlengine import models
     for ks_name, name_type_map in udt_by_keyspace.items():
         for type_name, klass in name_type_map.items():
             try:
-                cluster.register_user_type(ks_name, type_name, klass)
+                cluster.register_user_type(ks_name or models.DEFAULT_KEYSPACE, type_name, klass)
             except UserTypeDoesNotExist:
                 pass  # new types are covered in management sync functions
