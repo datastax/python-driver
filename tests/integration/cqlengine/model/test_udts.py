@@ -18,6 +18,7 @@ except ImportError:
 
 from datetime import datetime, date, time
 from decimal import Decimal
+from mock import Mock
 from uuid import UUID, uuid4
 
 from cassandra.cqlengine.models import Model
@@ -426,4 +427,21 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         UserModelText.create(id=unicode_name, info=user_template_ascii)
         UserModelText.create(id=unicode_name, info=user_template_unicode)
 
+    def test_register_default_keyspace(self):
+        class User(UserType):
+            age = columns.Integer()
+            name = columns.Text()
 
+        from cassandra.cqlengine import models
+        from cassandra.cqlengine import connection
+
+        # None emulating no model and no default keyspace before connecting
+        connection.udt_by_keyspace.clear()
+        User.register_for_keyspace(None)
+        self.assertEqual(len(connection.udt_by_keyspace), 1)
+        self.assertIn(None, connection.udt_by_keyspace)
+
+        # register should be with default keyspace, not None
+        cluster = Mock()
+        connection._register_known_types(cluster)
+        cluster.register_user_type.assert_called_with(models.DEFAULT_KEYSPACE, User.type_name(), User)
