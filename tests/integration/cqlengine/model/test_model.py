@@ -20,6 +20,7 @@ from mock import patch
 
 from cassandra.cqlengine import columns, CQLEngineException
 from cassandra.cqlengine.management import sync_table, drop_table, create_keyspace_simple, drop_keyspace
+from cassandra.cqlengine import models
 from cassandra.cqlengine.models import Model, ModelDefinitionException
 
 
@@ -111,7 +112,6 @@ class TestModel(unittest.TestCase):
         class TestModel(Model):
             k = columns.Integer(primary_key=True)
 
-        from cassandra.cqlengine import models
         # no model keyspace uses default
         self.assertEqual(TestModel.column_family_name(), "%s.test_model" % (models.DEFAULT_KEYSPACE,))
 
