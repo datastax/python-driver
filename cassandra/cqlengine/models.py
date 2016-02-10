@@ -480,7 +480,10 @@ class BaseModel(object):
         """
         cf_name = protect_name(cls._raw_column_family_name())
         if include_keyspace:
-            return '{0}.{1}'.format(protect_name(cls._get_keyspace()), cf_name)
+            keyspace = cls._get_keyspace()
+            if not keyspace:
+                raise CQLEngineException("Model keyspace is not set and no default is available. Set model keyspace or setup connection before attempting to generate a query.")
+            return '{0}.{1}'.format(protect_name(keyspace), cf_name)
 
         return cf_name
 
