@@ -70,39 +70,39 @@ class TestDatetime(BaseCassEngTestCase):
                 return None
 
         now = datetime(1982, 1, 1, tzinfo=TZ())
-        dt = self.DatetimeTest.objects.create(test_id=0, created_at=now)
-        dt2 = self.DatetimeTest.objects(test_id=0).first()
+        dt = self.DatetimeTest.objects.create(test_id=1, created_at=now)
+        dt2 = self.DatetimeTest.objects(test_id=1).first()
         assert dt2.created_at.timetuple()[:6] == (now + timedelta(hours=1)).timetuple()[:6]
 
     def test_datetime_date_support(self):
         today = date.today()
-        self.DatetimeTest.objects.create(test_id=0, created_at=today)
-        dt2 = self.DatetimeTest.objects(test_id=0).first()
+        self.DatetimeTest.objects.create(test_id=2, created_at=today)
+        dt2 = self.DatetimeTest.objects(test_id=2).first()
         assert dt2.created_at.isoformat() == datetime(today.year, today.month, today.day).isoformat()
 
     def test_datetime_none(self):
-        dt = self.DatetimeTest.objects.create(test_id=1, created_at=None)
-        dt2 = self.DatetimeTest.objects(test_id=1).first()
+        dt = self.DatetimeTest.objects.create(test_id=3, created_at=None)
+        dt2 = self.DatetimeTest.objects(test_id=3).first()
         assert dt2.created_at is None
 
-        dts = self.DatetimeTest.objects.filter(test_id=1).values_list('created_at')
+        dts = self.DatetimeTest.objects.filter(test_id=3).values_list('created_at')
         assert dts[0][0] is None
 
     def test_datetime_invalid(self):
         dt_value= 'INVALID'
         with self.assertRaises(TypeError):
-            self.DatetimeTest.objects.create(test_id=2, created_at=dt_value)
+            self.DatetimeTest.objects.create(test_id=4, created_at=dt_value)
 
     def test_datetime_timestamp(self):
         dt_value = 1454520554
-        self.DatetimeTest.objects.create(test_id=2, created_at=dt_value)
-        dt2 = self.DatetimeTest.objects(test_id=2).first()
+        self.DatetimeTest.objects.create(test_id=5, created_at=dt_value)
+        dt2 = self.DatetimeTest.objects(test_id=5).first()
         assert dt2.created_at == datetime.utcfromtimestamp(dt_value)
 
     def test_datetime_large(self):
         dt_value = datetime(2038, 12, 31, 10, 10, 10, 123000)
-        self.DatetimeTest.objects.create(test_id=2, created_at=dt_value)
-        dt2 = self.DatetimeTest.objects(test_id=2).first()
+        self.DatetimeTest.objects.create(test_id=6, created_at=dt_value)
+        dt2 = self.DatetimeTest.objects(test_id=6).first()
         assert dt2.created_at == dt_value
 
 

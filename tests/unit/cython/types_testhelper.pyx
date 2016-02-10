@@ -18,7 +18,10 @@ import datetime
 
 include '../../../cassandra/ioutils.pyx'
 
+import io
+
 from cassandra.cqltypes import DateType
+from cassandra.protocol import write_value
 from cassandra.deserializers import find_deserializer
 from cassandra.bytesio cimport BytesIOReader
 from cassandra.buffer cimport Buffer
@@ -36,7 +39,11 @@ def test_datetype(assert_equal):
         cdef Buffer buf
 
         dt = datetime.datetime.utcfromtimestamp(timestamp)
-        reader = BytesIOReader(b'\x00\x00\x00\x08' + DateType.serialize(dt, 0))
+
+        bytes = io.BytesIO()
+        write_value(bytes, DateType.serialize(dt, 0))
+        bytes.seek(0)
+        reader = BytesIOReader(bytes.read())
         get_buf(reader, &buf)
         deserialized_dt = from_binary(des, &buf, 0)
 
