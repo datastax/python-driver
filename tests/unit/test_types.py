@@ -204,6 +204,10 @@ class TypeTests(unittest.TestCase):
         expected = 1424817268.274
         self.assertEqual(DateType.deserialize(int64_pack(int(1000 * expected)), 0), datetime.datetime(2015, 2, 24, 22, 34, 28, 274000))
 
+        # Large date overflow (PYTHON-452)
+        expected = 2177403010.123
+        self.assertEqual(DateType.deserialize(int64_pack(int(1000 * expected)), 0), datetime.datetime(2038, 12, 31, 10, 10, 10, 123000))
+
     def test_write_read_string(self):
         with tempfile.TemporaryFile() as f:
             value = u'test'
