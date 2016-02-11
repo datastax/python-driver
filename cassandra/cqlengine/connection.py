@@ -56,9 +56,8 @@ def default():
 
     cluster = Cluster()
     session = cluster.connect()
-    session.row_factory = dict_factory
 
-    _register_known_types(cluster)
+    _setup_session(session)
 
     log.debug("cqlengine connection initialized with default session to localhost")
 
@@ -85,7 +84,7 @@ def set_session(s):
     if not models.DEFAULT_KEYSPACE and session.keyspace:
         models.DEFAULT_KEYSPACE = session.keyspace
 
-    _register_known_types(cluster)
+    _setup_session(session)
 
     log.debug("cqlengine connection initialized with %s", s)
 
@@ -138,9 +137,15 @@ def setup(
         raise
     if consistency is not None:
         session.default_consistency_level = consistency
-    session.row_factory = dict_factory
 
-    _register_known_types(cluster)
+    _setup_session(session)
+
+
+def _setup_session(session):
+    session.row_factory = dict_factory
+    enc = session.encoder
+    enc.mapping[tuple] = enc.cql_encode_tuple
+    _register_known_types(session.cluster)
 
 
 def execute(query, params=None, consistency_level=None, timeout=NOT_SET):

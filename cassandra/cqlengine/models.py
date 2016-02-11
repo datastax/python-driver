@@ -814,8 +814,8 @@ class ModelMetaClass(type):
                 raise ModelDefinitionException("column '{0}' conflicts with built-in attribute/method".format(k))
 
             # counter column primary keys are not allowed
-            if (v.primary_key or v.partition_key) and isinstance(v, (columns.Counter, columns.BaseContainerColumn)):
-                raise ModelDefinitionException('counter columns and container columns cannot be used as primary keys')
+            if (v.primary_key or v.partition_key) and isinstance(v, columns.Counter):
+                raise ModelDefinitionException('counter columns cannot be used as primary keys')
 
             # this will mark the first primary key column as a partition
             # key, if one hasn't been set already

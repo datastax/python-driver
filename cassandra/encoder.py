@@ -84,7 +84,7 @@ class Encoder(object):
             OrderedMap: self.cql_encode_map_collection,
             OrderedMapSerializedKey: self.cql_encode_map_collection,
             list: self.cql_encode_list_collection,
-            tuple: self.cql_encode_list_collection,
+            tuple: self.cql_encode_list_collection,  # TODO: change to tuple in next major
             set: self.cql_encode_set_collection,
             sortedset: self.cql_encode_set_collection,
             frozenset: self.cql_encode_set_collection,
