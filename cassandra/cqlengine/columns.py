@@ -249,7 +249,7 @@ class Column(object):
         return val is None
 
     @property
-    def sub_columns(self):
+    def sub_types(self):
         return []
 
 
@@ -648,7 +648,7 @@ class BaseContainerColumn(Column):
         return not val
 
     @property
-    def sub_columns(self):
+    def sub_types(self):
         return [self.value_col]
 
 
@@ -781,7 +781,7 @@ class Map(BaseContainerColumn):
         return dict((self.key_col.to_database(k), self.value_col.to_database(v)) for k, v in value.items())
 
     @property
-    def sub_columns(self):
+    def sub_types(self):
         return [self.key_col, self.value_col]
 
 
@@ -812,7 +812,7 @@ class Tuple(Column):
         if not args:
             raise ValueError("Tuple must specify at least one inner type")
 
-        sub_types = []
+        types = []
         for arg in args:
             inheritance_comparator = issubclass if isinstance(arg, type) else isinstance
             if not inheritance_comparator(arg, Column):
@@ -820,8 +820,8 @@ class Tuple(Column):
             if arg.db_type is None:
                 raise ValidationError("%s is an abstract type" % (arg,))
 
-            sub_types.append(arg() if isinstance(arg, type) else arg)
-        self.sub_types = sub_types
+            types.append(arg() if isinstance(arg, type) else arg)
+        self.types = types
 
         super(Tuple, self).__init__(**kwargs)
 
@@ -845,11 +845,10 @@ class Tuple(Column):
         return tuple(t.to_database(v) for t, v in zip(self.sub_types, value))
 
     @property
-    def sub_columns(self):
-        return self.sub_types
+    def sub_types(self):
+        return self.types
 
 # TODO:
-# sub_columns --> sub_types
 # test UDTs in tuples, vice versa
 # refactor init validation to common base
 # cqlsh None in tuple should display as null
@@ -877,12 +876,12 @@ class UserDefinedType(Column):
         super(UserDefinedType, self).__init__(**kwargs)
 
     @property
-    def sub_columns(self):
+    def sub_types(self):
         return list(self.user_type._fields.values())
 
 
 def resolve_udts(col_def, out_list):
-    for col in col_def.sub_columns:
+    for col in col_def.sub_types:
         resolve_udts(col, out_list)
     if isinstance(col_def, UserDefinedType):
         out_list.append(col_def.user_type)
