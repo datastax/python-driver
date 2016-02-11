@@ -796,6 +796,65 @@ class UDTValueManager(BaseValueManager):
         self.previous_value = copy(self.value)
 
 
+class Tuple(Column):
+    """
+    Stores a fixed-length set of positional values
+
+    http://docs.datastax.com/en/cql/3.1/cql/cql_reference/tupleType.html
+    """
+    def __init__(self, *args, **kwargs):
+        """
+        :param args: column types representing tuple composition
+        """
+
+        self.db_type = 'tuple<{0}>'.format(', '.join(typ.db_type for typ in args))
+
+        if not args:
+            raise ValueError("Tuple must specify at least one inner type")
+
+        sub_types = []
+        for arg in args:
+            inheritance_comparator = issubclass if isinstance(arg, type) else isinstance
+            if not inheritance_comparator(arg, Column):
+                raise ValidationError("%s is not a column class" % (arg,))
+            if arg.db_type is None:
+                raise ValidationError("%s is an abstract type" % (arg,))
+
+            sub_types.append(arg() if isinstance(arg, type) else arg)
+        self.sub_types = sub_types
+
+        super(Tuple, self).__init__(**kwargs)
+
+    def validate(self, value):
+        val = super(Tuple, self).validate(value)
+        if val is None:
+            return
+        if len(val) > self.sub_types:
+            raise ValidationError("Value %r has more fields than tuple definition (%s)" %
+                                  (val, ', '.join(t for t in self.sub_types)))
+        return tuple(t.validate(v) for t, v in zip(self.sub_types, val))
+
+    def to_python(self, value):
+        if value is None:
+            return tuple()
+        return tuple(t.to_python(v) for t, v in zip(self.sub_types, value))
+
+    def to_database(self, value):
+        if value is None:
+            return
+        return tuple(t.to_database(v) for t, v in zip(self.sub_types, value))
+
+    @property
+    def sub_columns(self):
+        return self.sub_types
+
+# TODO:
+# sub_columns --> sub_types
+# test UDTs in tuples, vice versa
+# refactor init validation to common base
+# cqlsh None in tuple should display as null
+
+
 class UserDefinedType(Column):
     """
     User Defined Type column
