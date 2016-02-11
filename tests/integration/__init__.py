@@ -267,8 +267,7 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[]):
         if start:
             if(len(workloads) > 0):
                 for node in CCM_CLUSTER.nodes.values():
-                    for workload in workloads:
-                        node.set_workload(workload)
+                        node.set_workloads(workloads)
             log.debug("Starting CCM cluster: {0}".format(cluster_name))
             CCM_CLUSTER.start(wait_for_binary_proto=True, wait_other_notice=True, jvm_args=jvm_args)
             #Added to wait for slow nodes to start up
