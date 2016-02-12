@@ -15,6 +15,8 @@
 from collections import namedtuple, defaultdict
 import logging
 import six
+from warnings import warn
+import threading
 
 from cassandra.cluster import Cluster, _NOT_SET, NoHostAvailable, UserTypeDoesNotExist
 from cassandra.query import SimpleStatement, Statement, dict_factory
@@ -32,6 +34,7 @@ Host = namedtuple('Host', ['name', 'port'])
 cluster = None
 session = None
 lazy_connect_args = None
+lazy_connect_lock = threading.RLock()
 
 
 # Because type models may be registered before a connection is present,
@@ -102,9 +105,14 @@ def setup(
     :param list hosts: list of hosts, (``contact_points`` for :class:`cassandra.cluster.Cluster`)
     :param str default_keyspace: The default keyspace to use
     :param int consistency: The global default :class:`~.ConsistencyLevel` - default is the same as :attr:`.Session.default_consistency_level`
-    :param bool lazy_connect: True if should not connect until first use
+    :param bool lazy_connect: True if should not connect until first use (Deprecated)
     :param bool retry_connect: True if we should retry to connect even if there was a connection failure initially
     :param \*\*kwargs: Pass-through keyword arguments for :class:`cassandra.cluster.Cluster`
+
+    .. warning ::
+
+      lazy_connect is deprecated. It will be removed in 3.3.
+
     """
     global cluster, session, lazy_connect_args
 
@@ -115,6 +123,9 @@ def setup(
     models.DEFAULT_KEYSPACE = default_keyspace
 
     if lazy_connect:
+        msg = "lazy_connect is deprecated. It will be removed in 3.3."
+        warn(msg, DeprecationWarning)
+        log.warning(msg)
         kwargs['default_keyspace'] = default_keyspace
         kwargs['consistency'] = consistency
         kwargs['lazy_connect'] = False
@@ -188,11 +199,12 @@ def get_cluster():
 
 def handle_lazy_connect():
     global lazy_connect_args
-    if lazy_connect_args:
-        log.debug("lazy connect")
-        hosts, kwargs = lazy_connect_args
-        lazy_connect_args = None
-        setup(hosts, **kwargs)
+    with lazy_connect_lock:
+        if lazy_connect_args:
+            log.debug("lazy connect")
+            hosts, kwargs = lazy_connect_args
+            lazy_connect_args = None
+            setup(hosts, **kwargs)
 
 
 def register_udt(keyspace, type_name, klass):
