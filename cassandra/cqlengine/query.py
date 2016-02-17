@@ -557,8 +557,9 @@ class AbstractQuerySet(object):
                 query_val = [column.to_database(v) for v in val]
             elif isinstance(val, BaseQueryFunction):
                 query_val = val
-            elif isinstance(column, (columns.List, columns.Set, columns.Map)):
-                # For collections, we query using the value, not the container
+            elif (isinstance(operator, ContainsOperator) and
+                  isinstance(column, (columns.List, columns.Set, columns.Map))):
+                # For ContainsOperator and collections, we query using the value, not the container
                 query_val = val
             else:
                 query_val = column.to_database(val)
