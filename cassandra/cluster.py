@@ -2828,7 +2828,9 @@ class ResponseFuture(object):
 
         .. versionadded:: 2.0.0
         """
+        log.debug('Pagination: Fetching next page')
         if not self._paging_state:
+            log.debug('Pagination: No more pages to fetch')
             raise QueryExhausted()
 
         self._make_query_plan()

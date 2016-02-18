@@ -258,7 +258,9 @@ class AbstractQuerySet(object):
         # results cache
         self._result_cache = None
         self._result_idx = None
+        self._result_generator = None
 
+        self._count = None
         self._batch = None
         self._ttl = getattr(model, '__default_ttl__', None)
         self._consistency = None
@@ -308,7 +310,7 @@ class AbstractQuerySet(object):
 
     def __len__(self):
         self._execute_query()
-        return len(self._result_cache)
+        return self.count()
 
     # ----query generation / execution----
 
@@ -340,7 +342,8 @@ class AbstractQuerySet(object):
         if self._batch:
             raise CQLEngineException("Only inserts, updates, and deletes are available in batch mode")
         if self._result_cache is None:
-            self._result_cache = list(self._execute(self._select_query()))
+            self._result_generator = (i for i in self._execute(self._select_query()))
+            self._result_cache = []
             self._construct_result = self._get_result_constructor()
 
     def _fill_result_cache_to_idx(self, idx):
@@ -354,13 +357,24 @@ class AbstractQuerySet(object):
         else:
             for idx in range(qty):
                 self._result_idx += 1
-                self._result_cache[self._result_idx] = self._construct_result(self._result_cache[self._result_idx])
+                while True:
+                    try:
+                        self._result_cache[self._result_idx] = self._construct_result(self._result_cache[self._result_idx])
+                        break
+                    except IndexError:
+                        self._result_cache.append(next(self._result_generator))
 
     def __iter__(self):
         self._execute_query()
 
-        for idx in range(len(self._result_cache)):
-            instance = self._result_cache[idx]
+        for idx in range(self.count()):
+            while True:
+                try:
+                    instance = self._result_cache[idx]
+                    break
+                except IndexError:
+                    self._result_cache.append(next(self._result_generator))
+
             if isinstance(instance, dict):
                 self._fill_result_cache_to_idx(idx)
             yield self._result_cache[idx]
@@ -368,7 +382,7 @@ class AbstractQuerySet(object):
     def __getitem__(self, s):
         self._execute_query()
 
-        num_results = len(self._result_cache)
+        num_results = self.count()
 
         if isinstance(s, slice):
             # calculate the amount of results that need to be loaded
@@ -577,10 +591,10 @@ class AbstractQuerySet(object):
             return self.filter(*args, **kwargs).get()
 
         self._execute_query()
-        if len(self._result_cache) == 0:
+        if self.count() == 0:
             raise self.model.DoesNotExist
-        elif len(self._result_cache) > 1:
-            raise self.model.MultipleObjectsReturned('{0} objects found'.format(len(self._result_cache)))
+        elif self.count() > 1:
+            raise self.model.MultipleObjectsReturned('{0} objects found'.format(self.count()))
         else:
             return self[0]
 
@@ -641,13 +655,12 @@ class AbstractQuerySet(object):
         if self._batch:
             raise CQLEngineException("Only inserts, updates, and deletes are available in batch mode")
 
-        if self._result_cache is None:
+        if self._count is None:
             query = self._select_query()
             query.count = True
             result = self._execute(query)
-            return result[0]['count']
-        else:
-            return len(self._result_cache)
+            self._count = result[0]['count']
+        return self._count
 
     def limit(self, v):
         """
