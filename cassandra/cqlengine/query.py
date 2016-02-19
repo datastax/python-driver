@@ -266,7 +266,7 @@ class AbstractQuerySet(object):
         self._result_cache = None
         self._result_idx = None
 
-        self._distinct_fields = []
+        self._distinct_fields = None
         self._batch = None
         self._ttl = getattr(model, '__default_ttl__', None)
         self._consistency = None
@@ -336,11 +336,11 @@ class AbstractQuerySet(object):
         return SelectStatement(
             self.column_family_name,
             fields=self._select_fields(),
-            distinct_fields=self._distinct_fields,
             where=self._where,
             order_by=self._order,
             limit=self._limit,
-            allow_filtering=self._allow_filtering
+            allow_filtering=self._allow_filtering,
+            distinct_fields=self._distinct_fields
         )
 
     # ----Reads------
@@ -664,7 +664,30 @@ class AbstractQuerySet(object):
 
     def distinct(self, distinct_fields=None):
         """
-        Returns the DISTINCT rows by this query. Default to partition key if no distinct_fields specified.
+        Returns the DISTINCT rows matched by this query.
+
+        distinct_fields default to the partition key fields if not specified.
+
+        *Note: distinct_fields must be a partition key or a static column*
+
+        .. code-block:: python
+
+            class Automobile(Model):
+                manufacturer = columns.Text(partition_key=True)
+                year = columns.Integer(primary_key=True)
+                model = columns.Text(primary_key=True)
+                price = columns.Decimal()
+
+            sync_table(Automobile)
+
+            # create rows
+
+            Automobile.objects.distinct()
+
+            # or
+
+            Automobile.objects.distinct(['manufacturer'])
+
         """
 
         clone = copy.deepcopy(self)

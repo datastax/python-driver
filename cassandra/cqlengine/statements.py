@@ -550,13 +550,13 @@ class SelectStatement(BaseCQLStatement):
     def __init__(self,
                  table,
                  fields=None,
-                 distinct_fields=[],
                  count=False,
                  consistency=None,
                  where=None,
                  order_by=None,
                  limit=None,
-                 allow_filtering=False):
+                 allow_filtering=False,
+                 distinct_fields=None):
 
         """
         :param where
