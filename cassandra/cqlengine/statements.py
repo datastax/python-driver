@@ -555,7 +555,8 @@ class SelectStatement(BaseCQLStatement):
                  where=None,
                  order_by=None,
                  limit=None,
-                 allow_filtering=False):
+                 allow_filtering=False,
+                 distinct_fields=None):
 
         """
         :param where
@@ -568,6 +569,7 @@ class SelectStatement(BaseCQLStatement):
         )
 
         self.fields = [fields] if isinstance(fields, six.string_types) else (fields or [])
+        self.distinct_fields = distinct_fields
         self.count = count
         self.order_by = [order_by] if isinstance(order_by, six.string_types) else order_by
         self.limit = limit
@@ -577,6 +579,8 @@ class SelectStatement(BaseCQLStatement):
         qs = ['SELECT']
         if self.count:
             qs += ['COUNT(*)']
+        elif self.distinct_fields:
+            qs += ['DISTINCT {0}'.format(', '.join(['"{0}"'.format(f) for f in self.distinct_fields]))]
         else:
             qs += [', '.join(['"{0}"'.format(f) for f in self.fields]) if self.fields else '*']
         qs += ['FROM', self.table]

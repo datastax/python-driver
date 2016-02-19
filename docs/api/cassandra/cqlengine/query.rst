@@ -18,6 +18,8 @@ The methods here are used to filter, order, and constrain results.
 
     .. automethod:: count
 
+    .. automethod:: distinct
+
     .. automethod:: filter
 
     .. automethod:: get

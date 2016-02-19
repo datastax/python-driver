@@ -266,6 +266,7 @@ class AbstractQuerySet(object):
         self._result_cache = None
         self._result_idx = None
 
+        self._distinct_fields = None
         self._batch = None
         self._ttl = getattr(model, '__default_ttl__', None)
         self._consistency = None
@@ -338,7 +339,8 @@ class AbstractQuerySet(object):
             where=self._where,
             order_by=self._order,
             limit=self._limit,
-            allow_filtering=self._allow_filtering
+            allow_filtering=self._allow_filtering,
+            distinct_fields=self._distinct_fields
         )
 
     # ----Reads------
@@ -660,6 +662,42 @@ class AbstractQuerySet(object):
         else:
             return len(self._result_cache)
 
+    def distinct(self, distinct_fields=None):
+        """
+        Returns the DISTINCT rows matched by this query.
+
+        distinct_fields default to the partition key fields if not specified.
+
+        *Note: distinct_fields must be a partition key or a static column*
+
+        .. code-block:: python
+
+            class Automobile(Model):
+                manufacturer = columns.Text(partition_key=True)
+                year = columns.Integer(primary_key=True)
+                model = columns.Text(primary_key=True)
+                price = columns.Decimal()
+
+            sync_table(Automobile)
+
+            # create rows
+
+            Automobile.objects.distinct()
+
+            # or
+
+            Automobile.objects.distinct(['manufacturer'])
+
+        """
+
+        clone = copy.deepcopy(self)
+        if distinct_fields:
+            clone._distinct_fields = distinct_fields
+        else:
+            clone._distinct_fields = [x.column_name for x in self.model._partition_keys.values()]
+
+        return clone
+
     def limit(self, v):
         """
         Limits the number of results returned by Cassandra.
@@ -694,7 +732,7 @@ class AbstractQuerySet(object):
     def _only_or_defer(self, action, fields):
         clone = copy.deepcopy(self)
         if clone._defer_fields or clone._only_fields:
-            raise QueryException("QuerySet alread has only or defer fields defined")
+            raise QueryException("QuerySet already has only or defer fields defined")
 
         # check for strange fields
         missing_fields = [f for f in fields if f not in self.model._columns.keys()]
