@@ -56,6 +56,14 @@ class SelectStatementTests(unittest.TestCase):
         self.assertIn('LIMIT', six.text_type(ss))
         self.assertNotIn('ORDER', six.text_type(ss))
 
+    def test_distinct(self):
+        ss = SelectStatement('table', distinct_fields=['field2'])
+        ss.add_where_clause(WhereClause('field1', EqualsOperator(), 'b'))
+        self.assertEqual(six.text_type(ss), 'SELECT DISTINCT "field2" FROM table WHERE "field1" = %(0)s', six.text_type(ss))
+
+        ss = SelectStatement('table', distinct_fields=['field1', 'field2'])
+        self.assertEqual(six.text_type(ss), 'SELECT DISTINCT "field1", "field2" FROM table')
+
     def test_context(self):
         ss = SelectStatement('table')
         ss.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))

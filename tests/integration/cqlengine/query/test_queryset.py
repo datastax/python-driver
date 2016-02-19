@@ -188,6 +188,20 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         query3 = query2.all()
         assert query3 == query2
 
+    def test_queryset_with_distinct(self):
+        """
+        Tests that calling distinct on a queryset w/without parameter are evaluated properly.
+        """
+
+        query1 = TestModel.objects.distinct()
+        self.assertEqual(len(query1._distinct_fields), 1)
+
+        query2 = TestModel.objects.distinct(['test_id'])
+        self.assertEqual(len(query2._distinct_fields), 1)
+
+        query3 = TestModel.objects.distinct(['test_id', 'attempt_id'])
+        self.assertEqual(len(query3._distinct_fields), 2)
+
     def test_defining_only_and_defer_fails(self):
         """
         Tests that trying to add fields to either only or defer, or doing so more than once fails
@@ -423,6 +437,20 @@ def test_non_quality_filtering():
     num = qA.count()
     assert num == 1, num
 
+
+class TestQuerySetDistinct(BaseQuerySetUsage):
+
+    def test_distinct_without_parameter(self):
+        q = TestModel.objects.distinct()
+        self.assertEqual(len(q), 3)
+
+    def test_distinct_with_parameter(self):
+        q = TestModel.objects.distinct(['test_id'])
+        self.assertEqual(len(q), 3)
+
+    def test_distinct_with_filter(self):
+        q = TestModel.objects.distinct(['test_id']).filter(test_id__in=[1,2])
+        self.assertEqual(len(q), 2)
 
 
 class TestQuerySetOrdering(BaseQuerySetUsage):

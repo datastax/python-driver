@@ -266,6 +266,7 @@ class AbstractQuerySet(object):
         self._result_cache = None
         self._result_idx = None
 
+        self._distinct_fields = []
         self._batch = None
         self._ttl = getattr(model, '__default_ttl__', None)
         self._consistency = None
@@ -335,6 +336,7 @@ class AbstractQuerySet(object):
         return SelectStatement(
             self.column_family_name,
             fields=self._select_fields(),
+            distinct_fields=self._distinct_fields,
             where=self._where,
             order_by=self._order,
             limit=self._limit,
@@ -660,6 +662,19 @@ class AbstractQuerySet(object):
         else:
             return len(self._result_cache)
 
+    def distinct(self, distinct_fields=None):
+        """
+        Returns the DISTINCT rows by this query. Default to partition key if no distinct_fields specified.
+        """
+
+        clone = copy.deepcopy(self)
+        if distinct_fields:
+            clone._distinct_fields = distinct_fields
+        else:
+            clone._distinct_fields = [x.column_name for x in self.model._partition_keys.values()]
+
+        return clone
+
     def limit(self, v):
         """
         Limits the number of results returned by Cassandra.
@@ -694,7 +709,7 @@ class AbstractQuerySet(object):
     def _only_or_defer(self, action, fields):
         clone = copy.deepcopy(self)
         if clone._defer_fields or clone._only_fields:
-            raise QueryException("QuerySet alread has only or defer fields defined")
+            raise QueryException("QuerySet already has only or defer fields defined")
 
         # check for strange fields
         missing_fields = [f for f in fields if f not in self.model._columns.keys()]
