@@ -77,6 +77,9 @@ class IndexedTestModel(Model):
     description = columns.Text()
     expected_result = columns.Integer()
     test_result = columns.Integer(index=True)
+    test_list = columns.List(columns.Integer, index=True)
+    test_set = columns.Set(columns.Integer, index=True)
+    test_map = columns.Map(columns.Text, columns.Integer, index=True)
 
 
 class TestMultiClusteringModel(Model):
@@ -238,6 +241,16 @@ class BaseQuerySetUsage(BaseCassEngTestCase):
                                         test_result=45)
         IndexedTestModel.objects.create(test_id=11, attempt_id=3, description='try12', expected_result=75,
                                         test_result=45)
+
+        IndexedTestModel.objects.create(test_id=12, attempt_id=3, description='list12', expected_result=75,
+                                        test_result=45, test_list=[1, 2, 42], test_set=set([1, 2, 3]),
+                                        test_map={'1': 1, '2': 2, '3': 3})
+        IndexedTestModel.objects.create(test_id=13, attempt_id=3, description='list13', expected_result=75,
+                                        test_result=45, test_list=[3, 4, 5], test_set=set([4, 5, 42]),
+                                        test_map={'1': 5, '2': 6, '3': 7})
+        IndexedTestModel.objects.create(test_id=14, attempt_id=3, description='list14', expected_result=75,
+                                        test_result=45, test_list=[1, 2, 3], test_set=set([1, 2, 3]),
+                                        test_map={'1': 1, '2': 2, '3': 42})
 
     @classmethod
     def tearDownClass(cls):
@@ -509,12 +522,22 @@ class TestQuerySetValidation(BaseQuerySetUsage):
             q = TestModel.objects(test_id__gt=0)
             list([i for i in q])
 
+
     def test_indexed_field_can_be_queried(self):
         """
         Tests that queries on an indexed field will work without any primary key relations specified
         """
         q = IndexedTestModel.objects(test_result=25)
-        assert q.count() == 4
+        self.assertEqual(q.count(), 4)
+
+        q = IndexedTestModel.objects.filter(test_list__contains=42)
+        self.assertEqual(q.count(), 1)
+
+        q = IndexedTestModel.objects.filter(test_set__contains=42)
+        self.assertEqual(q.count(), 1)
+
+        q = IndexedTestModel.objects.filter(test_map__contains=42)
+        self.assertEqual(q.count(), 1)
 
 
 class TestQuerySetDelete(BaseQuerySetUsage):
@@ -663,6 +686,31 @@ class TestInOperator(BaseQuerySetUsage):
         """ Tests the in operator works with the query expression query method """
         q = TestModel.filter(TestModel.test_id.in_([0, 1]))
         assert q.count() == 8
+
+
+class TestContainsOperator(BaseQuerySetUsage):
+    def test_kwarg_success_case(self):
+        """ Tests the CONTAINS operator works with the kwarg query method """
+        q = IndexedTestModel.filter(test_list__contains=1)
+        self.assertEqual(q.count(), 2)
+
+        q = IndexedTestModel.filter(test_set__contains=3)
+        self.assertEqual(q.count(), 2)
+
+        q = IndexedTestModel.filter(test_map__contains=42)
+        self.assertEqual(q.count(), 1)
+
+
+    def test_query_expression_success_case(self):
+        """ Tests the CONTAINS operator works with the query expression query method """
+        q = IndexedTestModel.filter(IndexedTestModel.test_list.contains_(1))
+        self.assertEqual(q.count(), 2)
+
+        q = IndexedTestModel.filter(IndexedTestModel.test_set.contains_(3))
+        self.assertEqual(q.count(), 2)
+
+        q = IndexedTestModel.filter(IndexedTestModel.test_map.contains_(42))
+        self.assertEqual(q.count(), 1)
 
 
 class TestValuesList(BaseQuerySetUsage):

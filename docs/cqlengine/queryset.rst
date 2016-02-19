@@ -37,6 +37,7 @@ Retrieving objects with filters
             year = columns.Integer(primary_key=True)
             model = columns.Text()
             price = columns.Decimal()
+            options = columns.Set(columns.Text)
 
     ...and assuming the Automobile table contains a record of every car model manufactured in the last 20 years or so, we can retrieve only the cars made by a single manufacturer like this:
 
@@ -172,6 +173,16 @@ Filtering Operators
 
             q.filter(Automobile.year <= 2012)
 
+    :attr:`CONTAINS (__contains) <query.QueryOperator.ContainsOperator>`
+
+        The CONTAINS operator is available for all collection types (List, Set, Map).
+
+        .. code-block:: python
+
+            q = Automobile.objects.filter(manufacturer='Tesla')
+            q.filter(options__contains='backup camera').allow_filtering()
+
+        Note that we need to use allow_filtering() since the *options* column has no secondary index.
 
 TimeUUID Functions
 ==================
@@ -341,4 +352,3 @@ Named tables are a way of querying a table without creating an class.  They're u
         user.objects()[0]
 
         # {u'pk': 1, u't': datetime.datetime(2014, 6, 26, 17, 10, 31, 774000)}
-
