@@ -1680,7 +1680,7 @@ class AggregateMetadata(FunctionTest):
                 'initial_condition': init_cond,
                 'return_type': "does not matter for creation"}
 
-    @notipv6
+    # @notipv6
     def test_return_type_meta(self):
         """
         Test to verify to that the return type of a an aggregate is honored in the metadata
@@ -1770,7 +1770,7 @@ class AggregateMetadata(FunctionTest):
             self.assertNotIn(-1, (aggregate_idx, func_idx), "AGGREGATE or FUNCTION not found in keyspace_cql: " + keyspace_cql)
             self.assertGreater(aggregate_idx, func_idx)
 
-    @notipv6
+    # @notipv6
     def test_same_name_diff_types(self):
         """
         Test to verify to that aggregates with different signatures are differentiated in metadata

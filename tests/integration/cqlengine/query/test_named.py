@@ -32,11 +32,11 @@ from tests.integration.cqlengine.query.test_queryset import BaseQuerySetUsage
 from tests.integration import BasicSharedKeyspaceUnitTestCase, greaterthanorequalcass30, notipv6
 
 
-class TestQuerySetOperation(BaseCassEngTestCase):
+class TestNamedOperation(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(TestQuerySetOperation, cls).setUpClass()
+        super(TestNamedOperation, cls).setUpClass()
         cls.keyspace = NamedKeyspace('cqlengine_test')
         cls.table = cls.keyspace.table('test_model')
 
@@ -121,11 +121,11 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         self.assertEqual(where.value, 1)
 
 
-class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
+class TestNamedSelectionAndIteration(BaseQuerySetUsage):
 
     @classmethod
     def setUpClass(cls):
-        super(TestQuerySetCountSelectionAndIteration, cls).setUpClass()
+        super(TestNamedSelectionAndIteration, cls).setUpClass()
 
         from tests.integration.cqlengine.query.test_queryset import TestModel
 
