@@ -528,16 +528,16 @@ class TestQuerySetValidation(BaseQuerySetUsage):
         Tests that queries on an indexed field will work without any primary key relations specified
         """
         q = IndexedTestModel.objects(test_result=25)
-        assert q.count() == 4
+        self.assertEqual(q.count(), 4)
 
         q = IndexedTestModel.objects.filter(test_list__contains=42)
-        assert q.count() == 1
+        self.assertEqual(q.count(), 1)
 
         q = IndexedTestModel.objects.filter(test_set__contains=42)
-        assert q.count() == 1
+        self.assertEqual(q.count(), 1)
 
         q = IndexedTestModel.objects.filter(test_map__contains=42)
-        assert q.count() == 1
+        self.assertEqual(q.count(), 1)
 
 
 class TestQuerySetDelete(BaseQuerySetUsage):
@@ -692,25 +692,25 @@ class TestContainsOperator(BaseQuerySetUsage):
     def test_kwarg_success_case(self):
         """ Tests the CONTAINS operator works with the kwarg query method """
         q = IndexedTestModel.filter(test_list__contains=1)
-        assert q.count() == 2
+        self.assertEqual(q.count(), 2)
 
         q = IndexedTestModel.filter(test_set__contains=3)
-        assert q.count() == 2
+        self.assertEqual(q.count(), 2)
 
         q = IndexedTestModel.filter(test_map__contains=42)
-        assert q.count() == 1
+        self.assertEqual(q.count(), 1)
 
 
     def test_query_expression_success_case(self):
         """ Tests the CONTAINS operator works with the query expression query method """
         q = IndexedTestModel.filter(IndexedTestModel.test_list.contains_(1))
-        assert q.count() == 2
+        self.assertEqual(q.count(), 2)
 
         q = IndexedTestModel.filter(IndexedTestModel.test_set.contains_(3))
-        assert q.count() == 2
+        self.assertEqual(q.count(), 2)
 
         q = IndexedTestModel.filter(IndexedTestModel.test_map.contains_(42))
-        assert q.count() == 1
+        self.assertEqual(q.count(), 1)
 
 
 class TestValuesList(BaseQuerySetUsage):
