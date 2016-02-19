@@ -607,7 +607,7 @@ class Decimal(Column):
         return self.validate(value)
 
 
-class BaseContainerColumn(Column):
+class BaseCollectionColumn(Column):
     """
     Base Container type for collection-like columns.
 
@@ -630,10 +630,10 @@ class BaseContainerColumn(Column):
             instances.append(inst)
 
         self.types = instances
-        super(BaseContainerColumn, self).__init__(**kwargs)
+        super(BaseCollectionColumn, self).__init__(**kwargs)
 
     def validate(self, value):
-        value = super(BaseContainerColumn, self).validate(value)
+        value = super(BaseCollectionColumn, self).validate(value)
         # It is dangerous to let collections have more than 65535.
         # See: https://issues.apache.org/jira/browse/CASSANDRA-5428
         if value is not None and len(value) > 65535:
@@ -650,6 +650,45 @@ class BaseContainerColumn(Column):
     @property
     def sub_types(self):
         return self.types
+
+
+class Tuple(BaseCollectionColumn):
+    """
+    Stores a fixed-length set of positional values
+
+    http://docs.datastax.com/en/cql/3.1/cql/cql_reference/tupleType.html
+    """
+    def __init__(self, *args, **kwargs):
+        """
+        :param args: column types representing tuple composition
+        """
+        if not args:
+            raise ValueError("Tuple must specify at least one inner type")
+        super(Tuple, self).__init__(args, **kwargs)
+        self.db_type = 'tuple<{0}>'.format(', '.join(typ.db_type for typ in self.types))
+
+    def validate(self, value):
+        val = super(Tuple, self).validate(value)
+        if val is None:
+            return
+        if len(val) > len(self.types):
+            raise ValidationError("Value %r has more fields than tuple definition (%s)" %
+                                  (val, ', '.join(t for t in self.types)))
+        return tuple(t.validate(v) for t, v in zip(self.types, val))
+
+    def to_python(self, value):
+        if value is None:
+            return tuple()
+        return tuple(t.to_python(v) for t, v in zip(self.types, value))
+
+    def to_database(self, value):
+        if value is None:
+            return
+        return tuple(t.to_database(v) for t, v in zip(self.types, value))
+
+
+class BaseContainerColumn(BaseCollectionColumn):
+    pass
 
 
 class Set(BaseContainerColumn):
@@ -785,41 +824,6 @@ class Map(BaseContainerColumn):
         if value is None:
             return None
         return dict((self.key_col.to_database(k), self.value_col.to_database(v)) for k, v in value.items())
-
-
-class Tuple(BaseContainerColumn):
-    """
-    Stores a fixed-length set of positional values
-
-    http://docs.datastax.com/en/cql/3.1/cql/cql_reference/tupleType.html
-    """
-    def __init__(self, *args, **kwargs):
-        """
-        :param args: column types representing tuple composition
-        """
-        if not args:
-            raise ValueError("Tuple must specify at least one inner type")
-        super(Tuple, self).__init__(args, **kwargs)
-        self.db_type = 'tuple<{0}>'.format(', '.join(typ.db_type for typ in self.types))
-
-    def validate(self, value):
-        val = super(Tuple, self).validate(value)
-        if val is None:
-            return
-        if len(val) > len(self.types):
-            raise ValidationError("Value %r has more fields than tuple definition (%s)" %
-                                  (val, ', '.join(t for t in self.types)))
-        return tuple(t.validate(v) for t, v in zip(self.types, val))
-
-    def to_python(self, value):
-        if value is None:
-            return tuple()
-        return tuple(t.to_python(v) for t, v in zip(self.types, value))
-
-    def to_database(self, value):
-        if value is None:
-            return
-        return tuple(t.to_database(v) for t, v in zip(self.types, value))
 
 
 class UDTValueManager(BaseValueManager):

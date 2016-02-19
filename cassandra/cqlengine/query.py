@@ -1151,11 +1151,9 @@ class DMLQuery(object):
                 val = getattr(self.instance, name, None)
                 val_mgr = self.instance._values[name]
 
-                # don't update something that is null
                 if val is None:
                     continue
 
-                # don't update something if it hasn't changed
                 if not val_mgr.changed and not isinstance(col, columns.Counter):
                     continue
 
@@ -1173,7 +1171,6 @@ class DMLQuery(object):
                     else:
                         raise RuntimeError
 
-                    # do the stuff
                     clause = klass(col.db_field_name, val,
                                    previous=val_mgr.previous_value, column=col)
                     if clause.get_context_size() > 0:
