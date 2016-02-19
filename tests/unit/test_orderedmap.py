@@ -152,6 +152,18 @@ class OrderedMapTest(unittest.TestCase):
         self.assertEqual(om.popitem(), item)
         self.assertRaises(KeyError, om.popitem)
 
+    def test_delitem(self):
+        om = OrderedMap({1: 1, 2: 2})
+
+        self.assertRaises(KeyError, om.__delitem__, 3)
+
+        del om[1]
+        self.assertEqual(om, {2: 2})
+        del om[2]
+        self.assertFalse(om)
+
+        self.assertRaises(KeyError, om.__delitem__, 1)
+
 
 class OrderedMapSerializedKeyTest(unittest.TestCase):
     def test_init(self):

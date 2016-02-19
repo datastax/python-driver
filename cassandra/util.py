@@ -746,7 +746,7 @@ class OrderedMap(Mapping):
             ...
         )
 
-    This class dervies from the (immutable) Mapping API. Objects in these maps
+    This class derives from the (immutable) Mapping API. Objects in these maps
     are not intended be modified.
 
     \* Note: Because of the way Cassandra encodes nested types, when using the
@@ -782,10 +782,21 @@ class OrderedMap(Mapping):
             self._items.append((key, value))
             self._index[flat_key] = len(self._items) - 1
 
+    __setitem__ = _insert
+
     def __getitem__(self, key):
         try:
             index = self._index[self._serialize_key(key)]
             return self._items[index][1]
+        except KeyError:
+            raise KeyError(str(key))
+
+    def __delitem__(self, key):
+        # not efficient -- for convenience only
+        try:
+            index = self._index.pop(self._serialize_key(key))
+            self._index = dict((k, i if i < index else i - 1) for k, i in self._index.items())
+            self._items.pop(index)
         except KeyError:
             raise KeyError(str(key))
 
