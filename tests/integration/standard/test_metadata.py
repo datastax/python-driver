@@ -34,7 +34,8 @@ from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
 from tests.integration import get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass, \
-    BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster, CONTACT_POINTS
+    BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster, \
+    CONTACT_POINTS, notipv6
 
 from tests.unit.cython.utils import notcython
 
@@ -388,6 +389,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertNotIn("min_threshold", cql)
         self.assertNotIn("max_threshold", cql)
 
+
     def test_refresh_schema_metadata(self):
         """
         test for synchronously refreshing all cluster metadata
@@ -533,6 +535,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         cluster2.shutdown()
 
+    @notipv6
     def test_refresh_metadata_for_mv(self):
         """
         test for synchronously refreshing materialized view metadata
@@ -702,6 +705,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         cluster2.shutdown()
 
+    @notipv6
     def test_multiple_indices(self):
         """
         test multiple indices on the same column.
@@ -959,6 +963,7 @@ CREATE TABLE export_udts.users (
             self.assertEqual(set(get_replicas('test1rf', token)), set([owners[(i + 1) % 3]]))
         cluster.shutdown()
 
+    @notipv6
     def test_legacy_tables(self):
 
         if CASS_SERVER_VERSION < (2, 1, 0):
@@ -1675,6 +1680,7 @@ class AggregateMetadata(FunctionTest):
                 'initial_condition': init_cond,
                 'return_type': "does not matter for creation"}
 
+    @notipv6
     def test_return_type_meta(self):
         """
         Test to verify to that the return type of a an aggregate is honored in the metadata
@@ -1764,6 +1770,7 @@ class AggregateMetadata(FunctionTest):
             self.assertNotIn(-1, (aggregate_idx, func_idx), "AGGREGATE or FUNCTION not found in keyspace_cql: " + keyspace_cql)
             self.assertGreater(aggregate_idx, func_idx)
 
+    @notipv6
     def test_same_name_diff_types(self):
         """
         Test to verify to that aggregates with different signatures are differentiated in metadata
@@ -1874,7 +1881,6 @@ class AggregateMetadata(FunctionTest):
             self.assertNotIn(-1, (init_cond_idx, final_func_idx))
             self.assertGreater(init_cond_idx, final_func_idx)
 
-
 class BadMetaTest(unittest.TestCase):
     """
     Test behavior when metadata has unexpected form
@@ -1981,6 +1987,7 @@ class MaterializedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
         self.session.execute("DROP MATERIALIZED VIEW {0}.mv1".format(self.keyspace_name))
         self.session.execute("DROP TABLE {0}.{1}".format(self.keyspace_name, self.function_table_name))
 
+    @notipv6
     def test_materialized_view_metadata_creation(self):
         """
         test for materialized view metadata creation
@@ -2003,6 +2010,7 @@ class MaterializedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
         self.assertEqual(self.keyspace_name, self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].keyspace_name)
         self.assertEqual(self.function_table_name, self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].base_table_name)
 
+    @notipv6
     def test_materialized_view_metadata_alter(self):
         """
         test for materialized view metadata alteration
@@ -2023,6 +2031,7 @@ class MaterializedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
         self.session.execute("ALTER MATERIALIZED VIEW {0}.mv1 WITH compaction = {{ 'class' : 'LeveledCompactionStrategy' }}".format(self.keyspace_name))
         self.assertIn("LeveledCompactionStrategy", self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].options["compaction"]["class"])
 
+    @notipv6
     def test_materialized_view_metadata_drop(self):
         """
         test for materialized view metadata dropping
@@ -2055,6 +2064,7 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
             raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
         super(MaterializedViewMetadataTestComplex, self).setUp()
 
+    @notipv6
     def test_create_view_metadata(self):
         """
         test to ensure that materialized view metadata is properly constructed
@@ -2158,6 +2168,7 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         day_column = mv_columns[5]
         compare_columns(day_column, mv.clustering_key[2], 'day')
 
+    @notipv6
     def test_base_table_column_addition_mv(self):
         """
         test to ensure that materialized view metadata is properly updated with base columns are added
@@ -2226,6 +2237,7 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         mv_alltime_fouls_comumn = self.cluster.metadata.keyspaces[self.keyspace_name].views["alltimehigh"].columns['fouls']
         self.assertEquals(mv_alltime_fouls_comumn.cql_type, 'int')
 
+    @notipv6
     def test_base_table_type_alter_mv(self):
         """
         test to ensure that materialized view metadata is properly updated when a type in the base table
@@ -2276,6 +2288,7 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
 
         self.assertEquals(score_mv_column.cql_type, 'blob')
 
+    @notipv6
     def test_metadata_with_quoted_identifiers(self):
         """
         test to ensure that materialized view metadata is properly constructed when quoted identifiers are used

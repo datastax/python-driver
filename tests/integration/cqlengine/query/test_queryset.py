@@ -43,7 +43,7 @@ from cassandra.cqlengine import operators
 from cassandra.util import uuid_from_time
 
 from cassandra.cqlengine.connection import get_session
-from tests.integration import PROTOCOL_VERSION, CASSANDRA_VERSION, greaterthancass20, greaterthancass21
+from tests.integration import PROTOCOL_VERSION, CASSANDRA_VERSION, greaterthancass20, greaterthancass21, notipv6
 
 
 class TzOffset(tzinfo):
@@ -462,6 +462,7 @@ def test_non_quality_filtering():
     assert num == 1, num
 
 
+<<<<<<< HEAD
 class TestQuerySetDistinct(BaseQuerySetUsage):
 
     def test_distinct_without_parameter(self):
@@ -494,6 +495,8 @@ class TestQuerySetDistinct(BaseQuerySetUsage):
         self.assertEqual(q.count(), 2)
 
 
+=======
+>>>>>>> b7efdfc... Partly added tests for annotations
 class TestQuerySetOrdering(BaseQuerySetUsage):
 
     def test_order_by_success_case(self):

@@ -153,6 +153,7 @@ greaterthancass21 = unittest.skipUnless(CASSANDRA_VERSION >= '2.2', 'Cassandra v
 greaterthanorequalcass30 = unittest.skipUnless(CASSANDRA_VERSION >= '3.0', 'Cassandra version 3.0 or greater required')
 lessthancass30 = unittest.skipUnless(CASSANDRA_VERSION < '3.0', 'Cassandra version less then 3.0 required')
 
+notipv6 = unittest.skipUnless(os.environ.get('IP') == 'ipv6', 'IPv6 not supported for this test')
 
 def wait_for_node_socket(node, timeout):
     binary_itf = node.network_interfaces['binary']

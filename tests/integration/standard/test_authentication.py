@@ -18,7 +18,7 @@ import time
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.auth import PlainTextAuthProvider, SASLClient, SaslAuthProvider
 
-from tests.integration import use_singledc, get_cluster, remove_cluster, PROTOCOL_VERSION
+from tests.integration import use_singledc, get_cluster, remove_cluster, PROTOCOL_VERSION, notipv6
 from tests.integration.util import assert_quiescent_pool_state
 
 try:
@@ -46,7 +46,7 @@ def setup_module():
 def teardown_module():
     remove_cluster()  # this test messes with config
 
-
+@notipv6
 class AuthenticationTests(unittest.TestCase):
     """
     Tests to cover basic authentication functionality
@@ -132,7 +132,7 @@ class AuthenticationTests(unittest.TestCase):
                                 cluster.connect)
         assert_quiescent_pool_state(self, cluster)
         cluster.shutdown()
-
+1
 
 class SaslAuthenticatorTests(AuthenticationTests):
     """

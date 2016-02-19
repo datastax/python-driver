@@ -19,7 +19,8 @@ from cassandra import ConsistencyLevel, OperationTimedOut, ReadTimeout, WriteTim
 from cassandra.cluster import Cluster
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.query import SimpleStatement
-from tests.integration import use_singledc, PROTOCOL_VERSION, get_cluster, setup_keyspace, remove_cluster, get_node
+from tests.integration import use_singledc, PROTOCOL_VERSION, get_cluster, setup_keyspace, remove_cluster, get_node, \
+    CONTACT_POINTS
 from mock import Mock
 
 try:
@@ -69,7 +70,7 @@ class ClientExceptionTests(unittest.TestCase):
                 "Native protocol 4,0+ is required for custom payloads, currently using %r"
                 % (PROTOCOL_VERSION,))
 
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         self.session = self.cluster.connect()
         self.nodes_currently_failing = []
         self.node1, self.node2, self.node3 = get_cluster().nodes.values()
@@ -309,12 +310,12 @@ class TimeoutTimerTest(unittest.TestCase):
         """
         Setup sessions and pause node1
         """
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         self.session = self.cluster.connect()
 
         # self.node1, self.node2, self.node3 = get_cluster().nodes.values()
         self.node1 = get_node(1)
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         self.session = self.cluster.connect()
 
         ddl = '''

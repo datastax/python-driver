@@ -23,7 +23,7 @@ except ImportError:
 
 from cassandra.cluster import Cluster
 from cassandra.protocol import ConfigurationException
-from tests.integration import use_singledc, PROTOCOL_VERSION, CONTACT_POINTS
+from tests.integration import use_singledc, PROTOCOL_VERSION, CONTACT_POINTS, notipv6
 from tests.integration.datatype_utils import update_datatypes
 
 
@@ -49,6 +49,7 @@ class ControlConnectionTests(unittest.TestCase):
             pass
         self.cluster.shutdown()
 
+    @notipv6
     def test_drop_keyspace(self):
         """
         Test to validate that dropping a keyspace with user defined types doesn't kill the control connection.

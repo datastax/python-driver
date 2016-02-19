@@ -29,8 +29,7 @@ from tests.integration.cqlengine import setup_connection
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine.query.test_queryset import BaseQuerySetUsage
 
-
-from tests.integration import BasicSharedKeyspaceUnitTestCase, greaterthanorequalcass30
+from tests.integration import BasicSharedKeyspaceUnitTestCase, greaterthanorequalcass30, notipv6
 
 
 class TestQuerySetOperation(BaseCassEngTestCase):
@@ -286,6 +285,7 @@ class TestNamedWithMV(BasicSharedKeyspaceUnitTestCase):
         super(TestNamedWithMV, cls).tearDownClass()
 
     @greaterthanorequalcass30
+    @notipv6
     def test_named_table_with_mv(self):
         """
         Test NamedTable access to materialized views

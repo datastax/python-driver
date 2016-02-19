@@ -27,7 +27,7 @@ from cassandra.cqlengine.models import Model, ValidationError
 from cassandra.cqlengine.management import sync_table, drop_table
 from tests.integration.cqlengine import is_prepend_reversed
 from tests.integration.cqlengine.base import BaseCassEngTestCase
-from tests.integration import greaterthancass20, CASSANDRA_VERSION
+from tests.integration import greaterthancass20, CASSANDRA_VERSION, notipv6
 
 log = logging.getLogger(__name__)
 
@@ -251,6 +251,7 @@ class TestListColumn(BaseCassEngTestCase):
                 del tb
         self.assertRaises(ValidationError, TestListModel.create, **{'text_list': [str(uuid4()) for _ in range(65536)]})
 
+    @notipv6
     def test_partial_updates(self):
         """ Tests that partial udpates work as expected """
         full = list(range(10))
@@ -345,7 +346,6 @@ class TestMapModel(Model):
     partition = columns.UUID(primary_key=True, default=uuid4)
     int_map = columns.Map(columns.Integer, columns.UUID, required=False)
     text_map = columns.Map(columns.Text, columns.DateTime, required=False)
-
 
 class TestMapColumn(BaseCassEngTestCase):
 

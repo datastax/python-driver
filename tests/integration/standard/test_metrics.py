@@ -23,7 +23,8 @@ from cassandra.query import SimpleStatement
 from cassandra import ConsistencyLevel, WriteTimeout, Unavailable, ReadTimeout
 
 from cassandra.cluster import Cluster, NoHostAvailable
-from tests.integration import get_cluster, get_node, use_singledc, PROTOCOL_VERSION, execute_until_pass, CONTACT_POINTS
+from tests.integration import get_cluster, get_node, use_singledc, PROTOCOL_VERSION, execute_until_pass, \
+    CONTACT_POINTS, notipv6
 
 
 def setup_module():
@@ -39,6 +40,7 @@ class MetricsTests(unittest.TestCase):
     def tearDown(self):
         self.cluster.shutdown()
 
+    @notipv6
     def test_connection_error(self):
         """
         Trigger and ensure connection_errors are counted
@@ -65,6 +67,7 @@ class MetricsTests(unittest.TestCase):
 
         self.assertGreater(self.cluster.metrics.stats.connection_errors, 0)
 
+    @notipv6
     def test_write_timeout(self):
         """
         Trigger and ensure write_timeouts are counted
@@ -93,6 +96,7 @@ class MetricsTests(unittest.TestCase):
         finally:
             get_node(1).resume()
 
+    @notipv6
     def test_read_timeout(self):
         """
         Trigger and ensure read_timeouts are counted
@@ -122,6 +126,8 @@ class MetricsTests(unittest.TestCase):
         finally:
             get_node(1).resume()
 
+
+    @notipv6
     def test_unavailable(self):
         """
         Trigger and ensure unavailables are counted

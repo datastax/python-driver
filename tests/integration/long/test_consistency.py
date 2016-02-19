@@ -9,7 +9,7 @@
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
+# See the License for the specific language governing permissions acnd
 # limitations under the License.
 
 import struct, time, traceback, sys, logging
@@ -18,7 +18,7 @@ from cassandra import ConsistencyLevel, OperationTimedOut, ReadTimeout, WriteTim
 from cassandra.cluster import Cluster
 from cassandra.policies import TokenAwarePolicy, RoundRobinPolicy, DowngradingConsistencyRetryPolicy
 from cassandra.query import SimpleStatement
-from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass
+from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass, CONTACT_POINTS
 
 from tests.integration.long.utils import (force_stop, create_schema, wait_for_down, wait_for_up,
                                           start, CoordinatorStats)
@@ -129,10 +129,15 @@ class ConsistencyTests(unittest.TestCase):
     def _test_tokenaware_one_node_down(self, keyspace, rf, accepted):
         cluster = Cluster(
             load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
-            protocol_version=PROTOCOL_VERSION)
+            protocol_version=PROTOCOL_VERSION,
+            contact_points=CONTACT_POINTS)
         session = cluster.connect()
+        print("1111111111")
         wait_for_up(cluster, 1, wait=False)
+        print("22222222")
+        # cluster.control_connection.refresh_schema()
         wait_for_up(cluster, 2)
+        print"nope"
 
         create_schema(cluster, session, keyspace, replication_factor=rf)
         self._insert(session, keyspace, count=1)
@@ -143,6 +148,7 @@ class ConsistencyTests(unittest.TestCase):
 
         try:
             force_stop(2)
+            print("ayyyy")
             wait_for_down(cluster, 2)
 
             self._assert_writes_succeed(session, keyspace, accepted)
@@ -164,145 +170,149 @@ class ConsistencyTests(unittest.TestCase):
             rf=1,
             accepted=set([ConsistencyLevel.ANY]))
 
-    def test_rftwo_tokenaware_one_node_down(self):
-        self._test_tokenaware_one_node_down(
-            keyspace='test_rftwo_tokenaware',
-            rf=2,
-            accepted=set([ConsistencyLevel.ANY, ConsistencyLevel.ONE]))
-
-    def test_rfthree_tokenaware_one_node_down(self):
-        self._test_tokenaware_one_node_down(
-            keyspace='test_rfthree_tokenaware',
-            rf=3,
-            accepted=set([ConsistencyLevel.ANY, ConsistencyLevel.ONE,
-                          ConsistencyLevel.TWO, ConsistencyLevel.QUORUM]))
-
-    def test_rfthree_tokenaware_none_down(self):
-        keyspace = 'test_rfthree_tokenaware_none_down'
-        cluster = Cluster(
-            load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
-            protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
-        wait_for_up(cluster, 1, wait=False)
-        wait_for_up(cluster, 2)
-
-        create_schema(cluster, session, keyspace, replication_factor=3)
-        self._insert(session, keyspace, count=1)
-        self._query(session, keyspace, count=1)
-        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 2, 1)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 0)
-
-        self.coordinator_stats.reset_counts()
-
-        self._assert_writes_succeed(session, keyspace, SINGLE_DC_CONSISTENCY_LEVELS)
-        self._assert_reads_succeed(session, keyspace,
-                                   SINGLE_DC_CONSISTENCY_LEVELS - set([ConsistencyLevel.ANY]),
-                                   expected_reader=2)
-
-        cluster.shutdown()
-
-    def _test_downgrading_cl(self, keyspace, rf, accepted):
-        cluster = Cluster(
-            load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
-            default_retry_policy=DowngradingConsistencyRetryPolicy(),
-            protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
-
-        create_schema(cluster, session, keyspace, replication_factor=rf)
-        self._insert(session, keyspace, 1)
-        self._query(session, keyspace, 1)
-        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 2, 1)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 0)
-
-        try:
-            force_stop(2)
-            wait_for_down(cluster, 2)
-
-            self._assert_writes_succeed(session, keyspace, accepted)
-            self._assert_reads_succeed(session, keyspace,
-                                       accepted - set([ConsistencyLevel.ANY]))
-            self._assert_writes_fail(session, keyspace,
-                                     SINGLE_DC_CONSISTENCY_LEVELS - accepted)
-            self._assert_reads_fail(session, keyspace,
-                                    SINGLE_DC_CONSISTENCY_LEVELS - accepted)
-        finally:
-            start(2)
-            wait_for_up(cluster, 2)
-
-        cluster.shutdown()
-
-    def test_rfone_downgradingcl(self):
-        self._test_downgrading_cl(
-            keyspace='test_rfone_downgradingcl',
-            rf=1,
-            accepted=set([ConsistencyLevel.ANY]))
-
-    def test_rftwo_downgradingcl(self):
-        self._test_downgrading_cl(
-            keyspace='test_rftwo_downgradingcl',
-            rf=2,
-            accepted=SINGLE_DC_CONSISTENCY_LEVELS)
-
-    def test_rfthree_roundrobin_downgradingcl(self):
-        keyspace = 'test_rfthree_roundrobin_downgradingcl'
-        cluster = Cluster(
-            load_balancing_policy=RoundRobinPolicy(),
-            default_retry_policy=DowngradingConsistencyRetryPolicy(),
-            protocol_version=PROTOCOL_VERSION)
-        self.rfthree_downgradingcl(cluster, keyspace, True)
-
-    def test_rfthree_tokenaware_downgradingcl(self):
-        keyspace = 'test_rfthree_tokenaware_downgradingcl'
-        cluster = Cluster(
-            load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
-            default_retry_policy=DowngradingConsistencyRetryPolicy(),
-            protocol_version=PROTOCOL_VERSION)
-        self.rfthree_downgradingcl(cluster, keyspace, False)
-
-    def rfthree_downgradingcl(self, cluster, keyspace, roundrobin):
-        session = cluster.connect()
-
-        create_schema(cluster, session, keyspace, replication_factor=2)
-        self._insert(session, keyspace, count=12)
-        self._query(session, keyspace, count=12)
-
-        if roundrobin:
-            self.coordinator_stats.assert_query_count_equals(self, 1, 4)
-            self.coordinator_stats.assert_query_count_equals(self, 2, 4)
-            self.coordinator_stats.assert_query_count_equals(self, 3, 4)
-        else:
-            self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-            self.coordinator_stats.assert_query_count_equals(self, 2, 12)
-            self.coordinator_stats.assert_query_count_equals(self, 3, 0)
-
-        try:
-            self.coordinator_stats.reset_counts()
-            force_stop(2)
-            wait_for_down(cluster, 2)
-
-            self._assert_writes_succeed(session, keyspace, SINGLE_DC_CONSISTENCY_LEVELS)
-
-            # Test reads that expected to complete successfully
-            for cl in SINGLE_DC_CONSISTENCY_LEVELS - set([ConsistencyLevel.ANY]):
-                self.coordinator_stats.reset_counts()
-                self._query(session, keyspace, 12, consistency_level=cl)
-                if roundrobin:
-                    self.coordinator_stats.assert_query_count_equals(self, 1, 6)
-                    self.coordinator_stats.assert_query_count_equals(self, 2, 0)
-                    self.coordinator_stats.assert_query_count_equals(self, 3, 6)
-                else:
-                    self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-                    self.coordinator_stats.assert_query_count_equals(self, 2, 0)
-                    self.coordinator_stats.assert_query_count_equals(self, 3, 12)
-        finally:
-            start(2)
-            wait_for_up(cluster, 2)
-
-        session.cluster.shutdown()
-
-    # TODO: can't be done in this class since we reuse the ccm cluster
-    #       instead we should create these elsewhere
-    # def test_rfthree_downgradingcl_twodcs(self):
-    # def test_rfthree_downgradingcl_twodcs_dcaware(self):
+    # def test_rftwo_tokenaware_one_node_down(self):
+    #     self._test_tokenaware_one_node_down(
+    #         keyspace='test_rftwo_tokenaware',
+    #         rf=2,
+    #         accepted=set([ConsistencyLevel.ANY, ConsistencyLevel.ONE]))
+    #
+    # def test_rfthree_tokenaware_one_node_down(self):
+    #     self._test_tokenaware_one_node_down(
+    #         keyspace='test_rfthree_tokenaware',
+    #         rf=3,
+    #         accepted=set([ConsistencyLevel.ANY, ConsistencyLevel.ONE,
+    #                       ConsistencyLevel.TWO, ConsistencyLevel.QUORUM]))
+    #
+    # def test_rfthree_tokenaware_none_down(self):
+    #     keyspace = 'test_rfthree_tokenaware_none_down'
+    #     cluster = Cluster(
+    #         load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
+    #         protocol_version=PROTOCOL_VERSION,
+    #         contact_points=CONTACT_POINTS)
+    #     session = cluster.connect()
+    #     wait_for_up(cluster, 1, wait=False)
+    #     wait_for_up(cluster, 2)
+    #
+    #     create_schema(cluster, session, keyspace, replication_factor=3)
+    #     self._insert(session, keyspace, count=1)
+    #     self._query(session, keyspace, count=1)
+    #     self.coordinator_stats.assert_query_count_equals(self, 1, 0)
+    #     self.coordinator_stats.assert_query_count_equals(self, 2, 1)
+    #     self.coordinator_stats.assert_query_count_equals(self, 3, 0)
+    #
+    #     self.coordinator_stats.reset_counts()
+    #
+    #     self._assert_writes_succeed(session, keyspace, SINGLE_DC_CONSISTENCY_LEVELS)
+    #     self._assert_reads_succeed(session, keyspace,
+    #                                SINGLE_DC_CONSISTENCY_LEVELS - set([ConsistencyLevel.ANY]),
+    #                                expected_reader=2)
+    #
+    #     cluster.shutdown()
+    #
+    # def _test_downgrading_cl(self, keyspace, rf, accepted):
+    #     cluster = Cluster(
+    #         load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
+    #         default_retry_policy=DowngradingConsistencyRetryPolicy(),
+    #         protocol_version=PROTOCOL_VERSION,
+    #         contact_points=CONTACT_POINTS)
+    #     session = cluster.connect()
+    #
+    #     create_schema(cluster, session, keyspace, replication_factor=rf)
+    #     self._insert(session, keyspace, 1)
+    #     self._query(session, keyspace, 1)
+    #     self.coordinator_stats.assert_query_count_equals(self, 1, 0)
+    #     self.coordinator_stats.assert_query_count_equals(self, 2, 1)
+    #     self.coordinator_stats.assert_query_count_equals(self, 3, 0)
+    #
+    #     try:
+    #         force_stop(2)
+    #         wait_for_down(cluster, 2)
+    #
+    #         self._assert_writes_succeed(session, keyspace, accepted)
+    #         self._assert_reads_succeed(session, keyspace,
+    #                                    accepted - set([ConsistencyLevel.ANY]))
+    #         self._assert_writes_fail(session, keyspace,
+    #                                  SINGLE_DC_CONSISTENCY_LEVELS - accepted)
+    #         self._assert_reads_fail(session, keyspace,
+    #                                 SINGLE_DC_CONSISTENCY_LEVELS - accepted)
+    #     finally:
+    #         start(2)
+    #         wait_for_up(cluster, 2)
+    #
+    #     cluster.shutdown()
+    #
+    # def test_rfone_downgradingcl(self):
+    #     self._test_downgrading_cl(
+    #         keyspace='test_rfone_downgradingcl',
+    #         rf=1,
+    #         accepted=set([ConsistencyLevel.ANY]))
+    #
+    # def test_rftwo_downgradingcl(self):
+    #     self._test_downgrading_cl(
+    #         keyspace='test_rftwo_downgradingcl',
+    #         rf=2,
+    #         accepted=SINGLE_DC_CONSISTENCY_LEVELS)
+    #
+    # def test_rfthree_roundrobin_downgradingcl(self):
+    #     keyspace = 'test_rfthree_roundrobin_downgradingcl'
+    #     cluster = Cluster(
+    #         load_balancing_policy=RoundRobinPolicy(),
+    #         default_retry_policy=DowngradingConsistencyRetryPolicy(),
+    #         protocol_version=PROTOCOL_VERSION,
+    #         contact_points=CONTACT_POINTS)
+    #     self.rfthree_downgradingcl(cluster, keyspace, True)
+    #
+    # def test_rfthree_tokenaware_downgradingcl(self):
+    #     keyspace = 'test_rfthree_tokenaware_downgradingcl'
+    #     cluster = Cluster(
+    #         load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
+    #         default_retry_policy=DowngradingConsistencyRetryPolicy(),
+    #         protocol_version=PROTOCOL_VERSION,
+    #         contact_points=CONTACT_POINTS)
+    #     self.rfthree_downgradingcl(cluster, keyspace, False)
+    #
+    # def rfthree_downgradingcl(self, cluster, keyspace, roundrobin):
+    #     session = cluster.connect()
+    #
+    #     create_schema(cluster, session, keyspace, replication_factor=2)
+    #     self._insert(session, keyspace, count=12)
+    #     self._query(session, keyspace, count=12)
+    #
+    #     if roundrobin:
+    #         self.coordinator_stats.assert_query_count_equals(self, 1, 4)
+    #         self.coordinator_stats.assert_query_count_equals(self, 2, 4)
+    #         self.coordinator_stats.assert_query_count_equals(self, 3, 4)
+    #     else:
+    #         self.coordinator_stats.assert_query_count_equals(self, 1, 0)
+    #         self.coordinator_stats.assert_query_count_equals(self, 2, 12)
+    #         self.coordinator_stats.assert_query_count_equals(self, 3, 0)
+    #
+    #     try:
+    #         self.coordinator_stats.reset_counts()
+    #         force_stop(2)
+    #         wait_for_down(cluster, 2)
+    #
+    #         self._assert_writes_succeed(session, keyspace, SINGLE_DC_CONSISTENCY_LEVELS)
+    #
+    #         # Test reads that expected to complete successfully
+    #         for cl in SINGLE_DC_CONSISTENCY_LEVELS - set([ConsistencyLevel.ANY]):
+    #             self.coordinator_stats.reset_counts()
+    #             self._query(session, keyspace, 12, consistency_level=cl)
+    #             if roundrobin:
+    #                 self.coordinator_stats.assert_query_count_equals(self, 1, 6)
+    #                 self.coordinator_stats.assert_query_count_equals(self, 2, 0)
+    #                 self.coordinator_stats.assert_query_count_equals(self, 3, 6)
+    #             else:
+    #                 self.coordinator_stats.assert_query_count_equals(self, 1, 0)
+    #                 self.coordinator_stats.assert_query_count_equals(self, 2, 0)
+    #                 self.coordinator_stats.assert_query_count_equals(self, 3, 12)
+    #     finally:
+    #         start(2)
+    #         wait_for_up(cluster, 2)
+    #
+    #     session.cluster.shutdown()
+    #
+    # # TODO: can't be done in this class since we reuse the ccm cluster
+    # #       instead we should create these elsewhere
+    # # def test_rfthree_downgradingcl_twodcs(self):
+    # # def test_rfthree_downgradingcl_twodcs_dcaware(self):

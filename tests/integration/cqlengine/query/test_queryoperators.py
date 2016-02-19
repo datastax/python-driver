@@ -24,6 +24,9 @@ from cassandra.cqlengine.statements import WhereClause
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 
+from tests.integration import notipv6
+
+
 class TestQuerySetOperation(BaseCassEngTestCase):
 
     def test_maxtimeuuid_function(self):
