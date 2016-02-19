@@ -560,37 +560,36 @@ class TestTupleColumn(BaseCassEngTestCase):
 
     def test_initial(self):
         tmp = TestTupleModel.create()
-        tmp.int_tuple = tmp.int_tuple + (1, 2, 3)
+        tmp.int_tuple = (1, 2, 3)
 
     def test_initial_retrieve(self):
         tmp = TestTupleModel.create()
         tmp2 = tmp.get(partition=tmp.partition)
-        tmp2.int_tuple = tmp2.int_tuple + (1, 2, 3)
+        tmp2.int_tuple = (1, 2, 3)
 
     def test_io_success(self):
         """ Tests that a basic usage works as expected """
         m1 = TestTupleModel.create(int_tuple=(1, 2, 3, 5, 6), text_tuple=('kai', 'andreas'), mixed_tuple=('first', 2, 'Third'))
         m2 = TestTupleModel.get(partition=m1.partition)
 
-        assert isinstance(m2.int_tuple, tuple)
-        assert isinstance(m2.text_tuple, tuple)
-        assert isinstance(m2.mixed_tuple, tuple)
+        self.assertIsInstance(m2.int_tuple, tuple)
+        self.assertIsInstance(m2.text_tuple, tuple)
+        self.assertIsInstance(m2.mixed_tuple, tuple)
 
+        self.assertEqual(len(m2.int_tuple), 3)
+        self.assertEqual(len(m2.text_tuple), 2)
+        self.assertEqual(len(m2.mixed_tuple), 3)
 
-        assert len(m2.int_tuple) == 3
-        assert len(m2.text_tuple) == 2
-        assert len(m2.mixed_tuple) == 3
+        self.assertEqual(m2.int_tuple[0], 1)
+        self.assertEqual(m2.int_tuple[1], 2)
+        self.assertEqual(m2.int_tuple[2], 3)
 
-        assert m2.int_tuple[0] == 1
-        assert m2.int_tuple[1] == 2
-        assert m2.int_tuple[2] == 3
+        self.assertEqual(m2.text_tuple[0], 'kai')
+        self.assertEqual(m2.text_tuple[1], 'andreas')
 
-        assert m2.text_tuple[0] == 'kai'
-        assert m2.text_tuple[1] == 'andreas'
-
-        assert m2.mixed_tuple[0] == 'first'
-        assert m2.mixed_tuple[1] == 2
-        assert m2.mixed_tuple[2] == 'Third'
+        self.assertEqual(m2.mixed_tuple[0], 'first')
+        self.assertEqual(m2.mixed_tuple[1], 2)
+        self.assertEqual(m2.mixed_tuple[2], 'Third')
 
     def test_type_validation(self):
         """
@@ -606,9 +605,9 @@ class TestTupleColumn(BaseCassEngTestCase):
         and that the class is instantiated in the constructor
         """
         mixed_tuple = columns.Tuple(columns.Text, columns.Integer, columns.Text, required=False)
-        assert isinstance(mixed_tuple.types[0], columns.Text)
-        assert isinstance(mixed_tuple.types[1], columns.Integer)
-        assert isinstance(mixed_tuple.types[2], columns.Text)
+        self.assertIsInstance(mixed_tuple.types[0], columns.Text)
+        self.assertIsInstance(mixed_tuple.types[1], columns.Integer)
+        self.assertIsInstance(mixed_tuple.types[2], columns.Text)
         self.assertEqual(len(mixed_tuple.types), 3)
 
     def test_default_empty_container_saving(self):
@@ -645,9 +644,9 @@ class TestTupleColumn(BaseCassEngTestCase):
         column = columns.Tuple(JsonTestColumn)
         val = (1, 2, 3)
         db_val = column.to_database(val)
-        assert db_val == [json.dumps(v) for v in val]
+        self.assertEqual(db_val, tuple(json.dumps(v) for v in val))
         py_val = column.to_python(db_val)
-        assert py_val == val
+        self.assertEqual(py_val, val)
 
     def test_update_from_non_empty_to_empty(self):
         # Can up date a touple raises a Runtime Error
@@ -657,7 +656,7 @@ class TestTupleColumn(BaseCassEngTestCase):
         tmp.update()
 
         tmp = TestTupleModel.get(partition=pkey)
-        self.assertEqual(tmp.int_tuple, (1, 3))
+        self.assertEqual(tmp.int_tuple, (1, 3, None))
 
     def test_insert_none(self):
         pkey = uuid4()
@@ -671,12 +670,12 @@ class TestTupleColumn(BaseCassEngTestCase):
         m.save()
 
         m2 = TestTupleModel.get(partition=m.partition)
-        assert m2.int_tuple == expected
+        self.assertEqual(m2.int_tuple, expected)
 
         TestTupleModel.objects(partition=m.partition).update(int_tuple=None)
 
         m3 = TestTupleModel.get(partition=m.partition)
-        assert m3.int_tuple == ()
+        self.assertEqual(m3.int_tuple, None)
 
 
 class TestTupleModelVeryLarge(Model):
