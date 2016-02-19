@@ -621,12 +621,13 @@ class BaseContainerColumn(Column):
             inheritance_comparator = issubclass if isinstance(t, type) else isinstance
             if not inheritance_comparator(t, Column):
                 raise ValidationError("%s is not a column class" % (t,))
-            if inheritance_comparator(t, BaseContainerColumn):  # should go away with PYTHON-478
-                raise ValidationError('container types cannot be nested')
             if t.db_type is None:
                 raise ValidationError("%s is an abstract type" % (t,))
+            inst = t() if isinstance(t, type) else t
+            if isinstance(t, BaseContainerColumn):
+                inst._freeze_db_type()
+            instances.append(inst)
 
-            instances.append(t() if isinstance(t, type) else t)
         self.types = instances
 
         super(BaseContainerColumn, self).__init__(**kwargs)
@@ -641,6 +642,10 @@ class BaseContainerColumn(Column):
 
     def _val_is_null(self, val):
         return not val
+
+    def _freeze_db_type(self):
+        if not self.db_type.startswith('frozen'):
+            self.db_type = "frozen<%s>" % (self.db_type,)
 
     @property
     def sub_types(self):
@@ -660,17 +665,16 @@ class Set(BaseContainerColumn):
             type on validation, or raise a validation error, defaults to True
         """
         self.strict = strict
-        self.db_type = 'set<{0}>'.format(value_type.db_type)
-
         super(Set, self).__init__((value_type,), default=default, **kwargs)
-
         self.value_col = self.types[0]
+        self.db_type = 'set<{0}>'.format(self.value_col.db_type)
+
 
     def validate(self, value):
         val = super(Set, self).validate(value)
         if val is None:
             return
-        types = (set,) if self.strict else (set, list, tuple)
+        types = (set, util.SortedSet) if self.strict else (set, util.SortedSet, list, tuple)
         if not isinstance(val, types):
             if self.strict:
                 raise ValidationError('{0} {1} is not a set object'.format(self.column_name, val))
@@ -703,11 +707,10 @@ class List(BaseContainerColumn):
         """
         :param value_type: a column class indicating the types of the value
         """
-        self.db_type = 'list<{0}>'.format(value_type.db_type)
-
         super(List, self).__init__((value_type,), default=default, **kwargs)
-
         self.value_col = self.types[0]
+        self.db_type = 'list<{0}>'.format(self.value_col.db_type)
+
 
     def validate(self, value):
         val = super(List, self).validate(value)
@@ -741,22 +744,21 @@ class Map(BaseContainerColumn):
         :param key_type: a column class indicating the types of the key
         :param value_type: a column class indicating the types of the value
         """
-
-        self.db_type = 'map<{0}, {1}>'.format(key_type.db_type, value_type.db_type)
-
         super(Map, self).__init__((key_type, value_type), default=default, **kwargs)
-
         self.key_col = self.types[0]
         self.value_col = self.types[1]
+        self.db_type = 'map<{0}, {1}>'.format(self.key_col.db_type, self.value_col.db_type)
 
     def validate(self, value):
         val = super(Map, self).validate(value)
         if val is None:
             return
-        if not isinstance(val, dict):
+        if not isinstance(val, (dict, util.OrderedMap)):
             raise ValidationError('{0} {1} is not a dict object'.format(self.column_name, val))
         if None in val:
             raise ValidationError("{0} None is not allowed in a map".format(self.column_name))
+        # TODO: stop doing this conversion because it doesn't support non-hashable collections as keys (cassandra does)
+        # will need to start using the cassandra.util types in the next major rev
         return dict((self.key_col.validate(k), self.value_col.validate(v)) for k, v in val.items())
 
     def to_python(self, value):
@@ -792,13 +794,10 @@ class Tuple(BaseContainerColumn):
         """
         :param args: column types representing tuple composition
         """
-
-        self.db_type = 'tuple<{0}>'.format(', '.join(typ.db_type for typ in args))
-
         if not args:
             raise ValueError("Tuple must specify at least one inner type")
-
         super(Tuple, self).__init__(args, **kwargs)
+        self.db_type = 'tuple<{0}>'.format(', '.join(typ.db_type for typ in self.types))
 
     def validate(self, value):
         val = super(Tuple, self).validate(value)
