@@ -80,6 +80,8 @@ class Column(object):
 
     instance_counter = 0
 
+    _python_type_hashable = True
+
     primary_key = False
     """
     bool flag, indicates this column is a primary key. The first primary key defined
@@ -611,7 +613,6 @@ class BaseContainerColumn(Column):
 
     https://cassandra.apache.org/doc/cql3/CQL.html#collections
     """
-
     def __init__(self, types, **kwargs):
         """
         :param types: a sequence of sub types in this collection
@@ -621,14 +622,14 @@ class BaseContainerColumn(Column):
             inheritance_comparator = issubclass if isinstance(t, type) else isinstance
             if not inheritance_comparator(t, Column):
                 raise ValidationError("%s is not a column class" % (t,))
-            if inheritance_comparator(t, BaseContainerColumn):  # should go away with PYTHON-478
-                raise ValidationError('container types cannot be nested')
             if t.db_type is None:
                 raise ValidationError("%s is an abstract type" % (t,))
+            inst = t() if isinstance(t, type) else t
+            if isinstance(t, BaseContainerColumn):
+                inst._freeze_db_type()
+            instances.append(inst)
 
-            instances.append(t() if isinstance(t, type) else t)
         self.types = instances
-
         super(BaseContainerColumn, self).__init__(**kwargs)
 
     def validate(self, value):
@@ -642,6 +643,10 @@ class BaseContainerColumn(Column):
     def _val_is_null(self, val):
         return not val
 
+    def _freeze_db_type(self):
+        if not self.db_type.startswith('frozen'):
+            self.db_type = "frozen<%s>" % (self.db_type,)
+
     @property
     def sub_types(self):
         return self.types
@@ -653,6 +658,9 @@ class Set(BaseContainerColumn):
 
     http://www.datastax.com/documentation/cql/3.1/cql/cql_using/use_set_t.html
     """
+
+    _python_type_hashable = False
+
     def __init__(self, value_type, strict=True, default=set, **kwargs):
         """
         :param value_type: a column class indicating the types of the value
@@ -660,17 +668,17 @@ class Set(BaseContainerColumn):
             type on validation, or raise a validation error, defaults to True
         """
         self.strict = strict
-        self.db_type = 'set<{0}>'.format(value_type.db_type)
-
         super(Set, self).__init__((value_type,), default=default, **kwargs)
-
         self.value_col = self.types[0]
+        if not self.value_col._python_type_hashable:
+            raise ValidationError("Cannot create a Set with unhashable value type (see PYTHON-494)")
+        self.db_type = 'set<{0}>'.format(self.value_col.db_type)
 
     def validate(self, value):
         val = super(Set, self).validate(value)
         if val is None:
             return
-        types = (set,) if self.strict else (set, list, tuple)
+        types = (set, util.SortedSet) if self.strict else (set, util.SortedSet, list, tuple)
         if not isinstance(val, types):
             if self.strict:
                 raise ValidationError('{0} {1} is not a set object'.format(self.column_name, val))
@@ -679,7 +687,8 @@ class Set(BaseContainerColumn):
 
         if None in val:
             raise ValidationError("{0} None not allowed in a set".format(self.column_name))
-
+        # TODO: stop doing this conversion because it doesn't support non-hashable collections as keys (cassandra does)
+        # will need to start using the cassandra.util types in the next major rev (PYTHON-494)
         return set(self.value_col.validate(v) for v in val)
 
     def to_python(self, value):
@@ -699,15 +708,16 @@ class List(BaseContainerColumn):
 
     http://www.datastax.com/documentation/cql/3.1/cql/cql_using/use_list_t.html
     """
+
+    _python_type_hashable = False
+
     def __init__(self, value_type, default=list, **kwargs):
         """
         :param value_type: a column class indicating the types of the value
         """
-        self.db_type = 'list<{0}>'.format(value_type.db_type)
-
         super(List, self).__init__((value_type,), default=default, **kwargs)
-
         self.value_col = self.types[0]
+        self.db_type = 'list<{0}>'.format(self.value_col.db_type)
 
     def validate(self, value):
         val = super(List, self).validate(value)
@@ -736,27 +746,33 @@ class Map(BaseContainerColumn):
 
     http://www.datastax.com/documentation/cql/3.1/cql/cql_using/use_map_t.html
     """
+
+    _python_type_hashable = False
+
     def __init__(self, key_type, value_type, default=dict, **kwargs):
         """
         :param key_type: a column class indicating the types of the key
         :param value_type: a column class indicating the types of the value
         """
-
-        self.db_type = 'map<{0}, {1}>'.format(key_type.db_type, value_type.db_type)
-
         super(Map, self).__init__((key_type, value_type), default=default, **kwargs)
-
         self.key_col = self.types[0]
         self.value_col = self.types[1]
+
+        if not self.key_col._python_type_hashable:
+            raise ValidationError("Cannot create a Map with unhashable key type (see PYTHON-494)")
+
+        self.db_type = 'map<{0}, {1}>'.format(self.key_col.db_type, self.value_col.db_type)
 
     def validate(self, value):
         val = super(Map, self).validate(value)
         if val is None:
             return
-        if not isinstance(val, dict):
+        if not isinstance(val, (dict, util.OrderedMap)):
             raise ValidationError('{0} {1} is not a dict object'.format(self.column_name, val))
         if None in val:
             raise ValidationError("{0} None is not allowed in a map".format(self.column_name))
+        # TODO: stop doing this conversion because it doesn't support non-hashable collections as keys (cassandra does)
+        # will need to start using the cassandra.util types in the next major rev (PYTHON-494)
         return dict((self.key_col.validate(k), self.value_col.validate(v)) for k, v in val.items())
 
     def to_python(self, value):
@@ -771,17 +787,6 @@ class Map(BaseContainerColumn):
         return dict((self.key_col.to_database(k), self.value_col.to_database(v)) for k, v in value.items())
 
 
-class UDTValueManager(BaseValueManager):
-    @property
-    def changed(self):
-        return self.value != self.previous_value or (self.value is not None and self.value.has_changed_fields())
-
-    def reset_previous_value(self):
-        if self.value is not None:
-            self.value.reset_changed_fields()
-        self.previous_value = copy(self.value)
-
-
 class Tuple(BaseContainerColumn):
     """
     Stores a fixed-length set of positional values
@@ -792,13 +797,10 @@ class Tuple(BaseContainerColumn):
         """
         :param args: column types representing tuple composition
         """
-
-        self.db_type = 'tuple<{0}>'.format(', '.join(typ.db_type for typ in args))
-
         if not args:
             raise ValueError("Tuple must specify at least one inner type")
-
         super(Tuple, self).__init__(args, **kwargs)
+        self.db_type = 'tuple<{0}>'.format(', '.join(typ.db_type for typ in self.types))
 
     def validate(self, value):
         val = super(Tuple, self).validate(value)
@@ -818,6 +820,17 @@ class Tuple(BaseContainerColumn):
         if value is None:
             return
         return tuple(t.to_database(v) for t, v in zip(self.types, value))
+
+
+class UDTValueManager(BaseValueManager):
+    @property
+    def changed(self):
+        return self.value != self.previous_value or (self.value is not None and self.value.has_changed_fields())
+
+    def reset_previous_value(self):
+        if self.value is not None:
+            self.value.reset_changed_fields()
+        self.previous_value = copy(self.value)
 
 
 class UserDefinedType(Column):

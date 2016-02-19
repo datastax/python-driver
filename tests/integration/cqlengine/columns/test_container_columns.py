@@ -21,7 +21,6 @@ import traceback
 from uuid import uuid4
 
 from cassandra import WriteTimeout
-
 import cassandra.cqlengine.columns as columns
 from cassandra.cqlengine.functions import get_total_seconds
 from cassandra.cqlengine.models import Model, ValidationError
@@ -109,14 +108,14 @@ class TestSetColumn(BaseCassEngTestCase):
         m1 = TestSetModel.create(int_set=set((1, 2)), text_set=set(('kai', 'andreas')))
         m2 = TestSetModel.get(partition=m1.partition)
 
-        assert isinstance(m2.int_set, set)
-        assert isinstance(m2.text_set, set)
+        self.assertIsInstance(m2.int_set, set)
+        self.assertIsInstance(m2.text_set, set)
 
-        assert 1 in m2.int_set
-        assert 2 in m2.int_set
+        self.assertIn(1, m2.int_set)
+        self.assertIn(2, m2.int_set)
 
-        assert 'kai' in m2.text_set
-        assert 'andreas' in m2.text_set
+        self.assertIn('kai', m2.text_set)
+        self.assertIn('andreas', m2.text_set)
 
     def test_type_validation(self):
         """
@@ -144,12 +143,12 @@ class TestSetColumn(BaseCassEngTestCase):
 
         m1.int_set.add(5)
         m1.int_set.remove(1)
-        assert m1.int_set == set((2, 3, 4, 5))
+        self.assertEqual(m1.int_set, set((2, 3, 4, 5)))
 
         m1.save()
 
         m2 = TestSetModel.get(partition=m1.partition)
-        assert m2.int_set == set((2, 3, 4, 5))
+        self.assertEqual(m2.int_set, set((2, 3, 4, 5)))
 
     def test_instantiation_with_column_class(self):
         """
@@ -157,23 +156,23 @@ class TestSetColumn(BaseCassEngTestCase):
         and that the class is instantiated in the constructor
         """
         column = columns.Set(columns.Text)
-        assert isinstance(column.value_col, columns.Text)
+        self.assertIsInstance(column.value_col, columns.Text)
 
     def test_instantiation_with_column_instance(self):
         """
         Tests that columns instantiated with a column instance work properly
         """
         column = columns.Set(columns.Text(min_length=100))
-        assert isinstance(column.value_col, columns.Text)
+        self.assertIsInstance(column.value_col, columns.Text)
 
     def test_to_python(self):
         """ Tests that to_python of value column is called """
         column = columns.Set(JsonTestColumn)
         val = set((1, 2, 3))
         db_val = column.to_database(val)
-        assert db_val == set(json.dumps(v) for v in val)
+        self.assertEqual(db_val, set(json.dumps(v) for v in val))
         py_val = column.to_python(db_val)
-        assert py_val == val
+        self.assertEqual(py_val, val)
 
     def test_default_empty_container_saving(self):
         """ tests that the default empty container is not saved if it hasn't been updated """
@@ -219,17 +218,17 @@ class TestListColumn(BaseCassEngTestCase):
         m1 = TestListModel.create(int_list=[1, 2], text_list=['kai', 'andreas'])
         m2 = TestListModel.get(partition=m1.partition)
 
-        assert isinstance(m2.int_list, list)
-        assert isinstance(m2.text_list, list)
+        self.assertIsInstance(m2.int_list, list)
+        self.assertIsInstance(m2.text_list, list)
 
-        assert len(m2.int_list) == 2
-        assert len(m2.text_list) == 2
+        self.assertEqual(len(m2.int_list), 2)
+        self.assertEqual(len(m2.text_list), 2)
 
-        assert m2.int_list[0] == 1
-        assert m2.int_list[1] == 2
+        self.assertEqual(m2.int_list[0], 1)
+        self.assertEqual(m2.int_list[1], 2)
 
-        assert m2.text_list[0] == 'kai'
-        assert m2.text_list[1] == 'andreas'
+        self.assertEqual(m2.text_list[0], 'kai')
+        self.assertEqual(m2.text_list[1], 'andreas')
 
     def test_type_validation(self):
         """
@@ -275,23 +274,23 @@ class TestListColumn(BaseCassEngTestCase):
         and that the class is instantiated in the constructor
         """
         column = columns.List(columns.Text)
-        assert isinstance(column.value_col, columns.Text)
+        self.assertIsInstance(column.value_col, columns.Text)
 
     def test_instantiation_with_column_instance(self):
         """
         Tests that columns instantiated with a column instance work properly
         """
         column = columns.List(columns.Text(min_length=100))
-        assert isinstance(column.value_col, columns.Text)
+        self.assertIsInstance(column.value_col, columns.Text)
 
     def test_to_python(self):
         """ Tests that to_python of value column is called """
         column = columns.List(JsonTestColumn)
         val = [1, 2, 3]
         db_val = column.to_database(val)
-        assert db_val == [json.dumps(v) for v in val]
+        self.assertEqual(db_val, [json.dumps(v) for v in val])
         py_val = column.to_python(db_val)
-        assert py_val == val
+        self.assertEqual(py_val, val)
 
     def test_default_empty_container_saving(self):
         """ tests that the default empty container is not saved if it hasn't been updated """
@@ -333,12 +332,12 @@ class TestListColumn(BaseCassEngTestCase):
         m.save()
 
         m2 = TestListModel.get(partition=m.partition)
-        assert m2.int_list == expected
+        self.assertEqual(m2.int_list, expected)
 
         TestListModel.objects(partition=m.partition).update(int_list=[])
 
         m3 = TestListModel.get(partition=m.partition)
-        assert m3.int_list == []
+        self.assertEqual(m3.int_list, [])
 
 
 class TestMapModel(Model):
@@ -398,8 +397,6 @@ class TestMapColumn(BaseCassEngTestCase):
         self.assertEqual(m2.int_map[1], k1)
         self.assertEqual(m2.int_map[2], k2)
 
-        self.assertTrue('now' in m2.text_map)
-        self.assertTrue('then' in m2.text_map)
         self.assertAlmostEqual(get_total_seconds(now - m2.text_map['now']), 0, 2)
         self.assertAlmostEqual(get_total_seconds(then - m2.text_map['then']), 0, 2)
 
@@ -441,7 +438,7 @@ class TestMapColumn(BaseCassEngTestCase):
         m1.save()
 
         m2 = TestMapModel.get(partition=m1.partition)
-        assert m2.text_map == final
+        self.assertEqual(m2.text_map, final)
 
     def test_updates_from_none(self):
         """ Tests that updates from None work as expected """
@@ -451,12 +448,12 @@ class TestMapColumn(BaseCassEngTestCase):
         m.save()
 
         m2 = TestMapModel.get(partition=m.partition)
-        assert m2.int_map == expected
+        self.assertEquals(m2.int_map, expected)
 
         m2.int_map = None
         m2.save()
         m3 = TestMapModel.get(partition=m.partition)
-        assert m3.int_map != expected
+        self.assertNotEqual(m3.int_map, expected)
 
     def test_blind_updates_from_none(self):
         """ Tests that updates from None work as expected """
@@ -466,12 +463,12 @@ class TestMapColumn(BaseCassEngTestCase):
         m.save()
 
         m2 = TestMapModel.get(partition=m.partition)
-        assert m2.int_map == expected
+        self.assertEqual(m2.int_map, expected)
 
         TestMapModel.objects(partition=m.partition).update(int_map={})
 
         m3 = TestMapModel.get(partition=m.partition)
-        assert m3.int_map != expected
+        self.assertNotEqual(m3.int_map, expected)
 
     def test_updates_to_none(self):
         """ Tests that setting the field to None works as expected """
@@ -480,7 +477,7 @@ class TestMapColumn(BaseCassEngTestCase):
         m.save()
 
         m2 = TestMapModel.get(partition=m.partition)
-        assert m2.int_map == {}
+        self.assertEqual(m2.int_map, {})
 
     def test_instantiation_with_column_class(self):
         """
@@ -488,25 +485,25 @@ class TestMapColumn(BaseCassEngTestCase):
         and that the class is instantiated in the constructor
         """
         column = columns.Map(columns.Text, columns.Integer)
-        assert isinstance(column.key_col, columns.Text)
-        assert isinstance(column.value_col, columns.Integer)
+        self.assertIsInstance(column.key_col, columns.Text)
+        self.assertIsInstance(column.value_col, columns.Integer)
 
     def test_instantiation_with_column_instance(self):
         """
         Tests that columns instantiated with a column instance work properly
         """
         column = columns.Map(columns.Text(min_length=100), columns.Integer())
-        assert isinstance(column.key_col, columns.Text)
-        assert isinstance(column.value_col, columns.Integer)
+        self.assertIsInstance(column.key_col, columns.Text)
+        self.assertIsInstance(column.value_col, columns.Integer)
 
     def test_to_python(self):
         """ Tests that to_python of value column is called """
         column = columns.Map(JsonTestColumn, JsonTestColumn)
         val = {1: 2, 3: 4, 5: 6}
         db_val = column.to_database(val)
-        assert db_val == dict((json.dumps(k), json.dumps(v)) for k, v in val.items())
+        self.assertEqual(db_val, dict((json.dumps(k), json.dumps(v)) for k, v in val.items()))
         py_val = column.to_python(db_val)
-        assert py_val == val
+        self.assertEqual(py_val, val)
 
     def test_default_empty_container_saving(self):
         """ tests that the default empty container is not saved if it hasn't been updated """
