@@ -1020,6 +1020,9 @@ class Timer(object):
         if timeout < 0:
             self.callback()
 
+    def __lt__(self, other):
+        return self.end < other.end
+
     def cancel(self):
         self.canceled = True
 
