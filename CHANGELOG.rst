@@ -1,3 +1,13 @@
+3.2.0
+=====
+
+Features
+--------
+
+Bug Fixes
+---------
+* Fix Python3 bug with Timers and heaps (github #466)
+
 3.1.0
 =====
 
