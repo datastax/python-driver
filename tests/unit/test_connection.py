@@ -24,7 +24,7 @@ from threading import Lock
 
 from cassandra.cluster import Cluster, Session
 from cassandra.connection import (Connection, HEADER_DIRECTION_TO_CLIENT, ProtocolError,
-                                  locally_supported_compressions, ConnectionHeartbeat, _Frame)
+                                  locally_supported_compressions, ConnectionHeartbeat, _Frame, Timer, TimerManager)
 from cassandra.marshal import uint8_pack, uint32_pack, int32_pack
 from cassandra.protocol import (write_stringmultimap, write_int, write_string,
                                 SupportedMessage, ProtocolHandler)
@@ -413,3 +413,25 @@ class ConnectionHeartbeatTest(unittest.TestCase):
         self.assertIsInstance(exc, Exception)
         self.assertEqual(exc.args, Exception('Connection heartbeat failure').args)
         holder.return_connection.assert_has_calls([call(connection)] * get_holders.call_count)
+
+
+class TimerTest(unittest.TestCase):
+
+    def test_timer_collision(self):
+        # simple test demonstrating #466
+        def f1():
+            pass
+
+        def f2():
+            pass
+
+        # same timeout, comparison will defer to the Timer object itself
+        t1 = Timer(0, f1)
+        t2 = Timer(0, f2)
+        t2.end = t1.end
+
+        tm = TimerManager()
+        tm.add_timer(t1)
+        tm.add_timer(t2)
+        # Prior to $466: "TypeError: unorderable types: Timer() < Timer()"
+        tm.service_timeouts()
