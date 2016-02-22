@@ -11,6 +11,7 @@ Bug Fixes
 ---------
 * Bus error (alignment issues) when running cython on some ARM platforms (PYTHON-450)
 * Overflow when decoding large collections (cython) (PYTHON-459)
+* Timer heap comparison issue with Python 3 (github #466)
 
 3.0.0
 =====
