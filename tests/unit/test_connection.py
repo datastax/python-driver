@@ -419,19 +419,13 @@ class TimerTest(unittest.TestCase):
 
     def test_timer_collision(self):
         # simple test demonstrating #466
-        def f1():
-            pass
-
-        def f2():
-            pass
-
         # same timeout, comparison will defer to the Timer object itself
-        t1 = Timer(0, f1)
-        t2 = Timer(0, f2)
+        t1 = Timer(0, lambda: None)
+        t2 = Timer(0, lambda: None)
         t2.end = t1.end
 
         tm = TimerManager()
         tm.add_timer(t1)
         tm.add_timer(t2)
-        # Prior to $466: "TypeError: unorderable types: Timer() < Timer()"
+        # Prior to #466: "TypeError: unorderable types: Timer() < Timer()"
         tm.service_timeouts()
