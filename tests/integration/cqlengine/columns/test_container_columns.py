@@ -559,16 +559,45 @@ class TestTupleColumn(BaseCassEngTestCase):
         drop_table(TestTupleModel)
 
     def test_initial(self):
+        """
+        Tests creation and insertion of tuple types with models
+
+        @since 3.2
+        @jira_ticket PYTHON-306
+        @expected_result Model is successfully crated
+
+        @test_category object_mapper
+        """
         tmp = TestTupleModel.create()
         tmp.int_tuple = (1, 2, 3)
 
     def test_initial_retrieve(self):
+        """
+        Tests creation and insertion of tuple types with models,
+        and their retrieval.
+
+        @since 3.2
+        @jira_ticket PYTHON-306
+        @expected_result Model is successfully crated
+
+        @test_category object_mapper
+        """
+
         tmp = TestTupleModel.create()
         tmp2 = tmp.get(partition=tmp.partition)
         tmp2.int_tuple = (1, 2, 3)
 
     def test_io_success(self):
-        """ Tests that a basic usage works as expected """
+        """
+        Tests creation and insertion of various types with models,
+        and their retrieval.
+
+        @since 3.2
+        @jira_ticket PYTHON-306
+        @expected_result Model is successfully created and fetched correctly
+
+        @test_category object_mapper
+        """
         m1 = TestTupleModel.create(int_tuple=(1, 2, 3, 5, 6), text_tuple=('kai', 'andreas'), mixed_tuple=('first', 2, 'Third'))
         m2 = TestTupleModel.get(partition=m1.partition)
 
@@ -576,24 +605,19 @@ class TestTupleColumn(BaseCassEngTestCase):
         self.assertIsInstance(m2.text_tuple, tuple)
         self.assertIsInstance(m2.mixed_tuple, tuple)
 
-        self.assertEqual(len(m2.int_tuple), 3)
-        self.assertEqual(len(m2.text_tuple), 2)
-        self.assertEqual(len(m2.mixed_tuple), 3)
-
-        self.assertEqual(m2.int_tuple[0], 1)
-        self.assertEqual(m2.int_tuple[1], 2)
-        self.assertEqual(m2.int_tuple[2], 3)
-
-        self.assertEqual(m2.text_tuple[0], 'kai')
-        self.assertEqual(m2.text_tuple[1], 'andreas')
-
-        self.assertEqual(m2.mixed_tuple[0], 'first')
-        self.assertEqual(m2.mixed_tuple[1], 2)
-        self.assertEqual(m2.mixed_tuple[2], 'Third')
+        self.assertEqual((1, 2, 3), m2.int_tuple)
+        self.assertEqual(('kai', 'andreas'), m2.text_tuple)
+        self.assertEqual(('first', 2, 'Third'), m2.mixed_tuple)
 
     def test_type_validation(self):
         """
-        Tests that attempting to use the wrong types will raise an exception
+        Tests to make sure tuple type validation occurs
+
+        @since 3.2
+        @jira_ticket PYTHON-306
+        @expected_result validation errors are raised
+
+        @test_category object_mapper
         """
         self.assertRaises(ValidationError, TestTupleModel.create, **{'int_tuple': ('string', True), 'text_tuple': ('test', 'test'), 'mixed_tuple': ('one', 2, 'three')})
         self.assertRaises(ValidationError, TestTupleModel.create, **{'int_tuple': ('string', 'string'), 'text_tuple': (1, 3.0), 'mixed_tuple': ('one', 2, 'three')})
@@ -603,6 +627,12 @@ class TestTupleColumn(BaseCassEngTestCase):
         """
         Tests that columns instantiated with a column class work properly
         and that the class is instantiated in the constructor
+
+        @since 3.2
+        @jira_ticket PYTHON-306
+        @expected_result types are instantiated correctly
+
+        @test_category object_mapper
         """
         mixed_tuple = columns.Tuple(columns.Text, columns.Integer, columns.Text, required=False)
         self.assertIsInstance(mixed_tuple.types[0], columns.Text)
@@ -611,7 +641,15 @@ class TestTupleColumn(BaseCassEngTestCase):
         self.assertEqual(len(mixed_tuple.types), 3)
 
     def test_default_empty_container_saving(self):
-        """ tests that the default empty container is not saved if it hasn't been updated """
+        """
+        Tests that the default empty container is not saved if it hasn't been updated
+
+        @since 3.2
+        @jira_ticket PYTHON-306
+        @expected_result empty tuple is not upserted
+
+        @test_category object_mapper
+        """
         pkey = uuid4()
         # create a row with tuple data
         TestTupleModel.create(partition=pkey, int_tuple=(1, 2, 3))
@@ -621,49 +659,69 @@ class TestTupleColumn(BaseCassEngTestCase):
         m = TestTupleModel.get(partition=pkey)
         self.assertEqual(m.int_tuple, (1, 2, 3))
 
-    def test_partial_updates(self):
-        """Truncates on create but not on save"""
-        """ broken"""
-        full = tuple(range(10))
-        initial = full[3:7]
+    def test_updates(self):
+        """
+        Tests that updates can be preformed on tuple containers
+
+        @since 3.2
+        @jira_ticket PYTHON-306
+        @expected_result tuple is replaced
+
+        @test_category object_mapper
+        """
+        initial = (1, 2)
+        replacement = (1, 2, 3)
 
         m1 = TestTupleModel.create(int_tuple=initial)
-        m1.int_tuple = (1, 2, 3)
+        m1.int_tuple = replacement
         m1.save()
 
-        if is_prepend_reversed():
-            expected = full[2::-1] + full[3:]
-        else:
-            expected = full
-
         m2 = TestTupleModel.get(partition=m1.partition)
-        self.assertEqual(tuple(m2.int_tuple), expected)
-
-    def test_to_python(self):
-        """ Tests that to_python of value column is called """
-        column = columns.Tuple(JsonTestColumn)
-        val = (1, 2, 3)
-        db_val = column.to_database(val)
-        self.assertEqual(db_val, tuple(json.dumps(v) for v in val))
-        py_val = column.to_python(db_val)
-        self.assertEqual(py_val, val)
+        self.assertEqual(tuple(m2.int_tuple), replacement)
 
     def test_update_from_non_empty_to_empty(self):
-        # Can up date a touple raises a Runtime Error
+        """
+        Tests that explcit none updates are processed correctly on tuples
+
+        @since 3.2
+        @jira_ticket PYTHON-306
+        @expected_result tuple is replaced with none
+
+        @test_category object_mapper
+        """
         pkey = uuid4()
-        tmp = TestTupleModel.create(partition=pkey, int_tuple=(1, 2))
-        tmp.int_tuple = (1, 3)
+        tmp = TestTupleModel.create(partition=pkey, int_tuple=(1, 2, 3))
+        tmp.int_tuple = (None)
         tmp.update()
 
         tmp = TestTupleModel.get(partition=pkey)
-        self.assertEqual(tmp.int_tuple, (1, 3, None))
+        self.assertEqual(tmp.int_tuple, (None))
 
     def test_insert_none(self):
+        """
+        Tests that Tuples can be created as none
+
+        @since 3.2
+        @jira_ticket PYTHON-306
+        @expected_result tuple is created as none
+
+        @test_category object_mapper
+        """
         pkey = uuid4()
-        self.assertRaises(ValidationError, TestTupleModel.create, **{'partition': pkey, 'int_tuple': (None)})
+        tmp = TestTupleModel.create(partition=pkey, int_tuple=(None))
+        self.assertEqual((None), tmp.int_tuple)
 
     def test_blind_tuple_updates_from_none(self):
-        """ Tests that updates from None work as expected """
+        """
+        Tests that Tuples can be updated from none
+
+        @since 3.2
+        @jira_ticket PYTHON-306
+        @expected_result tuple is created as none, but upserted to contain values
+
+        @test_category object_mapper
+        """
+
         m = TestTupleModel.create(int_tuple=None)
         expected = (1, 2, 3)
         m.int_tuple = expected
@@ -677,48 +735,3 @@ class TestTupleColumn(BaseCassEngTestCase):
         m3 = TestTupleModel.get(partition=m.partition)
         self.assertEqual(m3.int_tuple, None)
 
-
-class TestTupleModelVeryLarge(Model):
-
-    partition = columns.UUID(primary_key=True, default=uuid4)
-    args = []
-    for i in range(32767):
-        args.append(columns.Integer)
-    int_tuple = columns.Tuple(*args, required=False)
-
-
-class TestTupleModelOverLarge(Model):
-
-    partition = columns.UUID(primary_key=True, default=uuid4)
-    args = []
-    for i in range(32769):
-        args.append(columns.Integer)
-    int_tuple = columns.Tuple(*args, required=False)
-
-
-class TestTupleColumnLarge(BaseCassEngTestCase):
-
-    def test_element_count_validation(self):
-        drop_table(TestTupleModelVeryLarge)
-        sync_table(TestTupleModelVeryLarge)
-        """
-        Tests that big collections are supported
-        """
-        test_tuple = (i for i in range(32767))
-        m1 = TestTupleModelVeryLarge.create(int_tuple=test_tuple)
-        m2 = TestTupleModelVeryLarge.get(partition=m1.partition)
-        print(len(m2.int_tuple))
-        drop_table(TestTupleModelVeryLarge)
-
-    def test_element_count_validation_too_big(self):
-        drop_table(TestTupleModelOverLarge)
-        sync_table(TestTupleModelOverLarge)
-        """
-        Tests that big collections are detected and raise an exception.
-        """
-        test_tuple = (i for i in range(32769))
-        m1 = TestTupleModelOverLarge.create(int_tuple=test_tuple)
-        m2 = TestTupleModelOverLarge.get(partition=m1.partition)
-        print(len(m2.int_tuple))
-        # this will need to be wrapped in an assertion
-        drop_table(TestTupleModelOverLarge)
