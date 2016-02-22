@@ -18,9 +18,9 @@
 
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL
 import eventlet
-from eventlet.green import select, socket
+from eventlet.green import socket
+import ssl
 from eventlet.queue import Queue
-from functools import partial
 import logging
 import os
 from threading import Event
@@ -37,7 +37,8 @@ log = logging.getLogger(__name__)
 def is_timeout(err):
     return (
         err in (EINPROGRESS, EALREADY, EWOULDBLOCK) or
-        (err == EINVAL and os.name in ('nt', 'ce'))
+        (err == EINVAL and os.name in ('nt', 'ce')) or
+        (isinstance(err, ssl.SSLError) and err.args[0] == 'timed out')
     )
 
 
@@ -138,26 +139,17 @@ class EventletConnection(Connection):
                 return  # Leave the write loop
 
     def handle_read(self):
-        run_select = partial(select.select, (self._socket,), (), ())
         while True:
-            try:
-                run_select()
-            except Exception as exc:
-                if not self.is_closed:
-                    log.debug("Exception during read select() for %s: %s",
-                              self, exc)
-                    self.defunct(exc)
-                return
-
             try:
                 buf = self._socket.recv(self.in_buffer_size)
                 self._iobuf.write(buf)
             except socket.error as err:
-                if not is_timeout(err):
-                    log.debug("Exception during socket recv for %s: %s",
-                              self, err)
-                    self.defunct(err)
-                    return  # leave the read loop
+                if is_timeout(err):
+                    continue
+                log.debug("Exception during socket recv for %s: %s",
+                          self, err)
+                self.defunct(err)
+                return  # leave the read loop
 
             if self._iobuf.tell():
                 self.process_io_buffer()
