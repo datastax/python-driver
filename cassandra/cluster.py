@@ -41,7 +41,7 @@ except ImportError:
     from cassandra.util import WeakSet  # NOQA
 
 from functools import partial, wraps
-from itertools import groupby
+from itertools import groupby, count
 
 from cassandra import (ConsistencyLevel, AuthenticationFailed,
                        OperationTimedOut, UnsupportedOperation,
@@ -2542,6 +2542,7 @@ class _Scheduler(object):
     def __init__(self, executor):
         self._queue = Queue.PriorityQueue()
         self._scheduled_tasks = set()
+        self._count = count()
         self._executor = executor
 
         t = Thread(target=self.run, name="Task Scheduler")
@@ -2559,7 +2560,7 @@ class _Scheduler(object):
             # this can happen on interpreter shutdown
             pass
         self.is_shutdown = True
-        self._queue.put_nowait((0, None))
+        self._queue.put_nowait((0, 0, None))
 
     def schedule(self, delay, fn, *args, **kwargs):
         self._insert_task(delay, (fn, args, tuple(kwargs.items())))
@@ -2575,7 +2576,7 @@ class _Scheduler(object):
         if not self.is_shutdown:
             run_at = time.time() + delay
             self._scheduled_tasks.add(task)
-            self._queue.put_nowait((run_at, task))
+            self._queue.put_nowait((run_at, next(self._count), task))
         else:
             log.debug("Ignoring scheduled task after shutdown: %r", task)
 
@@ -2586,7 +2587,7 @@ class _Scheduler(object):
 
             try:
                 while True:
-                    run_at, task = self._queue.get(block=True, timeout=None)
+                    run_at, i, task = self._queue.get(block=True, timeout=None)
                     if self.is_shutdown:
                         log.debug("Not executing scheduled task due to Scheduler shutdown")
                         return
@@ -2597,7 +2598,7 @@ class _Scheduler(object):
                         future = self._executor.submit(fn, *args, **kwargs)
                         future.add_done_callback(self._log_if_failed)
                     else:
-                        self._queue.put_nowait((run_at, task))
+                        self._queue.put_nowait((run_at, i, task))
                         break
             except Queue.Empty:
                 pass
