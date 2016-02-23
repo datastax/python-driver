@@ -70,8 +70,8 @@ from cassandra.pool import (Host, _ReconnectionHandler, _HostReconnectionHandler
                             HostConnectionPool, HostConnection,
                             NoConnectionsAvailable)
 from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
-                             BatchStatement, bind_params, QueryTrace, Statement,
-                             named_tuple_factory, dict_factory, FETCH_SIZE_UNSET)
+                             BatchStatement, bind_params, QueryTrace,
+                             named_tuple_factory, dict_factory, tuple_factory, FETCH_SIZE_UNSET)
 
 
 def _is_eventlet_monkey_patched():
@@ -3409,3 +3409,24 @@ class ResultSet(object):
         See :meth:`.ResponseFuture.get_all_query_traces` for details.
         """
         return self.response_future.get_all_query_traces(max_wait_sec_per)
+
+    @property
+    def was_applied(self):
+        """
+        For LWT results, returns whether the transaction was applied.
+
+        Result is indeterminate if called on a result that was not an LWT request.
+
+        Only valid when one of tne of the internal row factories is in use.
+        """
+        if self.response_future.row_factory not in (named_tuple_factory, dict_factory, tuple_factory):
+            raise RuntimeError("Cannot determine LWT result with row factory %s" % (self.response_future.row_factsory,))
+        if len(self.current_rows) != 1:
+            raise RuntimeError("LWT result should have exactly one row. This has %d." % (len(self.current_rows)))
+
+        row = self.current_rows[0]
+        if isinstance(row, tuple):
+            return row[0]
+        else:
+            return row['[applied]']
+

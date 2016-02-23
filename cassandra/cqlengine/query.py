@@ -63,11 +63,13 @@ class MultipleObjectsReturned(QueryException):
 
 def check_applied(result):
     """
-    check if result contains some column '[applied]' with false value,
-    if that value is false, it means our light-weight transaction didn't
-    applied to database.
+    Raises LWTException if it looks like a failed LWT request.
     """
-    if result and '[applied]' in result[0] and not result[0]['[applied]']:
+    try:
+        applied = result.was_applied
+    except Exception:
+        applied = True  # result was not LWT form
+    if not applied:
         raise LWTException(result[0])
 
 
