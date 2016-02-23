@@ -6,6 +6,7 @@ Features
 * Pass name of server auth class to AuthProvider (PYTHON-454)
 * Surface schema agreed flag for DDL statements (PYTHON-458)
 * Automatically convert float and int to Decimal on serialization (PYTHON-468)
+* Expose prior state information via cqlengine LWTException (github #343)
 
 Bug Fixes
 ---------
