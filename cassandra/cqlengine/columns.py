@@ -625,7 +625,7 @@ class BaseCollectionColumn(Column):
             if t.db_type is None:
                 raise ValidationError("%s is an abstract type" % (t,))
             inst = t() if isinstance(t, type) else t
-            if isinstance(t, BaseContainerColumn):
+            if isinstance(t, BaseCollectionColumn):
                 inst._freeze_db_type()
             instances.append(inst)
 
