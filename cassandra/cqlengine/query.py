@@ -16,6 +16,7 @@ import copy
 from datetime import datetime, timedelta
 import time
 import six
+from warnings import warn
 
 from cassandra.cqlengine import columns, CQLEngineException, ValidationError, UnicodeMixin
 from cassandra.cqlengine import connection
@@ -23,7 +24,6 @@ from cassandra.cqlengine.functions import Token, BaseQueryFunction, QueryValue
 from cassandra.cqlengine.operators import (InOperator, EqualsOperator, GreaterThanOperator,
                                            GreaterThanOrEqualOperator, LessThanOperator,
                                            LessThanOrEqualOperator, ContainsOperator, BaseWhereOperator)
-# import * ?
 from cassandra.cqlengine.statements import (WhereClause, SelectStatement, DeleteStatement,
                                             UpdateStatement, AssignmentClause, InsertStatement,
                                             BaseCQLStatement, MapUpdateClause, MapDeleteClause,
@@ -1209,6 +1209,8 @@ class DMLQuery(object):
 
         nulled_fields = set()
         if self.instance._has_counter or self.instance._can_update():
+            if self.instance._has_counter:
+                warn("'create' and 'save' actions on Counters are deprecated. A future version will disallow this. Use the 'update' mechanism instead.")
             return self.update()
         else:
             insert = InsertStatement(self.column_family_name, ttl=self._ttl, timestamp=self._timestamp, if_not_exists=self._if_not_exists)
