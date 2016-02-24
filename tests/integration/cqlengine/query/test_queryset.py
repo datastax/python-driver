@@ -22,8 +22,10 @@ from datetime import datetime
 import time
 from uuid import uuid1, uuid4
 import uuid
+import sys
 
 from cassandra.cluster import Session
+from cassandra import InvalidRequest
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from cassandra.cqlengine.connection import NOT_SET
 import mock
@@ -41,7 +43,7 @@ from cassandra.cqlengine import operators
 from cassandra.util import uuid_from_time
 
 from cassandra.cqlengine.connection import get_session
-from tests.integration import PROTOCOL_VERSION
+from tests.integration import PROTOCOL_VERSION, CASSANDRA_VERSION, greaterthancass20
 
 
 class TzOffset(tzinfo):
@@ -72,6 +74,15 @@ class TestModel(Model):
 
 
 class IndexedTestModel(Model):
+
+    test_id = columns.Integer(primary_key=True)
+    attempt_id = columns.Integer(index=True)
+    description = columns.Text()
+    expected_result = columns.Integer()
+    test_result = columns.Integer(index=True)
+
+
+class IndexedCollectionsTestModel(Model):
 
     test_id = columns.Integer(primary_key=True)
     attempt_id = columns.Integer(index=True)
@@ -224,6 +235,7 @@ class BaseQuerySetUsage(BaseCassEngTestCase):
         super(BaseQuerySetUsage, cls).setUpClass()
         drop_table(TestModel)
         drop_table(IndexedTestModel)
+
         sync_table(TestModel)
         sync_table(IndexedTestModel)
         sync_table(TestMultiClusteringModel)
@@ -261,19 +273,22 @@ class BaseQuerySetUsage(BaseCassEngTestCase):
         IndexedTestModel.objects.create(test_id=11, attempt_id=3, description='try12', expected_result=75,
                                         test_result=45)
 
-        IndexedTestModel.objects.create(test_id=12, attempt_id=3, description='list12', expected_result=75,
-                                        test_result=45, test_list=[1, 2, 42], test_set=set([1, 2, 3]),
-                                        test_map={'1': 1, '2': 2, '3': 3})
-        IndexedTestModel.objects.create(test_id=13, attempt_id=3, description='list13', expected_result=75,
-                                        test_result=45, test_list=[3, 4, 5], test_set=set([4, 5, 42]),
-                                        test_map={'1': 5, '2': 6, '3': 7})
-        IndexedTestModel.objects.create(test_id=14, attempt_id=3, description='list14', expected_result=75,
-                                        test_result=45, test_list=[1, 2, 3], test_set=set([1, 2, 3]),
-                                        test_map={'1': 1, '2': 2, '3': 42})
+        if(CASSANDRA_VERSION >= '2.1'):
+            drop_table(IndexedCollectionsTestModel)
+            sync_table(IndexedCollectionsTestModel)
+            IndexedCollectionsTestModel.objects.create(test_id=12, attempt_id=3, description='list12', expected_result=75,
+                                                       test_result=45, test_list=[1, 2, 42], test_set=set([1, 2, 3]),
+                                                       test_map={'1': 1, '2': 2, '3': 3})
+            IndexedCollectionsTestModel.objects.create(test_id=13, attempt_id=3, description='list13', expected_result=75,
+                                                       test_result=45, test_list=[3, 4, 5], test_set=set([4, 5, 42]),
+                                                       test_map={'1': 5, '2': 6, '3': 7})
+            IndexedCollectionsTestModel.objects.create(test_id=14, attempt_id=3, description='list14', expected_result=75,
+                                                       test_result=45, test_list=[1, 2, 3], test_set=set([1, 2, 3]),
+                                                       test_map={'1': 1, '2': 2, '3': 42})
 
-        IndexedTestModel.objects.create(test_id=15, attempt_id=4, description='list14', expected_result=75,
-                                        test_result=45, test_list_no_index=[1, 2, 3], test_set_no_index=set([1, 2, 3]),
-                                        test_map_no_index={'1': 1, '2': 2, '3': 42})
+            IndexedCollectionsTestModel.objects.create(test_id=15, attempt_id=4, description='list14', expected_result=75,
+                                                       test_result=45, test_list_no_index=[1, 2, 3], test_set_no_index=set([1, 2, 3]),
+                                                       test_map_no_index={'1': 1, '2': 2, '3': 42})
 
     @classmethod
     def tearDownClass(cls):
@@ -461,6 +476,15 @@ class TestQuerySetDistinct(BaseQuerySetUsage):
         q = TestModel.objects.distinct(['test_id']).filter(test_id__in=[1,2])
         self.assertEqual(len(q), 2)
 
+    def test_distinct_with_non_partition(self):
+        with self.assertRaises(InvalidRequest):
+            q = TestModel.objects.distinct(['description']).filter(test_id__in=[1, 2])
+            len(q)
+
+    def test_zero_result(self):
+        q = TestModel.objects.distinct(['test_id']).filter(test_id__in=[52])
+        self.assertEqual(len(q), 0)
+
 
 class TestQuerySetOrdering(BaseQuerySetUsage):
 
@@ -559,6 +583,7 @@ class TestQuerySetValidation(BaseQuerySetUsage):
             q = TestModel.objects(test_id__gt=0)
             list([i for i in q])
 
+    @greaterthancass20
     def test_indexed_field_can_be_queried(self):
         """
         Tests that queries on an indexed field will work without any primary key relations specified
@@ -566,22 +591,22 @@ class TestQuerySetValidation(BaseQuerySetUsage):
         q = IndexedTestModel.objects(test_result=25)
         self.assertEqual(q.count(), 4)
 
-        q = IndexedTestModel.objects.filter(test_list__contains=42)
+        q = IndexedCollectionsTestModel.objects.filter(test_list__contains=42)
         self.assertEqual(q.count(), 1)
 
-        q = IndexedTestModel.objects.filter(test_list__contains=13)
+        q = IndexedCollectionsTestModel.objects.filter(test_list__contains=13)
         self.assertEqual(q.count(), 0)
 
-        q = IndexedTestModel.objects.filter(test_set__contains=42)
+        q = IndexedCollectionsTestModel.objects.filter(test_set__contains=42)
         self.assertEqual(q.count(), 1)
 
-        q = IndexedTestModel.objects.filter(test_set__contains=13)
+        q = IndexedCollectionsTestModel.objects.filter(test_set__contains=13)
         self.assertEqual(q.count(), 0)
 
-        q = IndexedTestModel.objects.filter(test_map__contains=42)
+        q = IndexedCollectionsTestModel.objects.filter(test_map__contains=42)
         self.assertEqual(q.count(), 1)
 
-        q = IndexedTestModel.objects.filter(test_map__contains=13)
+        q = IndexedCollectionsTestModel.objects.filter(test_map__contains=13)
         self.assertEqual(q.count(), 0)
 
 
@@ -733,65 +758,66 @@ class TestInOperator(BaseQuerySetUsage):
         assert q.count() == 8
 
 
+@greaterthancass20
 class TestContainsOperator(BaseQuerySetUsage):
     def test_kwarg_success_case(self):
         """ Tests the CONTAINS operator works with the kwarg query method """
-        q = IndexedTestModel.filter(test_list__contains=1)
+        q = IndexedCollectionsTestModel.filter(test_list__contains=1)
         self.assertEqual(q.count(), 2)
 
-        q = IndexedTestModel.filter(test_list__contains=13)
+        q = IndexedCollectionsTestModel.filter(test_list__contains=13)
         self.assertEqual(q.count(), 0)
 
-        q = IndexedTestModel.filter(test_set__contains=3)
+        q = IndexedCollectionsTestModel.filter(test_set__contains=3)
         self.assertEqual(q.count(), 2)
 
-        q = IndexedTestModel.filter(test_set__contains=13)
+        q = IndexedCollectionsTestModel.filter(test_set__contains=13)
         self.assertEqual(q.count(), 0)
 
-        q = IndexedTestModel.filter(test_map__contains=42)
+        q = IndexedCollectionsTestModel.filter(test_map__contains=42)
         self.assertEqual(q.count(), 1)
 
-        q = IndexedTestModel.filter(test_map__contains=13)
+        q = IndexedCollectionsTestModel.filter(test_map__contains=13)
         self.assertEqual(q.count(), 0)
 
         with self.assertRaises(QueryException):
-            q = IndexedTestModel.filter(test_list_no_index__contains=1)
+            q = IndexedCollectionsTestModel.filter(test_list_no_index__contains=1)
             self.assertEqual(q.count(), 0)
         with self.assertRaises(QueryException):
-            q = IndexedTestModel.filter(test_set_no_index__contains=1)
+            q = IndexedCollectionsTestModel.filter(test_set_no_index__contains=1)
             self.assertEqual(q.count(), 0)
         with self.assertRaises(QueryException):
-            q = IndexedTestModel.filter(test_map_no_index__contains=1)
+            q = IndexedCollectionsTestModel.filter(test_map_no_index__contains=1)
             self.assertEqual(q.count(), 0)
 
     def test_query_expression_success_case(self):
         """ Tests the CONTAINS operator works with the query expression query method """
-        q = IndexedTestModel.filter(IndexedTestModel.test_list.contains_(1))
+        q = IndexedCollectionsTestModel.filter(IndexedCollectionsTestModel.test_list.contains_(1))
         self.assertEqual(q.count(), 2)
 
-        q = IndexedTestModel.filter(IndexedTestModel.test_list.contains_(13))
+        q = IndexedCollectionsTestModel.filter(IndexedCollectionsTestModel.test_list.contains_(13))
         self.assertEqual(q.count(), 0)
 
-        q = IndexedTestModel.filter(IndexedTestModel.test_set.contains_(3))
+        q = IndexedCollectionsTestModel.filter(IndexedCollectionsTestModel.test_set.contains_(3))
         self.assertEqual(q.count(), 2)
 
-        q = IndexedTestModel.filter(IndexedTestModel.test_set.contains_(13))
+        q = IndexedCollectionsTestModel.filter(IndexedCollectionsTestModel.test_set.contains_(13))
         self.assertEqual(q.count(), 0)
 
-        q = IndexedTestModel.filter(IndexedTestModel.test_map.contains_(42))
+        q = IndexedCollectionsTestModel.filter(IndexedCollectionsTestModel.test_map.contains_(42))
         self.assertEqual(q.count(), 1)
 
-        q = IndexedTestModel.filter(IndexedTestModel.test_map.contains_(13))
+        q = IndexedCollectionsTestModel.filter(IndexedCollectionsTestModel.test_map.contains_(13))
         self.assertEqual(q.count(), 0)
 
         with self.assertRaises(QueryException):
-            q = IndexedTestModel.filter(IndexedTestModel.test_map_no_index.contains_(1))
+            q = IndexedCollectionsTestModel.filter(IndexedCollectionsTestModel.test_map_no_index.contains_(1))
             self.assertEqual(q.count(), 0)
         with self.assertRaises(QueryException):
-            q = IndexedTestModel.filter(IndexedTestModel.test_map_no_index.contains_(1))
+            q = IndexedCollectionsTestModel.filter(IndexedCollectionsTestModel.test_map_no_index.contains_(1))
             self.assertEqual(q.count(), 0)
         with self.assertRaises(QueryException):
-            q = IndexedTestModel.filter(IndexedTestModel.test_map_no_index.contains_(1))
+            q = IndexedCollectionsTestModel.filter(IndexedCollectionsTestModel.test_map_no_index.contains_(1))
             self.assertEqual(q.count(), 0)
 
 
