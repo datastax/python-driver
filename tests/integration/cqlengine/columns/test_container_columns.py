@@ -735,3 +735,224 @@ class TestTupleColumn(BaseCassEngTestCase):
         m3 = TestTupleModel.get(partition=m.partition)
         self.assertEqual(m3.int_tuple, None)
 
+
+class TestNestedModel(Model):
+
+    partition = columns.UUID(primary_key=True, default=uuid4)
+    list_list = columns.List(columns.List(columns.Integer), required=False)
+    map_list = columns.Map(columns.Text, columns.List(columns.Text), required=False)
+    set_tuple = columns.Set(columns.Tuple(columns.Integer, columns.Integer), required=False)
+
+
+class TestNestedType(BaseCassEngTestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        drop_table(TestNestedModel)
+        sync_table(TestNestedModel)
+
+    @classmethod
+    def tearDownClass(cls):
+        drop_table(TestNestedModel)
+
+    def test_initial(self):
+        """
+        Tests creation and insertion of nested collection types with models
+
+        @since 3.2
+        @jira_ticket PYTHON-478
+        @expected_result Model is successfully created
+
+        @test_category object_mapper
+        """
+        tmp = TestNestedModel.create()
+        tmp.list_list = [[1, 2, 3], [2, 3, 4], [3, 4, 5]]
+
+    def test_initial_retrieve(self):
+        """
+        Tests creation and insertion of nested collection types with models,
+        and their retrieval.
+
+        @since 3.2
+        @jira_ticket PYTHON-478
+        @expected_result Model is successfully crated
+
+        @test_category object_mapper
+        """
+
+        tmp = TestNestedModel.create()
+        tmp2 = tmp.get(partition=tmp.partition)
+        tmp2.list_list = [[1, 2, 3], [2, 3, 4], [3, 4, 5]]
+        tmp2.map_list = {'key1': ["text1", "text2", "text3"], "key2": ["text1", "text2", "text3"], "key3": ["text1", "text2", "text3"]}
+        tmp2.set_tuple = set(((1, 2), (3, 5), (4, 5)))
+
+    def test_io_success(self):
+        """
+        Tests creation and insertion of various nested collection types with models,
+        and their retrieval.
+
+        @since 3.2
+        @jira_ticket PYTHON-378
+        @expected_result Model is successfully created and fetched correctly
+
+        @test_category object_mapper
+        """
+        list_list_master = [[1, 2, 3], [2, 3, 4], [3, 4, 5]]
+        map_list_master = {'key1': ["text1", "text2", "text3"], "key2": ["text1", "text2", "text3"], "key3": ["text1", "text2", "text3"]}
+        set_tuple_master = set(((1, 2), (3, 5), (4, 5)))
+
+        m1 = TestNestedModel.create(list_list=list_list_master, map_list=map_list_master, set_tuple=set_tuple_master)
+        m2 = TestNestedModel.get(partition=m1.partition)
+
+        self.assertIsInstance(m2.list_list, list)
+        self.assertIsInstance(m2.list_list[0], list)
+        self.assertIsInstance(m2.map_list, dict)
+        self.assertIsInstance(m2.map_list.get("key2"), list)
+
+        self.assertEqual(list_list_master, m2.list_list)
+        self.assertEqual(map_list_master, m2.map_list)
+        self.assertEqual(set_tuple_master, m2.set_tuple)
+        self.assertIsInstance(m2.set_tuple.pop(), tuple)
+
+    def test_type_validation(self):
+        """
+        Tests to make sure nested collection type validation occurs
+
+        @since 3.2
+        @jira_ticket PYTHON-478
+        @expected_result validation errors are raised
+
+        @test_category object_mapper
+        """
+        list_list_bad_list_context = [['text', "text", "text"], ["text", "text", "text"], ["text", "text", "text"]]
+        list_list_no_list = ['text', "text", "text"]
+
+        map_list_bad_value = {'key1': [1, 2, 3], "key2": [1, 2, 3], "key3": [1, 2, 3]}
+        map_list_bad_key = {1: ["text1", "text2", "text3"], 2: ["text1", "text2", "text3"], 3: ["text1", "text2", "text3"]}
+
+        set_tuple_bad_tuple_value = set((("text", "text"), ("text", "text"), ("text", "text")))
+        set_tuple_not_set = ['This', 'is', 'not', 'a', 'set']
+
+        self.assertRaises(ValidationError, TestNestedModel.create, **{'list_list': list_list_bad_list_context})
+        self.assertRaises(ValidationError, TestNestedModel.create, **{'list_list': list_list_no_list})
+        self.assertRaises(ValidationError, TestNestedModel.create, **{'map_list': map_list_bad_value})
+        self.assertRaises(ValidationError, TestNestedModel.create, **{'map_list': map_list_bad_key})
+        self.assertRaises(ValidationError, TestNestedModel.create, **{'set_tuple': set_tuple_bad_tuple_value})
+        self.assertRaises(ValidationError, TestNestedModel.create, **{'set_tuple': set_tuple_not_set})
+
+    def test_instantiation_with_column_class(self):
+        """
+        Tests that columns instantiated with a column class work properly
+        and that the class is instantiated in the constructor
+
+        @since 3.2
+        @jira_ticket PYTHON-478
+        @expected_result types are instantiated correctly
+
+        @test_category object_mapper
+        """
+        list_list = columns.List(columns.List(columns.Integer), required=False)
+        map_list = columns.Map(columns.Text, columns.List(columns.Text), required=False)
+        set_tuple = columns.Set(columns.Tuple(columns.Integer, columns.Integer), required=False)
+
+        self.assertIsInstance(list_list, columns.List)
+        self.assertIsInstance(list_list.types[0], columns.List)
+        self.assertIsInstance(map_list.types[0], columns.Text)
+        self.assertIsInstance(map_list.types[1], columns.List)
+        self.assertIsInstance(set_tuple.types[0], columns.Tuple)
+
+    def test_default_empty_container_saving(self):
+        """
+        Tests that the default empty nested collection container is not saved if it hasn't been updated
+
+        @since 3.2
+        @jira_ticket PYTHON-478
+        @expected_result empty nested collection is not upserted
+
+        @test_category object_mapper
+        """
+        pkey = uuid4()
+        # create a row with tuple data
+        list_list_master = [[1, 2, 3], [2, 3, 4], [3, 4, 5]]
+        map_list_master = {'key1': ["text1", "text2", "text3"], "key2": ["text1", "text2", "text3"], "key3": ["text1", "text2", "text3"]}
+        set_tuple_master = set(((1, 2), (3, 5), (4, 5)))
+
+        TestNestedModel.create(partition=pkey, list_list=list_list_master, map_list=map_list_master, set_tuple=set_tuple_master)
+        # create another with no tuple data
+        TestNestedModel.create(partition=pkey)
+
+        m = TestNestedModel.get(partition=pkey)
+        self.assertEqual(m.list_list, list_list_master)
+        self.assertEqual(m.map_list, map_list_master)
+        self.assertEqual(m.set_tuple, set_tuple_master)
+
+    def test_updates(self):
+        """
+        Tests that updates can be preformed on nested collections
+
+        @since 3.2
+        @jira_ticket PYTHON-478
+        @expected_result nested collection is replaced
+
+        @test_category object_mapper
+        """
+        list_list_initial = [[1, 2, 3], [2, 3, 4], [3, 4, 5]]
+        list_list_replacement = [[1, 2, 3], [3, 4, 5]]
+        set_tuple_initial = set(((1, 2), (3, 5), (4, 5)))
+
+        map_list_initial = {'key1': ["text1", "text2", "text3"], "key2": ["text1", "text2", "text3"], "key3": ["text1", "text2", "text3"]}
+        map_list_replacement = {'key1': ["text1", "text2", "text3"], "key3": ["text1", "text2", "text3"]}
+        set_tuple_replacement = set(((7, 7), (7, 7), (4, 5)))
+
+        m1 = TestNestedModel.create(list_list=list_list_initial, map_list=map_list_initial, set_tuple=set_tuple_initial)
+        m1.list_list = list_list_replacement
+        m1.map_list = map_list_replacement
+        m1.set_tuple = set_tuple_replacement
+        m1.save()
+
+        m2 = TestNestedModel.get(partition=m1.partition)
+        self.assertEqual(m2.list_list, list_list_replacement)
+        self.assertEqual(m2.map_list, map_list_replacement)
+        self.assertEqual(m2.set_tuple, set_tuple_replacement)
+
+    def test_update_from_non_empty_to_empty(self):
+        """
+        Tests that explcit none updates are processed correctly on tuples
+
+        @since 3.2
+        @jira_ticket PYTHON-478
+        @expected_result nested collection is replaced with none
+
+        @test_category object_mapper
+        """
+        list_list_initial = [[1, 2, 3], [2, 3, 4], [3, 4, 5]]
+        map_list_initial = {'key1': ["text1", "text2", "text3"], "key2": ["text1", "text2", "text3"], "key3": ["text1", "text2", "text3"]}
+        set_tuple_initial = set(((1, 2), (3, 5), (4, 5)))
+        tmp = TestNestedModel.create(list_list=list_list_initial, map_list=map_list_initial, set_tuple=set_tuple_initial)
+        tmp.list_list = []
+        tmp.map_list = {}
+        tmp.set_tuple = set()
+        tmp.update()
+
+        tmp = TestNestedModel.get(partition=tmp.partition)
+        self.assertEqual(tmp.list_list, [])
+        self.assertEqual(tmp.map_list, {})
+        self.assertEqual(tmp.set_tuple, set())
+
+    def test_insert_none(self):
+        """
+        Tests that Tuples can be created as none
+
+        @since 3.2
+        @jira_ticket PYTHON-478
+        @expected_result nested collection is created as none
+
+        @test_category object_mapper
+        """
+        pkey = uuid4()
+        tmp = TestNestedModel.create(partition=pkey, list_list=(None), map_list=(None), set_tuple=(None))
+        self.assertEqual([], tmp.list_list)
+        self.assertEqual({}, tmp.map_list)
+        self.assertEqual(set(), tmp.set_tuple)
+
+
