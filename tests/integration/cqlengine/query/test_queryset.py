@@ -32,6 +32,7 @@ from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine import columns
 from cassandra.cqlengine import query
+from cassandra.cqlengine.query import QueryException
 from datetime import timedelta
 from datetime import tzinfo
 
@@ -80,6 +81,10 @@ class IndexedTestModel(Model):
     test_list = columns.List(columns.Integer, index=True)
     test_set = columns.Set(columns.Integer, index=True)
     test_map = columns.Map(columns.Text, columns.Integer, index=True)
+
+    test_list_no_index = columns.List(columns.Integer, index=False)
+    test_set_no_index = columns.Set(columns.Integer, index=False)
+    test_map_no_index = columns.Map(columns.Text, columns.Integer, index=False)
 
 
 class TestMultiClusteringModel(Model):
@@ -266,6 +271,10 @@ class BaseQuerySetUsage(BaseCassEngTestCase):
                                         test_result=45, test_list=[1, 2, 3], test_set=set([1, 2, 3]),
                                         test_map={'1': 1, '2': 2, '3': 42})
 
+        IndexedTestModel.objects.create(test_id=15, attempt_id=4, description='list14', expected_result=75,
+                                        test_result=45, test_list_no_index=[1, 2, 3], test_set_no_index=set([1, 2, 3]),
+                                        test_map_no_index={'1': 1, '2': 2, '3': 42})
+
     @classmethod
     def tearDownClass(cls):
         super(BaseQuerySetUsage, cls).tearDownClass()
@@ -292,7 +301,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
     def test_iteration(self):
         """ Tests that iterating over a query set pulls back all of the expected results """
         q = TestModel.objects(test_id=0)
-        #tuple of expected attempt_id, expected_result values
+        # tuple of expected attempt_id, expected_result values
         compare_set = set([(0, 5), (1, 10), (2, 15), (3, 20)])
         for t in q:
             val = t.attempt_id, t.expected_result
@@ -303,7 +312,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         # test with regular filtering
         q = TestModel.objects(attempt_id=3).allow_filtering()
         assert len(q) == 3
-        #tuple of expected test_id, expected_result values
+        # tuple of expected test_id, expected_result values
         compare_set = set([(0, 20), (1, 20), (2, 75)])
         for t in q:
             val = t.test_id, t.expected_result
@@ -314,7 +323,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         # test with query method
         q = TestModel.objects(TestModel.attempt_id == 3).allow_filtering()
         assert len(q) == 3
-        #tuple of expected test_id, expected_result values
+        # tuple of expected test_id, expected_result values
         compare_set = set([(0, 20), (1, 20), (2, 75)])
         for t in q:
             val = t.test_id, t.expected_result
@@ -326,7 +335,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         """ Tests that iterating over a query set more than once works """
         # test with both the filtering method and the query method
         for q in (TestModel.objects(test_id=0), TestModel.objects(TestModel.test_id == 0)):
-            #tuple of expected attempt_id, expected_result values
+            # tuple of expected attempt_id, expected_result values
             compare_set = set([(0, 5), (1, 10), (2, 15), (3, 20)])
             for t in q:
                 val = t.attempt_id, t.expected_result
@@ -334,7 +343,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
                 compare_set.remove(val)
             assert len(compare_set) == 0
 
-            #try it again
+            # try it again
             compare_set = set([(0, 5), (1, 10), (2, 15), (3, 20)])
             for t in q:
                 val = t.attempt_id, t.expected_result
@@ -550,7 +559,6 @@ class TestQuerySetValidation(BaseQuerySetUsage):
             q = TestModel.objects(test_id__gt=0)
             list([i for i in q])
 
-
     def test_indexed_field_can_be_queried(self):
         """
         Tests that queries on an indexed field will work without any primary key relations specified
@@ -561,11 +569,20 @@ class TestQuerySetValidation(BaseQuerySetUsage):
         q = IndexedTestModel.objects.filter(test_list__contains=42)
         self.assertEqual(q.count(), 1)
 
+        q = IndexedTestModel.objects.filter(test_list__contains=13)
+        self.assertEqual(q.count(), 0)
+
         q = IndexedTestModel.objects.filter(test_set__contains=42)
         self.assertEqual(q.count(), 1)
 
+        q = IndexedTestModel.objects.filter(test_set__contains=13)
+        self.assertEqual(q.count(), 0)
+
         q = IndexedTestModel.objects.filter(test_map__contains=42)
         self.assertEqual(q.count(), 1)
+
+        q = IndexedTestModel.objects.filter(test_map__contains=13)
+        self.assertEqual(q.count(), 0)
 
 
 class TestQuerySetDelete(BaseQuerySetUsage):
@@ -722,23 +739,60 @@ class TestContainsOperator(BaseQuerySetUsage):
         q = IndexedTestModel.filter(test_list__contains=1)
         self.assertEqual(q.count(), 2)
 
+        q = IndexedTestModel.filter(test_list__contains=13)
+        self.assertEqual(q.count(), 0)
+
         q = IndexedTestModel.filter(test_set__contains=3)
         self.assertEqual(q.count(), 2)
+
+        q = IndexedTestModel.filter(test_set__contains=13)
+        self.assertEqual(q.count(), 0)
 
         q = IndexedTestModel.filter(test_map__contains=42)
         self.assertEqual(q.count(), 1)
 
+        q = IndexedTestModel.filter(test_map__contains=13)
+        self.assertEqual(q.count(), 0)
+
+        with self.assertRaises(QueryException):
+            q = IndexedTestModel.filter(test_list_no_index__contains=1)
+            self.assertEqual(q.count(), 0)
+        with self.assertRaises(QueryException):
+            q = IndexedTestModel.filter(test_set_no_index__contains=1)
+            self.assertEqual(q.count(), 0)
+        with self.assertRaises(QueryException):
+            q = IndexedTestModel.filter(test_map_no_index__contains=1)
+            self.assertEqual(q.count(), 0)
 
     def test_query_expression_success_case(self):
         """ Tests the CONTAINS operator works with the query expression query method """
         q = IndexedTestModel.filter(IndexedTestModel.test_list.contains_(1))
         self.assertEqual(q.count(), 2)
 
+        q = IndexedTestModel.filter(IndexedTestModel.test_list.contains_(13))
+        self.assertEqual(q.count(), 0)
+
         q = IndexedTestModel.filter(IndexedTestModel.test_set.contains_(3))
         self.assertEqual(q.count(), 2)
 
+        q = IndexedTestModel.filter(IndexedTestModel.test_set.contains_(13))
+        self.assertEqual(q.count(), 0)
+
         q = IndexedTestModel.filter(IndexedTestModel.test_map.contains_(42))
         self.assertEqual(q.count(), 1)
+
+        q = IndexedTestModel.filter(IndexedTestModel.test_map.contains_(13))
+        self.assertEqual(q.count(), 0)
+
+        with self.assertRaises(QueryException):
+            q = IndexedTestModel.filter(IndexedTestModel.test_map_no_index.contains_(1))
+            self.assertEqual(q.count(), 0)
+        with self.assertRaises(QueryException):
+            q = IndexedTestModel.filter(IndexedTestModel.test_map_no_index.contains_(1))
+            self.assertEqual(q.count(), 0)
+        with self.assertRaises(QueryException):
+            q = IndexedTestModel.filter(IndexedTestModel.test_map_no_index.contains_(1))
+            self.assertEqual(q.count(), 0)
 
 
 class TestValuesList(BaseQuerySetUsage):
@@ -756,6 +810,7 @@ class TestObjectsProperty(BaseQuerySetUsage):
         assert TestModel.objects._result_cache is None
         len(TestModel.objects) # evaluate queryset
         assert TestModel.objects._result_cache is None
+
 
 class PageQueryTests(BaseCassEngTestCase):
     def test_paged_result_handling(self):
