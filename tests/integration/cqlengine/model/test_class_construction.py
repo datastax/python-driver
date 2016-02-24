@@ -217,6 +217,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
 
         self.assertEqual(len(warn), 0)
 
+
 class TestManualTableNaming(BaseCassEngTestCase):
 
     class RenamedTest(Model):
@@ -229,6 +230,31 @@ class TestManualTableNaming(BaseCassEngTestCase):
     def test_proper_table_naming(self):
         assert self.RenamedTest.column_family_name(include_keyspace=False) == 'manual_name'
         assert self.RenamedTest.column_family_name(include_keyspace=True) == 'whatever.manual_name'
+
+
+class TestManualTableNamingCaseSensitive(BaseCassEngTestCase):
+
+    class RenamedCaseInsensitiveTest(Model):
+        __keyspace__ = 'whatever'
+        __table_name__ = 'Manual_Name'
+
+        id = columns.UUID(primary_key=True)
+
+    class RenamedCaseSensitiveTest(Model):
+        __keyspace__ = 'whatever'
+        __table_name__ = 'Manual_Name'
+        __table_name_case_sensitive__ = True
+
+        id = columns.UUID(primary_key=True)
+
+    def test_proper_table_naming_case_insensitive(self):
+        self.assertEqual(self.RenamedCaseInsensitiveTest.column_family_name(include_keyspace=False), 'manual_name')
+        self.assertEqual(self.RenamedCaseInsensitiveTest.column_family_name(include_keyspace=True), 'whatever.manual_name')
+
+    def test_proper_table_naming_case_sensitive(self):
+        self.assertEqual(self.RenamedCaseSensitiveTest.column_family_name(include_keyspace=False), '"Manual_Name"')
+        self.assertEqual(self.RenamedCaseSensitiveTest.column_family_name(include_keyspace=True), 'whatever."Manual_Name"')
+
 
 class AbstractModel(Model):
     __abstract__ = True

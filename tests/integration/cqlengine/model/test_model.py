@@ -126,6 +126,23 @@ class TestModel(unittest.TestCase):
             # .. but we can still get the bare CF name
             self.assertEqual(TestModel.column_family_name(include_keyspace=False), "test_model")
 
+    def test_column_family_case_sensitive(self):
+        class TestModel(Model):
+            __table_name__ = 'TestModel'
+            __table_name_case_sensitive__ = True
+
+            k = columns.Integer(primary_key=True)
+
+        self.assertEqual(TestModel.column_family_name(), '%s."TestModel"' % (models.DEFAULT_KEYSPACE,))
+
+        TestModel.__keyspace__ = "my_test_keyspace"
+        self.assertEqual(TestModel.column_family_name(), '%s."TestModel"' % (TestModel.__keyspace__,))
+
+        del TestModel.__keyspace__
+        with patch('cassandra.cqlengine.models.DEFAULT_KEYSPACE', None):
+            self.assertRaises(CQLEngineException, TestModel.column_family_name)
+            self.assertEqual(TestModel.column_family_name(include_keyspace=False), '"TestModel"')
+
 
 class BuiltInAttributeConflictTest(unittest.TestCase):
     """tests Model definitions that conflict with built-in attributes/methods"""
