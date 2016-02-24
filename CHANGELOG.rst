@@ -1,13 +1,3 @@
-3.2.0
-=====
-
-Features
---------
-
-Bug Fixes
----------
-* Fix Python3 bug with Timers and heaps (github #466)
-
 3.1.0
 =====
 
@@ -16,12 +6,14 @@ Features
 * Pass name of server auth class to AuthProvider (PYTHON-454)
 * Surface schema agreed flag for DDL statements (PYTHON-458)
 * Automatically convert float and int to Decimal on serialization (PYTHON-468)
+* Expose prior state information via cqlengine LWTException (github #343)
 
 Bug Fixes
 ---------
 * Bus error (alignment issues) when running cython on some ARM platforms (PYTHON-450)
 * Overflow when decoding large collections (cython) (PYTHON-459)
 * Crash when updating a UDT column with a None value (github #467)
+* Timer heap comparison issue with Python 3 (github #466)
 
 3.0.0
 =====

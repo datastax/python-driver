@@ -81,8 +81,16 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
         id = uuid4()
 
         TestIfNotExistsModel.create(id=id, count=8, text='123456789')
-        with self.assertRaises(LWTException):
+
+        with self.assertRaises(LWTException) as assertion:
             TestIfNotExistsModel.if_not_exists().create(id=id, count=9, text='111111111111')
+
+        self.assertEqual(assertion.exception.existing, {
+            'count': 8,
+            'id': id,
+            'text': '123456789',
+            '[applied]': False,
+        })
 
         q = TestIfNotExistsModel.objects(id=id)
         self.assertEqual(len(q), 1)
@@ -117,8 +125,15 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
 
         b = BatchQuery()
         TestIfNotExistsModel.batch(b).if_not_exists().create(id=id, count=9, text='111111111111')
-        with self.assertRaises(LWTException):
+        with self.assertRaises(LWTException) as assertion:
             b.execute()
+
+        self.assertEqual(assertion.exception.existing, {
+            'count': 8,
+            'id': id,
+            'text': '123456789',
+            '[applied]': False,
+        })
 
         q = TestIfNotExistsModel.objects(id=id)
         self.assertEqual(len(q), 1)
