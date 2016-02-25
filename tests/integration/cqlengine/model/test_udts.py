@@ -23,7 +23,7 @@ from uuid import UUID, uuid4
 
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.usertype import UserType
-from cassandra.cqlengine import columns
+from cassandra.cqlengine import columns, connection
 from cassandra.cqlengine.management import sync_table, sync_type, create_keyspace_simple, drop_keyspace
 from cassandra.util import Date, Time
 
@@ -445,3 +445,41 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         cluster = Mock()
         connection._register_known_types(cluster)
         cluster.register_user_type.assert_called_with(models.DEFAULT_KEYSPACE, User.type_name(), User)
+
+    def test_db_field_override(self):
+        class db_field_different(UserType):
+            age = columns.Integer(db_field='a')
+            name = columns.Text(db_field='n')
+
+        class TheModel(Model):
+            id = columns.Integer(primary_key=True)
+            info = columns.UserDefinedType(db_field_different)
+
+        sync_table(TheModel)
+
+        cluster = connection.get_cluster()
+        type_meta = cluster.metadata.keyspaces[TheModel._get_keyspace()].user_types[db_field_different.type_name()]
+
+        type_fields = (db_field_different.age.column, db_field_different.name.column)
+        self.assertEqual(len(type_meta.field_names), len(type_fields))
+        for f in type_fields:
+            self.assertIn(f.db_field_name, type_meta.field_names)
+
+        id = 0
+        age = 42
+        name = 'John'
+        info = db_field_different(age=age, name=name)
+        TheModel.create(id=id, info=info)
+
+        self.assertEqual(1, TheModel.objects.count())
+
+        john = TheModel.objects().first()
+        self.assertEqual(john.id, id)
+        info = john.info
+        self.assertIsInstance(info, db_field_different)
+        self.assertEqual(info.age, age)
+        self.assertEqual(info.name, name)
+
+        # also excercise the db_Field mapping
+        self.assertEqual(info.a, age)
+        self.assertEqual(info.n, name)

@@ -28,6 +28,9 @@ class BaseUserType(object):
     def __init__(self, **values):
         self._values = {}
 
+        if self._db_map:
+            values = dict((self._db_map.get(k, k), v) for k, v in values.items())
+
         for name, field in self._fields.items():
             value = values.get(name, None)
             if value is not None or isinstance(field, columns.BaseContainerColumn):
@@ -67,6 +70,13 @@ class BaseUserType(object):
     def __iter__(self):
         for field in self._fields.keys():
             yield field
+
+    def __getattr__(self, attr):
+        # provides the mapping from db_field to fields
+        try:
+            return getattr(self, self._db_map[attr])
+        except KeyError:
+            raise AttributeError(attr)
 
     def __getitem__(self, key):
         if not isinstance(key, six.string_types):
@@ -158,13 +168,8 @@ class UserTypeMetaClass(type):
                 raise UserTypeDefinitionException("field '{0}' conflicts with built-in attribute/method".format(k))
             _transform_column(k, v)
 
-        # create db_name -> model name map for loading
-        db_map = {}
-        for field_name, field in field_dict.items():
-            db_map[field.db_field_name] = field_name
-
         attrs['_fields'] = field_dict
-        attrs['_db_map'] = db_map
+        attrs['_db_map'] = dict((field.db_field_name, name) for name, field in field_dict.items() if field.db_field_name != name)
 
         klass = super(UserTypeMetaClass, cls).__new__(cls, name, bases, attrs)
 
