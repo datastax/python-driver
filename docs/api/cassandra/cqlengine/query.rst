@@ -26,6 +26,10 @@ The methods here are used to filter, order, and constrain results.
 
     .. automethod:: limit
 
+    .. automethod:: if_not_exists
+
+    .. automethod:: if_exists
+
     .. automethod:: order_by
 
     .. automethod:: allow_filtering
