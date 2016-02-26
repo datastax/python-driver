@@ -384,7 +384,7 @@ class BaseModel(object):
         # and translate that into our local fields
         # the db_map is a db_field -> model field map
         items = values.items()
-        field_dict = dict([(cls._db_map.get(k, k), v) for k, v in items])
+        field_dict = dict((cls._db_map.get(k, k), v) for k, v in items)
 
         if cls._is_polymorphic:
             disc_key = field_dict.get(cls._discriminator_column_name)

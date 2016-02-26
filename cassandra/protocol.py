@@ -1048,6 +1048,8 @@ def cython_protocol_handler(colparser):
         my_opcodes[FastResultMessage.opcode] = FastResultMessage
         message_types_by_opcode = my_opcodes
 
+        col_parser = colparser
+
     return CythonProtocolHandler
 
 
