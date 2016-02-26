@@ -489,3 +489,12 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
             class something_silly(UserType):
                 first_col = columns.Integer()
                 second_col = columns.Text(db_field='first_col')
+
+    def test_set_udt_fields(self):
+        class User(UserType):
+            age = columns.Integer()
+            name = columns.Text()
+
+        u = User()
+        u.age = 20
+        self.assertEqual(20, u.age)

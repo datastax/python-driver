@@ -95,7 +95,7 @@ class BaseUserType(object):
         try:
             return self._len
         except:
-            self._len = len(self._columns.keys())
+            self._len = len(self._fields.keys())
             return self._len
 
     def keys(self):
