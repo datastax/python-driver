@@ -383,11 +383,11 @@ class BaseModel(object):
         # we're going to take the values, which is from the DB as a dict
         # and translate that into our local fields
         # the db_map is a db_field -> model field map
-        items = values.items()
-        field_dict = dict((cls._db_map.get(k, k), v) for k, v in items)
+        if cls._db_map:
+            values = dict((cls._db_map.get(k, k), v) for k, v in values.items())
 
         if cls._is_polymorphic:
-            disc_key = field_dict.get(cls._discriminator_column_name)
+            disc_key = values.get(cls._discriminator_column_name)
 
             if disc_key is None:
                 raise PolymorphicModelException('discriminator value was not found in values')
@@ -408,12 +408,12 @@ class BaseModel(object):
                     '{0} is not a subclass of {1}'.format(klass.__name__, cls.__name__)
                 )
 
-            field_dict = dict((k, v) for k, v in field_dict.items() if k in klass._columns.keys())
+            values = dict((k, v) for k, v in values.items() if k in klass._columns.keys())
 
         else:
             klass = cls
 
-        instance = klass(**field_dict)
+        instance = klass(**values)
         instance._set_persisted()
         return instance
 
@@ -854,8 +854,12 @@ class ModelMetaClass(type):
 
         # create db_name -> model name map for loading
         db_map = {}
-        for field_name, col in column_dict.items():
-            db_map[col.db_field_name] = field_name
+        for col_name, field in column_dict.items():
+            db_field = field.db_field_name
+            if db_field != col_name:
+                if db_field in column_dict:
+                    raise ModelDefinitionException("db_field '{0}' for column '{1}' conflicts with another attribute name".format(db_field, col_name))
+                db_map[db_field] = col_name
 
         # add management members to the class
         attrs['_columns'] = column_dict
