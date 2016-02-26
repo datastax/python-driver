@@ -27,7 +27,6 @@ class BaseUserType(object):
 
     def __init__(self, **values):
         self._values = {}
-
         if self._db_map:
             values = dict((self._db_map.get(k, k), v) for k, v in values.items())
 
@@ -169,7 +168,15 @@ class UserTypeMetaClass(type):
             _transform_column(k, v)
 
         attrs['_fields'] = field_dict
-        attrs['_db_map'] = dict((field.db_field_name, name) for name, field in field_dict.items() if field.db_field_name != name)
+
+        db_map = {}
+        for field_name, field in field_dict.items():
+            db_field = field.db_field_name
+            if db_field != field_name:
+                if db_field in field_dict:
+                    raise UserTypeDefinitionException("db_field '{0}' for field '{1}' conflicts with another attribute name".format(db_field, field_name))
+                db_map[db_field] = field_name
+        attrs['_db_map'] = db_map
 
         klass = super(UserTypeMetaClass, cls).__new__(cls, name, bases, attrs)
 

@@ -22,7 +22,7 @@ from mock import Mock
 from uuid import UUID, uuid4
 
 from cassandra.cqlengine.models import Model
-from cassandra.cqlengine.usertype import UserType
+from cassandra.cqlengine.usertype import UserType, UserTypeDefinitionException
 from cassandra.cqlengine import columns, connection
 from cassandra.cqlengine.management import sync_table, sync_type, create_keyspace_simple, drop_keyspace
 from cassandra.util import Date, Time
@@ -483,3 +483,9 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         # also excercise the db_Field mapping
         self.assertEqual(info.a, age)
         self.assertEqual(info.n, name)
+
+    def test_db_field_overload(self):
+        with self.assertRaises(UserTypeDefinitionException):
+            class something_silly(UserType):
+                first_col = columns.Integer()
+                second_col = columns.Text(db_field='first_col')
