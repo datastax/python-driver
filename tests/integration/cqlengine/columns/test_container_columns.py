@@ -449,7 +449,7 @@ class TestMapColumn(BaseCassEngTestCase):
         m.save()
 
         m2 = TestMapModel.get(partition=m.partition)
-        self.assertEquals(m2.int_map, expected)
+        self.assertEqual(m2.int_map, expected)
 
         m2.int_map = None
         m2.save()
