@@ -451,6 +451,13 @@ class BaseModel(object):
         """
         return cls._columns[name]
 
+    @classmethod
+    def _get_column_by_db_name(cls, name):
+        """
+        Returns the column, mapped by db_field name
+        """
+        return cls._columns.get(cls._db_map.get(name, name))
+
     def __eq__(self, other):
         if self.__class__ != other.__class__:
             return False
