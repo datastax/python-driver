@@ -780,8 +780,8 @@ class AbstractQuerySet(object):
         Deletes the contents of a query
         """
         # validate where clause
-        partition_key = [x for x in self.model._primary_keys.values()][0]
-        if not any([c.field == partition_key.column_name for c in self._where]):
+        partition_keys = set(x.db_field_name for x in self.model._partition_keys.values())
+        if partition_keys - set(c.field for c in self._where):
             raise QueryException("The partition key must be defined on delete queries")
 
         dq = DeleteStatement(
