@@ -229,7 +229,6 @@ class ColumnQueryEvaluator(query.AbstractQueryableColumn):
         return self.column.db_field_name
 
     def _get_column(self):
-        """ :rtype: ColumnQueryEvaluator """
         return self.column
 
 
@@ -845,11 +844,11 @@ class ModelMetaClass(type):
         for v in column_dict.values():
             # check for duplicate column names
             if v.db_field_name in col_names:
-                raise ModelException("{0} defines the column {1} more than once".format(name, v.db_field_name))
+                raise ModelException("{0} defines the column '{1}' more than once".format(name, v.db_field_name))
             if v.clustering_order and not (v.primary_key and not v.partition_key):
                 raise ModelException("clustering_order may be specified only for clustering primary keys")
             if v.clustering_order and v.clustering_order.lower() not in ('asc', 'desc'):
-                raise ModelException("invalid clustering order {0} for column {1}".format(repr(v.clustering_order), v.db_field_name))
+                raise ModelException("invalid clustering order '{0}' for column '{1}'".format(repr(v.clustering_order), v.db_field_name))
             col_names.add(v.db_field_name)
 
         # create db_name -> model name map for loading
@@ -857,8 +856,6 @@ class ModelMetaClass(type):
         for col_name, field in column_dict.items():
             db_field = field.db_field_name
             if db_field != col_name:
-                if db_field in column_dict:
-                    raise ModelDefinitionException("db_field '{0}' for column '{1}' conflicts with another attribute name".format(db_field, col_name))
                 db_map[db_field] = col_name
 
         # add management members to the class
