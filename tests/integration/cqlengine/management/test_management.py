@@ -235,6 +235,49 @@ class SyncTableTests(BaseCassEngTestCase):
         self.assertIn('SizeTieredCompactionStrategy', table_meta.as_cql_query())
 
 
+class IndexModel(Model):
+
+    __table_name__ = 'index_model'
+    first_key = columns.UUID(primary_key=True)
+    second_key = columns.Text(index=True)
+
+
+class IndexCaseSensitiveModel(Model):
+
+    __table_name__ = 'IndexModel'
+    __table_name_case_sensitive__ = True
+    first_key = columns.UUID(primary_key=True)
+    second_key = columns.Text(index=True)
+
+
+class IndexTests(BaseCassEngTestCase):
+
+    def setUp(self):
+        drop_table(IndexModel)
+
+    def test_sync_index(self):
+
+        sync_table(IndexModel)
+        table_meta = management._get_table_metadata(IndexModel)
+        self.assertIn("index_index_model_second_key", table_meta.indexes)
+
+        # index already exists
+        sync_table(IndexModel)
+        table_meta = management._get_table_metadata(IndexModel)
+        self.assertIn("index_index_model_second_key", table_meta.indexes)
+
+    def test_sync_index_case_sensitive(self):
+
+        sync_table(IndexCaseSensitiveModel)
+        table_meta = management._get_table_metadata(IndexCaseSensitiveModel)
+        self.assertIn("index_IndexModel_second_key", table_meta.indexes)
+
+        # index already exists
+        sync_table(IndexCaseSensitiveModel)
+        table_meta = management._get_table_metadata(IndexCaseSensitiveModel)
+        self.assertIn("index_IndexModel_second_key", table_meta.indexes)
+
+
 class NonModelFailureTest(BaseCassEngTestCase):
     class FakeModel(object):
         pass

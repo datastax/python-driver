@@ -28,6 +28,8 @@ Model
 
     .. autoattribute:: __table_name__
 
+    .. autoattribute:: __table_name_case_sensitive__
+
     .. autoattribute:: __keyspace__
 
     .. _ttl-change:

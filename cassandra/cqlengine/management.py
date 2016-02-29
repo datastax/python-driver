@@ -194,7 +194,7 @@ def sync_table(model):
         if table.indexes.get(index_name):
             continue
 
-        qs = ['CREATE INDEX {0}'.format(index_name)]
+        qs = ['CREATE INDEX {0}'.format(metadata.protect_name(index_name))]
         qs += ['ON {0}'.format(cf_name)]
         qs += ['("{0}")'.format(column.db_field_name)]
         qs = ' '.join(qs)
