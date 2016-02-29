@@ -37,7 +37,7 @@ class BaseValueManager(object):
 
     @property
     def deleted(self):
-        return self.value is None and self.previous_value is not None
+        return self.value is None and (self.explicit or self.previous_value is not None)
 
     @property
     def changed(self):
@@ -270,8 +270,6 @@ class Blob(Column):
         val = super(Bytes, self).to_database(value)
         return bytearray(val)
 
-    def to_python(self, value):
-        return value
 
 Bytes = Blob
 
