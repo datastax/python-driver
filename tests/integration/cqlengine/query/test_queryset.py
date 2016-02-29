@@ -917,72 +917,130 @@ class DBFieldModel(Model):
     v1 = columns.Integer(db_field='e', index=True)
 
 
+class DBFieldModelMixed1(Model):
+    k0 = columns.Integer(partition_key=True, db_field='a')
+    k1 = columns.Integer(partition_key=True)
+    c0 = columns.Integer(primary_key=True, db_field='c')
+    v0 = columns.Integer(db_field='d')
+    v1 = columns.Integer(index=True)
+
+
+class DBFieldModelMixed2(Model):
+    k0 = columns.Integer(partition_key=True)
+    k1 = columns.Integer(partition_key=True, db_field='b')
+    c0 = columns.Integer(primary_key=True)
+    v0 = columns.Integer(db_field='d')
+    v1 = columns.Integer(index=True, db_field='e')
+
+
 class TestModelQueryWithDBField(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
         super(TestModelQueryWithDBField, cls).setUpClass()
-        sync_table(DBFieldModel)
+        cls.model_list = [DBFieldModel, DBFieldModelMixed1, DBFieldModelMixed2]
+        for model in cls.model_list:
+            sync_table(model)
 
     @classmethod
     def tearDownClass(cls):
         super(TestModelQueryWithDBField, cls).tearDownClass()
-        drop_table(DBFieldModel)
+        for model in cls.model_list:
+            drop_table(model)
 
     def test_basic_crud(self):
-        values = {'k0': 1, 'k1': 2, 'c0': 3, 'v0': 4, 'v1': 5}
+        """
+        Tests creation update and delete of object model queries that are using db_field mappings.
 
-        # create
-        i = DBFieldModel.create(**values)
-        i = DBFieldModel.objects(k0=i.k0, k1=i.k1).first()
-        self.assertEqual(i, DBFieldModel(**values))
+        @since 3.1
+        @jira_ticket PYTHON-351
+        @expected_result results are properly retrieved without errors
 
-        # create
-        values['v0'] = 101
-        i.update(v0=values['v0'])
-        i = DBFieldModel.objects(k0=i.k0, k1=i.k1).first()
-        self.assertEqual(i, DBFieldModel(**values))
+        @test_category object_mapper
+        """
+        for model in self.model_list:
+            values = {'k0': 1, 'k1': 2, 'c0': 3, 'v0': 4, 'v1': 5}
+            # create
+            i = model.create(**values)
+            i = model.objects(k0=i.k0, k1=i.k1).first()
+            self.assertEqual(i, model(**values))
 
-        # delete
-        DBFieldModel.objects(k0=i.k0, k1=i.k1).delete()
-        i = DBFieldModel.objects(k0=i.k0, k1=i.k1).first()
-        self.assertIsNone(i)
+            # create
+            values['v0'] = 101
+            i.update(v0=values['v0'])
+            i = model.objects(k0=i.k0, k1=i.k1).first()
+            self.assertEqual(i, model(**values))
 
-        i = DBFieldModel.create(**values)
-        i = DBFieldModel.objects(k0=i.k0, k1=i.k1).first()
-        self.assertEqual(i, DBFieldModel(**values))
-        i.delete()
-        DBFieldModel.objects(k0=i.k0, k1=i.k1).delete()
-        i = DBFieldModel.objects(k0=i.k0, k1=i.k1).first()
-        self.assertIsNone(i)
+            # delete
+            model.objects(k0=i.k0, k1=i.k1).delete()
+            i = model.objects(k0=i.k0, k1=i.k1).first()
+            self.assertIsNone(i)
+
+            i = model.create(**values)
+            i = model.objects(k0=i.k0, k1=i.k1).first()
+            self.assertEqual(i, model(**values))
+            i.delete()
+            model.objects(k0=i.k0, k1=i.k1).delete()
+            i = model.objects(k0=i.k0, k1=i.k1).first()
+            self.assertIsNone(i)
 
     def test_slice(self):
-        values = {'k0': 1, 'k1': 3, 'c0': 3, 'v0': 4, 'v1': 5}
-        clustering_values = range(3)
-        for c in clustering_values:
-            values['c0'] = c
-            i = DBFieldModel.create(**values)
+        """
+        Tests slice queries for object models that are using db_field mapping
 
-        self.assertEqual(DBFieldModel.objects(k0=i.k0, k1=i.k1).count(), len(clustering_values))
-        self.assertEqual(DBFieldModel.objects(k0=i.k0, k1=i.k1, c0=i.c0).count(), 1)
-        self.assertEqual(DBFieldModel.objects(k0=i.k0, k1=i.k1, c0__lt=i.c0).count(), len(clustering_values[:-1]))
-        self.assertEqual(DBFieldModel.objects(k0=i.k0, k1=i.k1, c0__gt=0).count(), len(clustering_values[1:]))
+        @since 3.1
+        @jira_ticket PYTHON-351
+        @expected_result results are properly retrieved without errors
+
+        @test_category object_mapper
+        """
+        for model in self.model_list:
+            values = {'k0': 1, 'k1': 3, 'c0': 3, 'v0': 4, 'v1': 5}
+            clustering_values = range(3)
+            for c in clustering_values:
+                values['c0'] = c
+                i = model.create(**values)
+
+            self.assertEqual(model.objects(k0=i.k0, k1=i.k1).count(), len(clustering_values))
+            self.assertEqual(model.objects(k0=i.k0, k1=i.k1, c0=i.c0).count(), 1)
+            self.assertEqual(model.objects(k0=i.k0, k1=i.k1, c0__lt=i.c0).count(), len(clustering_values[:-1]))
+            self.assertEqual(model.objects(k0=i.k0, k1=i.k1, c0__gt=0).count(), len(clustering_values[1:]))
 
     def test_order(self):
-        values = {'k0': 1, 'k1': 4, 'c0': 3, 'v0': 4, 'v1': 5}
-        clustering_values = range(3)
-        for c in clustering_values:
-            values['c0'] = c
-            i = DBFieldModel.create(**values)
-        self.assertEqual(DBFieldModel.objects(k0=i.k0, k1=i.k1).order_by('c0').first().c0, clustering_values[0])
-        self.assertEqual(DBFieldModel.objects(k0=i.k0, k1=i.k1).order_by('-c0').first().c0, clustering_values[-1])
+        """
+        Tests order by queries for object models that are using db_field mapping
+
+        @since 3.1
+        @jira_ticket PYTHON-351
+        @expected_result results are properly retrieved without errors
+
+        @test_category object_mapper
+        """
+        for model in self.model_list:
+            values = {'k0': 1, 'k1': 4, 'c0': 3, 'v0': 4, 'v1': 5}
+            clustering_values = range(3)
+            for c in clustering_values:
+                values['c0'] = c
+                i = model.create(**values)
+            self.assertEqual(model.objects(k0=i.k0, k1=i.k1).order_by('c0').first().c0, clustering_values[0])
+            self.assertEqual(model.objects(k0=i.k0, k1=i.k1).order_by('-c0').first().c0, clustering_values[-1])
 
     def test_index(self):
-        values = {'k0': 1, 'k1': 5, 'c0': 3, 'v0': 4, 'v1': 5}
-        clustering_values = range(3)
-        for c in clustering_values:
-            values['c0'] = c
-            values['v1'] = c
-            i = DBFieldModel.create(**values)
-        self.assertEqual(DBFieldModel.objects(k0=i.k0, k1=i.k1).count(), len(clustering_values))
-        self.assertEqual(DBFieldModel.objects(k0=i.k0, k1=i.k1, v1=0).count(), 1)
+        """
+        Tests queries using index fields for object models using db_field mapping
+
+        @since 3.1
+        @jira_ticket PYTHON-351
+        @expected_result results are properly retrieved without errors
+
+        @test_category object_mapper
+        """
+        for model in self.model_list:
+            values = {'k0': 1, 'k1': 5, 'c0': 3, 'v0': 4, 'v1': 5}
+            clustering_values = range(3)
+            for c in clustering_values:
+                values['c0'] = c
+                values['v1'] = c
+                i = model.create(**values)
+            self.assertEqual(model.objects(k0=i.k0, k1=i.k1).count(), len(clustering_values))
+            self.assertEqual(model.objects(k0=i.k0, k1=i.k1, v1=0).count(), 1)
