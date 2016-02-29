@@ -178,12 +178,30 @@ class IfNotExistsDescriptor(object):
     def __get__(self, instance, model):
         if instance:
             # instance method
-            def ifnotexists_setter(ife):
+            def ifnotexists_setter(ife=True):
                 instance._if_not_exists = ife
                 return instance
             return ifnotexists_setter
 
         return model.objects.if_not_exists
+
+    def __call__(self, *args, **kwargs):
+        raise NotImplementedError
+
+
+class IfExistsDescriptor(object):
+    """
+    return a query set descriptor with a if_exists flag specified
+    """
+    def __get__(self, instance, model):
+        if instance:
+            # instance method
+            def ifexists_setter(ife=True):
+                instance._if_exists = ife
+                return instance
+            return ifexists_setter
+
+        return model.objects.if_exists
 
     def __call__(self, *args, **kwargs):
         raise NotImplementedError
@@ -303,6 +321,8 @@ class BaseModel(object):
 
     if_not_exists = IfNotExistsDescriptor()
 
+    if_exists = IfExistsDescriptor()
+
     # _len is lazily created by __len__
 
     __table_name__ = None
@@ -322,6 +342,8 @@ class BaseModel(object):
     _timestamp = None  # optional timestamp to include with the operation (USING TIMESTAMP)
 
     _if_not_exists = False  # optional if_not_exists flag to check existence before insertion
+
+    _if_exists = False  # optional if_exists flag to check existence before update
 
     _table_name = None  # used internally to cache a derived table name
 
@@ -654,7 +676,8 @@ class BaseModel(object):
                           consistency=self.__consistency__,
                           if_not_exists=self._if_not_exists,
                           transaction=self._transaction,
-                          timeout=self._timeout).save()
+                          timeout=self._timeout,
+                          if_exists=self._if_exists).save()
 
         self._set_persisted()
 
@@ -700,7 +723,8 @@ class BaseModel(object):
                           timestamp=self._timestamp,
                           consistency=self.__consistency__,
                           transaction=self._transaction,
-                          timeout=self._timeout).update()
+                          timeout=self._timeout,
+                          if_exists=self._if_exists).update()
 
         self._set_persisted()
 
@@ -717,7 +741,8 @@ class BaseModel(object):
                           batch=self._batch,
                           timestamp=self._timestamp,
                           consistency=self.__consistency__,
-                          timeout=self._timeout).delete()
+                          timeout=self._timeout,
+                          if_exists=self._if_exists).delete()
 
     def get_changed_columns(self):
         """

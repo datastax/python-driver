@@ -100,6 +100,24 @@ Model
 
         This method is supported on Cassandra 2.0 or later.
 
+    .. method:: if_exists()
+
+        Check the existence of an object before an update or delete. The existence of an
+        object is determined by its primary key(s). And please note using this flag
+        would incur performance cost.
+
+        If the update or delete isn't applied, a :class:`~cassandra.cqlengine.query.LWTException` is raised.
+
+        .. code-block:: python
+
+            try:
+                TestIfExistsModel.objects(id=id).if_exists().update(count=9, text='111111111111')
+            except LWTException as e:
+                # handle failure case
+                pass
+
+        This method is supported on Cassandra 2.0 or later.
+
     .. automethod:: save
 
     .. automethod:: update

@@ -708,7 +708,8 @@ class UpdateStatement(AssignmentStatement):
                  where=None,
                  ttl=None,
                  timestamp=None,
-                 transactions=None):
+                 transactions=None,
+                 if_exists=False):
         super(UpdateStatement, self). __init__(table,
                                                assignments=assignments,
                                                consistency=consistency,
@@ -720,6 +721,8 @@ class UpdateStatement(AssignmentStatement):
         self.transactions = []
         for transaction in transactions or []:
             self.add_transaction_clause(transaction)
+
+        self.if_exists = if_exists
 
     def __unicode__(self):
         qs = ['UPDATE', self.table]
@@ -743,6 +746,9 @@ class UpdateStatement(AssignmentStatement):
 
         if len(self.transactions) > 0:
             qs += [self._get_transactions()]
+
+        if self.if_exists:
+            qs += ["IF EXISTS"]
 
         return ' '.join(qs)
 
@@ -778,7 +784,7 @@ class UpdateStatement(AssignmentStatement):
 class DeleteStatement(BaseCQLStatement):
     """ a cql delete statement """
 
-    def __init__(self, table, fields=None, consistency=None, where=None, timestamp=None):
+    def __init__(self, table, fields=None, consistency=None, where=None, timestamp=None, if_exists=False):
         super(DeleteStatement, self).__init__(
             table,
             consistency=consistency,
@@ -790,6 +796,7 @@ class DeleteStatement(BaseCQLStatement):
             fields = [fields]
         for field in fields or []:
             self.add_field(field)
+        self.if_exists = if_exists
 
     def update_context_id(self, i):
         super(DeleteStatement, self).update_context_id(i)
@@ -828,5 +835,8 @@ class DeleteStatement(BaseCQLStatement):
 
         if self.where_clauses:
             qs += [self._where]
+
+        if self.if_exists:
+            qs += ["IF EXISTS"]
 
         return ' '.join(qs)
