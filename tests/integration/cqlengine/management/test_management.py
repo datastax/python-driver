@@ -209,7 +209,7 @@ class TablePropertiesTests(BaseCassEngTestCase):
         option = 'no way will this ever be an option'
         try:
             ModelWithTableProperties.__options__[option] = 'what was I thinking?'
-            self.assertRaisesRegexp(KeyError, "Invalid table option.*%s.*" % option, sync_table, ModelWithTableProperties)
+            self.assertRaisesRegex(KeyError, "Invalid table option.*%s.*" % option, sync_table, ModelWithTableProperties)
         finally:
             ModelWithTableProperties.__options__.pop(option, None)
 

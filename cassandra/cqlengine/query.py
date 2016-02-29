@@ -780,8 +780,8 @@ class AbstractQuerySet(object):
         Deletes the contents of a query
         """
         # validate where clause
-        partition_key = [x for x in self.model._primary_keys.values()][0]
-        if not any([c.field == partition_key.column_name for c in self._where]):
+        partition_keys = set(x.db_field_name for x in self.model._partition_keys.values())
+        if partition_keys - set(c.field for c in self._where):
             raise QueryException("The partition key must be defined on delete queries")
 
         dq = DeleteStatement(
@@ -841,7 +841,7 @@ class ModelQuerySet(AbstractQuerySet):
     def _validate_select_where(self):
         """ Checks that a filterset will not create invalid select statement """
         # check that there's either a =, a IN or a CONTAINS (collection) relationship with a primary key or indexed field
-        equal_ops = [self.model._columns.get(w.field) for w in self._where if isinstance(w.operator, EqualsOperator)]
+        equal_ops = [self.model._get_column_by_db_name(w.field) for w in self._where if isinstance(w.operator, EqualsOperator)]
         token_comparison = any([w for w in self._where if isinstance(w.value, Token)])
         if not any([w.primary_key or w.index for w in equal_ops]) and not token_comparison and not self._allow_filtering:
             raise QueryException(('Where clauses require either  =, a IN or a CONTAINS (collection) '

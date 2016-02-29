@@ -83,7 +83,7 @@ class AlterTableTest(BaseCassEngTestCase):
 
         table_meta = _get_table_metadata(tmp)
 
-        self.assertRegexpMatches(table_meta.export_as_string(), '.*SizeTieredCompactionStrategy.*')
+        self.assertRegex(table_meta.export_as_string(), '.*SizeTieredCompactionStrategy.*')
 
     def test_alter_options(self):
 
@@ -97,11 +97,11 @@ class AlterTableTest(BaseCassEngTestCase):
         drop_table(AlterTable)
         sync_table(AlterTable)
         table_meta = _get_table_metadata(AlterTable)
-        self.assertRegexpMatches(table_meta.export_as_string(), ".*'sstable_size_in_mb': '64'.*")
+        self.assertRegex(table_meta.export_as_string(), ".*'sstable_size_in_mb': '64'.*")
         AlterTable.__options__['compaction']['sstable_size_in_mb'] = '128'
         sync_table(AlterTable)
         table_meta = _get_table_metadata(AlterTable)
-        self.assertRegexpMatches(table_meta.export_as_string(), ".*'sstable_size_in_mb': '128'.*")
+        self.assertRegex(table_meta.export_as_string(), ".*'sstable_size_in_mb': '128'.*")
 
 
 class OptionsTest(BaseCassEngTestCase):

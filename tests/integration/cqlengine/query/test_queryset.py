@@ -907,3 +907,82 @@ class DMLQueryTimeoutTestCase(BaseQuerySetUsage):
         m = self.model.batch(b)
         with self.assertRaises(AssertionError):
             m.timeout(0.5)
+
+
+class DBFieldModel(Model):
+    k0 = columns.Integer(partition_key=True, db_field='a')
+    k1 = columns.Integer(partition_key=True, db_field='b')
+    c0 = columns.Integer(primary_key=True, db_field='c')
+    v0 = columns.Integer(db_field='d')
+    v1 = columns.Integer(db_field='e', index=True)
+
+
+class TestModelQueryWithDBField(BaseCassEngTestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestModelQueryWithDBField, cls).setUpClass()
+        sync_table(DBFieldModel)
+
+    @classmethod
+    def tearDownClass(cls):
+        super(TestModelQueryWithDBField, cls).tearDownClass()
+        drop_table(DBFieldModel)
+
+    def test_basic_crud(self):
+        values = {'k0': 1, 'k1': 2, 'c0': 3, 'v0': 4, 'v1': 5}
+
+        # create
+        i = DBFieldModel.create(**values)
+        i = DBFieldModel.objects(k0=i.k0, k1=i.k1).first()
+        self.assertEqual(i, DBFieldModel(**values))
+
+        # create
+        values['v0'] = 101
+        i.update(v0=values['v0'])
+        i = DBFieldModel.objects(k0=i.k0, k1=i.k1).first()
+        self.assertEqual(i, DBFieldModel(**values))
+
+        # delete
+        DBFieldModel.objects(k0=i.k0, k1=i.k1).delete()
+        i = DBFieldModel.objects(k0=i.k0, k1=i.k1).first()
+        self.assertIsNone(i)
+
+        i = DBFieldModel.create(**values)
+        i = DBFieldModel.objects(k0=i.k0, k1=i.k1).first()
+        self.assertEqual(i, DBFieldModel(**values))
+        i.delete()
+        DBFieldModel.objects(k0=i.k0, k1=i.k1).delete()
+        i = DBFieldModel.objects(k0=i.k0, k1=i.k1).first()
+        self.assertIsNone(i)
+
+    def test_slice(self):
+        values = {'k0': 1, 'k1': 3, 'c0': 3, 'v0': 4, 'v1': 5}
+        clustering_values = range(3)
+        for c in clustering_values:
+            values['c0'] = c
+            i = DBFieldModel.create(**values)
+
+        self.assertEqual(DBFieldModel.objects(k0=i.k0, k1=i.k1).count(), len(clustering_values))
+        self.assertEqual(DBFieldModel.objects(k0=i.k0, k1=i.k1, c0=i.c0).count(), 1)
+        self.assertEqual(DBFieldModel.objects(k0=i.k0, k1=i.k1, c0__lt=i.c0).count(), len(clustering_values[:-1]))
+        self.assertEqual(DBFieldModel.objects(k0=i.k0, k1=i.k1, c0__gt=0).count(), len(clustering_values[1:]))
+
+    def test_order(self):
+        values = {'k0': 1, 'k1': 4, 'c0': 3, 'v0': 4, 'v1': 5}
+        clustering_values = range(3)
+        for c in clustering_values:
+            values['c0'] = c
+            i = DBFieldModel.create(**values)
+        self.assertEqual(DBFieldModel.objects(k0=i.k0, k1=i.k1).order_by('c0').first().c0, clustering_values[0])
+        self.assertEqual(DBFieldModel.objects(k0=i.k0, k1=i.k1).order_by('-c0').first().c0, clustering_values[-1])
+
+    def test_index(self):
+        values = {'k0': 1, 'k1': 5, 'c0': 3, 'v0': 4, 'v1': 5}
+        clustering_values = range(3)
+        for c in clustering_values:
+            values['c0'] = c
+            values['v1'] = c
+            i = DBFieldModel.create(**values)
+        self.assertEqual(DBFieldModel.objects(k0=i.k0, k1=i.k1).count(), len(clustering_values))
+        self.assertEqual(DBFieldModel.objects(k0=i.k0, k1=i.k1, v1=0).count(), 1)

@@ -69,9 +69,9 @@ class TestModelClassFunction(BaseCassEngTestCase):
         Tests that trying to create conflicting db column names will fail
         """
 
-        with self.assertRaises(ModelException):
+        with self.assertRaisesRegex(ModelException, r".*more than once$"):
             class BadNames(Model):
-                words = columns.Text()
+                words = columns.Text(primary_key=True)
                 content = columns.Text(db_field='words')
 
     def test_column_ordering_is_preserved(self):
@@ -94,7 +94,6 @@ class TestModelClassFunction(BaseCassEngTestCase):
 
                 count   = columns.Integer()
                 text    = columns.Text(required=False)
-
 
     def test_value_managers_are_keeping_model_instances_isolated(self):
         """
