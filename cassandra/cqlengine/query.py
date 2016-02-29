@@ -133,6 +133,8 @@ class BatchQuery(object):
 
     http://www.datastax.com/docs/1.2/cql_cli/cql/BATCH
     """
+    warn_multiple_exec = True
+
     _consistency = None
 
     def __init__(self, batch_type=None, timestamp=None, consistency=None, execute_on_exception=False,
@@ -163,6 +165,8 @@ class BatchQuery(object):
         self._execute_on_exception = execute_on_exception
         self._timeout = timeout
         self._callbacks = []
+        self._executed = False
+        self._context_entered = False
 
     def add_query(self, query):
         if not isinstance(query, BaseCQLStatement):
@@ -175,9 +179,6 @@ class BatchQuery(object):
     def _execute_callbacks(self):
         for callback, args, kwargs in self._callbacks:
             callback(*args, **kwargs)
-
-        # trying to clear up the ref counts for objects mentioned in the set
-        del self._callbacks
 
     def add_callback(self, fn, *args, **kwargs):
         """Add a function and arguments to be passed to it to be executed after the batch executes.
@@ -197,6 +198,13 @@ class BatchQuery(object):
         self._callbacks.append((fn, args, kwargs))
 
     def execute(self):
+        if self._executed and self.warn_multiple_exec:
+            msg = "Batch executed multiple times."
+            if self._context_entered:
+                msg += " If using the batch as a context manager, there is no need to call execute directly."
+            warn(msg)
+        self._executed = True
+
         if len(self.queries) == 0:
             # Empty batch is a no-op
             # except for callbacks
@@ -237,6 +245,7 @@ class BatchQuery(object):
         self._execute_callbacks()
 
     def __enter__(self):
+        self._context_entered = True
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
