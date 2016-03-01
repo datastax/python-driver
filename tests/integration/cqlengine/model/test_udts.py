@@ -24,7 +24,7 @@ from uuid import UUID, uuid4
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.usertype import UserType, UserTypeDefinitionException
 from cassandra.cqlengine import columns, connection
-from cassandra.cqlengine.management import sync_table, sync_type, create_keyspace_simple, drop_keyspace
+from cassandra.cqlengine.management import sync_table, sync_type, create_keyspace_simple, drop_keyspace, drop_table
 from cassandra.util import Date, Time
 
 from tests.integration import PROTOCOL_VERSION
@@ -447,6 +447,17 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         cluster.register_user_type.assert_called_with(models.DEFAULT_KEYSPACE, User.type_name(), User)
 
     def test_db_field_override(self):
+        """
+        Tests for db_field override
+
+        Tests to ensure that udt's in models can specify db_field for a particular field and that it will be honored.
+
+        @since 3.1.0
+        @jira_ticket PYTHON-346
+        @expected_result The actual cassandra column will use the db_field specified.
+
+        @test_category data_types:udt
+        """
         class db_field_different(UserType):
             age = columns.Integer(db_field='a')
             name = columns.Text(db_field='n')
@@ -461,6 +472,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         type_meta = cluster.metadata.keyspaces[TheModel._get_keyspace()].user_types[db_field_different.type_name()]
 
         type_fields = (db_field_different.age.column, db_field_different.name.column)
+
         self.assertEqual(len(type_meta.field_names), len(type_fields))
         for f in type_fields:
             self.assertIn(f.db_field_name, type_meta.field_names)
@@ -479,16 +491,32 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         self.assertIsInstance(info, db_field_different)
         self.assertEqual(info.age, age)
         self.assertEqual(info.name, name)
-
         # also excercise the db_Field mapping
         self.assertEqual(info.a, age)
         self.assertEqual(info.n, name)
 
     def test_db_field_overload(self):
+        """
+        Tests for db_field UserTypeDefinitionException
+
+        Test so that when we override a model's default field witha  db_field that it errors appropriately
+
+        @since 3.1.0
+        @jira_ticket PYTHON-346
+        @expected_result Setting a db_field to an existing field causes an exception to occur.
+
+        @test_category data_types:udt
+        """
+
         with self.assertRaises(UserTypeDefinitionException):
             class something_silly(UserType):
                 first_col = columns.Integer()
                 second_col = columns.Text(db_field='first_col')
+
+        with self.assertRaises(UserTypeDefinitionException):
+            class something_silly_2(UserType):
+                first_col = columns.Integer(db_field="second_col")
+                second_col = columns.Text()
 
     def test_set_udt_fields(self):
         # PYTHON-502
