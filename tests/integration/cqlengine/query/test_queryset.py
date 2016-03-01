@@ -635,6 +635,27 @@ class TestQuerySetDelete(BaseQuerySetUsage):
         with self.assertRaises(query.QueryException):
             TestModel.objects(attempt_id=0).delete()
 
+    @unittest.skipIf(CASSANDRA_VERSION < '3.0', "range deletion was introduce in C* 3.0, currently running {0}".format(CASSANDRA_VERSION))
+    def test_range_deletion(self):
+        """
+        Tests that range deletion work as expected
+        """
+
+        for i in range(10):
+            TestMultiClusteringModel.objects().create(one=1, two=i, three=i)
+
+        TestMultiClusteringModel.objects(one=1, two__gte=0, two__lte=3).delete()
+        self.assertEqual(6, len(TestMultiClusteringModel.objects.all()))
+
+        TestMultiClusteringModel.objects(one=1, two__gt=3, two__lt=5).delete()
+        self.assertEqual(5, len(TestMultiClusteringModel.objects.all()))
+
+        TestMultiClusteringModel.objects(one=1, two__in=[8,9]).delete()
+        self.assertEqual(3, len(TestMultiClusteringModel.objects.all()))
+
+        TestMultiClusteringModel.objects(one__in=[1], two__gte=0).delete()
+        self.assertEqual(0, len(TestMultiClusteringModel.objects.all()))
+
 
 class TimeUUIDQueryModel(Model):
 
