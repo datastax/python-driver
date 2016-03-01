@@ -22,7 +22,7 @@ from uuid import uuid4
 from cassandra.cqlengine import columns
 from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine.models import Model
-from cassandra.cqlengine.query import BatchQuery, LWTException, IfExistsWithCounterColumn
+from cassandra.cqlengine.query import BatchQuery, BatchType, LWTException, IfExistsWithCounterColumn
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration import PROTOCOL_VERSION
@@ -30,8 +30,15 @@ from tests.integration import PROTOCOL_VERSION
 
 class TestIfExistsModel(Model):
 
-    id = columns.UUID(primary_key=True, default=lambda: uuid4())
+    id = columns.Integer(primary_key=True, default=lambda: uuid4())
     count = columns.Integer()
+    text = columns.Text(required=False)
+
+
+class TestIfExistsModel2(Model):
+
+    id = columns.Integer(primary_key=True)
+    count = columns.Integer(primary_key=True, required=False)
     text = columns.Text(required=False)
 
 
@@ -47,11 +54,13 @@ class BaseIfExistsTest(BaseCassEngTestCase):
     def setUpClass(cls):
         super(BaseIfExistsTest, cls).setUpClass()
         sync_table(TestIfExistsModel)
+        sync_table(TestIfExistsModel2)
 
     @classmethod
     def tearDownClass(cls):
         super(BaseIfExistsTest, cls).tearDownClass()
         drop_table(TestIfExistsModel)
+        drop_table(TestIfExistsModel2)
 
 
 class BaseIfExistsWithCounterTest(BaseCassEngTestCase):
@@ -71,7 +80,15 @@ class IfExistsUpdateTests(BaseIfExistsTest):
 
     @unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
     def test_update_if_exists(self):
-        """ tests that update with if_exists work as expected """
+        """
+        Tests that update with if_exists work as expected
+
+        @since 3.1
+        @jira_ticket PYTHON-432
+        @expected_result updates to be applied when primary key exists, otherwise LWT exception to be thrown
+
+        @test_category object_mapper
+        """
 
         id = uuid4()
 
@@ -105,7 +122,15 @@ class IfExistsUpdateTests(BaseIfExistsTest):
 
     @unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
     def test_batch_update_if_exists_success(self):
-        """ tests that batch update with if_exists work as expected """
+        """
+        Tests that batch update with if_exists work as expected
+
+        @since 3.1
+        @jira_ticket PYTHON-432
+        @expected_result
+
+        @test_category object_mapper
+        """
 
         id = uuid4()
 
@@ -132,8 +157,38 @@ class IfExistsUpdateTests(BaseIfExistsTest):
         self.assertEqual(tm.text, '111111111')
 
     @unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
+    def test_batch_mixed_update_if_exists_success(self):
+        """
+        Tests that batch update with with one bad query will still fail with LWTException
+
+        @since 3.1
+        @jira_ticket PYTHON-432
+        @expected_result
+
+        @test_category object_mapper
+        """
+
+        m = TestIfExistsModel2.create(id=1, count=8, text='123456789')
+        with self.assertRaises(LWTException) as assertion:
+            with BatchQuery() as b:
+                m.text = '111111112'
+                m.batch(b).if_exists().update()  # Does exist
+                n = TestIfExistsModel2(id=1, count=10, text="Failure")  # Doesn't exist
+                n.batch(b).if_exists().update()
+
+        self.assertEqual(assertion.exception.existing.get('[applied]'), False)
+
+    @unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
     def test_delete_if_exists(self):
-        """ tests that delete with if_exists work as expected """
+        """
+        Tests that delete with if_exists work, and throw proper LWT exception when they are are not applied
+
+        @since 3.1
+        @jira_ticket PYTHON-432
+        @expected_result Deletes will be preformed if they exist, otherwise throw LWT exception
+
+        @test_category object_mapper
+        """
 
         id = uuid4()
 
@@ -158,10 +213,17 @@ class IfExistsUpdateTests(BaseIfExistsTest):
             '[applied]': False,
         })
 
-
     @unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
     def test_batch_delete_if_exists_success(self):
-        """ tests that batch delete with if_exists work as expected """
+        """
+        Tests that batch deletes with if_exists work, and throw proper LWTException when they are are not applied
+
+        @since 3.1
+        @jira_ticket PYTHON-432
+        @expected_result Deletes will be preformed if they exist, otherwise throw LWTException
+
+        @test_category object_mapper
+        """
 
         id = uuid4()
 
@@ -182,11 +244,34 @@ class IfExistsUpdateTests(BaseIfExistsTest):
             '[applied]': False,
         })
 
+    @unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
+    def test_batch_delete_mixed(self):
+        """
+        Tests that batch deletes  with multiple queries and throw proper LWTException when they are are not all applicable
+
+        @since 3.1
+        @jira_ticket PYTHON-432
+        @expected_result If one delete clause doesn't exist all should fail.
+
+        @test_category object_mapper
+        """
+
+        m = TestIfExistsModel2.create(id=3, count=8, text='123456789')
+
+        with self.assertRaises(LWTException) as assertion:
+            with BatchQuery() as b:
+                m.batch(b).if_exists().delete()  # Does exist
+                n = TestIfExistsModel2(id=3, count=42, text='1111111')  # Doesn't exist
+                n.batch(b).if_exists().delete()
+
+        self.assertEqual(assertion.exception.existing.get('[applied]'), False)
+        q = TestIfExistsModel2.objects(id=3, count=8)
+        self.assertEqual(len(q), 1)
+
 
 class IfExistsQueryTest(BaseIfExistsTest):
 
     def test_if_exists_included_on_queryset_update(self):
-        """ tests that if_exists on queryset works as expected """
 
         with mock.patch.object(self.session, 'execute') as m:
             TestIfExistsModel.objects(id=uuid4()).if_exists().update(count=42)
@@ -216,8 +301,14 @@ class IfExistsQueryTest(BaseIfExistsTest):
 class IfExistWithCounterTest(BaseIfExistsWithCounterTest):
 
     def test_instance_raise_exception(self):
-        """ make sure exception is raised when calling
-        if_exists on table with counter column
+        """
+        Tests if exists is used with a counter column model that exception are thrown
+
+        @since 3.1
+        @jira_ticket PYTHON-432
+        @expected_result Deletes will be preformed if they exist, otherwise throw LWTException
+
+        @test_category object_mapper
         """
         id = uuid4()
         with self.assertRaises(IfExistsWithCounterColumn):
