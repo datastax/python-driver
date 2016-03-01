@@ -52,7 +52,7 @@ class LWTException(CQLEngineException):
     :param existing: The current state of the data which prevented the write.
     """
     def __init__(self, existing):
-        super(LWTException, self).__init__(self)
+        super(LWTException, self).__init__("LWT Query was not applied")
         self.existing = existing
 
 
