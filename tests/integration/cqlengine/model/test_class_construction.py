@@ -21,6 +21,7 @@ from cassandra.cqlengine.query import ModelQuerySet, DMLQuery
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 
+
 class TestModelClassFunction(BaseCassEngTestCase):
     """
     Tests verifying the behavior of the Model metaclass
@@ -34,15 +35,15 @@ class TestModelClassFunction(BaseCassEngTestCase):
 
         class TestModel(Model):
 
-            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
+            id = columns.UUID(primary_key=True, default=lambda:uuid4())
             text = columns.Text()
 
-        #check class attibutes
+        # check class attibutes
         self.assertHasAttr(TestModel, '_columns')
         self.assertHasAttr(TestModel, 'id')
         self.assertHasAttr(TestModel, 'text')
 
-        #check instance attributes
+        # check instance attributes
         inst = TestModel()
         self.assertHasAttr(inst, 'id')
         self.assertHasAttr(inst, 'text')
@@ -56,7 +57,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         """
         class WildDBNames(Model):
 
-            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
+            id = columns.UUID(primary_key=True, default=lambda:uuid4())
             content = columns.Text(db_field='words_and_whatnot')
             numbers = columns.Integer(db_field='integers_etc')
 
@@ -92,8 +93,8 @@ class TestModelClassFunction(BaseCassEngTestCase):
         with self.assertRaises(ModelDefinitionException):
             class TestModel(Model):
 
-                count   = columns.Integer()
-                text    = columns.Text(required=False)
+                count = columns.Integer()
+                text = columns.Text(required=False)
 
     def test_value_managers_are_keeping_model_instances_isolated(self):
         """
@@ -101,7 +102,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         """
         class Stuff(Model):
 
-            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
+            id = columns.UUID(primary_key=True, default=lambda:uuid4())
             num = columns.Integer()
 
         inst1 = Stuff(num=5)
@@ -117,7 +118,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         """
         class TestModel(Model):
 
-            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
+            id = columns.UUID(primary_key=True, default=lambda:uuid4())
             text = columns.Text()
 
         class InheritedModel(TestModel):
@@ -130,7 +131,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         """ Tests that auto column family name generation works as expected """
         class TestModel(Model):
 
-            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
+            id = columns.UUID(primary_key=True, default=lambda:uuid4())
             text = columns.Text()
 
         assert TestModel.column_family_name(include_keyspace=False) == 'test_model'
@@ -163,7 +164,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         """ Tests that columns that can be deleted have the del attribute """
         class DelModel(Model):
 
-            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
+            id = columns.UUID(primary_key=True, default=lambda:uuid4())
             key = columns.Integer(primary_key=True)
             data = columns.Integer(required=False)
 
@@ -177,25 +178,25 @@ class TestModelClassFunction(BaseCassEngTestCase):
 
         class Model1(Model):
 
-            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
+            id = columns.UUID(primary_key=True, default=lambda:uuid4())
 
         class Model2(Model):
 
-            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
+            id = columns.UUID(primary_key=True, default=lambda:uuid4())
 
         try:
             raise Model1.DoesNotExist
         except Model2.DoesNotExist:
             assert False, "Model1 exception should not be caught by Model2"
         except Model1.DoesNotExist:
-            #expected
+            # expected
             pass
 
     def test_does_not_exist_inherits_from_superclass(self):
         """ Tests that a DoesNotExist exception can be caught by it's parent class DoesNotExist """
         class Model1(Model):
 
-            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
+            id = columns.UUID(primary_key=True, default=lambda:uuid4())
 
         class Model2(Model1):
             pass
@@ -203,7 +204,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         try:
             raise Model2.DoesNotExist
         except Model1.DoesNotExist:
-            #expected
+            # expected
             pass
         except Exception:
             assert False, "Model2 exception should not be caught by Model1"
@@ -247,10 +248,29 @@ class TestManualTableNamingCaseSensitive(BaseCassEngTestCase):
         id = columns.UUID(primary_key=True)
 
     def test_proper_table_naming_case_insensitive(self):
+        """
+        Test to ensure case senstivity is not honored by default honored
+
+        @since 3.1
+        @jira_ticket PYTHON-337
+        @expected_result table_names arel lowercase
+
+        @test_category object_mapper
+        """
         self.assertEqual(self.RenamedCaseInsensitiveTest.column_family_name(include_keyspace=False), 'manual_name')
         self.assertEqual(self.RenamedCaseInsensitiveTest.column_family_name(include_keyspace=True), 'whatever.manual_name')
 
     def test_proper_table_naming_case_sensitive(self):
+        """
+        Test to ensure case is honored when the flag is correctly set.
+
+        @since 3.1
+        @jira_ticket PYTHON-337
+        @expected_result table_name case is honored.
+
+        @test_category object_mapper
+        """
+
         self.assertEqual(self.RenamedCaseSensitiveTest.column_family_name(include_keyspace=False), '"Manual_Name"')
         self.assertEqual(self.RenamedCaseSensitiveTest.column_family_name(include_keyspace=True), 'whatever."Manual_Name"')
 
@@ -263,19 +283,23 @@ class ConcreteModel(AbstractModel):
     pkey = columns.Integer(primary_key=True)
     data = columns.Integer()
 
+
 class AbstractModelWithCol(Model):
 
     __abstract__ = True
     pkey = columns.Integer(primary_key=True)
 
+
 class ConcreteModelWithCol(AbstractModelWithCol):
     data = columns.Integer()
+
 
 class AbstractModelWithFullCols(Model):
     __abstract__ = True
 
     pkey = columns.Integer(primary_key=True)
     data = columns.Integer()
+
 
 class TestAbstractModelClasses(BaseCassEngTestCase):
 

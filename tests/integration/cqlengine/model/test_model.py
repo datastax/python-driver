@@ -127,6 +127,15 @@ class TestModel(unittest.TestCase):
             self.assertEqual(TestModel.column_family_name(include_keyspace=False), "test_model")
 
     def test_column_family_case_sensitive(self):
+        """
+        Test to ensure case sensitivity is honored when __table_name_case_sensitive__ flag is set
+
+        @since 3.1
+        @jira_ticket PYTHON-337
+        @expected_result table_name case is respected
+
+        @test_category object_mapper
+        """
         class TestModel(Model):
             __table_name__ = 'TestModel'
             __table_name_case_sensitive__ = True
