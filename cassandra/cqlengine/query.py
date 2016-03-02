@@ -758,7 +758,11 @@ class AbstractQuerySet(object):
             for user in User.objects().limit(100):
                 print(user)
         """
-        if not (v is None or isinstance(v, six.integer_types)):
+
+        if v is None:
+            v = 0
+
+        if not isinstance(v, six.integer_types):
             raise TypeError
         if v == self._limit:
             return self
