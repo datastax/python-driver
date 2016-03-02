@@ -203,6 +203,15 @@ class BatchQueryCallbacksTests(BaseCassEngTestCase):
         self.assertEqual(len(call_history), 2)
 
     def test_callbacks_work_multiple_times(self):
+        """
+        Tests that multiple executions of execute on a batch statement
+        logs a warning, and that we don't encounter an attribute error.
+        @since 3.1
+        @jira_ticket PYTHON-445
+        @expected_result warning message is logged
+
+        @test_category object_mapper
+        """
         call_history = []
 
         def my_callback(*args, **kwargs):
@@ -217,6 +226,16 @@ class BatchQueryCallbacksTests(BaseCassEngTestCase):
         self.assertRegex(str(w[0].message), r"^Batch.*multiple.*")
 
     def test_disable_multiple_callback_warning(self):
+        """
+        Tests that multiple executions of a batch statement
+        don't log a warning when warn_multiple_exec flag is set, and
+        that we don't encounter an attribute error.
+        @since 3.1
+        @jira_ticket PYTHON-445
+        @expected_result warning message is logged
+
+        @test_category object_mapper
+        """
         call_history = []
 
         def my_callback(*args, **kwargs):
