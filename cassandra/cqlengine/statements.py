@@ -577,10 +577,13 @@ class SelectStatement(BaseCQLStatement):
 
     def __unicode__(self):
         qs = ['SELECT']
-        if self.count:
+        if self.distinct_fields:
+            if self.count:
+                qs += ['DISTINCT COUNT({0})'.format(', '.join(['"{0}"'.format(f) for f in self.distinct_fields]))]
+            else:
+                qs += ['DISTINCT {0}'.format(', '.join(['"{0}"'.format(f) for f in self.distinct_fields]))]
+        elif self.count:
             qs += ['COUNT(*)']
-        elif self.distinct_fields:
-            qs += ['DISTINCT {0}'.format(', '.join(['"{0}"'.format(f) for f in self.distinct_fields]))]
         else:
             qs += [', '.join(['"{0}"'.format(f) for f in self.fields]) if self.fields else '*']
         qs += ['FROM', self.table]

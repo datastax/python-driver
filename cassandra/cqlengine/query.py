@@ -328,7 +328,7 @@ class AbstractQuerySet(object):
     def __deepcopy__(self, memo):
         clone = self.__class__(self.model)
         for k, v in self.__dict__.items():
-            if k in ['_con', '_cur', '_result_cache', '_result_idx']:  # don't clone these
+            if k in ['_con', '_cur', '_result_cache', '_result_idx', '_result_generator']:  # don't clone these
                 clone.__dict__[k] = None
             elif k == '_batch':
                 # we need to keep the same batch instance across
@@ -403,45 +403,53 @@ class AbstractQuerySet(object):
     def __iter__(self):
         self._execute_query()
 
-        for idx in range(self.count()):
-            while True:
+        idx = 0
+        while True:
+            if len(self._result_cache) <= idx:
                 try:
-                    instance = self._result_cache[idx]
-                    break
-                except IndexError:
                     self._result_cache.append(next(self._result_generator))
+                except StopIteration:
+                    break
 
+            instance = self._result_cache[idx]
             if isinstance(instance, dict):
                 self._fill_result_cache_to_idx(idx)
             yield self._result_cache[idx]
 
+            idx += 1
+
     def __getitem__(self, s):
         self._execute_query()
 
-        num_results = self.count()
-
         if isinstance(s, slice):
             # calculate the amount of results that need to be loaded
-            end = num_results if s.step is None else s.step
-            if end < 0:
-                end += num_results
-            else:
-                end -= 1
-            self._fill_result_cache_to_idx(end)
+            end = s.stop
+            if s.start < 0 or s.stop < 0:
+                end = self.count()
+
+            try:
+                self._fill_result_cache_to_idx(end)
+            except StopIteration:
+                pass
+
             return self._result_cache[s.start:s.stop:s.step]
         else:
-            # return the object at this index
-            s = int(s)
+            try:
+                s = int(s)
+            except (ValueError, TypeError):
+                raise TypeError('QuerySet indices must be integers')
 
-            # handle negative indexing
+            # Using negative indexing is costly since we have to execute a count()
             if s < 0:
+                num_results = self.count()
                 s += num_results
 
-            if s >= num_results:
-                raise IndexError
-            else:
+            try:
                 self._fill_result_cache_to_idx(s)
-                return self._result_cache[s]
+            except StopIteration:
+                raise IndexError
+
+            return self._result_cache[s]
 
     def _get_result_constructor(self):
         """
@@ -699,7 +707,8 @@ class AbstractQuerySet(object):
             query = self._select_query()
             query.count = True
             result = self._execute(query)
-            self._count = result[0]['count']
+            count_row = result[0].popitem()
+            self._count = count_row[1]
         return self._count
 
     def distinct(self, distinct_fields=None):
