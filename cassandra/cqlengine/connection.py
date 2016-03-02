@@ -81,9 +81,9 @@ def set_session(s):
     session = s
     cluster = s.cluster
 
-    # Set default keyspace from given session's keyspace if not already set
-    from cassandra.cqlengine import models
-    if not models.DEFAULT_KEYSPACE and session.keyspace:
+    # Set default keyspace from given session's keyspace
+    if session.keyspace:
+        from cassandra.cqlengine import models
         models.DEFAULT_KEYSPACE = session.keyspace
 
     _setup_session(session)
