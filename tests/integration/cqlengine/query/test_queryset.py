@@ -485,6 +485,13 @@ class TestQuerySetDistinct(BaseQuerySetUsage):
         q = TestModel.objects.distinct(['test_id']).filter(test_id__in=[52])
         self.assertEqual(len(q), 0)
 
+    def test_distinct_with_explicit_count(self):
+        q = TestModel.objects.distinct(['test_id'])
+        self.assertEqual(q.count(), 3)
+
+        q = TestModel.objects.distinct(['test_id']).filter(test_id__in=[1, 2])
+        self.assertEqual(q.count(), 2)
+
 
 class TestQuerySetOrdering(BaseQuerySetUsage):
 

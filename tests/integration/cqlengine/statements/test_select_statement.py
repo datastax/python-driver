@@ -64,6 +64,9 @@ class SelectStatementTests(unittest.TestCase):
         ss = SelectStatement('table', distinct_fields=['field1', 'field2'])
         self.assertEqual(six.text_type(ss), 'SELECT DISTINCT "field1", "field2" FROM table')
 
+        ss = SelectStatement('table', distinct_fields=['field1'], count=True)
+        self.assertEqual(six.text_type(ss), 'SELECT DISTINCT COUNT("field1") FROM table')
+
     def test_context(self):
         ss = SelectStatement('table')
         ss.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
