@@ -96,3 +96,15 @@ class SelectStatementTests(unittest.TestCase):
         self.assertIn('ORDER BY x, y', qstr)
         self.assertIn('ALLOW FILTERING', qstr)
 
+    def test_limit_rendering(self):
+        ss = SelectStatement('table', None, limit=10)
+        qstr = six.text_type(ss)
+        self.assertIn('LIMIT 10', qstr)
+
+        ss = SelectStatement('table', None, limit=0)
+        qstr = six.text_type(ss)
+        self.assertNotIn('LIMIT', qstr)
+
+        ss = SelectStatement('table', None, limit=None)
+        qstr = six.text_type(ss)
+        self.assertNotIn('LIMIT', qstr)
