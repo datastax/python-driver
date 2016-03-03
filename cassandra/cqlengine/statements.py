@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 import time
 import six
 
+from cassandra.query import FETCH_SIZE_UNSET
 from cassandra.cqlengine import UnicodeMixin
 from cassandra.cqlengine.functions import QueryValue
 from cassandra.cqlengine.operators import BaseWhereOperator, InOperator
@@ -470,13 +471,14 @@ class MapDeleteClause(BaseDeleteClause):
 class BaseCQLStatement(UnicodeMixin):
     """ The base cql statement class """
 
-    def __init__(self, table, consistency=None, timestamp=None, where=None):
+    def __init__(self, table, consistency=None, timestamp=None, where=None, fetch_size=None):
         super(BaseCQLStatement, self).__init__()
         self.table = table
         self.consistency = consistency
         self.context_id = 0
         self.context_counter = self.context_id
         self.timestamp = timestamp
+        self.fetch_size = fetch_size if fetch_size else FETCH_SIZE_UNSET
 
         self.where_clauses = []
         for clause in where or []:
@@ -556,7 +558,8 @@ class SelectStatement(BaseCQLStatement):
                  order_by=None,
                  limit=None,
                  allow_filtering=False,
-                 distinct_fields=None):
+                 distinct_fields=None,
+                 fetch_size=None):
 
         """
         :param where
@@ -565,7 +568,8 @@ class SelectStatement(BaseCQLStatement):
         super(SelectStatement, self).__init__(
             table,
             consistency=consistency,
-            where=where
+            where=where,
+            fetch_size=fetch_size
         )
 
         self.fields = [fields] if isinstance(fields, six.string_types) else (fields or [])

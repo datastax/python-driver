@@ -302,6 +302,7 @@ class AbstractQuerySet(object):
         self._if_not_exists = False
         self._timeout = connection.NOT_SET
         self._if_exists = False
+        self._fetch_size = None
 
     @property
     def column_family_name(self):
@@ -369,7 +370,8 @@ class AbstractQuerySet(object):
             order_by=self._order,
             limit=self._limit,
             allow_filtering=self._allow_filtering,
-            distinct_fields=self._distinct_fields
+            distinct_fields=self._distinct_fields,
+            fetch_size=self._fetch_size
         )
 
     # ----Reads------
@@ -772,6 +774,30 @@ class AbstractQuerySet(object):
 
         clone = copy.deepcopy(self)
         clone._limit = v
+        return clone
+
+    def fetch_size(self, v):
+        """
+        Sets the number of rows that are fetched at a time.
+
+        *Note that driver's default fetch size is 5000.
+
+        .. code-block:: python
+
+            for user in User.objects().fetch_size(500):
+                print(user)
+        """
+
+        if not isinstance(v, six.integer_types):
+            raise TypeError
+        if v == self._fetch_size:
+            return self
+
+        if v < 1:
+            raise QueryException("fetch size less than 1 is not allowed")
+
+        clone = copy.deepcopy(self)
+        clone._fetch_size = v
         return clone
 
     def allow_filtering(self):
