@@ -16,6 +16,7 @@ try:
 except ImportError:
     import unittest  # noqa
 
+from cassandra.query import FETCH_SIZE_UNSET
 from cassandra.cqlengine.statements import BaseCQLStatement, StatementException
 
 
@@ -26,3 +27,14 @@ class BaseStatementTest(unittest.TestCase):
         stmt = BaseCQLStatement('table', [])
         with self.assertRaises(StatementException):
             stmt.add_where_clause('x=5')
+
+    def test_fetch_size(self):
+        """ tests that fetch_size is correctly set """
+        stmt = BaseCQLStatement('table', None, fetch_size=1000)
+        self.assertEqual(stmt.fetch_size, 1000)
+
+        stmt = BaseCQLStatement('table', None, fetch_size=None)
+        self.assertEqual(stmt.fetch_size, FETCH_SIZE_UNSET)
+
+        stmt = BaseCQLStatement('table', None)
+        self.assertEqual(stmt.fetch_size, FETCH_SIZE_UNSET)

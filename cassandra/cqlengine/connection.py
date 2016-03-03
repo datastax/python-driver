@@ -162,8 +162,7 @@ def execute(query, params=None, consistency_level=None, timeout=NOT_SET):
 
     elif isinstance(query, BaseCQLStatement):
         params = query.get_context()
-        query = str(query)
-        query = SimpleStatement(query, consistency_level=consistency_level)
+        query = SimpleStatement(str(query), consistency_level=consistency_level, fetch_size=query.fetch_size)
 
     elif isinstance(query, six.string_types):
         query = SimpleStatement(query, consistency_level=consistency_level)

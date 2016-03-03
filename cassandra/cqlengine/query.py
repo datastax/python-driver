@@ -289,8 +289,12 @@ class AbstractQuerySet(object):
         # results cache
         self._result_cache = None
         self._result_idx = None
+        self._result_generator = None
 
         self._distinct_fields = None
+
+        self._count = None
+
         self._batch = None
         self._ttl = getattr(model, '__default_ttl__', None)
         self._consistency = None
@@ -298,6 +302,7 @@ class AbstractQuerySet(object):
         self._if_not_exists = False
         self._timeout = connection.NOT_SET
         self._if_exists = False
+        self._fetch_size = None
 
     @property
     def column_family_name(self):
@@ -324,7 +329,7 @@ class AbstractQuerySet(object):
     def __deepcopy__(self, memo):
         clone = self.__class__(self.model)
         for k, v in self.__dict__.items():
-            if k in ['_con', '_cur', '_result_cache', '_result_idx']:  # don't clone these
+            if k in ['_con', '_cur', '_result_cache', '_result_idx', '_result_generator']:  # don't clone these
                 clone.__dict__[k] = None
             elif k == '_batch':
                 # we need to keep the same batch instance across
@@ -341,7 +346,7 @@ class AbstractQuerySet(object):
 
     def __len__(self):
         self._execute_query()
-        return len(self._result_cache)
+        return self.count()
 
     # ----query generation / execution----
 
@@ -365,7 +370,8 @@ class AbstractQuerySet(object):
             order_by=self._order,
             limit=self._limit,
             allow_filtering=self._allow_filtering,
-            distinct_fields=self._distinct_fields
+            distinct_fields=self._distinct_fields,
+            fetch_size=self._fetch_size
         )
 
     # ----Reads------
@@ -374,7 +380,8 @@ class AbstractQuerySet(object):
         if self._batch:
             raise CQLEngineException("Only inserts, updates, and deletes are available in batch mode")
         if self._result_cache is None:
-            self._result_cache = list(self._execute(self._select_query()))
+            self._result_generator = (i for i in self._execute(self._select_query()))
+            self._result_cache = []
             self._construct_result = self._get_result_constructor()
 
     def _fill_result_cache_to_idx(self, idx):
@@ -388,44 +395,63 @@ class AbstractQuerySet(object):
         else:
             for idx in range(qty):
                 self._result_idx += 1
-                self._result_cache[self._result_idx] = self._construct_result(self._result_cache[self._result_idx])
+                while True:
+                    try:
+                        self._result_cache[self._result_idx] = self._construct_result(self._result_cache[self._result_idx])
+                        break
+                    except IndexError:
+                        self._result_cache.append(next(self._result_generator))
 
     def __iter__(self):
         self._execute_query()
 
-        for idx in range(len(self._result_cache)):
+        idx = 0
+        while True:
+            if len(self._result_cache) <= idx:
+                try:
+                    self._result_cache.append(next(self._result_generator))
+                except StopIteration:
+                    break
+
             instance = self._result_cache[idx]
             if isinstance(instance, dict):
                 self._fill_result_cache_to_idx(idx)
             yield self._result_cache[idx]
 
+            idx += 1
+
     def __getitem__(self, s):
         self._execute_query()
 
-        num_results = len(self._result_cache)
-
         if isinstance(s, slice):
             # calculate the amount of results that need to be loaded
-            end = num_results if s.step is None else s.step
-            if end < 0:
-                end += num_results
-            else:
-                end -= 1
-            self._fill_result_cache_to_idx(end)
+            end = s.stop
+            if s.start < 0 or s.stop < 0:
+                end = self.count()
+
+            try:
+                self._fill_result_cache_to_idx(end)
+            except StopIteration:
+                pass
+
             return self._result_cache[s.start:s.stop:s.step]
         else:
-            # return the object at this index
-            s = int(s)
+            try:
+                s = int(s)
+            except (ValueError, TypeError):
+                raise TypeError('QuerySet indices must be integers')
 
-            # handle negative indexing
+            # Using negative indexing is costly since we have to execute a count()
             if s < 0:
+                num_results = self.count()
                 s += num_results
 
-            if s >= num_results:
-                raise IndexError
-            else:
+            try:
                 self._fill_result_cache_to_idx(s)
-                return self._result_cache[s]
+            except StopIteration:
+                raise IndexError
+
+            return self._result_cache[s]
 
     def _get_result_constructor(self):
         """
@@ -615,10 +641,10 @@ class AbstractQuerySet(object):
             return self.filter(*args, **kwargs).get()
 
         self._execute_query()
-        if len(self._result_cache) == 0:
+        if self.count() == 0:
             raise self.model.DoesNotExist
-        elif len(self._result_cache) > 1:
-            raise self.model.MultipleObjectsReturned('{0} objects found'.format(len(self._result_cache)))
+        elif self.count() > 1:
+            raise self.model.MultipleObjectsReturned('{0} objects found'.format(self.count()))
         else:
             return self[0]
 
@@ -679,13 +705,13 @@ class AbstractQuerySet(object):
         if self._batch:
             raise CQLEngineException("Only inserts, updates, and deletes are available in batch mode")
 
-        if self._result_cache is None:
+        if self._count is None:
             query = self._select_query()
             query.count = True
             result = self._execute(query)
-            return result[0]['count']
-        else:
-            return len(self._result_cache)
+            count_row = result[0].popitem()
+            self._count = count_row[1]
+        return self._count
 
     def distinct(self, distinct_fields=None):
         """
@@ -734,7 +760,11 @@ class AbstractQuerySet(object):
             for user in User.objects().limit(100):
                 print(user)
         """
-        if not (v is None or isinstance(v, six.integer_types)):
+
+        if v is None:
+            v = 0
+
+        if not isinstance(v, six.integer_types):
             raise TypeError
         if v == self._limit:
             return self
@@ -744,6 +774,30 @@ class AbstractQuerySet(object):
 
         clone = copy.deepcopy(self)
         clone._limit = v
+        return clone
+
+    def fetch_size(self, v):
+        """
+        Sets the number of rows that are fetched at a time.
+
+        *Note that driver's default fetch size is 5000.
+
+        .. code-block:: python
+
+            for user in User.objects().fetch_size(500):
+                print(user)
+        """
+
+        if not isinstance(v, six.integer_types):
+            raise TypeError
+        if v == self._fetch_size:
+            return self
+
+        if v < 1:
+            raise QueryException("fetch size less than 1 is not allowed")
+
+        clone = copy.deepcopy(self)
+        clone._fetch_size = v
         return clone
 
     def allow_filtering(self):

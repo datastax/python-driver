@@ -485,6 +485,13 @@ class TestQuerySetDistinct(BaseQuerySetUsage):
         q = TestModel.objects.distinct(['test_id']).filter(test_id__in=[52])
         self.assertEqual(len(q), 0)
 
+    def test_distinct_with_explicit_count(self):
+        q = TestModel.objects.distinct(['test_id'])
+        self.assertEqual(q.count(), 3)
+
+        q = TestModel.objects.distinct(['test_id']).filter(test_id__in=[1, 2])
+        self.assertEqual(q.count(), 2)
+
 
 class TestQuerySetOrdering(BaseQuerySetUsage):
 
@@ -554,16 +561,31 @@ class TestQuerySetSlicing(BaseQuerySetUsage):
     def test_slicing_works_properly(self):
         q = TestModel.objects(test_id=0).order_by('attempt_id')
         expected_order = [0, 1, 2, 3]
+
         for model, expect in zip(q[1:3], expected_order[1:3]):
-            assert model.attempt_id == expect
+            self.assertEqual(model.attempt_id, expect)
+
+        for model, expect in zip(q[0:3:2], expected_order[0:3:2]):
+            self.assertEqual(model.attempt_id, expect)
 
     def test_negative_slicing(self):
         q = TestModel.objects(test_id=0).order_by('attempt_id')
         expected_order = [0, 1, 2, 3]
+
         for model, expect in zip(q[-3:], expected_order[-3:]):
-            assert model.attempt_id == expect
+            self.assertEqual(model.attempt_id, expect)
+
         for model, expect in zip(q[:-1], expected_order[:-1]):
-            assert model.attempt_id == expect
+            self.assertEqual(model.attempt_id, expect)
+
+        for model, expect in zip(q[1:-1], expected_order[1:-1]):
+            self.assertEqual(model.attempt_id, expect)
+
+        for model, expect in zip(q[-3:-1], expected_order[-3:-1]):
+            self.assertEqual(model.attempt_id, expect)
+
+        for model, expect in zip(q[-3:-1:2], expected_order[-3:-1:2]):
+            self.assertEqual(model.attempt_id, expect)
 
 
 class TestQuerySetValidation(BaseQuerySetUsage):
