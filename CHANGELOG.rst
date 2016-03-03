@@ -16,7 +16,6 @@ Features
 * cqlengine: Add support for UPDATE/DELETE ... IF EXISTS statements (PYTHON-432)
 * cqlengine: Allow nested container types (PYTHON-478)
 * cqlengine: Add ability to set query's fetch_size and limit (PYTHON-323)
-* cqlengine: Fix inserting None for model save (PYTHON-475)
 * cqlengine: Internalize default keyspace from successive set_session (PYTHON-486)
 * cqlengine: Warn when Model.create() on Counters (to be deprecated) (PYTHON-333)
 
@@ -41,6 +40,7 @@ Bug Fixes
 * cqlengine: BatchQuery multiple time executing execute statements. (PYTHON-445)
 * cqlengine: Better error for management functions when no connection set (PYTHON-451)
 * cqlengine: Handle None values for UDT attributes in cqlengine (PYTHON-470)
+* cqlengine: Fix inserting None for model save (PYTHON-475)
 * cqlengine: EQ doesn't map to a QueryOperator (setup race condition) (PYTHON-476)
 * cqlengine: class.MultipleObjectsReturned has DoesNotExist as base class (PYTHON-489)
 * cqlengine: Typo in cqlengine UserType __len__ breaks attribute assignment (PYTHON-502)
