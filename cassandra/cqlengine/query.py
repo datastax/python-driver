@@ -700,7 +700,9 @@ class AbstractQuerySet(object):
 
     def count(self):
         """
-        Returns the number of rows matched by this query
+        Returns the number of rows matched by this query.
+
+        *Note: This function executes a SELECT COUNT() and has a performance cost on large datasets*
         """
         if self._batch:
             raise CQLEngineException("Only inserts, updates, and deletes are available in batch mode")
@@ -751,13 +753,18 @@ class AbstractQuerySet(object):
 
     def limit(self, v):
         """
-        Limits the number of results returned by Cassandra.
+        Limits the number of results returned by Cassandra. Use *0* or *None* to disable.
 
         *Note that CQL's default limit is 10,000, so all queries without a limit set explicitly will have an implicit limit of 10,000*
 
         .. code-block:: python
 
+            # Fetch 100 users
             for user in User.objects().limit(100):
+                print(user)
+
+            # Fetch all users
+            for user in User.objects().limit(None):
                 print(user)
         """
 
@@ -780,7 +787,7 @@ class AbstractQuerySet(object):
         """
         Sets the number of rows that are fetched at a time.
 
-        *Note that driver's default fetch size is 5000.
+        *Note that driver's default fetch size is 5000.*
 
         .. code-block:: python
 
