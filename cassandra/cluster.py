@@ -1444,6 +1444,9 @@ class Session(object):
 
     default_serial_consistency_level = None
     """
+    The default :class:`~ConsistencyLevel` for serial phase of  conditional updates executed through
+    this session.  This default may be overridden by setting the
+    :attr:`~.Statement.serial_consistency_level` on individual statements.
     """
 
     max_trace_wait = 2.0
