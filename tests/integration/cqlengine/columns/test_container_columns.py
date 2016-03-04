@@ -566,7 +566,7 @@ class TestTupleColumn(BaseCassEngTestCase):
         """
         Tests creation and insertion of tuple types with models
 
-        @since 3.2
+        @since 3.1
         @jira_ticket PYTHON-306
         @expected_result Model is successfully crated
 
@@ -580,7 +580,7 @@ class TestTupleColumn(BaseCassEngTestCase):
         Tests creation and insertion of tuple types with models,
         and their retrieval.
 
-        @since 3.2
+        @since 3.1
         @jira_ticket PYTHON-306
         @expected_result Model is successfully crated
 
@@ -596,7 +596,7 @@ class TestTupleColumn(BaseCassEngTestCase):
         Tests creation and insertion of various types with models,
         and their retrieval.
 
-        @since 3.2
+        @since 3.1
         @jira_ticket PYTHON-306
         @expected_result Model is successfully created and fetched correctly
 
@@ -617,7 +617,7 @@ class TestTupleColumn(BaseCassEngTestCase):
         """
         Tests to make sure tuple type validation occurs
 
-        @since 3.2
+        @since 3.1
         @jira_ticket PYTHON-306
         @expected_result validation errors are raised
 
@@ -632,7 +632,7 @@ class TestTupleColumn(BaseCassEngTestCase):
         Tests that columns instantiated with a column class work properly
         and that the class is instantiated in the constructor
 
-        @since 3.2
+        @since 3.1
         @jira_ticket PYTHON-306
         @expected_result types are instantiated correctly
 
@@ -648,7 +648,7 @@ class TestTupleColumn(BaseCassEngTestCase):
         """
         Tests that the default empty container is not saved if it hasn't been updated
 
-        @since 3.2
+        @since 3.1
         @jira_ticket PYTHON-306
         @expected_result empty tuple is not upserted
 
@@ -667,7 +667,7 @@ class TestTupleColumn(BaseCassEngTestCase):
         """
         Tests that updates can be preformed on tuple containers
 
-        @since 3.2
+        @since 3.1
         @jira_ticket PYTHON-306
         @expected_result tuple is replaced
 
@@ -687,7 +687,7 @@ class TestTupleColumn(BaseCassEngTestCase):
         """
         Tests that explcit none updates are processed correctly on tuples
 
-        @since 3.2
+        @since 3.1
         @jira_ticket PYTHON-306
         @expected_result tuple is replaced with none
 
@@ -705,7 +705,7 @@ class TestTupleColumn(BaseCassEngTestCase):
         """
         Tests that Tuples can be created as none
 
-        @since 3.2
+        @since 3.1
         @jira_ticket PYTHON-306
         @expected_result tuple is created as none
 
@@ -719,7 +719,7 @@ class TestTupleColumn(BaseCassEngTestCase):
         """
         Tests that Tuples can be updated from none
 
-        @since 3.2
+        @since 3.1
         @jira_ticket PYTHON-306
         @expected_result tuple is created as none, but upserted to contain values
 
@@ -766,7 +766,7 @@ class TestNestedType(BaseCassEngTestCase):
         """
         Tests creation and insertion of nested collection types with models
 
-        @since 3.2
+        @since 3.1
         @jira_ticket PYTHON-478
         @expected_result Model is successfully created
 
@@ -780,7 +780,7 @@ class TestNestedType(BaseCassEngTestCase):
         Tests creation and insertion of nested collection types with models,
         and their retrieval.
 
-        @since 3.2
+        @since 3.1
         @jira_ticket PYTHON-478
         @expected_result Model is successfully crated
 
@@ -798,7 +798,7 @@ class TestNestedType(BaseCassEngTestCase):
         Tests creation and insertion of various nested collection types with models,
         and their retrieval.
 
-        @since 3.2
+        @since 3.1
         @jira_ticket PYTHON-378
         @expected_result Model is successfully created and fetched correctly
 
@@ -825,7 +825,7 @@ class TestNestedType(BaseCassEngTestCase):
         """
         Tests to make sure nested collection type validation occurs
 
-        @since 3.2
+        @since 3.1
         @jira_ticket PYTHON-478
         @expected_result validation errors are raised
 
@@ -852,7 +852,7 @@ class TestNestedType(BaseCassEngTestCase):
         Tests that columns instantiated with a column class work properly
         and that the class is instantiated in the constructor
 
-        @since 3.2
+        @since 3.1
         @jira_ticket PYTHON-478
         @expected_result types are instantiated correctly
 
@@ -872,7 +872,7 @@ class TestNestedType(BaseCassEngTestCase):
         """
         Tests that the default empty nested collection container is not saved if it hasn't been updated
 
-        @since 3.2
+        @since 3.1
         @jira_ticket PYTHON-478
         @expected_result empty nested collection is not upserted
 
@@ -897,7 +897,7 @@ class TestNestedType(BaseCassEngTestCase):
         """
         Tests that updates can be preformed on nested collections
 
-        @since 3.2
+        @since 3.1
         @jira_ticket PYTHON-478
         @expected_result nested collection is replaced
 
@@ -926,7 +926,7 @@ class TestNestedType(BaseCassEngTestCase):
         """
         Tests that explcit none updates are processed correctly on tuples
 
-        @since 3.2
+        @since 3.1
         @jira_ticket PYTHON-478
         @expected_result nested collection is replaced with none
 
@@ -950,7 +950,7 @@ class TestNestedType(BaseCassEngTestCase):
         """
         Tests that Tuples can be created as none
 
-        @since 3.2
+        @since 3.1
         @jira_ticket PYTHON-478
         @expected_result nested collection is created as none
 
