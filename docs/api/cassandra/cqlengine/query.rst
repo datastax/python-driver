@@ -32,6 +32,8 @@ The methods here are used to filter, order, and constrain results.
 
     .. automethod:: limit
 
+    .. automethod:: fetch_size
+
     .. automethod:: if_not_exists
 
     .. automethod:: if_exists
