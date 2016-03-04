@@ -38,7 +38,8 @@ def is_timeout(err):
     return (
         err in (EINPROGRESS, EALREADY, EWOULDBLOCK) or
         (err == EINVAL and os.name in ('nt', 'ce')) or
-        (isinstance(err, ssl.SSLError) and err.args[0] == 'timed out')
+        (isinstance(err, ssl.SSLError) and err.args[0] == 'timed out') or
+        isinstance(err, socket.timeout)
     )
 
 
