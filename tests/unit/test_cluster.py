@@ -17,9 +17,11 @@ try:
 except ImportError:
     import unittest  # noqa
 
-from mock import patch
+from mock import patch, Mock
 
-from cassandra.cluster import _Scheduler
+from cassandra import ConsistencyLevel
+from cassandra.cluster import _Scheduler, Session
+from cassandra.query import SimpleStatement
 
 
 class SchedulerTest(unittest.TestCase):
@@ -36,3 +38,34 @@ class SchedulerTest(unittest.TestCase):
         sched = _Scheduler(None)
         sched.schedule(0, lambda: None)
         sched.schedule(0, lambda: None)  # pre-473: "TypeError: unorderable types: function() < function()"t
+
+
+class SessionTest(unittest.TestCase):
+    # TODO: this suite could be expanded; for now just adding a test covering a PR
+
+    @patch('cassandra.cluster.ResponseFuture._make_query_plan')
+    def test_default_serial_consistency_level(self, *args):
+        """
+        Make sure default_serial_consistency_level passes through to a query message.
+        Also make sure Statement.serial_consistency_level overrides the default.
+
+        PR #510
+        """
+        s = Session(Mock(protocol_version=4), [])
+
+        # default is None
+        self.assertIsNone(s.default_serial_consistency_level)
+
+        sentinel = 1001
+        for cl in (None, ConsistencyLevel.LOCAL_SERIAL, ConsistencyLevel.SERIAL, sentinel):
+            s.default_serial_consistency_level = cl
+
+            # default is passed through
+            f = s._create_response_future(query='', parameters=[], trace=False, custom_payload={}, timeout=100)
+            self.assertEqual(f.message.serial_consistency_level, cl)
+
+            # any non-None statement setting takes precedence
+            for cl_override in (ConsistencyLevel.LOCAL_SERIAL, ConsistencyLevel.SERIAL):
+                f = s._create_response_future(SimpleStatement(query_string='', serial_consistency_level=cl_override), parameters=[], trace=False, custom_payload={}, timeout=100)
+                self.assertEqual(s.default_serial_consistency_level, cl)
+                self.assertEqual(f.message.serial_consistency_level, cl_override)

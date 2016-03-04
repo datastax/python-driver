@@ -9,6 +9,7 @@ Features
 * Eventlet Reactor IO improvement (PYTHON-495)
 * Make pure Python ProtocolHandler available even when Cython is present (PYTHON-501)
 * Optional Cython deserializer for bytes as bytearray (PYTHON-503)
+* Add Session.default_serial_consistency_level (github #510)
 * cqlengine: Expose prior state information via cqlengine LWTException (github #343, PYTHON-336)
 * cqlengine: Collection datatype "contains" operators support (Cassandra 2.1) #278 (PYTHON-258)
 * cqlengine: Add DISTINCT query operator (PYTHON-266)
