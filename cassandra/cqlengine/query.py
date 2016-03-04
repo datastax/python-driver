@@ -700,7 +700,9 @@ class AbstractQuerySet(object):
 
     def count(self):
         """
-        Returns the number of rows matched by this query
+        Returns the number of rows matched by this query.
+
+        *Note: This function executes a SELECT COUNT() and has a performance cost on large datasets*
         """
         if self._batch:
             raise CQLEngineException("Only inserts, updates, and deletes are available in batch mode")

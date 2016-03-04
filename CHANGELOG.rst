@@ -45,6 +45,24 @@ Bug Fixes
 * cqlengine: class.MultipleObjectsReturned has DoesNotExist as base class (PYTHON-489)
 * cqlengine: Typo in cqlengine UserType __len__ breaks attribute assignment (PYTHON-502)
 
+
+Other
+-----
+
+* cqlengine: a major improvement on queryset has been introduced. It
+  is a lot more efficient to iterage large datasets: the rows are
+  now fetched on demand using the driver pagination.
+
+* cqlengine: the queryset len() and count() behaviors have changed. It
+  now executes a "SELECT COUNT(*)" of the query rather than returning
+  the size of the internal result_cache (loaded rows). On large
+  queryset, you might want to avoid using them due to the performance
+  cost. Note that trying to access objects using list index/slicing
+  with negative indices also requires a count to be
+  executed.
+
+
+
 3.0.0
 =====
 November 24, 2015
