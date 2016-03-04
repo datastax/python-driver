@@ -50,7 +50,7 @@ Other
 -----
 
 * cqlengine: a major improvement on queryset has been introduced. It
-  is a lot more efficient to iterage large datasets: the rows are
+  is a lot more efficient to iterate large datasets: the rows are
   now fetched on demand using the driver pagination.
 
 * cqlengine: the queryset len() and count() behaviors have changed. It
