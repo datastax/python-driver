@@ -223,7 +223,7 @@ class BatchQueryCallbacksTests(BaseCassEngTestCase):
                 batch.execute()
             batch.execute()
         self.assertEqual(len(w), 2)  # package filter setup to warn always
-        self.assertRegex(str(w[0].message), r"^Batch.*multiple.*")
+        self.assertRegexpMatches(str(w[0].message), r"^Batch.*multiple.*")
 
     def test_disable_multiple_callback_warning(self):
         """

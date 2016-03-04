@@ -26,6 +26,8 @@ from cassandra.query import dict_factory
 
 from tests.integration import PROTOCOL_VERSION, execute_with_long_wait_retry
 from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.integration.cqlengine import DEFAULT_KEYSPACE, setup_connection
+from cassandra.cqlengine import models
 
 
 class TestConnectModel(Model):
@@ -38,6 +40,7 @@ class ConnectionTest(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
+        cls.original_cluster = connection.cluster
         cls.keyspace1 = 'ctest1'
         cls.keyspace2 = 'ctest2'
         super(ConnectionTest, cls).setUpClass()
@@ -52,7 +55,11 @@ class ConnectionTest(BaseCassEngTestCase):
     def tearDownClass(cls):
         execute_with_long_wait_retry(cls.setup_session, "DROP KEYSPACE {0}".format(cls.keyspace1))
         execute_with_long_wait_retry(cls.setup_session, "DROP KEYSPACE {0}".format(cls.keyspace2))
+        models.DEFAULT_KEYSPACE = DEFAULT_KEYSPACE
+        cls.original_cluster.shutdown()
         cls.setup_cluster.shutdown()
+        setup_connection(DEFAULT_KEYSPACE)
+        models.DEFAULT_KEYSPACE
 
     def setUp(self):
         self.c = Cluster(protocol_version=PROTOCOL_VERSION)
