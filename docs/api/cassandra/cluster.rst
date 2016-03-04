@@ -99,6 +99,8 @@
    .. autoattribute:: default_consistency_level
       :annotation: = LOCAL_ONE
 
+   .. autoattribute:: default_serial_consistency_level
+
    .. autoattribute:: row_factory
 
    .. autoattribute:: default_fetch_size

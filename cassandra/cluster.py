@@ -1429,7 +1429,6 @@ class Session(object):
     """
 
     default_consistency_level = ConsistencyLevel.LOCAL_ONE
-
     """
     The default :class:`~ConsistencyLevel` for operations executed through
     this session.  This default may be overridden by setting the
@@ -1447,6 +1446,8 @@ class Session(object):
     The default :class:`~ConsistencyLevel` for serial phase of  conditional updates executed through
     this session.  This default may be overridden by setting the
     :attr:`~.Statement.serial_consistency_level` on individual statements.
+
+    Only valid for ``protocol_version >= 2``.
     """
 
     max_trace_wait = 2.0
@@ -3317,8 +3318,7 @@ class ResultSet(object):
     @property
     def current_rows(self):
         """
-        :return: the list of current page rows. May be empty if the result was empty,
-        or this is the last page.
+        :return: the list of current page rows. May be empty if the result was empty, or this is the last page.
         """
         return self._current_rows or []
 
