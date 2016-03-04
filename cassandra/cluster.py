@@ -1444,6 +1444,15 @@ class Session(object):
         default changed from ONE to LOCAL_ONE
     """
 
+    default_serial_consistency_level = None
+    """
+    The default :class:`~ConsistencyLevel` for serial phase of  conditional updates executed through
+    this session.  This default may be overridden by setting the
+    :attr:`~.Statement.serial_consistency_level` on individual statements.
+
+    Only valid for ``protocol_version >= 2``.
+    """
+
     max_trace_wait = 2.0
     """
     The maximum amount of time (in seconds) the driver will wait for trace
@@ -1635,6 +1644,8 @@ class Session(object):
             query = query.bind(parameters)
 
         cl = query.consistency_level if query.consistency_level is not None else self.default_consistency_level
+        serial_cl = query.serial_consistency_level if query.serial_consistency_level is not None else self.default_serial_consistency_level
+
         fetch_size = query.fetch_size
         if fetch_size is FETCH_SIZE_UNSET and self._protocol_version >= 2:
             fetch_size = self.default_fetch_size
@@ -1651,12 +1662,12 @@ class Session(object):
             if parameters:
                 query_string = bind_params(query_string, parameters, self.encoder)
             message = QueryMessage(
-                query_string, cl, query.serial_consistency_level,
+                query_string, cl, serial_cl,
                 fetch_size, timestamp=timestamp)
         elif isinstance(query, BoundStatement):
             message = ExecuteMessage(
                 query.prepared_statement.query_id, query.values, cl,
-                query.serial_consistency_level, fetch_size,
+                serial_cl, fetch_size,
                 timestamp=timestamp)
             prepared_statement = query.prepared_statement
         elif isinstance(query, BatchStatement):
@@ -1667,7 +1678,7 @@ class Session(object):
                     "setting Cluster.protocol_version to 2 to support this operation.")
             message = BatchMessage(
                 query.batch_type, query._statements_and_parameters, cl,
-                query.serial_consistency_level, timestamp)
+                serial_cl, timestamp)
 
         message.tracing = trace
 
