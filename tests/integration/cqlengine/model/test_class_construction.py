@@ -70,7 +70,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         Tests that trying to create conflicting db column names will fail
         """
 
-        with self.assertRaisesRegex(ModelException, r".*more than once$"):
+        with self.assertRaisesRegexp(ModelException, r".*more than once$"):
             class BadNames(Model):
                 words = columns.Text(primary_key=True)
                 content = columns.Text(db_field='words')

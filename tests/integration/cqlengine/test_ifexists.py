@@ -30,7 +30,7 @@ from tests.integration import PROTOCOL_VERSION
 
 class TestIfExistsModel(Model):
 
-    id = columns.Integer(primary_key=True, default=lambda: uuid4())
+    id = columns.UUID(primary_key=True, default=lambda: uuid4())
     count = columns.Integer()
     text = columns.Text(required=False)
 
