@@ -34,7 +34,7 @@ from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine import columns
 from cassandra.cqlengine import query
-from cassandra.cqlengine.query import QueryException
+from cassandra.cqlengine.query import QueryException, BatchQuery
 from datetime import timedelta
 from datetime import tzinfo
 
@@ -1087,3 +1087,49 @@ class TestModelQueryWithDBField(BaseCassEngTestCase):
                 i = model.create(**values)
             self.assertEqual(model.objects(k0=i.k0, k1=i.k1).count(), len(clustering_values))
             self.assertEqual(model.objects(k0=i.k0, k1=i.k1, v1=0).count(), 1)
+
+
+class TestModelSmall(Model):
+
+    test_id = columns.Integer(primary_key=True)
+
+
+class TestModelQueryWithFetchSize(BaseCassEngTestCase):
+    """
+    Test FetchSize, and ensure that results are returned correctly
+    regardless of the paging size
+
+    @since 3.1
+    @jira_ticket PYTHON-324
+    @expected_result results are properly retrieved and the correct size
+
+    @test_category object_mapper
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestModelQueryWithFetchSize, cls).setUpClass()
+        sync_table(TestModelSmall)
+
+    @classmethod
+    def tearDownClass(cls):
+        super(TestModelQueryWithFetchSize, cls).tearDownClass()
+        drop_table(TestModelSmall)
+
+    def test_defaultFetchSize(self):
+        with BatchQuery() as b:
+            for i in range(5100):
+                TestModelSmall.batch(b).create(test_id=i)
+        self.assertEqual(len(TestModelSmall.objects.fetch_size(1)), 5100)
+        self.assertEqual(len(TestModelSmall.objects.fetch_size(500)), 5100)
+        self.assertEqual(len(TestModelSmall.objects.fetch_size(4999)), 5100)
+        self.assertEqual(len(TestModelSmall.objects.fetch_size(5000)), 5100)
+        self.assertEqual(len(TestModelSmall.objects.fetch_size(5001)), 5100)
+        self.assertEqual(len(TestModelSmall.objects.fetch_size(5100)), 5100)
+        self.assertEqual(len(TestModelSmall.objects.fetch_size(5101)), 5100)
+        self.assertEqual(len(TestModelSmall.objects.fetch_size(1)), 5100)
+
+        with self.assertRaises(QueryException):
+            TestModelSmall.objects.fetch_size(0)
+        with self.assertRaises(QueryException):
+            TestModelSmall.objects.fetch_size(-1)
