@@ -394,7 +394,6 @@ class AbstractQuerySet(object):
         Fill the result cache with all results.
         """
 
-        # iterate all results
         idx = 0
         try:
             while True:
@@ -445,9 +444,11 @@ class AbstractQuerySet(object):
         self._execute_query()
 
         if isinstance(s, slice):
+            start = s.start if s.start else 0
+
             # calculate the amount of results that need to be loaded
             end = s.stop
-            if s.start < 0 or s.stop < 0:
+            if start < 0 or s.stop is None or s.stop < 0:
                 end = self.count()
 
             try:
@@ -455,7 +456,7 @@ class AbstractQuerySet(object):
             except StopIteration:
                 pass
 
-            return self._result_cache[s.start:s.stop:s.step]
+            return self._result_cache[start:s.stop:s.step]
         else:
             try:
                 s = int(s)
