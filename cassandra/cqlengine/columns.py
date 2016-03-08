@@ -504,7 +504,10 @@ class UUID(Column):
     def validate(self, value):
         val = super(UUID, self).validate(value)
         if val is None:
-            return
+            if self.has_default:
+                val = self.get_default()
+            else:
+                return
         if isinstance(val, _UUID):
             return val
         if isinstance(val, six.string_types):
