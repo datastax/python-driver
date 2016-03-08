@@ -43,7 +43,7 @@ from cassandra.cqlengine import operators
 from cassandra.util import uuid_from_time
 
 from cassandra.cqlengine.connection import get_session
-from tests.integration import PROTOCOL_VERSION, CASSANDRA_VERSION, greaterthancass20
+from tests.integration import PROTOCOL_VERSION, CASSANDRA_VERSION, greaterthancass20, greaterthancass21
 
 
 class TzOffset(tzinfo):
@@ -485,6 +485,7 @@ class TestQuerySetDistinct(BaseQuerySetUsage):
         q = TestModel.objects.distinct(['test_id']).filter(test_id__in=[52])
         self.assertEqual(len(q), 0)
 
+    @greaterthancass21
     def test_distinct_with_explicit_count(self):
         q = TestModel.objects.distinct(['test_id'])
         self.assertEqual(q.count(), 3)

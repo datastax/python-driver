@@ -267,14 +267,13 @@ class IndexTests(BaseCassEngTestCase):
         """
         sync_table(IndexModel)
         table_meta = management._get_table_metadata(IndexModel)
-        self.assertIn("index_index_model_second_key", table_meta.indexes)
+        self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'second_key'))
 
         # index already exists
         sync_table(IndexModel)
         table_meta = management._get_table_metadata(IndexModel)
-        self.assertIn("index_index_model_second_key", table_meta.indexes)
+        self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'second_key'))
 
-    @greaterthancass20
     def test_sync_index_case_sensitive(self):
         """
         Tests the default table creation, and ensures the table_name is created correctly and surfaced correctly
@@ -288,12 +287,12 @@ class IndexTests(BaseCassEngTestCase):
         """
         sync_table(IndexCaseSensitiveModel)
         table_meta = management._get_table_metadata(IndexCaseSensitiveModel)
-        self.assertIn("index_IndexModel_second_key", table_meta.indexes)
+        self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'second_key'))
 
         # index already exists
         sync_table(IndexCaseSensitiveModel)
         table_meta = management._get_table_metadata(IndexCaseSensitiveModel)
-        self.assertIn("index_IndexModel_second_key", table_meta.indexes)
+        self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'second_key'))
 
 
 class NonModelFailureTest(BaseCassEngTestCase):
