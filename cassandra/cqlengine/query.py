@@ -384,6 +384,27 @@ class AbstractQuerySet(object):
             self._result_cache = []
             self._construct_result = self._get_result_constructor()
 
+            # "DISTINCT COUNT()" is not supported in C* < 2.2, so we need to materialize all results to get
+            # len() and count() working with DISTINCT queries
+            if self._distinct_fields:
+                self._fill_result_cache()
+
+    def _fill_result_cache(self):
+        """
+        Fill the result cache with all results.
+        """
+
+        # iterate all results
+        idx = 0
+        try:
+            while True:
+                idx += 1000
+                self._fill_result_cache_to_idx(idx)
+        except StopIteration:
+            pass
+
+        self._count = len(self._result_cache)
+
     def _fill_result_cache_to_idx(self, idx):
         self._execute_query()
         if self._result_idx is None:
