@@ -16,6 +16,7 @@ Releasing
     python setup.py register
     python setup.py sdist upload
 
+* On pypi, make the latest GA the only visible version
 * Update the docs (see below)
 * Append a 'postN' string to the version tuple in ``cassandra/__init__.py``
   so that it looks like ``(x, y, z, 'postN')``
