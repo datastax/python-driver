@@ -11,3 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from tests.unit.cython.utils import cyimport, cythontest
+utils_testhelper = cyimport('tests.unit.cython.utils_testhelper')
+
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
+
+
+class UtilsTest(unittest.TestCase):
+    """Test Cython Utils functions"""
+
+    @cythontest
+    def test_datetime_from_timestamp(self):
+        utils_testhelper.test_datetime_from_timestamp(self.assertEqual)

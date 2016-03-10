@@ -22,8 +22,10 @@ from datetime import datetime
 import time
 from uuid import uuid1, uuid4
 import uuid
+import sys
 
 from cassandra.cluster import Session
+from cassandra import InvalidRequest
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from cassandra.cqlengine.connection import NOT_SET
 import mock
@@ -32,6 +34,7 @@ from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine import columns
 from cassandra.cqlengine import query
+from cassandra.cqlengine.query import QueryException, BatchQuery
 from datetime import timedelta
 from datetime import tzinfo
 
@@ -40,7 +43,7 @@ from cassandra.cqlengine import operators
 from cassandra.util import uuid_from_time
 
 from cassandra.cqlengine.connection import get_session
-from tests.integration import PROTOCOL_VERSION
+from tests.integration import PROTOCOL_VERSION, CASSANDRA_VERSION, greaterthancass20, greaterthancass21
 
 
 class TzOffset(tzinfo):
@@ -77,6 +80,22 @@ class IndexedTestModel(Model):
     description = columns.Text()
     expected_result = columns.Integer()
     test_result = columns.Integer(index=True)
+
+
+class IndexedCollectionsTestModel(Model):
+
+    test_id = columns.Integer(primary_key=True)
+    attempt_id = columns.Integer(index=True)
+    description = columns.Text()
+    expected_result = columns.Integer()
+    test_result = columns.Integer(index=True)
+    test_list = columns.List(columns.Integer, index=True)
+    test_set = columns.Set(columns.Integer, index=True)
+    test_map = columns.Map(columns.Text, columns.Integer, index=True)
+
+    test_list_no_index = columns.List(columns.Integer, index=False)
+    test_set_no_index = columns.Set(columns.Integer, index=False)
+    test_map_no_index = columns.Map(columns.Text, columns.Integer, index=False)
 
 
 class TestMultiClusteringModel(Model):
@@ -185,6 +204,20 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         query3 = query2.all()
         assert query3 == query2
 
+    def test_queryset_with_distinct(self):
+        """
+        Tests that calling distinct on a queryset w/without parameter are evaluated properly.
+        """
+
+        query1 = TestModel.objects.distinct()
+        self.assertEqual(len(query1._distinct_fields), 1)
+
+        query2 = TestModel.objects.distinct(['test_id'])
+        self.assertEqual(len(query2._distinct_fields), 1)
+
+        query3 = TestModel.objects.distinct(['test_id', 'attempt_id'])
+        self.assertEqual(len(query3._distinct_fields), 2)
+
     def test_defining_only_and_defer_fails(self):
         """
         Tests that trying to add fields to either only or defer, or doing so more than once fails
@@ -202,6 +235,7 @@ class BaseQuerySetUsage(BaseCassEngTestCase):
         super(BaseQuerySetUsage, cls).setUpClass()
         drop_table(TestModel)
         drop_table(IndexedTestModel)
+
         sync_table(TestModel)
         sync_table(IndexedTestModel)
         sync_table(TestMultiClusteringModel)
@@ -239,6 +273,23 @@ class BaseQuerySetUsage(BaseCassEngTestCase):
         IndexedTestModel.objects.create(test_id=11, attempt_id=3, description='try12', expected_result=75,
                                         test_result=45)
 
+        if(CASSANDRA_VERSION >= '2.1'):
+            drop_table(IndexedCollectionsTestModel)
+            sync_table(IndexedCollectionsTestModel)
+            IndexedCollectionsTestModel.objects.create(test_id=12, attempt_id=3, description='list12', expected_result=75,
+                                                       test_result=45, test_list=[1, 2, 42], test_set=set([1, 2, 3]),
+                                                       test_map={'1': 1, '2': 2, '3': 3})
+            IndexedCollectionsTestModel.objects.create(test_id=13, attempt_id=3, description='list13', expected_result=75,
+                                                       test_result=45, test_list=[3, 4, 5], test_set=set([4, 5, 42]),
+                                                       test_map={'1': 5, '2': 6, '3': 7})
+            IndexedCollectionsTestModel.objects.create(test_id=14, attempt_id=3, description='list14', expected_result=75,
+                                                       test_result=45, test_list=[1, 2, 3], test_set=set([1, 2, 3]),
+                                                       test_map={'1': 1, '2': 2, '3': 42})
+
+            IndexedCollectionsTestModel.objects.create(test_id=15, attempt_id=4, description='list14', expected_result=75,
+                                                       test_result=45, test_list_no_index=[1, 2, 3], test_set_no_index=set([1, 2, 3]),
+                                                       test_map_no_index={'1': 1, '2': 2, '3': 42})
+
     @classmethod
     def tearDownClass(cls):
         super(BaseQuerySetUsage, cls).tearDownClass()
@@ -265,7 +316,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
     def test_iteration(self):
         """ Tests that iterating over a query set pulls back all of the expected results """
         q = TestModel.objects(test_id=0)
-        #tuple of expected attempt_id, expected_result values
+        # tuple of expected attempt_id, expected_result values
         compare_set = set([(0, 5), (1, 10), (2, 15), (3, 20)])
         for t in q:
             val = t.attempt_id, t.expected_result
@@ -276,7 +327,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         # test with regular filtering
         q = TestModel.objects(attempt_id=3).allow_filtering()
         assert len(q) == 3
-        #tuple of expected test_id, expected_result values
+        # tuple of expected test_id, expected_result values
         compare_set = set([(0, 20), (1, 20), (2, 75)])
         for t in q:
             val = t.test_id, t.expected_result
@@ -287,7 +338,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         # test with query method
         q = TestModel.objects(TestModel.attempt_id == 3).allow_filtering()
         assert len(q) == 3
-        #tuple of expected test_id, expected_result values
+        # tuple of expected test_id, expected_result values
         compare_set = set([(0, 20), (1, 20), (2, 75)])
         for t in q:
             val = t.test_id, t.expected_result
@@ -299,7 +350,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         """ Tests that iterating over a query set more than once works """
         # test with both the filtering method and the query method
         for q in (TestModel.objects(test_id=0), TestModel.objects(TestModel.test_id == 0)):
-            #tuple of expected attempt_id, expected_result values
+            # tuple of expected attempt_id, expected_result values
             compare_set = set([(0, 5), (1, 10), (2, 15), (3, 20)])
             for t in q:
                 val = t.attempt_id, t.expected_result
@@ -307,7 +358,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
                 compare_set.remove(val)
             assert len(compare_set) == 0
 
-            #try it again
+            # try it again
             compare_set = set([(0, 5), (1, 10), (2, 15), (3, 20)])
             for t in q:
                 val = t.attempt_id, t.expected_result
@@ -411,6 +462,37 @@ def test_non_quality_filtering():
     assert num == 1, num
 
 
+class TestQuerySetDistinct(BaseQuerySetUsage):
+
+    def test_distinct_without_parameter(self):
+        q = TestModel.objects.distinct()
+        self.assertEqual(len(q), 3)
+
+    def test_distinct_with_parameter(self):
+        q = TestModel.objects.distinct(['test_id'])
+        self.assertEqual(len(q), 3)
+
+    def test_distinct_with_filter(self):
+        q = TestModel.objects.distinct(['test_id']).filter(test_id__in=[1,2])
+        self.assertEqual(len(q), 2)
+
+    def test_distinct_with_non_partition(self):
+        with self.assertRaises(InvalidRequest):
+            q = TestModel.objects.distinct(['description']).filter(test_id__in=[1, 2])
+            len(q)
+
+    def test_zero_result(self):
+        q = TestModel.objects.distinct(['test_id']).filter(test_id__in=[52])
+        self.assertEqual(len(q), 0)
+
+    @greaterthancass21
+    def test_distinct_with_explicit_count(self):
+        q = TestModel.objects.distinct(['test_id'])
+        self.assertEqual(q.count(), 3)
+
+        q = TestModel.objects.distinct(['test_id']).filter(test_id__in=[1, 2])
+        self.assertEqual(q.count(), 2)
+
 
 class TestQuerySetOrdering(BaseQuerySetUsage):
 
@@ -480,16 +562,31 @@ class TestQuerySetSlicing(BaseQuerySetUsage):
     def test_slicing_works_properly(self):
         q = TestModel.objects(test_id=0).order_by('attempt_id')
         expected_order = [0, 1, 2, 3]
+
         for model, expect in zip(q[1:3], expected_order[1:3]):
-            assert model.attempt_id == expect
+            self.assertEqual(model.attempt_id, expect)
+
+        for model, expect in zip(q[0:3:2], expected_order[0:3:2]):
+            self.assertEqual(model.attempt_id, expect)
 
     def test_negative_slicing(self):
         q = TestModel.objects(test_id=0).order_by('attempt_id')
         expected_order = [0, 1, 2, 3]
+
         for model, expect in zip(q[-3:], expected_order[-3:]):
-            assert model.attempt_id == expect
+            self.assertEqual(model.attempt_id, expect)
+
         for model, expect in zip(q[:-1], expected_order[:-1]):
-            assert model.attempt_id == expect
+            self.assertEqual(model.attempt_id, expect)
+
+        for model, expect in zip(q[1:-1], expected_order[1:-1]):
+            self.assertEqual(model.attempt_id, expect)
+
+        for model, expect in zip(q[-3:-1], expected_order[-3:-1]):
+            self.assertEqual(model.attempt_id, expect)
+
+        for model, expect in zip(q[-3:-1:2], expected_order[-3:-1:2]):
+            self.assertEqual(model.attempt_id, expect)
 
 
 class TestQuerySetValidation(BaseQuerySetUsage):
@@ -509,12 +606,31 @@ class TestQuerySetValidation(BaseQuerySetUsage):
             q = TestModel.objects(test_id__gt=0)
             list([i for i in q])
 
+    @greaterthancass20
     def test_indexed_field_can_be_queried(self):
         """
         Tests that queries on an indexed field will work without any primary key relations specified
         """
         q = IndexedTestModel.objects(test_result=25)
-        assert q.count() == 4
+        self.assertEqual(q.count(), 4)
+
+        q = IndexedCollectionsTestModel.objects.filter(test_list__contains=42)
+        self.assertEqual(q.count(), 1)
+
+        q = IndexedCollectionsTestModel.objects.filter(test_list__contains=13)
+        self.assertEqual(q.count(), 0)
+
+        q = IndexedCollectionsTestModel.objects.filter(test_set__contains=42)
+        self.assertEqual(q.count(), 1)
+
+        q = IndexedCollectionsTestModel.objects.filter(test_set__contains=13)
+        self.assertEqual(q.count(), 0)
+
+        q = IndexedCollectionsTestModel.objects.filter(test_map__contains=42)
+        self.assertEqual(q.count(), 1)
+
+        q = IndexedCollectionsTestModel.objects.filter(test_map__contains=13)
+        self.assertEqual(q.count(), 0)
 
 
 class TestQuerySetDelete(BaseQuerySetUsage):
@@ -541,6 +657,27 @@ class TestQuerySetDelete(BaseQuerySetUsage):
         """ Tests that attempting to delete a whole table without any arguments will fail """
         with self.assertRaises(query.QueryException):
             TestModel.objects(attempt_id=0).delete()
+
+    @unittest.skipIf(CASSANDRA_VERSION < '3.0', "range deletion was introduce in C* 3.0, currently running {0}".format(CASSANDRA_VERSION))
+    def test_range_deletion(self):
+        """
+        Tests that range deletion work as expected
+        """
+
+        for i in range(10):
+            TestMultiClusteringModel.objects().create(one=1, two=i, three=i)
+
+        TestMultiClusteringModel.objects(one=1, two__gte=0, two__lte=3).delete()
+        self.assertEqual(6, len(TestMultiClusteringModel.objects.all()))
+
+        TestMultiClusteringModel.objects(one=1, two__gt=3, two__lt=5).delete()
+        self.assertEqual(5, len(TestMultiClusteringModel.objects.all()))
+
+        TestMultiClusteringModel.objects(one=1, two__in=[8,9]).delete()
+        self.assertEqual(3, len(TestMultiClusteringModel.objects.all()))
+
+        TestMultiClusteringModel.objects(one__in=[1], two__gte=0).delete()
+        self.assertEqual(0, len(TestMultiClusteringModel.objects.all()))
 
 
 class TimeUUIDQueryModel(Model):
@@ -665,6 +802,69 @@ class TestInOperator(BaseQuerySetUsage):
         assert q.count() == 8
 
 
+@greaterthancass20
+class TestContainsOperator(BaseQuerySetUsage):
+    def test_kwarg_success_case(self):
+        """ Tests the CONTAINS operator works with the kwarg query method """
+        q = IndexedCollectionsTestModel.filter(test_list__contains=1)
+        self.assertEqual(q.count(), 2)
+
+        q = IndexedCollectionsTestModel.filter(test_list__contains=13)
+        self.assertEqual(q.count(), 0)
+
+        q = IndexedCollectionsTestModel.filter(test_set__contains=3)
+        self.assertEqual(q.count(), 2)
+
+        q = IndexedCollectionsTestModel.filter(test_set__contains=13)
+        self.assertEqual(q.count(), 0)
+
+        q = IndexedCollectionsTestModel.filter(test_map__contains=42)
+        self.assertEqual(q.count(), 1)
+
+        q = IndexedCollectionsTestModel.filter(test_map__contains=13)
+        self.assertEqual(q.count(), 0)
+
+        with self.assertRaises(QueryException):
+            q = IndexedCollectionsTestModel.filter(test_list_no_index__contains=1)
+            self.assertEqual(q.count(), 0)
+        with self.assertRaises(QueryException):
+            q = IndexedCollectionsTestModel.filter(test_set_no_index__contains=1)
+            self.assertEqual(q.count(), 0)
+        with self.assertRaises(QueryException):
+            q = IndexedCollectionsTestModel.filter(test_map_no_index__contains=1)
+            self.assertEqual(q.count(), 0)
+
+    def test_query_expression_success_case(self):
+        """ Tests the CONTAINS operator works with the query expression query method """
+        q = IndexedCollectionsTestModel.filter(IndexedCollectionsTestModel.test_list.contains_(1))
+        self.assertEqual(q.count(), 2)
+
+        q = IndexedCollectionsTestModel.filter(IndexedCollectionsTestModel.test_list.contains_(13))
+        self.assertEqual(q.count(), 0)
+
+        q = IndexedCollectionsTestModel.filter(IndexedCollectionsTestModel.test_set.contains_(3))
+        self.assertEqual(q.count(), 2)
+
+        q = IndexedCollectionsTestModel.filter(IndexedCollectionsTestModel.test_set.contains_(13))
+        self.assertEqual(q.count(), 0)
+
+        q = IndexedCollectionsTestModel.filter(IndexedCollectionsTestModel.test_map.contains_(42))
+        self.assertEqual(q.count(), 1)
+
+        q = IndexedCollectionsTestModel.filter(IndexedCollectionsTestModel.test_map.contains_(13))
+        self.assertEqual(q.count(), 0)
+
+        with self.assertRaises(QueryException):
+            q = IndexedCollectionsTestModel.filter(IndexedCollectionsTestModel.test_map_no_index.contains_(1))
+            self.assertEqual(q.count(), 0)
+        with self.assertRaises(QueryException):
+            q = IndexedCollectionsTestModel.filter(IndexedCollectionsTestModel.test_map_no_index.contains_(1))
+            self.assertEqual(q.count(), 0)
+        with self.assertRaises(QueryException):
+            q = IndexedCollectionsTestModel.filter(IndexedCollectionsTestModel.test_map_no_index.contains_(1))
+            self.assertEqual(q.count(), 0)
+
+
 class TestValuesList(BaseQuerySetUsage):
     def test_values_list(self):
         q = TestModel.objects.filter(test_id=0, attempt_id=1)
@@ -680,6 +880,7 @@ class TestObjectsProperty(BaseQuerySetUsage):
         assert TestModel.objects._result_cache is None
         len(TestModel.objects) # evaluate queryset
         assert TestModel.objects._result_cache is None
+
 
 class PageQueryTests(BaseCassEngTestCase):
     def test_paged_result_handling(self):
@@ -750,3 +951,186 @@ class DMLQueryTimeoutTestCase(BaseQuerySetUsage):
         m = self.model.batch(b)
         with self.assertRaises(AssertionError):
             m.timeout(0.5)
+
+
+class DBFieldModel(Model):
+    k0 = columns.Integer(partition_key=True, db_field='a')
+    k1 = columns.Integer(partition_key=True, db_field='b')
+    c0 = columns.Integer(primary_key=True, db_field='c')
+    v0 = columns.Integer(db_field='d')
+    v1 = columns.Integer(db_field='e', index=True)
+
+
+class DBFieldModelMixed1(Model):
+    k0 = columns.Integer(partition_key=True, db_field='a')
+    k1 = columns.Integer(partition_key=True)
+    c0 = columns.Integer(primary_key=True, db_field='c')
+    v0 = columns.Integer(db_field='d')
+    v1 = columns.Integer(index=True)
+
+
+class DBFieldModelMixed2(Model):
+    k0 = columns.Integer(partition_key=True)
+    k1 = columns.Integer(partition_key=True, db_field='b')
+    c0 = columns.Integer(primary_key=True)
+    v0 = columns.Integer(db_field='d')
+    v1 = columns.Integer(index=True, db_field='e')
+
+
+class TestModelQueryWithDBField(BaseCassEngTestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestModelQueryWithDBField, cls).setUpClass()
+        cls.model_list = [DBFieldModel, DBFieldModelMixed1, DBFieldModelMixed2]
+        for model in cls.model_list:
+            sync_table(model)
+
+    @classmethod
+    def tearDownClass(cls):
+        super(TestModelQueryWithDBField, cls).tearDownClass()
+        for model in cls.model_list:
+            drop_table(model)
+
+    def test_basic_crud(self):
+        """
+        Tests creation update and delete of object model queries that are using db_field mappings.
+
+        @since 3.1
+        @jira_ticket PYTHON-351
+        @expected_result results are properly retrieved without errors
+
+        @test_category object_mapper
+        """
+        for model in self.model_list:
+            values = {'k0': 1, 'k1': 2, 'c0': 3, 'v0': 4, 'v1': 5}
+            # create
+            i = model.create(**values)
+            i = model.objects(k0=i.k0, k1=i.k1).first()
+            self.assertEqual(i, model(**values))
+
+            # create
+            values['v0'] = 101
+            i.update(v0=values['v0'])
+            i = model.objects(k0=i.k0, k1=i.k1).first()
+            self.assertEqual(i, model(**values))
+
+            # delete
+            model.objects(k0=i.k0, k1=i.k1).delete()
+            i = model.objects(k0=i.k0, k1=i.k1).first()
+            self.assertIsNone(i)
+
+            i = model.create(**values)
+            i = model.objects(k0=i.k0, k1=i.k1).first()
+            self.assertEqual(i, model(**values))
+            i.delete()
+            model.objects(k0=i.k0, k1=i.k1).delete()
+            i = model.objects(k0=i.k0, k1=i.k1).first()
+            self.assertIsNone(i)
+
+    def test_slice(self):
+        """
+        Tests slice queries for object models that are using db_field mapping
+
+        @since 3.1
+        @jira_ticket PYTHON-351
+        @expected_result results are properly retrieved without errors
+
+        @test_category object_mapper
+        """
+        for model in self.model_list:
+            values = {'k0': 1, 'k1': 3, 'c0': 3, 'v0': 4, 'v1': 5}
+            clustering_values = range(3)
+            for c in clustering_values:
+                values['c0'] = c
+                i = model.create(**values)
+
+            self.assertEqual(model.objects(k0=i.k0, k1=i.k1).count(), len(clustering_values))
+            self.assertEqual(model.objects(k0=i.k0, k1=i.k1, c0=i.c0).count(), 1)
+            self.assertEqual(model.objects(k0=i.k0, k1=i.k1, c0__lt=i.c0).count(), len(clustering_values[:-1]))
+            self.assertEqual(model.objects(k0=i.k0, k1=i.k1, c0__gt=0).count(), len(clustering_values[1:]))
+
+    def test_order(self):
+        """
+        Tests order by queries for object models that are using db_field mapping
+
+        @since 3.1
+        @jira_ticket PYTHON-351
+        @expected_result results are properly retrieved without errors
+
+        @test_category object_mapper
+        """
+        for model in self.model_list:
+            values = {'k0': 1, 'k1': 4, 'c0': 3, 'v0': 4, 'v1': 5}
+            clustering_values = range(3)
+            for c in clustering_values:
+                values['c0'] = c
+                i = model.create(**values)
+            self.assertEqual(model.objects(k0=i.k0, k1=i.k1).order_by('c0').first().c0, clustering_values[0])
+            self.assertEqual(model.objects(k0=i.k0, k1=i.k1).order_by('-c0').first().c0, clustering_values[-1])
+
+    def test_index(self):
+        """
+        Tests queries using index fields for object models using db_field mapping
+
+        @since 3.1
+        @jira_ticket PYTHON-351
+        @expected_result results are properly retrieved without errors
+
+        @test_category object_mapper
+        """
+        for model in self.model_list:
+            values = {'k0': 1, 'k1': 5, 'c0': 3, 'v0': 4, 'v1': 5}
+            clustering_values = range(3)
+            for c in clustering_values:
+                values['c0'] = c
+                values['v1'] = c
+                i = model.create(**values)
+            self.assertEqual(model.objects(k0=i.k0, k1=i.k1).count(), len(clustering_values))
+            self.assertEqual(model.objects(k0=i.k0, k1=i.k1, v1=0).count(), 1)
+
+
+class TestModelSmall(Model):
+
+    test_id = columns.Integer(primary_key=True)
+
+
+class TestModelQueryWithFetchSize(BaseCassEngTestCase):
+    """
+    Test FetchSize, and ensure that results are returned correctly
+    regardless of the paging size
+
+    @since 3.1
+    @jira_ticket PYTHON-324
+    @expected_result results are properly retrieved and the correct size
+
+    @test_category object_mapper
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestModelQueryWithFetchSize, cls).setUpClass()
+        sync_table(TestModelSmall)
+
+    @classmethod
+    def tearDownClass(cls):
+        super(TestModelQueryWithFetchSize, cls).tearDownClass()
+        drop_table(TestModelSmall)
+
+    def test_defaultFetchSize(self):
+        with BatchQuery() as b:
+            for i in range(5100):
+                TestModelSmall.batch(b).create(test_id=i)
+        self.assertEqual(len(TestModelSmall.objects.fetch_size(1)), 5100)
+        self.assertEqual(len(TestModelSmall.objects.fetch_size(500)), 5100)
+        self.assertEqual(len(TestModelSmall.objects.fetch_size(4999)), 5100)
+        self.assertEqual(len(TestModelSmall.objects.fetch_size(5000)), 5100)
+        self.assertEqual(len(TestModelSmall.objects.fetch_size(5001)), 5100)
+        self.assertEqual(len(TestModelSmall.objects.fetch_size(5100)), 5100)
+        self.assertEqual(len(TestModelSmall.objects.fetch_size(5101)), 5100)
+        self.assertEqual(len(TestModelSmall.objects.fetch_size(1)), 5100)
+
+        with self.assertRaises(QueryException):
+            TestModelSmall.objects.fetch_size(0)
+        with self.assertRaises(QueryException):
+            TestModelSmall.objects.fetch_size(-1)

@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 import time
 import six
 
+from cassandra.query import FETCH_SIZE_UNSET
 from cassandra.cqlengine import UnicodeMixin
 from cassandra.cqlengine.functions import QueryValue
 from cassandra.cqlengine.operators import BaseWhereOperator, InOperator
@@ -470,13 +471,14 @@ class MapDeleteClause(BaseDeleteClause):
 class BaseCQLStatement(UnicodeMixin):
     """ The base cql statement class """
 
-    def __init__(self, table, consistency=None, timestamp=None, where=None):
+    def __init__(self, table, consistency=None, timestamp=None, where=None, fetch_size=None):
         super(BaseCQLStatement, self).__init__()
         self.table = table
         self.consistency = consistency
         self.context_id = 0
         self.context_counter = self.context_id
         self.timestamp = timestamp
+        self.fetch_size = fetch_size if fetch_size else FETCH_SIZE_UNSET
 
         self.where_clauses = []
         for clause in where or []:
@@ -555,7 +557,9 @@ class SelectStatement(BaseCQLStatement):
                  where=None,
                  order_by=None,
                  limit=None,
-                 allow_filtering=False):
+                 allow_filtering=False,
+                 distinct_fields=None,
+                 fetch_size=None):
 
         """
         :param where
@@ -564,10 +568,12 @@ class SelectStatement(BaseCQLStatement):
         super(SelectStatement, self).__init__(
             table,
             consistency=consistency,
-            where=where
+            where=where,
+            fetch_size=fetch_size
         )
 
         self.fields = [fields] if isinstance(fields, six.string_types) else (fields or [])
+        self.distinct_fields = distinct_fields
         self.count = count
         self.order_by = [order_by] if isinstance(order_by, six.string_types) else order_by
         self.limit = limit
@@ -575,7 +581,12 @@ class SelectStatement(BaseCQLStatement):
 
     def __unicode__(self):
         qs = ['SELECT']
-        if self.count:
+        if self.distinct_fields:
+            if self.count:
+                qs += ['DISTINCT COUNT({0})'.format(', '.join(['"{0}"'.format(f) for f in self.distinct_fields]))]
+            else:
+                qs += ['DISTINCT {0}'.format(', '.join(['"{0}"'.format(f) for f in self.distinct_fields]))]
+        elif self.count:
             qs += ['COUNT(*)']
         else:
             qs += [', '.join(['"{0}"'.format(f) for f in self.fields]) if self.fields else '*']
@@ -704,7 +715,8 @@ class UpdateStatement(AssignmentStatement):
                  where=None,
                  ttl=None,
                  timestamp=None,
-                 transactions=None):
+                 transactions=None,
+                 if_exists=False):
         super(UpdateStatement, self). __init__(table,
                                                assignments=assignments,
                                                consistency=consistency,
@@ -716,6 +728,8 @@ class UpdateStatement(AssignmentStatement):
         self.transactions = []
         for transaction in transactions or []:
             self.add_transaction_clause(transaction)
+
+        self.if_exists = if_exists
 
     def __unicode__(self):
         qs = ['UPDATE', self.table]
@@ -739,6 +753,9 @@ class UpdateStatement(AssignmentStatement):
 
         if len(self.transactions) > 0:
             qs += [self._get_transactions()]
+
+        if self.if_exists:
+            qs += ["IF EXISTS"]
 
         return ' '.join(qs)
 
@@ -774,7 +791,7 @@ class UpdateStatement(AssignmentStatement):
 class DeleteStatement(BaseCQLStatement):
     """ a cql delete statement """
 
-    def __init__(self, table, fields=None, consistency=None, where=None, timestamp=None):
+    def __init__(self, table, fields=None, consistency=None, where=None, timestamp=None, if_exists=False):
         super(DeleteStatement, self).__init__(
             table,
             consistency=consistency,
@@ -786,6 +803,7 @@ class DeleteStatement(BaseCQLStatement):
             fields = [fields]
         for field in fields or []:
             self.add_field(field)
+        self.if_exists = if_exists
 
     def update_context_id(self, i):
         super(DeleteStatement, self).update_context_id(i)
@@ -824,5 +842,8 @@ class DeleteStatement(BaseCQLStatement):
 
         if self.where_clauses:
             qs += [self._where]
+
+        if self.if_exists:
+            qs += ["IF EXISTS"]
 
         return ' '.join(qs)

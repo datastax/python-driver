@@ -17,7 +17,12 @@ try:
 except ImportError:
     import unittest  # noqa
 
-import os, six, time, sys, logging, traceback
+import logging
+import os
+import socket
+import sys
+import time
+import traceback
 from threading import Event
 from subprocess import call
 from itertools import groupby
@@ -89,6 +94,8 @@ def _get_cass_version_from_dse(dse_version):
         cass_ver = "2.0"
     elif dse_version.startswith('4.7') or dse_version.startswith('4.8'):
         cass_ver = "2.1"
+    elif dse_version.startswith('5.0'):
+        cass_ver = "3.0"
     else:
         log.error("Uknown dse version found {0}, defaulting to 2.1".format(dse_version))
         cass_ver = "2.1"
@@ -137,8 +144,32 @@ lessthenprotocolv4 = unittest.skipUnless(PROTOCOL_VERSION < 4, 'Protocol version
 greaterthanprotocolv3 = unittest.skipUnless(PROTOCOL_VERSION >= 4, 'Protocol versions less than 4 are not supported')
 
 greaterthancass20 = unittest.skipUnless(CASSANDRA_VERSION >= '2.1', 'Cassandra version 2.1 or greater required')
+greaterthancass21 = unittest.skipUnless(CASSANDRA_VERSION >= '2.2', 'Cassandra version 2.2 or greater required')
 greaterthanorequalcass30 = unittest.skipUnless(CASSANDRA_VERSION >= '3.0', 'Cassandra version 3.0 or greater required')
 lessthancass30 = unittest.skipUnless(CASSANDRA_VERSION < '3.0', 'Cassandra version less then 3.0 required')
+
+
+def wait_for_node_socket(node, timeout):
+    binary_itf = node.network_interfaces['binary']
+    if not common.check_socket_listening(binary_itf, timeout=timeout):
+        log.warn("Unable to connect to binary socket for node " + node.name)
+    else:
+        log.debug("Node %s is up and listening " % (node.name,))
+
+
+def check_socket_listening(itf, timeout=60):
+    end = time.time() + timeout
+    while time.time() <= end:
+        try:
+            sock = socket.socket()
+            sock.connect(itf)
+            sock.close()
+            return True
+        except socket.error:
+            # Try again in another 200ms
+            time.sleep(.2)
+            continue
+    return False
 
 
 def get_cluster():
@@ -149,16 +180,16 @@ def get_node(node_id):
     return CCM_CLUSTER.nodes['node%s' % node_id]
 
 
-def use_multidc(dc_list):
-    use_cluster(MULTIDC_CLUSTER_NAME, dc_list, start=True)
+def use_multidc(dc_list, workloads=[]):
+    use_cluster(MULTIDC_CLUSTER_NAME, dc_list, start=True, workloads=workloads)
 
 
-def use_singledc(start=True):
-    use_cluster(CLUSTER_NAME, [3], start=start)
+def use_singledc(start=True, workloads=[]):
+    use_cluster(CLUSTER_NAME, [3], start=start, workloads=workloads)
 
 
-def use_single_node(start=True):
-    use_cluster(SINGLE_NODE_CLUSTER_NAME, [1], start=start)
+def use_single_node(start=True, workloads=[]):
+    use_cluster(SINGLE_NODE_CLUSTER_NAME, [1], start=start, workloads=workloads)
 
 
 def remove_cluster():
@@ -193,7 +224,7 @@ def is_current_cluster(cluster_name, node_counts):
     return False
 
 
-def use_cluster(cluster_name, nodes, ipformat=None, start=True):
+def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[]):
     global CCM_CLUSTER
     if USE_CASS_EXTERNAL:
         if CCM_CLUSTER:
@@ -239,12 +270,18 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True):
             jvm_args = [" -Dcassandra.custom_query_handler_class=org.apache.cassandra.cql3.CustomPayloadMirroringQueryHandler"]
 
         if start:
+            if(len(workloads) > 0):
+                for node in CCM_CLUSTER.nodes.values():
+                        node.set_workloads(workloads)
             log.debug("Starting CCM cluster: {0}".format(cluster_name))
             CCM_CLUSTER.start(wait_for_binary_proto=True, wait_other_notice=True, jvm_args=jvm_args)
+            # Added to wait for slow nodes to start up
+            for node in CCM_CLUSTER.nodes.values():
+                wait_for_node_socket(node, 120)
             setup_keyspace(ipformat=ipformat)
     except Exception:
         log.exception("Failed to start CCM cluster; removing cluster.")
-        
+
         if os.name == "nt":
             if CCM_CLUSTER:
                 for node in CCM_CLUSTER.nodes.itervalues():

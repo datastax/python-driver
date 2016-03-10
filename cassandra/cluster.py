@@ -41,7 +41,7 @@ except ImportError:
     from cassandra.util import WeakSet  # NOQA
 
 from functools import partial, wraps
-from itertools import groupby
+from itertools import groupby, count
 
 from cassandra import (ConsistencyLevel, AuthenticationFailed,
                        OperationTimedOut, UnsupportedOperation,
@@ -70,8 +70,8 @@ from cassandra.pool import (Host, _ReconnectionHandler, _HostReconnectionHandler
                             HostConnectionPool, HostConnection,
                             NoConnectionsAvailable)
 from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
-                             BatchStatement, bind_params, QueryTrace, Statement,
-                             named_tuple_factory, dict_factory, FETCH_SIZE_UNSET)
+                             BatchStatement, bind_params, QueryTrace,
+                             named_tuple_factory, dict_factory, tuple_factory, FETCH_SIZE_UNSET)
 
 
 def _is_eventlet_monkey_patched():
@@ -1444,6 +1444,15 @@ class Session(object):
         default changed from ONE to LOCAL_ONE
     """
 
+    default_serial_consistency_level = None
+    """
+    The default :class:`~ConsistencyLevel` for serial phase of  conditional updates executed through
+    this session.  This default may be overridden by setting the
+    :attr:`~.Statement.serial_consistency_level` on individual statements.
+
+    Only valid for ``protocol_version >= 2``.
+    """
+
     max_trace_wait = 2.0
     """
     The maximum amount of time (in seconds) the driver will wait for trace
@@ -1635,6 +1644,8 @@ class Session(object):
             query = query.bind(parameters)
 
         cl = query.consistency_level if query.consistency_level is not None else self.default_consistency_level
+        serial_cl = query.serial_consistency_level if query.serial_consistency_level is not None else self.default_serial_consistency_level
+
         fetch_size = query.fetch_size
         if fetch_size is FETCH_SIZE_UNSET and self._protocol_version >= 2:
             fetch_size = self.default_fetch_size
@@ -1651,12 +1662,12 @@ class Session(object):
             if parameters:
                 query_string = bind_params(query_string, parameters, self.encoder)
             message = QueryMessage(
-                query_string, cl, query.serial_consistency_level,
+                query_string, cl, serial_cl,
                 fetch_size, timestamp=timestamp)
         elif isinstance(query, BoundStatement):
             message = ExecuteMessage(
                 query.prepared_statement.query_id, query.values, cl,
-                query.serial_consistency_level, fetch_size,
+                serial_cl, fetch_size,
                 timestamp=timestamp)
             prepared_statement = query.prepared_statement
         elif isinstance(query, BatchStatement):
@@ -1667,7 +1678,7 @@ class Session(object):
                     "setting Cluster.protocol_version to 2 to support this operation.")
             message = BatchMessage(
                 query.batch_type, query._statements_and_parameters, cl,
-                query.serial_consistency_level, timestamp)
+                serial_cl, timestamp)
 
         message.tracing = trace
 
@@ -2542,6 +2553,7 @@ class _Scheduler(object):
     def __init__(self, executor):
         self._queue = Queue.PriorityQueue()
         self._scheduled_tasks = set()
+        self._count = count()
         self._executor = executor
 
         t = Thread(target=self.run, name="Task Scheduler")
@@ -2559,7 +2571,7 @@ class _Scheduler(object):
             # this can happen on interpreter shutdown
             pass
         self.is_shutdown = True
-        self._queue.put_nowait((0, None))
+        self._queue.put_nowait((0, 0, None))
 
     def schedule(self, delay, fn, *args, **kwargs):
         self._insert_task(delay, (fn, args, tuple(kwargs.items())))
@@ -2575,7 +2587,7 @@ class _Scheduler(object):
         if not self.is_shutdown:
             run_at = time.time() + delay
             self._scheduled_tasks.add(task)
-            self._queue.put_nowait((run_at, task))
+            self._queue.put_nowait((run_at, next(self._count), task))
         else:
             log.debug("Ignoring scheduled task after shutdown: %r", task)
 
@@ -2586,7 +2598,7 @@ class _Scheduler(object):
 
             try:
                 while True:
-                    run_at, task = self._queue.get(block=True, timeout=None)
+                    run_at, i, task = self._queue.get(block=True, timeout=None)
                     if self.is_shutdown:
                         log.debug("Not executing scheduled task due to Scheduler shutdown")
                         return
@@ -2597,7 +2609,7 @@ class _Scheduler(object):
                         future = self._executor.submit(fn, *args, **kwargs)
                         future.add_done_callback(self._log_if_failed)
                     else:
-                        self._queue.put_nowait((run_at, task))
+                        self._queue.put_nowait((run_at, i, task))
                         break
             except Queue.Empty:
                 pass
@@ -3408,3 +3420,24 @@ class ResultSet(object):
         See :meth:`.ResponseFuture.get_all_query_traces` for details.
         """
         return self.response_future.get_all_query_traces(max_wait_sec_per)
+
+    @property
+    def was_applied(self):
+        """
+        For LWT results, returns whether the transaction was applied.
+
+        Result is indeterminate if called on a result that was not an LWT request.
+
+        Only valid when one of tne of the internal row factories is in use.
+        """
+        if self.response_future.row_factory not in (named_tuple_factory, dict_factory, tuple_factory):
+            raise RuntimeError("Cannot determine LWT result with row factory %s" % (self.response_future.row_factsory,))
+        if len(self.current_rows) != 1:
+            raise RuntimeError("LWT result should have exactly one row. This has %d." % (len(self.current_rows)))
+
+        row = self.current_rows[0]
+        if isinstance(row, tuple):
+            return row[0]
+        else:
+            return row['[applied]']
+

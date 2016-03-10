@@ -25,10 +25,10 @@ from cassandra.cluster import Session
 
 class TestMultiKeyModel(Model):
 
-    partition   = columns.Integer(primary_key=True)
-    cluster     = columns.Integer(primary_key=True)
-    count       = columns.Integer(required=False)
-    text        = columns.Text(required=False)
+    partition = columns.Integer(primary_key=True)
+    cluster = columns.Integer(primary_key=True)
+    count = columns.Integer(required=False)
+    text = columns.Text(required=False)
 
 class BatchQueryLogModel(Model):
 
@@ -77,12 +77,12 @@ class BatchQueryTests(BaseCassEngTestCase):
         inst.batch(b).save()
 
         inst2 = TestMultiKeyModel.get(partition=self.pkey, cluster=2)
-        assert inst2.count == 3
+        self.assertEqual(inst2.count, 3)
 
         b.execute()
 
         inst3 = TestMultiKeyModel.get(partition=self.pkey, cluster=2)
-        assert inst3.count == 4
+        self.assertEqual(inst3.count, 4)
 
     def test_delete_success_case(self):
 
@@ -120,9 +120,9 @@ class BatchQueryTests(BaseCassEngTestCase):
 
         with BatchQuery() as b:
             TestMultiKeyModel.objects.batch(b).filter(partition=0).delete()
-            assert TestMultiKeyModel.filter(partition=0).count() == 5
+            self.assertEqual(TestMultiKeyModel.filter(partition=0).count(), 5)
 
-        assert TestMultiKeyModel.filter(partition=0).count() == 0
+        self.assertEqual(TestMultiKeyModel.filter(partition=0).count(), 0)
         #cleanup
         for m in TestMultiKeyModel.all():
             m.delete()
@@ -132,23 +132,23 @@ class BatchQueryTests(BaseCassEngTestCase):
         b = BatchQuery()
 
         q = TestMultiKeyModel.objects.batch(b)
-        assert q._batch == b
+        self.assertEqual(q._batch, b)
 
         q = q.batch(None)
-        assert q._batch is None
+        self.assertIsNone(q._batch)
 
     def test_dml_none_success_case(self):
         """ Tests that passing None into the batch call clears any batch object """
         b = BatchQuery()
 
         q = DMLQuery(TestMultiKeyModel, batch=b)
-        assert q._batch == b
+        self.assertEqual(q._batch, b)
 
         q.batch(None)
-        assert q._batch is None
+        self.assertIsNone(q._batch)
 
     def test_batch_execute_on_exception_succeeds(self):
-    # makes sure if execute_on_exception == True we still apply the batch
+        # makes sure if execute_on_exception == True we still apply the batch
         drop_table(BatchQueryLogModel)
         sync_table(BatchQueryLogModel)
 
@@ -167,7 +167,7 @@ class BatchQueryTests(BaseCassEngTestCase):
         self.assertEqual(1, len(obj))
 
     def test_batch_execute_on_exception_skips_if_not_specified(self):
-    # makes sure if execute_on_exception == True we still apply the batch
+        # makes sure if execute_on_exception == True we still apply the batch
         drop_table(BatchQueryLogModel)
         sync_table(BatchQueryLogModel)
 

@@ -16,14 +16,14 @@ import copy
 from datetime import datetime, timedelta
 import time
 import six
+from warnings import warn
 
 from cassandra.cqlengine import columns, CQLEngineException, ValidationError, UnicodeMixin
 from cassandra.cqlengine import connection
 from cassandra.cqlengine.functions import Token, BaseQueryFunction, QueryValue
 from cassandra.cqlengine.operators import (InOperator, EqualsOperator, GreaterThanOperator,
                                            GreaterThanOrEqualOperator, LessThanOperator,
-                                           LessThanOrEqualOperator, BaseWhereOperator)
-# import * ?
+                                           LessThanOrEqualOperator, ContainsOperator, BaseWhereOperator)
 from cassandra.cqlengine.statements import (WhereClause, SelectStatement, DeleteStatement,
                                             UpdateStatement, AssignmentClause, InsertStatement,
                                             BaseCQLStatement, MapUpdateClause, MapDeleteClause,
@@ -38,9 +38,22 @@ class QueryException(CQLEngineException):
 class IfNotExistsWithCounterColumn(CQLEngineException):
     pass
 
+class IfExistsWithCounterColumn(CQLEngineException):
+    pass
+
 
 class LWTException(CQLEngineException):
-    pass
+    """Lightweight transaction exception.
+
+    This exception will be raised when a write using an `IF` clause could not be
+    applied due to existing data violating the condition. The existing data is
+    available through the ``existing`` attribute.
+
+    :param existing: The current state of the data which prevented the write.
+    """
+    def __init__(self, existing):
+        super(LWTException, self).__init__("LWT Query was not applied")
+        self.existing = existing
 
 
 class DoesNotExist(QueryException):
@@ -53,12 +66,14 @@ class MultipleObjectsReturned(QueryException):
 
 def check_applied(result):
     """
-    check if result contains some column '[applied]' with false value,
-    if that value is false, it means our light-weight transaction didn't
-    applied to database.
+    Raises LWTException if it looks like a failed LWT request.
     """
-    if result and '[applied]' in result[0] and not result[0]['[applied]']:
-        raise LWTException('')
+    try:
+        applied = result.was_applied
+    except Exception:
+        applied = True  # result was not LWT form
+    if not applied:
+        raise LWTException(result[0])
 
 
 class AbstractQueryableColumn(UnicodeMixin):
@@ -87,6 +102,13 @@ class AbstractQueryableColumn(UnicodeMixin):
         """
         return WhereClause(six.text_type(self), InOperator(), item)
 
+    def contains_(self, item):
+        """
+        Returns a CONTAINS operator
+        """
+        return WhereClause(six.text_type(self), ContainsOperator(), item)
+
+
     def __eq__(self, other):
         return WhereClause(six.text_type(self), EqualsOperator(), self._to_database(other))
 
@@ -114,6 +136,8 @@ class BatchQuery(object):
 
     http://www.datastax.com/docs/1.2/cql_cli/cql/BATCH
     """
+    warn_multiple_exec = True
+
     _consistency = None
 
     def __init__(self, batch_type=None, timestamp=None, consistency=None, execute_on_exception=False,
@@ -144,6 +168,8 @@ class BatchQuery(object):
         self._execute_on_exception = execute_on_exception
         self._timeout = timeout
         self._callbacks = []
+        self._executed = False
+        self._context_entered = False
 
     def add_query(self, query):
         if not isinstance(query, BaseCQLStatement):
@@ -156,9 +182,6 @@ class BatchQuery(object):
     def _execute_callbacks(self):
         for callback, args, kwargs in self._callbacks:
             callback(*args, **kwargs)
-
-        # trying to clear up the ref counts for objects mentioned in the set
-        del self._callbacks
 
     def add_callback(self, fn, *args, **kwargs):
         """Add a function and arguments to be passed to it to be executed after the batch executes.
@@ -178,6 +201,13 @@ class BatchQuery(object):
         self._callbacks.append((fn, args, kwargs))
 
     def execute(self):
+        if self._executed and self.warn_multiple_exec:
+            msg = "Batch executed multiple times."
+            if self._context_entered:
+                msg += " If using the batch as a context manager, there is no need to call execute directly."
+            warn(msg)
+        self._executed = True
+
         if len(self.queries) == 0:
             # Empty batch is a no-op
             # except for callbacks
@@ -218,6 +248,7 @@ class BatchQuery(object):
         self._execute_callbacks()
 
     def __enter__(self):
+        self._context_entered = True
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -258,6 +289,11 @@ class AbstractQuerySet(object):
         # results cache
         self._result_cache = None
         self._result_idx = None
+        self._result_generator = None
+
+        self._distinct_fields = None
+
+        self._count = None
 
         self._batch = None
         self._ttl = getattr(model, '__default_ttl__', None)
@@ -265,6 +301,8 @@ class AbstractQuerySet(object):
         self._timestamp = None
         self._if_not_exists = False
         self._timeout = connection.NOT_SET
+        self._if_exists = False
+        self._fetch_size = None
 
     @property
     def column_family_name(self):
@@ -275,7 +313,7 @@ class AbstractQuerySet(object):
             return self._batch.add_query(q)
         else:
             result = connection.execute(q, consistency_level=self._consistency, timeout=self._timeout)
-            if self._transaction:
+            if self._if_not_exists or self._if_exists or self._transaction:
                 check_applied(result)
             return result
 
@@ -291,7 +329,7 @@ class AbstractQuerySet(object):
     def __deepcopy__(self, memo):
         clone = self.__class__(self.model)
         for k, v in self.__dict__.items():
-            if k in ['_con', '_cur', '_result_cache', '_result_idx']:  # don't clone these
+            if k in ['_con', '_cur', '_result_cache', '_result_idx', '_result_generator']:  # don't clone these
                 clone.__dict__[k] = None
             elif k == '_batch':
                 # we need to keep the same batch instance across
@@ -308,7 +346,7 @@ class AbstractQuerySet(object):
 
     def __len__(self):
         self._execute_query()
-        return len(self._result_cache)
+        return self.count()
 
     # ----query generation / execution----
 
@@ -331,7 +369,9 @@ class AbstractQuerySet(object):
             where=self._where,
             order_by=self._order,
             limit=self._limit,
-            allow_filtering=self._allow_filtering
+            allow_filtering=self._allow_filtering,
+            distinct_fields=self._distinct_fields,
+            fetch_size=self._fetch_size
         )
 
     # ----Reads------
@@ -340,8 +380,29 @@ class AbstractQuerySet(object):
         if self._batch:
             raise CQLEngineException("Only inserts, updates, and deletes are available in batch mode")
         if self._result_cache is None:
-            self._result_cache = list(self._execute(self._select_query()))
+            self._result_generator = (i for i in self._execute(self._select_query()))
+            self._result_cache = []
             self._construct_result = self._get_result_constructor()
+
+            # "DISTINCT COUNT()" is not supported in C* < 2.2, so we need to materialize all results to get
+            # len() and count() working with DISTINCT queries
+            if self._distinct_fields:
+                self._fill_result_cache()
+
+    def _fill_result_cache(self):
+        """
+        Fill the result cache with all results.
+        """
+
+        idx = 0
+        try:
+            while True:
+                idx += 1000
+                self._fill_result_cache_to_idx(idx)
+        except StopIteration:
+            pass
+
+        self._count = len(self._result_cache)
 
     def _fill_result_cache_to_idx(self, idx):
         self._execute_query()
@@ -354,44 +415,65 @@ class AbstractQuerySet(object):
         else:
             for idx in range(qty):
                 self._result_idx += 1
-                self._result_cache[self._result_idx] = self._construct_result(self._result_cache[self._result_idx])
+                while True:
+                    try:
+                        self._result_cache[self._result_idx] = self._construct_result(self._result_cache[self._result_idx])
+                        break
+                    except IndexError:
+                        self._result_cache.append(next(self._result_generator))
 
     def __iter__(self):
         self._execute_query()
 
-        for idx in range(len(self._result_cache)):
+        idx = 0
+        while True:
+            if len(self._result_cache) <= idx:
+                try:
+                    self._result_cache.append(next(self._result_generator))
+                except StopIteration:
+                    break
+
             instance = self._result_cache[idx]
             if isinstance(instance, dict):
                 self._fill_result_cache_to_idx(idx)
             yield self._result_cache[idx]
 
+            idx += 1
+
     def __getitem__(self, s):
         self._execute_query()
 
-        num_results = len(self._result_cache)
-
         if isinstance(s, slice):
-            # calculate the amount of results that need to be loaded
-            end = num_results if s.step is None else s.step
-            if end < 0:
-                end += num_results
-            else:
-                end -= 1
-            self._fill_result_cache_to_idx(end)
-            return self._result_cache[s.start:s.stop:s.step]
-        else:
-            # return the object at this index
-            s = int(s)
+            start = s.start if s.start else 0
 
-            # handle negative indexing
+            # calculate the amount of results that need to be loaded
+            end = s.stop
+            if start < 0 or s.stop is None or s.stop < 0:
+                end = self.count()
+
+            try:
+                self._fill_result_cache_to_idx(end)
+            except StopIteration:
+                pass
+
+            return self._result_cache[start:s.stop:s.step]
+        else:
+            try:
+                s = int(s)
+            except (ValueError, TypeError):
+                raise TypeError('QuerySet indices must be integers')
+
+            # Using negative indexing is costly since we have to execute a count()
             if s < 0:
+                num_results = self.count()
                 s += num_results
 
-            if s >= num_results:
-                raise IndexError
-            else:
+            try:
                 self._fill_result_cache_to_idx(s)
-                return self._result_cache[s]
+            except StopIteration:
+                raise IndexError
+
+            return self._result_cache[s]
 
     def _get_result_constructor(self):
         """
@@ -550,6 +632,10 @@ class AbstractQuerySet(object):
                 query_val = [column.to_database(v) for v in val]
             elif isinstance(val, BaseQueryFunction):
                 query_val = val
+            elif (isinstance(operator, ContainsOperator) and
+                  isinstance(column, (columns.List, columns.Set, columns.Map))):
+                # For ContainsOperator and collections, we query using the value, not the container
+                query_val = val
             else:
                 query_val = column.to_database(val)
 
@@ -577,10 +663,10 @@ class AbstractQuerySet(object):
             return self.filter(*args, **kwargs).get()
 
         self._execute_query()
-        if len(self._result_cache) == 0:
+        if self.count() == 0:
             raise self.model.DoesNotExist
-        elif len(self._result_cache) > 1:
-            raise self.model.MultipleObjectsReturned('{0} objects found'.format(len(self._result_cache)))
+        elif self.count() > 1:
+            raise self.model.MultipleObjectsReturned('{0} objects found'.format(self.count()))
         else:
             return self[0]
 
@@ -636,31 +722,78 @@ class AbstractQuerySet(object):
 
     def count(self):
         """
-        Returns the number of rows matched by this query
+        Returns the number of rows matched by this query.
+
+        *Note: This function executes a SELECT COUNT() and has a performance cost on large datasets*
         """
         if self._batch:
             raise CQLEngineException("Only inserts, updates, and deletes are available in batch mode")
 
-        if self._result_cache is None:
+        if self._count is None:
             query = self._select_query()
             query.count = True
             result = self._execute(query)
-            return result[0]['count']
+            count_row = result[0].popitem()
+            self._count = count_row[1]
+        return self._count
+
+    def distinct(self, distinct_fields=None):
+        """
+        Returns the DISTINCT rows matched by this query.
+
+        distinct_fields default to the partition key fields if not specified.
+
+        *Note: distinct_fields must be a partition key or a static column*
+
+        .. code-block:: python
+
+            class Automobile(Model):
+                manufacturer = columns.Text(partition_key=True)
+                year = columns.Integer(primary_key=True)
+                model = columns.Text(primary_key=True)
+                price = columns.Decimal()
+
+            sync_table(Automobile)
+
+            # create rows
+
+            Automobile.objects.distinct()
+
+            # or
+
+            Automobile.objects.distinct(['manufacturer'])
+
+        """
+
+        clone = copy.deepcopy(self)
+        if distinct_fields:
+            clone._distinct_fields = distinct_fields
         else:
-            return len(self._result_cache)
+            clone._distinct_fields = [x.column_name for x in self.model._partition_keys.values()]
+
+        return clone
 
     def limit(self, v):
         """
-        Limits the number of results returned by Cassandra.
+        Limits the number of results returned by Cassandra. Use *0* or *None* to disable.
 
         *Note that CQL's default limit is 10,000, so all queries without a limit set explicitly will have an implicit limit of 10,000*
 
         .. code-block:: python
 
+            # Fetch 100 users
             for user in User.objects().limit(100):
                 print(user)
+
+            # Fetch all users
+            for user in User.objects().limit(None):
+                print(user)
         """
-        if not (v is None or isinstance(v, six.integer_types)):
+
+        if v is None:
+            v = 0
+
+        if not isinstance(v, six.integer_types):
             raise TypeError
         if v == self._limit:
             return self
@@ -670,6 +803,30 @@ class AbstractQuerySet(object):
 
         clone = copy.deepcopy(self)
         clone._limit = v
+        return clone
+
+    def fetch_size(self, v):
+        """
+        Sets the number of rows that are fetched at a time.
+
+        *Note that driver's default fetch size is 5000.*
+
+        .. code-block:: python
+
+            for user in User.objects().fetch_size(500):
+                print(user)
+        """
+
+        if not isinstance(v, six.integer_types):
+            raise TypeError
+        if v == self._fetch_size:
+            return self
+
+        if v < 1:
+            raise QueryException("fetch size less than 1 is not allowed")
+
+        clone = copy.deepcopy(self)
+        clone._fetch_size = v
         return clone
 
     def allow_filtering(self):
@@ -683,7 +840,7 @@ class AbstractQuerySet(object):
     def _only_or_defer(self, action, fields):
         clone = copy.deepcopy(self)
         if clone._defer_fields or clone._only_fields:
-            raise QueryException("QuerySet alread has only or defer fields defined")
+            raise QueryException("QuerySet already has only or defer fields defined")
 
         # check for strange fields
         missing_fields = [f for f in fields if f not in self.model._columns.keys()]
@@ -710,23 +867,29 @@ class AbstractQuerySet(object):
         return self._only_or_defer('defer', fields)
 
     def create(self, **kwargs):
-        return self.model(**kwargs).batch(self._batch).ttl(self._ttl).\
-            consistency(self._consistency).if_not_exists(self._if_not_exists).\
-            timestamp(self._timestamp).save()
+        return self.model(**kwargs) \
+            .batch(self._batch) \
+            .ttl(self._ttl) \
+            .consistency(self._consistency) \
+            .if_not_exists(self._if_not_exists) \
+            .timestamp(self._timestamp) \
+            .if_exists(self._if_exists) \
+            .save()
 
     def delete(self):
         """
         Deletes the contents of a query
         """
         # validate where clause
-        partition_key = [x for x in self.model._primary_keys.values()][0]
-        if not any([c.field == partition_key.column_name for c in self._where]):
+        partition_keys = set(x.db_field_name for x in self.model._partition_keys.values())
+        if partition_keys - set(c.field for c in self._where):
             raise QueryException("The partition key must be defined on delete queries")
 
         dq = DeleteStatement(
             self.column_family_name,
             where=self._where,
-            timestamp=self._timestamp
+            timestamp=self._timestamp,
+            if_exists=self._if_exists
         )
         self._execute(dq)
 
@@ -779,11 +942,12 @@ class ModelQuerySet(AbstractQuerySet):
     """
     def _validate_select_where(self):
         """ Checks that a filterset will not create invalid select statement """
-        # check that there's either a = or IN relationship with a primary key or indexed field
-        equal_ops = [self.model._columns.get(w.field) for w in self._where if isinstance(w.operator, EqualsOperator)]
+        # check that there's either a =, a IN or a CONTAINS (collection) relationship with a primary key or indexed field
+        equal_ops = [self.model._get_column_by_db_name(w.field) for w in self._where if isinstance(w.operator, EqualsOperator)]
         token_comparison = any([w for w in self._where if isinstance(w.value, Token)])
         if not any([w.primary_key or w.index for w in equal_ops]) and not token_comparison and not self._allow_filtering:
-            raise QueryException('Where clauses require either a "=" or "IN" comparison with either a primary key or indexed field')
+            raise QueryException(('Where clauses require either  =, a IN or a CONTAINS (collection) '
+                                  'comparison with either a primary key or indexed field'))
 
         if not self._allow_filtering:
             # if the query is not on an indexed field
@@ -867,10 +1031,27 @@ class ModelQuerySet(AbstractQuerySet):
         return clone
 
     def if_not_exists(self):
+        """
+        Check the existence of an object before insertion.
+
+        If the insertion isn't applied, a LWTException is raised.
+        """
         if self.model._has_counter:
             raise IfNotExistsWithCounterColumn('if_not_exists cannot be used with tables containing counter columns')
         clone = copy.deepcopy(self)
         clone._if_not_exists = True
+        return clone
+
+    def if_exists(self):
+        """
+        Check the existence of an object before an update or delete.
+
+        If the update or delete isn't applied, a LWTException is raised.
+        """
+        if self.model._has_counter:
+            raise IfExistsWithCounterColumn('if_exists cannot be used with tables containing counter columns')
+        clone = copy.deepcopy(self)
+        clone._if_exists = True
         return clone
 
     def update(self, **values):
@@ -965,7 +1146,7 @@ class ModelQuerySet(AbstractQuerySet):
 
         nulled_columns = set()
         us = UpdateStatement(self.column_family_name, where=self._where, ttl=self._ttl,
-                             timestamp=self._timestamp, transactions=self._transaction)
+                             timestamp=self._timestamp, transactions=self._transaction, if_exists=self._if_exists)
         for name, val in values.items():
             col_name, col_op = self._parse_filter_arg(name)
             col = self.model._columns.get(col_name)
@@ -1005,7 +1186,8 @@ class ModelQuerySet(AbstractQuerySet):
             self._execute(us)
 
         if nulled_columns:
-            ds = DeleteStatement(self.column_family_name, fields=nulled_columns, where=self._where)
+            ds = DeleteStatement(self.column_family_name, fields=nulled_columns,
+                                 where=self._where, if_exists=self._if_exists)
             self._execute(ds)
 
 
@@ -1021,9 +1203,10 @@ class DMLQuery(object):
     _consistency = None
     _timestamp = None
     _if_not_exists = False
+    _if_exists = False
 
     def __init__(self, model, instance=None, batch=None, ttl=None, consistency=None, timestamp=None,
-                 if_not_exists=False, transaction=None, timeout=connection.NOT_SET):
+                 if_not_exists=False, transaction=None, timeout=connection.NOT_SET, if_exists=False):
         self.model = model
         self.column_family_name = self.model.column_family_name()
         self.instance = instance
@@ -1032,6 +1215,7 @@ class DMLQuery(object):
         self._consistency = consistency
         self._timestamp = timestamp
         self._if_not_exists = if_not_exists
+        self._if_exists = if_exists
         self._transaction = transaction
         self._timeout = timeout
 
@@ -1040,7 +1224,7 @@ class DMLQuery(object):
             return self._batch.add_query(q)
         else:
             tmp = connection.execute(q, consistency_level=self._consistency, timeout=self._timeout)
-            if self._if_not_exists or self._transaction:
+            if self._if_not_exists or self._if_exists or self._transaction:
                 check_applied(tmp)
             return tmp
 
@@ -1054,7 +1238,7 @@ class DMLQuery(object):
         """
         executes a delete query to remove columns that have changed to null
         """
-        ds = DeleteStatement(self.column_family_name)
+        ds = DeleteStatement(self.column_family_name, if_exists=self._if_exists)
         deleted_fields = False
         for _, v in self.instance._values.items():
             col = v.column
@@ -1088,8 +1272,8 @@ class DMLQuery(object):
         assert type(self.instance) == self.model
         null_clustering_key = False if len(self.instance._clustering_keys) == 0 else True
         static_changed_only = True
-        statement = UpdateStatement(self.column_family_name, ttl=self._ttl,
-                                    timestamp=self._timestamp, transactions=self._transaction)
+        statement = UpdateStatement(self.column_family_name, ttl=self._ttl, timestamp=self._timestamp,
+                                    transactions=self._transaction, if_exists=self._if_exists)
         for name, col in self.instance._clustering_keys.items():
             null_clustering_key = null_clustering_key and col._val_is_null(getattr(self.instance, name, None))
         # get defined fields and their column names
@@ -1101,11 +1285,9 @@ class DMLQuery(object):
                 val = getattr(self.instance, name, None)
                 val_mgr = self.instance._values[name]
 
-                # don't update something that is null
                 if val is None:
                     continue
 
-                # don't update something if it hasn't changed
                 if not val_mgr.changed and not isinstance(col, columns.Counter):
                     continue
 
@@ -1123,7 +1305,6 @@ class DMLQuery(object):
                     else:
                         raise RuntimeError
 
-                    # do the stuff
                     clause = klass(col.db_field_name, val,
                                    previous=val_mgr.previous_value, column=col)
                     if clause.get_context_size() > 0:
@@ -1162,6 +1343,8 @@ class DMLQuery(object):
 
         nulled_fields = set()
         if self.instance._has_counter or self.instance._can_update():
+            if self.instance._has_counter:
+                warn("'create' and 'save' actions on Counters are deprecated. A future version will disallow this. Use the 'update' mechanism instead.")
             return self.update()
         else:
             insert = InsertStatement(self.column_family_name, ttl=self._ttl, timestamp=self._timestamp, if_not_exists=self._if_not_exists)
@@ -1194,7 +1377,7 @@ class DMLQuery(object):
         if self.instance is None:
             raise CQLEngineException("DML Query instance attribute is None")
 
-        ds = DeleteStatement(self.column_family_name, timestamp=self._timestamp)
+        ds = DeleteStatement(self.column_family_name, timestamp=self._timestamp, if_exists=self._if_exists)
         for name, col in self.model._primary_keys.items():
             if (not col.partition_key) and (getattr(self.instance, name) is None):
                 continue

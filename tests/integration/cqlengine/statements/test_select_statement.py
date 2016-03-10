@@ -56,6 +56,17 @@ class SelectStatementTests(unittest.TestCase):
         self.assertIn('LIMIT', six.text_type(ss))
         self.assertNotIn('ORDER', six.text_type(ss))
 
+    def test_distinct(self):
+        ss = SelectStatement('table', distinct_fields=['field2'])
+        ss.add_where_clause(WhereClause('field1', EqualsOperator(), 'b'))
+        self.assertEqual(six.text_type(ss), 'SELECT DISTINCT "field2" FROM table WHERE "field1" = %(0)s', six.text_type(ss))
+
+        ss = SelectStatement('table', distinct_fields=['field1', 'field2'])
+        self.assertEqual(six.text_type(ss), 'SELECT DISTINCT "field1", "field2" FROM table')
+
+        ss = SelectStatement('table', distinct_fields=['field1'], count=True)
+        self.assertEqual(six.text_type(ss), 'SELECT DISTINCT COUNT("field1") FROM table')
+
     def test_context(self):
         ss = SelectStatement('table')
         ss.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
@@ -85,3 +96,15 @@ class SelectStatementTests(unittest.TestCase):
         self.assertIn('ORDER BY x, y', qstr)
         self.assertIn('ALLOW FILTERING', qstr)
 
+    def test_limit_rendering(self):
+        ss = SelectStatement('table', None, limit=10)
+        qstr = six.text_type(ss)
+        self.assertIn('LIMIT 10', qstr)
+
+        ss = SelectStatement('table', None, limit=0)
+        qstr = six.text_type(ss)
+        self.assertNotIn('LIMIT', qstr)
+
+        ss = SelectStatement('table', None, limit=None)
+        qstr = six.text_type(ss)
+        self.assertNotIn('LIMIT', qstr)

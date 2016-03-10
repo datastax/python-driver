@@ -894,15 +894,15 @@ class EventMessage(_MessageType):
         return event
 
 
-class ProtocolHandler(object):
+class _ProtocolHandler(object):
     """
-    ProtocolHander handles encoding and decoding messages.
+    _ProtocolHander handles encoding and decoding messages.
 
     This class can be specialized to compose Handlers which implement alternative
     result decoding or type deserialization. Class definitions are passed to :class:`cassandra.cluster.Cluster`
     on initialization.
 
-    Contracted class methods are :meth:`ProtocolHandler.encode_message` and :meth:`ProtocolHandler.decode_message`.
+    Contracted class methods are :meth:`_ProtocolHandler.encode_message` and :meth:`_ProtocolHandler.decode_message`.
     """
 
     message_types_by_opcode = _message_types_by_opcode.copy()
@@ -1039,14 +1039,16 @@ def cython_protocol_handler(colparser):
         code_to_type = dict((v, k) for k, v in ResultMessage.type_codes.items())
         recv_results_rows = classmethod(make_recv_results_rows(colparser))
 
-    class CythonProtocolHandler(ProtocolHandler):
+    class CythonProtocolHandler(_ProtocolHandler):
         """
         Use FastResultMessage to decode query result message messages.
         """
 
-        my_opcodes = ProtocolHandler.message_types_by_opcode.copy()
+        my_opcodes = _ProtocolHandler.message_types_by_opcode.copy()
         my_opcodes[FastResultMessage.opcode] = FastResultMessage
         message_types_by_opcode = my_opcodes
+
+        col_parser = colparser
 
     return CythonProtocolHandler
 
@@ -1057,6 +1059,7 @@ if HAVE_CYTHON:
     LazyProtocolHandler = cython_protocol_handler(LazyParser())
 else:
     # Use Python-based ProtocolHandler
+    ProtocolHandler = _ProtocolHandler
     LazyProtocolHandler = None
 
 

@@ -12,16 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from tests.unit.cython.utils import cyimport, cythontest
+types_testhelper = cyimport('tests.unit.cython.types_testhelper')
+
 try:
     import unittest2 as unittest
 except ImportError:
     import unittest  # noqa
 
-from cassandra.cqlengine.operators import BaseQueryOperator, QueryOperatorException
 
+class TypesTest(unittest.TestCase):
 
-class BaseOperatorTest(unittest.TestCase):
-
-    def test_get_operator_cannot_be_called_from_base_class(self):
-        with self.assertRaises(QueryOperatorException):
-            BaseQueryOperator.get_operator('*')
+    @cythontest
+    def test_datetype(self):
+        types_testhelper.test_datetype(self.assertEqual)

@@ -15,7 +15,7 @@
 import logging
 import re
 import six
-import warnings
+from warnings import warn
 
 from cassandra.cqlengine import CQLEngineException, ValidationError
 from cassandra.cqlengine import columns
@@ -178,12 +178,30 @@ class IfNotExistsDescriptor(object):
     def __get__(self, instance, model):
         if instance:
             # instance method
-            def ifnotexists_setter(ife):
+            def ifnotexists_setter(ife=True):
                 instance._if_not_exists = ife
                 return instance
             return ifnotexists_setter
 
         return model.objects.if_not_exists
+
+    def __call__(self, *args, **kwargs):
+        raise NotImplementedError
+
+
+class IfExistsDescriptor(object):
+    """
+    return a query set descriptor with a if_exists flag specified
+    """
+    def __get__(self, instance, model):
+        if instance:
+            # instance method
+            def ifexists_setter(ife=True):
+                instance._if_exists = ife
+                return instance
+            return ifexists_setter
+
+        return model.objects.if_exists
 
     def __call__(self, *args, **kwargs):
         raise NotImplementedError
@@ -229,7 +247,6 @@ class ColumnQueryEvaluator(query.AbstractQueryableColumn):
         return self.column.db_field_name
 
     def _get_column(self):
-        """ :rtype: ColumnQueryEvaluator """
         return self.column
 
 
@@ -304,9 +321,13 @@ class BaseModel(object):
 
     if_not_exists = IfNotExistsDescriptor()
 
+    if_exists = IfExistsDescriptor()
+
     # _len is lazily created by __len__
 
     __table_name__ = None
+
+    __table_name_case_sensitive__ = False
 
     __keyspace__ = None
 
@@ -323,6 +344,8 @@ class BaseModel(object):
     _timestamp = None  # optional timestamp to include with the operation (USING TIMESTAMP)
 
     _if_not_exists = False  # optional if_not_exists flag to check existence before insertion
+
+    _if_exists = False  # optional if_exists flag to check existence before update
 
     _table_name = None  # used internally to cache a derived table name
 
@@ -383,11 +406,11 @@ class BaseModel(object):
         # we're going to take the values, which is from the DB as a dict
         # and translate that into our local fields
         # the db_map is a db_field -> model field map
-        items = values.items()
-        field_dict = dict([(cls._db_map.get(k, k), v) for k, v in items])
+        if cls._db_map:
+            values = dict((cls._db_map.get(k, k), v) for k, v in values.items())
 
         if cls._is_polymorphic:
-            disc_key = field_dict.get(cls._discriminator_column_name)
+            disc_key = values.get(cls._discriminator_column_name)
 
             if disc_key is None:
                 raise PolymorphicModelException('discriminator value was not found in values')
@@ -408,12 +431,12 @@ class BaseModel(object):
                     '{0} is not a subclass of {1}'.format(klass.__name__, cls.__name__)
                 )
 
-            field_dict = dict((k, v) for k, v in field_dict.items() if k in klass._columns.keys())
+            values = dict((k, v) for k, v in values.items() if k in klass._columns.keys())
 
         else:
             klass = cls
 
-        instance = klass(**field_dict)
+        instance = klass(**values)
         instance._set_persisted()
         return instance
 
@@ -452,6 +475,13 @@ class BaseModel(object):
         """
         return cls._columns[name]
 
+    @classmethod
+    def _get_column_by_db_name(cls, name):
+        """
+        Returns the column, mapped by db_field name
+        """
+        return cls._columns.get(cls._db_map.get(name, name))
+
     def __eq__(self, other):
         if self.__class__ != other.__class__:
             return False
@@ -480,7 +510,10 @@ class BaseModel(object):
         """
         cf_name = protect_name(cls._raw_column_family_name())
         if include_keyspace:
-            return '{0}.{1}'.format(protect_name(cls._get_keyspace()), cf_name)
+            keyspace = cls._get_keyspace()
+            if not keyspace:
+                raise CQLEngineException("Model keyspace is not set and no default is available. Set model keyspace or setup connection before attempting to generate a query.")
+            return '{0}.{1}'.format(protect_name(keyspace), cf_name)
 
         return cf_name
 
@@ -489,7 +522,14 @@ class BaseModel(object):
     def _raw_column_family_name(cls):
         if not cls._table_name:
             if cls.__table_name__:
-                cls._table_name = cls.__table_name__.lower()
+                if cls.__table_name_case_sensitive__:
+                    cls._table_name = cls.__table_name__
+                else:
+                    table_name = cls.__table_name__.lower()
+                    if cls.__table_name__ != table_name:
+                        warn(("Model __table_name__ will be case sensitive by default in 4.0. "
+                        "You should fix the __table_name__ value of the '{0}' model.").format(cls.__name__))
+                    cls._table_name = table_name
             else:
                 if cls._is_polymorphic and not cls._is_polymorphic_base:
                     cls._table_name = cls._polymorphic_base._raw_column_family_name()
@@ -645,7 +685,8 @@ class BaseModel(object):
                           consistency=self.__consistency__,
                           if_not_exists=self._if_not_exists,
                           transaction=self._transaction,
-                          timeout=self._timeout).save()
+                          timeout=self._timeout,
+                          if_exists=self._if_exists).save()
 
         self._set_persisted()
 
@@ -691,7 +732,8 @@ class BaseModel(object):
                           timestamp=self._timestamp,
                           consistency=self.__consistency__,
                           transaction=self._transaction,
-                          timeout=self._timeout).update()
+                          timeout=self._timeout,
+                          if_exists=self._if_exists).update()
 
         self._set_persisted()
 
@@ -708,7 +750,8 @@ class BaseModel(object):
                           batch=self._batch,
                           timestamp=self._timestamp,
                           consistency=self.__consistency__,
-                          timeout=self._timeout).delete()
+                          timeout=self._timeout,
+                          if_exists=self._if_exists).delete()
 
     def get_changed_columns(self):
         """
@@ -811,8 +854,8 @@ class ModelMetaClass(type):
                 raise ModelDefinitionException("column '{0}' conflicts with built-in attribute/method".format(k))
 
             # counter column primary keys are not allowed
-            if (v.primary_key or v.partition_key) and isinstance(v, (columns.Counter, columns.BaseContainerColumn)):
-                raise ModelDefinitionException('counter columns and container columns cannot be used as primary keys')
+            if (v.primary_key or v.partition_key) and isinstance(v, columns.Counter):
+                raise ModelDefinitionException('counter columns cannot be used as primary keys')
 
             # this will mark the first primary key column as a partition
             # key, if one hasn't been set already
@@ -842,17 +885,19 @@ class ModelMetaClass(type):
         for v in column_dict.values():
             # check for duplicate column names
             if v.db_field_name in col_names:
-                raise ModelException("{0} defines the column {1} more than once".format(name, v.db_field_name))
+                raise ModelException("{0} defines the column '{1}' more than once".format(name, v.db_field_name))
             if v.clustering_order and not (v.primary_key and not v.partition_key):
                 raise ModelException("clustering_order may be specified only for clustering primary keys")
             if v.clustering_order and v.clustering_order.lower() not in ('asc', 'desc'):
-                raise ModelException("invalid clustering order {0} for column {1}".format(repr(v.clustering_order), v.db_field_name))
+                raise ModelException("invalid clustering order '{0}' for column '{1}'".format(repr(v.clustering_order), v.db_field_name))
             col_names.add(v.db_field_name)
 
         # create db_name -> model name map for loading
         db_map = {}
-        for field_name, col in column_dict.items():
-            db_map[col.db_field_name] = field_name
+        for col_name, field in column_dict.items():
+            db_field = field.db_field_name
+            if db_field != col_name:
+                db_map[db_field] = col_name
 
         # add management members to the class
         attrs['_columns'] = column_dict
@@ -892,7 +937,7 @@ class ModelMetaClass(type):
             if MultipleObjectsReturnedBase is not None:
                 break
 
-        MultipleObjectsReturnedBase = DoesNotExistBase or attrs.pop('MultipleObjectsReturned', BaseModel.MultipleObjectsReturned)
+        MultipleObjectsReturnedBase = MultipleObjectsReturnedBase or attrs.pop('MultipleObjectsReturned', BaseModel.MultipleObjectsReturned)
         attrs['MultipleObjectsReturned'] = type('MultipleObjectsReturned', (MultipleObjectsReturnedBase,), {})
 
         # create the class and add a QuerySet to it
@@ -919,6 +964,11 @@ class Model(BaseModel):
     __table_name__ = None
     """
     *Optional.* Sets the name of the CQL table for this model. If left blank, the table name will be the name of the model, with it's module name as it's prefix. Manually defined table names are not inherited.
+    """
+
+    __table_name_case_sensitive__ = False
+    """
+    *Optional.* By default, __table_name__ is case insensitive. Set this to True if you want to preserve the case sensitivity.
     """
 
     __keyspace__ = None

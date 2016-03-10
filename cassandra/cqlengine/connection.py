@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 import logging
 import six
+import threading
 
 from cassandra.cluster import Cluster, _NOT_SET, NoHostAvailable, UserTypeDoesNotExist
 from cassandra.query import SimpleStatement, Statement, dict_factory
@@ -32,12 +33,13 @@ Host = namedtuple('Host', ['name', 'port'])
 cluster = None
 session = None
 lazy_connect_args = None
+lazy_connect_lock = threading.RLock()
 
 
 # Because type models may be registered before a connection is present,
 # and because sessions may be replaced, we must register UDTs here, in order
 # to have them registered when a new session is established.
-udt_by_keyspace = {}
+udt_by_keyspace = defaultdict(dict)
 
 
 class UndefinedKeyspaceException(CQLEngineException):
@@ -56,9 +58,8 @@ def default():
 
     cluster = Cluster()
     session = cluster.connect()
-    session.row_factory = dict_factory
 
-    _register_known_types(cluster)
+    _setup_session(session)
 
     log.debug("cqlengine connection initialized with default session to localhost")
 
@@ -80,12 +81,12 @@ def set_session(s):
     session = s
     cluster = s.cluster
 
-    # Set default keyspace from given session's keyspace if not already set
-    from cassandra.cqlengine import models
-    if not models.DEFAULT_KEYSPACE and session.keyspace:
+    # Set default keyspace from given session's keyspace
+    if session.keyspace:
+        from cassandra.cqlengine import models
         models.DEFAULT_KEYSPACE = session.keyspace
 
-    _register_known_types(cluster)
+    _setup_session(session)
 
     log.debug("cqlengine connection initialized with %s", s)
 
@@ -138,9 +139,15 @@ def setup(
         raise
     if consistency is not None:
         session.default_consistency_level = consistency
-    session.row_factory = dict_factory
 
-    _register_known_types(cluster)
+    _setup_session(session)
+
+
+def _setup_session(session):
+    session.row_factory = dict_factory
+    enc = session.encoder
+    enc.mapping[tuple] = enc.cql_encode_tuple
+    _register_known_types(session.cluster)
 
 
 def execute(query, params=None, consistency_level=None, timeout=NOT_SET):
@@ -155,8 +162,7 @@ def execute(query, params=None, consistency_level=None, timeout=NOT_SET):
 
     elif isinstance(query, BaseCQLStatement):
         params = query.get_context()
-        query = str(query)
-        query = SimpleStatement(query, consistency_level=consistency_level)
+        query = SimpleStatement(str(query), consistency_level=consistency_level, fetch_size=query.fetch_size)
 
     elif isinstance(query, six.string_types):
         query = SimpleStatement(query, consistency_level=consistency_level)
@@ -183,18 +189,24 @@ def get_cluster():
 
 def handle_lazy_connect():
     global lazy_connect_args
-    if lazy_connect_args:
-        log.debug("lazy connect")
-        hosts, kwargs = lazy_connect_args
-        lazy_connect_args = None
-        setup(hosts, **kwargs)
+
+    # if lazy_connect_args is None, it means the cluster is setup and ready
+    # No need to acquire the lock
+    if not lazy_connect_args:
+        return
+
+    with lazy_connect_lock:
+        # lazy_connect_args might have been set to None by another thread while waiting the lock
+        # In this case, do nothing.
+        if lazy_connect_args:
+            log.debug("lazy connect")
+            hosts, kwargs = lazy_connect_args
+            setup(hosts, **kwargs)
+            lazy_connect_args = None
 
 
 def register_udt(keyspace, type_name, klass):
-    try:
-        udt_by_keyspace[keyspace][type_name] = klass
-    except KeyError:
-        udt_by_keyspace[keyspace] = {type_name: klass}
+    udt_by_keyspace[keyspace][type_name] = klass
 
     global cluster
     if cluster:
@@ -205,9 +217,10 @@ def register_udt(keyspace, type_name, klass):
 
 
 def _register_known_types(cluster):
+    from cassandra.cqlengine import models
     for ks_name, name_type_map in udt_by_keyspace.items():
         for type_name, klass in name_type_map.items():
             try:
-                cluster.register_user_type(ks_name, type_name, klass)
+                cluster.register_user_type(ks_name or models.DEFAULT_KEYSPACE, type_name, klass)
             except UserTypeDoesNotExist:
                 pass  # new types are covered in management sync functions

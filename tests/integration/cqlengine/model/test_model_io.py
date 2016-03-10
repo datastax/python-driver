@@ -41,6 +41,16 @@ class TestModel(Model):
     a_bool = columns.Boolean(default=False)
 
 
+class TestModelSave(Model):
+    partition = columns.UUID(primary_key=True, default=uuid4)
+    cluster = columns.Integer(primary_key=True)
+    count = columns.Integer(required=False)
+    text = columns.Text(required=False, index=True)
+    text_set = columns.Set(columns.Text, required=False)
+    text_list = columns.List(columns.Text, required=False)
+    text_map = columns.Map(columns.Text, columns.Text, required=False)
+
+
 class TestModelIO(BaseCassEngTestCase):
 
     @classmethod
@@ -310,13 +320,16 @@ class TestUpdating(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(TestUpdating, cls).setUpClass()
+        drop_table(TestModelSave)
         drop_table(TestMultiKeyModel)
+        sync_table(TestModelSave)
         sync_table(TestMultiKeyModel)
 
     @classmethod
     def tearDownClass(cls):
         super(TestUpdating, cls).tearDownClass()
         drop_table(TestMultiKeyModel)
+        drop_table(TestModelSave)
 
     def setUp(self):
         super(TestUpdating, self).setUp()
@@ -447,6 +460,60 @@ class TestUpdating(BaseCassEngTestCase):
         self.assertTrue(self.instance.get_changed_columns() == [])
         self.assertTrue(self.instance._values['count'].previous_value is None)
         self.assertTrue(self.instance.count is None)
+
+    def test_save_to_none(self):
+        """
+        Test update of column value of None with save() function.
+
+        Under specific scenarios calling save on a None value wouldn't update
+        previous values. This issue only manifests with a new instantiation of the model,
+        if existing model is modified and updated the issue will not occur.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-475
+        @expected_result column value should be updated to None
+
+        @test_category object_mapper
+        """
+
+        partition = uuid4()
+        cluster = 1
+        text = 'set'
+        text_list = ['set']
+        text_set = set(("set",))
+        text_map = {"set": 'set'}
+        initial = TestModelSave(partition=partition, cluster=cluster, text=text, text_list=text_list,
+                                text_set=text_set, text_map=text_map)
+        initial.save()
+        current = TestModelSave.objects.get(partition=partition, cluster=cluster)
+        self.assertEqual(current.text, text)
+        self.assertEqual(current.text_list, text_list)
+        self.assertEqual(current.text_set, text_set)
+        self.assertEqual(current.text_map, text_map)
+
+        next = TestModelSave(partition=partition, cluster=cluster, text=None, text_list=None,
+                            text_set=None, text_map=None)
+
+        next.save()
+        current = TestModelSave.objects.get(partition=partition, cluster=cluster)
+        self.assertEqual(current.text, None)
+        self.assertEqual(current.text_list, [])
+        self.assertEqual(current.text_set, set())
+        self.assertEqual(current.text_map, {})
+
+
+def test_none_filter_fails():
+    class NoneFilterModel(Model):
+
+        pk = columns.Integer(primary_key=True)
+        v = columns.Integer()
+    sync_table(NoneFilterModel)
+
+    try:
+        NoneFilterModel.objects(pk=None)
+        raise Exception("fail")
+    except CQLEngineException as e:
+        pass
 
 
 class TestCanUpdate(BaseCassEngTestCase):

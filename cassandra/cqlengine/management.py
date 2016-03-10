@@ -107,6 +107,18 @@ def drop_keyspace(name):
         execute("DROP KEYSPACE {0}".format(metadata.protect_name(name)))
 
 
+def _get_index_name_by_column(table, column_name):
+    """
+    Find the index name for a given table and column.
+    """
+    for _, index_metadata in six.iteritems(table.indexes):
+        options = dict(index_metadata.index_options)
+        if 'target' in options and options['target'] == column_name:
+            return index_metadata.name
+
+    return None
+
+
 def sync_table(model):
     """
     Inspects the model and creates / updates the corresponding table and columns.
@@ -190,11 +202,11 @@ def sync_table(model):
 
     # TODO: support multiple indexes in C* 3.0+
     for column in indexes:
-        index_name = 'index_{0}_{1}'.format(raw_cf_name, column.db_field_name)
-        if table.indexes.get(index_name):
+        index_name = _get_index_name_by_column(table, column.db_field_name)
+        if index_name:
             continue
 
-        qs = ['CREATE INDEX {0}'.format(index_name)]
+        qs = ['CREATE INDEX']
         qs += ['ON {0}'.format(cf_name)]
         qs += ['("{0}")'.format(column.db_field_name)]
         qs = ' '.join(qs)

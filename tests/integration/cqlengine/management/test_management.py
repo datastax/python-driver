@@ -17,9 +17,7 @@ except ImportError:
     import unittest  # noqa
 
 import mock
-import warnings
 
-from cassandra.cqlengine import CACHING_ALL, CACHING_NONE
 from cassandra.cqlengine.connection import get_session, get_cluster
 from cassandra.cqlengine import CQLEngineException
 from cassandra.cqlengine import management
@@ -27,7 +25,7 @@ from cassandra.cqlengine.management import _get_non_pk_field_names, _get_table_m
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine import columns
 
-from tests.integration import CASSANDRA_VERSION, PROTOCOL_VERSION
+from tests.integration import PROTOCOL_VERSION, greaterthancass20
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine.query.test_queryset import TestModel
 
@@ -235,6 +233,68 @@ class SyncTableTests(BaseCassEngTestCase):
         self.assertIn('SizeTieredCompactionStrategy', table_meta.as_cql_query())
 
 
+class IndexModel(Model):
+
+    __table_name__ = 'index_model'
+    first_key = columns.UUID(primary_key=True)
+    second_key = columns.Text(index=True)
+
+
+class IndexCaseSensitiveModel(Model):
+
+    __table_name__ = 'IndexModel'
+    __table_name_case_sensitive__ = True
+    first_key = columns.UUID(primary_key=True)
+    second_key = columns.Text(index=True)
+
+
+class IndexTests(BaseCassEngTestCase):
+
+    def setUp(self):
+        drop_table(IndexModel)
+        drop_table(IndexCaseSensitiveModel)
+
+    def test_sync_index(self):
+        """
+        Tests the default table creation, and ensures the table_name is created and surfaced correctly
+        in the table metadata
+
+        @since 3.1
+        @jira_ticket PYTHON-337
+        @expected_result table_name is lower case
+
+        @test_category object_mapper
+        """
+        sync_table(IndexModel)
+        table_meta = management._get_table_metadata(IndexModel)
+        self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'second_key'))
+
+        # index already exists
+        sync_table(IndexModel)
+        table_meta = management._get_table_metadata(IndexModel)
+        self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'second_key'))
+
+    def test_sync_index_case_sensitive(self):
+        """
+        Tests the default table creation, and ensures the table_name is created correctly and surfaced correctly
+        in table metadata
+
+        @since 3.1
+        @jira_ticket PYTHON-337
+        @expected_result table_name is lower case
+
+        @test_category object_mapper
+        """
+        sync_table(IndexCaseSensitiveModel)
+        table_meta = management._get_table_metadata(IndexCaseSensitiveModel)
+        self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'second_key'))
+
+        # index already exists
+        sync_table(IndexCaseSensitiveModel)
+        table_meta = management._get_table_metadata(IndexCaseSensitiveModel)
+        self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'second_key'))
+
+
 class NonModelFailureTest(BaseCassEngTestCase):
     class FakeModel(object):
         pass
@@ -242,6 +302,7 @@ class NonModelFailureTest(BaseCassEngTestCase):
     def test_failure(self):
         with self.assertRaises(CQLEngineException):
             sync_table(self.FakeModel)
+
 
 class StaticColumnTests(BaseCassEngTestCase):
     def test_static_columns(self):

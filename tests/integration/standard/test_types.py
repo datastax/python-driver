@@ -21,6 +21,7 @@ from datetime import datetime
 import math
 import six
 
+import cassandra
 from cassandra import InvalidRequest
 from cassandra.cluster import Cluster
 from cassandra.concurrent import execute_concurrent_with_args
@@ -97,6 +98,36 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         results = s.execute("SELECT * FROM blobbytes")[0]
         for expected, actual in zip(params, results):
             self.assertEqual(expected, actual)
+
+    @unittest.skipIf(not hasattr(cassandra, 'deserializers'), "Cython required for to test DesBytesTypeArray deserializer")
+    def test_des_bytes_type_array(self):
+        """
+        Simple test to ensure the DesBytesTypeByteArray deserializer functionally works
+
+        @since 3.1
+        @jira_ticket PYTHON-503
+        @expected_result byte array should be deserialized appropriately.
+
+        @test_category queries:custom_payload
+        """
+        original = None
+        try:
+
+            original = cassandra.deserializers.DesBytesType
+            cassandra.deserializers.DesBytesType = cassandra.deserializers.DesBytesTypeByteArray
+            s = self.session
+
+            s.execute("CREATE TABLE blobbytes2 (a ascii PRIMARY KEY, b blob)")
+
+            params = ['key1', bytearray(b'blob1')]
+            s.execute("INSERT INTO blobbytes2 (a, b) VALUES (%s, %s)", params)
+
+            results = s.execute("SELECT * FROM blobbytes2")[0]
+            for expected, actual in zip(params, results):
+                self.assertEqual(expected, actual)
+        finally:
+            if original is not None:
+                cassandra.deserializers.DesBytesType=original
 
     def test_can_insert_primitive_datatypes(self):
         """

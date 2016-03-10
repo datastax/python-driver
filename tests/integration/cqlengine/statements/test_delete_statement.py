@@ -60,3 +60,15 @@ class DeleteStatementTests(TestCase):
         ds = DeleteStatement('table', None)
         ds.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
         self.assertEqual(ds.get_context(), {'0': 'b'})
+
+    def test_range_deletion_rendering(self):
+        ds = DeleteStatement('table', None)
+        ds.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
+        ds.add_where_clause(WhereClause('created_at', GreaterThanOrEqualOperator(), '0'))
+        ds.add_where_clause(WhereClause('created_at', LessThanOrEqualOperator(), '10'))
+        self.assertEqual(six.text_type(ds), 'DELETE FROM table WHERE "a" = %(0)s AND "created_at" >= %(1)s AND "created_at" <= %(2)s', six.text_type(ds))
+
+        ds = DeleteStatement('table', None)
+        ds.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
+        ds.add_where_clause(WhereClause('created_at', InOperator(), ['0', '10', '20']))
+        self.assertEqual(six.text_type(ds), 'DELETE FROM table WHERE "a" = %(0)s AND "created_at" IN %(1)s', six.text_type(ds))

@@ -37,6 +37,7 @@ Retrieving objects with filters
             year = columns.Integer(primary_key=True)
             model = columns.Text()
             price = columns.Decimal()
+            options = columns.Set(columns.Text)
 
     ...and assuming the Automobile table contains a record of every car model manufactured in the last 20 years or so, we can retrieve only the cars made by a single manufacturer like this:
 
@@ -78,6 +79,10 @@ Accessing objects in a QuerySet
             q[0] #returns the first result
             q[1] #returns the second result
 
+        .. note::
+
+            * CQL does not support specifying a start position in it's queries. Therefore, accessing elements using array indexing will load every result up to the index value requested
+            * Using negative indices requires a "SELECT COUNT()" to be executed. This has a performance cost on large datasets.
 
     * list slicing
         .. code-block:: python
@@ -86,7 +91,10 @@ Accessing objects in a QuerySet
             q[1:] #returns all results except the first
             q[1:9] #returns a slice of the results
 
-        *Note: CQL does not support specifying a start position in it's queries. Therefore, accessing elements using array indexing / slicing will load every result up to the index value requested*
+        .. note::
+
+            * CQL does not support specifying a start position in it's queries. Therefore, accessing elements using array slicing will load every result up to the index value requested
+            * Using negative indices requires a "SELECT COUNT()" to be executed. This has a performance cost on large datasets.
 
     * calling :attr:`get() <query.QuerySet.get>` on the queryset
         .. code-block:: python
@@ -172,6 +180,16 @@ Filtering Operators
 
             q.filter(Automobile.year <= 2012)
 
+    :attr:`CONTAINS (__contains) <query.QueryOperator.ContainsOperator>`
+
+        The CONTAINS operator is available for all collection types (List, Set, Map).
+
+        .. code-block:: python
+
+            q = Automobile.objects.filter(manufacturer='Tesla')
+            q.filter(options__contains='backup camera').allow_filtering()
+
+        Note that we need to use allow_filtering() since the *options* column has no secondary index.
 
 TimeUUID Functions
 ==================
@@ -341,4 +359,3 @@ Named tables are a way of querying a table without creating an class.  They're u
         user.objects()[0]
 
         # {u'pk': 1, u't': datetime.datetime(2014, 6, 26, 17, 10, 31, 774000)}
-

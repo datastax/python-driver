@@ -46,6 +46,12 @@ cdef class DesBytesType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
         return to_bytes(buf)
 
+# this is to facilitate cqlsh integration, which requires bytearrays for BytesType
+# It is switched in by simply overwriting DesBytesType:
+# deserializers.DesBytesType = deserializers.DesBytesTypeByteArray
+cdef class DesBytesTypeByteArray(Deserializer):
+    cdef deserialize(self, Buffer *buf, int protocol_version):
+        return bytearray(buf.ptr[:buf.size])
 
 # TODO: Use libmpdec: http://www.bytereef.org/mpdecimal/index.html
 cdef class DesDecimalType(Deserializer):
