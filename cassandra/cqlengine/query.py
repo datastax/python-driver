@@ -664,12 +664,20 @@ class AbstractQuerySet(object):
             return self.filter(*args, **kwargs).get()
 
         self._execute_query()
-        if self.count() == 0:
+
+        # Check that the resultset only contains one element, avoiding sending a COUNT query
+        try:
+            self[1]
+            raise self.model.MultipleObjectsReturned('Multiple objects found')
+        except IndexError:
+            pass
+
+        try:
+            obj = self[0]
+        except IndexError:
             raise self.model.DoesNotExist
-        elif self.count() > 1:
-            raise self.model.MultipleObjectsReturned('{0} objects found'.format(self.count()))
-        else:
-            return self[0]
+
+        return obj
 
     def _get_ordering_condition(self, colname):
         order_type = 'DESC' if colname.startswith('-') else 'ASC'
