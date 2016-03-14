@@ -290,6 +290,7 @@ class AbstractQuerySet(object):
         self._result_cache = None
         self._result_idx = None
         self._result_generator = None
+        self._materialize_results = True
 
         self._distinct_fields = None
 
@@ -386,7 +387,7 @@ class AbstractQuerySet(object):
 
             # "DISTINCT COUNT()" is not supported in C* < 2.2, so we need to materialize all results to get
             # len() and count() working with DISTINCT queries
-            if self._distinct_fields:
+            if self._materialize_results or self._distinct_fields:
                 self._fill_result_cache()
 
     def _fill_result_cache(self):
