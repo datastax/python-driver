@@ -1,3 +1,12 @@
+3.1.1
+=====
+March 14, 2016
+
+Bug Fixes
+---------
+
+* cqlengine: Fix performance issue related to additional "COUNT" queries (PYTHON-522)
+
 3.1.0
 =====
 March 10, 2016
