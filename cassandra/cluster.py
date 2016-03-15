@@ -3391,7 +3391,7 @@ class ResultSet(object):
             raise RuntimeError("Cannot use %s when results have been iterated." % operator)
         if self.response_future.has_more_pages:
             log.warning("Using %s on paged results causes entire result set to be materialized.", operator)
-            self._fetch_all()
+        self._fetch_all()  # done regardless of paging status in case the row factory produces a generator
         self._list_mode = True
 
     def __eq__(self, other):
