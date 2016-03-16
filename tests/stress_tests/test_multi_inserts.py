@@ -19,7 +19,7 @@ except ImportError:
 
 import os
 from cassandra.cluster import Cluster
-from tests.integration import use_singledc, PROTOCOL_VERSION
+from tests.integration import use_singledc, PROTOCOL_VERSION, CONTACT_POINTS
 
 
 def setup_module():
@@ -38,7 +38,8 @@ class StressInsertsTests(unittest.TestCase):
         DROP TABLE IF EXISTS race;
         CREATE TABLE race (x int PRIMARY KEY);
         """
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         self.session = self.cluster.connect('test1rf')
 
         ddl1 = '''

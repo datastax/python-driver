@@ -18,7 +18,7 @@ import time
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.auth import PlainTextAuthProvider, SASLClient, SaslAuthProvider
 
-from tests.integration import use_singledc, get_cluster, remove_cluster, PROTOCOL_VERSION, notipv6
+from tests.integration import use_singledc, get_cluster, remove_cluster, PROTOCOL_VERSION, notipv6, CONTACT_POINTS
 from tests.integration.util import assert_quiescent_pool_state
 
 try:
@@ -38,7 +38,7 @@ def setup_module():
     ccm_cluster.set_configuration_options(config_options)
     log.debug("Starting ccm test cluster with %s", config_options)
     ccm_cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
-    # there seems to be some race, with some versions of C* taking longer to 
+    # there seems to be some race, with some versions of C* taking longer to
     # get the auth (and default user) setup. Sleep here to give it a chance
     time.sleep(10)
 
@@ -46,7 +46,7 @@ def setup_module():
 def teardown_module():
     remove_cluster()  # this test messes with config
 
-@notipv6
+
 class AuthenticationTests(unittest.TestCase):
     """
     Tests to cover basic authentication functionality
@@ -72,15 +72,15 @@ class AuthenticationTests(unittest.TestCase):
         return Cluster(protocol_version=PROTOCOL_VERSION,
                        idle_heartbeat_interval=0,
                        auth_provider=self.get_authentication_provider(username=usr, password=pwd),
-                       contact_points=['::1'])
+                       contact_points=CONTACT_POINTS)
 
+    # @notipv6
     def test_auth_connect(self):
         user = 'u'
         passwd = 'password'
 
         root_session = self.cluster_as('cassandra', 'cassandra').connect()
         root_session.execute('CREATE USER %s WITH PASSWORD %s', (user, passwd))
-
         try:
             cluster = self.cluster_as(user, passwd)
             session = cluster.connect()
@@ -126,13 +126,14 @@ class AuthenticationTests(unittest.TestCase):
         cluster.shutdown()
 
     def test_connect_no_auth_provider(self):
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION,
+                          contact_points=CONTACT_POINTS)
         self.assertRaisesRegexp(NoHostAvailable,
                                 '.*AuthenticationFailed.*Remote end requires authentication.*',
                                 cluster.connect)
         assert_quiescent_pool_state(self, cluster)
         cluster.shutdown()
-1
+
 
 class SaslAuthenticatorTests(AuthenticationTests):
     """

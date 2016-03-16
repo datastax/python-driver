@@ -18,7 +18,7 @@ from cassandra import ConsistencyLevel, AlreadyExists
 from cassandra.cluster import Cluster
 from cassandra.query import SimpleStatement
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass
+from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass, CONTACT_POINTS
 
 try:
     import unittest2 as unittest
@@ -36,7 +36,7 @@ class SchemaTests(unittest.TestCase):
 
     @classmethod
     def setup_class(cls):
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         cls.session = cls.cluster.connect()
 
     @classmethod
@@ -97,7 +97,7 @@ class SchemaTests(unittest.TestCase):
         Tests for any schema disagreements using the same keyspace multiple times
         """
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         session = cluster.connect()
 
         for i in range(30):

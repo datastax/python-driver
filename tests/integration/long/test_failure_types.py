@@ -20,7 +20,7 @@ from cassandra.cluster import Cluster
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.query import SimpleStatement
 from tests.integration import use_singledc, PROTOCOL_VERSION, get_cluster, setup_keyspace, remove_cluster, get_node, \
-    CONTACT_POINTS
+    CONTACT_POINTS, notipv6
 from mock import Mock
 
 try:
@@ -122,7 +122,7 @@ class ClientExceptionTests(unittest.TestCase):
         for node in failing_nodes:
             if node not in self.nodes_currently_failing:
                 node.stop(wait_other_notice=True, gently=False)
-                node.start(jvm_args=[" -Dcassandra.test.fail_writes_ks=" + keyspace], wait_for_binary_proto=True,
+                node.start(jvm_args=["  -Djava.net.preferIPv4Stack=false -Dcassandra.test.fail_writes_ks=" + keyspace], wait_for_binary_proto=True,
                            wait_other_notice=True)
                 self.nodes_currently_failing.append(node)
 
@@ -130,7 +130,7 @@ class ClientExceptionTests(unittest.TestCase):
         for node in self.nodes_currently_failing:
             if node not in failing_nodes:
                 node.stop(wait_other_notice=True, gently=False)
-                node.start(wait_for_binary_proto=True, wait_other_notice=True)
+                node.start(wait_for_binary_proto=True, wait_other_notice=True, jvm_args=[" -Djava.net.preferIPv4Stack=false"])
                 self.nodes_currently_failing.remove(node)
 
     def _perform_cql_statement(self, text, consistency_level, expected_exception):
@@ -333,7 +333,8 @@ class TimeoutTimerTest(unittest.TestCase):
         self.session.execute("DROP TABLE test3rf.timeout")
         self.cluster.shutdown()
 
-    def test_async_timeouts(self):
+    @notipv6
+    def testf_async_timeouts(self):
         """
         Test to validate that timeouts are honored
 

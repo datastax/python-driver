@@ -15,15 +15,19 @@
 from __future__ import print_function
 import logging
 import time
+import os
 
 from collections import defaultdict
 from ccmlib.node import Node
 
 from cassandra.query import named_tuple_factory
 
-from tests.integration import get_node, get_cluster, IP_FORMAT
+from tests.integration import get_node, get_cluster
 
-# IP_FORMAT = '127.0.0.%s'
+if os.environ.get('IP') == "IPV6":
+    IP_FORMAT = "::%s"
+else:
+    IP_FORMAT = '127.0.0.%s'
 
 log = logging.getLogger(__name__)
 
@@ -131,11 +135,6 @@ def wait_for_up(cluster, node, wait=True):
     tries = 0
     while tries < 100:
         host = cluster.metadata.get_host(IP_FORMAT % node)
-        while host is None:
-            cluster.control_connection.refresh_schema()
-            host = cluster.metadata.get_host(IP_FORMAT % node)
-            print("Not none")
-        # print(IP_FORMAT % node)
         if host and host.is_up:
             log.debug("Done waiting for node %s to be up", node)
             return
@@ -152,8 +151,6 @@ def wait_for_down(cluster, node, wait=True):
     tries = 0
     while tries < 100:
         host = cluster.metadata.get_host(IP_FORMAT % node)
-        print(host)
-        print(IP_FORMAT % node)
         if not host or not host.is_up:
             log.debug("Done waiting for node %s to be down", node)
             return

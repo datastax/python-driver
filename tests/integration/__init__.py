@@ -53,11 +53,9 @@ cql_version = None
 if os.environ.get('IP') == "IPV6":
     CONTACT_POINTS = ["::1"]
     IP_FORMAT = "::%d"
-    print "Yooooo"
 else:
     CONTACT_POINTS = ["127.0.0.1"]
     IP_FORMAT = "127.0.0.%d"
-    print "Noooo"
 
 
 def get_server_versions():
@@ -177,7 +175,6 @@ def check_socket_listening(itf, timeout=60):
             continue
     return False
 
-
 def get_cluster():
     return CCM_CLUSTER
 
@@ -286,8 +283,6 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[]):
             for node in CCM_CLUSTER.nodes.values():
                 wait_for_node_socket(node, 120)
 
-            setup_keyspace(ipformat=IP_FORMAT)
-
     except Exception:
         log.exception("Failed to start CCM cluster; removing cluster.")
 
@@ -302,6 +297,7 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[]):
 
 
 def teardown_package():
+    return
     if USE_CASS_EXTERNAL:
         return
     # when multiple modules are run explicitly, this runs between them

@@ -26,7 +26,8 @@ from cassandra.cluster import Cluster, UserTypeDoesNotExist
 from cassandra.query import dict_factory
 from cassandra.util import OrderedMap
 
-from tests.integration import get_server_versions, use_singledc, PROTOCOL_VERSION, execute_until_pass, BasicSegregatedKeyspaceUnitTestCase, greaterthancass20, CONTACT_POINTSc
+from tests.integration import get_server_versions, use_singledc, PROTOCOL_VERSION, execute_until_pass, \
+    BasicSegregatedKeyspaceUnitTestCase, greaterthancass20, CONTACT_POINTS, notipv6
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, COLLECTION_TYPES, \
     get_sample, get_collection_sample
 
@@ -50,6 +51,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         super(UDTTests, self).setUp()
         self.session.set_keyspace(self.keyspace_name)
 
+    # @notipv6
     def test_can_insert_unprepared_registered_udts(self):
         """
         Test the insertion of unprepared, registered UDTs
@@ -196,6 +198,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
 
         c.shutdown()
 
+    @notipv6
     def test_can_insert_prepared_registered_udts(self):
         """
         Test the insertion of prepared, registered UDTs
@@ -360,6 +363,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
             result = session.execute("SELECT v_{0} FROM mytable WHERE k=1".format(i))[0]
             self.assertEqual(udt, result["v_{0}".format(i)])
 
+    # @notipv6
     def test_can_insert_nested_registered_udts(self):
         """
         Test for ensuring nested registered udts are properly inserted
@@ -391,6 +395,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
 
         c.shutdown()
 
+    @notipv6
     def test_can_insert_nested_unregistered_udts(self):
         """
         Test for ensuring nested unregistered udts are properly inserted
@@ -430,6 +435,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
 
         c.shutdown()
 
+    @notipv6
     def test_can_insert_nested_registered_udts_with_different_namedtuples(self):
         """
         Test for ensuring nested udts are inserted correctly when the
@@ -591,6 +597,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         result = session.execute("SELECT %s FROM %s WHERE k=%%s" % (column_name, table_name), (0,))[0][0]
         self.assertEqual(result, value)
 
+    # @notipv6
     def test_can_insert_nested_collections(self):
         """
         Test for inserting various types of nested COLLECTION_TYPES into tables and UDTs

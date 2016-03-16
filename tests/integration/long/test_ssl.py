@@ -21,7 +21,7 @@ import os, sys, traceback, logging, ssl
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
-from tests.integration import use_singledc, PROTOCOL_VERSION, get_cluster, remove_cluster
+from tests.integration import use_singledc, PROTOCOL_VERSION, get_cluster, remove_cluster, CONTACT_POINTS
 
 log = logging.getLogger(__name__)
 
@@ -108,8 +108,10 @@ class SSLConnectionTests(unittest.TestCase):
             if tries > 5:
                 raise RuntimeError("Failed to connect to SSL cluster after 5 attempts")
             try:
-                cluster = Cluster(protocol_version=PROTOCOL_VERSION, ssl_options={'ca_certs': abs_path_ca_cert_path,
-                                                                                  'ssl_version': ssl.PROTOCOL_TLSv1})
+                cluster = Cluster(protocol_version=PROTOCOL_VERSION,
+                                  contact_points=CONTACT_POINTS,
+                                  ssl_options={'ca_certs': abs_path_ca_cert_path,
+                                               'ssl_version': ssl.PROTOCOL_TLSv1})
                 session = cluster.connect()
                 break
             except Exception:
@@ -164,10 +166,12 @@ class SSLConnectionAuthTests(unittest.TestCase):
             if tries > 5:
                 raise RuntimeError("Failed to connect to SSL cluster after 5 attempts")
             try:
-                cluster = Cluster(protocol_version=PROTOCOL_VERSION, ssl_options={'ca_certs': abs_path_ca_cert_path,
-                                                                                  'ssl_version': ssl.PROTOCOL_TLSv1,
-                                                                                  'keyfile': abs_driver_keyfile,
-                                                                                  'certfile': abs_driver_certfile})
+                cluster = Cluster(protocol_version=PROTOCOL_VERSION,
+                                  contact_points=CONTACT_POINTS,
+                                  ssl_options={'ca_certs': abs_path_ca_cert_path,
+                                               'ssl_version': ssl.PROTOCOL_TLSv1,
+                                               'keyfile': abs_driver_keyfile,
+                                                'certfile': abs_driver_certfile})
 
                 session = cluster.connect()
                 break
@@ -207,8 +211,11 @@ class SSLConnectionAuthTests(unittest.TestCase):
         """
 
         abs_path_ca_cert_path = os.path.abspath(CLIENT_CA_CERTS)
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION, ssl_options={'ca_certs': abs_path_ca_cert_path,
-                                                                          'ssl_version': ssl.PROTOCOL_TLSv1})
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION,
+                          contact_points=CONTACT_POINTS,
+                          ssl_options={'ca_certs': abs_path_ca_cert_path,
+                                       'ssl_version': ssl.PROTOCOL_TLSv1})
+
         # attempt to connect and expect an exception
 
         with self.assertRaises(NoHostAvailable) as context:
@@ -233,9 +240,12 @@ class SSLConnectionAuthTests(unittest.TestCase):
         abs_driver_keyfile = os.path.abspath(DRIVER_KEYFILE)
         abs_driver_certfile = os.path.abspath(DRIVER_CERTFILE_BAD)
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION, ssl_options={'ca_certs': abs_path_ca_cert_path,
-                                                                          'ssl_version': ssl.PROTOCOL_TLSv1,
-                                                                          'keyfile': abs_driver_keyfile,
-                                                                          'certfile': abs_driver_certfile})
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION,
+                          contact_points=CONTACT_POINTS,
+                          ssl_options={'ca_certs': abs_path_ca_cert_path,
+                                       'ssl_version': ssl.PROTOCOL_TLSv1,
+                                       'keyfile': abs_driver_keyfile,
+                                       'certfile': abs_driver_certfile})
+
         with self.assertRaises(NoHostAvailable) as context:
             cluster.connect()

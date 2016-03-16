@@ -27,6 +27,7 @@ from tests.integration.cqlengine.base import BaseCassEngTestCase
 
 class LoadTests(BaseCassEngTestCase):
 
+    @notipv6
     def test_lots_of_queries(self):
         import resource
         import objgraph

@@ -38,7 +38,7 @@ from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine.models import Model, ValidationError
 from cassandra import util
 
-from tests.integration import PROTOCOL_VERSION
+from tests.integration import PROTOCOL_VERSION, notipv6
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 
 
@@ -408,6 +408,7 @@ class TestInet(BaseCassEngTestCase):
 
         assert m.address == "192.168.1.1"
 
+    @notipv6
     def test_non_address_fails(self):
         # TODO: presently this only tests that the server blows it up. Is there supposed to be local validation?
         with self.assertRaises(InvalidRequest):

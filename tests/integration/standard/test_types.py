@@ -31,7 +31,7 @@ from cassandra.util import sortedset
 from tests.unit.cython.utils import cythontest
 
 from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass, notprotocolv1, \
-    BasicSharedKeyspaceUnitTestCase, greaterthancass20, lessthancass30, CONTACT_POINTS
+    BasicSharedKeyspaceUnitTestCase, greaterthancass20, lessthancass30, CONTACT_POINTS, notipv6
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, COLLECTION_TYPES, \
     get_sample, get_collection_sample
 
@@ -265,6 +265,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
 
         c.shutdown()
 
+    @notipv6
     def test_can_insert_empty_strings_and_nulls(self):
         """
         Test insertion of empty strings and null values
@@ -371,6 +372,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         for col in results:
             self.assertEqual(None, col)
 
+    @notipv6
     def test_can_insert_empty_values_for_int32(self):
         """
         Ensure Int32Type supports empty values
@@ -386,6 +388,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         finally:
             Int32Type.support_empty_values = False
 
+    @notipv6
     def test_timezone_aware_datetimes_are_timestamps(self):
         """
         Ensure timezone-aware datetimes are converted to timestamps correctly
@@ -673,6 +676,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
             self.assertEqual(created_tuple, result['v_%s' % i])
         c.shutdown()
 
+    @notipv6
     def test_can_insert_tuples_with_nulls(self):
         """
         Test tuples with null and empty string fields.
@@ -700,6 +704,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         self.assertEqual(('', None, None, b''), result[0].t)
         self.assertEqual(('', None, None, b''), s.execute(read)[0].t)
 
+    @notipv6
     def test_can_insert_unicode_query_string(self):
         """
         Test to ensure unicode strings can be used in a query
@@ -708,6 +713,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         s.execute(u"SELECT * FROM system.local WHERE key = 'ef\u2052ef'")
         s.execute(u"SELECT * FROM system.local WHERE key = %s", (u"fe\u2051fe",))
 
+    @notipv6
     def test_can_read_composite_type(self):
         """
         Test to ensure that CompositeTypes can be used in a query
@@ -732,6 +738,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         self.assertEqual(0, result.a)
         self.assertEqual(('abc',), result.b)
 
+    @notipv6
     @notprotocolv1
     def test_special_float_cql_encoding(self):
         """

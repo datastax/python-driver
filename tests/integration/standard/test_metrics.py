@@ -40,7 +40,7 @@ class MetricsTests(unittest.TestCase):
     def tearDown(self):
         self.cluster.shutdown()
 
-    @notipv6
+    # @notipv6
     def test_connection_error(self):
         """
         Trigger and ensure connection_errors are counted
@@ -67,7 +67,7 @@ class MetricsTests(unittest.TestCase):
 
         self.assertGreater(self.cluster.metrics.stats.connection_errors, 0)
 
-    @notipv6
+    # @notipv6
     def test_write_timeout(self):
         """
         Trigger and ensure write_timeouts are counted
@@ -96,7 +96,7 @@ class MetricsTests(unittest.TestCase):
         finally:
             get_node(1).resume()
 
-    @notipv6
+    # @notipv6
     def test_read_timeout(self):
         """
         Trigger and ensure read_timeouts are counted
@@ -127,7 +127,7 @@ class MetricsTests(unittest.TestCase):
             get_node(1).resume()
 
 
-    @notipv6
+    # @notipv6
     def test_unavailable(self):
         """
         Trigger and ensure unavailables are counted

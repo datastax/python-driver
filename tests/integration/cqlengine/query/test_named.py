@@ -284,8 +284,8 @@ class TestNamedWithMV(BasicSharedKeyspaceUnitTestCase):
         setup_connection(models.DEFAULT_KEYSPACE)
         super(TestNamedWithMV, cls).tearDownClass()
 
-    @greaterthanorequalcass30
     @notipv6
+    @greaterthanorequalcass30
     def test_named_table_with_mv(self):
         """
         Test NamedTable access to materialized views
