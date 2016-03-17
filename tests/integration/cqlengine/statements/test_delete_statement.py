@@ -13,9 +13,10 @@
 # limitations under the License.
 
 from unittest import TestCase
-from cassandra.cqlengine.statements import DeleteStatement, WhereClause, MapDeleteClause
+from cassandra.cqlengine.statements import DeleteStatement, WhereClause, MapDeleteClause, TransactionClause
 from cassandra.cqlengine.operators import *
 import six
+
 
 class DeleteStatementTests(TestCase):
 
@@ -49,7 +50,7 @@ class DeleteStatementTests(TestCase):
 
     def test_context_update(self):
         ds = DeleteStatement('table', None)
-        ds.add_field(MapDeleteClause('d', {1: 2}, {1:2, 3: 4}))
+        ds.add_field(MapDeleteClause('d', {1: 2}, {1: 2, 3: 4}))
         ds.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
 
         ds.update_context_id(7)
@@ -72,3 +73,13 @@ class DeleteStatementTests(TestCase):
         ds.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
         ds.add_where_clause(WhereClause('created_at', InOperator(), ['0', '10', '20']))
         self.assertEqual(six.text_type(ds), 'DELETE FROM table WHERE "a" = %(0)s AND "created_at" IN %(1)s', six.text_type(ds))
+
+    def test_delete_conditional(self):
+        where = [WhereClause('id', EqualsOperator(), 1)]
+        transactions = [TransactionClause('f0', 'value0'), TransactionClause('f1', 'value1')]
+        ds = DeleteStatement('table', where=where, transactions=transactions)
+        self.assertEqual(len(ds.transactions), len(transactions))
+        self.assertEqual(six.text_type(ds), 'DELETE FROM table WHERE "id" = %(0)s IF "f0" = %(1)s AND "f1" = %(2)s', six.text_type(ds))
+        fields = ['one', 'two']
+        ds = DeleteStatement('table', fields=fields, where=where, transactions=transactions)
+        self.assertEqual(six.text_type(ds), 'DELETE "one", "two" FROM table WHERE "id" = %(0)s IF "f0" = %(1)s AND "f1" = %(2)s', six.text_type(ds))
