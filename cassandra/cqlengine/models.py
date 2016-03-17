@@ -751,6 +751,7 @@ class BaseModel(object):
                           timestamp=self._timestamp,
                           consistency=self.__consistency__,
                           timeout=self._timeout,
+                          transaction=self._transaction,
                           if_exists=self._if_exists).delete()
 
     def get_changed_columns(self):

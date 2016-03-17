@@ -791,7 +791,7 @@ class UpdateStatement(AssignmentStatement):
 class DeleteStatement(BaseCQLStatement):
     """ a cql delete statement """
 
-    def __init__(self, table, fields=None, consistency=None, where=None, timestamp=None, if_exists=False):
+    def __init__(self, table, fields=None, consistency=None, where=None, timestamp=None, transactions=None, if_exists=False):
         super(DeleteStatement, self).__init__(
             table,
             consistency=consistency,
@@ -803,6 +803,11 @@ class DeleteStatement(BaseCQLStatement):
             fields = [fields]
         for field in fields or []:
             self.add_field(field)
+
+        self.transactions = []
+        for transaction in transactions or []:
+            self.add_transaction_clause(transaction)
+
         self.if_exists = if_exists
 
     def update_context_id(self, i):
@@ -815,6 +820,8 @@ class DeleteStatement(BaseCQLStatement):
         ctx = super(DeleteStatement, self).get_context()
         for field in self.fields:
             field.update_context(ctx)
+        for clause in self.transactions or []:
+            clause.update_context(ctx)
         return ctx
 
     def add_field(self, field):
@@ -825,6 +832,22 @@ class DeleteStatement(BaseCQLStatement):
         field.set_context_id(self.context_counter)
         self.context_counter += field.get_context_size()
         self.fields.append(field)
+
+    def add_transaction_clause(self, clause):
+        """
+        Adds a iff clause to this statement
+
+        :param clause: The clause that will be added to the iff statement
+        :type clause: TransactionClause
+        """
+        if not isinstance(clause, TransactionClause):
+            raise StatementException('only instances of AssignmentClause can be added to statements')
+        clause.set_context_id(self.context_counter)
+        self.context_counter += clause.get_context_size()
+        self.transactions.append(clause)
+
+    def _get_transactions(self):
+        return 'IF {0}'.format(' AND '.join([six.text_type(c) for c in self.transactions]))
 
     def __unicode__(self):
         qs = ['DELETE']
@@ -842,6 +865,9 @@ class DeleteStatement(BaseCQLStatement):
 
         if self.where_clauses:
             qs += [self._where]
+
+        if self.transactions:
+            qs += [self._get_transactions()]
 
         if self.if_exists:
             qs += ["IF EXISTS"]

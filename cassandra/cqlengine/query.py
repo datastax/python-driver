@@ -898,6 +898,7 @@ class AbstractQuerySet(object):
             self.column_family_name,
             where=self._where,
             timestamp=self._timestamp,
+            transactions=self._transaction,
             if_exists=self._if_exists
         )
         self._execute(dq)
@@ -1196,7 +1197,7 @@ class ModelQuerySet(AbstractQuerySet):
 
         if nulled_columns:
             ds = DeleteStatement(self.column_family_name, fields=nulled_columns,
-                                 where=self._where, if_exists=self._if_exists)
+                                 where=self._where, transactions=self._transaction, if_exists=self._if_exists)
             self._execute(ds)
 
 
@@ -1247,7 +1248,7 @@ class DMLQuery(object):
         """
         executes a delete query to remove columns that have changed to null
         """
-        ds = DeleteStatement(self.column_family_name, if_exists=self._if_exists)
+        ds = DeleteStatement(self.column_family_name, transactions=self._transaction, if_exists=self._if_exists)
         deleted_fields = False
         for _, v in self.instance._values.items():
             col = v.column
@@ -1324,7 +1325,7 @@ class DMLQuery(object):
                         col.to_database(val)
                     ))
 
-        if statement.get_context_size() > 0 or self.instance._has_counter:
+        if statement.assignments:
             for name, col in self.model._primary_keys.items():
                 # only include clustering key if clustering key is not null, and non static columns are changed to avoid cql error
                 if (null_clustering_key or static_changed_only) and (not col.partition_key):
@@ -1386,7 +1387,7 @@ class DMLQuery(object):
         if self.instance is None:
             raise CQLEngineException("DML Query instance attribute is None")
 
-        ds = DeleteStatement(self.column_family_name, timestamp=self._timestamp, if_exists=self._if_exists)
+        ds = DeleteStatement(self.column_family_name, timestamp=self._timestamp, transactions=self._transaction, if_exists=self._if_exists)
         for name, col in self.model._primary_keys.items():
             if (not col.partition_key) and (getattr(self.instance, name) is None):
                 continue
