@@ -134,3 +134,45 @@ class TestTransaction(BaseCassEngTestCase):
 
         updated = TestTransactionModel.objects(id=id).first()
         self.assertEqual(updated.text, 'something else')
+
+    def test_delete_transaction(self):
+        # DML path
+        t = TestTransactionModel.create(text='something', count=5)
+        self.assertEqual(TestTransactionModel.objects(id=t.id).count(), 1)
+        with self.assertRaises(LWTException):
+            t.iff(count=9999).delete()
+        self.assertEqual(TestTransactionModel.objects(id=t.id).count(), 1)
+        t.iff(count=5).delete()
+        self.assertEqual(TestTransactionModel.objects(id=t.id).count(), 0)
+
+        # QuerySet path
+        t = TestTransactionModel.create(text='something', count=5)
+        self.assertEqual(TestTransactionModel.objects(id=t.id).count(), 1)
+        with self.assertRaises(LWTException):
+            TestTransactionModel.objects(id=t.id).iff(count=9999).delete()
+        self.assertEqual(TestTransactionModel.objects(id=t.id).count(), 1)
+        TestTransactionModel.objects(id=t.id).iff(count=5).delete()
+        self.assertEqual(TestTransactionModel.objects(id=t.id).count(), 0)
+
+    def test_update_to_none(self):
+        # This test is done because updates to none are split into deletes
+        # for old versions of cassandra. Can be removed when we drop that code
+        # https://github.com/datastax/python-driver/blob/3.1.1/cassandra/cqlengine/query.py#L1197-L1200
+
+        # DML path
+        t = TestTransactionModel.create(text='something', count=5)
+        self.assertEqual(TestTransactionModel.objects(id=t.id).count(), 1)
+        with self.assertRaises(LWTException):
+            t.iff(count=9999).update(text=None)
+        self.assertIsNotNone(TestTransactionModel.objects(id=t.id).first().text)
+        t.iff(count=5).update(text=None)
+        self.assertIsNone(TestTransactionModel.objects(id=t.id).first().text)
+
+        # QuerySet path
+        t = TestTransactionModel.create(text='something', count=5)
+        self.assertEqual(TestTransactionModel.objects(id=t.id).count(), 1)
+        with self.assertRaises(LWTException):
+            TestTransactionModel.objects(id=t.id).iff(count=9999).update(text=None)
+        self.assertIsNotNone(TestTransactionModel.objects(id=t.id).first().text)
+        TestTransactionModel.objects(id=t.id).iff(count=5).update(text=None)
+        self.assertIsNone(TestTransactionModel.objects(id=t.id).first().text)
