@@ -24,33 +24,33 @@ from cassandra.cqlengine import columns
 from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.query import BatchQuery, LWTException
-from cassandra.cqlengine.statements import TransactionClause
+from cassandra.cqlengine.statements import ConditionalClause
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration import CASSANDRA_VERSION
 
 
-class TestTransactionModel(Model):
+class TestConditionalModel(Model):
     id = columns.UUID(primary_key=True, default=uuid4)
     count = columns.Integer()
     text = columns.Text(required=False)
 
 
-@unittest.skipUnless(CASSANDRA_VERSION >= '2.0.0', "transactions only supported on cassandra 2.0 or higher")
-class TestTransaction(BaseCassEngTestCase):
+@unittest.skipUnless(CASSANDRA_VERSION >= '2.0.0', "conditionals only supported on cassandra 2.0 or higher")
+class TestConditional(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(TestTransaction, cls).setUpClass()
-        sync_table(TestTransactionModel)
+        super(TestConditional, cls).setUpClass()
+        sync_table(TestConditionalModel)
 
     @classmethod
     def tearDownClass(cls):
-        super(TestTransaction, cls).tearDownClass()
-        drop_table(TestTransactionModel)
+        super(TestConditional, cls).tearDownClass()
+        drop_table(TestConditionalModel)
 
-    def test_update_using_transaction(self):
-        t = TestTransactionModel.create(text='blah blah')
+    def test_update_using_conditional(self):
+        t = TestConditionalModel.create(text='blah blah')
         t.text = 'new blah'
         with mock.patch.object(self.session, 'execute') as m:
             t.iff(text='blah blah').save()
@@ -58,18 +58,18 @@ class TestTransaction(BaseCassEngTestCase):
         args = m.call_args
         self.assertIn('IF "text" = %(0)s', args[0][0].query_string)
 
-    def test_update_transaction_success(self):
-        t = TestTransactionModel.create(text='blah blah', count=5)
+    def test_update_conditional_success(self):
+        t = TestConditionalModel.create(text='blah blah', count=5)
         id = t.id
         t.text = 'new blah'
         t.iff(text='blah blah').save()
 
-        updated = TestTransactionModel.objects(id=id).first()
+        updated = TestConditionalModel.objects(id=id).first()
         self.assertEqual(updated.count, 5)
         self.assertEqual(updated.text, 'new blah')
 
     def test_update_failure(self):
-        t = TestTransactionModel.create(text='blah blah')
+        t = TestConditionalModel.create(text='blah blah')
         t.text = 'new blah'
         t = t.iff(text='something wrong')
 
@@ -82,21 +82,21 @@ class TestTransaction(BaseCassEngTestCase):
         })
 
     def test_blind_update(self):
-        t = TestTransactionModel.create(text='blah blah')
+        t = TestConditionalModel.create(text='blah blah')
         t.text = 'something else'
         uid = t.id
 
         with mock.patch.object(self.session, 'execute') as m:
-            TestTransactionModel.objects(id=uid).iff(text='blah blah').update(text='oh hey der')
+            TestConditionalModel.objects(id=uid).iff(text='blah blah').update(text='oh hey der')
 
         args = m.call_args
         self.assertIn('IF "text" = %(1)s', args[0][0].query_string)
 
     def test_blind_update_fail(self):
-        t = TestTransactionModel.create(text='blah blah')
+        t = TestConditionalModel.create(text='blah blah')
         t.text = 'something else'
         uid = t.id
-        qs = TestTransactionModel.objects(id=uid).iff(text='Not dis!')
+        qs = TestConditionalModel.objects(id=uid).iff(text='Not dis!')
         with self.assertRaises(LWTException) as assertion:
             qs.update(text='this will never work')
 
@@ -105,20 +105,20 @@ class TestTransaction(BaseCassEngTestCase):
             '[applied]': False,
         })
 
-    def test_transaction_clause(self):
-        tc = TransactionClause('some_value', 23)
+    def test_conditional_clause(self):
+        tc = ConditionalClause('some_value', 23)
         tc.set_context_id(3)
 
         self.assertEqual('"some_value" = %(3)s', six.text_type(tc))
         self.assertEqual('"some_value" = %(3)s', str(tc))
 
-    def test_batch_update_transaction(self):
-        t = TestTransactionModel.create(text='something', count=5)
+    def test_batch_update_conditional(self):
+        t = TestConditionalModel.create(text='something', count=5)
         id = t.id
         with BatchQuery() as b:
             t.batch(b).iff(count=5).update(text='something else')
 
-        updated = TestTransactionModel.objects(id=id).first()
+        updated = TestConditionalModel.objects(id=id).first()
         self.assertEqual(updated.text, 'something else')
 
         b = BatchQuery()
@@ -132,27 +132,27 @@ class TestTransaction(BaseCassEngTestCase):
             '[applied]': False,
         })
 
-        updated = TestTransactionModel.objects(id=id).first()
+        updated = TestConditionalModel.objects(id=id).first()
         self.assertEqual(updated.text, 'something else')
 
-    def test_delete_transaction(self):
+    def test_delete_conditional(self):
         # DML path
-        t = TestTransactionModel.create(text='something', count=5)
-        self.assertEqual(TestTransactionModel.objects(id=t.id).count(), 1)
+        t = TestConditionalModel.create(text='something', count=5)
+        self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 1)
         with self.assertRaises(LWTException):
             t.iff(count=9999).delete()
-        self.assertEqual(TestTransactionModel.objects(id=t.id).count(), 1)
+        self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 1)
         t.iff(count=5).delete()
-        self.assertEqual(TestTransactionModel.objects(id=t.id).count(), 0)
+        self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 0)
 
         # QuerySet path
-        t = TestTransactionModel.create(text='something', count=5)
-        self.assertEqual(TestTransactionModel.objects(id=t.id).count(), 1)
+        t = TestConditionalModel.create(text='something', count=5)
+        self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 1)
         with self.assertRaises(LWTException):
-            TestTransactionModel.objects(id=t.id).iff(count=9999).delete()
-        self.assertEqual(TestTransactionModel.objects(id=t.id).count(), 1)
-        TestTransactionModel.objects(id=t.id).iff(count=5).delete()
-        self.assertEqual(TestTransactionModel.objects(id=t.id).count(), 0)
+            TestConditionalModel.objects(id=t.id).iff(count=9999).delete()
+        self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 1)
+        TestConditionalModel.objects(id=t.id).iff(count=5).delete()
+        self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 0)
 
     def test_update_to_none(self):
         # This test is done because updates to none are split into deletes
@@ -160,19 +160,19 @@ class TestTransaction(BaseCassEngTestCase):
         # https://github.com/datastax/python-driver/blob/3.1.1/cassandra/cqlengine/query.py#L1197-L1200
 
         # DML path
-        t = TestTransactionModel.create(text='something', count=5)
-        self.assertEqual(TestTransactionModel.objects(id=t.id).count(), 1)
+        t = TestConditionalModel.create(text='something', count=5)
+        self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 1)
         with self.assertRaises(LWTException):
             t.iff(count=9999).update(text=None)
-        self.assertIsNotNone(TestTransactionModel.objects(id=t.id).first().text)
+        self.assertIsNotNone(TestConditionalModel.objects(id=t.id).first().text)
         t.iff(count=5).update(text=None)
-        self.assertIsNone(TestTransactionModel.objects(id=t.id).first().text)
+        self.assertIsNone(TestConditionalModel.objects(id=t.id).first().text)
 
         # QuerySet path
-        t = TestTransactionModel.create(text='something', count=5)
-        self.assertEqual(TestTransactionModel.objects(id=t.id).count(), 1)
+        t = TestConditionalModel.create(text='something', count=5)
+        self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 1)
         with self.assertRaises(LWTException):
-            TestTransactionModel.objects(id=t.id).iff(count=9999).update(text=None)
-        self.assertIsNotNone(TestTransactionModel.objects(id=t.id).first().text)
-        TestTransactionModel.objects(id=t.id).iff(count=5).update(text=None)
-        self.assertIsNone(TestTransactionModel.objects(id=t.id).first().text)
+            TestConditionalModel.objects(id=t.id).iff(count=9999).update(text=None)
+        self.assertIsNotNone(TestConditionalModel.objects(id=t.id).first().text)
+        TestConditionalModel.objects(id=t.id).iff(count=5).update(text=None)
+        self.assertIsNone(TestConditionalModel.objects(id=t.id).first().text)

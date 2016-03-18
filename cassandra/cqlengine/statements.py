@@ -148,7 +148,7 @@ class AssignmentClause(BaseClause):
         return self.field, self.context_id
 
 
-class TransactionClause(BaseClause):
+class ConditionalClause(BaseClause):
     """ A single variable iff statement """
 
     def __unicode__(self):
@@ -471,7 +471,7 @@ class MapDeleteClause(BaseDeleteClause):
 class BaseCQLStatement(UnicodeMixin):
     """ The base cql statement class """
 
-    def __init__(self, table, consistency=None, timestamp=None, where=None, fetch_size=None, transactions=None):
+    def __init__(self, table, consistency=None, timestamp=None, where=None, fetch_size=None, conditionals=None):
         super(BaseCQLStatement, self).__init__()
         self.table = table
         self.consistency = consistency
@@ -484,9 +484,9 @@ class BaseCQLStatement(UnicodeMixin):
         for clause in where or []:
             self.add_where_clause(clause)
 
-        self.transactions = []
-        for transaction in transactions or []:
-            self.add_transaction_clause(transaction)
+        self.conditionals = []
+        for conditional in conditionals or []:
+            self.add_conditional_clause(conditional)
 
     def add_where_clause(self, clause):
         """
@@ -510,21 +510,21 @@ class BaseCQLStatement(UnicodeMixin):
             clause.update_context(ctx)
         return ctx
 
-    def add_transaction_clause(self, clause):
+    def add_conditional_clause(self, clause):
         """
         Adds a iff clause to this statement
 
         :param clause: The clause that will be added to the iff statement
-        :type clause: TransactionClause
+        :type clause: ConditionalClause
         """
-        if not isinstance(clause, TransactionClause):
+        if not isinstance(clause, ConditionalClause):
             raise StatementException('only instances of AssignmentClause can be added to statements')
         clause.set_context_id(self.context_counter)
         self.context_counter += clause.get_context_size()
-        self.transactions.append(clause)
+        self.conditionals.append(clause)
 
-    def _get_transactions(self):
-        return 'IF {0}'.format(' AND '.join([six.text_type(c) for c in self.transactions]))
+    def _get_conditionals(self):
+        return 'IF {0}'.format(' AND '.join([six.text_type(c) for c in self.conditionals]))
 
     def get_context_size(self):
         return len(self.get_context())
@@ -637,12 +637,12 @@ class AssignmentStatement(BaseCQLStatement):
                  where=None,
                  ttl=None,
                  timestamp=None,
-                 transactions=None):
+                 conditionals=None):
         super(AssignmentStatement, self).__init__(
             table,
             consistency=consistency,
             where=where,
-            transactions=transactions
+            conditionals=conditionals
         )
         self.ttl = ttl
         self.timestamp = timestamp
@@ -737,7 +737,7 @@ class UpdateStatement(AssignmentStatement):
                  where=None,
                  ttl=None,
                  timestamp=None,
-                 transactions=None,
+                 conditionals=None,
                  if_exists=False):
         super(UpdateStatement, self). __init__(table,
                                                assignments=assignments,
@@ -745,7 +745,7 @@ class UpdateStatement(AssignmentStatement):
                                                where=where,
                                                ttl=ttl,
                                                timestamp=timestamp,
-                                               transactions=transactions)
+                                               conditionals=conditionals)
 
         self.if_exists = if_exists
 
@@ -769,8 +769,8 @@ class UpdateStatement(AssignmentStatement):
         if self.where_clauses:
             qs += [self._where]
 
-        if len(self.transactions) > 0:
-            qs += [self._get_transactions()]
+        if len(self.conditionals) > 0:
+            qs += [self._get_conditionals()]
 
         if self.if_exists:
             qs += ["IF EXISTS"]
@@ -779,27 +779,27 @@ class UpdateStatement(AssignmentStatement):
 
     def get_context(self):
         ctx = super(UpdateStatement, self).get_context()
-        for clause in self.transactions or []:
+        for clause in self.conditionals:
             clause.update_context(ctx)
         return ctx
 
     def update_context_id(self, i):
         super(UpdateStatement, self).update_context_id(i)
-        for transaction in self.transactions:
-            transaction.set_context_id(self.context_counter)
-            self.context_counter += transaction.get_context_size()
+        for conditional in self.conditionals:
+            conditional.set_context_id(self.context_counter)
+            self.context_counter += conditional.get_context_size()
 
 
 class DeleteStatement(BaseCQLStatement):
     """ a cql delete statement """
 
-    def __init__(self, table, fields=None, consistency=None, where=None, timestamp=None, transactions=None, if_exists=False):
+    def __init__(self, table, fields=None, consistency=None, where=None, timestamp=None, conditionals=None, if_exists=False):
         super(DeleteStatement, self).__init__(
             table,
             consistency=consistency,
             where=where,
             timestamp=timestamp,
-            transactions=transactions
+            conditionals=conditionals
         )
         self.fields = []
         if isinstance(fields, six.string_types):
@@ -814,12 +814,15 @@ class DeleteStatement(BaseCQLStatement):
         for field in self.fields:
             field.set_context_id(self.context_counter)
             self.context_counter += field.get_context_size()
+        for t in self.conditionals:
+            t.set_context_id(self.context_counter)
+            self.context_counter += t.get_context_size()
 
     def get_context(self):
         ctx = super(DeleteStatement, self).get_context()
         for field in self.fields:
             field.update_context(ctx)
-        for clause in self.transactions or []:
+        for clause in self.conditionals:
             clause.update_context(ctx)
         return ctx
 
@@ -849,8 +852,8 @@ class DeleteStatement(BaseCQLStatement):
         if self.where_clauses:
             qs += [self._where]
 
-        if self.transactions:
-            qs += [self._get_transactions()]
+        if self.conditionals:
+            qs += [self._get_conditionals()]
 
         if self.if_exists:
             qs += ["IF EXISTS"]
