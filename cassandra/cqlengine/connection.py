@@ -13,9 +13,9 @@
 # limitations under the License.
 
 from collections import namedtuple, defaultdict
+from threading import local
 import logging
 import six
-import threading
 
 from cassandra.cluster import Cluster, _NOT_SET, NoHostAvailable, UserTypeDoesNotExist
 from cassandra.query import SimpleStatement, Statement, dict_factory
@@ -32,8 +32,8 @@ Host = namedtuple('Host', ['name', 'port'])
 
 cluster = None
 session = None
-lazy_connect_args = None
-lazy_connect_lock = threading.RLock()
+lazy_connect_args = local()
+lazy_connect_args.options = None
 
 
 # Because type models may be registered before a connection is present,
@@ -121,7 +121,7 @@ def setup(
         kwargs['consistency'] = consistency
         kwargs['lazy_connect'] = False
         kwargs['retry_connect'] = retry_connect
-        lazy_connect_args = (hosts, kwargs)
+        lazy_connect_args.options = (hosts, kwargs)
         return
 
     cluster = Cluster(hosts, **kwargs)
@@ -135,7 +135,7 @@ def setup(
             kwargs['consistency'] = consistency
             kwargs['lazy_connect'] = False
             kwargs['retry_connect'] = retry_connect
-            lazy_connect_args = (hosts, kwargs)
+            lazy_connect_args.options = (hosts, kwargs)
         raise
     if consistency is not None:
         session.default_consistency_level = consistency
@@ -189,20 +189,11 @@ def get_cluster():
 
 def handle_lazy_connect():
     global lazy_connect_args
-
-    # if lazy_connect_args is None, it means the cluster is setup and ready
-    # No need to acquire the lock
-    if not lazy_connect_args:
-        return
-
-    with lazy_connect_lock:
-        # lazy_connect_args might have been set to None by another thread while waiting the lock
-        # In this case, do nothing.
-        if lazy_connect_args:
-            log.debug("lazy connect")
-            hosts, kwargs = lazy_connect_args
-            setup(hosts, **kwargs)
-            lazy_connect_args = None
+    if lazy_connect_args.options:
+        log.debug("lazy connect")
+        hosts, kwargs = lazy_connect_args.options
+        lazy_connect_args.options = None
+        setup(hosts, **kwargs)
 
 
 def register_udt(keyspace, type_name, klass):
