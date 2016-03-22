@@ -588,21 +588,19 @@ class AbstractQuerySet(object):
         for arg, val in kwargs.items():
             col_name, col_op = self._parse_filter_arg(arg)
             quote_field = True
-            # resolve column and operator
-            try:
-                column = self.model._get_column(col_name)
-            except KeyError:
-                if col_name == 'pk__token':
-                    if not isinstance(val, Token):
-                        raise QueryException("Virtual column 'pk__token' may only be compared to Token() values")
-                    column = columns._PartitionKeysToken(self.model)
-                    quote_field = False
-                else:
-                    raise QueryException("Can't resolve column name: '{0}'".format(col_name))
 
-            if isinstance(val, Token):
+            if not isinstance(val, Token):
+                try:
+                    column = self.model._get_column(col_name)
+                except KeyError:
+                    raise QueryException("Can't resolve column name: '{0}'".format(col_name))
+            else:
                 if col_name != 'pk__token':
                     raise QueryException("Token() values may only be compared to the 'pk__token' virtual column")
+
+                column = columns._PartitionKeysToken(self.model)
+                quote_field = False
+
                 partition_columns = column.partition_columns
                 if len(partition_columns) != len(val.value):
                     raise QueryException(
@@ -941,13 +939,13 @@ class ModelQuerySet(AbstractQuerySet):
         # check that there's either a =, a IN or a CONTAINS (collection) relationship with a primary key or indexed field
         equal_ops = [self.model._get_column_by_db_name(w.field) for w in self._where if isinstance(w.operator, EqualsOperator)]
         token_comparison = any([w for w in self._where if isinstance(w.value, Token)])
-        if not any([w.primary_key or w.index for w in equal_ops]) and not token_comparison and not self._allow_filtering:
+        if not any(w.primary_key or w.index for w in equal_ops) and not token_comparison and not self._allow_filtering:
             raise QueryException(('Where clauses require either  =, a IN or a CONTAINS (collection) '
                                   'comparison with either a primary key or indexed field'))
 
         if not self._allow_filtering:
             # if the query is not on an indexed field
-            if not any([w.index for w in equal_ops]):
+            if not any(w.index for w in equal_ops):
                 if not any([w.partition_key for w in equal_ops]) and not token_comparison:
                     raise QueryException('Filtering on a clustering key without a partition key is not allowed unless allow_filtering() is called on the querset')
 
