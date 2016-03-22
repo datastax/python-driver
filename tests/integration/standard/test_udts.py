@@ -51,7 +51,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         super(UDTTests, self).setUp()
         self.session.set_keyspace(self.keyspace_name)
 
-    # @notipv6
+    @notipv6
     def test_can_insert_unprepared_registered_udts(self):
         """
         Test the insertion of unprepared, registered UDTs
@@ -249,6 +249,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
 
         c.shutdown()
 
+    @notipv6
     def test_can_insert_udts_with_nulls(self):
         """
         Test the insertion of UDTs with null and empty string fields
@@ -363,7 +364,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
             result = session.execute("SELECT v_{0} FROM mytable WHERE k=1".format(i))[0]
             self.assertEqual(udt, result["v_{0}".format(i)])
 
-    # @notipv6
+    @notipv6
     def test_can_insert_nested_registered_udts(self):
         """
         Test for ensuring nested registered udts are properly inserted
@@ -488,6 +489,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
 
         c.shutdown()
 
+    @notipv6
     def test_can_insert_udt_all_datatypes(self):
         """
         Test for inserting various types of PRIMITIVE_DATATYPES into UDT's
@@ -533,6 +535,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
 
         c.shutdown()
 
+    @notipv6
     def test_can_insert_udt_all_collection_datatypes(self):
         """
         Test for inserting various types of COLLECTION_TYPES into UDT's
@@ -597,7 +600,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         result = session.execute("SELECT %s FROM %s WHERE k=%%s" % (column_name, table_name), (0,))[0][0]
         self.assertEqual(result, value)
 
-    # @notipv6
+    @notipv6
     def test_can_insert_nested_collections(self):
         """
         Test for inserting various types of nested COLLECTION_TYPES into tables and UDTs

@@ -74,7 +74,7 @@ class AuthenticationTests(unittest.TestCase):
                        auth_provider=self.get_authentication_provider(username=usr, password=pwd),
                        contact_points=CONTACT_POINTS)
 
-    # @notipv6
+    @notipv6
     def test_auth_connect(self):
         user = 'u'
         passwd = 'password'
@@ -97,6 +97,7 @@ class AuthenticationTests(unittest.TestCase):
             root_session.execute('DROP USER %s', user)
             assert_quiescent_pool_state(self, root_session.cluster)
             root_session.cluster.shutdown()
+
 
     def test_connect_wrong_pwd(self):
         cluster = self.cluster_as('cassandra', 'wrong_pass')
