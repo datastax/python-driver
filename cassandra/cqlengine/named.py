@@ -12,7 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from cassandra.util import OrderedDict
+
 from cassandra.cqlengine import CQLEngineException
+from cassandra.cqlengine.columns import Column
+from cassandra.cqlengine.connection import get_cluster
 from cassandra.cqlengine.query import AbstractQueryableColumn, SimpleQuerySet
 from cassandra.cqlengine.query import DoesNotExist as _DoesNotExist
 from cassandra.cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
@@ -78,6 +82,8 @@ class NamedTable(object):
 
     objects = QuerySetDescriptor()
 
+    __partition_keys = None
+
     class DoesNotExist(_DoesNotExist):
         pass
 
@@ -87,6 +93,20 @@ class NamedTable(object):
     def __init__(self, keyspace, name):
         self.keyspace = keyspace
         self.name = name
+
+    @property
+    def _partition_keys(self):
+        if not self.__partition_keys:
+            self._get_partition_keys()
+        return self.__partition_keys
+
+    def _get_partition_keys(self):
+        try:
+            table_meta = get_cluster().metadata.keyspaces[self.keyspace].tables[self.name]
+            self.__partition_keys = OrderedDict((pk.name, Column(primary_key=True, partition_key=True, db_field=pk.name)) for pk in table_meta.partition_key)
+        except Exception as e:
+            raise CQLEngineException("Failed inspecting partition keys for {0}."
+                                     "Ensure cqlengine is connected before attempting this with NamedTable.".format(self.column_family_name()))
 
     def column(self, name):
         return NamedColumn(name)
