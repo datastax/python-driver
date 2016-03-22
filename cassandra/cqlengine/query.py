@@ -550,7 +550,6 @@ class AbstractQuerySet(object):
             clone._transaction.append(operator)
 
         for col_name, val in kwargs.items():
-            exists = False
             try:
                 column = self.model._get_column(col_name)
             except KeyError:
@@ -571,7 +570,7 @@ class AbstractQuerySet(object):
                             len(val.value), len(partition_columns)))
                 val.set_columns(partition_columns)
 
-            if isinstance(val, BaseQueryFunction) or exists is True:
+            if isinstance(val, BaseQueryFunction):
                 query_val = val
             else:
                 query_val = column.to_database(val)
