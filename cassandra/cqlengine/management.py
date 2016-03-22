@@ -176,6 +176,7 @@ def sync_table(model):
     else:
         log.debug("sync_table checking existing table %s", cf_name)
         # see if we're missing any columns
+        table_meta = tables[raw_cf_name]
         field_names = _get_non_pk_field_names(tables[raw_cf_name])
         model_fields = set()
         # # TODO: does this work with db_name??
@@ -184,6 +185,13 @@ def sync_table(model):
                 continue  # we can't mess with the PK
             model_fields.add(name)
             if col.db_field_name in field_names:
+                col_meta = table_meta.columns[col.db_field_name]
+
+                if col_meta.cql_type != col.db_type:
+                    msg = 'Existing table {0} has column "{1}" with a type ({2}) differing from the model type ({3}).' \
+                          ' Model should be updated.'.format(cf_name, col.db_field_name, col_meta.cql_type, col.db_type)
+                    warnings.warn(msg)
+                    log.warning(msg)
                 continue  # skip columns already defined
 
             # add missing column using the column def
@@ -259,12 +267,20 @@ def _sync_type(ks_name, type_model, omit_subtypes=None):
         cluster.refresh_user_type_metadata(ks_name, type_name)
         type_model.register_for_keyspace(ks_name)
     else:
-        defined_fields = defined_types[type_name].field_names
+        type_meta = defined_types[type_name]
+        defined_fields = type_meta.field_names
         model_fields = set()
         for field in type_model._fields.values():
             model_fields.add(field.db_field_name)
             if field.db_field_name not in defined_fields:
                 execute("ALTER TYPE {0} ADD {1}".format(type_name_qualified, field.get_column_def()))
+            else:
+                field_type = type_meta.field_types[defined_fields.index(field.db_field_name)]
+                if field_type != field.db_type:
+                    msg = 'Existing user type {0} has field "{1}" with a type ({2}) differing from the model user type ({3}).' \
+                          ' UserType should be updated.'.format(type_name_qualified, field.db_field_name, field_type, field.db_type)
+                    warnings.warn(msg)
+                    log.warning(msg)
 
         type_model.register_for_keyspace(ks_name)
 
