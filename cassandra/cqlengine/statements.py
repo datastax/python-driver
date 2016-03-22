@@ -364,17 +364,13 @@ class MapUpdateClause(ContainerUpdateClause):
         self._analyzed = True
 
     def get_context_size(self):
-        if not self._analyzed:
-            self._analyze()
-        if self.previous is None and not self._updates:
+        if self.is_assignment:
             return 1
         return len(self._updates or []) * 2
 
     def update_context(self, ctx):
-        if not self._analyzed:
-            self._analyze()
         ctx_id = self.context_id
-        if self.previous is None and not self._updates:
+        if self.is_assignment:
             ctx[str(ctx_id)] = {}
         else:
             for key in self._updates or []:
@@ -383,13 +379,17 @@ class MapUpdateClause(ContainerUpdateClause):
                 ctx[str(ctx_id + 1)] = self._column.value_col.to_database(val) if self._column else val
                 ctx_id += 2
 
-    def __unicode__(self):
+    @property
+    def is_assignment(self):
         if not self._analyzed:
             self._analyze()
+        return self.previous is None and not self._updates
+
+    def __unicode__(self):
         qs = []
 
         ctx_id = self.context_id
-        if self.previous is None and not self._updates:
+        if self.is_assignment:
             qs += ['"{0}" = %({1})s'.format(self.field, ctx_id)]
         else:
             for _ in self._updates or []:
