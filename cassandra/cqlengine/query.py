@@ -550,25 +550,13 @@ class AbstractQuerySet(object):
             clone._transaction.append(operator)
 
         for col_name, val in kwargs.items():
+            if isinstance(val, Token):
+                raise QueryException("Token() values are not valid in conditionals")
+
             try:
                 column = self.model._get_column(col_name)
             except KeyError:
-                if col_name == 'pk__token':
-                    if not isinstance(val, Token):
-                        raise QueryException("Virtual column 'pk__token' may only be compared to Token() values")
-                    column = columns._PartitionKeysToken(self.model)
-                else:
-                    raise QueryException("Can't resolve column name: '{0}'".format(col_name))
-
-            if isinstance(val, Token):
-                if col_name != 'pk__token':
-                    raise QueryException("Token() values may only be compared to the 'pk__token' virtual column")
-                partition_columns = column.partition_columns
-                if len(partition_columns) != len(val.value):
-                    raise QueryException(
-                        'Token() received {0} arguments but model has {1} partition keys'.format(
-                            len(val.value), len(partition_columns)))
-                val.set_columns(partition_columns)
+                raise QueryException("Can't resolve column name: '{0}'".format(col_name))
 
             if isinstance(val, BaseQueryFunction):
                 query_val = val
