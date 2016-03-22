@@ -28,7 +28,7 @@ from cassandra.cqlengine.statements import (WhereClause, SelectStatement, Delete
                                             UpdateStatement, AssignmentClause, InsertStatement,
                                             BaseCQLStatement, MapUpdateClause, MapDeleteClause,
                                             ListUpdateClause, SetUpdateClause, CounterUpdateClause,
-                                            TransactionClause)
+                                            ConditionalClause)
 
 
 class QueryException(CQLEngineException):
@@ -43,7 +43,7 @@ class IfExistsWithCounterColumn(CQLEngineException):
 
 
 class LWTException(CQLEngineException):
-    """Lightweight transaction exception.
+    """Lightweight conditional exception.
 
     This exception will be raised when a write using an `IF` clause could not be
     applied due to existing data violating the condition. The existing data is
@@ -146,7 +146,7 @@ class BatchQuery(object):
         :param batch_type: (optional) One of batch type values available through BatchType enum
         :type batch_type: str or None
         :param timestamp: (optional) A datetime or timedelta object with desired timestamp to be applied
-            to the batch transaction.
+            to the batch conditional.
         :type timestamp: datetime or timedelta or None
         :param consistency: (optional) One of consistency values ("ANY", "ONE", "QUORUM" etc)
         :type consistency: The :class:`.ConsistencyLevel` to be used for the batch query, or None.
@@ -267,8 +267,8 @@ class AbstractQuerySet(object):
         # Where clause filters
         self._where = []
 
-        # Transaction clause filters
-        self._transaction = []
+        # Conditional clause filters
+        self._conditional = []
 
         # ordering arguments
         self._order = []
@@ -314,7 +314,7 @@ class AbstractQuerySet(object):
             return self._batch.add_query(q)
         else:
             result = connection.execute(q, consistency_level=self._consistency, timeout=self._timeout)
-            if self._if_not_exists or self._if_exists or self._transaction:
+            if self._if_not_exists or self._if_exists or self._conditional:
                 check_applied(result)
             return result
 
@@ -545,9 +545,9 @@ class AbstractQuerySet(object):
 
         clone = copy.deepcopy(self)
         for operator in args:
-            if not isinstance(operator, TransactionClause):
+            if not isinstance(operator, ConditionalClause):
                 raise QueryException('{0} is not a valid query operator'.format(operator))
-            clone._transaction.append(operator)
+            clone._conditional.append(operator)
 
         for col_name, val in kwargs.items():
             exists = False
@@ -576,7 +576,7 @@ class AbstractQuerySet(object):
             else:
                 query_val = column.to_database(val)
 
-            clone._transaction.append(TransactionClause(col_name, query_val))
+            clone._conditional.append(ConditionalClause(col_name, query_val))
 
         return clone
 
@@ -898,6 +898,7 @@ class AbstractQuerySet(object):
             self.column_family_name,
             where=self._where,
             timestamp=self._timestamp,
+            conditionals=self._conditional,
             if_exists=self._if_exists
         )
         self._execute(dq)
@@ -1155,7 +1156,7 @@ class ModelQuerySet(AbstractQuerySet):
 
         nulled_columns = set()
         us = UpdateStatement(self.column_family_name, where=self._where, ttl=self._ttl,
-                             timestamp=self._timestamp, transactions=self._transaction, if_exists=self._if_exists)
+                             timestamp=self._timestamp, conditionals=self._conditional, if_exists=self._if_exists)
         for name, val in values.items():
             col_name, col_op = self._parse_filter_arg(name)
             col = self.model._columns.get(col_name)
@@ -1196,7 +1197,7 @@ class ModelQuerySet(AbstractQuerySet):
 
         if nulled_columns:
             ds = DeleteStatement(self.column_family_name, fields=nulled_columns,
-                                 where=self._where, if_exists=self._if_exists)
+                                 where=self._where, conditionals=self._conditional, if_exists=self._if_exists)
             self._execute(ds)
 
 
@@ -1215,7 +1216,7 @@ class DMLQuery(object):
     _if_exists = False
 
     def __init__(self, model, instance=None, batch=None, ttl=None, consistency=None, timestamp=None,
-                 if_not_exists=False, transaction=None, timeout=connection.NOT_SET, if_exists=False):
+                 if_not_exists=False, conditional=None, timeout=connection.NOT_SET, if_exists=False):
         self.model = model
         self.column_family_name = self.model.column_family_name()
         self.instance = instance
@@ -1225,7 +1226,7 @@ class DMLQuery(object):
         self._timestamp = timestamp
         self._if_not_exists = if_not_exists
         self._if_exists = if_exists
-        self._transaction = transaction
+        self._conditional = conditional
         self._timeout = timeout
 
     def _execute(self, q):
@@ -1233,7 +1234,7 @@ class DMLQuery(object):
             return self._batch.add_query(q)
         else:
             tmp = connection.execute(q, consistency_level=self._consistency, timeout=self._timeout)
-            if self._if_not_exists or self._if_exists or self._transaction:
+            if self._if_not_exists or self._if_exists or self._conditional:
                 check_applied(tmp)
             return tmp
 
@@ -1247,7 +1248,7 @@ class DMLQuery(object):
         """
         executes a delete query to remove columns that have changed to null
         """
-        ds = DeleteStatement(self.column_family_name, if_exists=self._if_exists)
+        ds = DeleteStatement(self.column_family_name, conditionals=self._conditional, if_exists=self._if_exists)
         deleted_fields = False
         for _, v in self.instance._values.items():
             col = v.column
@@ -1282,7 +1283,7 @@ class DMLQuery(object):
         null_clustering_key = False if len(self.instance._clustering_keys) == 0 else True
         static_changed_only = True
         statement = UpdateStatement(self.column_family_name, ttl=self._ttl, timestamp=self._timestamp,
-                                    transactions=self._transaction, if_exists=self._if_exists)
+                                    conditionals=self._conditional, if_exists=self._if_exists)
         for name, col in self.instance._clustering_keys.items():
             null_clustering_key = null_clustering_key and col._val_is_null(getattr(self.instance, name, None))
         # get defined fields and their column names
@@ -1324,7 +1325,7 @@ class DMLQuery(object):
                         col.to_database(val)
                     ))
 
-        if statement.get_context_size() > 0 or self.instance._has_counter:
+        if statement.assignments:
             for name, col in self.model._primary_keys.items():
                 # only include clustering key if clustering key is not null, and non static columns are changed to avoid cql error
                 if (null_clustering_key or static_changed_only) and (not col.partition_key):
@@ -1386,7 +1387,7 @@ class DMLQuery(object):
         if self.instance is None:
             raise CQLEngineException("DML Query instance attribute is None")
 
-        ds = DeleteStatement(self.column_family_name, timestamp=self._timestamp, if_exists=self._if_exists)
+        ds = DeleteStatement(self.column_family_name, timestamp=self._timestamp, conditionals=self._conditional, if_exists=self._if_exists)
         for name, col in self.model._primary_keys.items():
             if (not col.partition_key) and (getattr(self.instance, name) is None):
                 continue
