@@ -24,7 +24,7 @@ from cassandra import ConsistencyLevel, OperationTimedOut, WriteTimeout
 from cassandra.cluster import Cluster
 from cassandra.query import dict_factory
 from cassandra.query import SimpleStatement
-from tests.integration import use_singledc, PROTOCOL_VERSION, CONTACT_POINTS
+from tests.integration import use_singledc, PROTOCOL_VERSION, CONTACT_POINTS, notipv6
 from tests.integration.long.utils import create_schema
 
 try:
@@ -55,6 +55,7 @@ def create_column_name(i):
     return column_name
 
 
+# @notipv6
 class LargeDataTests(unittest.TestCase):
 
     def setUp(self):

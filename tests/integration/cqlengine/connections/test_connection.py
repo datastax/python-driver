@@ -24,7 +24,7 @@ from cassandra.cqlengine.management import sync_table
 from cassandra.cluster import Cluster
 from cassandra.query import dict_factory
 
-from tests.integration import PROTOCOL_VERSION, execute_with_long_wait_retry
+from tests.integration import PROTOCOL_VERSION, execute_with_long_wait_retry, CONTACT_POINTS, notipv6
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine import DEFAULT_KEYSPACE, setup_connection
 from cassandra.cqlengine import models
@@ -35,7 +35,7 @@ class TestConnectModel(Model):
     id = columns.Integer(primary_key=True)
     keyspace = columns.Text()
 
-
+@notipv6
 class ConnectionTest(BaseCassEngTestCase):
 
     @classmethod
@@ -44,7 +44,7 @@ class ConnectionTest(BaseCassEngTestCase):
         cls.keyspace1 = 'ctest1'
         cls.keyspace2 = 'ctest2'
         super(ConnectionTest, cls).setUpClass()
-        cls.setup_cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.setup_cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         cls.setup_session = cls.setup_cluster.connect()
         ddl = "CREATE KEYSPACE {0} WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': '{1}'}}".format(cls.keyspace1, 1)
         execute_with_long_wait_retry(cls.setup_session, ddl)
@@ -62,7 +62,7 @@ class ConnectionTest(BaseCassEngTestCase):
         models.DEFAULT_KEYSPACE
 
     def setUp(self):
-        self.c = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.c = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=CONTACT_POINTS)
         self.session1 = self.c.connect(keyspace=self.keyspace1)
         self.session1.row_factory = dict_factory
         self.session2 = self.c.connect(keyspace=self.keyspace2)

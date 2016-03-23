@@ -21,6 +21,7 @@ from cassandra.cqlengine.management import drop_table, sync_table, _get_table_me
 from cassandra.cqlengine.models import Model
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.integration import notipv6
 
 
 class LeveledCompactionTestTable(Model):
@@ -31,7 +32,7 @@ class LeveledCompactionTestTable(Model):
     user_id = columns.UUID(primary_key=True)
     name = columns.Text()
 
-
+@notipv6
 class AlterTableTest(BaseCassEngTestCase):
 
     def test_alter_is_called_table(self):
@@ -103,7 +104,7 @@ class AlterTableTest(BaseCassEngTestCase):
         table_meta = _get_table_metadata(AlterTable)
         self.assertRegexpMatches(table_meta.export_as_string(), ".*'sstable_size_in_mb': '128'.*")
 
-
+@notipv6
 class OptionsTest(BaseCassEngTestCase):
 
     def _verify_options(self, table_meta, expected_options):

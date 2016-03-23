@@ -25,11 +25,11 @@ from cassandra.cqlengine.management import _get_non_pk_field_names, _get_table_m
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine import columns
 
-from tests.integration import PROTOCOL_VERSION, greaterthancass20
+from tests.integration import PROTOCOL_VERSION, greaterthancass20, notipv6
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine.query.test_queryset import TestModel
 
-
+@notipv6
 class KeyspaceManagementTest(BaseCassEngTestCase):
     def test_create_drop_succeeeds(self):
         cluster = get_cluster()
@@ -50,7 +50,7 @@ class KeyspaceManagementTest(BaseCassEngTestCase):
         management.drop_keyspace(keyspace_nts)
         self.assertNotIn(keyspace_nts, cluster.metadata.keyspaces)
 
-
+@notipv6
 class DropTableTest(BaseCassEngTestCase):
 
     def test_multiple_deletes_dont_fail(self):
@@ -81,7 +81,7 @@ class PrimaryKeysOnlyModel(Model):
     first_ey = columns.Integer(primary_key=True)
     second_key = columns.Integer(primary_key=True)
 
-
+@notipv6
 class CapitalizedKeyTest(BaseCassEngTestCase):
 
     def test_table_definition(self):
@@ -129,7 +129,7 @@ class FourthModel(Model):
     # removed fourth key, but it should stay in the DB
     renamed = columns.Map(columns.Text, columns.Text, db_field='blah')
 
-
+@notipv6
 class AddColumnTest(BaseCassEngTestCase):
     def setUp(self):
         drop_table(FirstModel)
@@ -248,6 +248,7 @@ class IndexCaseSensitiveModel(Model):
     second_key = columns.Text(index=True)
 
 
+@notipv6
 class IndexTests(BaseCassEngTestCase):
 
     def setUp(self):
@@ -304,6 +305,7 @@ class NonModelFailureTest(BaseCassEngTestCase):
             sync_table(self.FakeModel)
 
 
+@notipv6
 class StaticColumnTests(BaseCassEngTestCase):
     def test_static_columns(self):
         if PROTOCOL_VERSION < 2:
