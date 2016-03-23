@@ -261,6 +261,9 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[]):
                 CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
                 if CASSANDRA_VERSION >= '3.0':
                     CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
+            if 'spark' in workloads:
+                config_options = {"initial_spark_worker_resources": 0.1}
+                CCM_CLUSTER.set_dse_configuration_options(config_options)
             common.switch_cluster(path, cluster_name)
             CCM_CLUSTER.populate(nodes, ipformat=ipformat)
     try:
