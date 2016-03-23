@@ -100,14 +100,12 @@ class MaxTimeUUID(TimeUUIDQueryFunction):
     format_string = 'MaxTimeUUID(%({0})s)'
 
 
-
 class Token(BaseQueryFunction):
     """
     compute the token for a given partition key
 
     http://cassandra.apache.org/doc/cql3/CQL.html#tokenFun
     """
-
     def __init__(self, *values):
         if len(values) == 1 and isinstance(values[0], (list, tuple)):
             values = values[0]

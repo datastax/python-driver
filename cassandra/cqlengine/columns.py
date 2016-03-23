@@ -881,12 +881,3 @@ class _PartitionKeysToken(Column):
     @property
     def db_field_name(self):
         return 'token({0})'.format(', '.join(['"{0}"'.format(c.db_field_name) for c in self.partition_columns]))
-
-    def to_database(self, value):
-        from cqlengine.functions import Token
-        assert isinstance(value, Token)
-        value.set_columns(self.partition_columns)
-        return value
-
-    def get_cql(self):
-        return "token({0})".format(", ".join(c.cql for c in self.partition_columns))
