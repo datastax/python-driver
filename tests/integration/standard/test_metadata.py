@@ -1749,8 +1749,6 @@ class AggregateMetadata(FunctionTest):
 
         c.shutdown()
 
-        time.sleep(5)
-
 
     def test_aggregates_after_functions(self):
         """
