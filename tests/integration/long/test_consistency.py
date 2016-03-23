@@ -18,7 +18,7 @@ from cassandra import ConsistencyLevel, OperationTimedOut, ReadTimeout, WriteTim
 from cassandra.cluster import Cluster
 from cassandra.policies import TokenAwarePolicy, RoundRobinPolicy, DowngradingConsistencyRetryPolicy
 from cassandra.query import SimpleStatement
-from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass, CONTACT_POINTS
+from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass, CONTACT_POINTS, notipv6
 
 from tests.integration.long.utils import (force_stop, create_schema, wait_for_down, wait_for_up,
                                           start, CoordinatorStats)
@@ -46,6 +46,7 @@ def setup_module():
     use_singledc()
 
 
+@notipv6
 class ConsistencyTests(unittest.TestCase):
 
     def setUp(self):

@@ -24,6 +24,7 @@ from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.query import BatchQuery
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.integration import notipv6
 
 class TestConsistencyModel(Model):
 
@@ -43,7 +44,7 @@ class BaseConsistencyTest(BaseCassEngTestCase):
         super(BaseConsistencyTest, cls).tearDownClass()
         drop_table(TestConsistencyModel)
 
-
+# @notipv6
 class TestConsistency(BaseConsistencyTest):
     def test_create_uses_consistency(self):
 

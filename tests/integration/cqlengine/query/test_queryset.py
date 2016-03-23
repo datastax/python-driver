@@ -105,6 +105,7 @@ class TestMultiClusteringModel(Model):
     three = columns.Integer(primary_key=True)
 
 
+# @notipv6
 class TestQuerySetOperation(BaseCassEngTestCase):
     def test_query_filter_parsing(self):
         """
@@ -297,7 +298,7 @@ class BaseQuerySetUsage(BaseCassEngTestCase):
         drop_table(IndexedTestModel)
         drop_table(TestMultiClusteringModel)
 
-
+# @notipv6
 class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
     def test_count(self):
         """ Tests that adding filtering statements affects the count query as expected """
@@ -439,7 +440,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         """
         """
 
-
+# @notipv6
 def test_non_quality_filtering():
     class NonEqualityFilteringModel(Model):
 
@@ -461,8 +462,6 @@ def test_non_quality_filtering():
     num = qA.count()
     assert num == 1, num
 
-
-<<<<<<< HEAD
 class TestQuerySetDistinct(BaseQuerySetUsage):
 
     def test_distinct_without_parameter(self):
@@ -494,9 +493,7 @@ class TestQuerySetDistinct(BaseQuerySetUsage):
         q = TestModel.objects.distinct(['test_id']).filter(test_id__in=[1, 2])
         self.assertEqual(q.count(), 2)
 
-
-=======
->>>>>>> b7efdfc... Partly added tests for annotations
+# @notipv6
 class TestQuerySetOrdering(BaseQuerySetUsage):
 
     def test_order_by_success_case(self):
@@ -543,7 +540,7 @@ class TestQuerySetOrdering(BaseQuerySetUsage):
         results = TestMultiClusteringModel.objects.filter(one=1, two=1).order_by('two').order_by('three')
         assert [r.three for r in results] == [1, 2, 3, 4, 5]
 
-
+# @notipv6
 class TestQuerySetSlicing(BaseQuerySetUsage):
     def test_out_of_range_index_raises_error(self):
         q = TestModel.objects(test_id=0).order_by('attempt_id')
@@ -591,7 +588,7 @@ class TestQuerySetSlicing(BaseQuerySetUsage):
         for model, expect in zip(q[-3:-1:2], expected_order[-3:-1:2]):
             self.assertEqual(model.attempt_id, expect)
 
-
+# @notipv6
 class TestQuerySetValidation(BaseQuerySetUsage):
     def test_primary_key_or_index_must_be_specified(self):
         """
@@ -636,6 +633,7 @@ class TestQuerySetValidation(BaseQuerySetUsage):
         self.assertEqual(q.count(), 0)
 
 
+@notipv6
 class TestQuerySetDelete(BaseQuerySetUsage):
     def test_delete(self):
         TestModel.objects.create(test_id=3, attempt_id=0, description='try9', expected_result=50, test_result=40)
@@ -690,6 +688,7 @@ class TimeUUIDQueryModel(Model):
     data = columns.Text(required=False)
 
 
+# @notipv6
 class TestMinMaxTimeUUIDFunctions(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
@@ -793,6 +792,7 @@ class TestMinMaxTimeUUIDFunctions(BaseCassEngTestCase):
         assert '4' in datas
 
 
+@notipv6
 class TestInOperator(BaseQuerySetUsage):
     def test_kwarg_success_case(self):
         """ Tests the in operator works with the kwarg query method """
@@ -803,7 +803,6 @@ class TestInOperator(BaseQuerySetUsage):
         """ Tests the in operator works with the query expression query method """
         q = TestModel.filter(TestModel.test_id.in_([0, 1]))
         assert q.count() == 8
-
 
 @greaterthancass20
 class TestContainsOperator(BaseQuerySetUsage):
@@ -867,7 +866,7 @@ class TestContainsOperator(BaseQuerySetUsage):
             q = IndexedCollectionsTestModel.filter(IndexedCollectionsTestModel.test_map_no_index.contains_(1))
             self.assertEqual(q.count(), 0)
 
-
+# @notipv6
 class TestValuesList(BaseQuerySetUsage):
     def test_values_list(self):
         q = TestModel.objects.filter(test_id=0, attempt_id=1)
@@ -878,6 +877,7 @@ class TestValuesList(BaseQuerySetUsage):
         assert item == 10
 
 
+# @notipv6
 class TestObjectsProperty(BaseQuerySetUsage):
     def test_objects_property_returns_fresh_queryset(self):
         assert TestModel.objects._result_cache is None
@@ -886,6 +886,7 @@ class TestObjectsProperty(BaseQuerySetUsage):
 
 
 class PageQueryTests(BaseCassEngTestCase):
+    @notipv6
     def test_paged_result_handling(self):
         if PROTOCOL_VERSION < 2:
             raise unittest.SkipTest("Paging requires native protocol 2+, currently using: {0}".format(PROTOCOL_VERSION))
@@ -906,6 +907,7 @@ class PageQueryTests(BaseCassEngTestCase):
         assert len(results) == 2
 
 
+# @notipv6
 class ModelQuerySetTimeoutTestCase(BaseQuerySetUsage):
     def test_default_timeout(self):
         with mock.patch.object(Session, 'execute') as mock_execute:
@@ -923,6 +925,7 @@ class ModelQuerySetTimeoutTestCase(BaseQuerySetUsage):
             self.assertEqual(mock_execute.call_args[-1]['timeout'], None)
 
 
+@notipv6
 class DMLQueryTimeoutTestCase(BaseQuerySetUsage):
     def setUp(self):
         self.model = TestModel(test_id=1, attempt_id=1, description='timeout test')

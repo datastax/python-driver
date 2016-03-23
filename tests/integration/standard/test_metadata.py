@@ -1950,6 +1950,7 @@ class BadMetaTest(unittest.TestCase):
             self.assertIs(m._exc_info[0], self.BadMetaException)
             self.assertIn("/*\nWarning:", m.export_as_string())
 
+    @notipv6
     def test_bad_user_function(self):
         self._skip_if_not_version((2, 2, 0))
         self.session.execute("""CREATE FUNCTION IF NOT EXISTS %s (key int, val int)
@@ -1962,6 +1963,7 @@ class BadMetaTest(unittest.TestCase):
             self.assertIs(m._exc_info[0], self.BadMetaException)
             self.assertIn("/*\nWarning:", m.export_as_string())
 
+    @notipv6
     def test_bad_user_aggregate(self):
         self._skip_if_not_version((2, 2, 0))
         self.session.execute("""CREATE FUNCTION IF NOT EXISTS sum_int (key int, val int)

@@ -549,6 +549,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         cluster.shutdown()
 
+    @notipv6
     def test_token_aware_with_local_table(self):
         use_singledc()
         cluster = Cluster(
@@ -565,7 +566,6 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         cluster.shutdown()
 
 
-    # BAD TEST! BAD!
     @notipv6
     def test_white_list(self):
         use_singledc()

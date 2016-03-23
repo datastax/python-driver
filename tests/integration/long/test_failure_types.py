@@ -149,6 +149,7 @@ class ClientExceptionTests(unittest.TestCase):
             with self.assertRaises(expected_exception):
                 self.execute_helper(self.session, statement)
 
+    @notipv6
     def test_write_failures_from_coordinator(self):
         """
         Test to validate that write failures from the coordinator are surfaced appropriately.
@@ -207,6 +208,7 @@ class ClientExceptionTests(unittest.TestCase):
             DROP KEYSPACE testksfail
             """, consistency_level=ConsistencyLevel.ANY, expected_exception=None)
 
+    @notipv6
     def test_tombstone_overflow_read_failure(self):
         """
         Test to validate that a ReadFailure is returned from the node when a specified threshold of tombstombs is
@@ -252,6 +254,7 @@ class ClientExceptionTests(unittest.TestCase):
             DROP TABLE test3rf.test2;
             """, consistency_level=ConsistencyLevel.ALL, expected_exception=None)
 
+    @notipv6
     def test_user_function_failure(self):
         """
         Test to validate that exceptions in user defined function are correctly surfaced by the driver to us.

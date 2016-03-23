@@ -20,6 +20,7 @@ from cassandra.cqlengine.management import drop_table, sync_table
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.query import BatchQuery
 from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.integration import notipv6
 
 from mock import patch
 
@@ -29,7 +30,7 @@ class TestMultiKeyModel(Model):
     count       = columns.Integer(required=False)
     text        = columns.Text(required=False)
 
-
+# @notipv6
 class BatchQueryTests(BaseCassEngTestCase):
 
     @classmethod
