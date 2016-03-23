@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-import time
+import calendar
 import datetime
+import time
 
 include '../../../cassandra/ioutils.pyx'
 
@@ -70,3 +70,39 @@ def test_datetype(assert_equal):
     # Large date overflow (PYTHON-452)
     expected = 2177403010.123
     assert_equal(deserialize(expected), datetime.datetime(2038, 12, 31, 10, 10, 10, 123000))
+
+
+def test_date_side_by_side(assert_equal):
+    # Test pure python and cython date deserialization side-by-side
+    # This is meant to detect inconsistent rounding or conversion (PYTHON-480 for example)
+    # The test covers the full range of time deserializable in Python. It bounds through
+    # the range in factors of two to cover floating point scale. At each bound it sweeps
+    # all combinations of fractional seconds to verify rounding
+
+    cdef BytesIOReader reader
+    cdef Buffer buf
+    cdef Deserializer cython_deserializer = find_deserializer(DateType)
+    import time
+
+    def verify_time(ms):
+        blob = DateType.serialize(ms, 0)
+        bior = BytesIOReader(blob)
+        buf.ptr = bior.read()
+        buf.size = bior.size
+        cython_deserialized = from_binary(cython_deserializer, &buf, 0)
+        python_deserialized = DateType.deserialize(blob, 0)
+        assert_equal(cython_deserialized, python_deserialized)
+
+    # min -> 0
+    x = int(calendar.timegm(datetime.datetime(1, 1, 1).utctimetuple()) * 1000)
+    while x < -1:  # for some reason -1 // 2 == -1 so we can't wait for zero
+        for y in range(1000):
+            verify_time(x + y)
+        x //= 2
+
+    # max -> 0
+    x = int(calendar.timegm(datetime.datetime(9999, 12, 31, 23, 59, 59, 999999).utctimetuple()) * 1000)
+    while x:
+        for ms in range(1000):
+            verify_time(x - ms)
+        x //= 2
