@@ -14,6 +14,7 @@
 
 import copy
 from datetime import datetime, timedelta
+from functools import partial
 import time
 import six
 from warnings import warn
@@ -281,6 +282,7 @@ class AbstractQuerySet(object):
 
         # see the defer and only methods
         self._defer_fields = []
+        self._deferred_values = {}
         self._only_fields = []
 
         self._values_list = False
@@ -383,7 +385,7 @@ class AbstractQuerySet(object):
         if self._result_cache is None:
             self._result_generator = (i for i in self._execute(self._select_query()))
             self._result_cache = []
-            self._construct_result = self._get_result_constructor()
+            self._construct_result = self._maybe_inject_deferred(self._get_result_constructor())
 
             # "DISTINCT COUNT()" is not supported in C* < 2.2, so we need to materialize all results to get
             # len() and count() working with DISTINCT queries
@@ -481,6 +483,15 @@ class AbstractQuerySet(object):
         Returns a function that will be used to instantiate query results
         """
         raise NotImplementedError
+
+    @staticmethod
+    def _construct_with_deferred(f, deferred, row):
+        row.update(deferred)
+        return f(row)
+
+    def _maybe_inject_deferred(self, constructor):
+        return partial(self._construct_with_deferred, constructor, self._deferred_values)\
+            if self._deferred_values else constructor
 
     def batch(self, batch_obj):
         """
@@ -624,6 +635,9 @@ class AbstractQuerySet(object):
                 query_val = val
             else:
                 query_val = column.to_database(val)
+                if not col_op:  # only equal values should be deferred
+                    clone._defer_fields.append(col_name)
+                    clone._deferred_values[column.db_field_name] = val  # map by db field name for substitution in results
 
             clone._where.append(WhereClause(column.db_field_name, operator, query_val, quote_field=quote_field))
 
