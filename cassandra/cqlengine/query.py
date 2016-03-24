@@ -832,9 +832,10 @@ class AbstractQuerySet(object):
         return clone
 
     def _only_or_defer(self, action, fields):
-        clone = copy.deepcopy(self)
-        if clone._defer_fields or clone._only_fields:
+        if self._defer_fields or self._only_fields:
             raise QueryException("QuerySet already has only or defer fields defined")
+
+        clone = copy.deepcopy(self)
 
         # check for strange fields
         missing_fields = [f for f in fields if f not in self.model._columns.keys()]
