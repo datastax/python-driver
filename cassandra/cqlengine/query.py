@@ -978,18 +978,12 @@ class ModelQuerySet(AbstractQuerySet):
     def _get_result_constructor(self):
         """ Returns a function that will be used to instantiate query results """
         if not self._values_list:  # we want models
-            return lambda rows: self.model._construct_instance(rows)
+            return self.model._construct_instance
         elif self._flat_values_list:  # the user has requested flattened list (1 value per row)
             key = self._only_fields[0]
             return lambda row: row[key]
         else:
-            return lambda row: self._get_row_value_list(self._only_fields, row)
-
-    def _get_row_value_list(self, fields, row):
-        result = []
-        for x in fields:
-            result.append(row[x])
-        return result
+            return lambda row: [row[f] for f in self._only_fields]
 
     def _get_ordering_condition(self, colname):
         colname, order_type = super(ModelQuerySet, self)._get_ordering_condition(colname)
