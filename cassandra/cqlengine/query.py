@@ -935,16 +935,14 @@ class ResultObject(dict):
 
 class SimpleQuerySet(AbstractQuerySet):
     """
-
+    Overrides _get_result_constructor for querysets that do not define a model (e.g. NamedTable queries)
     """
 
     def _get_result_constructor(self):
         """
         Returns a function that will be used to instantiate query results
         """
-        def _construct_instance(values):
-            return ResultObject(values)
-        return _construct_instance
+        return ResultObject
 
 
 class ModelQuerySet(AbstractQuerySet):
