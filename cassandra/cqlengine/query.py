@@ -980,7 +980,8 @@ class ModelQuerySet(AbstractQuerySet):
         if not self._values_list:  # we want models
             return lambda rows: self.model._construct_instance(rows)
         elif self._flat_values_list:  # the user has requested flattened list (1 value per row)
-            return lambda row: row.popitem()[1]
+            key = self._only_fields[0]
+            return lambda row: row[key]
         else:
             return lambda row: self._get_row_value_list(self._only_fields, row)
 
