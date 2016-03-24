@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from copy import deepcopy, copy
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import logging
 import six
 from uuid import UUID as _UUID
@@ -429,11 +429,27 @@ class DateTime(Column):
     """
     db_type = 'timestamp'
 
+    truncate_microseconds = False
+    """
+    Set this ``True`` to have model instances truncate the date, quantizing it in the same way it will be in the database.
+    This allows equality comparison between assigned values and values read back from the database::
+
+        DateTime.truncate_microseconds = True
+        assert Model.create(id=0, d=datetime.utcnow()) == Model.objects(id=0).first()
+
+    Defaults to ``False`` to preserve legacy behavior. May change in the future.
+    """
+
     def to_python(self, value):
         if value is None:
             return
         if isinstance(value, datetime):
-            return value
+            if DateTime.truncate_microseconds:
+                us = value.microsecond
+                truncated_us = us // 1000 * 1000
+                return value - timedelta(microseconds=us - truncated_us)
+            else:
+                return value
         elif isinstance(value, date):
             return datetime(*(value.timetuple()[:6]))
 

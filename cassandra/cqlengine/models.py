@@ -492,12 +492,7 @@ class BaseModel(object):
         if keys != other_keys:
             return False
 
-        # check that all of the attributes match
-        for key in other_keys:
-            if getattr(self, key, None) != getattr(other, key, None):
-                return False
-
-        return True
+        return all(getattr(self, key, None) == getattr(other, key, None) for key in other_keys)
 
     def __ne__(self, other):
         return not self.__eq__(other)
