@@ -281,7 +281,7 @@ class AbstractQuerySet(object):
         self._limit = 10000
 
         # see the defer and only methods
-        self._defer_fields = []
+        self._defer_fields = set()
         self._deferred_values = {}
         self._only_fields = []
 
@@ -636,7 +636,7 @@ class AbstractQuerySet(object):
             else:
                 query_val = column.to_database(val)
                 if not col_op:  # only equal values should be deferred
-                    clone._defer_fields.append(col_name)
+                    clone._defer_fields.add(col_name)
                     clone._deferred_values[column.db_field_name] = val  # map by db field name for substitution in results
 
             clone._where.append(WhereClause(column.db_field_name, operator, query_val, quote_field=quote_field))
@@ -846,8 +846,8 @@ class AbstractQuerySet(object):
         return clone
 
     def _only_or_defer(self, action, fields):
-        if self._defer_fields or self._only_fields:
-            raise QueryException("QuerySet already has only or defer fields defined")
+        if action == 'only' and self._only_fields:
+            raise QueryException("QuerySet already has 'only' fields defined")
 
         clone = copy.deepcopy(self)
 
@@ -859,7 +859,7 @@ class AbstractQuerySet(object):
                     ', '.join(missing_fields), self.model.__name__))
 
         if action == 'defer':
-            clone._defer_fields = fields
+            clone._defer_fields.update(fields)
         elif action == 'only':
             clone._only_fields = fields
         else:
