@@ -17,17 +17,19 @@ except ImportError:
     import unittest  # noqa
 
 import mock
-
+import logging
 from cassandra.cqlengine.connection import get_session, get_cluster
 from cassandra.cqlengine import CQLEngineException
 from cassandra.cqlengine import management
-from cassandra.cqlengine.management import _get_non_pk_field_names, _get_table_metadata, sync_table, drop_table
+from cassandra.cqlengine.management import _get_non_pk_field_names, _get_table_metadata, sync_table, drop_table, sync_type
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine import columns
 
-from tests.integration import PROTOCOL_VERSION, greaterthancass20
+from tests.integration import PROTOCOL_VERSION, greaterthancass20, MockLoggingHandler
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine.query.test_queryset import TestModel
+from cassandra.cqlengine.usertype import UserType
+from tests.integration.cqlengine import DEFAULT_KEYSPACE
 
 
 class KeyspaceManagementTest(BaseCassEngTestCase):
@@ -246,6 +248,62 @@ class IndexCaseSensitiveModel(Model):
     __table_name_case_sensitive__ = True
     first_key = columns.UUID(primary_key=True)
     second_key = columns.Text(index=True)
+
+
+class BaseInconsistent(Model):
+
+    __table_name__ = 'inconsistent'
+    first_key = columns.UUID(primary_key=True)
+    second_key = columns.Integer(index=True)
+    third_key = columns.Integer(index=True)
+
+
+class ChangedInconsistent(Model):
+
+    __table_name__ = 'inconsistent'
+    __table_name_case_sensitive__ = True
+    first_key = columns.UUID(primary_key=True)
+    second_key = columns.Text(index=True)
+
+
+class BaseInconsistentType(UserType):
+        __type_name__ = 'type_inconsistent'
+        age = columns.Integer()
+        name = columns.Text()
+
+
+class ChangedInconsistentType(UserType):
+        __type_name__ = 'type_inconsistent'
+        age = columns.Integer()
+        name = columns.Integer()
+
+
+class InconsistentTable(BaseCassEngTestCase):
+
+    def setUp(self):
+        drop_table(IndexModel)
+
+    def test_sync_warnings(self):
+        """
+        Test to insure when inconsistent changes are made to a table, or type as part of a sync call that the proper logging messages are surfaced
+
+        @since 3.2
+        @jira_ticket PYTHON-260
+        @expected_result warnings are logged
+
+        @test_category object_mapper
+        """
+        mock_handler = MockLoggingHandler()
+        logger = logging.getLogger(management.__name__)
+        logger.addHandler(mock_handler)
+        sync_table(BaseInconsistent)
+        sync_table(ChangedInconsistent)
+        self.assertTrue('differing from the model type' in mock_handler.messages.get('warning')[0])
+        sync_type(DEFAULT_KEYSPACE, BaseInconsistentType)
+        mock_handler.reset()
+        sync_type(DEFAULT_KEYSPACE, ChangedInconsistentType)
+        self.assertTrue('differing from the model user type' in mock_handler.messages.get('warning')[0])
+        logger.removeHandler(mock_handler)
 
 
 class IndexTests(BaseCassEngTestCase):
