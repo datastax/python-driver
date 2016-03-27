@@ -138,8 +138,11 @@ class Encoder(object):
     def cql_encode_object(self, val):
         """
         Default encoder for all objects that do not have a specific encoder function
-        registered. This function simply calls :meth:`str()` on the object.
+        registered. If this object has _asdict() defined (e.g. namedtuple), it will be called first.
+        Otherwise, this function simply calls :meth:`str()` on the object.
         """
+        if hasattr(val, '_asdict'):
+            return self.cql_encode_map_collection(val._asdict())
         return str(val)
 
     def cql_encode_float(self, val):
