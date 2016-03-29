@@ -169,7 +169,7 @@ class ContainerUpdateClause(AssignmentClause):
         self._column = column
 
     def _to_database(self, val):
-        return self._column.to_database(val) if self._column else val
+        return self._column.to_database(val)
 
     def _analyze(self):
         raise NotImplementedError
@@ -369,8 +369,8 @@ class MapUpdateClause(ContainerUpdateClause):
         else:
             for key in self._updates or []:
                 val = self.value.get(key)
-                ctx[str(ctx_id)] = self._column.key_col.to_database(key) if self._column else key
-                ctx[str(ctx_id + 1)] = self._column.value_col.to_database(val) if self._column else val
+                ctx[str(ctx_id)] = self._column.key_col.to_database(key)
+                ctx[str(ctx_id + 1)] = self._column.value_col.to_database(val)
                 ctx_id += 2
 
     @property
