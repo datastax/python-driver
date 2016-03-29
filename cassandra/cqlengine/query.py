@@ -14,6 +14,7 @@
 
 import copy
 from datetime import datetime, timedelta
+from functools import partial
 import time
 import six
 from warnings import warn
@@ -280,7 +281,8 @@ class AbstractQuerySet(object):
         self._limit = 10000
 
         # see the defer and only methods
-        self._defer_fields = []
+        self._defer_fields = set()
+        self._deferred_values = {}
         self._only_fields = []
 
         self._values_list = False
@@ -383,7 +385,7 @@ class AbstractQuerySet(object):
         if self._result_cache is None:
             self._result_generator = (i for i in self._execute(self._select_query()))
             self._result_cache = []
-            self._construct_result = self._get_result_constructor()
+            self._construct_result = self._maybe_inject_deferred(self._get_result_constructor())
 
             # "DISTINCT COUNT()" is not supported in C* < 2.2, so we need to materialize all results to get
             # len() and count() working with DISTINCT queries
@@ -481,6 +483,15 @@ class AbstractQuerySet(object):
         Returns a function that will be used to instantiate query results
         """
         raise NotImplementedError
+
+    @staticmethod
+    def _construct_with_deferred(f, deferred, row):
+        row.update(deferred)
+        return f(row)
+
+    def _maybe_inject_deferred(self, constructor):
+        return partial(self._construct_with_deferred, constructor, self._deferred_values)\
+            if self._deferred_values else constructor
 
     def batch(self, batch_obj):
         """
@@ -624,6 +635,9 @@ class AbstractQuerySet(object):
                 query_val = val
             else:
                 query_val = column.to_database(val)
+                if not col_op:  # only equal values should be deferred
+                    clone._defer_fields.add(col_name)
+                    clone._deferred_values[column.db_field_name] = val  # map by db field name for substitution in results
 
             clone._where.append(WhereClause(column.db_field_name, operator, query_val, quote_field=quote_field))
 
@@ -832,9 +846,10 @@ class AbstractQuerySet(object):
         return clone
 
     def _only_or_defer(self, action, fields):
+        if action == 'only' and self._only_fields:
+            raise QueryException("QuerySet already has 'only' fields defined")
+
         clone = copy.deepcopy(self)
-        if clone._defer_fields or clone._only_fields:
-            raise QueryException("QuerySet already has only or defer fields defined")
 
         # check for strange fields
         missing_fields = [f for f in fields if f not in self.model._columns.keys()]
@@ -844,7 +859,7 @@ class AbstractQuerySet(object):
                     ', '.join(missing_fields), self.model.__name__))
 
         if action == 'defer':
-            clone._defer_fields = fields
+            clone._defer_fields.update(fields)
         elif action == 'only':
             clone._only_fields = fields
         else:
@@ -920,16 +935,14 @@ class ResultObject(dict):
 
 class SimpleQuerySet(AbstractQuerySet):
     """
-
+    Overrides _get_result_constructor for querysets that do not define a model (e.g. NamedTable queries)
     """
 
     def _get_result_constructor(self):
         """
         Returns a function that will be used to instantiate query results
         """
-        def _construct_instance(values):
-            return ResultObject(values)
-        return _construct_instance
+        return ResultObject
 
 
 class ModelQuerySet(AbstractQuerySet):
@@ -963,17 +976,12 @@ class ModelQuerySet(AbstractQuerySet):
     def _get_result_constructor(self):
         """ Returns a function that will be used to instantiate query results """
         if not self._values_list:  # we want models
-            return lambda rows: self.model._construct_instance(rows)
+            return self.model._construct_instance
         elif self._flat_values_list:  # the user has requested flattened list (1 value per row)
-            return lambda row: row.popitem()[1]
+            key = self._only_fields[0]
+            return lambda row: row[key]
         else:
-            return lambda row: self._get_row_value_list(self._only_fields, row)
-
-    def _get_row_value_list(self, fields, row):
-        result = []
-        for x in fields:
-            result.append(row[x])
-        return result
+            return lambda row: [row[f] for f in self._only_fields]
 
     def _get_ordering_condition(self, colname):
         colname, order_type = super(ModelQuerySet, self)._get_ordering_condition(colname)
