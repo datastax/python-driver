@@ -1180,7 +1180,7 @@ class ModelQuerySet(AbstractQuerySet):
                     klass = MapUpdateClause
                 else:
                     raise RuntimeError
-                us.add_assignment_clause(klass(col.db_field_name, col.to_database(val), operation=col_op))
+                us.add_assignment_clause(klass(col, col.to_database(val), operation=col_op))
             else:
                 us.add_assignment_clause(AssignmentClause(
                     col.db_field_name, col.to_database(val)))
@@ -1308,8 +1308,8 @@ class DMLQuery(object):
                     else:
                         raise RuntimeError
 
-                    clause = klass(col.db_field_name, val,
-                                   previous=val_mgr.previous_value, column=col)
+                    clause = klass(col, val,
+                                   previous=val_mgr.previous_value)
                     if clause.get_context_size() > 0:
                         statement.add_assignment_clause(clause)
                 else:
