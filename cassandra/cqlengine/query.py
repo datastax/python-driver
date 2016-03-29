@@ -1180,10 +1180,10 @@ class ModelQuerySet(AbstractQuerySet):
                     klass = MapUpdateClause
                 else:
                     raise RuntimeError
-                us.add_assignment_clause(klass(col_name, col.to_database(val), operation=col_op))
+                us.add_assignment_clause(klass(col.db_field_name, col.to_database(val), operation=col_op))
             else:
                 us.add_assignment_clause(AssignmentClause(
-                    col_name, col.to_database(val)))
+                    col.db_field_name, col.to_database(val)))
 
         if us.assignments:
             self._execute(us)
