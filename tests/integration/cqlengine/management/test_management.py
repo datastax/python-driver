@@ -25,7 +25,7 @@ from cassandra.cqlengine.management import _get_non_pk_field_names, _get_table_m
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine import columns
 
-from tests.integration import PROTOCOL_VERSION, greaterthancass20, MockLoggingHandler
+from tests.integration import PROTOCOL_VERSION, greaterthancass20, MockLoggingHandler, CASSANDRA_VERSION
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine.query.test_queryset import TestModel
 from cassandra.cqlengine.usertype import UserType
@@ -299,10 +299,11 @@ class InconsistentTable(BaseCassEngTestCase):
         sync_table(BaseInconsistent)
         sync_table(ChangedInconsistent)
         self.assertTrue('differing from the model type' in mock_handler.messages.get('warning')[0])
-        sync_type(DEFAULT_KEYSPACE, BaseInconsistentType)
-        mock_handler.reset()
-        sync_type(DEFAULT_KEYSPACE, ChangedInconsistentType)
-        self.assertTrue('differing from the model user type' in mock_handler.messages.get('warning')[0])
+        if CASSANDRA_VERSION >= '2.1':
+            sync_type(DEFAULT_KEYSPACE, BaseInconsistentType)
+            mock_handler.reset()
+            sync_type(DEFAULT_KEYSPACE, ChangedInconsistentType)
+            self.assertTrue('differing from the model user type' in mock_handler.messages.get('warning')[0])
         logger.removeHandler(mock_handler)
 
 
