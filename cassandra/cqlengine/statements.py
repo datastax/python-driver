@@ -159,29 +159,25 @@ class ConditionalClause(BaseClause):
         return self.field, self.context_id
 
 
-class ContainerUpdateClauseMapMeta(type):
+class ContainerUpdateTypeMapMeta(type):
 
     def __init__(cls, name, bases, dct):
-        if not hasattr(cls, 'clause_map'):
-            cls.clause_map = {}
+        if not hasattr(cls, 'type_map'):
+            cls.type_map = {}
         else:
-            cls.clause_map[cls.col_type] = cls
-        super(ContainerUpdateClauseMapMeta, cls).__init__(name, bases, dct)
+            cls.type_map[cls.col_type] = cls
+        super(ContainerUpdateTypeMapMeta, cls).__init__(name, bases, dct)
 
 
-@six.add_metaclass(ContainerUpdateClauseMapMeta)
+@six.add_metaclass(ContainerUpdateTypeMapMeta)
 class ContainerUpdateClause(AssignmentClause):
 
-    def __init__(self, column, value, operation=None, previous=None):
-        super(ContainerUpdateClause, self).__init__(column.db_field_name, value)
+    def __init__(self, field, value, operation=None, previous=None):
+        super(ContainerUpdateClause, self).__init__(field, value)
         self.previous = previous
         self._assignments = None
         self._operation = operation
         self._analyzed = False
-        self._column = column
-
-    def _to_database(self, val):
-        return self._column.to_database(val)
 
     def _analyze(self):
         raise NotImplementedError
@@ -254,15 +250,15 @@ class SetUpdateClause(ContainerUpdateClause):
                 self._assignments is None and
                 self._additions is None and
                 self._removals is None):
-            ctx[str(ctx_id)] = self._to_database({})
+            ctx[str(ctx_id)] = set()
         if self._assignments is not None:
-            ctx[str(ctx_id)] = self._to_database(self._assignments)
+            ctx[str(ctx_id)] = self._assignments
             ctx_id += 1
         if self._additions is not None:
-            ctx[str(ctx_id)] = self._to_database(self._additions)
+            ctx[str(ctx_id)] = self._additions
             ctx_id += 1
         if self._removals is not None:
-            ctx[str(ctx_id)] = self._to_database(self._removals)
+            ctx[str(ctx_id)] = self._removals
 
 
 class ListUpdateClause(ContainerUpdateClause):
@@ -301,13 +297,13 @@ class ListUpdateClause(ContainerUpdateClause):
             self._analyze()
         ctx_id = self.context_id
         if self._assignments is not None:
-            ctx[str(ctx_id)] = self._to_database(self._assignments)
+            ctx[str(ctx_id)] = self._assignments
             ctx_id += 1
         if self._prepend is not None:
-            ctx[str(ctx_id)] = self._to_database(self._prepend)
+            ctx[str(ctx_id)] = self._prepend
             ctx_id += 1
         if self._append is not None:
-            ctx[str(ctx_id)] = self._to_database(self._append)
+            ctx[str(ctx_id)] = self._append
 
     def _analyze(self):
         """ works out the updates to be performed """
@@ -387,8 +383,8 @@ class MapUpdateClause(ContainerUpdateClause):
         else:
             for key in self._updates or []:
                 val = self.value.get(key)
-                ctx[str(ctx_id)] = self._column.key_col.to_database(key)
-                ctx[str(ctx_id + 1)] = self._column.value_col.to_database(val)
+                ctx[str(ctx_id)] = key
+                ctx[str(ctx_id + 1)] = val
                 ctx_id += 2
 
     @property
@@ -415,9 +411,9 @@ class CounterUpdateClause(AssignmentClause):
 
     col_type = columns.Counter
 
-    def __init__(self, column, value, previous=None):
-        super(CounterUpdateClause, self).__init__(column.db_field_name, column.to_database(value))
-        self.previous = column.to_database(previous) if previous else 0
+    def __init__(self, field, value, previous=None):
+        super(CounterUpdateClause, self).__init__(field, value)
+        self.previous = previous or 0
 
     def get_context_size(self):
         return 1
@@ -804,15 +800,17 @@ class UpdateStatement(AssignmentStatement):
             self.context_counter += conditional.get_context_size()
 
     def add_update(self, column, value, operation=None, previous=None):
+        value = column.to_database(value)
         col_type = type(column)
-        container_update_type = ContainerUpdateClause.clause_map.get(col_type)
+        container_update_type = ContainerUpdateClause.type_map.get(col_type)
         if container_update_type:
-            clause = container_update_type(column, value, operation, previous)
+            previous = column.to_database(previous)
+            clause = container_update_type(column.db_field_name, value, operation, previous)
         elif col_type == columns.Counter:
-            clause = CounterUpdateClause(column, value)
+            clause = CounterUpdateClause(column.db_field_name, value)
         else:
-            clause = AssignmentClause(column.db_field_name, column.to_database(value))
-        if clause.get_context_size(): # this is to exclude map removals from updates. Can go away if we drop support for C* < 1.2.4 and remove two-phase updates
+            clause = AssignmentClause(column.db_field_name, value)
+        if clause.get_context_size():  # this is to exclude map removals from updates. Can go away if we drop support for C* < 1.2.4 and remove two-phase updates
             self.add_assignment_clause(clause)
 
 

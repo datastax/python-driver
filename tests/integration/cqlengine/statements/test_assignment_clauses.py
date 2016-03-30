@@ -16,7 +16,6 @@ try:
 except ImportError:
     import unittest  # noqa
 
-from cassandra.cqlengine.columns import *
 from cassandra.cqlengine.statements import AssignmentClause, SetUpdateClause, ListUpdateClause, MapUpdateClause, MapDeleteClause, FieldDeleteClause, CounterUpdateClause
 
 
@@ -34,7 +33,7 @@ class AssignmentClauseTests(unittest.TestCase):
 class SetUpdateClauseTests(unittest.TestCase):
 
     def test_update_from_none(self):
-        c = SetUpdateClause(Set(Integer, db_field='s'), set((1, 2)), previous=None)
+        c = SetUpdateClause('s', set((1, 2)), previous=None)
         c._analyze()
         c.set_context_id(0)
 
@@ -51,7 +50,7 @@ class SetUpdateClauseTests(unittest.TestCase):
 
     def test_null_update(self):
         """ tests setting a set to None creates an empty update statement """
-        c = SetUpdateClause(Set(Integer, db_field='s'), None, previous=set((1, 2)))
+        c = SetUpdateClause('s', None, previous=set((1, 2)))
         c._analyze()
         c.set_context_id(0)
 
@@ -68,7 +67,7 @@ class SetUpdateClauseTests(unittest.TestCase):
 
     def test_no_update(self):
         """ tests an unchanged value creates an empty update statement """
-        c = SetUpdateClause(Set(Integer, db_field='s'), set((1, 2)), previous=set((1, 2)))
+        c = SetUpdateClause('s', set((1, 2)), previous=set((1, 2)))
         c._analyze()
         c.set_context_id(0)
 
@@ -86,7 +85,7 @@ class SetUpdateClauseTests(unittest.TestCase):
     def test_update_empty_set(self):
         """tests assigning a set to an empty set creates a nonempty
         update statement and nonzero context size."""
-        c = SetUpdateClause(column=Set(Integer, db_field='s'), value=set())
+        c = SetUpdateClause(field='s', value=set())
         c._analyze()
         c.set_context_id(0)
 
@@ -102,7 +101,7 @@ class SetUpdateClauseTests(unittest.TestCase):
         self.assertEqual(ctx, {'0': set()})
 
     def test_additions(self):
-        c = SetUpdateClause(Set(Integer, db_field='s'), set((1, 2, 3)), previous=set((1, 2)))
+        c = SetUpdateClause('s', set((1, 2, 3)), previous=set((1, 2)))
         c._analyze()
         c.set_context_id(0)
 
@@ -118,7 +117,7 @@ class SetUpdateClauseTests(unittest.TestCase):
         self.assertEqual(ctx, {'0': set((3,))})
 
     def test_removals(self):
-        c = SetUpdateClause(Set(Integer, db_field='s'), set((1, 2)), previous=set((1, 2, 3)))
+        c = SetUpdateClause('s', set((1, 2)), previous=set((1, 2, 3)))
         c._analyze()
         c.set_context_id(0)
 
@@ -134,7 +133,7 @@ class SetUpdateClauseTests(unittest.TestCase):
         self.assertEqual(ctx, {'0': set((3,))})
 
     def test_additions_and_removals(self):
-        c = SetUpdateClause(Set(Integer, db_field='s'), set((2, 3)), previous=set((1, 2)))
+        c = SetUpdateClause('s', set((2, 3)), previous=set((1, 2)))
         c._analyze()
         c.set_context_id(0)
 
@@ -153,7 +152,7 @@ class SetUpdateClauseTests(unittest.TestCase):
 class ListUpdateClauseTests(unittest.TestCase):
 
     def test_update_from_none(self):
-        c = ListUpdateClause(List(Integer, db_field='l'), [1, 2, 3])
+        c = ListUpdateClause('s', [1, 2, 3])
         c._analyze()
         c.set_context_id(0)
 
@@ -162,14 +161,14 @@ class ListUpdateClauseTests(unittest.TestCase):
         self.assertIsNone(c._prepend)
 
         self.assertEqual(c.get_context_size(), 1)
-        self.assertEqual(str(c), '"l" = %(0)s')
+        self.assertEqual(str(c), '"s" = %(0)s')
 
         ctx = {}
         c.update_context(ctx)
         self.assertEqual(ctx, {'0': [1, 2, 3]})
 
     def test_update_from_empty(self):
-        c = ListUpdateClause(List(Integer, db_field='l'), [1, 2, 3], previous=[])
+        c = ListUpdateClause('s', [1, 2, 3], previous=[])
         c._analyze()
         c.set_context_id(0)
 
@@ -178,14 +177,14 @@ class ListUpdateClauseTests(unittest.TestCase):
         self.assertIsNone(c._prepend)
 
         self.assertEqual(c.get_context_size(), 1)
-        self.assertEqual(str(c), '"l" = %(0)s')
+        self.assertEqual(str(c), '"s" = %(0)s')
 
         ctx = {}
         c.update_context(ctx)
         self.assertEqual(ctx, {'0': [1, 2, 3]})
 
     def test_update_from_different_list(self):
-        c = ListUpdateClause(List(Integer, db_field='l'), [1, 2, 3], previous=[3, 2, 1])
+        c = ListUpdateClause('s', [1, 2, 3], previous=[3, 2, 1])
         c._analyze()
         c.set_context_id(0)
 
@@ -194,14 +193,14 @@ class ListUpdateClauseTests(unittest.TestCase):
         self.assertIsNone(c._prepend)
 
         self.assertEqual(c.get_context_size(), 1)
-        self.assertEqual(str(c), '"l" = %(0)s')
+        self.assertEqual(str(c), '"s" = %(0)s')
 
         ctx = {}
         c.update_context(ctx)
         self.assertEqual(ctx, {'0': [1, 2, 3]})
 
     def test_append(self):
-        c = ListUpdateClause(List(Integer, db_field='l'), [1, 2, 3, 4], previous=[1, 2])
+        c = ListUpdateClause('s', [1, 2, 3, 4], previous=[1, 2])
         c._analyze()
         c.set_context_id(0)
 
@@ -210,14 +209,14 @@ class ListUpdateClauseTests(unittest.TestCase):
         self.assertIsNone(c._prepend)
 
         self.assertEqual(c.get_context_size(), 1)
-        self.assertEqual(str(c), '"l" = "l" + %(0)s')
+        self.assertEqual(str(c), '"s" = "s" + %(0)s')
 
         ctx = {}
         c.update_context(ctx)
         self.assertEqual(ctx, {'0': [3, 4]})
 
     def test_prepend(self):
-        c = ListUpdateClause(List(Integer, db_field='l'), [1, 2, 3, 4], previous=[3, 4])
+        c = ListUpdateClause('s', [1, 2, 3, 4], previous=[3, 4])
         c._analyze()
         c.set_context_id(0)
 
@@ -226,14 +225,14 @@ class ListUpdateClauseTests(unittest.TestCase):
         self.assertEqual(c._prepend, [1, 2])
 
         self.assertEqual(c.get_context_size(), 1)
-        self.assertEqual(str(c), '"l" = %(0)s + "l"')
+        self.assertEqual(str(c), '"s" = %(0)s + "s"')
 
         ctx = {}
         c.update_context(ctx)
         self.assertEqual(ctx, {'0': [1, 2]})
 
     def test_append_and_prepend(self):
-        c = ListUpdateClause(List(Integer, db_field='l'), [1, 2, 3, 4, 5, 6], previous=[3, 4])
+        c = ListUpdateClause('s', [1, 2, 3, 4, 5, 6], previous=[3, 4])
         c._analyze()
         c.set_context_id(0)
 
@@ -242,7 +241,7 @@ class ListUpdateClauseTests(unittest.TestCase):
         self.assertEqual(c._prepend, [1, 2])
 
         self.assertEqual(c.get_context_size(), 2)
-        self.assertEqual(str(c), '"l" = %(0)s + "l", "l" = "l" + %(1)s')
+        self.assertEqual(str(c), '"s" = %(0)s + "s", "s" = "s" + %(1)s')
 
         ctx = {}
         c.update_context(ctx)
@@ -250,7 +249,7 @@ class ListUpdateClauseTests(unittest.TestCase):
 
     def test_shrinking_list_update(self):
         """ tests that updating to a smaller list results in an insert statement """
-        c = ListUpdateClause(List(Integer, db_field='l'), [1, 2, 3], previous=[1, 2, 3, 4])
+        c = ListUpdateClause('s', [1, 2, 3], previous=[1, 2, 3, 4])
         c._analyze()
         c.set_context_id(0)
 
@@ -259,7 +258,7 @@ class ListUpdateClauseTests(unittest.TestCase):
         self.assertIsNone(c._prepend)
 
         self.assertEqual(c.get_context_size(), 1)
-        self.assertEqual(str(c), '"l" = %(0)s')
+        self.assertEqual(str(c), '"s" = %(0)s')
 
         ctx = {}
         c.update_context(ctx)
@@ -269,33 +268,33 @@ class ListUpdateClauseTests(unittest.TestCase):
 class MapUpdateTests(unittest.TestCase):
 
     def test_update(self):
-        c = MapUpdateClause(Map(Integer, Integer, db_field='m'), {3: 0, 5: 6}, previous={5: 0, 3: 4})
+        c = MapUpdateClause('s', {3: 0, 5: 6}, previous={5: 0, 3: 4})
         c._analyze()
         c.set_context_id(0)
 
         self.assertEqual(c._updates, [3, 5])
         self.assertEqual(c.get_context_size(), 4)
-        self.assertEqual(str(c), '"m"[%(0)s] = %(1)s, "m"[%(2)s] = %(3)s')
+        self.assertEqual(str(c), '"s"[%(0)s] = %(1)s, "s"[%(2)s] = %(3)s')
 
         ctx = {}
         c.update_context(ctx)
         self.assertEqual(ctx, {'0': 3, "1": 0, '2': 5, '3': 6})
 
     def test_update_from_null(self):
-        c = MapUpdateClause(Map(Integer, Integer, db_field='m'), {3: 0, 5: 6})
+        c = MapUpdateClause('s', {3: 0, 5: 6})
         c._analyze()
         c.set_context_id(0)
 
         self.assertEqual(c._updates, [3, 5])
         self.assertEqual(c.get_context_size(), 4)
-        self.assertEqual(str(c), '"m"[%(0)s] = %(1)s, "m"[%(2)s] = %(3)s')
+        self.assertEqual(str(c), '"s"[%(0)s] = %(1)s, "s"[%(2)s] = %(3)s')
 
         ctx = {}
         c.update_context(ctx)
         self.assertEqual(ctx, {'0': 3, "1": 0, '2': 5, '3': 6})
 
     def test_nulled_columns_arent_included(self):
-        c = MapUpdateClause(Map(Integer, Integer, db_field='m'), {3: 0}, {1: 2, 3: 4})
+        c = MapUpdateClause('s', {3: 0}, {1: 2, 3: 4})
         c._analyze()
         c.set_context_id(0)
 
@@ -305,7 +304,7 @@ class MapUpdateTests(unittest.TestCase):
 class CounterUpdateTests(unittest.TestCase):
 
     def test_positive_update(self):
-        c = CounterUpdateClause(Counter(db_field='a'), 5, 3)
+        c = CounterUpdateClause('a', 5, 3)
         c.set_context_id(5)
 
         self.assertEqual(c.get_context_size(), 1)
@@ -316,7 +315,7 @@ class CounterUpdateTests(unittest.TestCase):
         self.assertEqual(ctx, {'5': 2})
 
     def test_negative_update(self):
-        c = CounterUpdateClause(Counter(db_field='a'), 4, 7)
+        c = CounterUpdateClause('a', 4, 7)
         c.set_context_id(3)
 
         self.assertEqual(c.get_context_size(), 1)
@@ -327,7 +326,7 @@ class CounterUpdateTests(unittest.TestCase):
         self.assertEqual(ctx, {'3': 3})
 
     def noop_update(self):
-        c = CounterUpdateClause(Counter(db_field='a'), 5, 5)
+        c = CounterUpdateClause('a', 5, 5)
         c.set_context_id(5)
 
         self.assertEqual(c.get_context_size(), 1)

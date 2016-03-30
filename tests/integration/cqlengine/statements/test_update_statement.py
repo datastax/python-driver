@@ -16,7 +16,6 @@ try:
 except ImportError:
     import unittest  # noqa
 
-from cassandra.cqlengine.columns import *
 from cassandra.cqlengine.operators import *
 from cassandra.cqlengine.statements import (UpdateStatement, WhereClause,
                                   AssignmentClause, SetUpdateClause,
@@ -63,25 +62,25 @@ class UpdateStatementTests(unittest.TestCase):
 
     def test_update_set_add(self):
         us = UpdateStatement('table')
-        us.add_assignment_clause(SetUpdateClause(Set(Integer, db_field='a'), set((1,)), operation='add'))
+        us.add_assignment_clause(SetUpdateClause('a', set((1,)), operation='add'))
         self.assertEqual(six.text_type(us), 'UPDATE table SET "a" = "a" + %(0)s')
 
     def test_update_empty_set_add_does_not_assign(self):
         us = UpdateStatement('table')
-        us.add_assignment_clause(SetUpdateClause(Set(Integer, db_field='a'), set(), operation='add'))
+        us.add_assignment_clause(SetUpdateClause('a', set(), operation='add'))
         self.assertEqual(six.text_type(us), 'UPDATE table SET "a" = "a" + %(0)s')
 
     def test_update_empty_set_removal_does_not_assign(self):
         us = UpdateStatement('table')
-        us.add_assignment_clause(SetUpdateClause(Set(Integer, db_field='a'), set(), operation='remove'))
+        us.add_assignment_clause(SetUpdateClause('a', set(), operation='remove'))
         self.assertEqual(six.text_type(us), 'UPDATE table SET "a" = "a" - %(0)s')
 
     def test_update_list_prepend_with_empty_list(self):
         us = UpdateStatement('table')
-        us.add_assignment_clause(ListUpdateClause(List(Integer, db_field='a'), [], operation='prepend'))
+        us.add_assignment_clause(ListUpdateClause('a', [], operation='prepend'))
         self.assertEqual(six.text_type(us), 'UPDATE table SET "a" = %(0)s + "a"')
 
     def test_update_list_append_with_empty_list(self):
         us = UpdateStatement('table')
-        us.add_assignment_clause(ListUpdateClause(List(Integer, db_field='a'), [], operation='append'))
+        us.add_assignment_clause(ListUpdateClause('a', [], operation='append'))
         self.assertEqual(six.text_type(us), 'UPDATE table SET "a" = "a" + %(0)s')
