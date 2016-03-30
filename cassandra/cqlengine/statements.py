@@ -17,6 +17,7 @@ import time
 import six
 
 from cassandra.query import FETCH_SIZE_UNSET
+from cassandra.cqlengine import columns
 from cassandra.cqlengine import UnicodeMixin
 from cassandra.cqlengine.functions import QueryValue
 from cassandra.cqlengine.operators import BaseWhereOperator, InOperator
@@ -158,6 +159,17 @@ class ConditionalClause(BaseClause):
         return self.field, self.context_id
 
 
+class ContainerUpdateClauseMapMeta(type):
+
+    def __init__(cls, name, bases, dct):
+        if not hasattr(cls, 'clause_map'):
+            cls.clause_map = {}
+        else:
+            cls.clause_map[cls.col_type] = cls
+        super(ContainerUpdateClauseMapMeta, cls).__init__(name, bases, dct)
+
+
+@six.add_metaclass(ContainerUpdateClauseMapMeta)
 class ContainerUpdateClause(AssignmentClause):
 
     def __init__(self, column, value, operation=None, previous=None):
@@ -183,6 +195,8 @@ class ContainerUpdateClause(AssignmentClause):
 
 class SetUpdateClause(ContainerUpdateClause):
     """ updates a set collection """
+
+    col_type = columns.Set
 
     _additions = None
     _removals = None
@@ -253,6 +267,8 @@ class SetUpdateClause(ContainerUpdateClause):
 
 class ListUpdateClause(ContainerUpdateClause):
     """ updates a list collection """
+
+    col_type = columns.List
 
     _append = None
     _prepend = None
@@ -345,6 +361,8 @@ class ListUpdateClause(ContainerUpdateClause):
 class MapUpdateClause(ContainerUpdateClause):
     """ updates a map collection """
 
+    col_type = columns.Map
+
     _updates = None
 
     def _analyze(self):
@@ -393,17 +411,19 @@ class MapUpdateClause(ContainerUpdateClause):
         return ', '.join(qs)
 
 
-class CounterUpdateClause(ContainerUpdateClause):
+class CounterUpdateClause(AssignmentClause):
+
+    col_type = columns.Counter
 
     def __init__(self, column, value, previous=None):
-        super(CounterUpdateClause, self).__init__(column, value, previous=previous)
-        self.previous = self.previous or 0
+        super(CounterUpdateClause, self).__init__(column.db_field_name, column.to_database(value))
+        self.previous = column.to_database(previous) if previous else 0
 
     def get_context_size(self):
         return 1
 
     def update_context(self, ctx):
-        ctx[str(self.context_id)] = self._to_database(abs(self.value - self.previous))
+        ctx[str(self.context_id)] = abs(self.value - self.previous)
 
     def __unicode__(self):
         delta = self.value - self.previous
@@ -782,6 +802,18 @@ class UpdateStatement(AssignmentStatement):
         for conditional in self.conditionals:
             conditional.set_context_id(self.context_counter)
             self.context_counter += conditional.get_context_size()
+
+    def add_update(self, column, value, operation=None, previous=None):
+        col_type = type(column)
+        container_update_type = ContainerUpdateClause.clause_map.get(col_type)
+        if container_update_type:
+            clause = container_update_type(column, value, operation, previous)
+        elif col_type == columns.Counter:
+            clause = CounterUpdateClause(column, value)
+        else:
+            clause = AssignmentClause(column.db_field_name, column.to_database(value))
+        if clause.get_context_size(): # this is to exclude map removals from updates. Can go away if we drop support for C* < 1.2.4 and remove two-phase updates
+            self.add_assignment_clause(clause)
 
 
 class DeleteStatement(BaseCQLStatement):

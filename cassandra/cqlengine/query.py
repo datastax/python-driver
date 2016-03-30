@@ -1167,23 +1167,7 @@ class ModelQuerySet(AbstractQuerySet):
                 nulled_columns.add(col_name)
                 continue
 
-            # add the update statements
-            if isinstance(col, columns.Counter):
-                # TODO: implement counter updates
-                raise NotImplementedError
-            elif isinstance(col, (columns.List, columns.Set, columns.Map)):
-                if isinstance(col, columns.List):
-                    klass = ListUpdateClause
-                elif isinstance(col, columns.Set):
-                    klass = SetUpdateClause
-                elif isinstance(col, columns.Map):
-                    klass = MapUpdateClause
-                else:
-                    raise RuntimeError
-                us.add_assignment_clause(klass(col, col.to_database(val), operation=col_op))
-            else:
-                us.add_assignment_clause(AssignmentClause(
-                    col.db_field_name, col.to_database(val)))
+            us.add_update(col, val, operation=col_op)
 
         if us.assignments:
             self._execute(us)
@@ -1295,28 +1279,7 @@ class DMLQuery(object):
                     continue
 
                 static_changed_only = static_changed_only and col.static
-                if isinstance(col, (columns.BaseContainerColumn, columns.Counter)):
-                    # get appropriate clause
-                    if isinstance(col, columns.List):
-                        klass = ListUpdateClause
-                    elif isinstance(col, columns.Map):
-                        klass = MapUpdateClause
-                    elif isinstance(col, columns.Set):
-                        klass = SetUpdateClause
-                    elif isinstance(col, columns.Counter):
-                        klass = CounterUpdateClause
-                    else:
-                        raise RuntimeError
-
-                    clause = klass(col, val,
-                                   previous=val_mgr.previous_value)
-                    if clause.get_context_size() > 0:
-                        statement.add_assignment_clause(clause)
-                else:
-                    statement.add_assignment_clause(AssignmentClause(
-                        col.db_field_name,
-                        col.to_database(val)
-                    ))
+                statement.add_update(col, val, previous=val_mgr.previous_value)
 
         if statement.assignments:
             for name, col in self.model._primary_keys.items():
