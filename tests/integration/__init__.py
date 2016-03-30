@@ -484,6 +484,26 @@ class BasicKeyspaceUnitTestCase(unittest.TestCase):
             execute_until_pass(self.session, ddl)
 
 
+class MockLoggingHandler(logging.Handler):
+    """Mock logging handler to check for expected logs."""
+
+    def __init__(self, *args, **kwargs):
+        self.reset()
+        logging.Handler.__init__(self, *args, **kwargs)
+
+    def emit(self, record):
+        self.messages[record.levelname.lower()].append(record.getMessage())
+
+    def reset(self):
+        self.messages = {
+            'debug': [],
+            'info': [],
+            'warning': [],
+            'error': [],
+            'critical': [],
+        }
+
+
 class BasicExistingKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):
     """
     This is basic unit test defines class level teardown and setup methods. It assumes that keyspace is already defined, or created as part of the test.
