@@ -152,7 +152,11 @@ def sync_table(model):
 
     cluster = get_cluster()
 
-    keyspace = cluster.metadata.keyspaces[ks_name]
+    try:
+        keyspace = cluster.metadata.keyspaces[ks_name]
+    except KeyError:
+        raise CQLEngineException("Keyspace '{0}' for model {1} does not exist.".format(ks_name, model))
+
     tables = keyspace.tables
 
     syncd_types = set()
