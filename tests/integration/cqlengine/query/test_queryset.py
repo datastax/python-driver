@@ -1089,6 +1089,39 @@ class TestModelQueryWithDBField(BaseCassEngTestCase):
             self.assertEqual(model.objects(k0=i.k0, k1=i.k1).count(), len(clustering_values))
             self.assertEqual(model.objects(k0=i.k0, k1=i.k1, v1=0).count(), 1)
 
+    def test_db_field_names_used(self):
+        """
+        Tests to ensure that with generated cql update statements correctly utilize the db_field values.
+
+        @since 3.2
+        @jira_ticket PYTHON-530
+        @expected_result resulting cql_statements will use the db_field values
+
+        @test_category object_mapper
+        """
+
+        values = ('k0', 'k1', 'c0', 'v0', 'v1')
+        # Test QuerySet Path
+        b = BatchQuery()
+        DBFieldModel.objects(k0=1).batch(b).update(
+            v0=0,
+            v1=9,
+        )
+        for value in values:
+            self.assertTrue(value not in str(b.queries[0]))
+
+        # Test DML path
+        b2 = BatchQuery()
+        dml_field_model = DBFieldModel.create(k0=1, k1=5, c0=3, v0=4, v1=5)
+        dml_field_model.batch(b2).update(
+            v0=0,
+            v1=9,
+        )
+        for value in values:
+            self.assertTrue(value not in str(b2.queries[0]))
+
+
+
 
 class TestModelSmall(Model):
 
