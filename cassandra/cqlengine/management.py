@@ -13,7 +13,6 @@
 # limitations under the License.
 
 from collections import namedtuple
-from itertools import chain
 import json
 import logging
 import os
