@@ -159,6 +159,7 @@ class Column(object):
 
         # the column name in the model definition
         self.column_name = None
+        self._partition_key_index = None
         self.static = static
 
         self.value = None

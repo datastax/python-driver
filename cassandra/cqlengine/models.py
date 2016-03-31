@@ -843,6 +843,7 @@ class ModelMetaClass(type):
 
         has_partition_keys = any(v.partition_key for (k, v) in column_definitions)
 
+        partition_key_index = 0
         # transform column definitions
         for k, v in column_definitions:
             # don't allow a column with the same name as a built-in attribute or method
@@ -858,6 +859,9 @@ class ModelMetaClass(type):
             if not has_partition_keys and v.primary_key:
                 v.partition_key = True
                 has_partition_keys = True
+            if v.partition_key:
+                v._partition_key_index = partition_key_index
+                partition_key_index += 1
             _transform_column(k, v)
 
         partition_keys = OrderedDict(k for k in primary_keys.items() if k[1].partition_key)

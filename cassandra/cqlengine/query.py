@@ -37,6 +37,7 @@ class QueryException(CQLEngineException):
 class IfNotExistsWithCounterColumn(CQLEngineException):
     pass
 
+
 class IfExistsWithCounterColumn(CQLEngineException):
     pass
 
