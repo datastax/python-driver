@@ -27,9 +27,7 @@ from cassandra.cqlengine.operators import (InOperator, EqualsOperator, GreaterTh
                                            LessThanOrEqualOperator, ContainsOperator, BaseWhereOperator)
 from cassandra.cqlengine.statements import (WhereClause, SelectStatement, DeleteStatement,
                                             UpdateStatement, AssignmentClause, InsertStatement,
-                                            BaseCQLStatement, MapUpdateClause, MapDeleteClause,
-                                            ListUpdateClause, SetUpdateClause, CounterUpdateClause,
-                                            ConditionalClause)
+                                            BaseCQLStatement, MapDeleteClause, ConditionalClause)
 
 
 class QueryException(CQLEngineException):
