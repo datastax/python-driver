@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from collections import namedtuple
+from itertools import chain
 import json
 import logging
 import os
@@ -175,24 +176,23 @@ def sync_table(model):
     else:
         log.debug("sync_table checking existing table %s", cf_name)
         table_meta = tables[raw_cf_name]
+
+        _validate_pk(model, table_meta)
+
         table_columns = table_meta.columns
         model_fields = set()
-        # # TODO: does this work with db_name??
+
         for model_name, col in model._columns.items():
             db_name = col.db_field_name
             model_fields.add(db_name)
             if db_name in table_columns:
                 col_meta = table_columns[db_name]
-
                 if col_meta.cql_type != col.db_type:
-                    if col.primary_key or col.partition_key:
-                        raise CQLEngineException("Table {0} already exists, but has different types for primary key column '{1}' ({2}) (model field '{3}' ({4})). "
-                                                 "Update the model or remove the table.".format(cf_name, db_name, col_meta.cql_type, model_name, col.db_type))
-                    else:
-                        msg = 'Existing table {0} has column "{1}" with a type ({2}) differing from the model type ({3}).' \
-                              ' Model should be updated.'.format(cf_name, db_name, col_meta.cql_type, col.db_type)
-                        warnings.warn(msg)
-                        log.warning(msg)
+                    msg = 'Existing table {0} has column "{1}" with a type ({2}) differing from the model type ({3}).' \
+                          ' Model should be updated.'.format(cf_name, db_name, col_meta.cql_type, col.db_type)
+                    warnings.warn(msg)
+                    log.warning(msg)
+
                 continue
 
             if col.primary_key or col.primary_key:
@@ -222,6 +222,22 @@ def sync_table(model):
         qs += ['("{0}")'.format(column.db_field_name)]
         qs = ' '.join(qs)
         execute(qs)
+
+
+def _validate_pk(model, table_meta):
+    model_partition = [c.db_field_name for c in model._partition_keys.values()]
+    meta_partition = [c.name for c in table_meta.partition_key]
+    model_clustering = [c.db_field_name for c in model._clustering_keys.values()]
+    meta_clustering = [c.name for c in table_meta.clustering_key]
+
+    if model_partition != meta_partition or model_clustering != meta_clustering:
+        def _pk_string(partition, clustering):
+            return "PRIMARY KEY (({0}){1})".format(', '.join(partition), ', ' + ', '.join(clustering) if clustering else '')
+        raise CQLEngineException("Model {0} PRIMARY KEY composition does not match existing table {1}. "
+                                 "Model: {2}; Table: {3}. "
+                                 "Update model or drop the table.".format(model, model.column_family_name(),
+                                                                          _pk_string(model_partition, model_clustering),
+                                                                          _pk_string(meta_partition, meta_clustering)))
 
 
 def sync_type(ks_name, type_model):
