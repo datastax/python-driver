@@ -21,7 +21,7 @@ import logging
 from cassandra.cqlengine.connection import get_session, get_cluster
 from cassandra.cqlengine import CQLEngineException
 from cassandra.cqlengine import management
-from cassandra.cqlengine.management import _get_non_pk_field_names, _get_table_metadata, sync_table, drop_table, sync_type
+from cassandra.cqlengine.management import _get_table_metadata, sync_table, drop_table, sync_type
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine import columns
 
@@ -128,7 +128,7 @@ class FourthModel(Model):
     first_key = columns.UUID(primary_key=True)
     second_key = columns.UUID()
     third_key = columns.Text()
-    # removed fourth key, but it should stay in the DB
+    # renamed model field, but map to existing column
     renamed = columns.Map(columns.Text, columns.Text, db_field='blah')
 
 
@@ -138,23 +138,31 @@ class AddColumnTest(BaseCassEngTestCase):
 
     def test_add_column(self):
         sync_table(FirstModel)
-        fields = _get_non_pk_field_names(_get_table_metadata(FirstModel))
+        meta_columns = _get_table_metadata(FirstModel).columns
+        self.assertEqual(set(meta_columns), set(FirstModel._columns))
 
-        # this should contain the second key
-        self.assertEqual(len(fields), 2)
-        # get schema
         sync_table(SecondModel)
-
-        fields = _get_non_pk_field_names(_get_table_metadata(FirstModel))
-        self.assertEqual(len(fields), 3)
+        meta_columns = _get_table_metadata(FirstModel).columns
+        self.assertEqual(set(meta_columns), set(SecondModel._columns))
 
         sync_table(ThirdModel)
-        fields = _get_non_pk_field_names(_get_table_metadata(FirstModel))
-        self.assertEqual(len(fields), 4)
+        meta_columns = _get_table_metadata(FirstModel).columns
+        self.assertEqual(len(meta_columns), 5)
+        self.assertEqual(len(ThirdModel._columns), 4)
+        self.assertIn('fourth_key', meta_columns)
+        self.assertNotIn('fourth_key', ThirdModel._columns)
+        self.assertIn('blah', ThirdModel._columns)
+        self.assertIn('blah', meta_columns)
 
         sync_table(FourthModel)
-        fields = _get_non_pk_field_names(_get_table_metadata(FirstModel))
-        self.assertEqual(len(fields), 4)
+        meta_columns = _get_table_metadata(FirstModel).columns
+        self.assertEqual(len(meta_columns), 5)
+        self.assertEqual(len(ThirdModel._columns), 4)
+        self.assertIn('fourth_key', meta_columns)
+        self.assertNotIn('fourth_key', FourthModel._columns)
+        self.assertIn('renamed', FourthModel._columns)
+        self.assertNotIn('renamed', meta_columns)
+        self.assertIn('blah', meta_columns)
 
 
 class ModelWithTableProperties(Model):
