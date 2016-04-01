@@ -26,7 +26,7 @@ from cassandra.cqlengine.operators import (InOperator, EqualsOperator, GreaterTh
                                            GreaterThanOrEqualOperator, LessThanOperator,
                                            LessThanOrEqualOperator, ContainsOperator, BaseWhereOperator)
 from cassandra.cqlengine.statements import (WhereClause, SelectStatement, DeleteStatement,
-                                            UpdateStatement, AssignmentClause, InsertStatement,
+                                            UpdateStatement, InsertStatement,
                                             BaseCQLStatement, MapDeleteClause, ConditionalClause)
 
 

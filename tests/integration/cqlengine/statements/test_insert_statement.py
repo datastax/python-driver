@@ -16,18 +16,13 @@ try:
 except ImportError:
     import unittest  # noqa
 
-from cassandra.cqlengine.columns import Column
-from cassandra.cqlengine.statements import InsertStatement, StatementException, AssignmentClause
-
 import six
 
-class InsertStatementTests(unittest.TestCase):
+from cassandra.cqlengine.columns import Column
+from cassandra.cqlengine.statements import InsertStatement
 
-    def test_where_clause_failure(self):
-        """ tests that where clauses cannot be added to Insert statements """
-        ist = InsertStatement('table', None)
-        with self.assertRaises(StatementException):
-            ist.add_where_clause('s')
+
+class InsertStatementTests(unittest.TestCase):
 
     def test_statement(self):
         ist = InsertStatement('table', None)
