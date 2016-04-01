@@ -233,13 +233,17 @@ class Statement(object):
         if custom_payload is not None:
             self.custom_payload = custom_payload
 
+    def _key_parts_packed(self, parts):
+        for p in parts:
+            l = len(p)
+            yield struct.pack(">H%dsB" % l, l, p, 0)
+
     def _get_routing_key(self):
         return self._routing_key
 
     def _set_routing_key(self, key):
         if isinstance(key, (list, tuple)):
-            self._routing_key = b"".join(struct.pack("HsB", len(component), component, 0)
-                                         for component in key)
+            self._routing_key = b"".join(self._key_parts_packed(key))
         else:
             self._routing_key = key
 
@@ -565,13 +569,7 @@ class BoundStatement(Statement):
         if len(routing_indexes) == 1:
             self._routing_key = self.values[routing_indexes[0]]
         else:
-            components = []
-            for statement_index in routing_indexes:
-                val = self.values[statement_index]
-                l = len(val)
-                components.append(struct.pack(">H%dsB" % l, l, val, 0))
-
-            self._routing_key = b"".join(components)
+            self._routing_key = b"".join(self._key_parts_packed(self.values[i] for i in routing_indexes))
 
         return self._routing_key
 
