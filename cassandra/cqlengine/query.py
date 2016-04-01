@@ -1239,11 +1239,7 @@ class DMLQuery(object):
 
         if deleted_fields:
             for name, col in self.model._primary_keys.items():
-                ds.add_where_clause(WhereClause(
-                    col.db_field_name,
-                    EqualsOperator(),
-                    col.to_database(getattr(self.instance, name))
-                ))
+                ds.add_where(col, EqualsOperator(), getattr(self.instance, name))
             self._execute(ds)
 
     def update(self):
@@ -1285,11 +1281,7 @@ class DMLQuery(object):
                 # only include clustering key if clustering key is not null, and non static columns are changed to avoid cql error
                 if (null_clustering_key or static_changed_only) and (not col.partition_key):
                     continue
-                statement.add_where_clause(WhereClause(
-                    col.db_field_name,
-                    EqualsOperator(),
-                    col.to_database(getattr(self.instance, name))
-                ))
+                statement.add_where(col, EqualsOperator(), getattr(self.instance, name))
             self._execute(statement)
 
         if not null_clustering_key:
@@ -1324,10 +1316,7 @@ class DMLQuery(object):
                     if self.instance._values[name].changed:
                         nulled_fields.add(col.db_field_name)
                     continue
-                insert.add_assignment_clause(AssignmentClause(
-                    col.db_field_name,
-                    col.to_database(getattr(self.instance, name, None))
-                ))
+                insert.add_assignment(col, getattr(self.instance, name, None))
 
         # skip query execution if it's empty
         # caused by pointless update queries
@@ -1344,12 +1333,8 @@ class DMLQuery(object):
 
         ds = DeleteStatement(self.column_family_name, timestamp=self._timestamp, conditionals=self._conditional, if_exists=self._if_exists)
         for name, col in self.model._primary_keys.items():
-            if (not col.partition_key) and (getattr(self.instance, name) is None):
+            val = getattr(self.instance, name)
+            if val is None and not col.parition_key:
                 continue
-
-            ds.add_where_clause(WhereClause(
-                col.db_field_name,
-                EqualsOperator(),
-                col.to_database(getattr(self.instance, name))
-            ))
+            ds.add_where(col, EqualsOperator(), val)
         self._execute(ds)

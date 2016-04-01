@@ -481,6 +481,8 @@ class MapDeleteClause(BaseDeleteClause):
 class BaseCQLStatement(UnicodeMixin):
     """ The base cql statement class """
 
+    parition_key_values = None
+
     def __init__(self, table, consistency=None, timestamp=None, where=None, fetch_size=None, conditionals=None):
         super(BaseCQLStatement, self).__init__()
         self.table = table
@@ -492,20 +494,32 @@ class BaseCQLStatement(UnicodeMixin):
 
         self.where_clauses = []
         for clause in where or []:
-            self.add_where_clause(clause)
+            self._add_where_clause(clause)
 
         self.conditionals = []
         for conditional in conditionals or []:
             self.add_conditional_clause(conditional)
 
-    def add_where_clause(self, clause):
-        """
-        adds a where clause to this statement
-        :param clause: the clause to add
-        :type clause: WhereClause
-        """
-        if not isinstance(clause, WhereClause):
-            raise StatementException("only instances of WhereClause can be added to statements")
+    def _update_partition_key(self, column, value):
+        if column.partition_key:
+            if self.parition_key_values:
+                self.parition_key_values.append(value)
+            else:
+                self.parition_key_values = [value]
+            # assert part keys are added in order
+            # this is an optimization based on the way statements are constructed in
+            # cqlengine.query (columns always iterated in order). If that assumption
+            # goes away we can preallocate the key values list and insert using
+            # self.partition_key_values
+            assert column._partition_key_index == len(self.parition_key_values) - 1
+
+    def add_where(self, column, operator, value, quote_field=True):
+        value = column.to_database(value)
+        clause = WhereClause(column.db_field_name, operator, value, quote_field)
+        self._add_where_clause(clause)
+        self._update_partition_key(column, value)
+
+    def _add_where_clause(self, clause):
         clause.set_context_id(self.context_counter)
         self.context_counter += clause.get_context_size()
         self.where_clauses.append(clause)
@@ -660,7 +674,7 @@ class AssignmentStatement(BaseCQLStatement):
         # add assignments
         self.assignments = []
         for assignment in assignments or []:
-            self.add_assignment_clause(assignment)
+            self._add_assignment_clause(assignment)
 
     def update_context_id(self, i):
         super(AssignmentStatement, self).update_context_id(i)
@@ -668,14 +682,13 @@ class AssignmentStatement(BaseCQLStatement):
             assignment.set_context_id(self.context_counter)
             self.context_counter += assignment.get_context_size()
 
-    def add_assignment_clause(self, clause):
-        """
-        adds an assignment clause to this statement
-        :param clause: the clause to add
-        :type clause: AssignmentClause
-        """
-        if not isinstance(clause, AssignmentClause):
-            raise StatementException("only instances of AssignmentClause can be added to statements")
+    def add_assignment(self, column, value):
+        value = column.to_database(value)
+        clause = AssignmentClause(column.db_field_name, value)
+        self._add_assignment_clause(clause)
+        self._update_partition_key(column, value)
+
+    def _add_assignment_clause(self, clause):
         clause.set_context_id(self.context_counter)
         self.context_counter += clause.get_context_size()
         self.assignments.append(clause)
@@ -811,7 +824,7 @@ class UpdateStatement(AssignmentStatement):
         else:
             clause = AssignmentClause(column.db_field_name, value)
         if clause.get_context_size():  # this is to exclude map removals from updates. Can go away if we drop support for C* < 1.2.4 and remove two-phase updates
-            self.add_assignment_clause(clause)
+            self._add_assignment_clause(clause)
 
 
 class DeleteStatement(BaseCQLStatement):
