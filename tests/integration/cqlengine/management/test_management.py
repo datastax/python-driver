@@ -78,9 +78,45 @@ class CapitalizedKeyModel(Model):
 
 class PrimaryKeysOnlyModel(Model):
 
+    __table_name__ = "primary_keys_only"
     __options__ = {'compaction': {'class': 'LeveledCompactionStrategy'}}
 
-    first_ey = columns.Integer(primary_key=True)
+    first_key = columns.Integer(primary_key=True)
+    second_key = columns.Integer(primary_key=True)
+
+
+class PrimaryKeysModelChanged(Model):
+
+    __table_name__ = "primary_keys_only"
+    __options__ = {'compaction': {'class': 'LeveledCompactionStrategy'}}
+
+    new_first_key = columns.Integer(primary_key=True)
+    second_key = columns.Integer(primary_key=True)
+
+
+class PrimaryKeysModelTypeChanged(Model):
+
+    __table_name__ = "primary_keys_only"
+    __options__ = {'compaction': {'class': 'LeveledCompactionStrategy'}}
+
+    first_key = columns.Float(primary_key=True)
+    second_key = columns.Integer(primary_key=True)
+
+
+class PrimaryKeysRemovedPk(Model):
+
+    __table_name__ = "primary_keys_only"
+    __options__ = {'compaction': {'class': 'LeveledCompactionStrategy'}}
+
+    second_key = columns.Integer(primary_key=True)
+
+
+class PrimaryKeysAddedClusteringKey(Model):
+
+    __table_name__ = "primary_keys_only"
+    __options__ = {'compaction': {'class': 'LeveledCompactionStrategy'}}
+
+    new_first_key = columns.Float(primary_key=True)
     second_key = columns.Integer(primary_key=True)
 
 
@@ -241,6 +277,21 @@ class SyncTableTests(BaseCassEngTestCase):
 
         table_meta = management._get_table_metadata(PrimaryKeysOnlyModel)
         self.assertIn('SizeTieredCompactionStrategy', table_meta.as_cql_query())
+
+    def test_primary_key_validation(self):
+        """
+        Test to ensure that changes to primary keys throw CQLEngineExceptions
+
+        @since 3.2
+        @jira_ticket PYTHON-532
+        @expected_result Attempts to modify primary keys throw an exception
+
+        @test_category object_mapper
+        """
+        sync_table(PrimaryKeysOnlyModel)
+        self.assertRaises(CQLEngineException, sync_table, PrimaryKeysModelChanged)
+        self.assertRaises(CQLEngineException, sync_table, PrimaryKeysAddedClusteringKey)
+        self.assertRaises(CQLEngineException, sync_table, PrimaryKeysRemovedPk)
 
 
 class IndexModel(Model):
