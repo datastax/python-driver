@@ -113,7 +113,8 @@ def _get_index_name_by_column(table, column_name):
     """
     for _, index_metadata in six.iteritems(table.indexes):
         options = dict(index_metadata.index_options)
-        if 'target' in options and options['target'] == column_name:
+        possible_index_values = [column_name, "values(%s)" % column_name]
+        if 'target' in options and options['target'] in possible_index_values:
             return index_metadata.name
 
     return None
