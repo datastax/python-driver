@@ -22,7 +22,6 @@ from datetime import datetime
 import time
 from uuid import uuid1, uuid4
 import uuid
-import sys
 
 from cassandra.cluster import Session
 from cassandra import InvalidRequest
@@ -1167,3 +1166,75 @@ class TestModelQueryWithFetchSize(BaseCassEngTestCase):
             TestModelSmall.objects.fetch_size(0)
         with self.assertRaises(QueryException):
             TestModelSmall.objects.fetch_size(-1)
+
+
+class People(Model):
+    __table_name__ = "people"
+    last_name = columns.Text(primary_key=True, partition_key=True)
+    first_name = columns.Text(primary_key=True)
+    birthday = columns.DateTime()
+
+
+class People2(Model):
+    __table_name__ = "people"
+    last_name = columns.Text(primary_key=True, partition_key=True)
+    first_name = columns.Text(primary_key=True)
+    middle_name = columns.Text()
+    birthday = columns.DateTime()
+
+
+class TestModelQueryWithDifferedFeld(BaseCassEngTestCase):
+    """
+    Tests that selects with filter will deffer population of known values until after the results are returned.
+    I.E.  Instead of generating SELECT * FROM People WHERE last_name="Smith" It will generate
+    SELECT first_name, birthday FROM People WHERE last_name="Smith"
+    Where last_name 'smith' will populated post query
+
+    @since 3.2
+    @jira_ticket PYTHON-520
+    @expected_result only needed fields are included in the query
+
+    @test_category object_mapper
+    """
+    @classmethod
+    def setUpClass(cls):
+        super(TestModelQueryWithDifferedFeld, cls).setUpClass()
+        sync_table(People)
+
+    @classmethod
+    def tearDownClass(cls):
+        super(TestModelQueryWithDifferedFeld, cls).tearDownClass()
+        drop_table(People)
+
+    def test_defaultFetchSize(self):
+        # Populate Table
+        People.objects.create(last_name="Smith", first_name="John", birthday=datetime.now())
+        People.objects.create(last_name="Bestwater", first_name="Alan", birthday=datetime.now())
+        People.objects.create(last_name="Smith", first_name="Greg", birthday=datetime.now())
+        People.objects.create(last_name="Smith", first_name="Adam", birthday=datetime.now())
+
+        # Check query constructions
+        expected_fields = ['first_name', 'birthday']
+        self.assertEqual(People.filter(last_name="Smith")._select_fields(), expected_fields)
+        # Validate correct fields are fetched
+        smiths = list(People.filter(last_name="Smith"))
+        self.assertEqual(len(smiths), 3)
+        self.assertTrue(smiths[0].last_name is not None)
+
+        # Modify table with new value
+        sync_table(People2)
+
+        # populate new format
+        People2.objects.create(last_name="Smith", first_name="Chris", middle_name="Raymond", birthday=datetime.now())
+        People2.objects.create(last_name="Smith", first_name="Andrew", middle_name="Micheal", birthday=datetime.now())
+
+        # validate query construction
+        expected_fields = ['first_name', 'middle_name', 'birthday']
+        self.assertEqual(People2.filter(last_name="Smith")._select_fields(), expected_fields)
+
+        # validate correct items are returneds
+        smiths = list(People2.filter(last_name="Smith"))
+        self.assertEqual(len(smiths), 5)
+        self.assertTrue(smiths[0].last_name is not None)
+
+
