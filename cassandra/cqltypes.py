@@ -77,6 +77,7 @@ def trim_if_startswith(s, prefix):
 
 
 _casstypes = {}
+_cqltypes = {}
 
 
 cql_type_scanner = re.Scanner((
@@ -106,6 +107,8 @@ class CassandraTypeType(type):
         cls = type.__new__(metacls, name, bases, dct)
         if not name.startswith('_'):
             _casstypes[name] = cls
+            if not cls.typename.startswith("'org"):
+                _cqltypes[cls.typename] = cls
         return cls
 
 
