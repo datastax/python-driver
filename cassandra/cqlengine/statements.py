@@ -504,7 +504,7 @@ class BaseCQLStatement(UnicodeMixin):
 
     def partition_key_values(self, field_index_map):
         parts = [None] * len(field_index_map)
-        self._update_part_key_values(field_index_map, (w for w in self.where_clauses if isinstance(w.operator, EqualsOperator)), parts)
+        self._update_part_key_values(field_index_map, (w for w in self.where_clauses if w.operator.__class__ == EqualsOperator), parts)
         return parts
 
     def add_where(self, column, operator, value, quote_field=True):
