@@ -157,16 +157,16 @@ def execute(query, params=None, consistency_level=None, timeout=NOT_SET):
     if not session:
         raise CQLEngineException("It is required to setup() cqlengine before executing queries")
 
-    if isinstance(query, BaseCQLStatement):
+    if isinstance(query, SimpleStatement):
+        pass  #
+    elif isinstance(query, BaseCQLStatement):
         params = query.get_context()
         query = SimpleStatement(str(query), consistency_level=consistency_level, fetch_size=query.fetch_size)
-
     elif isinstance(query, six.string_types):
         query = SimpleStatement(query, consistency_level=consistency_level)
 
     log.debug(query.query_string)
 
-    params = params or {}
     result = session.execute(query, params, timeout=timeout)
 
     return result

@@ -315,7 +315,7 @@ class AbstractQuerySet(object):
         if self._batch:
             return self._batch.add_query(statement)
         else:
-            result = _execute_statement(self.model, statement, self._consistency, None, self._timeout)
+            result = _execute_statement(self.model, statement, self._consistency, self._timeout)
             if self._if_not_exists or self._if_exists or self._conditional:
                 check_applied(result)
             return result
@@ -1210,7 +1210,7 @@ class DMLQuery(object):
         if self._batch:
             return self._batch.add_query(statement)
         else:
-            results = _execute_statement(self.model, statement, self._consistency, None, self._timeout)
+            results = _execute_statement(self.model, statement, self._consistency, self._timeout)
             if self._if_not_exists or self._if_exists or self._conditional:
                 check_applied(results)
             return results
@@ -1341,9 +1341,9 @@ class DMLQuery(object):
         self._execute(ds)
 
 
-def _execute_statement(model, statement, consistency_level, fetch_size, timeout):
+def _execute_statement(model, statement, consistency_level, timeout):
     params = statement.get_context()
-    s = SimpleStatement(str(statement), consistency_level=consistency_level, fetch_size=fetch_size)
+    s = SimpleStatement(str(statement), consistency_level=consistency_level, fetch_size=statement.fetch_size)
     if model._partition_key_index:  # not available on NamedTable
         key_values = statement.partition_key_values(model._partition_key_index)
         if not any(v is None for v in key_values):
