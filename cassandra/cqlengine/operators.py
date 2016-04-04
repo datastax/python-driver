@@ -60,6 +60,11 @@ class EqualsOperator(BaseWhereOperator):
     cql_symbol = '='
 
 
+class NotEqualsOperator(BaseWhereOperator):
+    symbol = 'NE'
+    cql_symbol = '!='
+
+
 class InOperator(EqualsOperator):
     symbol = 'IN'
     cql_symbol = 'IN'
