@@ -243,7 +243,10 @@ class Statement(object):
 
     def _set_routing_key(self, key):
         if isinstance(key, (list, tuple)):
-            self._routing_key = b"".join(self._key_parts_packed(key))
+            if len(key) == 1:
+                self._routing_key = key[0]
+            else:
+                self._routing_key = b"".join(self._key_parts_packed(key))
         else:
             self._routing_key = key
 
