@@ -623,6 +623,11 @@ class SimpleDateType(_CassandraType):
         try:
             days = val.days_from_epoch
         except AttributeError:
+            if isinstance(val, int):
+                # the DB wants offset int values, but util.Date init takes days from epoch
+                # here we assume int values are offset, as they would appear in CQL
+                # short circuit to avoid subtracting just to add offset
+                return uint32_pack(val)
             days = util.Date(val).days_from_epoch
         return uint32_pack(days + SimpleDateType.EPOCH_OFFSET_DAYS)
 
