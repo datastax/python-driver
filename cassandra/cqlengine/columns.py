@@ -887,7 +887,9 @@ class UserDefinedType(Column):
 
     @property
     def cql_type(self):
-        return UserType.apply_parameters([c.cql_type for c in self.user_type._fields.values()])
+        return UserType.make_udt_class(keyspace='', udt_name=self.user_type.type_name(),
+                                       field_names=[c.db_field_name for c in self.user_type._fields.values()],
+                                       field_types=[c.cql_type for c in self.user_type._fields.values()])
 
 
 def resolve_udts(col_def, out_list):
