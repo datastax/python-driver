@@ -22,7 +22,6 @@ from datetime import datetime
 import time
 from uuid import uuid1, uuid4
 import uuid
-import sys
 
 from cassandra.cluster import Session
 from cassandra import InvalidRequest
@@ -457,8 +456,8 @@ def test_non_quality_filtering():
     NonEqualityFilteringModel.create(sequence_id=3, example_type=0, created_at=datetime.now())
     NonEqualityFilteringModel.create(sequence_id=5, example_type=1, created_at=datetime.now())
 
-    qA = NonEqualityFilteringModel.objects(NonEqualityFilteringModel.sequence_id > 3).allow_filtering()
-    num = qA.count()
+    qa = NonEqualityFilteringModel.objects(NonEqualityFilteringModel.sequence_id > 3).allow_filtering()
+    num = qa.count()
     assert num == 1, num
 
 
@@ -473,7 +472,7 @@ class TestQuerySetDistinct(BaseQuerySetUsage):
         self.assertEqual(len(q), 3)
 
     def test_distinct_with_filter(self):
-        q = TestModel.objects.distinct(['test_id']).filter(test_id__in=[1,2])
+        q = TestModel.objects.distinct(['test_id']).filter(test_id__in=[1, 2])
         self.assertEqual(len(q), 2)
 
     def test_distinct_with_non_partition(self):
@@ -510,19 +509,19 @@ class TestQuerySetOrdering(BaseQuerySetUsage):
     def test_ordering_by_non_second_primary_keys_fail(self):
         # kwarg filtering
         with self.assertRaises(query.QueryException):
-            q = TestModel.objects(test_id=0).order_by('test_id')
+            TestModel.objects(test_id=0).order_by('test_id')
 
         # kwarg filtering
         with self.assertRaises(query.QueryException):
-            q = TestModel.objects(TestModel.test_id == 0).order_by('test_id')
+            TestModel.objects(TestModel.test_id == 0).order_by('test_id')
 
     def test_ordering_by_non_primary_keys_fails(self):
         with self.assertRaises(query.QueryException):
-            q = TestModel.objects(test_id=0).order_by('description')
+            TestModel.objects(test_id=0).order_by('description')
 
     def test_ordering_on_indexed_columns_fails(self):
         with self.assertRaises(query.QueryException):
-            q = IndexedTestModel.objects(test_id=0).order_by('attempt_id')
+            IndexedTestModel.objects(test_id=0).order_by('attempt_id')
 
     def test_ordering_on_multiple_clustering_columns(self):
         TestMultiClusteringModel.create(one=1, two=1, three=4)
@@ -673,7 +672,7 @@ class TestQuerySetDelete(BaseQuerySetUsage):
         TestMultiClusteringModel.objects(one=1, two__gt=3, two__lt=5).delete()
         self.assertEqual(5, len(TestMultiClusteringModel.objects.all()))
 
-        TestMultiClusteringModel.objects(one=1, two__in=[8,9]).delete()
+        TestMultiClusteringModel.objects(one=1, two__in=[8, 9]).delete()
         self.assertEqual(3, len(TestMultiClusteringModel.objects.all()))
 
         TestMultiClusteringModel.objects(one__in=[1], two__gte=0).delete()
@@ -878,7 +877,7 @@ class TestValuesList(BaseQuerySetUsage):
 class TestObjectsProperty(BaseQuerySetUsage):
     def test_objects_property_returns_fresh_queryset(self):
         assert TestModel.objects._result_cache is None
-        len(TestModel.objects) # evaluate queryset
+        len(TestModel.objects)  # evaluate queryset
         assert TestModel.objects._result_cache is None
 
 

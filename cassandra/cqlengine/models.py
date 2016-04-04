@@ -380,6 +380,10 @@ class BaseModel(object):
                                 ', '.join('{0}={1}'.format(k, getattr(self, k)) for k in self._primary_keys.keys()))
 
     @classmethod
+    def _routing_key_from_values(cls, pk_values, protocol_version):
+        return cls._key_serializer(pk_values, protocol_version)
+
+    @classmethod
     def _discover_polymorphic_submodels(cls):
         if not cls._is_polymorphic_base:
             raise ModelException('_discover_polymorphic_submodels can only be called on polymorphic base classes')
@@ -867,6 +871,11 @@ class ModelMetaClass(type):
         partition_keys = OrderedDict(k for k in primary_keys.items() if k[1].partition_key)
         clustering_keys = OrderedDict(k for k in primary_keys.items() if not k[1].partition_key)
 
+        key_cols = [c for c in partition_keys.values()]
+        partition_key_index = dict((col.db_field_name, col._partition_key_index) for col in key_cols)
+        key_cql_types = [c.cql_type for c in key_cols]
+        key_serializer = staticmethod(lambda parts, proto_version: [t.to_binary(p, proto_version) for t, p in zip(key_cql_types, parts)])
+
         # setup partition key shortcut
         if len(partition_keys) == 0:
             if not is_abstract:
@@ -910,6 +919,8 @@ class ModelMetaClass(type):
         attrs['_dynamic_columns'] = {}
 
         attrs['_partition_keys'] = partition_keys
+        attrs['_partition_key_index'] = partition_key_index
+        attrs['_key_serializer'] = key_serializer
         attrs['_clustering_keys'] = clustering_keys
         attrs['_has_counter'] = len(counter_columns) > 0
 

@@ -19,6 +19,7 @@ import time
 import six
 from warnings import warn
 
+from cassandra.query import SimpleStatement
 from cassandra.cqlengine import columns, CQLEngineException, ValidationError, UnicodeMixin
 from cassandra.cqlengine import connection
 from cassandra.cqlengine.functions import Token, BaseQueryFunction, QueryValue
@@ -310,11 +311,11 @@ class AbstractQuerySet(object):
     def column_family_name(self):
         return self.model.column_family_name()
 
-    def _execute(self, q):
+    def _execute(self, statement):
         if self._batch:
-            return self._batch.add_query(q)
+            return self._batch.add_query(statement)
         else:
-            result = connection.execute(q, consistency_level=self._consistency, timeout=self._timeout)
+            result = _execute_statement(self.model, statement, self._consistency, None, self._timeout)
             if self._if_not_exists or self._if_exists or self._conditional:
                 check_applied(result)
             return result
@@ -1205,14 +1206,14 @@ class DMLQuery(object):
         self._conditional = conditional
         self._timeout = timeout
 
-    def _execute(self, q):
+    def _execute(self, statement):
         if self._batch:
-            return self._batch.add_query(q)
+            return self._batch.add_query(statement)
         else:
-            tmp = connection.execute(q, consistency_level=self._consistency, timeout=self._timeout)
+            results = _execute_statement(self.model, statement, self._consistency, None, self._timeout)
             if self._if_not_exists or self._if_exists or self._conditional:
-                check_applied(tmp)
-            return tmp
+                check_applied(results)
+            return results
 
     def batch(self, batch_obj):
         if batch_obj is not None and not isinstance(batch_obj, BatchQuery):
@@ -1338,3 +1339,14 @@ class DMLQuery(object):
                 continue
             ds.add_where(col, EqualsOperator(), val)
         self._execute(ds)
+
+
+def _execute_statement(model, statement, consistency_level, fetch_size, timeout):
+    params = statement.get_context()
+    s = SimpleStatement(str(statement), consistency_level=consistency_level, fetch_size=fetch_size)
+    if model._partition_key_index:
+        key_values = statement.partition_key_values(model._partition_key_index)
+        if not any(v is None for v in key_values):
+            parts = model._routing_key_from_values(key_values, connection.get_cluster().protocol_version)
+            s.routing_key = parts
+    return connection.execute(s, params, timeout=timeout)
