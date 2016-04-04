@@ -111,13 +111,12 @@ def _get_index_name_by_column(table, column_name):
     """
     Find the index name for a given table and column.
     """
-    for _, index_metadata in six.iteritems(table.indexes):
+    protected_name = metadata.protect_name(column_name)
+    possible_index_values = [protected_name, "values(%s)" % protected_name]
+    for index_metadata in table.indexes.values():
         options = dict(index_metadata.index_options)
-        possible_index_values = [column_name, "values(%s)" % column_name]
-        if 'target' in options and options['target'] in possible_index_values:
+        if options.get('target') in possible_index_values:
             return index_metadata.name
-
-    return None
 
 
 def sync_table(model):
