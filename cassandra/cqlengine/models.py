@@ -335,6 +335,8 @@ class BaseModel(object):
 
     __options__ = None
 
+    __compute_routing_key__ = True
+
     # the queryset class used for this class
     __queryset__ = query.ModelQuerySet
     __dmlquery__ = query.DMLQuery
@@ -871,10 +873,14 @@ class ModelMetaClass(type):
         partition_keys = OrderedDict(k for k in primary_keys.items() if k[1].partition_key)
         clustering_keys = OrderedDict(k for k in primary_keys.items() if not k[1].partition_key)
 
-        key_cols = [c for c in partition_keys.values()]
-        partition_key_index = dict((col.db_field_name, col._partition_key_index) for col in key_cols)
-        key_cql_types = [c.cql_type for c in key_cols]
-        key_serializer = staticmethod(lambda parts, proto_version: [t.to_binary(p, proto_version) for t, p in zip(key_cql_types, parts)])
+        if attrs.get('__compute_routing_key__', True):
+            key_cols = [c for c in partition_keys.values()]
+            partition_key_index = dict((col.db_field_name, col._partition_key_index) for col in key_cols)
+            key_cql_types = [c.cql_type for c in key_cols]
+            key_serializer = staticmethod(lambda parts, proto_version: [t.to_binary(p, proto_version) for t, p in zip(key_cql_types, parts)])
+        else:
+            partition_key_index = {}
+            key_serializer = staticmethod(lambda parts, proto_version: None)
 
         # setup partition key shortcut
         if len(partition_keys) == 0:
@@ -997,4 +1003,9 @@ class Model(BaseModel):
     __discriminator_value__ = None
     """
     *Optional* Specifies a value for the discriminator column when using model inheritance.
+    """
+
+    __compute_routing_key__ = True
+    """
+    *Optional* Setting False disables computing the routing key for TokenAwareRouting
     """
