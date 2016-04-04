@@ -1344,7 +1344,7 @@ class DMLQuery(object):
 def _execute_statement(model, statement, consistency_level, fetch_size, timeout):
     params = statement.get_context()
     s = SimpleStatement(str(statement), consistency_level=consistency_level, fetch_size=fetch_size)
-    if model._partition_key_index:
+    if model._partition_key_index:  # not available on NamedTable
         key_values = statement.partition_key_values(model._partition_key_index)
         if not any(v is None for v in key_values):
             parts = model._routing_key_from_values(key_values, connection.get_cluster().protocol_version)

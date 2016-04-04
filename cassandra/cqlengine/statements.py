@@ -482,10 +482,9 @@ class MapDeleteClause(BaseDeleteClause):
 class BaseCQLStatement(UnicodeMixin):
     """ The base cql statement class """
 
-    def __init__(self, table, consistency=None, timestamp=None, where=None, fetch_size=None, conditionals=None):
+    def __init__(self, table, timestamp=None, where=None, fetch_size=None, conditionals=None):
         super(BaseCQLStatement, self).__init__()
         self.table = table
-        self.consistency = consistency
         self.context_id = 0
         self.context_counter = self.context_id
         self.timestamp = timestamp
@@ -591,7 +590,6 @@ class SelectStatement(BaseCQLStatement):
                  table,
                  fields=None,
                  count=False,
-                 consistency=None,
                  where=None,
                  order_by=None,
                  limit=None,
@@ -605,7 +603,6 @@ class SelectStatement(BaseCQLStatement):
         """
         super(SelectStatement, self).__init__(
             table,
-            consistency=consistency,
             where=where,
             fetch_size=fetch_size
         )
@@ -651,14 +648,12 @@ class AssignmentStatement(BaseCQLStatement):
     def __init__(self,
                  table,
                  assignments=None,
-                 consistency=None,
                  where=None,
                  ttl=None,
                  timestamp=None,
                  conditionals=None):
         super(AssignmentStatement, self).__init__(
             table,
-            consistency=consistency,
             where=where,
             conditionals=conditionals
         )
@@ -708,14 +703,12 @@ class InsertStatement(AssignmentStatement):
     def __init__(self,
                  table,
                  assignments=None,
-                 consistency=None,
                  where=None,
                  ttl=None,
                  timestamp=None,
                  if_not_exists=False):
         super(InsertStatement, self).__init__(table,
                                               assignments=assignments,
-                                              consistency=consistency,
                                               where=where,
                                               ttl=ttl,
                                               timestamp=timestamp)
@@ -751,7 +744,6 @@ class UpdateStatement(AssignmentStatement):
     def __init__(self,
                  table,
                  assignments=None,
-                 consistency=None,
                  where=None,
                  ttl=None,
                  timestamp=None,
@@ -759,7 +751,6 @@ class UpdateStatement(AssignmentStatement):
                  if_exists=False):
         super(UpdateStatement, self). __init__(table,
                                                assignments=assignments,
-                                               consistency=consistency,
                                                where=where,
                                                ttl=ttl,
                                                timestamp=timestamp,
@@ -825,10 +816,9 @@ class UpdateStatement(AssignmentStatement):
 class DeleteStatement(BaseCQLStatement):
     """ a cql delete statement """
 
-    def __init__(self, table, fields=None, consistency=None, where=None, timestamp=None, conditionals=None, if_exists=False):
+    def __init__(self, table, fields=None, where=None, timestamp=None, conditionals=None, if_exists=False):
         super(DeleteStatement, self).__init__(
             table,
-            consistency=consistency,
             where=where,
             timestamp=timestamp,
             conditionals=conditionals
