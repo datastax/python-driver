@@ -105,6 +105,29 @@ class TestDatetime(BaseCassEngTestCase):
         dt2 = self.DatetimeTest.objects(test_id=6).first()
         assert dt2.created_at == dt_value
 
+    def test_datetime_truncate_microseconds(self):
+        """
+        Test to ensure that truncate microseconds works as expected.
+        This will be default behavior in the future and we will need to modify the tests to comply
+        with new behavior
+
+        @since 3.2
+        @jira_ticket PYTHON-273
+        @expected_result microseconds should be to the nearest thousand when truncate is set.
+
+        @test_category object_mapper
+        """
+        DateTime.truncate_microseconds = True
+        try:
+            dt_value = datetime(2024, 12, 31, 10, 10, 10, 923567)
+            dt_truncated = datetime(2024, 12, 31, 10, 10, 10, 923000)
+            self.DatetimeTest.objects.create(test_id=6, created_at=dt_value)
+            dt2 = self.DatetimeTest.objects(test_id=6).first()
+            self.assertEqual(dt2.created_at,dt_truncated)
+        finally:
+            # We need to always return behavior to default
+            DateTime.truncate_microseconds = False
+
 
 class TestBoolDefault(BaseCassEngTestCase):
     class BoolDefaultValueTest(Model):
@@ -122,6 +145,7 @@ class TestBoolDefault(BaseCassEngTestCase):
         tmp2 = self.BoolDefaultValueTest.get(test_id=1)
         self.assertEqual(True, tmp2.stuff)
 
+
 class TestBoolValidation(BaseCassEngTestCase):
     class BoolValidationTest(Model):
 
@@ -137,6 +161,7 @@ class TestBoolValidation(BaseCassEngTestCase):
 
         test_obj.validate()
         self.assertIsNone(test_obj.bool_column)
+
 
 class TestVarInt(BaseCassEngTestCase):
     class VarIntTest(Model):
@@ -228,6 +253,7 @@ class TestDecimal(BaseCassEngTestCase):
         dt2 = self.DecimalTest.objects(test_id=0).first()
         assert dt2.dec_val == D('5')
 
+
 class TestUUID(BaseCassEngTestCase):
     class UUIDTest(Model):
 
@@ -261,6 +287,7 @@ class TestUUID(BaseCassEngTestCase):
         t1 = self.UUIDTest.get(test_id=0)
         assert a_uuid == t1.a_uuid
 
+
 class TestTimeUUID(BaseCassEngTestCase):
     class TimeUUIDTest(Model):
 
@@ -285,6 +312,7 @@ class TestTimeUUID(BaseCassEngTestCase):
 
         assert t1.timeuuid.time == t1.timeuuid.time
 
+
 class TestInteger(BaseCassEngTestCase):
     class IntegerTest(Model):
 
@@ -296,6 +324,7 @@ class TestInteger(BaseCassEngTestCase):
         it = self.IntegerTest()
         it.validate()
 
+
 class TestBigInt(BaseCassEngTestCase):
     class BigIntTest(Model):
 
@@ -306,6 +335,7 @@ class TestBigInt(BaseCassEngTestCase):
         """ Tests that bigint columns with a default value of 0 validate """
         it = self.BigIntTest()
         it.validate()
+
 
 class TestText(BaseCassEngTestCase):
 
@@ -352,8 +382,6 @@ class TestText(BaseCassEngTestCase):
         Text().validate(None)
 
 
-
-
 class TestExtraFieldsRaiseException(BaseCassEngTestCase):
     class TestModel(Model):
 
@@ -362,6 +390,7 @@ class TestExtraFieldsRaiseException(BaseCassEngTestCase):
     def test_extra_field(self):
         with self.assertRaises(ValidationError):
             self.TestModel.create(bacon=5000)
+
 
 class TestPythonDoesntDieWhenExtraFieldIsInCassandra(BaseCassEngTestCase):
     class TestModel(Model):
@@ -375,6 +404,7 @@ class TestPythonDoesntDieWhenExtraFieldIsInCassandra(BaseCassEngTestCase):
         self.TestModel.create()
         execute("ALTER TABLE {0} add blah int".format(self.TestModel.column_family_name(include_keyspace=True)))
         self.TestModel.objects().all()
+
 
 class TestTimeUUIDFromDatetime(BaseCassEngTestCase):
     def test_conversion_specific_date(self):
@@ -390,6 +420,7 @@ class TestTimeUUIDFromDatetime(BaseCassEngTestCase):
 
         # checks that we created a UUID1 with the proper timestamp
         assert new_dt == dt
+
 
 class TestInet(BaseCassEngTestCase):
 
