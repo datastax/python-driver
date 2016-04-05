@@ -26,7 +26,8 @@ from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
 from cassandra.cluster import Cluster
 from cassandra.policies import HostDistance
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, greaterthanprotocolv3
+from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, \
+    greaterthanprotocolv3, greaterthancass20
 
 import time
 import re
@@ -228,6 +229,95 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         self.session.execute(create_table)
         result_set = self.session.execute("SELECT * FROM {0}.{1}".format(self.keyspace_name, self.function_table_name))
         self.assertEqual(result_set.column_names, [u'user', u'game', u'year', u'month', u'day', u'score'])
+
+    def create_param_table(self):
+        self.session.execute("""CREATE TABLE IF NOT EXISTS {0}.users(
+                            user_id BIGINT PRIMARY KEY,
+                            first VARCHAR,
+                            last VARCHAR,
+                            age BIGINT
+                            )""".format(self.keyspace_name))
+
+    def test_positional_params(self):
+        """
+        Test to validate positional parameters
+
+        test_positional_params tests that positional parameters can be used in a query. It first creates a simple table.
+        It then inserts into this table using positional parameters. Finally, it performs a select query and verifies
+        that the data has been properly written and retrieved.
+
+        @since 3.2.0
+        @jira_ticket PYTHON-491
+        @expected_result positional params should be parsed by the driver.
+
+        @test_category queries:basic
+        """
+
+        self.create_param_table()
+        self.session.execute("""INSERT INTO {0}.users (user_id, first, last, age)
+                            VALUES (%s, %s, %s, %s)
+                            """.format(self.keyspace_name),
+                             (0, 'John', 'Doe', 40))
+
+        result = self.session.execute("SELECT * FROM {0}.users WHERE user_id=%s".format(self.keyspace_name), (0,))[0]
+        self.assertEqual(result.user_id, 0)
+        self.assertEqual(result.first, 'John')
+        self.assertEqual(result.last, 'Doe')
+        self.assertEqual(result.age, 40)
+
+    @greaterthancass20
+    def test_named_params(self):
+        """
+        Test to validate named parameters
+
+        test_named_params tests that named parameters can be used in a query. It first creates a simple table.
+        It then inserts into this table using named parameters. Finally, it performs a select query and verifies
+        that the data has been properly written and retrieved.
+
+        @since 3.2.0
+        @jira_ticket PYTHON-439
+        @expected_result named params should be parsed by the driver.
+
+        @test_category queries:named_parameters
+        """
+
+        self.create_param_table()
+        self.session.execute("""INSERT INTO {0}.users (user_id, first, last, age)
+                            VALUES (%(a)s, %(b)s, %(c)s, %(d)s)
+                            """.format(self.keyspace_name),
+                             {'a': 0, 'b': 'John', 'c': 'Doe', 'd': 40})
+
+        result = self.session.execute("SELECT * FROM {0}.users WHERE user_id=%(id)s".format(self.keyspace_name), {'id': 0})[0]
+        self.assertEqual(result.user_id, 0)
+        self.assertEqual(result.first, 'John')
+        self.assertEqual(result.last, 'Doe')
+        self.assertEqual(result.age, 40)
+
+    @greaterthancass20
+    def test_raise_error_on_invalid_named_params(self):
+        """
+        Test to validate invalid named parameters
+
+        test_raise_error_on_invalid_named_params tests that named parameters with missing arguments cannot be used in a
+        query. It first creates a simple table. It then inserts into this table using named parameters, with one missing
+        argument. It verifies that a KeyError is raised in this case.
+
+        @expected_errors KeyError When there is a missing parameter.
+
+        @since 3.2.0
+        @jira_ticket PYTHON-439
+        @expected_result A KeyError should be raised due to missing arguments.
+
+        @test_category queries:named_parameters
+        """
+
+        self.create_param_table()
+
+        with self.assertRaises(KeyError):
+            self.session.execute("""INSERT INTO {0}.users (user_id, first, last, age)
+                                VALUES (%(a)s, %(b)s, %(c)s, %(d)s)
+                                """.format(self.keyspace_name),
+                                 {'a': 0, 'b': 'John', 'c': 'Doe'})
 
 
 class PreparedStatementTests(unittest.TestCase):
@@ -464,6 +554,54 @@ class BatchStatementTests(BasicSharedKeyspaceUnitTestCase):
             self.session.execute(batch)
         finally:
             self.session.execute("DROP TABLE test3rf.testtext")
+
+    @greaterthancass20
+    def test_named_params_in_batches(self):
+        """
+        Test to validate named parameters with batches
+
+        test_named_params_in_batches tests that named parameters can be used in a query for a batch statement. It first
+        creates a simple table. It then inserts into this table using named parameters inside of a batch. Finally, it
+        performs a select query and verifies that the data has been properly written and retrieved.
+
+        @since 3.2.0
+        @jira_ticket PYTHON-439
+        @expected_result named params should be parsed by the driver.
+
+        @test_category queries:named_parameters
+        """
+
+        self.session.execute("""CREATE TABLE IF NOT EXISTS {0}.users(
+                            user_id BIGINT PRIMARY KEY,
+                            first VARCHAR,
+                            last VARCHAR,
+                            age BIGINT
+                            )""".format(self.keyspace_name))
+
+        batch = BatchStatement(BatchType.LOGGED)
+
+        batch.add("""INSERT INTO {0}.users (user_id, first, last, age)
+                VALUES (%(a)s, %(b)s, %(c)s, %(d)s)
+                """.format(self.keyspace_name),
+                {'a': 0, 'b': 'John', 'c': 'Doe', 'd': 40})
+
+        batch.add("""INSERT INTO {0}.users (user_id, first, last, age)
+                VALUES (%(a)s, %(b)s, %(c)s, %(d)s)
+                """.format(self.keyspace_name),
+                {'a': 1, 'b': 'Jane', 'c': 'Doe', 'd': 30})
+
+        self.session.execute(batch)
+
+        result = self.session.execute("SELECT * FROM {0}.users".format(self.keyspace_name))
+        self.assertEqual(result[0].user_id, 0)
+        self.assertEqual(result[0].first, 'John')
+        self.assertEqual(result[0].last, 'Doe')
+        self.assertEqual(result[0].age, 40)
+
+        self.assertEqual(result[1].user_id, 1)
+        self.assertEqual(result[1].first, 'Jane')
+        self.assertEqual(result[1].last, 'Doe')
+        self.assertEqual(result[1].age, 30)
 
 
 class SerialConsistencyTests(unittest.TestCase):
