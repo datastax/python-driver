@@ -560,10 +560,11 @@ class AbstractQuerySet(object):
                 raise QueryException('{0} is not a valid query operator'.format(operator))
             clone._conditional.append(operator)
 
-        for col_name, val in kwargs.items():
+        for arg, val in kwargs.items():
             if isinstance(val, Token):
                 raise QueryException("Token() values are not valid in conditionals")
 
+            col_name, col_op = self._parse_filter_arg(arg)
             try:
                 column = self.model._get_column(col_name)
             except KeyError:
@@ -574,7 +575,9 @@ class AbstractQuerySet(object):
             else:
                 query_val = column.to_database(val)
 
-            clone._conditional.append(ConditionalClause(col_name, query_val))
+            operator_class = BaseWhereOperator.get_operator(col_op or 'EQ')
+            operator = operator_class()
+            clone._conditional.append(WhereClause(column.db_field_name, operator, query_val))
 
         return clone
 

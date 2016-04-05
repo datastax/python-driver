@@ -527,8 +527,6 @@ class BaseCQLStatement(UnicodeMixin):
         :param clause: The clause that will be added to the iff statement
         :type clause: ConditionalClause
         """
-        if not isinstance(clause, ConditionalClause):
-            raise StatementException('only instances of AssignmentClause can be added to statements')
         clause.set_context_id(self.context_counter)
         self.context_counter += clause.get_context_size()
         self.conditionals.append(clause)
