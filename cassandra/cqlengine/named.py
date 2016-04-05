@@ -84,6 +84,8 @@ class NamedTable(object):
 
     __partition_keys = None
 
+    _partition_key_index = None
+
     class DoesNotExist(_DoesNotExist):
         pass
 

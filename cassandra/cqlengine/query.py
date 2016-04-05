@@ -19,6 +19,7 @@ import time
 import six
 from warnings import warn
 
+from cassandra.query import SimpleStatement
 from cassandra.cqlengine import columns, CQLEngineException, ValidationError, UnicodeMixin
 from cassandra.cqlengine import connection
 from cassandra.cqlengine.functions import Token, BaseQueryFunction, QueryValue
@@ -26,10 +27,8 @@ from cassandra.cqlengine.operators import (InOperator, EqualsOperator, GreaterTh
                                            GreaterThanOrEqualOperator, LessThanOperator,
                                            LessThanOrEqualOperator, ContainsOperator, BaseWhereOperator)
 from cassandra.cqlengine.statements import (WhereClause, SelectStatement, DeleteStatement,
-                                            UpdateStatement, AssignmentClause, InsertStatement,
-                                            BaseCQLStatement, MapUpdateClause, MapDeleteClause,
-                                            ListUpdateClause, SetUpdateClause, CounterUpdateClause,
-                                            ConditionalClause)
+                                            UpdateStatement, InsertStatement,
+                                            BaseCQLStatement, MapDeleteClause, ConditionalClause)
 
 
 class QueryException(CQLEngineException):
@@ -38,6 +37,7 @@ class QueryException(CQLEngineException):
 
 class IfNotExistsWithCounterColumn(CQLEngineException):
     pass
+
 
 class IfExistsWithCounterColumn(CQLEngineException):
     pass
@@ -311,11 +311,11 @@ class AbstractQuerySet(object):
     def column_family_name(self):
         return self.model.column_family_name()
 
-    def _execute(self, q):
+    def _execute(self, statement):
         if self._batch:
-            return self._batch.add_query(q)
+            return self._batch.add_query(statement)
         else:
-            result = connection.execute(q, consistency_level=self._consistency, timeout=self._timeout)
+            result = _execute_statement(self.model, statement, self._consistency, self._timeout)
             if self._if_not_exists or self._if_exists or self._conditional:
                 check_applied(result)
             return result
@@ -1209,14 +1209,14 @@ class DMLQuery(object):
         self._conditional = conditional
         self._timeout = timeout
 
-    def _execute(self, q):
+    def _execute(self, statement):
         if self._batch:
-            return self._batch.add_query(q)
+            return self._batch.add_query(statement)
         else:
-            tmp = connection.execute(q, consistency_level=self._consistency, timeout=self._timeout)
+            results = _execute_statement(self.model, statement, self._consistency, self._timeout)
             if self._if_not_exists or self._if_exists or self._conditional:
-                check_applied(tmp)
-            return tmp
+                check_applied(results)
+            return results
 
     def batch(self, batch_obj):
         if batch_obj is not None and not isinstance(batch_obj, BatchQuery):
@@ -1243,11 +1243,7 @@ class DMLQuery(object):
 
         if deleted_fields:
             for name, col in self.model._primary_keys.items():
-                ds.add_where_clause(WhereClause(
-                    col.db_field_name,
-                    EqualsOperator(),
-                    col.to_database(getattr(self.instance, name))
-                ))
+                ds.add_where(col, EqualsOperator(), getattr(self.instance, name))
             self._execute(ds)
 
     def update(self):
@@ -1289,11 +1285,7 @@ class DMLQuery(object):
                 # only include clustering key if clustering key is not null, and non static columns are changed to avoid cql error
                 if (null_clustering_key or static_changed_only) and (not col.partition_key):
                     continue
-                statement.add_where_clause(WhereClause(
-                    col.db_field_name,
-                    EqualsOperator(),
-                    col.to_database(getattr(self.instance, name))
-                ))
+                statement.add_where(col, EqualsOperator(), getattr(self.instance, name))
             self._execute(statement)
 
         if not null_clustering_key:
@@ -1328,10 +1320,7 @@ class DMLQuery(object):
                     if self.instance._values[name].changed:
                         nulled_fields.add(col.db_field_name)
                     continue
-                insert.add_assignment_clause(AssignmentClause(
-                    col.db_field_name,
-                    col.to_database(getattr(self.instance, name, None))
-                ))
+                insert.add_assignment(col, getattr(self.instance, name, None))
 
         # skip query execution if it's empty
         # caused by pointless update queries
@@ -1348,12 +1337,20 @@ class DMLQuery(object):
 
         ds = DeleteStatement(self.column_family_name, timestamp=self._timestamp, conditionals=self._conditional, if_exists=self._if_exists)
         for name, col in self.model._primary_keys.items():
-            if (not col.partition_key) and (getattr(self.instance, name) is None):
+            val = getattr(self.instance, name)
+            if val is None and not col.parition_key:
                 continue
-
-            ds.add_where_clause(WhereClause(
-                col.db_field_name,
-                EqualsOperator(),
-                col.to_database(getattr(self.instance, name))
-            ))
+            ds.add_where(col, EqualsOperator(), val)
         self._execute(ds)
+
+
+def _execute_statement(model, statement, consistency_level, timeout):
+    params = statement.get_context()
+    s = SimpleStatement(str(statement), consistency_level=consistency_level, fetch_size=statement.fetch_size)
+    if model._partition_key_index:
+        key_values = statement.partition_key_values(model._partition_key_index)
+        if not any(v is None for v in key_values):
+            parts = model._routing_key_from_values(key_values, connection.get_cluster().protocol_version)
+            s.routing_key = parts
+            s.keyspace = model._get_keyspace()
+    return connection.execute(s, params, timeout=timeout)

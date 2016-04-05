@@ -79,6 +79,8 @@ Model
                                               'tombstone_compaction_interval': '86400'},
                                'gc_grace_seconds': '0'}
 
+    .. autoattribute:: __compute_routing_key__
+
 
     The base methods allow creating, storing, and querying modeled objects.
 

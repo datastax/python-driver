@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from datetime import datetime, timedelta
+from itertools import ifilter
 import time
 import six
 
@@ -20,7 +21,7 @@ from cassandra.query import FETCH_SIZE_UNSET
 from cassandra.cqlengine import columns
 from cassandra.cqlengine import UnicodeMixin
 from cassandra.cqlengine.functions import QueryValue
-from cassandra.cqlengine.operators import BaseWhereOperator, InOperator
+from cassandra.cqlengine.operators import BaseWhereOperator, InOperator, EqualsOperator
 
 
 class StatementException(Exception):
@@ -481,10 +482,9 @@ class MapDeleteClause(BaseDeleteClause):
 class BaseCQLStatement(UnicodeMixin):
     """ The base cql statement class """
 
-    def __init__(self, table, consistency=None, timestamp=None, where=None, fetch_size=None, conditionals=None):
+    def __init__(self, table, timestamp=None, where=None, fetch_size=None, conditionals=None):
         super(BaseCQLStatement, self).__init__()
         self.table = table
-        self.consistency = consistency
         self.context_id = 0
         self.context_counter = self.context_id
         self.timestamp = timestamp
@@ -492,20 +492,27 @@ class BaseCQLStatement(UnicodeMixin):
 
         self.where_clauses = []
         for clause in where or []:
-            self.add_where_clause(clause)
+            self._add_where_clause(clause)
 
         self.conditionals = []
         for conditional in conditionals or []:
             self.add_conditional_clause(conditional)
 
-    def add_where_clause(self, clause):
-        """
-        adds a where clause to this statement
-        :param clause: the clause to add
-        :type clause: WhereClause
-        """
-        if not isinstance(clause, WhereClause):
-            raise StatementException("only instances of WhereClause can be added to statements")
+    def _update_part_key_values(self, field_index_map, clauses, parts):
+        for clause in ifilter(lambda c: c.field in field_index_map, clauses):
+            parts[field_index_map[clause.field]] = clause.value
+
+    def partition_key_values(self, field_index_map):
+        parts = [None] * len(field_index_map)
+        self._update_part_key_values(field_index_map, (w for w in self.where_clauses if w.operator.__class__ == EqualsOperator), parts)
+        return parts
+
+    def add_where(self, column, operator, value, quote_field=True):
+        value = column.to_database(value)
+        clause = WhereClause(column.db_field_name, operator, value, quote_field)
+        self._add_where_clause(clause)
+
+    def _add_where_clause(self, clause):
         clause.set_context_id(self.context_counter)
         self.context_counter += clause.get_context_size()
         self.where_clauses.append(clause)
@@ -581,7 +588,6 @@ class SelectStatement(BaseCQLStatement):
                  table,
                  fields=None,
                  count=False,
-                 consistency=None,
                  where=None,
                  order_by=None,
                  limit=None,
@@ -595,7 +601,6 @@ class SelectStatement(BaseCQLStatement):
         """
         super(SelectStatement, self).__init__(
             table,
-            consistency=consistency,
             where=where,
             fetch_size=fetch_size
         )
@@ -641,14 +646,12 @@ class AssignmentStatement(BaseCQLStatement):
     def __init__(self,
                  table,
                  assignments=None,
-                 consistency=None,
                  where=None,
                  ttl=None,
                  timestamp=None,
                  conditionals=None):
         super(AssignmentStatement, self).__init__(
             table,
-            consistency=consistency,
             where=where,
             conditionals=conditionals
         )
@@ -658,7 +661,7 @@ class AssignmentStatement(BaseCQLStatement):
         # add assignments
         self.assignments = []
         for assignment in assignments or []:
-            self.add_assignment_clause(assignment)
+            self._add_assignment_clause(assignment)
 
     def update_context_id(self, i):
         super(AssignmentStatement, self).update_context_id(i)
@@ -666,14 +669,17 @@ class AssignmentStatement(BaseCQLStatement):
             assignment.set_context_id(self.context_counter)
             self.context_counter += assignment.get_context_size()
 
-    def add_assignment_clause(self, clause):
-        """
-        adds an assignment clause to this statement
-        :param clause: the clause to add
-        :type clause: AssignmentClause
-        """
-        if not isinstance(clause, AssignmentClause):
-            raise StatementException("only instances of AssignmentClause can be added to statements")
+    def partition_key_values(self, field_index_map):
+        parts = super(AssignmentStatement, self).partition_key_values(field_index_map)
+        self._update_part_key_values(field_index_map, self.assignments, parts)
+        return parts
+
+    def add_assignment(self, column, value):
+        value = column.to_database(value)
+        clause = AssignmentClause(column.db_field_name, value)
+        self._add_assignment_clause(clause)
+
+    def _add_assignment_clause(self, clause):
         clause.set_context_id(self.context_counter)
         self.context_counter += clause.get_context_size()
         self.assignments.append(clause)
@@ -695,22 +701,17 @@ class InsertStatement(AssignmentStatement):
     def __init__(self,
                  table,
                  assignments=None,
-                 consistency=None,
                  where=None,
                  ttl=None,
                  timestamp=None,
                  if_not_exists=False):
         super(InsertStatement, self).__init__(table,
                                               assignments=assignments,
-                                              consistency=consistency,
                                               where=where,
                                               ttl=ttl,
                                               timestamp=timestamp)
 
         self.if_not_exists = if_not_exists
-
-    def add_where_clause(self, clause):
-        raise StatementException("Cannot add where clauses to insert statements")
 
     def __unicode__(self):
         qs = ['INSERT INTO {0}'.format(self.table)]
@@ -741,7 +742,6 @@ class UpdateStatement(AssignmentStatement):
     def __init__(self,
                  table,
                  assignments=None,
-                 consistency=None,
                  where=None,
                  ttl=None,
                  timestamp=None,
@@ -749,7 +749,6 @@ class UpdateStatement(AssignmentStatement):
                  if_exists=False):
         super(UpdateStatement, self). __init__(table,
                                                assignments=assignments,
-                                               consistency=consistency,
                                                where=where,
                                                ttl=ttl,
                                                timestamp=timestamp,
@@ -809,16 +808,15 @@ class UpdateStatement(AssignmentStatement):
         else:
             clause = AssignmentClause(column.db_field_name, value)
         if clause.get_context_size():  # this is to exclude map removals from updates. Can go away if we drop support for C* < 1.2.4 and remove two-phase updates
-            self.add_assignment_clause(clause)
+            self._add_assignment_clause(clause)
 
 
 class DeleteStatement(BaseCQLStatement):
     """ a cql delete statement """
 
-    def __init__(self, table, fields=None, consistency=None, where=None, timestamp=None, conditionals=None, if_exists=False):
+    def __init__(self, table, fields=None, where=None, timestamp=None, conditionals=None, if_exists=False):
         super(DeleteStatement, self).__init__(
             table,
-            consistency=consistency,
             where=where,
             timestamp=timestamp,
             conditionals=conditionals

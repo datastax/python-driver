@@ -19,7 +19,7 @@ import six
 from uuid import UUID as _UUID
 
 from cassandra import util
-from cassandra.cqltypes import SimpleDateType
+from cassandra.cqltypes import SimpleDateType, _cqltypes, UserType
 from cassandra.cqlengine import ValidationError
 from cassandra.cqlengine.functions import get_total_seconds
 
@@ -159,6 +159,7 @@ class Column(object):
 
         # the column name in the model definition
         self.column_name = None
+        self._partition_key_index = None
         self.static = static
 
         self.value = None
@@ -254,6 +255,10 @@ class Column(object):
     @property
     def sub_types(self):
         return []
+
+    @property
+    def cql_type(self):
+        return _cqltypes[self.db_type]
 
 
 class Blob(Column):
@@ -665,6 +670,10 @@ class BaseCollectionColumn(Column):
     def sub_types(self):
         return self.types
 
+    @property
+    def cql_type(self):
+        return _cqltypes[self.__class__.__name__.lower()].apply_parameters([c.cql_type for c in self.types])
+
 
 class Tuple(BaseCollectionColumn):
     """
@@ -875,6 +884,12 @@ class UserDefinedType(Column):
     @property
     def sub_types(self):
         return list(self.user_type._fields.values())
+
+    @property
+    def cql_type(self):
+        return UserType.make_udt_class(keyspace='', udt_name=self.user_type.type_name(),
+                                       field_names=[c.db_field_name for c in self.user_type._fields.values()],
+                                       field_types=[c.cql_type for c in self.user_type._fields.values()])
 
 
 def resolve_udts(col_def, out_list):

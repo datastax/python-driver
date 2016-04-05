@@ -335,6 +335,8 @@ class BaseModel(object):
 
     __options__ = None
 
+    __compute_routing_key__ = True
+
     # the queryset class used for this class
     __queryset__ = query.ModelQuerySet
     __dmlquery__ = query.DMLQuery
@@ -378,6 +380,10 @@ class BaseModel(object):
         """
         return '{0} <{1}>'.format(self.__class__.__name__,
                                 ', '.join('{0}={1}'.format(k, getattr(self, k)) for k in self._primary_keys.keys()))
+
+    @classmethod
+    def _routing_key_from_values(cls, pk_values, protocol_version):
+        return cls._key_serializer(pk_values, protocol_version)
 
     @classmethod
     def _discover_polymorphic_submodels(cls):
@@ -843,6 +849,7 @@ class ModelMetaClass(type):
 
         has_partition_keys = any(v.partition_key for (k, v) in column_definitions)
 
+        partition_key_index = 0
         # transform column definitions
         for k, v in column_definitions:
             # don't allow a column with the same name as a built-in attribute or method
@@ -858,10 +865,22 @@ class ModelMetaClass(type):
             if not has_partition_keys and v.primary_key:
                 v.partition_key = True
                 has_partition_keys = True
+            if v.partition_key:
+                v._partition_key_index = partition_key_index
+                partition_key_index += 1
             _transform_column(k, v)
 
         partition_keys = OrderedDict(k for k in primary_keys.items() if k[1].partition_key)
         clustering_keys = OrderedDict(k for k in primary_keys.items() if not k[1].partition_key)
+
+        if attrs.get('__compute_routing_key__', True):
+            key_cols = [c for c in partition_keys.values()]
+            partition_key_index = dict((col.db_field_name, col._partition_key_index) for col in key_cols)
+            key_cql_types = [c.cql_type for c in key_cols]
+            key_serializer = staticmethod(lambda parts, proto_version: [t.to_binary(p, proto_version) for t, p in zip(key_cql_types, parts)])
+        else:
+            partition_key_index = {}
+            key_serializer = staticmethod(lambda parts, proto_version: None)
 
         # setup partition key shortcut
         if len(partition_keys) == 0:
@@ -906,6 +925,8 @@ class ModelMetaClass(type):
         attrs['_dynamic_columns'] = {}
 
         attrs['_partition_keys'] = partition_keys
+        attrs['_partition_key_index'] = partition_key_index
+        attrs['_key_serializer'] = key_serializer
         attrs['_clustering_keys'] = clustering_keys
         attrs['_has_counter'] = len(counter_columns) > 0
 
@@ -982,4 +1003,9 @@ class Model(BaseModel):
     __discriminator_value__ = None
     """
     *Optional* Specifies a value for the discriminator column when using model inheritance.
+    """
+
+    __compute_routing_key__ = True
+    """
+    *Optional* Setting False disables computing the routing key for TokenAwareRouting
     """
