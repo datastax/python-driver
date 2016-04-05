@@ -978,15 +978,13 @@ class DBFieldModelMixed2(Model):
 
 class TestModelQueryWithDBField(BaseCassEngTestCase):
 
-    @classmethod
-    def setUpClass(cls):
+    def setUp(cls):
         super(TestModelQueryWithDBField, cls).setUpClass()
         cls.model_list = [DBFieldModel, DBFieldModelMixed1, DBFieldModelMixed2]
         for model in cls.model_list:
             sync_table(model)
 
-    @classmethod
-    def tearDownClass(cls):
+    def tearDown(cls):
         super(TestModelQueryWithDBField, cls).tearDownClass()
         for model in cls.model_list:
             drop_table(model)
@@ -1118,8 +1116,6 @@ class TestModelQueryWithDBField(BaseCassEngTestCase):
         )
         for value in values:
             self.assertTrue(value not in str(b2.queries[0]))
-
-
 
 
 class TestModelSmall(Model):
