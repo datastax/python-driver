@@ -13,9 +13,9 @@
 # limitations under the License.
 
 from datetime import datetime, timedelta
-from itertools import ifilter
 import time
 import six
+from six.moves import filter
 
 from cassandra.query import FETCH_SIZE_UNSET
 from cassandra.cqlengine import columns
@@ -499,7 +499,7 @@ class BaseCQLStatement(UnicodeMixin):
             self.add_conditional_clause(conditional)
 
     def _update_part_key_values(self, field_index_map, clauses, parts):
-        for clause in ifilter(lambda c: c.field in field_index_map, clauses):
+        for clause in filter(lambda c: c.field in field_index_map, clauses):
             parts[field_index_map[clause.field]] = clause.value
 
     def partition_key_values(self, field_index_map):
