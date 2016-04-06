@@ -532,6 +532,10 @@ class Cluster(object):
             self.contact_points = contact_points
 
         self.port = port
+
+        self.contact_points_resolved = [endpoint[4][0] for a in self.contact_points
+                                        for endpoint in socket.getaddrinfo(a, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM)]
+
         self.compression = compression
         self.protocol_version = protocol_version
         self.auth_provider = auth_provider
@@ -830,7 +834,7 @@ class Cluster(object):
                           self.contact_points, self.protocol_version)
                 self.connection_class.initialize_reactor()
                 atexit.register(partial(_shutdown_cluster, self))
-                for address in self.contact_points:
+                for address in self.contact_points_resolved:
                     host, new = self.add_host(address, signal=False)
                     if new:
                         host.set_up()
@@ -2320,7 +2324,7 @@ class ControlConnection(object):
             if old_host.address != connection.host and old_host.address not in found_hosts:
                 should_rebuild_token_map = True
                 if old_host.address not in self._cluster.contact_points:
-                    log.debug("[control connection] Found host that has been removed: %r", old_host)
+                    log.debug("[control connection] Removing host not found in peers metadata: %r", old_host)
                     self._cluster.remove_host(old_host)
 
         log.debug("[control connection] Finished fetching ring info")
