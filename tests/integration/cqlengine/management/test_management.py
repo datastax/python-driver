@@ -366,6 +366,14 @@ class InconsistentTable(BaseCassEngTestCase):
         logger.removeHandler(mock_handler)
 
 
+class TestIndexSetModel(Model):
+    partition = columns.UUID(primary_key=True)
+    int_set = columns.Set(columns.Integer, index=True)
+    int_list = columns.List(columns.Integer, index=True)
+    text_map = columns.Map(columns.Text, columns.DateTime, index=True)
+    mixed_tuple = columns.Tuple(columns.Text, columns.Integer, columns.Text, index=True)
+
+
 class IndexTests(BaseCassEngTestCase):
 
     def setUp(self):
@@ -411,6 +419,23 @@ class IndexTests(BaseCassEngTestCase):
         sync_table(IndexCaseSensitiveModel)
         table_meta = management._get_table_metadata(IndexCaseSensitiveModel)
         self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'second_key'))
+
+    def test_sync_indexed_set(self):
+        """
+        Tests that models that have container types with indices can be synced.
+
+        @since 3.2
+        @jira_ticket PYTHON-533
+        @expected_result table_sync should complete without a server error.
+
+        @test_category object_mapper
+        """
+        sync_table(TestIndexSetModel)
+        table_meta = management._get_table_metadata(TestIndexSetModel)
+        self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'int_set'))
+        self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'int_list'))
+        self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'text_map'))
+        self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'mixed_tuple'))
 
 
 class NonModelFailureTest(BaseCassEngTestCase):
