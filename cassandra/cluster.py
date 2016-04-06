@@ -2717,7 +2717,16 @@ class ResponseFuture(object):
             self._timer.cancel()
 
     def _on_timeout(self):
-        self._set_final_exception(OperationTimedOut(self._errors, self._current_host))
+        errors = self._errors
+        if not errors:
+            if self.is_schema_agreed:
+                errors = {self._current_host.address: "Client request timeout. See Session.execute[_async](timeout)"}
+            else:
+                connection = getattr(self.session.cluster.control_connection, '_connection')
+                host = connection.host if connection else 'unknown'
+                errors = {host: "Request timed out while waiting for schema agreement. See Session.execute[_async](timeout) and Cluster.max_schema_agreement_wait."}
+
+        self._set_final_exception(OperationTimedOut(errors, self._current_host))
 
     def _make_query_plan(self):
         # convert the list/generator/etc to an iterator so that subsequent
