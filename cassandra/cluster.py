@@ -529,6 +529,8 @@ class Cluster(object):
             if isinstance(contact_points, six.string_types):
                 raise TypeError("contact_points should not be a string, it should be a sequence (e.g. list) of strings")
 
+            if None in contact_points:
+                raise ValueError("contact_points should not contain None (it can resolve to localhost)")
             self.contact_points = contact_points
 
         self.port = port
