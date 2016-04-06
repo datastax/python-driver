@@ -125,6 +125,7 @@ class _Frame(object):
 
 NONBLOCKING = (errno.EAGAIN, errno.EWOULDBLOCK)
 
+
 class ConnectionException(Exception):
     """
     An unrecoverable error was hit when attempting to use a connection,
@@ -319,6 +320,8 @@ class Connection(object):
     def _connect_socket(self):
         sockerr = None
         addresses = socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        if not addresses:
+            raise ConnectionException("getaddrinfo returned empty list for %s" % (self.host,))
         for (af, socktype, proto, canonname, sockaddr) in addresses:
             try:
                 self._socket = self._socket_impl.socket(af, socktype, proto)
