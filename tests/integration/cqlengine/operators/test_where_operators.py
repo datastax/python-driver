@@ -39,7 +39,7 @@ class TestWhereOperators(TestCase):
     def test_operator_rendering(self):
         """ tests symbols are rendered properly """
         self.assertEqual("=", six.text_type(EqualsOperator()))
-        self.assertEqual("=!", six.text_type(NotEqualsOperator()))
+        self.assertEqual("!=", six.text_type(NotEqualsOperator()))
         self.assertEqual("IN", six.text_type(InOperator()))
         self.assertEqual(">", six.text_type(GreaterThanOperator()))
         self.assertEqual(">=", six.text_type(GreaterThanOrEqualOperator()))
