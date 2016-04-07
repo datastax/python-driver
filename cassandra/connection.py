@@ -327,7 +327,7 @@ class Connection(object):
                 self._socket = self._socket_impl.socket(af, socktype, proto)
                 if self.ssl_options:
                     if not self._ssl_impl:
-                        raise Exception("This version of Python was not compiled with SSL support")
+                        raise RuntimeError("This version of Python was not compiled with SSL support")
                     self._socket = self._ssl_impl.wrap_socket(self._socket, **self.ssl_options)
                 self._socket.settimeout(self.connect_timeout)
                 self._socket.connect(sockaddr)

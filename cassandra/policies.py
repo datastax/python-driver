@@ -337,7 +337,7 @@ class TokenAwarePolicy(LoadBalancingPolicy):
 
     def check_supported(self):
         if not self._cluster_metadata.can_support_partitioner():
-            raise Exception(
+            raise RuntimeError(
                 '%s cannot be used with the cluster partitioner (%s) because '
                 'the relevant C extension for this driver was not compiled. '
                 'See the installation instructions for details on building '

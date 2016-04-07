@@ -45,7 +45,7 @@ from itertools import groupby, count
 
 from cassandra import (ConsistencyLevel, AuthenticationFailed,
                        OperationTimedOut, UnsupportedOperation,
-                       SchemaTargetType)
+                       SchemaTargetType, DriverException)
 from cassandra.connection import (ConnectionException, ConnectionShutdown,
                                   ConnectionHeartbeat, ProtocolVersionUnsupported)
 from cassandra.cqltypes import UserType
@@ -819,7 +819,7 @@ class Cluster(object):
                 log.warning("Downgrading core protocol version from %d to %d for %s", self.protocol_version, new_version, host_addr)
                 self.protocol_version = new_version
             else:
-                raise Exception("Cannot downgrade protocol version (%d) below minimum supported version: %d" % (new_version, MIN_SUPPORTED_VERSION))
+                raise DriverException("Cannot downgrade protocol version (%d) below minimum supported version: %d" % (new_version, MIN_SUPPORTED_VERSION))
 
     def connect(self, keyspace=None):
         """
@@ -829,7 +829,7 @@ class Cluster(object):
         """
         with self._lock:
             if self.is_shutdown:
-                raise Exception("Cluster is already shut down")
+                raise DriverException("Cluster is already shut down")
 
             if not self._is_setup:
                 log.debug("Connecting to cluster, contact points: %s; protocol version: %s",
@@ -1251,7 +1251,7 @@ class Cluster(object):
         An Exception is raised if schema refresh fails for any reason.
         """
         if not self.control_connection.refresh_schema(schema_agreement_wait=max_schema_agreement_wait):
-            raise Exception("Schema metadata was not refreshed. See log for details.")
+            raise DriverException("Schema metadata was not refreshed. See log for details.")
 
     def refresh_keyspace_metadata(self, keyspace, max_schema_agreement_wait=None):
         """
@@ -1262,7 +1262,7 @@ class Cluster(object):
         """
         if not self.control_connection.refresh_schema(target_type=SchemaTargetType.KEYSPACE, keyspace=keyspace,
                                                       schema_agreement_wait=max_schema_agreement_wait):
-            raise Exception("Keyspace metadata was not refreshed. See log for details.")
+            raise DriverException("Keyspace metadata was not refreshed. See log for details.")
 
     def refresh_table_metadata(self, keyspace, table, max_schema_agreement_wait=None):
         """
@@ -1272,7 +1272,7 @@ class Cluster(object):
         See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
         """
         if not self.control_connection.refresh_schema(target_type=SchemaTargetType.TABLE, keyspace=keyspace, table=table, schema_agreement_wait=max_schema_agreement_wait):
-            raise Exception("Table metadata was not refreshed. See log for details.")
+            raise DriverException("Table metadata was not refreshed. See log for details.")
 
     def refresh_materialized_view_metadata(self, keyspace, view, max_schema_agreement_wait=None):
         """
@@ -1281,7 +1281,7 @@ class Cluster(object):
         See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
         """
         if not self.control_connection.refresh_schema(target_type=SchemaTargetType.TABLE, keyspace=keyspace, table=view, schema_agreement_wait=max_schema_agreement_wait):
-            raise Exception("View metadata was not refreshed. See log for details.")
+            raise DriverException("View metadata was not refreshed. See log for details.")
 
     def refresh_user_type_metadata(self, keyspace, user_type, max_schema_agreement_wait=None):
         """
@@ -1290,7 +1290,7 @@ class Cluster(object):
         See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
         """
         if not self.control_connection.refresh_schema(target_type=SchemaTargetType.TYPE, keyspace=keyspace, type=user_type, schema_agreement_wait=max_schema_agreement_wait):
-            raise Exception("User Type metadata was not refreshed. See log for details.")
+            raise DriverException("User Type metadata was not refreshed. See log for details.")
 
     def refresh_user_function_metadata(self, keyspace, function, max_schema_agreement_wait=None):
         """
@@ -1301,7 +1301,7 @@ class Cluster(object):
         See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
         """
         if not self.control_connection.refresh_schema(target_type=SchemaTargetType.FUNCTION, keyspace=keyspace, function=function, schema_agreement_wait=max_schema_agreement_wait):
-            raise Exception("User Function metadata was not refreshed. See log for details.")
+            raise DriverException("User Function metadata was not refreshed. See log for details.")
 
     def refresh_user_aggregate_metadata(self, keyspace, aggregate, max_schema_agreement_wait=None):
         """
@@ -1312,7 +1312,7 @@ class Cluster(object):
         See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
         """
         if not self.control_connection.refresh_schema(target_type=SchemaTargetType.AGGREGATE, keyspace=keyspace, aggregate=aggregate, schema_agreement_wait=max_schema_agreement_wait):
-            raise Exception("User Aggregate metadata was not refreshed. See log for details.")
+            raise DriverException("User Aggregate metadata was not refreshed. See log for details.")
 
     def refresh_nodes(self):
         """
@@ -1321,7 +1321,7 @@ class Cluster(object):
         An Exception is raised if node refresh fails for any reason.
         """
         if not self.control_connection.refresh_node_list_and_token_map():
-            raise Exception("Node list was not refreshed. See log for details.")
+            raise DriverException("Node list was not refreshed. See log for details.")
 
     def set_meta_refresh_enabled(self, enabled):
         """
@@ -2824,7 +2824,7 @@ class ResponseFuture(object):
         """
         # TODO: When timers are introduced, just make this wait
         if not self._event.is_set():
-            raise Exception("warnings cannot be retrieved before ResponseFuture is finalized")
+            raise DriverException("warnings cannot be retrieved before ResponseFuture is finalized")
         return self._warnings
 
     @property
@@ -2842,7 +2842,7 @@ class ResponseFuture(object):
         """
         # TODO: When timers are introduced, just make this wait
         if not self._event.is_set():
-            raise Exception("custom_payload cannot be retrieved before ResponseFuture is finalized")
+            raise DriverException("custom_payload cannot be retrieved before ResponseFuture is finalized")
         return self._custom_payload
 
     def start_fetching_next_page(self):
