@@ -481,6 +481,37 @@ class Cluster(object):
     establishment, options passing, and authentication.
     """
 
+    @property
+    def schema_metadata_enabled(self):
+        """
+        Flag indicating whether internal schema metadata is updated.
+
+        When disabled, the driver does not populate Cluster.metadata.keyspaces on connect, or on schema change events. This
+        can be used to speed initial connection, and reduce load on client and server during operation. Turning this off
+        gives away token aware request routing, and programmatic inspection of the metadata model.
+        """
+        return self.control_connection._schema_meta_enabled
+
+    @schema_metadata_enabled.setter
+    def schema_metadata_enabled(self, enabled):
+        self.control_connection._schema_meta_enabled = bool(enabled)
+
+    @property
+    def token_metadata_enabled(self):
+        """
+        Flag indicating whether internal token metadata is updated.
+
+        When disabled, the driver does not query node token information on connect, or on topology change events. This
+        can be used to speed initial connection, and reduce load on client and server during operation. It is most useful
+        in large clusters using vnodes, where the token map can be expensive to compute. Turning this off
+        gives away token aware request routing, and programmatic inspection of the token ring.
+        """
+        return self.control_connection._token_meta_enabled
+
+    @token_metadata_enabled.setter
+    def token_metadata_enabled(self, enabled):
+        self.control_connection._token_meta_enabled = bool(enabled)
+
     sessions = None
     control_connection = None
     scheduler = None
@@ -520,7 +551,9 @@ class Cluster(object):
                  idle_heartbeat_interval=30,
                  schema_event_refresh_window=2,
                  topology_event_refresh_window=10,
-                 connect_timeout=5):
+                 connect_timeout=5,
+                 schema_metadata_enabled=True,
+                 token_metadata_enabled=True):
         """
         Any of the mutable Cluster attributes may be set as keyword arguments
         to the constructor.
@@ -619,7 +652,9 @@ class Cluster(object):
 
         self.control_connection = ControlConnection(
             self, self.control_connection_timeout,
-            self.schema_event_refresh_window, self.topology_event_refresh_window)
+            self.schema_event_refresh_window, self.topology_event_refresh_window,
+            schema_metadata_enabled, token_metadata_enabled)
+
 
     def register_user_type(self, keyspace, user_type, klass):
         """
@@ -1244,7 +1279,7 @@ class Cluster(object):
 
         An Exception is raised if schema refresh fails for any reason.
         """
-        if not self.control_connection.refresh_schema(schema_agreement_wait=max_schema_agreement_wait):
+        if not self.control_connection.refresh_schema(schema_agreement_wait=max_schema_agreement_wait, force=True):
             raise Exception("Schema metadata was not refreshed. See log for details.")
 
     def refresh_keyspace_metadata(self, keyspace, max_schema_agreement_wait=None):
@@ -1255,7 +1290,7 @@ class Cluster(object):
         See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
         """
         if not self.control_connection.refresh_schema(target_type=SchemaTargetType.KEYSPACE, keyspace=keyspace,
-                                                      schema_agreement_wait=max_schema_agreement_wait):
+                                                      schema_agreement_wait=max_schema_agreement_wait, force=True):
             raise Exception("Keyspace metadata was not refreshed. See log for details.")
 
     def refresh_table_metadata(self, keyspace, table, max_schema_agreement_wait=None):
@@ -1265,7 +1300,8 @@ class Cluster(object):
 
         See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
         """
-        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.TABLE, keyspace=keyspace, table=table, schema_agreement_wait=max_schema_agreement_wait):
+        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.TABLE, keyspace=keyspace, table=table,
+                                                      schema_agreement_wait=max_schema_agreement_wait, force=True):
             raise Exception("Table metadata was not refreshed. See log for details.")
 
     def refresh_materialized_view_metadata(self, keyspace, view, max_schema_agreement_wait=None):
@@ -1274,7 +1310,8 @@ class Cluster(object):
 
         See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
         """
-        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.TABLE, keyspace=keyspace, table=view, schema_agreement_wait=max_schema_agreement_wait):
+        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.TABLE, keyspace=keyspace, table=view,
+                                                      schema_agreement_wait=max_schema_agreement_wait, force=True):
             raise Exception("View metadata was not refreshed. See log for details.")
 
     def refresh_user_type_metadata(self, keyspace, user_type, max_schema_agreement_wait=None):
@@ -1283,7 +1320,8 @@ class Cluster(object):
 
         See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
         """
-        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.TYPE, keyspace=keyspace, type=user_type, schema_agreement_wait=max_schema_agreement_wait):
+        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.TYPE, keyspace=keyspace, type=user_type,
+                                                      schema_agreement_wait=max_schema_agreement_wait, force=True):
             raise Exception("User Type metadata was not refreshed. See log for details.")
 
     def refresh_user_function_metadata(self, keyspace, function, max_schema_agreement_wait=None):
@@ -1294,7 +1332,8 @@ class Cluster(object):
 
         See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
         """
-        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.FUNCTION, keyspace=keyspace, function=function, schema_agreement_wait=max_schema_agreement_wait):
+        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.FUNCTION, keyspace=keyspace, function=function,
+                                                      schema_agreement_wait=max_schema_agreement_wait, force=True):
             raise Exception("User Function metadata was not refreshed. See log for details.")
 
     def refresh_user_aggregate_metadata(self, keyspace, aggregate, max_schema_agreement_wait=None):
@@ -1305,7 +1344,8 @@ class Cluster(object):
 
         See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
         """
-        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.AGGREGATE, keyspace=keyspace, aggregate=aggregate, schema_agreement_wait=max_schema_agreement_wait):
+        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.AGGREGATE, keyspace=keyspace, aggregate=aggregate,
+                                                      schema_agreement_wait=max_schema_agreement_wait, force=True):
             raise Exception("User Aggregate metadata was not refreshed. See log for details.")
 
     def refresh_nodes(self):
@@ -1319,6 +1359,8 @@ class Cluster(object):
 
     def set_meta_refresh_enabled(self, enabled):
         """
+        *Deprecated:* set :attr:`~.Cluster.schema_metadata_enabled` :attr:`~.Cluster.token_metadata_enabled` instead
+
         Sets a flag to enable (True) or disable (False) all metadata refresh queries.
         This applies to both schema and node topology.
 
@@ -1327,7 +1369,8 @@ class Cluster(object):
         Meta refresh must be enabled for the driver to become aware of any cluster
         topology changes or schema updates.
         """
-        self.control_connection.set_meta_refresh_enabled(bool(enabled))
+        self.schema_metadata_enabled = enabled
+        self.token_metadata_enabled = enabled
 
     def _prepare_all_queries(self, host):
         if not self._prepared_statements:
@@ -2010,7 +2053,10 @@ class ControlConnection(object):
     """
 
     _SELECT_PEERS = "SELECT peer, data_center, rack, tokens, rpc_address, schema_version FROM system.peers"
+    _SELECT_PEERS_NO_TOKENS = "SELECT peer, data_center, rack, rpc_address, schema_version FROM system.peers"
     _SELECT_LOCAL = "SELECT cluster_name, data_center, rack, tokens, partitioner, release_version, schema_version FROM system.local WHERE key='local'"
+    _SELECT_LOCAL_NO_TOKENS = "SELECT cluster_name, data_center, rack, partitioner, release_version, schema_version FROM system.local WHERE key='local'"
+
 
     _SELECT_SCHEMA_PEERS = "SELECT peer, rpc_address, schema_version FROM system.peers"
     _SELECT_SCHEMA_LOCAL = "SELECT schema_version FROM system.local WHERE key='local'"
@@ -2022,14 +2068,17 @@ class ControlConnection(object):
     _schema_event_refresh_window = None
     _topology_event_refresh_window = None
 
-    _meta_refresh_enabled = True
+    _schema_meta_enabled = True
+    _token_meta_enabled = True
 
     # for testing purposes
     _time = time
 
     def __init__(self, cluster, timeout,
                  schema_event_refresh_window,
-                 topology_event_refresh_window):
+                 topology_event_refresh_window,
+                 schema_meta_enabled=True,
+                 token_meta_enabled=True):
         # use a weak reference to allow the Cluster instance to be GC'ed (and
         # shutdown) since implementing __del__ disables the cycle detector
         self._cluster = weakref.proxy(cluster)
@@ -2038,6 +2087,8 @@ class ControlConnection(object):
 
         self._schema_event_refresh_window = schema_event_refresh_window
         self._topology_event_refresh_window = topology_event_refresh_window
+        self._schema_meta_enabled = schema_meta_enabled
+        self._token_meta_enabled = token_meta_enabled
 
         self._lock = RLock()
         self._schema_agreement_lock = Lock()
@@ -2119,8 +2170,10 @@ class ControlConnection(object):
                 "SCHEMA_CHANGE": partial(_watch_callback, self_weakref, '_handle_schema_change')
             }, register_timeout=self._timeout)
 
-            peers_query = QueryMessage(query=self._SELECT_PEERS, consistency_level=ConsistencyLevel.ONE)
-            local_query = QueryMessage(query=self._SELECT_LOCAL, consistency_level=ConsistencyLevel.ONE)
+            sel_peers = self._SELECT_PEERS if self._token_meta_enabled else self._SELECT_PEERS_NO_TOKENS
+            sel_local = self._SELECT_LOCAL if self._token_meta_enabled else self._SELECT_LOCAL_NO_TOKENS
+            peers_query = QueryMessage(query=sel_peers, consistency_level=ConsistencyLevel.ONE)
+            local_query = QueryMessage(query=sel_local, consistency_level=ConsistencyLevel.ONE)
             shared_results = connection.wait_for_responses(
                 peers_query, local_query, timeout=self._timeout)
 
@@ -2200,14 +2253,10 @@ class ControlConnection(object):
                 self._connection.close()
                 del self._connection
 
-    def refresh_schema(self, **kwargs):
-        if not self._meta_refresh_enabled:
-            log.debug("[control connection] Skipping schema refresh because meta refresh is disabled")
-            return False
-
+    def refresh_schema(self, force=False, **kwargs):
         try:
             if self._connection:
-                return self._refresh_schema(self._connection, **kwargs)
+                return self._refresh_schema(self._connection, force=force, **kwargs)
         except ReferenceError:
             pass  # our weak reference to the Cluster is no good
         except Exception:
@@ -2215,13 +2264,18 @@ class ControlConnection(object):
             self._signal_error()
         return False
 
-    def _refresh_schema(self, connection, preloaded_results=None, schema_agreement_wait=None, **kwargs):
+    def _refresh_schema(self, connection, preloaded_results=None, schema_agreement_wait=None, force=False, **kwargs):
         if self._cluster.is_shutdown:
             return False
 
         agreed = self.wait_for_schema_agreement(connection,
                                                 preloaded_results=preloaded_results,
                                                 wait_time=schema_agreement_wait)
+
+        if not self._schema_meta_enabled and not force:
+            log.debug("[control connection] Skipping schema refresh because schema metadata is disabled")
+            return False
+
         if not agreed:
             log.debug("Skipping schema refresh due to lack of schema agreement")
             return False
@@ -2231,10 +2285,6 @@ class ControlConnection(object):
         return True
 
     def refresh_node_list_and_token_map(self, force_token_rebuild=False):
-        if not self._meta_refresh_enabled:
-            log.debug("[control connection] Skipping node list refresh because meta refresh is disabled")
-            return False
-
         try:
             if self._connection:
                 self._refresh_node_list_and_token_map(self._connection, force_token_rebuild=force_token_rebuild)
@@ -2254,10 +2304,17 @@ class ControlConnection(object):
             peers_result = preloaded_results[0]
             local_result = preloaded_results[1]
         else:
-            log.debug("[control connection] Refreshing node list and token map")
             cl = ConsistencyLevel.ONE
-            peers_query = QueryMessage(query=self._SELECT_PEERS, consistency_level=cl)
-            local_query = QueryMessage(query=self._SELECT_LOCAL, consistency_level=cl)
+            if not self._token_meta_enabled:
+                log.debug("[control connection] Refreshing node list without token map")
+                sel_peers = self._SELECT_PEERS_NO_TOKENS
+                sel_local = self._SELECT_LOCAL_NO_TOKENS
+            else:
+                log.debug("[control connection] Refreshing node list and token map")
+                sel_peers = self._SELECT_PEERS
+                sel_local = self._SELECT_LOCAL
+            peers_query = QueryMessage(query=sel_peers, consistency_level=cl)
+            local_query = QueryMessage(query=sel_local, consistency_level=cl)
             peers_result, local_result = connection.wait_for_responses(
                 peers_query, local_query, timeout=self._timeout)
 
@@ -2296,8 +2353,8 @@ class ControlConnection(object):
             if not addr or addr in ["0.0.0.0", "::"]:
                 addr = row.get("peer")
 
-            tokens = row.get("tokens")
-            if not tokens:
+            tokens = row.get("tokens", None)
+            if 'tokens' in row and not tokens:  # it was selected, but empty
                 log.warning("Excluding host (%s) with no tokens in system.peers table of %s." % (addr, connection.host))
                 continue
 
@@ -2529,9 +2586,6 @@ class ControlConnection(object):
         if connection is self._connection and (connection.is_defunct or connection.is_closed):
             self.reconnect()
 
-    def set_meta_refresh_enabled(self, enabled):
-        self._meta_refresh_enabled = enabled
-
 
 def _stop_scheduler(scheduler, thread):
     try:
@@ -2626,13 +2680,9 @@ class _Scheduler(object):
 
 def refresh_schema_and_set_result(control_conn, response_future, **kwargs):
     try:
-        if control_conn._meta_refresh_enabled:
-            log.debug("Refreshing schema in response to schema change. "
-                      "%s", kwargs)
-            response_future.is_schema_agreed = control_conn._refresh_schema(response_future._connection, **kwargs)
-        else:
-            log.debug("Skipping schema refresh in response to schema change because meta refresh is disabled; "
-                      "%s", kwargs)
+        log.debug("Refreshing schema in response to schema change. "
+                  "%s", kwargs)
+        response_future.is_schema_agreed = control_conn._refresh_schema(response_future._connection, **kwargs)
     except Exception:
         log.exception("Exception refreshing schema in response to schema change:")
         response_future.session.submit(control_conn.refresh_schema, **kwargs)

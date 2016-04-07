@@ -49,6 +49,12 @@
 
    .. autoattribute:: connect_timeout
 
+   .. autoattribute:: schema_metadata_enabled
+      :annotation: = True
+
+   .. autoattribute:: token_metadata_enabled
+      :annotation: = True
+
    .. automethod:: connect
 
    .. automethod:: shutdown
