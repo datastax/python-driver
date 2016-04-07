@@ -76,6 +76,10 @@ class DeleteStatementTests(TestCase):
         ds.add_where(Column(db_field='created_at'), InOperator(), ['0', '10', '20'])
         self.assertEqual(six.text_type(ds), 'DELETE FROM table WHERE "a" = %(0)s AND "created_at" IN %(1)s', six.text_type(ds))
 
+        ds = DeleteStatement('table', None)
+        ds.add_where(Column(db_field='a'), NotEqualsOperator(), 'b')
+        self.assertEqual(six.text_type(ds), 'DELETE FROM table WHERE "a" != %(0)s', six.text_type(ds))
+
     def test_delete_conditional(self):
         where = [WhereClause('id', EqualsOperator(), 1)]
         conditionals = [ConditionalClause('f0', 'value0'), ConditionalClause('f1', 'value1')]

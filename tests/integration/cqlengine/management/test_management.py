@@ -420,6 +420,7 @@ class IndexTests(BaseCassEngTestCase):
         table_meta = management._get_table_metadata(IndexCaseSensitiveModel)
         self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'second_key'))
 
+    @greaterthancass20
     def test_sync_indexed_set(self):
         """
         Tests that models that have container types with indices can be synced.

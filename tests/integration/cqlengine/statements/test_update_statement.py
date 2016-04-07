@@ -39,6 +39,9 @@ class UpdateStatementTests(unittest.TestCase):
         us.add_where(Column(db_field='a'), EqualsOperator(), 'x')
         self.assertEqual(six.text_type(us), 'UPDATE table SET "a" = %(0)s, "c" = %(1)s WHERE "a" = %(2)s', six.text_type(us))
 
+        us.add_where(Column(db_field='a'), NotEqualsOperator(), 'y')
+        self.assertEqual(six.text_type(us), 'UPDATE table SET "a" = %(0)s, "c" = %(1)s WHERE "a" = %(2)s AND "a" != %(3)s', six.text_type(us))
+
     def test_context(self):
         us = UpdateStatement('table')
         us.add_assignment(Column(db_field='a'), 'b')

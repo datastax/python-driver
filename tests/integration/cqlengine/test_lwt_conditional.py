@@ -154,6 +154,62 @@ class TestConditional(BaseCassEngTestCase):
         TestConditionalModel.objects(id=t.id).iff(count=5).delete()
         self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 0)
 
+    def test_delete_lwt_ne(self):
+        """
+        Test to ensure that deletes using IF and not equals are honored correctly
+
+        @since 3.2
+        @jira_ticket PYTHON-328
+        @expected_result Delete conditional with NE should be honored
+
+        @test_category object_mapper
+        """
+
+        # DML path
+        t = TestConditionalModel.create(text='something', count=5)
+        self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 1)
+        with self.assertRaises(LWTException):
+            t.iff(count__ne=5).delete()
+        t.iff(count__ne=2).delete()
+        self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 0)
+
+        # QuerySet path
+        t = TestConditionalModel.create(text='something', count=5)
+        self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 1)
+        with self.assertRaises(LWTException):
+            TestConditionalModel.objects(id=t.id).iff(count__ne=5).delete()
+        TestConditionalModel.objects(id=t.id).iff(count__ne=2).delete()
+        self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 0)
+
+    def test_update_lwt_ne(self):
+        """
+        Test to ensure that update using IF and not equals are honored correctly
+
+        @since 3.2
+        @jira_ticket PYTHON-328
+        @expected_result update conditional with NE should be honored
+
+        @test_category object_mapper
+        """
+
+        # DML path
+        t = TestConditionalModel.create(text='something', count=5)
+        self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 1)
+        with self.assertRaises(LWTException):
+            t.iff(count__ne=5).update(text='nothing')
+        t.iff(count__ne=2).update(text='nothing')
+        self.assertEqual(TestConditionalModel.objects(id=t.id).first().text, 'nothing')
+        t.delete()
+
+        # QuerySet path
+        t = TestConditionalModel.create(text='something', count=5)
+        self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 1)
+        with self.assertRaises(LWTException):
+            TestConditionalModel.objects(id=t.id).iff(count__ne=5).update(text='nothing')
+        TestConditionalModel.objects(id=t.id).iff(count__ne=2).update(text='nothing')
+        self.assertEqual(TestConditionalModel.objects(id=t.id).first().text, 'nothing')
+        t.delete()
+
     def test_update_to_none(self):
         # This test is done because updates to none are split into deletes
         # for old versions of cassandra. Can be removed when we drop that code
