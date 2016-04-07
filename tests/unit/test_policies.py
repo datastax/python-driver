@@ -483,7 +483,7 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
         host_none = Host(1, SimpleConvictionPolicy)
 
         # contact point is '1'
-        cluster = Mock(contact_points=[1])
+        cluster = Mock(contact_points_resolved=[1])
 
         # contact DC first
         policy = DCAwareRoundRobinPolicy()
