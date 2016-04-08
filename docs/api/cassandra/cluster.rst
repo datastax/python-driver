@@ -25,6 +25,8 @@
 
    .. autoattribute:: conviction_policy_factory
 
+   .. autoattribute:: address_translator
+
    .. autoattribute:: connection_class
 
    .. autoattribute:: metrics_enabled
