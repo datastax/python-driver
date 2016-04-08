@@ -38,6 +38,7 @@ def is_prepend_reversed():
     ver, _ = get_server_versions()
     return not (ver >= (2, 0, 13) or ver >= (2, 1, 3))
 
+
 def setup_connection(keyspace_name):
     connection.setup(['127.0.0.1'],
                      consistency=ConsistencyLevel.ONE,
