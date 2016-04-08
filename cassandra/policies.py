@@ -232,7 +232,7 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
             self._dc_live_hosts[dc] = tuple(set(dc_hosts))
 
         if not self.local_dc:
-            self._contact_points = cluster.contact_points
+            self._contact_points = cluster.contact_points_resolved
 
         self._position = randint(0, len(hosts) - 1) if hosts else 0
 
@@ -334,7 +334,7 @@ class TokenAwarePolicy(LoadBalancingPolicy):
 
     def check_supported(self):
         if not self._cluster_metadata.can_support_partitioner():
-            raise Exception(
+            raise RuntimeError(
                 '%s cannot be used with the cluster partitioner (%s) because '
                 'the relevant C extension for this driver was not compiled. '
                 'See the installation instructions for details on building '
