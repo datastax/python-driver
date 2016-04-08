@@ -16,11 +16,8 @@ from itertools import islice, cycle, groupby, repeat
 import logging
 from random import randint
 from threading import Lock
-import six
 
 from cassandra import ConsistencyLevel
-
-from six.moves import range
 
 log = logging.getLogger(__name__)
 
@@ -849,3 +846,31 @@ class DowngradingConsistencyRetryPolicy(RetryPolicy):
             return (self.RETHROW, None)
         else:
             return self._pick_consistency(alive_replicas)
+
+
+class AddressTranslator(object):
+    """
+    Interface for translating cluster-defined endpoints.
+
+    The driver discovers nodes using server metadata and topology change events. Normally,
+    the endpoint defined by the server is the right way to connect to a node. In some environments,
+    these addresses may not be reachable, or not preferred (public vs. private IPs in cloud environments,
+    suboptimal routing, etc). This interface allows for translating from server defined endpoints to
+    preferred addresses for driver connections.
+
+    *Note:* :attr:`~Cluster.contact_points` provided while creating the :class:`~.Cluster` instance are not
+    translated using this mechanism -- only addresses received from Cassandra nodes are.
+    """
+    def translate(self, addr):
+        """
+        Accepts the node ip address, and returns a translated address to be used connecting to this node.
+        """
+        raise NotImplementedError
+
+
+class IdentityTranslator(AddressTranslator):
+    """
+    Returns the endpoint with no translation
+    """
+    def translate(self, addr):
+        return addr

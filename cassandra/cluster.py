@@ -65,7 +65,7 @@ from cassandra.protocol import (QueryMessage, ResultMessage,
 from cassandra.metadata import Metadata, protect_name, murmur3
 from cassandra.policies import (TokenAwarePolicy, DCAwareRoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
-                                RetryPolicy)
+                                RetryPolicy, IdentityTranslator)
 from cassandra.pool import (Host, _ReconnectionHandler, _HostReconnectionHandler,
                             HostConnectionPool, HostConnection,
                             NoConnectionsAvailable)
@@ -347,6 +347,12 @@ class Cluster(object):
     :class:`.policies.SimpleConvictionPolicy`.
     """
 
+    address_translator = IdentityTranslator()
+    """
+    :class:`.policies.AddressTranslator` instance to be used in translating server node addresses
+    to driver connection addresses.
+    """
+
     connect_to_remote_hosts = True
     """
     If left as :const:`True`, hosts that are considered :attr:`~.HostDistance.REMOTE`
@@ -553,7 +559,8 @@ class Cluster(object):
                  topology_event_refresh_window=10,
                  connect_timeout=5,
                  schema_metadata_enabled=True,
-                 token_metadata_enabled=True):
+                 token_metadata_enabled=True,
+                 address_translator=None):
         """
         Any of the mutable Cluster attributes may be set as keyword arguments
         to the constructor.
@@ -572,7 +579,6 @@ class Cluster(object):
         if load_balancing_policy is not None:
             if isinstance(load_balancing_policy, type):
                 raise TypeError("load_balancing_policy should not be a class, it should be an instance of that class")
-
             self.load_balancing_policy = load_balancing_policy
         else:
             self.load_balancing_policy = default_lbp_factory()
@@ -580,19 +586,22 @@ class Cluster(object):
         if reconnection_policy is not None:
             if isinstance(reconnection_policy, type):
                 raise TypeError("reconnection_policy should not be a class, it should be an instance of that class")
-
             self.reconnection_policy = reconnection_policy
 
         if default_retry_policy is not None:
             if isinstance(default_retry_policy, type):
                 raise TypeError("default_retry_policy should not be a class, it should be an instance of that class")
-
             self.default_retry_policy = default_retry_policy
 
         if conviction_policy_factory is not None:
             if not callable(conviction_policy_factory):
                 raise ValueError("conviction_policy_factory must be callable")
             self.conviction_policy_factory = conviction_policy_factory
+
+        if address_translator is not None:
+            if isinstance(address_translator, type):
+                raise TypeError("address_translator should not be a class, it should be an instance of that class")
+            self.address_translator = address_translator
 
         if connection_class is not None:
             self.connection_class = connection_class
@@ -2348,10 +2357,7 @@ class ControlConnection(object):
         should_rebuild_token_map = force_token_rebuild or self._cluster.metadata.partitioner is None
         found_hosts = set()
         for row in peers_result:
-            addr = row.get("rpc_address")
-
-            if not addr or addr in ["0.0.0.0", "::"]:
-                addr = row.get("peer")
+            addr = self._rpc_from_peer_row(row)
 
             tokens = row.get("tokens", None)
             if 'tokens' in row and not tokens:  # it was selected, but empty
@@ -2413,7 +2419,7 @@ class ControlConnection(object):
 
     def _handle_topology_change(self, event):
         change_type = event["change_type"]
-        addr, port = event["address"]
+        addr = self._translate_address(event["address"][0])
         if change_type == "NEW_NODE" or change_type == "MOVED_NODE":
             if self._topology_event_refresh_window >= 0:
                 delay = self._delay_for_event_type('topology_change', self._topology_event_refresh_window)
@@ -2424,7 +2430,7 @@ class ControlConnection(object):
 
     def _handle_status_change(self, event):
         change_type = event["change_type"]
-        addr, port = event["address"]
+        addr = self._translate_address(event["address"][0])
         host = self._cluster.metadata.get_host(addr)
         if change_type == "UP":
             delay = 1 + self._delay_for_event_type('status_change', 0.5)  # randomness to avoid thundering herd problem on events
@@ -2441,6 +2447,9 @@ class ControlConnection(object):
             if host is not None:
                 # this will be run by the scheduler
                 self._cluster.on_down(host, is_host_addition=False)
+
+    def _translate_address(self, addr):
+        return self._cluster.address_translator.translate(addr)
 
     def _handle_schema_change(self, event):
         if self._schema_event_refresh_window < 0:
@@ -2523,11 +2532,7 @@ class ControlConnection(object):
             schema_ver = row.get('schema_version')
             if not schema_ver:
                 continue
-
-            addr = row.get("rpc_address")
-            if not addr or addr in ["0.0.0.0", "::"]:
-                addr = row.get("peer")
-
+            addr = self._rpc_from_peer_row(row)
             peer = self._cluster.metadata.get_host(addr)
             if peer and peer.is_up:
                 versions[schema_ver].add(addr)
@@ -2537,6 +2542,12 @@ class ControlConnection(object):
             return None
 
         return dict((version, list(nodes)) for version, nodes in six.iteritems(versions))
+
+    def _rpc_from_peer_row(self, row):
+        addr = row.get("rpc_address")
+        if not addr or addr in ["0.0.0.0", "::"]:
+            addr = row.get("peer")
+        return self._translate_address(addr)
 
     def _signal_error(self):
         with self._lock:
