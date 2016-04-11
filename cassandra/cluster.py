@@ -3058,15 +3058,17 @@ class ResponseFuture(object):
                     return
 
                 retry_type, consistency = retry
-                if retry_type is RetryPolicy.RETRY:
+                if retry_type in (RetryPolicy.RETRY, RetryPolicy.RETRY_NEXT_HOST):
                     self._query_retries += 1
-                    self._retry(reuse_connection=True, consistency_level=consistency)
+                    reuse = retry_type  == RetryPolicy.RETRY
+                    self._retry(reuse_connection=reuse, consistency_level=consistency)
                 elif retry_type is RetryPolicy.RETHROW:
                     self._set_final_exception(response.to_exception())
                 else:  # IGNORE
                     if self._metrics is not None:
                         self._metrics.on_ignore()
                     self._set_final_result(None)
+                self._errors[self._current_host] = response.to_exception()
             elif isinstance(response, ConnectionException):
                 if self._metrics is not None:
                     self._metrics.on_connection_error()
