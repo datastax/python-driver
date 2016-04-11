@@ -14,13 +14,21 @@
 
 import os
 import warnings
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 from cassandra import ConsistencyLevel
 
 from cassandra.cqlengine import connection
 from cassandra.cqlengine.management import create_keyspace_simple, CQLENG_ALLOW_SCHEMA_MANAGEMENT
+import cassandra
 
 from tests.integration import get_server_versions, use_single_node, PROTOCOL_VERSION
 DEFAULT_KEYSPACE = 'cqlengine_test'
+
+
+CQL_SKIP_EXECUTE = bool(os.getenv('CQL_SKIP_EXECUTE', False))
 
 
 def setup_package():
@@ -44,3 +52,57 @@ def setup_connection(keyspace_name):
                      consistency=ConsistencyLevel.ONE,
                      protocol_version=PROTOCOL_VERSION,
                      default_keyspace=keyspace_name)
+
+
+class StatementCounter(object):
+    """
+    Simple python object used to hold a count of the number of times
+    the wrapped method has been invoked
+    """
+    def __init__(self, patched_func):
+        self.func = patched_func
+        self.counter = 0
+
+    def wrapped_execute(self, *args, **kwargs):
+        self.counter += 1
+        return self.func(*args, **kwargs)
+
+    def get_counter(self):
+        return self.counter
+
+
+def execute_count(expected):
+    """
+    A decorator used wrap cassandra.cqlengine.connection.execute. It counts the number of times this method is invoked
+    then compares it to the number expected. If they don't match it throws an assertion error.
+    This function can be disabled by running the test harness with the env variable CQL_SKIP_EXECUTE=1 set
+    """
+    def innerCounter(fn):
+        def wrapped_function(*args, **kwargs):
+            # Create a counter monkey patch into cassandra.cqlengine.connection.execute
+            count = StatementCounter(cassandra.cqlengine.connection.execute)
+            original_function = cassandra.cqlengine.connection.execute
+            # Monkey patch in our StatementCounter wrapper
+            cassandra.cqlengine.connection.execute = count.wrapped_execute
+            # Invoked the underlying unit test
+            to_return = fn(*args, **kwargs)
+            # Get the count from our monkey patched counter
+            count.get_counter()
+            # DeMonkey Patch our code
+            cassandra.cqlengine.connection.execute = original_function
+            # Check to see if the count is what you expect
+            tc = unittest.TestCase("__init__")
+            tc.assertEquals(count.get_counter(), expected, "Expected number of cassandra.cqlengine.connection.execute calls doesn't match actual number invoked Expected: {0}, Invoked {1}".format(count.get_counter(), expected))
+            return to_return
+        # Name of the wrapped function must match the original or unittest will error out.
+        wrapped_function.__name__ = fn.__name__
+        wrapped_function.__doc__ = fn.__doc__
+        # Escape hatch
+        if(CQL_SKIP_EXECUTE):
+            return fn
+        else:
+            return wrapped_function
+
+    return innerCounter
+
+

@@ -20,6 +20,7 @@ from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine import columns
 from tests.integration.cqlengine import is_prepend_reversed
 from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.integration.cqlengine import execute_count
 
 
 class TestQueryUpdateModel(Model):
@@ -45,6 +46,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
         super(QueryUpdateTests, cls).tearDownClass()
         drop_table(TestQueryUpdateModel)
 
+    @execute_count(8)
     def test_update_values(self):
         """ tests calling udpate on a queryset """
         partition = uuid4()
@@ -65,6 +67,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
             self.assertEqual(row.count, 6 if i == 3 else i)
             self.assertEqual(row.text, str(i))
 
+    @execute_count(6)
     def test_update_values_validation(self):
         """ tests calling udpate on models with values passed in """
         partition = uuid4()
@@ -91,6 +94,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
         with self.assertRaises(ValidationError):
             TestQueryUpdateModel.objects(partition=uuid4(), cluster=3).update(cluster=5000)
 
+    @execute_count(8)
     def test_null_update_deletes_column(self):
         """ setting a field to null in the update should issue a delete statement """
         partition = uuid4()
@@ -111,6 +115,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
             self.assertEqual(row.count, i)
             self.assertEqual(row.text, None if i == 3 else str(i))
 
+    @execute_count(9)
     def test_mixed_value_and_null_update(self):
         """ tests that updating a columns value, and removing another works properly """
         partition = uuid4()
@@ -131,9 +136,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
             self.assertEqual(row.count, 6 if i == 3 else i)
             self.assertEqual(row.text, None if i == 3 else str(i))
 
-    def test_counter_updates(self):
-        pass
-
+    @execute_count(3)
     def test_set_add_updates(self):
         partition = uuid4()
         cluster = 1
@@ -144,6 +147,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
         self.assertEqual(obj.text_set, set(("foo", "bar")))
 
+    @execute_count(2)
     def test_set_add_updates_new_record(self):
         """ If the key doesn't exist yet, an update creates the record
         """
@@ -154,6 +158,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
         self.assertEqual(obj.text_set, set(("bar",)))
 
+    @execute_count(3)
     def test_set_remove_updates(self):
         partition = uuid4()
         cluster = 1
@@ -165,6 +170,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
         self.assertEqual(obj.text_set, set(("baz",)))
 
+    @execute_count(3)
     def test_set_remove_new_record(self):
         """ Removing something not in the set should silently do nothing
         """
@@ -178,6 +184,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
         self.assertEqual(obj.text_set, set(("foo",)))
 
+    @execute_count(3)
     def test_list_append_updates(self):
         partition = uuid4()
         cluster = 1
@@ -189,6 +196,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
         self.assertEqual(obj.text_list, ["foo", "bar"])
 
+    @execute_count(3)
     def test_list_prepend_updates(self):
         """ Prepend two things since order is reversed by default by CQL """
         partition = uuid4()
@@ -204,6 +212,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
         expected = (prepended[::-1] if is_prepend_reversed() else prepended) + original
         self.assertEqual(obj.text_list, expected)
 
+    @execute_count(3)
     def test_map_update_updates(self):
         """ Merge a dictionary into existing value """
         partition = uuid4()
@@ -217,6 +226,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
         self.assertEqual(obj.text_map, {"foo": '1', "bar": '3', "baz": '4'})
 
+    @execute_count(3)
     def test_map_update_none_deletes_key(self):
         """ The CQL behavior is if you set a key in a map to null it deletes
         that key from the map.  Test that this works with __update.
