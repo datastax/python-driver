@@ -784,7 +784,7 @@ class TestModelRoutingKeys(BaseCassEngTestCase):
         uuid = uuid4()
         values = {'k': 5, 'v': 3, 'partition': uuid, 'cluster': 6, 'count': 42, 'text': 'text', 'float': 3.1415, 'text_2': 'text_2'}
         res = dict((v, k) for k, v in values.items())
-        items = model._partition_key_index.items()
+        items = list(model._partition_key_index.items())
         if(reverse):
             items.reverse()
         # Add where clauses for each partition key
