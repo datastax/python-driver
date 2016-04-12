@@ -927,15 +927,15 @@ class HeartbeatFuture(object):
             raise OperationTimedOut("Connection heartbeat timeout after %s seconds" % (timeout,), self.connection.host)
 
     def _options_callback(self, response):
-        if not isinstance(response, SupportedMessage):
+        if isinstance(response, SupportedMessage):
+            log.debug("Received options response on connection (%s) from %s",
+                      id(self.connection), self.connection.host)
+        else:
             if isinstance(response, ConnectionException):
                 self._exception = response
             else:
                 self._exception = ConnectionException("Received unexpected response to OptionsMessage: %s"
                                                       % (response,))
-
-        log.debug("Received options response on connection (%s) from %s",
-                  id(self.connection), self.connection.host)
         self._event.set()
 
 
