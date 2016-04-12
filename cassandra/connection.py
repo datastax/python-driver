@@ -969,7 +969,7 @@ class ConnectionHeartbeat(Thread):
                                     futures.append(HeartbeatFuture(connection, owner))
                                 except Exception as e:
                                     log.warning("Failed sending heartbeat message on connection (%s) to %s",
-                                                id(connection), connection.host, exc_info=True)
+                                                id(connection), connection.host)
                                     failed_connections.append((connection, owner, e))
                             else:
                                 connection.reset_idle()
@@ -989,7 +989,7 @@ class ConnectionHeartbeat(Thread):
                         connection.reset_idle()
                     except Exception as e:
                         log.warning("Heartbeat failed for connection (%s) to %s",
-                                    id(connection), connection.host, exc_info=True)
+                                    id(connection), connection.host)
                         failed_connections.append((f.connection, f.owner, e))
 
                 for connection, owner, exc in failed_connections:
