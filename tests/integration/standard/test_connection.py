@@ -227,10 +227,20 @@ class ConnectionTests(object):
             t.join()
 
     def test_connect_timeout(self):
-        start = time.time()
-        self.assertRaises(Exception, self.get_connection, timeout=sys.float_info.min)
-        end = time.time()
-        self.assertAlmostEqual(start, end, 1)
+        # Underlying socket implementations don't always throw a socket timeout even with min float
+        # This can be timing sensitive, added retry to ensure failure occurs if it can
+        max_retry_count = 10
+        exception_thrown = False
+        for i in range(max_retry_count):
+            start = time.time()
+            try:
+                self.get_connection(timeout=sys.float_info.min)
+            except Exception as e:
+                end = time.time()
+                self.assertAlmostEqual(start, end, 1)
+                exception_thrown = True
+                break
+        self.assertTrue(exception_thrown)
 
 
 class AsyncoreConnectionTests(ConnectionTests, unittest.TestCase):

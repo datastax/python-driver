@@ -1,3 +1,32 @@
+3.2.0
+=====
+April 12, 2016
+
+Features
+--------
+* cqlengine: Warn on sync_schema type mismatch (PYTHON-260)
+* cqlengine: Automatically defer fields with the '=' operator (and immutable values) in select queries (PYTHON-520)
+* cqlengine: support non-equal conditions for LWT (PYTHON-528)
+* cqlengine: sync_table should validate the primary key composition (PYTHON-532)
+* cqlengine: token-aware routing for mapper statements (PYTHON-535)
+
+Bug Fixes
+---------
+* Deleting a column in a lightweight transaction raises a SyntaxException #325 (PYTHON-249)
+* cqlengine: make Token function works with named tables/columns #86 (PYTHON-272)
+* comparing models with datetime fields fail #79 (PYTHON-273)
+* cython date deserializer integer math should be aligned with CPython (PYTHON-480)
+* db_field is not always respected with UpdateStatement (PYTHON-530)
+* Sync_table fails on column.Set with secondary index (PYTHON-533)
+
+3.1.1
+=====
+March 14, 2016
+
+Bug Fixes
+---------
+* cqlengine: Fix performance issue related to additional "COUNT" queries (PYTHON-522)
+
 3.1.0
 =====
 March 10, 2016

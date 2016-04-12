@@ -61,7 +61,6 @@ class BaseColumnIOTest(BaseCassEngTestCase):
 
         # create a table with the given column
         class IOTestModel(Model):
-            table_name = cls.column.db_type + "_io_test_model_{0}".format(uuid4().hex[:8])
             pkey = cls.column(primary_key=True)
             data = cls.column()
 

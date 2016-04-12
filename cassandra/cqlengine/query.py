@@ -14,10 +14,12 @@
 
 import copy
 from datetime import datetime, timedelta
+from functools import partial
 import time
 import six
 from warnings import warn
 
+from cassandra.query import SimpleStatement
 from cassandra.cqlengine import columns, CQLEngineException, ValidationError, UnicodeMixin
 from cassandra.cqlengine import connection
 from cassandra.cqlengine.functions import Token, BaseQueryFunction, QueryValue
@@ -25,10 +27,8 @@ from cassandra.cqlengine.operators import (InOperator, EqualsOperator, GreaterTh
                                            GreaterThanOrEqualOperator, LessThanOperator,
                                            LessThanOrEqualOperator, ContainsOperator, BaseWhereOperator)
 from cassandra.cqlengine.statements import (WhereClause, SelectStatement, DeleteStatement,
-                                            UpdateStatement, AssignmentClause, InsertStatement,
-                                            BaseCQLStatement, MapUpdateClause, MapDeleteClause,
-                                            ListUpdateClause, SetUpdateClause, CounterUpdateClause,
-                                            TransactionClause)
+                                            UpdateStatement, InsertStatement,
+                                            BaseCQLStatement, MapDeleteClause, ConditionalClause)
 
 
 class QueryException(CQLEngineException):
@@ -38,12 +38,13 @@ class QueryException(CQLEngineException):
 class IfNotExistsWithCounterColumn(CQLEngineException):
     pass
 
+
 class IfExistsWithCounterColumn(CQLEngineException):
     pass
 
 
 class LWTException(CQLEngineException):
-    """Lightweight transaction exception.
+    """Lightweight conditional exception.
 
     This exception will be raised when a write using an `IF` clause could not be
     applied due to existing data violating the condition. The existing data is
@@ -146,7 +147,7 @@ class BatchQuery(object):
         :param batch_type: (optional) One of batch type values available through BatchType enum
         :type batch_type: str or None
         :param timestamp: (optional) A datetime or timedelta object with desired timestamp to be applied
-            to the batch transaction.
+            to the batch conditional.
         :type timestamp: datetime or timedelta or None
         :param consistency: (optional) One of consistency values ("ANY", "ONE", "QUORUM" etc)
         :type consistency: The :class:`.ConsistencyLevel` to be used for the batch query, or None.
@@ -267,8 +268,8 @@ class AbstractQuerySet(object):
         # Where clause filters
         self._where = []
 
-        # Transaction clause filters
-        self._transaction = []
+        # Conditional clause filters
+        self._conditional = []
 
         # ordering arguments
         self._order = []
@@ -280,7 +281,8 @@ class AbstractQuerySet(object):
         self._limit = 10000
 
         # see the defer and only methods
-        self._defer_fields = []
+        self._defer_fields = set()
+        self._deferred_values = {}
         self._only_fields = []
 
         self._values_list = False
@@ -309,12 +311,12 @@ class AbstractQuerySet(object):
     def column_family_name(self):
         return self.model.column_family_name()
 
-    def _execute(self, q):
+    def _execute(self, statement):
         if self._batch:
-            return self._batch.add_query(q)
+            return self._batch.add_query(statement)
         else:
-            result = connection.execute(q, consistency_level=self._consistency, timeout=self._timeout)
-            if self._if_not_exists or self._if_exists or self._transaction:
+            result = _execute_statement(self.model, statement, self._consistency, self._timeout)
+            if self._if_not_exists or self._if_exists or self._conditional:
                 check_applied(result)
             return result
 
@@ -383,7 +385,7 @@ class AbstractQuerySet(object):
         if self._result_cache is None:
             self._result_generator = (i for i in self._execute(self._select_query()))
             self._result_cache = []
-            self._construct_result = self._get_result_constructor()
+            self._construct_result = self._maybe_inject_deferred(self._get_result_constructor())
 
             # "DISTINCT COUNT()" is not supported in C* < 2.2, so we need to materialize all results to get
             # len() and count() working with DISTINCT queries
@@ -482,6 +484,15 @@ class AbstractQuerySet(object):
         """
         raise NotImplementedError
 
+    @staticmethod
+    def _construct_with_deferred(f, deferred, row):
+        row.update(deferred)
+        return f(row)
+
+    def _maybe_inject_deferred(self, constructor):
+        return partial(self._construct_with_deferred, constructor, self._deferred_values)\
+            if self._deferred_values else constructor
+
     def batch(self, batch_obj):
         """
         Set a batch object to run the query on.
@@ -545,38 +556,28 @@ class AbstractQuerySet(object):
 
         clone = copy.deepcopy(self)
         for operator in args:
-            if not isinstance(operator, TransactionClause):
+            if not isinstance(operator, ConditionalClause):
                 raise QueryException('{0} is not a valid query operator'.format(operator))
-            clone._transaction.append(operator)
+            clone._conditional.append(operator)
 
-        for col_name, val in kwargs.items():
-            exists = False
+        for arg, val in kwargs.items():
+            if isinstance(val, Token):
+                raise QueryException("Token() values are not valid in conditionals")
+
+            col_name, col_op = self._parse_filter_arg(arg)
             try:
                 column = self.model._get_column(col_name)
             except KeyError:
-                if col_name == 'pk__token':
-                    if not isinstance(val, Token):
-                        raise QueryException("Virtual column 'pk__token' may only be compared to Token() values")
-                    column = columns._PartitionKeysToken(self.model)
-                else:
-                    raise QueryException("Can't resolve column name: '{0}'".format(col_name))
+                raise QueryException("Can't resolve column name: '{0}'".format(col_name))
 
-            if isinstance(val, Token):
-                if col_name != 'pk__token':
-                    raise QueryException("Token() values may only be compared to the 'pk__token' virtual column")
-                partition_columns = column.partition_columns
-                if len(partition_columns) != len(val.value):
-                    raise QueryException(
-                        'Token() received {0} arguments but model has {1} partition keys'.format(
-                            len(val.value), len(partition_columns)))
-                val.set_columns(partition_columns)
-
-            if isinstance(val, BaseQueryFunction) or exists is True:
+            if isinstance(val, BaseQueryFunction):
                 query_val = val
             else:
                 query_val = column.to_database(val)
 
-            clone._transaction.append(TransactionClause(col_name, query_val))
+            operator_class = BaseWhereOperator.get_operator(col_op or 'EQ')
+            operator = operator_class()
+            clone._conditional.append(WhereClause(column.db_field_name, operator, query_val))
 
         return clone
 
@@ -601,21 +602,19 @@ class AbstractQuerySet(object):
         for arg, val in kwargs.items():
             col_name, col_op = self._parse_filter_arg(arg)
             quote_field = True
-            # resolve column and operator
-            try:
-                column = self.model._get_column(col_name)
-            except KeyError:
-                if col_name == 'pk__token':
-                    if not isinstance(val, Token):
-                        raise QueryException("Virtual column 'pk__token' may only be compared to Token() values")
-                    column = columns._PartitionKeysToken(self.model)
-                    quote_field = False
-                else:
-                    raise QueryException("Can't resolve column name: '{0}'".format(col_name))
 
-            if isinstance(val, Token):
+            if not isinstance(val, Token):
+                try:
+                    column = self.model._get_column(col_name)
+                except KeyError:
+                    raise QueryException("Can't resolve column name: '{0}'".format(col_name))
+            else:
                 if col_name != 'pk__token':
                     raise QueryException("Token() values may only be compared to the 'pk__token' virtual column")
+
+                column = columns._PartitionKeysToken(self.model)
+                quote_field = False
+
                 partition_columns = column.partition_columns
                 if len(partition_columns) != len(val.value):
                     raise QueryException(
@@ -639,6 +638,9 @@ class AbstractQuerySet(object):
                 query_val = val
             else:
                 query_val = column.to_database(val)
+                if not col_op:  # only equal values should be deferred
+                    clone._defer_fields.add(col_name)
+                    clone._deferred_values[column.db_field_name] = val  # map by db field name for substitution in results
 
             clone._where.append(WhereClause(column.db_field_name, operator, query_val, quote_field=quote_field))
 
@@ -847,9 +849,10 @@ class AbstractQuerySet(object):
         return clone
 
     def _only_or_defer(self, action, fields):
+        if action == 'only' and self._only_fields:
+            raise QueryException("QuerySet already has 'only' fields defined")
+
         clone = copy.deepcopy(self)
-        if clone._defer_fields or clone._only_fields:
-            raise QueryException("QuerySet already has only or defer fields defined")
 
         # check for strange fields
         missing_fields = [f for f in fields if f not in self.model._columns.keys()]
@@ -859,7 +862,7 @@ class AbstractQuerySet(object):
                     ', '.join(missing_fields), self.model.__name__))
 
         if action == 'defer':
-            clone._defer_fields = fields
+            clone._defer_fields.update(fields)
         elif action == 'only':
             clone._only_fields = fields
         else:
@@ -898,6 +901,7 @@ class AbstractQuerySet(object):
             self.column_family_name,
             where=self._where,
             timestamp=self._timestamp,
+            conditionals=self._conditional,
             if_exists=self._if_exists
         )
         self._execute(dq)
@@ -934,16 +938,14 @@ class ResultObject(dict):
 
 class SimpleQuerySet(AbstractQuerySet):
     """
-
+    Overrides _get_result_constructor for querysets that do not define a model (e.g. NamedTable queries)
     """
 
     def _get_result_constructor(self):
         """
         Returns a function that will be used to instantiate query results
         """
-        def _construct_instance(values):
-            return ResultObject(values)
-        return _construct_instance
+        return ResultObject
 
 
 class ModelQuerySet(AbstractQuerySet):
@@ -954,13 +956,13 @@ class ModelQuerySet(AbstractQuerySet):
         # check that there's either a =, a IN or a CONTAINS (collection) relationship with a primary key or indexed field
         equal_ops = [self.model._get_column_by_db_name(w.field) for w in self._where if isinstance(w.operator, EqualsOperator)]
         token_comparison = any([w for w in self._where if isinstance(w.value, Token)])
-        if not any([w.primary_key or w.index for w in equal_ops]) and not token_comparison and not self._allow_filtering:
+        if not any(w.primary_key or w.index for w in equal_ops) and not token_comparison and not self._allow_filtering:
             raise QueryException(('Where clauses require either  =, a IN or a CONTAINS (collection) '
                                   'comparison with either a primary key or indexed field'))
 
         if not self._allow_filtering:
             # if the query is not on an indexed field
-            if not any([w.index for w in equal_ops]):
+            if not any(w.index for w in equal_ops):
                 if not any([w.partition_key for w in equal_ops]) and not token_comparison:
                     raise QueryException('Filtering on a clustering key without a partition key is not allowed unless allow_filtering() is called on the querset')
 
@@ -977,17 +979,12 @@ class ModelQuerySet(AbstractQuerySet):
     def _get_result_constructor(self):
         """ Returns a function that will be used to instantiate query results """
         if not self._values_list:  # we want models
-            return lambda rows: self.model._construct_instance(rows)
+            return self.model._construct_instance
         elif self._flat_values_list:  # the user has requested flattened list (1 value per row)
-            return lambda row: row.popitem()[1]
+            key = self._only_fields[0]
+            return lambda row: row[key]
         else:
-            return lambda row: self._get_row_value_list(self._only_fields, row)
-
-    def _get_row_value_list(self, fields, row):
-        result = []
-        for x in fields:
-            result.append(row[x])
-        return result
+            return lambda row: [row[f] for f in self._only_fields]
 
     def _get_ordering_condition(self, colname):
         colname, order_type = super(ModelQuerySet, self)._get_ordering_condition(colname)
@@ -1155,7 +1152,7 @@ class ModelQuerySet(AbstractQuerySet):
 
         nulled_columns = set()
         us = UpdateStatement(self.column_family_name, where=self._where, ttl=self._ttl,
-                             timestamp=self._timestamp, transactions=self._transaction, if_exists=self._if_exists)
+                             timestamp=self._timestamp, conditionals=self._conditional, if_exists=self._if_exists)
         for name, val in values.items():
             col_name, col_op = self._parse_filter_arg(name)
             col = self.model._columns.get(col_name)
@@ -1173,30 +1170,14 @@ class ModelQuerySet(AbstractQuerySet):
                 nulled_columns.add(col_name)
                 continue
 
-            # add the update statements
-            if isinstance(col, columns.Counter):
-                # TODO: implement counter updates
-                raise NotImplementedError
-            elif isinstance(col, (columns.List, columns.Set, columns.Map)):
-                if isinstance(col, columns.List):
-                    klass = ListUpdateClause
-                elif isinstance(col, columns.Set):
-                    klass = SetUpdateClause
-                elif isinstance(col, columns.Map):
-                    klass = MapUpdateClause
-                else:
-                    raise RuntimeError
-                us.add_assignment_clause(klass(col_name, col.to_database(val), operation=col_op))
-            else:
-                us.add_assignment_clause(AssignmentClause(
-                    col_name, col.to_database(val)))
+            us.add_update(col, val, operation=col_op)
 
         if us.assignments:
             self._execute(us)
 
         if nulled_columns:
             ds = DeleteStatement(self.column_family_name, fields=nulled_columns,
-                                 where=self._where, if_exists=self._if_exists)
+                                 where=self._where, conditionals=self._conditional, if_exists=self._if_exists)
             self._execute(ds)
 
 
@@ -1215,7 +1196,7 @@ class DMLQuery(object):
     _if_exists = False
 
     def __init__(self, model, instance=None, batch=None, ttl=None, consistency=None, timestamp=None,
-                 if_not_exists=False, transaction=None, timeout=connection.NOT_SET, if_exists=False):
+                 if_not_exists=False, conditional=None, timeout=connection.NOT_SET, if_exists=False):
         self.model = model
         self.column_family_name = self.model.column_family_name()
         self.instance = instance
@@ -1225,17 +1206,17 @@ class DMLQuery(object):
         self._timestamp = timestamp
         self._if_not_exists = if_not_exists
         self._if_exists = if_exists
-        self._transaction = transaction
+        self._conditional = conditional
         self._timeout = timeout
 
-    def _execute(self, q):
+    def _execute(self, statement):
         if self._batch:
-            return self._batch.add_query(q)
+            return self._batch.add_query(statement)
         else:
-            tmp = connection.execute(q, consistency_level=self._consistency, timeout=self._timeout)
-            if self._if_not_exists or self._if_exists or self._transaction:
-                check_applied(tmp)
-            return tmp
+            results = _execute_statement(self.model, statement, self._consistency, self._timeout)
+            if self._if_not_exists or self._if_exists or self._conditional:
+                check_applied(results)
+            return results
 
     def batch(self, batch_obj):
         if batch_obj is not None and not isinstance(batch_obj, BatchQuery):
@@ -1247,7 +1228,7 @@ class DMLQuery(object):
         """
         executes a delete query to remove columns that have changed to null
         """
-        ds = DeleteStatement(self.column_family_name, if_exists=self._if_exists)
+        ds = DeleteStatement(self.column_family_name, conditionals=self._conditional, if_exists=self._if_exists)
         deleted_fields = False
         for _, v in self.instance._values.items():
             col = v.column
@@ -1262,11 +1243,7 @@ class DMLQuery(object):
 
         if deleted_fields:
             for name, col in self.model._primary_keys.items():
-                ds.add_where_clause(WhereClause(
-                    col.db_field_name,
-                    EqualsOperator(),
-                    col.to_database(getattr(self.instance, name))
-                ))
+                ds.add_where(col, EqualsOperator(), getattr(self.instance, name))
             self._execute(ds)
 
     def update(self):
@@ -1282,7 +1259,7 @@ class DMLQuery(object):
         null_clustering_key = False if len(self.instance._clustering_keys) == 0 else True
         static_changed_only = True
         statement = UpdateStatement(self.column_family_name, ttl=self._ttl, timestamp=self._timestamp,
-                                    transactions=self._transaction, if_exists=self._if_exists)
+                                    conditionals=self._conditional, if_exists=self._if_exists)
         for name, col in self.instance._clustering_keys.items():
             null_clustering_key = null_clustering_key and col._val_is_null(getattr(self.instance, name, None))
         # get defined fields and their column names
@@ -1301,39 +1278,14 @@ class DMLQuery(object):
                     continue
 
                 static_changed_only = static_changed_only and col.static
-                if isinstance(col, (columns.BaseContainerColumn, columns.Counter)):
-                    # get appropriate clause
-                    if isinstance(col, columns.List):
-                        klass = ListUpdateClause
-                    elif isinstance(col, columns.Map):
-                        klass = MapUpdateClause
-                    elif isinstance(col, columns.Set):
-                        klass = SetUpdateClause
-                    elif isinstance(col, columns.Counter):
-                        klass = CounterUpdateClause
-                    else:
-                        raise RuntimeError
+                statement.add_update(col, val, previous=val_mgr.previous_value)
 
-                    clause = klass(col.db_field_name, val,
-                                   previous=val_mgr.previous_value, column=col)
-                    if clause.get_context_size() > 0:
-                        statement.add_assignment_clause(clause)
-                else:
-                    statement.add_assignment_clause(AssignmentClause(
-                        col.db_field_name,
-                        col.to_database(val)
-                    ))
-
-        if statement.get_context_size() > 0 or self.instance._has_counter:
+        if statement.assignments:
             for name, col in self.model._primary_keys.items():
                 # only include clustering key if clustering key is not null, and non static columns are changed to avoid cql error
                 if (null_clustering_key or static_changed_only) and (not col.partition_key):
                     continue
-                statement.add_where_clause(WhereClause(
-                    col.db_field_name,
-                    EqualsOperator(),
-                    col.to_database(getattr(self.instance, name))
-                ))
+                statement.add_where(col, EqualsOperator(), getattr(self.instance, name))
             self._execute(statement)
 
         if not null_clustering_key:
@@ -1368,10 +1320,7 @@ class DMLQuery(object):
                     if self.instance._values[name].changed:
                         nulled_fields.add(col.db_field_name)
                     continue
-                insert.add_assignment_clause(AssignmentClause(
-                    col.db_field_name,
-                    col.to_database(getattr(self.instance, name, None))
-                ))
+                insert.add_assignment(col, getattr(self.instance, name, None))
 
         # skip query execution if it's empty
         # caused by pointless update queries
@@ -1386,14 +1335,22 @@ class DMLQuery(object):
         if self.instance is None:
             raise CQLEngineException("DML Query instance attribute is None")
 
-        ds = DeleteStatement(self.column_family_name, timestamp=self._timestamp, if_exists=self._if_exists)
+        ds = DeleteStatement(self.column_family_name, timestamp=self._timestamp, conditionals=self._conditional, if_exists=self._if_exists)
         for name, col in self.model._primary_keys.items():
-            if (not col.partition_key) and (getattr(self.instance, name) is None):
+            val = getattr(self.instance, name)
+            if val is None and not col.parition_key:
                 continue
-
-            ds.add_where_clause(WhereClause(
-                col.db_field_name,
-                EqualsOperator(),
-                col.to_database(getattr(self.instance, name))
-            ))
+            ds.add_where(col, EqualsOperator(), val)
         self._execute(ds)
+
+
+def _execute_statement(model, statement, consistency_level, timeout):
+    params = statement.get_context()
+    s = SimpleStatement(str(statement), consistency_level=consistency_level, fetch_size=statement.fetch_size)
+    if model._partition_key_index:
+        key_values = statement.partition_key_values(model._partition_key_index)
+        if not any(v is None for v in key_values):
+            parts = model._routing_key_from_values(key_values, connection.get_cluster().protocol_version)
+            s.routing_key = parts
+            s.keyspace = model._get_keyspace()
+    return connection.execute(s, params, timeout=timeout)

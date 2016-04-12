@@ -74,7 +74,7 @@ class RoutingTests(unittest.TestCase):
         select = s.prepare("SELECT token(%s) FROM %s WHERE %s" %
                            (primary_key, table_name, where_clause))
 
-        return (insert, select)
+        return insert, select
 
     def test_singular_key(self):
         # string

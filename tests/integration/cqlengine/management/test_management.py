@@ -17,17 +17,19 @@ except ImportError:
     import unittest  # noqa
 
 import mock
-
+import logging
 from cassandra.cqlengine.connection import get_session, get_cluster
 from cassandra.cqlengine import CQLEngineException
 from cassandra.cqlengine import management
-from cassandra.cqlengine.management import _get_non_pk_field_names, _get_table_metadata, sync_table, drop_table
+from cassandra.cqlengine.management import _get_table_metadata, sync_table, drop_table, sync_type
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine import columns
 
-from tests.integration import PROTOCOL_VERSION, greaterthancass20
+from tests.integration import PROTOCOL_VERSION, greaterthancass20, MockLoggingHandler, CASSANDRA_VERSION
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine.query.test_queryset import TestModel
+from cassandra.cqlengine.usertype import UserType
+from tests.integration.cqlengine import DEFAULT_KEYSPACE
 
 
 class KeyspaceManagementTest(BaseCassEngTestCase):
@@ -76,9 +78,45 @@ class CapitalizedKeyModel(Model):
 
 class PrimaryKeysOnlyModel(Model):
 
+    __table_name__ = "primary_keys_only"
     __options__ = {'compaction': {'class': 'LeveledCompactionStrategy'}}
 
-    first_ey = columns.Integer(primary_key=True)
+    first_key = columns.Integer(primary_key=True)
+    second_key = columns.Integer(primary_key=True)
+
+
+class PrimaryKeysModelChanged(Model):
+
+    __table_name__ = "primary_keys_only"
+    __options__ = {'compaction': {'class': 'LeveledCompactionStrategy'}}
+
+    new_first_key = columns.Integer(primary_key=True)
+    second_key = columns.Integer(primary_key=True)
+
+
+class PrimaryKeysModelTypeChanged(Model):
+
+    __table_name__ = "primary_keys_only"
+    __options__ = {'compaction': {'class': 'LeveledCompactionStrategy'}}
+
+    first_key = columns.Float(primary_key=True)
+    second_key = columns.Integer(primary_key=True)
+
+
+class PrimaryKeysRemovedPk(Model):
+
+    __table_name__ = "primary_keys_only"
+    __options__ = {'compaction': {'class': 'LeveledCompactionStrategy'}}
+
+    second_key = columns.Integer(primary_key=True)
+
+
+class PrimaryKeysAddedClusteringKey(Model):
+
+    __table_name__ = "primary_keys_only"
+    __options__ = {'compaction': {'class': 'LeveledCompactionStrategy'}}
+
+    new_first_key = columns.Float(primary_key=True)
     second_key = columns.Integer(primary_key=True)
 
 
@@ -126,7 +164,7 @@ class FourthModel(Model):
     first_key = columns.UUID(primary_key=True)
     second_key = columns.UUID()
     third_key = columns.Text()
-    # removed fourth key, but it should stay in the DB
+    # renamed model field, but map to existing column
     renamed = columns.Map(columns.Text, columns.Text, db_field='blah')
 
 
@@ -136,23 +174,31 @@ class AddColumnTest(BaseCassEngTestCase):
 
     def test_add_column(self):
         sync_table(FirstModel)
-        fields = _get_non_pk_field_names(_get_table_metadata(FirstModel))
+        meta_columns = _get_table_metadata(FirstModel).columns
+        self.assertEqual(set(meta_columns), set(FirstModel._columns))
 
-        # this should contain the second key
-        self.assertEqual(len(fields), 2)
-        # get schema
         sync_table(SecondModel)
-
-        fields = _get_non_pk_field_names(_get_table_metadata(FirstModel))
-        self.assertEqual(len(fields), 3)
+        meta_columns = _get_table_metadata(FirstModel).columns
+        self.assertEqual(set(meta_columns), set(SecondModel._columns))
 
         sync_table(ThirdModel)
-        fields = _get_non_pk_field_names(_get_table_metadata(FirstModel))
-        self.assertEqual(len(fields), 4)
+        meta_columns = _get_table_metadata(FirstModel).columns
+        self.assertEqual(len(meta_columns), 5)
+        self.assertEqual(len(ThirdModel._columns), 4)
+        self.assertIn('fourth_key', meta_columns)
+        self.assertNotIn('fourth_key', ThirdModel._columns)
+        self.assertIn('blah', ThirdModel._columns)
+        self.assertIn('blah', meta_columns)
 
         sync_table(FourthModel)
-        fields = _get_non_pk_field_names(_get_table_metadata(FirstModel))
-        self.assertEqual(len(fields), 4)
+        meta_columns = _get_table_metadata(FirstModel).columns
+        self.assertEqual(len(meta_columns), 5)
+        self.assertEqual(len(ThirdModel._columns), 4)
+        self.assertIn('fourth_key', meta_columns)
+        self.assertNotIn('fourth_key', FourthModel._columns)
+        self.assertIn('renamed', FourthModel._columns)
+        self.assertNotIn('renamed', meta_columns)
+        self.assertIn('blah', meta_columns)
 
 
 class ModelWithTableProperties(Model):
@@ -232,6 +278,21 @@ class SyncTableTests(BaseCassEngTestCase):
         table_meta = management._get_table_metadata(PrimaryKeysOnlyModel)
         self.assertIn('SizeTieredCompactionStrategy', table_meta.as_cql_query())
 
+    def test_primary_key_validation(self):
+        """
+        Test to ensure that changes to primary keys throw CQLEngineExceptions
+
+        @since 3.2
+        @jira_ticket PYTHON-532
+        @expected_result Attempts to modify primary keys throw an exception
+
+        @test_category object_mapper
+        """
+        sync_table(PrimaryKeysOnlyModel)
+        self.assertRaises(CQLEngineException, sync_table, PrimaryKeysModelChanged)
+        self.assertRaises(CQLEngineException, sync_table, PrimaryKeysAddedClusteringKey)
+        self.assertRaises(CQLEngineException, sync_table, PrimaryKeysRemovedPk)
+
 
 class IndexModel(Model):
 
@@ -246,6 +307,71 @@ class IndexCaseSensitiveModel(Model):
     __table_name_case_sensitive__ = True
     first_key = columns.UUID(primary_key=True)
     second_key = columns.Text(index=True)
+
+
+class BaseInconsistent(Model):
+
+    __table_name__ = 'inconsistent'
+    first_key = columns.UUID(primary_key=True)
+    second_key = columns.Integer(index=True)
+    third_key = columns.Integer(index=True)
+
+
+class ChangedInconsistent(Model):
+
+    __table_name__ = 'inconsistent'
+    __table_name_case_sensitive__ = True
+    first_key = columns.UUID(primary_key=True)
+    second_key = columns.Text(index=True)
+
+
+class BaseInconsistentType(UserType):
+        __type_name__ = 'type_inconsistent'
+        age = columns.Integer()
+        name = columns.Text()
+
+
+class ChangedInconsistentType(UserType):
+        __type_name__ = 'type_inconsistent'
+        age = columns.Integer()
+        name = columns.Integer()
+
+
+class InconsistentTable(BaseCassEngTestCase):
+
+    def setUp(self):
+        drop_table(IndexModel)
+
+    def test_sync_warnings(self):
+        """
+        Test to insure when inconsistent changes are made to a table, or type as part of a sync call that the proper logging messages are surfaced
+
+        @since 3.2
+        @jira_ticket PYTHON-260
+        @expected_result warnings are logged
+
+        @test_category object_mapper
+        """
+        mock_handler = MockLoggingHandler()
+        logger = logging.getLogger(management.__name__)
+        logger.addHandler(mock_handler)
+        sync_table(BaseInconsistent)
+        sync_table(ChangedInconsistent)
+        self.assertTrue('differing from the model type' in mock_handler.messages.get('warning')[0])
+        if CASSANDRA_VERSION >= '2.1':
+            sync_type(DEFAULT_KEYSPACE, BaseInconsistentType)
+            mock_handler.reset()
+            sync_type(DEFAULT_KEYSPACE, ChangedInconsistentType)
+            self.assertTrue('differing from the model user type' in mock_handler.messages.get('warning')[0])
+        logger.removeHandler(mock_handler)
+
+
+class TestIndexSetModel(Model):
+    partition = columns.UUID(primary_key=True)
+    int_set = columns.Set(columns.Integer, index=True)
+    int_list = columns.List(columns.Integer, index=True)
+    text_map = columns.Map(columns.Text, columns.DateTime, index=True)
+    mixed_tuple = columns.Tuple(columns.Text, columns.Integer, columns.Text, index=True)
 
 
 class IndexTests(BaseCassEngTestCase):
@@ -293,6 +419,24 @@ class IndexTests(BaseCassEngTestCase):
         sync_table(IndexCaseSensitiveModel)
         table_meta = management._get_table_metadata(IndexCaseSensitiveModel)
         self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'second_key'))
+
+    @greaterthancass20
+    def test_sync_indexed_set(self):
+        """
+        Tests that models that have container types with indices can be synced.
+
+        @since 3.2
+        @jira_ticket PYTHON-533
+        @expected_result table_sync should complete without a server error.
+
+        @test_category object_mapper
+        """
+        sync_table(TestIndexSetModel)
+        table_meta = management._get_table_metadata(TestIndexSetModel)
+        self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'int_set'))
+        self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'int_list'))
+        self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'text_map'))
+        self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'mixed_tuple'))
 
 
 class NonModelFailureTest(BaseCassEngTestCase):

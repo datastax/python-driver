@@ -16,22 +16,18 @@ try:
 except ImportError:
     import unittest  # noqa
 
-from cassandra.cqlengine.statements import InsertStatement, StatementException, AssignmentClause
-
 import six
+
+from cassandra.cqlengine.columns import Column
+from cassandra.cqlengine.statements import InsertStatement
+
 
 class InsertStatementTests(unittest.TestCase):
 
-    def test_where_clause_failure(self):
-        """ tests that where clauses cannot be added to Insert statements """
-        ist = InsertStatement('table', None)
-        with self.assertRaises(StatementException):
-            ist.add_where_clause('s')
-
     def test_statement(self):
         ist = InsertStatement('table', None)
-        ist.add_assignment_clause(AssignmentClause('a', 'b'))
-        ist.add_assignment_clause(AssignmentClause('c', 'd'))
+        ist.add_assignment(Column(db_field='a'), 'b')
+        ist.add_assignment(Column(db_field='c'), 'd')
 
         self.assertEqual(
             six.text_type(ist),
@@ -40,8 +36,8 @@ class InsertStatementTests(unittest.TestCase):
 
     def test_context_update(self):
         ist = InsertStatement('table', None)
-        ist.add_assignment_clause(AssignmentClause('a', 'b'))
-        ist.add_assignment_clause(AssignmentClause('c', 'd'))
+        ist.add_assignment(Column(db_field='a'), 'b')
+        ist.add_assignment(Column(db_field='c'), 'd')
 
         ist.update_context_id(4)
         self.assertEqual(
@@ -53,6 +49,6 @@ class InsertStatementTests(unittest.TestCase):
 
     def test_additional_rendering(self):
         ist = InsertStatement('table', ttl=60)
-        ist.add_assignment_clause(AssignmentClause('a', 'b'))
-        ist.add_assignment_clause(AssignmentClause('c', 'd'))
+        ist.add_assignment(Column(db_field='a'), 'b')
+        ist.add_assignment(Column(db_field='c'), 'd')
         self.assertIn('USING TTL 60', six.text_type(ist))

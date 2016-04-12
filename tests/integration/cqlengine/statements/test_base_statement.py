@@ -17,16 +17,10 @@ except ImportError:
     import unittest  # noqa
 
 from cassandra.query import FETCH_SIZE_UNSET
-from cassandra.cqlengine.statements import BaseCQLStatement, StatementException
+from cassandra.cqlengine.statements import BaseCQLStatement
 
 
 class BaseStatementTest(unittest.TestCase):
-
-    def test_where_clause_type_checking(self):
-        """ tests that only assignment clauses can be added to queries """
-        stmt = BaseCQLStatement('table', [])
-        with self.assertRaises(StatementException):
-            stmt.add_where_clause('x=5')
 
     def test_fetch_size(self):
         """ tests that fetch_size is correctly set """

@@ -19,10 +19,13 @@ from cassandra.cqlengine import functions
 from cassandra.cqlengine import query
 from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine.models import Model
+from cassandra.cqlengine.named import NamedTable
 from cassandra.cqlengine.operators import EqualsOperator
 from cassandra.cqlengine.statements import WhereClause
-
+from tests.integration.cqlengine import DEFAULT_KEYSPACE
 from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.integration.cqlengine import execute_count
+
 
 class TestQuerySetOperation(BaseCassEngTestCase):
 
@@ -54,7 +57,7 @@ class TestQuerySetOperation(BaseCassEngTestCase):
 
 
 class TokenTestModel(Model):
-
+    __table_name__ = "token_test_model"
     key = columns.Integer(primary_key=True)
     val = columns.Integer()
 
@@ -69,6 +72,7 @@ class TestTokenFunction(BaseCassEngTestCase):
         super(TestTokenFunction, self).tearDown()
         drop_table(TokenTestModel)
 
+    @execute_count(14)
     def test_token_function(self):
         """ Tests that token functions work properly """
         assert TokenTestModel.objects().count() == 0
@@ -124,3 +128,28 @@ class TestTokenFunction(BaseCassEngTestCase):
         # The # of arguments to Token must match the # of partition keys
         func = functions.Token('a')
         self.assertRaises(query.QueryException, TestModel.objects.filter, pk__token__gt=func)
+
+    @execute_count(7)
+    def test_named_table_pk_token_function(self):
+        """
+        Test to ensure that token function work with named tables.
+
+        @since 3.2
+        @jira_ticket PYTHON-272
+        @expected_result partition key token functions should all for pagination. Prior to Python-272
+        this would fail with an AttributeError
+
+        @test_category object_mapper
+        """
+
+        for i in range(5):
+            TokenTestModel.create(key=i, val=i)
+        named = NamedTable(DEFAULT_KEYSPACE, TokenTestModel.__table_name__)
+
+        query = named.objects.all().limit(1)
+        first_page = list(query)
+        last = first_page[-1]
+        self.assertTrue(len(first_page) is 1)
+        next_page = list(query.filter(pk__token__gt=functions.Token(last.key)))
+        self.assertTrue(len(next_page) is 1)
+

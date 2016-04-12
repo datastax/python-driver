@@ -261,6 +261,9 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[]):
                 CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
                 if CASSANDRA_VERSION >= '3.0':
                     CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
+            if 'spark' in workloads:
+                config_options = {"initial_spark_worker_resources": 0.1}
+                CCM_CLUSTER.set_dse_configuration_options(config_options)
             common.switch_cluster(path, cluster_name)
             CCM_CLUSTER.populate(nodes, ipformat=ipformat)
     try:
@@ -479,6 +482,26 @@ class BasicKeyspaceUnitTestCase(unittest.TestCase):
     def drop_function_table(self):
             ddl = "DROP TABLE {0}.{1} ".format(self.keyspace_name, self.function_table_name)
             execute_until_pass(self.session, ddl)
+
+
+class MockLoggingHandler(logging.Handler):
+    """Mock logging handler to check for expected logs."""
+
+    def __init__(self, *args, **kwargs):
+        self.reset()
+        logging.Handler.__init__(self, *args, **kwargs)
+
+    def emit(self, record):
+        self.messages[record.levelname.lower()].append(record.getMessage())
+
+    def reset(self):
+        self.messages = {
+            'debug': [],
+            'info': [],
+            'warning': [],
+            'error': [],
+            'critical': [],
+        }
 
 
 class BasicExistingKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):

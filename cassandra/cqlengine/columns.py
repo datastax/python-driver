@@ -13,13 +13,13 @@
 # limitations under the License.
 
 from copy import deepcopy, copy
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import logging
 import six
 from uuid import UUID as _UUID
 
 from cassandra import util
-from cassandra.cqltypes import SimpleDateType
+from cassandra.cqltypes import SimpleDateType, _cqltypes, UserType
 from cassandra.cqlengine import ValidationError
 from cassandra.cqlengine.functions import get_total_seconds
 
@@ -159,6 +159,7 @@ class Column(object):
 
         # the column name in the model definition
         self.column_name = None
+        self._partition_key_index = None
         self.static = static
 
         self.value = None
@@ -254,6 +255,10 @@ class Column(object):
     @property
     def sub_types(self):
         return []
+
+    @property
+    def cql_type(self):
+        return _cqltypes[self.db_type]
 
 
 class Blob(Column):
@@ -429,11 +434,27 @@ class DateTime(Column):
     """
     db_type = 'timestamp'
 
+    truncate_microseconds = False
+    """
+    Set this ``True`` to have model instances truncate the date, quantizing it in the same way it will be in the database.
+    This allows equality comparison between assigned values and values read back from the database::
+
+        DateTime.truncate_microseconds = True
+        assert Model.create(id=0, d=datetime.utcnow()) == Model.objects(id=0).first()
+
+    Defaults to ``False`` to preserve legacy behavior. May change in the future.
+    """
+
     def to_python(self, value):
         if value is None:
             return
         if isinstance(value, datetime):
-            return value
+            if DateTime.truncate_microseconds:
+                us = value.microsecond
+                truncated_us = us // 1000 * 1000
+                return value - timedelta(microseconds=us - truncated_us)
+            else:
+                return value
         elif isinstance(value, date):
             return datetime(*(value.timetuple()[:6]))
 
@@ -649,6 +670,10 @@ class BaseCollectionColumn(Column):
     def sub_types(self):
         return self.types
 
+    @property
+    def cql_type(self):
+        return _cqltypes[self.__class__.__name__.lower()].apply_parameters([c.cql_type for c in self.types])
+
 
 class Tuple(BaseCollectionColumn):
     """
@@ -860,6 +885,12 @@ class UserDefinedType(Column):
     def sub_types(self):
         return list(self.user_type._fields.values())
 
+    @property
+    def cql_type(self):
+        return UserType.make_udt_class(keyspace='', udt_name=self.user_type.type_name(),
+                                       field_names=[c.db_field_name for c in self.user_type._fields.values()],
+                                       field_types=[c.cql_type for c in self.user_type._fields.values()])
+
 
 def resolve_udts(col_def, out_list):
     for col in col_def.sub_types:
@@ -881,12 +912,3 @@ class _PartitionKeysToken(Column):
     @property
     def db_field_name(self):
         return 'token({0})'.format(', '.join(['"{0}"'.format(c.db_field_name) for c in self.partition_columns]))
-
-    def to_database(self, value):
-        from cqlengine.functions import Token
-        assert isinstance(value, Token)
-        value.set_columns(self.partition_columns)
-        return value
-
-    def get_cql(self):
-        return "token({0})".format(", ".join(c.cql for c in self.partition_columns))

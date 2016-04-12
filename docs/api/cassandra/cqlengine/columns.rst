@@ -54,6 +54,8 @@ Columns of all types are initialized by passing :class:`.Column` attributes to t
 
 .. autoclass:: DateTime(**kwargs)
 
+    .. autoattribute:: truncate_microseconds
+
 .. autoclass:: Decimal(**kwargs)
 
 .. autoclass:: Double(**kwargs)

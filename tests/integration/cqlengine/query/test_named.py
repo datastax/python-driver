@@ -25,7 +25,7 @@ from cassandra.cqlengine.query import ResultObject
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.cqlengine import models
 
-from tests.integration.cqlengine import setup_connection
+from tests.integration.cqlengine import setup_connection, execute_count
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine.query.test_queryset import BaseQuerySetUsage
 
@@ -134,6 +134,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         cls.keyspace = NamedKeyspace(ks)
         cls.table = cls.keyspace.table(tn)
 
+    @execute_count(2)
     def test_count(self):
         """ Tests that adding filtering statements affects the count query as expected """
         assert self.table.objects.count() == 12
@@ -141,6 +142,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         q = self.table.objects(test_id=0)
         assert q.count() == 4
 
+    @execute_count(2)
     def test_query_expression_count(self):
         """ Tests that adding query statements affects the count query as expected """
         assert self.table.objects.count() == 12
@@ -148,6 +150,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         q = self.table.objects(self.table.column('test_id') == 0)
         assert q.count() == 4
 
+    @execute_count(3)
     def test_iteration(self):
         """ Tests that iterating over a query set pulls back all of the expected results """
         q = self.table.objects(test_id=0)
@@ -181,6 +184,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
             compare_set.remove(val)
         assert len(compare_set) == 0
 
+    @execute_count(2)
     def test_multiple_iterations_work_properly(self):
         """ Tests that iterating over a query set more than once works """
         # test with both the filtering method and the query method
@@ -201,6 +205,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
                 compare_set.remove(val)
             assert len(compare_set) == 0
 
+    @execute_count(2)
     def test_multiple_iterators_are_isolated(self):
         """
         tests that the use of one iterator does not affect the behavior of another
@@ -214,6 +219,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
                 assert next(iter1).attempt_id == attempt_id
                 assert next(iter2).attempt_id == attempt_id
 
+    @execute_count(3)
     def test_get_success_case(self):
         """
         Tests that the .get() method works on new and existing querysets
@@ -235,6 +241,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         assert m.test_id == 0
         assert m.attempt_id == 0
 
+    @execute_count(3)
     def test_query_expression_get_success_case(self):
         """
         Tests that the .get() method works on new and existing querysets
@@ -256,6 +263,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         assert m.test_id == 0
         assert m.attempt_id == 0
 
+    @execute_count(1)
     def test_get_doesnotexist_exception(self):
         """
         Tests that get calls that don't return a result raises a DoesNotExist error
@@ -263,6 +271,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         with self.assertRaises(self.table.DoesNotExist):
             self.table.objects.get(test_id=100)
 
+    @execute_count(1)
     def test_get_multipleobjects_exception(self):
         """
         Tests that get calls that return multiple results raise a MultipleObjectsReturned error
@@ -286,6 +295,7 @@ class TestNamedWithMV(BasicSharedKeyspaceUnitTestCase):
         super(TestNamedWithMV, cls).tearDownClass()
 
     @greaterthanorequalcass30
+    @execute_count(5)
     def test_named_table_with_mv(self):
         """
         Test NamedTable access to materialized views

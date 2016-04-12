@@ -17,6 +17,8 @@ Duplicate module of util.py, with some accelerated functions
 used for deserialization.
 """
 
+from libc.math cimport modf, round, fabs
+
 from cpython.datetime cimport (
     timedelta_new,
         # cdef inline object timedelta_new(int days, int seconds, int useconds)
@@ -44,6 +46,17 @@ cdef datetime_from_timestamp(double timestamp):
     cdef int days = <int> (timestamp / DAY_IN_SECONDS)
     cdef int64_t days_in_seconds = (<int64_t> days) * DAY_IN_SECONDS
     cdef int seconds = <int> (timestamp - days_in_seconds)
-    cdef int microseconds = <int> ((timestamp - days_in_seconds - seconds) * 1000000)
+    cdef double tmp
+    cdef double micros_left = modf(timestamp, &tmp) * 1000000.
+    micros_left = modf(micros_left, &tmp)
+    cdef int microseconds = <int> tmp
+
+    # rounding to emulate fp math in delta_new
+    cdef int x_odd
+    tmp = round(micros_left)
+    if fabs(tmp - micros_left) == 0.5:
+        x_odd = microseconds & 1
+        tmp = 2.0 * round((micros_left + x_odd) * 0.5) - x_odd
+    microseconds += <int>tmp
 
     return DATETIME_EPOC + timedelta_new(days, seconds, microseconds)
