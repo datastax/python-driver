@@ -924,7 +924,7 @@ class HeartbeatFuture(object):
             if self._exception:
                 raise self._exception
         else:
-            raise OperationTimedOut()
+            raise OperationTimedOut("Connection heartbeat timeout after %s seconds" % (timeout,), self.connection.host)
 
     def _options_callback(self, response):
         if not isinstance(response, SupportedMessage):
