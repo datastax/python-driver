@@ -24,6 +24,7 @@ from cassandra.cqlengine.operators import EqualsOperator
 from cassandra.cqlengine.statements import WhereClause
 from tests.integration.cqlengine import DEFAULT_KEYSPACE
 from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.integration.cqlengine import execute_count
 
 
 class TestQuerySetOperation(BaseCassEngTestCase):
@@ -71,6 +72,7 @@ class TestTokenFunction(BaseCassEngTestCase):
         super(TestTokenFunction, self).tearDown()
         drop_table(TokenTestModel)
 
+    @execute_count(14)
     def test_token_function(self):
         """ Tests that token functions work properly """
         assert TokenTestModel.objects().count() == 0
@@ -127,6 +129,7 @@ class TestTokenFunction(BaseCassEngTestCase):
         func = functions.Token('a')
         self.assertRaises(query.QueryException, TestModel.objects.filter, pk__token__gt=func)
 
+    @execute_count(7)
     def test_named_table_pk_token_function(self):
         """
         Test to ensure that token function work with named tables.

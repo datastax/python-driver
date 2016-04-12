@@ -20,6 +20,7 @@ from cassandra.cqlengine.management import drop_table, sync_table
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.query import BatchQuery, DMLQuery
 from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.integration.cqlengine import execute_count
 from cassandra.cluster import Session
 
 
@@ -55,6 +56,7 @@ class BatchQueryTests(BaseCassEngTestCase):
         for obj in TestMultiKeyModel.filter(partition=self.pkey):
             obj.delete()
 
+    @execute_count(3)
     def test_insert_success_case(self):
 
         b = BatchQuery()
@@ -67,6 +69,7 @@ class BatchQueryTests(BaseCassEngTestCase):
 
         TestMultiKeyModel.get(partition=self.pkey, cluster=2)
 
+    @execute_count(4)
     def test_update_success_case(self):
 
         inst = TestMultiKeyModel.create(partition=self.pkey, cluster=2, count=3, text='4')
@@ -84,6 +87,7 @@ class BatchQueryTests(BaseCassEngTestCase):
         inst3 = TestMultiKeyModel.get(partition=self.pkey, cluster=2)
         self.assertEqual(inst3.count, 4)
 
+    @execute_count(4)
     def test_delete_success_case(self):
 
         inst = TestMultiKeyModel.create(partition=self.pkey, cluster=2, count=3, text='4')
@@ -99,6 +103,7 @@ class BatchQueryTests(BaseCassEngTestCase):
         with self.assertRaises(TestMultiKeyModel.DoesNotExist):
             TestMultiKeyModel.get(partition=self.pkey, cluster=2)
 
+    @execute_count(11)
     def test_context_manager(self):
 
         with BatchQuery() as b:
@@ -112,6 +117,7 @@ class BatchQueryTests(BaseCassEngTestCase):
         for i in range(5):
             TestMultiKeyModel.get(partition=self.pkey, cluster=i)
 
+    @execute_count(9)
     def test_bulk_delete_success_case(self):
 
         for i in range(1):
@@ -127,6 +133,7 @@ class BatchQueryTests(BaseCassEngTestCase):
         for m in TestMultiKeyModel.all():
             m.delete()
 
+    @execute_count(0)
     def test_none_success_case(self):
         """ Tests that passing None into the batch call clears any batch object """
         b = BatchQuery()
@@ -137,6 +144,7 @@ class BatchQueryTests(BaseCassEngTestCase):
         q = q.batch(None)
         self.assertIsNone(q._batch)
 
+    @execute_count(0)
     def test_dml_none_success_case(self):
         """ Tests that passing None into the batch call clears any batch object """
         b = BatchQuery()
@@ -147,6 +155,7 @@ class BatchQueryTests(BaseCassEngTestCase):
         q.batch(None)
         self.assertIsNone(q._batch)
 
+    @execute_count(3)
     def test_batch_execute_on_exception_succeeds(self):
         # makes sure if execute_on_exception == True we still apply the batch
         drop_table(BatchQueryLogModel)
@@ -166,6 +175,7 @@ class BatchQueryTests(BaseCassEngTestCase):
         # should be 1 because the batch should execute
         self.assertEqual(1, len(obj))
 
+    @execute_count(2)
     def test_batch_execute_on_exception_skips_if_not_specified(self):
         # makes sure if execute_on_exception == True we still apply the batch
         drop_table(BatchQueryLogModel)
@@ -186,12 +196,14 @@ class BatchQueryTests(BaseCassEngTestCase):
         # should be 0 because the batch should not execute
         self.assertEqual(0, len(obj))
 
+    @execute_count(1)
     def test_batch_execute_timeout(self):
         with mock.patch.object(Session, 'execute') as mock_execute:
             with BatchQuery(timeout=1) as b:
                 BatchQueryLogModel.batch(b).create(k=2, v=2)
             self.assertEqual(mock_execute.call_args[-1]['timeout'], 1)
 
+    @execute_count(1)
     def test_batch_execute_no_timeout(self):
         with mock.patch.object(Session, 'execute') as mock_execute:
             with BatchQuery() as b:
