@@ -967,10 +967,10 @@ class ConnectionHeartbeat(Thread):
                             if connection.is_idle:
                                 try:
                                     futures.append(HeartbeatFuture(connection, owner))
-                                except Exception:
+                                except Exception as e:
                                     log.warning("Failed sending heartbeat message on connection (%s) to %s",
                                                 id(connection), connection.host, exc_info=True)
-                                    failed_connections.append((connection, owner))
+                                    failed_connections.append((connection, owner, e))
                             else:
                                 connection.reset_idle()
                         else:
@@ -987,14 +987,14 @@ class ConnectionHeartbeat(Thread):
                         with connection.lock:
                             connection.in_flight -= 1
                         connection.reset_idle()
-                    except Exception:
+                    except Exception as e:
                         log.warning("Heartbeat failed for connection (%s) to %s",
                                     id(connection), connection.host, exc_info=True)
-                        failed_connections.append((f.connection, f.owner))
+                        failed_connections.append((f.connection, f.owner, e))
 
-                for connection, owner in failed_connections:
+                for connection, owner, exc in failed_connections:
                     self._raise_if_stopped()
-                    connection.defunct(Exception('Connection heartbeat failure'))
+                    connection.defunct(exc)
                     owner.return_connection(connection)
             except self.ShutdownException:
                 pass
