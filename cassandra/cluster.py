@@ -45,7 +45,7 @@ from itertools import groupby, count
 
 from cassandra import (ConsistencyLevel, AuthenticationFailed,
                        OperationTimedOut, UnsupportedOperation,
-                       SchemaTargetType)
+                       SchemaTargetType, DriverException)
 from cassandra.connection import (ConnectionException, ConnectionShutdown,
                                   ConnectionHeartbeat, ProtocolVersionUnsupported)
 from cassandra.cqltypes import UserType
@@ -65,7 +65,7 @@ from cassandra.protocol import (QueryMessage, ResultMessage,
 from cassandra.metadata import Metadata, protect_name, murmur3
 from cassandra.policies import (TokenAwarePolicy, DCAwareRoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
-                                RetryPolicy)
+                                RetryPolicy, IdentityTranslator)
 from cassandra.pool import (Host, _ReconnectionHandler, _HostReconnectionHandler,
                             HostConnectionPool, HostConnection,
                             NoConnectionsAvailable)
@@ -347,6 +347,12 @@ class Cluster(object):
     :class:`.policies.SimpleConvictionPolicy`.
     """
 
+    address_translator = IdentityTranslator()
+    """
+    :class:`.policies.AddressTranslator` instance to be used in translating server node addresses
+    to driver connection addresses.
+    """
+
     connect_to_remote_hosts = True
     """
     If left as :const:`True`, hosts that are considered :attr:`~.HostDistance.REMOTE`
@@ -481,6 +487,37 @@ class Cluster(object):
     establishment, options passing, and authentication.
     """
 
+    @property
+    def schema_metadata_enabled(self):
+        """
+        Flag indicating whether internal schema metadata is updated.
+
+        When disabled, the driver does not populate Cluster.metadata.keyspaces on connect, or on schema change events. This
+        can be used to speed initial connection, and reduce load on client and server during operation. Turning this off
+        gives away token aware request routing, and programmatic inspection of the metadata model.
+        """
+        return self.control_connection._schema_meta_enabled
+
+    @schema_metadata_enabled.setter
+    def schema_metadata_enabled(self, enabled):
+        self.control_connection._schema_meta_enabled = bool(enabled)
+
+    @property
+    def token_metadata_enabled(self):
+        """
+        Flag indicating whether internal token metadata is updated.
+
+        When disabled, the driver does not query node token information on connect, or on topology change events. This
+        can be used to speed initial connection, and reduce load on client and server during operation. It is most useful
+        in large clusters using vnodes, where the token map can be expensive to compute. Turning this off
+        gives away token aware request routing, and programmatic inspection of the token ring.
+        """
+        return self.control_connection._token_meta_enabled
+
+    @token_metadata_enabled.setter
+    def token_metadata_enabled(self, enabled):
+        self.control_connection._token_meta_enabled = bool(enabled)
+
     sessions = None
     control_connection = None
     scheduler = None
@@ -520,7 +557,10 @@ class Cluster(object):
                  idle_heartbeat_interval=30,
                  schema_event_refresh_window=2,
                  topology_event_refresh_window=10,
-                 connect_timeout=5):
+                 connect_timeout=5,
+                 schema_metadata_enabled=True,
+                 token_metadata_enabled=True,
+                 address_translator=None):
         """
         Any of the mutable Cluster attributes may be set as keyword arguments
         to the constructor.
@@ -529,9 +569,15 @@ class Cluster(object):
             if isinstance(contact_points, six.string_types):
                 raise TypeError("contact_points should not be a string, it should be a sequence (e.g. list) of strings")
 
+            if None in contact_points:
+                raise ValueError("contact_points should not contain None (it can resolve to localhost)")
             self.contact_points = contact_points
 
         self.port = port
+
+        self.contact_points_resolved = [endpoint[4][0] for a in self.contact_points
+                                        for endpoint in socket.getaddrinfo(a, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM)]
+
         self.compression = compression
         self.protocol_version = protocol_version
         self.auth_provider = auth_provider
@@ -539,7 +585,6 @@ class Cluster(object):
         if load_balancing_policy is not None:
             if isinstance(load_balancing_policy, type):
                 raise TypeError("load_balancing_policy should not be a class, it should be an instance of that class")
-
             self.load_balancing_policy = load_balancing_policy
         else:
             self.load_balancing_policy = default_lbp_factory()
@@ -547,19 +592,22 @@ class Cluster(object):
         if reconnection_policy is not None:
             if isinstance(reconnection_policy, type):
                 raise TypeError("reconnection_policy should not be a class, it should be an instance of that class")
-
             self.reconnection_policy = reconnection_policy
 
         if default_retry_policy is not None:
             if isinstance(default_retry_policy, type):
                 raise TypeError("default_retry_policy should not be a class, it should be an instance of that class")
-
             self.default_retry_policy = default_retry_policy
 
         if conviction_policy_factory is not None:
             if not callable(conviction_policy_factory):
                 raise ValueError("conviction_policy_factory must be callable")
             self.conviction_policy_factory = conviction_policy_factory
+
+        if address_translator is not None:
+            if isinstance(address_translator, type):
+                raise TypeError("address_translator should not be a class, it should be an instance of that class")
+            self.address_translator = address_translator
 
         if connection_class is not None:
             self.connection_class = connection_class
@@ -619,7 +667,9 @@ class Cluster(object):
 
         self.control_connection = ControlConnection(
             self, self.control_connection_timeout,
-            self.schema_event_refresh_window, self.topology_event_refresh_window)
+            self.schema_event_refresh_window, self.topology_event_refresh_window,
+            schema_metadata_enabled, token_metadata_enabled)
+
 
     def register_user_type(self, keyspace, user_type, klass):
         """
@@ -813,7 +863,7 @@ class Cluster(object):
                 log.warning("Downgrading core protocol version from %d to %d for %s", self.protocol_version, new_version, host_addr)
                 self.protocol_version = new_version
             else:
-                raise Exception("Cannot downgrade protocol version (%d) below minimum supported version: %d" % (new_version, MIN_SUPPORTED_VERSION))
+                raise DriverException("Cannot downgrade protocol version (%d) below minimum supported version: %d" % (new_version, MIN_SUPPORTED_VERSION))
 
     def connect(self, keyspace=None):
         """
@@ -823,14 +873,14 @@ class Cluster(object):
         """
         with self._lock:
             if self.is_shutdown:
-                raise Exception("Cluster is already shut down")
+                raise DriverException("Cluster is already shut down")
 
             if not self._is_setup:
                 log.debug("Connecting to cluster, contact points: %s; protocol version: %s",
                           self.contact_points, self.protocol_version)
                 self.connection_class.initialize_reactor()
                 atexit.register(partial(_shutdown_cluster, self))
-                for address in self.contact_points:
+                for address in self.contact_points_resolved:
                     host, new = self.add_host(address, signal=False)
                     if new:
                         host.set_up()
@@ -1244,8 +1294,8 @@ class Cluster(object):
 
         An Exception is raised if schema refresh fails for any reason.
         """
-        if not self.control_connection.refresh_schema(schema_agreement_wait=max_schema_agreement_wait):
-            raise Exception("Schema metadata was not refreshed. See log for details.")
+        if not self.control_connection.refresh_schema(schema_agreement_wait=max_schema_agreement_wait, force=True):
+            raise DriverException("Schema metadata was not refreshed. See log for details.")
 
     def refresh_keyspace_metadata(self, keyspace, max_schema_agreement_wait=None):
         """
@@ -1255,8 +1305,8 @@ class Cluster(object):
         See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
         """
         if not self.control_connection.refresh_schema(target_type=SchemaTargetType.KEYSPACE, keyspace=keyspace,
-                                                      schema_agreement_wait=max_schema_agreement_wait):
-            raise Exception("Keyspace metadata was not refreshed. See log for details.")
+                                                      schema_agreement_wait=max_schema_agreement_wait, force=True):
+            raise DriverException("Keyspace metadata was not refreshed. See log for details.")
 
     def refresh_table_metadata(self, keyspace, table, max_schema_agreement_wait=None):
         """
@@ -1265,8 +1315,9 @@ class Cluster(object):
 
         See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
         """
-        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.TABLE, keyspace=keyspace, table=table, schema_agreement_wait=max_schema_agreement_wait):
-            raise Exception("Table metadata was not refreshed. See log for details.")
+        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.TABLE, keyspace=keyspace, table=table,
+                                                      schema_agreement_wait=max_schema_agreement_wait, force=True):
+            raise DriverException("Table metadata was not refreshed. See log for details.")
 
     def refresh_materialized_view_metadata(self, keyspace, view, max_schema_agreement_wait=None):
         """
@@ -1274,8 +1325,9 @@ class Cluster(object):
 
         See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
         """
-        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.TABLE, keyspace=keyspace, table=view, schema_agreement_wait=max_schema_agreement_wait):
-            raise Exception("View metadata was not refreshed. See log for details.")
+        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.TABLE, keyspace=keyspace, table=view,
+                                                      schema_agreement_wait=max_schema_agreement_wait, force=True):
+            raise DriverException("View metadata was not refreshed. See log for details.")
 
     def refresh_user_type_metadata(self, keyspace, user_type, max_schema_agreement_wait=None):
         """
@@ -1283,8 +1335,9 @@ class Cluster(object):
 
         See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
         """
-        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.TYPE, keyspace=keyspace, type=user_type, schema_agreement_wait=max_schema_agreement_wait):
-            raise Exception("User Type metadata was not refreshed. See log for details.")
+        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.TYPE, keyspace=keyspace, type=user_type,
+                                                      schema_agreement_wait=max_schema_agreement_wait, force=True):
+            raise DriverException("User Type metadata was not refreshed. See log for details.")
 
     def refresh_user_function_metadata(self, keyspace, function, max_schema_agreement_wait=None):
         """
@@ -1294,8 +1347,9 @@ class Cluster(object):
 
         See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
         """
-        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.FUNCTION, keyspace=keyspace, function=function, schema_agreement_wait=max_schema_agreement_wait):
-            raise Exception("User Function metadata was not refreshed. See log for details.")
+        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.FUNCTION, keyspace=keyspace, function=function,
+                                                      schema_agreement_wait=max_schema_agreement_wait, force=True):
+            raise DriverException("User Function metadata was not refreshed. See log for details.")
 
     def refresh_user_aggregate_metadata(self, keyspace, aggregate, max_schema_agreement_wait=None):
         """
@@ -1305,8 +1359,9 @@ class Cluster(object):
 
         See :meth:`~.Cluster.refresh_schema_metadata` for description of ``max_schema_agreement_wait`` behavior
         """
-        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.AGGREGATE, keyspace=keyspace, aggregate=aggregate, schema_agreement_wait=max_schema_agreement_wait):
-            raise Exception("User Aggregate metadata was not refreshed. See log for details.")
+        if not self.control_connection.refresh_schema(target_type=SchemaTargetType.AGGREGATE, keyspace=keyspace, aggregate=aggregate,
+                                                      schema_agreement_wait=max_schema_agreement_wait, force=True):
+            raise DriverException("User Aggregate metadata was not refreshed. See log for details.")
 
     def refresh_nodes(self):
         """
@@ -1315,10 +1370,12 @@ class Cluster(object):
         An Exception is raised if node refresh fails for any reason.
         """
         if not self.control_connection.refresh_node_list_and_token_map():
-            raise Exception("Node list was not refreshed. See log for details.")
+            raise DriverException("Node list was not refreshed. See log for details.")
 
     def set_meta_refresh_enabled(self, enabled):
         """
+        *Deprecated:* set :attr:`~.Cluster.schema_metadata_enabled` :attr:`~.Cluster.token_metadata_enabled` instead
+
         Sets a flag to enable (True) or disable (False) all metadata refresh queries.
         This applies to both schema and node topology.
 
@@ -1327,7 +1384,8 @@ class Cluster(object):
         Meta refresh must be enabled for the driver to become aware of any cluster
         topology changes or schema updates.
         """
-        self.control_connection.set_meta_refresh_enabled(bool(enabled))
+        self.schema_metadata_enabled = enabled
+        self.token_metadata_enabled = enabled
 
     def _prepare_all_queries(self, host):
         if not self._prepared_statements:
@@ -2009,8 +2067,11 @@ class ControlConnection(object):
     Internal
     """
 
-    _SELECT_PEERS = "SELECT peer, data_center, rack, tokens, rpc_address, schema_version FROM system.peers"
-    _SELECT_LOCAL = "SELECT cluster_name, data_center, rack, tokens, partitioner, release_version, schema_version FROM system.local WHERE key='local'"
+    _SELECT_PEERS = "SELECT * FROM system.peers"
+    _SELECT_PEERS_NO_TOKENS = "SELECT peer, data_center, rack, rpc_address, schema_version FROM system.peers"
+    _SELECT_LOCAL = "SELECT * FROM system.local WHERE key='local'"
+    _SELECT_LOCAL_NO_TOKENS = "SELECT cluster_name, data_center, rack, partitioner, release_version, schema_version FROM system.local WHERE key='local'"
+
 
     _SELECT_SCHEMA_PEERS = "SELECT peer, rpc_address, schema_version FROM system.peers"
     _SELECT_SCHEMA_LOCAL = "SELECT schema_version FROM system.local WHERE key='local'"
@@ -2022,14 +2083,17 @@ class ControlConnection(object):
     _schema_event_refresh_window = None
     _topology_event_refresh_window = None
 
-    _meta_refresh_enabled = True
+    _schema_meta_enabled = True
+    _token_meta_enabled = True
 
     # for testing purposes
     _time = time
 
     def __init__(self, cluster, timeout,
                  schema_event_refresh_window,
-                 topology_event_refresh_window):
+                 topology_event_refresh_window,
+                 schema_meta_enabled=True,
+                 token_meta_enabled=True):
         # use a weak reference to allow the Cluster instance to be GC'ed (and
         # shutdown) since implementing __del__ disables the cycle detector
         self._cluster = weakref.proxy(cluster)
@@ -2038,6 +2102,8 @@ class ControlConnection(object):
 
         self._schema_event_refresh_window = schema_event_refresh_window
         self._topology_event_refresh_window = topology_event_refresh_window
+        self._schema_meta_enabled = schema_meta_enabled
+        self._token_meta_enabled = token_meta_enabled
 
         self._lock = RLock()
         self._schema_agreement_lock = Lock()
@@ -2119,8 +2185,10 @@ class ControlConnection(object):
                 "SCHEMA_CHANGE": partial(_watch_callback, self_weakref, '_handle_schema_change')
             }, register_timeout=self._timeout)
 
-            peers_query = QueryMessage(query=self._SELECT_PEERS, consistency_level=ConsistencyLevel.ONE)
-            local_query = QueryMessage(query=self._SELECT_LOCAL, consistency_level=ConsistencyLevel.ONE)
+            sel_peers = self._SELECT_PEERS if self._token_meta_enabled else self._SELECT_PEERS_NO_TOKENS
+            sel_local = self._SELECT_LOCAL if self._token_meta_enabled else self._SELECT_LOCAL_NO_TOKENS
+            peers_query = QueryMessage(query=sel_peers, consistency_level=ConsistencyLevel.ONE)
+            local_query = QueryMessage(query=sel_local, consistency_level=ConsistencyLevel.ONE)
             shared_results = connection.wait_for_responses(
                 peers_query, local_query, timeout=self._timeout)
 
@@ -2200,14 +2268,10 @@ class ControlConnection(object):
                 self._connection.close()
                 del self._connection
 
-    def refresh_schema(self, **kwargs):
-        if not self._meta_refresh_enabled:
-            log.debug("[control connection] Skipping schema refresh because meta refresh is disabled")
-            return False
-
+    def refresh_schema(self, force=False, **kwargs):
         try:
             if self._connection:
-                return self._refresh_schema(self._connection, **kwargs)
+                return self._refresh_schema(self._connection, force=force, **kwargs)
         except ReferenceError:
             pass  # our weak reference to the Cluster is no good
         except Exception:
@@ -2215,13 +2279,18 @@ class ControlConnection(object):
             self._signal_error()
         return False
 
-    def _refresh_schema(self, connection, preloaded_results=None, schema_agreement_wait=None, **kwargs):
+    def _refresh_schema(self, connection, preloaded_results=None, schema_agreement_wait=None, force=False, **kwargs):
         if self._cluster.is_shutdown:
             return False
 
         agreed = self.wait_for_schema_agreement(connection,
                                                 preloaded_results=preloaded_results,
                                                 wait_time=schema_agreement_wait)
+
+        if not self._schema_meta_enabled and not force:
+            log.debug("[control connection] Skipping schema refresh because schema metadata is disabled")
+            return False
+
         if not agreed:
             log.debug("Skipping schema refresh due to lack of schema agreement")
             return False
@@ -2231,10 +2300,6 @@ class ControlConnection(object):
         return True
 
     def refresh_node_list_and_token_map(self, force_token_rebuild=False):
-        if not self._meta_refresh_enabled:
-            log.debug("[control connection] Skipping node list refresh because meta refresh is disabled")
-            return False
-
         try:
             if self._connection:
                 self._refresh_node_list_and_token_map(self._connection, force_token_rebuild=force_token_rebuild)
@@ -2254,10 +2319,17 @@ class ControlConnection(object):
             peers_result = preloaded_results[0]
             local_result = preloaded_results[1]
         else:
-            log.debug("[control connection] Refreshing node list and token map")
             cl = ConsistencyLevel.ONE
-            peers_query = QueryMessage(query=self._SELECT_PEERS, consistency_level=cl)
-            local_query = QueryMessage(query=self._SELECT_LOCAL, consistency_level=cl)
+            if not self._token_meta_enabled:
+                log.debug("[control connection] Refreshing node list without token map")
+                sel_peers = self._SELECT_PEERS_NO_TOKENS
+                sel_local = self._SELECT_LOCAL_NO_TOKENS
+            else:
+                log.debug("[control connection] Refreshing node list and token map")
+                sel_peers = self._SELECT_PEERS
+                sel_local = self._SELECT_LOCAL
+            peers_query = QueryMessage(query=sel_peers, consistency_level=cl)
+            local_query = QueryMessage(query=sel_local, consistency_level=cl)
             peers_result, local_result = connection.wait_for_responses(
                 peers_query, local_query, timeout=self._timeout)
 
@@ -2277,6 +2349,8 @@ class ControlConnection(object):
                 datacenter = local_row.get("data_center")
                 rack = local_row.get("rack")
                 self._update_location_info(host, datacenter, rack)
+                host.listen_address = local_row.get("listen_address")
+                host.broadcast_address = local_row.get("broadcast_address")
 
             partitioner = local_row.get("partitioner")
             tokens = local_row.get("tokens")
@@ -2291,13 +2365,10 @@ class ControlConnection(object):
         should_rebuild_token_map = force_token_rebuild or self._cluster.metadata.partitioner is None
         found_hosts = set()
         for row in peers_result:
-            addr = row.get("rpc_address")
+            addr = self._rpc_from_peer_row(row)
 
-            if not addr or addr in ["0.0.0.0", "::"]:
-                addr = row.get("peer")
-
-            tokens = row.get("tokens")
-            if not tokens:
+            tokens = row.get("tokens", None)
+            if 'tokens' in row and not tokens:  # it was selected, but empty
                 log.warning("Excluding host (%s) with no tokens in system.peers table of %s." % (addr, connection.host))
                 continue
 
@@ -2313,6 +2384,8 @@ class ControlConnection(object):
             else:
                 should_rebuild_token_map |= self._update_location_info(host, datacenter, rack)
 
+            host.broadcast_address = row.get("peer")
+
             if partitioner and tokens:
                 token_map[host] = tokens
 
@@ -2320,7 +2393,7 @@ class ControlConnection(object):
             if old_host.address != connection.host and old_host.address not in found_hosts:
                 should_rebuild_token_map = True
                 if old_host.address not in self._cluster.contact_points:
-                    log.debug("[control connection] Found host that has been removed: %r", old_host)
+                    log.debug("[control connection] Removing host not found in peers metadata: %r", old_host)
                     self._cluster.remove_host(old_host)
 
         log.debug("[control connection] Finished fetching ring info")
@@ -2356,7 +2429,7 @@ class ControlConnection(object):
 
     def _handle_topology_change(self, event):
         change_type = event["change_type"]
-        addr, port = event["address"]
+        addr = self._translate_address(event["address"][0])
         if change_type == "NEW_NODE" or change_type == "MOVED_NODE":
             if self._topology_event_refresh_window >= 0:
                 delay = self._delay_for_event_type('topology_change', self._topology_event_refresh_window)
@@ -2367,7 +2440,7 @@ class ControlConnection(object):
 
     def _handle_status_change(self, event):
         change_type = event["change_type"]
-        addr, port = event["address"]
+        addr = self._translate_address(event["address"][0])
         host = self._cluster.metadata.get_host(addr)
         if change_type == "UP":
             delay = 1 + self._delay_for_event_type('status_change', 0.5)  # randomness to avoid thundering herd problem on events
@@ -2384,6 +2457,9 @@ class ControlConnection(object):
             if host is not None:
                 # this will be run by the scheduler
                 self._cluster.on_down(host, is_host_addition=False)
+
+    def _translate_address(self, addr):
+        return self._cluster.address_translator.translate(addr)
 
     def _handle_schema_change(self, event):
         if self._schema_event_refresh_window < 0:
@@ -2466,11 +2542,7 @@ class ControlConnection(object):
             schema_ver = row.get('schema_version')
             if not schema_ver:
                 continue
-
-            addr = row.get("rpc_address")
-            if not addr or addr in ["0.0.0.0", "::"]:
-                addr = row.get("peer")
-
+            addr = self._rpc_from_peer_row(row)
             peer = self._cluster.metadata.get_host(addr)
             if peer and peer.is_up:
                 versions[schema_ver].add(addr)
@@ -2480,6 +2552,12 @@ class ControlConnection(object):
             return None
 
         return dict((version, list(nodes)) for version, nodes in six.iteritems(versions))
+
+    def _rpc_from_peer_row(self, row):
+        addr = row.get("rpc_address")
+        if not addr or addr in ["0.0.0.0", "::"]:
+            addr = row.get("peer")
+        return self._translate_address(addr)
 
     def _signal_error(self):
         with self._lock:
@@ -2528,9 +2606,6 @@ class ControlConnection(object):
     def return_connection(self, connection):
         if connection is self._connection and (connection.is_defunct or connection.is_closed):
             self.reconnect()
-
-    def set_meta_refresh_enabled(self, enabled):
-        self._meta_refresh_enabled = enabled
 
 
 def _stop_scheduler(scheduler, thread):
@@ -2626,13 +2701,9 @@ class _Scheduler(object):
 
 def refresh_schema_and_set_result(control_conn, response_future, **kwargs):
     try:
-        if control_conn._meta_refresh_enabled:
-            log.debug("Refreshing schema in response to schema change. "
-                      "%s", kwargs)
-            response_future.is_schema_agreed = control_conn._refresh_schema(response_future._connection, **kwargs)
-        else:
-            log.debug("Skipping schema refresh in response to schema change because meta refresh is disabled; "
-                      "%s", kwargs)
+        log.debug("Refreshing schema in response to schema change. "
+                  "%s", kwargs)
+        response_future.is_schema_agreed = control_conn._refresh_schema(response_future._connection, **kwargs)
     except Exception:
         log.exception("Exception refreshing schema in response to schema change:")
         response_future.session.submit(control_conn.refresh_schema, **kwargs)
@@ -2717,7 +2788,16 @@ class ResponseFuture(object):
             self._timer.cancel()
 
     def _on_timeout(self):
-        self._set_final_exception(OperationTimedOut(self._errors, self._current_host))
+        errors = self._errors
+        if not errors:
+            if self.is_schema_agreed:
+                errors = {self._current_host.address: "Client request timeout. See Session.execute[_async](timeout)"}
+            else:
+                connection = getattr(self.session.cluster.control_connection, '_connection')
+                host = connection.host if connection else 'unknown'
+                errors = {host: "Request timed out while waiting for schema agreement. See Session.execute[_async](timeout) and Cluster.max_schema_agreement_wait."}
+
+        self._set_final_exception(OperationTimedOut(errors, self._current_host))
 
     def _make_query_plan(self):
         # convert the list/generator/etc to an iterator so that subsequent
@@ -2809,7 +2889,7 @@ class ResponseFuture(object):
         """
         # TODO: When timers are introduced, just make this wait
         if not self._event.is_set():
-            raise Exception("warnings cannot be retrieved before ResponseFuture is finalized")
+            raise DriverException("warnings cannot be retrieved before ResponseFuture is finalized")
         return self._warnings
 
     @property
@@ -2827,7 +2907,7 @@ class ResponseFuture(object):
         """
         # TODO: When timers are introduced, just make this wait
         if not self._event.is_set():
-            raise Exception("custom_payload cannot be retrieved before ResponseFuture is finalized")
+            raise DriverException("custom_payload cannot be retrieved before ResponseFuture is finalized")
         return self._custom_payload
 
     def start_fetching_next_page(self):
@@ -2982,15 +3062,17 @@ class ResponseFuture(object):
                     return
 
                 retry_type, consistency = retry
-                if retry_type is RetryPolicy.RETRY:
+                if retry_type in (RetryPolicy.RETRY, RetryPolicy.RETRY_NEXT_HOST):
                     self._query_retries += 1
-                    self._retry(reuse_connection=True, consistency_level=consistency)
+                    reuse = retry_type  == RetryPolicy.RETRY
+                    self._retry(reuse_connection=reuse, consistency_level=consistency)
                 elif retry_type is RetryPolicy.RETHROW:
                     self._set_final_exception(response.to_exception())
                 else:  # IGNORE
                     if self._metrics is not None:
                         self._metrics.on_ignore()
                     self._set_final_result(None)
+                self._errors[self._current_host] = response.to_exception()
             elif isinstance(response, ConnectionException):
                 if self._metrics is not None:
                     self._metrics.on_connection_error()

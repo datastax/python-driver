@@ -1402,8 +1402,10 @@ class TokenMap(object):
         with self._rebuild_lock:
             current = self.tokens_to_hosts_by_ks.get(keyspace, None)
             if (build_if_absent and current is None) or (not build_if_absent and current is not None):
-                replica_map = self.replica_map_for_keyspace(self._metadata.keyspaces[keyspace])
-                self.tokens_to_hosts_by_ks[keyspace] = replica_map
+                ks_meta = self._metadata.keyspaces.get(keyspace)
+                if ks_meta:
+                    replica_map = self.replica_map_for_keyspace(self._metadata.keyspaces[keyspace])
+                    self.tokens_to_hosts_by_ks[keyspace] = replica_map
 
     def replica_map_for_keyspace(self, ks_metadata):
         strategy = ks_metadata.replication_strategy

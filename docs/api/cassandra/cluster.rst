@@ -25,6 +25,8 @@
 
    .. autoattribute:: conviction_policy_factory
 
+   .. autoattribute:: address_translator
+
    .. autoattribute:: connection_class
 
    .. autoattribute:: metrics_enabled
@@ -48,6 +50,12 @@
    .. autoattribute:: topology_event_refresh_window
 
    .. autoattribute:: connect_timeout
+
+   .. autoattribute:: schema_metadata_enabled
+      :annotation: = True
+
+   .. autoattribute:: token_metadata_enabled
+      :annotation: = True
 
    .. automethod:: connect
 

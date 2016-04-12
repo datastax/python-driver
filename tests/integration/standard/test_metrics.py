@@ -145,13 +145,13 @@ class MetricsTests(unittest.TestCase):
             query = SimpleStatement("INSERT INTO test (k, v) VALUES (2, 2)", consistency_level=ConsistencyLevel.ALL)
             with self.assertRaises(Unavailable):
                 self.session.execute(query)
-            self.assertEqual(1, self.cluster.metrics.stats.unavailables)
+            self.assertEqual(2, self.cluster.metrics.stats.unavailables)
 
             # Test write
             query = SimpleStatement("SELECT * FROM test", consistency_level=ConsistencyLevel.ALL)
             with self.assertRaises(Unavailable):
                 self.session.execute(query, timeout=None)
-            self.assertEqual(2, self.cluster.metrics.stats.unavailables)
+            self.assertEqual(4, self.cluster.metrics.stats.unavailables)
         finally:
             get_node(1).start(wait_other_notice=True, wait_for_binary_proto=True)
             # Give some time for the cluster to come back up, for the next test
