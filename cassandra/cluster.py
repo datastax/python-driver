@@ -2067,9 +2067,9 @@ class ControlConnection(object):
     Internal
     """
 
-    _SELECT_PEERS = "SELECT peer, data_center, rack, tokens, rpc_address, schema_version FROM system.peers"
+    _SELECT_PEERS = "SELECT * FROM system.peers"
     _SELECT_PEERS_NO_TOKENS = "SELECT peer, data_center, rack, rpc_address, schema_version FROM system.peers"
-    _SELECT_LOCAL = "SELECT cluster_name, data_center, rack, tokens, partitioner, release_version, schema_version FROM system.local WHERE key='local'"
+    _SELECT_LOCAL = "SELECT * FROM system.local WHERE key='local'"
     _SELECT_LOCAL_NO_TOKENS = "SELECT cluster_name, data_center, rack, partitioner, release_version, schema_version FROM system.local WHERE key='local'"
 
 
@@ -2349,6 +2349,8 @@ class ControlConnection(object):
                 datacenter = local_row.get("data_center")
                 rack = local_row.get("rack")
                 self._update_location_info(host, datacenter, rack)
+                host.listen_address = local_row.get("listen_address")
+                host.broadcast_address = local_row.get("broadcast_address")
 
             partitioner = local_row.get("partitioner")
             tokens = local_row.get("tokens")
@@ -2381,6 +2383,8 @@ class ControlConnection(object):
                 should_rebuild_token_map = True
             else:
                 should_rebuild_token_map |= self._update_location_info(host, datacenter, rack)
+
+            host.broadcast_address = row.get("peer")
 
             if partitioner and tokens:
                 token_map[host] = tokens

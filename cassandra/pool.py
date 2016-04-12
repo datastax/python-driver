@@ -48,7 +48,21 @@ class Host(object):
 
     address = None
     """
-    The IP address or hostname of the node.
+    The IP address of the node. This is the RPC address the driver uses when connecting to the node
+    """
+
+    broadcast_address = None
+    """
+    broadcast address configured for the node, *if available* ('peer' in system.peers table).
+    This is not present in the ``system.local`` table for older versions of Cassandra. It is also not queried if
+    :attr:`~.Cluster.token_metadata_enabled` is ``False``.
+    """
+
+    listen_address = None
+    """
+    listen address configured for the node, *if available*. This is only available in the ``system.local`` table for newer
+    versions of Cassandra. It is also not queried if :attr:`~.Cluster.token_metadata_enabled` is ``False``.
+    Usually the same as ``broadcast_address`` unless configured differently in cassandra.yaml.
     """
 
     conviction_policy = None
