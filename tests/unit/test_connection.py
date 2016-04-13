@@ -385,7 +385,7 @@ class ConnectionHeartbeatTest(unittest.TestCase):
         connection.defunct.assert_has_calls([call(ANY)] * get_holders.call_count)
         exc = connection.defunct.call_args_list[0][0][0]
         self.assertIsInstance(exc, ConnectionException)
-        self.assertRegex(exc.args[0], r'^Received unexpected response to OptionsMessage.*')
+        self.assertRegexpMatches(exc.args[0], r'^Received unexpected response to OptionsMessage.*')
         holder.return_connection.assert_has_calls([call(connection)] * get_holders.call_count)
 
     def test_timeout(self, *args):
