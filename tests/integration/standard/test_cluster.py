@@ -41,6 +41,38 @@ def setup_module():
 
 class ClusterTests(unittest.TestCase):
 
+    def test_host_resolution(self):
+        """
+        Test to insure A records are resolved appropriately.
+
+        @since 3.3
+        @jira_ticket PYTHON-415
+        @expected_result hostname will be transformed into IP
+
+        @test_category connection
+        """
+        cluster = Cluster(contact_points=["localhost"], protocol_version=PROTOCOL_VERSION, connect_timeout=1)
+        self.assertTrue('127.0.0.1' in cluster.contact_points_resolved)
+
+    def test_host_duplication(self):
+        """
+        Ensure that duplicate hosts in the contact points are surfaced in the cluster metadata
+
+        @since 3.3
+        @jira_ticket PYTHON-103
+        @expected_result duplicate hosts aren't surfaced in cluster.metadata
+
+        @test_category connection
+        """
+        cluster = Cluster(contact_points=["localhost", "127.0.0.1", "localhost", "localhost", "localhost"], protocol_version=PROTOCOL_VERSION, connect_timeout=1)
+        cluster.connect()
+        self.assertEqual(len(cluster.metadata.all_hosts()), 3)
+        cluster.shutdown()
+        cluster = Cluster(contact_points=["127.0.0.1", "localhost"], protocol_version=PROTOCOL_VERSION, connect_timeout=1)
+        cluster.connect()
+        self.assertEqual(len(cluster.metadata.all_hosts()), 3)
+        cluster.shutdown()
+
     def test_raise_error_on_control_connection_timeout(self):
         """
         Test for initial control connection timeout
