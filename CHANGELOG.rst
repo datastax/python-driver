@@ -1,3 +1,9 @@
+3.2.1
+=====
+April 13, 2016
+
+* Introduced an update to allow deserializer compilation with recently released Cython 0.24
+
 3.2.0
 =====
 April 12, 2016
