@@ -344,7 +344,7 @@ class ConnectionHeartbeatTest(unittest.TestCase):
         get_holders = self.make_get_holders(1)
         max_connection = Mock(spec=Connection, host='localhost',
                               lock=Lock(),
-                              max_request_id=in_flight, in_flight=in_flight,
+                              max_request_id=in_flight - 1, in_flight=in_flight,
                               is_idle=True, is_defunct=False, is_closed=False)
         holder = get_holders.return_value[0]
         holder.get_connections.return_value.append(max_connection)

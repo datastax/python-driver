@@ -296,6 +296,8 @@ class HostConnection(object):
         self.host_distance = host_distance
         self._session = weakref.proxy(session)
         self._lock = Lock()
+        # this is used in conjunction with the connection streams. Not using the connection lock because the connection can be replaced in the lifetime of the pool.
+        self._stream_available_condition = Condition(self._lock)
         self._is_replacing = False
 
         if host_distance == HostDistance.IGNORED:
@@ -320,16 +322,27 @@ class HostConnection(object):
         if not conn:
             raise NoConnectionsAvailable()
 
-        with conn.lock:
-            if conn.in_flight < conn.max_request_id:
-                conn.in_flight += 1
-                return conn, conn.get_request_id()
+        start = time.time()
+        remaining = timeout
+        while True:
+            with conn.lock:
+                if conn.in_flight <= conn.max_request_id:
+                    conn.in_flight += 1
+                    return conn, conn.get_request_id()
+            if timeout is not None:
+                remaining = timeout - time.time() + start
+                if remaining < 0:
+                    break
+            with self._stream_available_condition:
+                self._stream_available_condition.wait(remaining)
 
         raise NoConnectionsAvailable("All request IDs are currently in use")
 
     def return_connection(self, connection):
         with connection.lock:
             connection.in_flight -= 1
+        with self._stream_available_condition:
+            self._stream_available_condition.notify()
 
         if (connection.is_defunct or connection.is_closed) and not connection.signaled_error:
             log.debug("Defunct or closed connection (%s) returned to pool, potentially "
@@ -355,6 +368,7 @@ class HostConnection(object):
         self._connection = conn
         with self._lock:
             self._is_replacing = False
+            self._stream_available_condition.notify()
 
     def shutdown(self):
         with self._lock:
@@ -362,6 +376,7 @@ class HostConnection(object):
                 return
             else:
                 self.is_shutdown = True
+            self._stream_available_condition.notify_all()
 
         if self._connection:
             self._connection.close()

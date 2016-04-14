@@ -211,6 +211,12 @@ class Connection(object):
     # the number of request IDs that are currently in use.
     in_flight = 0
 
+    # Max concurrent requests allowed per connection. This is set optimistically high, allowing
+    # all request ids to be used in protocol version 3+. Normally concurrency would be controlled
+    # at a higher level by the application or concurrent.execute_concurrent. This attribute
+    # is for lower-level integrations that want some upper bound without reimplementing.
+    max_in_flight = 2 ** 15
+
     # A set of available request IDs.  When using the v3 protocol or higher,
     # this will not initially include all request IDs in order to save memory,
     # but the set will grow if it is exhausted.
@@ -262,13 +268,14 @@ class Connection(object):
         self._iobuf = io.BytesIO()
 
         if protocol_version >= 3:
-            self.max_request_id = (2 ** 15) - 1
-            # Don't fill the deque with 2**15 items right away. Start with 300 and add
+            self.max_request_id = min(self.max_in_flight - 1, (2 ** 15) - 1)
+            # Don't fill the deque with 2**15 items right away. Start with some and add
             # more if needed.
-            self.request_ids = deque(range(300))
-            self.highest_request_id = 299
+            initial_size = min(300, self.max_in_flight)
+            self.request_ids = deque(range(initial_size))
+            self.highest_request_id = initial_size - 1
         else:
-            self.max_request_id = (2 ** 7) - 1
+            self.max_request_id = min(self.max_in_flight, (2 ** 7) - 1)
             self.request_ids = deque(range(self.max_request_id + 1))
             self.highest_request_id = self.max_request_id
 
@@ -464,7 +471,7 @@ class Connection(object):
         while True:
             needed = len(msgs) - messages_sent
             with self.lock:
-                available = min(needed, self.max_request_id - self.in_flight)
+                available = min(needed, self.max_request_id - self.in_flight + 1)
                 request_ids = [self.get_request_id() for _ in range(available)]
                 self.in_flight += available
 
@@ -911,7 +918,7 @@ class HeartbeatFuture(object):
         log.debug("Sending options message heartbeat on idle connection (%s) %s",
                   id(connection), connection.host)
         with connection.lock:
-            if connection.in_flight < connection.max_request_id:
+            if connection.in_flight <= connection.max_request_id:
                 connection.in_flight += 1
                 connection.send_msg(OptionsMessage(), connection.get_request_id(), self._options_callback)
             else:
