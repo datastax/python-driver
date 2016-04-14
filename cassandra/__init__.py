@@ -198,7 +198,11 @@ class DriverException(Exception):
     pass
 
 
-class Unavailable(DriverException):
+class RequestExecutionException(DriverException):
+    pass
+
+
+class Unavailable(RequestExecutionException):
     """
     There were not enough live replicas to satisfy the requested consistency
     level, so the coordinator node immediately failed the request without
@@ -224,7 +228,7 @@ class Unavailable(DriverException):
                                  'alive_replicas': alive_replicas}))
 
 
-class Timeout(DriverException):
+class Timeout(RequestExecutionException):
     """
     Replicas failed to respond to the coordinator node before timing out.
     """
@@ -293,7 +297,7 @@ class WriteTimeout(Timeout):
         self.write_type = write_type
 
 
-class CoordinationFailure(DriverException):
+class CoordinationFailure(RequestExecutionException):
     """
     Replicas sent a failure to the coordinator.
     """
@@ -363,7 +367,7 @@ class WriteFailure(CoordinationFailure):
         self.write_type = write_type
 
 
-class FunctionFailure(DriverException):
+class FunctionFailure(RequestExecutionException):
     """
     User Defined Function failed during execution
     """
@@ -390,7 +394,15 @@ class FunctionFailure(DriverException):
         Exception.__init__(self, summary_message)
 
 
-class AlreadyExists(DriverException):
+class RequestValidationException(DriverException):
+    pass
+
+
+class ConfigurationException(RequestValidationException):
+    pass
+
+
+class AlreadyExists(ConfigurationException):
     """
     An attempt was made to create a keyspace or table that already exists.
     """
@@ -418,7 +430,7 @@ class AlreadyExists(DriverException):
         self.table = table
 
 
-class InvalidRequest(DriverException):
+class InvalidRequest(RequestValidationException):
     """
     A query was made that was invalid for some reason, such as trying to set
     the keyspace for a connection to a nonexistent keyspace.
@@ -426,9 +438,9 @@ class InvalidRequest(DriverException):
     pass
 
 
-class Unauthorized(DriverException):
+class Unauthorized(RequestValidationException):
     """
-    The current user is not authorized to perfom the requested operation.
+    The current user is not authorized to perform the requested operation.
     """
     pass
 
