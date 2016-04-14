@@ -10,8 +10,8 @@ except ImportError:
 from cassandra.query import tuple_factory
 from cassandra.cluster import Cluster
 from cassandra.protocol import ProtocolHandler, LazyProtocolHandler, NumpyProtocolHandler
-
-from tests.integration import use_singledc, PROTOCOL_VERSION, notprotocolv1, drop_keyspace_shutdown_cluster
+from cassandra.cython_deps import HAVE_CYTHON, HAVE_NUMPY
+from tests.integration import use_singledc, PROTOCOL_VERSION, notprotocolv1, drop_keyspace_shutdown_cluster, VERIFY_CYTHON
 from tests.integration.datatype_utils import update_datatypes
 from tests.integration.standard.utils import (
     create_table_with_all_types, get_all_primitive_params, get_primitive_datatypes)
@@ -122,6 +122,20 @@ class CythonProtocolHandlerTest(unittest.TestCase):
         self.assertEqual(count, expected_pages + 1)  # see note about extra 'page' above
 
         cluster.shutdown()
+
+    @numpytest
+    def test_cython_numpy_are_installed_valid(self):
+        """
+        Test to validate that cython and numpy are installed correctly
+        @since 3.3.0
+        @jira_ticket PYTHON-543
+        @expected_result Cython and Numpy should be present
+
+        @test_category configuration
+        """
+        if VERIFY_CYTHON:
+            self.assertTrue(HAVE_CYTHON)
+            self.assertTrue(HAVE_NUMPY)
 
     def _verify_numpy_page(self, page):
         colnames = self.colnames
