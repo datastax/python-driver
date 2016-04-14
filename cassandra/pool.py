@@ -78,6 +78,11 @@ class Host(object):
     up or down.
     """
 
+    release_version = None
+    """
+    release_version as queried from the control connection system tables
+    """
+
     _datacenter = None
     _rack = None
     _reconnection_handler = None
