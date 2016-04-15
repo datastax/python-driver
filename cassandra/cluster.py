@@ -2068,10 +2068,9 @@ class ControlConnection(object):
     """
 
     _SELECT_PEERS = "SELECT * FROM system.peers"
-    _SELECT_PEERS_NO_TOKENS = "SELECT peer, data_center, rack, rpc_address, schema_version FROM system.peers"
+    _SELECT_PEERS_NO_TOKENS = "SELECT peer, data_center, rack, rpc_address, release_version, schema_version FROM system.peers"
     _SELECT_LOCAL = "SELECT * FROM system.local WHERE key='local'"
     _SELECT_LOCAL_NO_TOKENS = "SELECT cluster_name, data_center, rack, partitioner, release_version, schema_version FROM system.local WHERE key='local'"
-
 
     _SELECT_SCHEMA_PEERS = "SELECT peer, rpc_address, schema_version FROM system.peers"
     _SELECT_SCHEMA_LOCAL = "SELECT schema_version FROM system.local WHERE key='local'"
@@ -2351,13 +2350,12 @@ class ControlConnection(object):
                 self._update_location_info(host, datacenter, rack)
                 host.listen_address = local_row.get("listen_address")
                 host.broadcast_address = local_row.get("broadcast_address")
+                host.release_version = local_row.get("release_version")
 
             partitioner = local_row.get("partitioner")
             tokens = local_row.get("tokens")
             if partitioner and tokens:
                 token_map[host] = tokens
-
-            connection.server_version = local_row['release_version']
 
         # Check metadata.partitioner to see if we haven't built anything yet. If
         # every node in the cluster was in the contact points, we won't discover
@@ -2385,6 +2383,7 @@ class ControlConnection(object):
                 should_rebuild_token_map |= self._update_location_info(host, datacenter, rack)
 
             host.broadcast_address = row.get("peer")
+            host.release_version = row.get("release_version")
 
             if partitioner and tokens:
                 token_map[host] = tokens

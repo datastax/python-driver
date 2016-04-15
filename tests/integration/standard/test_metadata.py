@@ -142,7 +142,8 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertEqual([], tablemeta.clustering_key)
         self.assertEqual([u'a', u'b', u'c'], sorted(tablemeta.columns.keys()))
 
-        parser = get_schema_parser(self.cluster.control_connection._connection, 1)
+        cc = self.cluster.control_connection._connection
+        parser = get_schema_parser(cc, str(CASS_SERVER_VERSION[0]), 1)
 
         for option in tablemeta.options:
             self.assertIn(option, parser.recognized_table_options)
@@ -1919,7 +1920,7 @@ class BadMetaTest(unittest.TestCase):
         cls.session.execute("CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}" % cls.keyspace_name)
         cls.session.set_keyspace(cls.keyspace_name)
         connection = cls.cluster.control_connection._connection
-        cls.parser_class = get_schema_parser(connection, timeout=20).__class__
+        cls.parser_class = get_schema_parser(connection, str(CASS_SERVER_VERSION[0]), timeout=20).__class__
 
     @classmethod
     def teardown_class(cls):
