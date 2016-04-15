@@ -34,7 +34,7 @@ from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
 from tests.integration import get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass, \
-    BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase, BasicExistingKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster
+    BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase, BasicExistingKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster, CASSANDRA_VERSION
 
 from tests.unit.cython.utils import notcython
 
@@ -64,6 +64,20 @@ class HostMetatDataTests(BasicExistingKeyspaceUnitTestCase):
         # The control connection node should have the listen address set.
         listen_addrs = [host.listen_address for host in self.cluster.metadata.all_hosts()]
         self.assertTrue(local_host in listen_addrs)
+
+    def test_host_release_version(self):
+        """
+        Checks the hosts release version and validates that it is equal to the
+        Cassandra version we are using in our test harness.
+
+        @since 3.3
+        @jira_ticket PYTHON-301
+        @expected_result host.release version should match our specified Cassandra version.
+
+        @test_category metadata
+        """
+        for host in self.cluster.metadata.all_hosts():
+            self.assertEqual(host.release_version, CASSANDRA_VERSION)
 
 
 class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
