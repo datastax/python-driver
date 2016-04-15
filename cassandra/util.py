@@ -1171,3 +1171,14 @@ def _positional_rename_invalid_identifiers(field_names):
             or name.startswith('_')):
             names_out[index] = 'field_%d_' % index
     return names_out
+
+
+def _sanitize_identifiers(field_names):
+    names_out = _positional_rename_invalid_identifiers(field_names)
+    if len(names_out) != len(set(names_out)):
+        observed_names = set()
+        for index, name in enumerate(names_out):
+            while names_out[index] in observed_names:
+                names_out[index] = "%s_" % (names_out[index],)
+            observed_names.add(names_out[index])
+    return names_out
