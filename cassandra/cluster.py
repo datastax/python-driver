@@ -2814,6 +2814,7 @@ class ResponseFuture(object):
         """ Internal """
         # query_plan is an iterator, so this will resume where we last left
         # off if send_request() is called multiple times
+        start = time.time()
         for host in self.query_plan:
             req_id = self._query(host)
             if req_id is not None:
@@ -2824,6 +2825,9 @@ class ResponseFuture(object):
                 # in the case of full disconnect, where no hosts will be available
                 if self._timer is None:
                     self._start_timer()
+                return
+            if self.timeout is not None and time.time() - start > self.timeout:
+                self._on_timeout()
                 return
 
         self._set_final_exception(NoHostAvailable(
