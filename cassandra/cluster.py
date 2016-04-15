@@ -2151,6 +2151,8 @@ class ControlConnection(object):
             except Exception as exc:
                 errors[host.address] = exc
                 log.warning("[control connection] Error connecting to %s:", host, exc_info=True)
+            if self._is_shutdown:
+                raise DriverException("[control connection] Reconnection in progress during shutdown")
 
         raise NoHostAvailable("Unable to connect to any servers", errors)
 
@@ -2164,6 +2166,9 @@ class ControlConnection(object):
         while True:
             try:
                 connection = self._cluster.connection_factory(host.address, is_control_connection=True)
+                if self._is_shutdown:
+                    connection.close()
+                    raise DriverException("Reconnecting during shutdown")
                 break
             except ProtocolVersionUnsupported as e:
                 self._cluster.protocol_downgrade(host.address, e.startup_version)
@@ -2265,7 +2270,7 @@ class ControlConnection(object):
             log.debug("Shutting down control connection")
             if self._connection:
                 self._connection.close()
-                del self._connection
+                self._connection = None
 
     def refresh_schema(self, force=False, **kwargs):
         try:
