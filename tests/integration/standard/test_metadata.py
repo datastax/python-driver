@@ -34,14 +34,36 @@ from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
 from tests.integration import get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass, \
-    BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster
+    BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase, BasicExistingKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster
 
 from tests.unit.cython.utils import notcython
+
 
 def setup_module():
     use_singledc()
     global CASS_SERVER_VERSION
     CASS_SERVER_VERSION = get_server_versions()[0]
+
+
+class HostMetatDataTests(BasicExistingKeyspaceUnitTestCase):
+    def test_broadcast_listen_address(self):
+        """
+        Check to ensure that the broadcast and listen adresss is populated correctly
+
+        @since 3.3
+        @jira_ticket PYTHON-332
+        @expected_result They are populated for C*> 2.0.16, 2.1.6, 2.2.0
+
+        @test_category metadata
+        """
+        # All nodes should have the broadcast_address set
+        for host in self.cluster.metadata.all_hosts():
+            self.assertIsNotNone(host.broadcast_address)
+        con = self.cluster.control_connection.get_connections()[0]
+        local_host = con.host
+        # The control connection node should have the listen address set.
+        listen_addrs = [host.listen_address for host in self.cluster.metadata.all_hosts()]
+        self.assertTrue(local_host in listen_addrs)
 
 
 class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
