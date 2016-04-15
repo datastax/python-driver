@@ -2357,8 +2357,6 @@ class ControlConnection(object):
             if partitioner and tokens:
                 token_map[host] = tokens
 
-            connection.server_version = local_row['release_version']
-
         # Check metadata.partitioner to see if we haven't built anything yet. If
         # every node in the cluster was in the contact points, we won't discover
         # any new nodes, so we need this additional check.  (See PYTHON-90)

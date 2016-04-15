@@ -232,8 +232,6 @@ class Connection(object):
     is_control_connection = False
     signaled_error = False  # used for flagging at the pool level
 
-    _server_version = None
-
     _iobuf = None
     _current_frame = None
 
@@ -828,18 +826,6 @@ class Connection(object):
 
     def reset_idle(self):
         self.msg_received = False
-
-    @property
-    def server_version(self):
-        if self._server_version is None:
-            query_message = QueryMessage(query="SELECT release_version FROM system.local", consistency_level=ConsistencyLevel.ONE)
-            message = self.wait_for_response(query_message)
-            self._server_version = message.results[1][0][0]  # (col names, rows)[rows][first row][only item]
-        return self._server_version
-
-    @server_version.setter
-    def server_version(self, version):
-        self._server_version = version
 
     def __str__(self):
         status = ""
