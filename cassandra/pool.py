@@ -349,12 +349,17 @@ class HostConnection(object):
 
     def _replace(self, connection):
         log.debug("Replacing connection (%s) to %s", id(connection), self.host)
-        conn = self._session.cluster.connection_factory(self.host.address)
-        if self._session.keyspace:
-            conn.set_keyspace_blocking(self._session.keyspace)
-        self._connection = conn
-        with self._lock:
-            self._is_replacing = False
+        try:
+            conn = self._session.cluster.connection_factory(self.host.address)
+            if self._session.keyspace:
+                conn.set_keyspace_blocking(self._session.keyspace)
+            self._connection = conn
+        except Exception:
+            log.warning("Failed reconnecting %s. Retrying." % (self.host.address,))
+            self._session.submit(self._replace, connection)
+        else:
+            with self._lock:
+                self._is_replacing = False
 
     def shutdown(self):
         with self._lock:
@@ -513,10 +518,10 @@ class HostConnectionPool(object):
         max_conns = self._session.cluster.get_max_connections_per_host(self.host_distance)
         with self._lock:
             if self.is_shutdown:
-                return False
+                return True
 
             if self.open_count >= max_conns:
-                return False
+                return True
 
             self.open_count += 1
 
@@ -660,16 +665,21 @@ class HostConnectionPool(object):
 
         if should_replace:
             log.debug("Replacing connection (%s) to %s", id(connection), self.host)
-
-            def close_and_replace():
-                connection.close()
-                self._add_conn_if_under_max()
-
-            self._session.submit(close_and_replace)
+            connection.close()
+            self._session.submit(self._retrying_replace)
         else:
-            # just close it
             log.debug("Closing connection (%s) to %s", id(connection), self.host)
             connection.close()
+
+    def _retrying_replace(self):
+        replaced = False
+        try:
+            replaced = self._add_conn_if_under_max()
+        except Exception:
+            log.exception("Failed replacing connection to %s", self.host)
+        if not replaced:
+            log.debug("Failed replacing connection to %s. Retrying.", self.host)
+            self._session.submit(self._retrying_replace)
 
     def shutdown(self):
         with self._lock:

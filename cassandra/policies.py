@@ -17,7 +17,7 @@ import logging
 from random import randint
 from threading import Lock
 
-from cassandra import ConsistencyLevel
+from cassandra import ConsistencyLevel, OperationTimedOut
 
 log = logging.getLogger(__name__)
 
@@ -465,7 +465,7 @@ class SimpleConvictionPolicy(ConvictionPolicy):
     """
 
     def add_failure(self, connection_exc):
-        return True
+        return not isinstance(connection_exc, OperationTimedOut)
 
     def reset(self):
         pass

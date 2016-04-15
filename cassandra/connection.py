@@ -924,18 +924,18 @@ class HeartbeatFuture(object):
             if self._exception:
                 raise self._exception
         else:
-            raise OperationTimedOut()
+            raise OperationTimedOut("Connection heartbeat timeout after %s seconds" % (timeout,), self.connection.host)
 
     def _options_callback(self, response):
-        if not isinstance(response, SupportedMessage):
+        if isinstance(response, SupportedMessage):
+            log.debug("Received options response on connection (%s) from %s",
+                      id(self.connection), self.connection.host)
+        else:
             if isinstance(response, ConnectionException):
                 self._exception = response
             else:
                 self._exception = ConnectionException("Received unexpected response to OptionsMessage: %s"
                                                       % (response,))
-
-        log.debug("Received options response on connection (%s) from %s",
-                  id(self.connection), self.connection.host)
         self._event.set()
 
 
@@ -967,10 +967,10 @@ class ConnectionHeartbeat(Thread):
                             if connection.is_idle:
                                 try:
                                     futures.append(HeartbeatFuture(connection, owner))
-                                except Exception:
+                                except Exception as e:
                                     log.warning("Failed sending heartbeat message on connection (%s) to %s",
-                                                id(connection), connection.host, exc_info=True)
-                                    failed_connections.append((connection, owner))
+                                                id(connection), connection.host)
+                                    failed_connections.append((connection, owner, e))
                             else:
                                 connection.reset_idle()
                         else:
@@ -987,14 +987,14 @@ class ConnectionHeartbeat(Thread):
                         with connection.lock:
                             connection.in_flight -= 1
                         connection.reset_idle()
-                    except Exception:
+                    except Exception as e:
                         log.warning("Heartbeat failed for connection (%s) to %s",
-                                    id(connection), connection.host, exc_info=True)
-                        failed_connections.append((f.connection, f.owner))
+                                    id(connection), connection.host)
+                        failed_connections.append((f.connection, f.owner, e))
 
-                for connection, owner in failed_connections:
+                for connection, owner, exc in failed_connections:
                     self._raise_if_stopped()
-                    connection.defunct(Exception('Connection heartbeat failure'))
+                    connection.defunct(exc)
                     owner.return_connection(connection)
             except self.ShutdownException:
                 pass
