@@ -246,6 +246,8 @@ class Connection(object):
     _socket_impl = socket
     _ssl_impl = ssl
 
+    _match_hostname = False
+
     def __init__(self, host='127.0.0.1', port=9042, authenticator=None,
                  ssl_options=None, sockopts=None, compression=True,
                  cql_version=None, protocol_version=MAX_SUPPORTED_VERSION, is_control_connection=False,
@@ -253,7 +255,7 @@ class Connection(object):
         self.host = host
         self.port = port
         self.authenticator = authenticator
-        self.ssl_options = ssl_options
+        self.ssl_options = ssl_options.copy() if ssl_options else None
         self.sockopts = sockopts
         self.compression = compression
         self.cql_version = cql_version
@@ -264,6 +266,13 @@ class Connection(object):
         self._push_watchers = defaultdict(set)
         self._requests = {}
         self._iobuf = io.BytesIO()
+
+        if ssl_options:
+            self._match_hostname = bool(self.ssl_options.pop('match_hostname', False))
+            if self._match_hostname:
+                if not getattr(ssl, 'match_hostname', None):
+                    raise RuntimeError("ssl_options specify 'match_hostname', but ssl.match_hostname is not provided. "
+                                       "Patch or upgrade Python to use this option.")
 
         if protocol_version >= 3:
             self.max_request_id = min(self.max_in_flight - 1, (2 ** 15) - 1)
@@ -336,6 +345,8 @@ class Connection(object):
                     self._socket = self._ssl_impl.wrap_socket(self._socket, **self.ssl_options)
                 self._socket.settimeout(self.connect_timeout)
                 self._socket.connect(sockaddr)
+                if self._match_hostname:
+                    ssl.match_hostname(self._socket.getpeercert(), self.host)
                 sockerr = None
                 break
             except socket.error as err:
