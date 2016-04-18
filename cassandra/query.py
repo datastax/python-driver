@@ -864,7 +864,7 @@ class QueryTrace(object):
         self.trace_id = trace_id
         self._session = session
 
-    def populate(self, max_wait=2.0, wait_for_complete=True):
+    def populate(self, max_wait=2.0, wait_for_complete=True, query_cl=None):
         """
         Retrieves the actual tracing details from Cassandra and populates the
         attributes of this instance.  Because tracing details are stored
@@ -875,6 +875,9 @@ class QueryTrace(object):
 
         `wait_for_complete=False` bypasses the wait for duration to be populated.
         This can be used to query events from partial sessions.
+
+        `query_cl` specifies a consistency level to use for polling the trace tables,
+        if it should be different than the session default.
         """
         attempt = 0
         start = time.time()
@@ -886,7 +889,7 @@ class QueryTrace(object):
 
             log.debug("Attempting to fetch trace info for trace ID: %s", self.trace_id)
             session_results = self._execute(
-                self._SELECT_SESSIONS_FORMAT, (self.trace_id,), time_spent, max_wait)
+                SimpleStatement(self._SELECT_SESSIONS_FORMAT, consistency_level=query_cl), (self.trace_id,), time_spent, max_wait)
 
             is_complete = session_results and session_results[0].duration is not None
             if not session_results or (wait_for_complete and not is_complete):
@@ -910,7 +913,7 @@ class QueryTrace(object):
             log.debug("Attempting to fetch trace events for trace ID: %s", self.trace_id)
             time_spent = time.time() - start
             event_results = self._execute(
-                self._SELECT_EVENTS_FORMAT, (self.trace_id,), time_spent, max_wait)
+                SimpleStatement(self._SELECT_EVENTS_FORMAT, consistency_level=query_cl), (self.trace_id,), time_spent, max_wait)
             log.debug("Fetched trace events for trace ID: %s", self.trace_id)
             self.events = tuple(TraceEvent(r.activity, r.event_id, r.source, r.source_elapsed, r.thread)
                                 for r in event_results)
