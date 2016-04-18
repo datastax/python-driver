@@ -386,6 +386,14 @@ class Cluster(object):
     a string pointing to the location of the CA certs file), and you probably
     want to specify ``ssl_version`` as ``ssl.PROTOCOL_TLSv1`` to match
     Cassandra's default protocol.
+
+    .. versionchanged:: 3.3.0
+
+    In addition to ``wrap_socket`` kwargs, clients may also specify ``'match_hostname': True`` to verify the cert hostname
+    as outlined in RFC 2818 and RFC 6125. Note that this requires the certificate to be transferred, so
+    should almost always require the option ``'cert_reqs': ssl.CERT_REQUIRED``. Note also that this functionality was not built into
+    Python standard library until (2.7.9, 3.2). To enable this mechanism in earlier versions, patch ``ssl.match_hostname``
+    with a custom or `back-ported function <https://pypi.python.org/pypi/backports.ssl_match_hostname>`_.
     """
 
     sockopts = None
