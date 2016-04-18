@@ -242,6 +242,8 @@ class Connection(object):
     _socket_impl = socket
     _ssl_impl = ssl
 
+    _match_hostname = False
+
     def __init__(self, host='127.0.0.1', port=9042, authenticator=None,
                  ssl_options=None, sockopts=None, compression=True,
                  cql_version=None, protocol_version=MAX_SUPPORTED_VERSION, is_control_connection=False,
@@ -249,7 +251,7 @@ class Connection(object):
         self.host = host
         self.port = port
         self.authenticator = authenticator
-        self.ssl_options = ssl_options.copy()
+        self.ssl_options = ssl_options.copy() if ssl_options else None
         self.sockopts = sockopts
         self.compression = compression
         self.cql_version = cql_version
