@@ -29,10 +29,9 @@ from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.protocol import QueryMessage
 from cassandra.connection import Connection
 from cassandra.policies import WhiteListRoundRobinPolicy
-from cassandra.query import SimpleStatement
 
 from tests import is_monkey_patched
-from tests.integration import use_singledc, PROTOCOL_VERSION, execute_with_long_wait_retry
+from tests.integration import use_singledc, PROTOCOL_VERSION
 
 try:
     from cassandra.io.libevreactor import LibevConnection
@@ -56,7 +55,7 @@ class ConnectionTimeoutTest(unittest.TestCase):
         Connection.max_in_flight = self.defaultInFlight
         self.cluster.shutdown()
 
-    def testInFlightTimeout(self):
+    def test_in_flight_timeout(self):
         """
         Test to ensure that connection id fetching will block when max_id is reached/
 
