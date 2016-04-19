@@ -112,3 +112,19 @@ class TestCounterColumn(BaseCassEngTestCase):
         instance = TestCounterModel()
         assert instance.counter == 0
 
+    def test_save_after_no_update(self):
+        expected_value = 15
+        instance = TestCounterModel.create()
+        instance.update(counter=expected_value)
+
+        # read back
+        instance = TestCounterModel.get(partition=instance.partition)
+        self.assertEqual(instance.counter, expected_value)
+
+        # save after doing nothing
+        instance.save()
+        self.assertEqual(instance.counter, expected_value)
+
+        # make sure there was no increment
+        instance = TestCounterModel.get(partition=instance.partition)
+        self.assertEqual(instance.counter, expected_value)
