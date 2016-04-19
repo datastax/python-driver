@@ -804,7 +804,7 @@ class UpdateStatement(AssignmentStatement):
             previous = column.to_database(previous)
             clause = container_update_type(column.db_field_name, value, operation, previous)
         elif col_type == columns.Counter:
-            clause = CounterUpdateClause(column.db_field_name, value)
+            clause = CounterUpdateClause(column.db_field_name, value, previous)
         else:
             clause = AssignmentClause(column.db_field_name, value)
         if clause.get_context_size():  # this is to exclude map removals from updates. Can go away if we drop support for C* < 1.2.4 and remove two-phase updates
