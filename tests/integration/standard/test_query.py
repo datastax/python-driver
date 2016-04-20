@@ -20,13 +20,13 @@ try:
 except ImportError:
     import unittest  # noqa
 
-from cassandra import ConsistencyLevel
+from cassandra import ConsistencyLevel, Unavailable, InvalidRequest
 from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
                              BatchStatement, BatchType, dict_factory, TraceUnavailable)
-from cassandra.cluster import Cluster
+from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.policies import HostDistance
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, greaterthanprotocolv3
+from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, greaterthanprotocolv3, get_node
 
 import time
 import re
@@ -109,7 +109,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         only be the case if the c* version is 2.2 or greater
 
         @since 2.6.0
-        @jira_ticket PYTHON-235
+        @jira_ticket PYTHON-435
         @expected_result client address should be present in C* >= 2.2, otherwise should be none.
 
         @test_category tracing
@@ -137,6 +137,32 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         # Ensure that ip is set
         self.assertIsNotNone(client_ip, "Client IP was not set in trace with C* >= 2.2")
         self.assertTrue(pat.match(client_ip), "Client IP from trace did not match the expected value")
+
+    def test_trace_cl(self):
+        """
+        Test to ensure that CL is set correctly honored when executing trace queries.
+
+        @since 3.3
+        @jira_ticket PYTHON-435
+        @expected_result Consistency Levels set on get_query_trace should be honored
+        """
+        # Execute a query
+        query = "SELECT * FROM system.local"
+        statement = SimpleStatement(query)
+        response_future = self.session.execute_async(statement, trace=True)
+        response_future.result()
+        with self.assertRaises(Unavailable):
+            response_future.get_query_trace(query_cl=ConsistencyLevel.THREE)
+        # Try again with a smattering of other CL's
+        self.assertIsNotNone(response_future.get_query_trace(max_wait=2.0, query_cl=ConsistencyLevel.TWO).trace_id)
+        response_future = self.session.execute_async(statement, trace=True)
+        response_future.result()
+        self.assertIsNotNone(response_future.get_query_trace(max_wait=2.0, query_cl=ConsistencyLevel.ONE).trace_id)
+        response_future = self.session.execute_async(statement, trace=True)
+        response_future.result()
+        with self.assertRaises(InvalidRequest):
+            self.assertIsNotNone(response_future.get_query_trace(max_wait=2.0, query_cl=ConsistencyLevel.ANY).trace_id)
+        self.assertIsNotNone(response_future.get_query_trace(max_wait=2.0, query_cl=ConsistencyLevel.QUORUM).trace_id)
 
     def test_incomplete_query_trace(self):
         """
