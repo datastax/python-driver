@@ -2356,6 +2356,9 @@ class ControlConnection(object):
             cluster_name = local_row["cluster_name"]
             self._cluster.metadata.cluster_name = cluster_name
 
+            partitioner = local_row.get("partitioner")
+            tokens = local_row.get("tokens")
+
             host = self._cluster.metadata.get_host(connection.host)
             if host:
                 datacenter = local_row.get("data_center")
@@ -2365,10 +2368,8 @@ class ControlConnection(object):
                 host.broadcast_address = local_row.get("broadcast_address")
                 host.release_version = local_row.get("release_version")
 
-            partitioner = local_row.get("partitioner")
-            tokens = local_row.get("tokens")
-            if partitioner and tokens:
-                token_map[host] = tokens
+                if partitioner and tokens:
+                    token_map[host] = tokens
 
         # Check metadata.partitioner to see if we haven't built anything yet. If
         # every node in the cluster was in the contact points, we won't discover
