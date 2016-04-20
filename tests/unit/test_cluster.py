@@ -19,9 +19,64 @@ except ImportError:
 
 from mock import patch, Mock
 
-from cassandra import ConsistencyLevel
+from cassandra import ConsistencyLevel, DriverException, Timeout, Unavailable, RequestExecutionException, ReadTimeout, WriteTimeout, CoordinationFailure, ReadFailure, WriteFailure, FunctionFailure, AlreadyExists,\
+    InvalidRequest, Unauthorized, AuthenticationFailed, OperationTimedOut, UnsupportedOperation, RequestValidationException, ConfigurationException
 from cassandra.cluster import _Scheduler, Session, Cluster
 from cassandra.query import SimpleStatement
+
+
+class ExceptionTypeTest(unittest.TestCase):
+
+    def test_exception_types(self):
+        """
+        PYTHON-443
+        Sanity check to ensure we don't unintentionally change class hierarchy of exception types
+        """
+        self.assertTrue(issubclass(Unavailable, DriverException))
+        self.assertTrue(issubclass(Unavailable, RequestExecutionException))
+
+        self.assertTrue(issubclass(ReadTimeout, DriverException))
+        self.assertTrue(issubclass(ReadTimeout, RequestExecutionException))
+        self.assertTrue(issubclass(ReadTimeout, Timeout))
+
+        self.assertTrue(issubclass(WriteTimeout, DriverException))
+        self.assertTrue(issubclass(WriteTimeout, RequestExecutionException))
+        self.assertTrue(issubclass(WriteTimeout, Timeout))
+
+        self.assertTrue(issubclass(CoordinationFailure, DriverException))
+        self.assertTrue(issubclass(CoordinationFailure, RequestExecutionException))
+
+        self.assertTrue(issubclass(ReadFailure, DriverException))
+        self.assertTrue(issubclass(ReadFailure, RequestExecutionException))
+        self.assertTrue(issubclass(ReadFailure, CoordinationFailure))
+
+        self.assertTrue(issubclass(WriteFailure, DriverException))
+        self.assertTrue(issubclass(WriteFailure, RequestExecutionException))
+        self.assertTrue(issubclass(WriteFailure, CoordinationFailure))
+
+        self.assertTrue(issubclass(FunctionFailure, DriverException))
+        self.assertTrue(issubclass(FunctionFailure, RequestExecutionException))
+
+        self.assertTrue(issubclass(RequestValidationException, DriverException))
+
+        self.assertTrue(issubclass(ConfigurationException, DriverException))
+        self.assertTrue(issubclass(ConfigurationException, RequestValidationException))
+
+        self.assertTrue(issubclass(AlreadyExists, DriverException))
+        self.assertTrue(issubclass(AlreadyExists, RequestValidationException))
+        self.assertTrue(issubclass(AlreadyExists, ConfigurationException))
+
+        self.assertTrue(issubclass(InvalidRequest, DriverException))
+        self.assertTrue(issubclass(InvalidRequest, RequestValidationException))
+
+        self.assertTrue(issubclass(Unauthorized, DriverException))
+        self.assertTrue(issubclass(Unauthorized, RequestValidationException))
+
+        self.assertTrue(issubclass(AuthenticationFailed, DriverException))
+
+        self.assertTrue(issubclass(OperationTimedOut, DriverException))
+
+        self.assertTrue(issubclass(UnsupportedOperation, DriverException))
 
 
 class ContactListTest(unittest.TestCase):
