@@ -1,8 +1,14 @@
+3.2.2
+=====
+April 19, 2016
+
+* Fix counter save-after-no-update (PYTHON-547)
+
 3.2.1
 =====
 April 13, 2016
 
-* Introduced an update to allow deserializer compilation with recently released Cython 0.24
+* Introduced an update to allow deserializer compilation with recently released Cython 0.24 (PYTHON-542)
 
 3.2.0
 =====
