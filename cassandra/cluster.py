@@ -2610,7 +2610,13 @@ class ControlConnection(object):
             self.refresh_node_list_and_token_map(force_token_rebuild=True)
 
     def on_remove(self, host):
-        self.refresh_node_list_and_token_map(force_token_rebuild=True)
+        c = self._connection
+        if c and c.host == host.address:
+            log.debug("[control connection] Control connection host (%s) is being removed. Reconnecting", host)
+            # refresh will be done on reconnect
+            self.reconnect()
+        else:
+            self.refresh_node_list_and_token_map(force_token_rebuild=True)
 
     def get_connections(self):
         c = getattr(self, '_connection', None)
