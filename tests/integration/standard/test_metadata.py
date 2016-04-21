@@ -77,7 +77,7 @@ class HostMetatDataTests(BasicExistingKeyspaceUnitTestCase):
         @test_category metadata
         """
         for host in self.cluster.metadata.all_hosts():
-            self.assertEqual(host.release_version, CASSANDRA_VERSION)
+            self.assertTrue(host.release_version.startswith(CASSANDRA_VERSION))
 
 
 class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
