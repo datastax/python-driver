@@ -82,6 +82,36 @@ class HostMetatDataTests(BasicExistingKeyspaceUnitTestCase):
 
 class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
+    def test_schema_metadata_disable(self):
+        """
+        Checks to ensure that schema metadata_enabled, and token_metadata_enabled
+        flags work correctly.
+
+        @since 3.3
+        @jira_ticket PYTHON-327
+        @expected_result schema metadata will not be populated when schema_metadata_enabled is fause
+        token_metadata will be missing when token_metadata is set to false
+
+        @test_category metadata
+        """
+        # Validate metadata is missing where appropriate
+        no_schema = Cluster(schema_metadata_enabled=False)
+        no_schema_session = no_schema.connect()
+        self.assertEqual(len(no_schema.metadata.keyspaces), 0)
+        self.assertEqual(no_schema.metadata.export_schema_as_string(), '')
+        no_token = Cluster(token_metadata_enabled=False)
+        no_token_session = no_token.connect()
+        self.assertEqual(len(no_token.metadata.token_map.token_to_host_owner), 0)
+
+        # Do a simple query to ensure queries are working
+        query = "SELECT * FROM system.local"
+        no_schema_rs = no_schema_session.execute(query)
+        no_token_rs = no_token_session.execute(query)
+        self.assertIsNotNone(no_schema_rs[0])
+        self.assertIsNotNone(no_token_rs[0])
+        no_schema.shutdown()
+        no_token.shutdown()
+
     def make_create_statement(self, partition_cols, clustering_cols=None, other_cols=None, compact=False):
         clustering_cols = clustering_cols or []
         other_cols = other_cols or []
