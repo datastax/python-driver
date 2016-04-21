@@ -2633,7 +2633,7 @@ def _stop_scheduler(scheduler, thread):
     thread.join()
 
 
-class _Scheduler(object):
+class _Scheduler(Thread):
 
     _queue = None
     _scheduled_tasks = None
@@ -2646,13 +2646,9 @@ class _Scheduler(object):
         self._count = count()
         self._executor = executor
 
-        t = Thread(target=self.run, name="Task Scheduler")
-        t.daemon = True
-        t.start()
-
-        # although this runs on a daemonized thread, we prefer to stop
-        # it gracefully to avoid random errors during interpreter shutdown
-        atexit.register(partial(_stop_scheduler, weakref.proxy(self), t))
+        Thread.__init__(self, name="Task Scheduler")
+        self.daemon = True
+        self.start()
 
     def shutdown(self):
         try:
@@ -2662,6 +2658,7 @@ class _Scheduler(object):
             pass
         self.is_shutdown = True
         self._queue.put_nowait((0, 0, None))
+        self.join()
 
     def schedule(self, delay, fn, *args, **kwargs):
         self._insert_task(delay, (fn, args, tuple(kwargs.items())))
@@ -2690,7 +2687,8 @@ class _Scheduler(object):
                 while True:
                     run_at, i, task = self._queue.get(block=True, timeout=None)
                     if self.is_shutdown:
-                        log.debug("Not executing scheduled task due to Scheduler shutdown")
+                        if task:
+                            log.debug("Not executing scheduled task due to Scheduler shutdown")
                         return
                     if run_at <= time.time():
                         self._scheduled_tasks.discard(task)
