@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests.integration import get_server_versions, use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCaseWFunctionTable
+from tests.integration import get_server_versions, use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCaseWFunctionTable, BasicSharedKeyspaceUnitTestCase, execute_until_pass
 
 try:
     import unittest2 as unittest
@@ -26,6 +26,52 @@ from cassandra.util import OrderedDict
 
 def setup_module():
     use_singledc()
+
+
+class NameTupleFactory(BasicSharedKeyspaceUnitTestCase):
+
+    def setUp(self):
+        super(NameTupleFactory, self).setUp()
+        self.session.row_factory = named_tuple_factory
+        ddl = '''
+                CREATE TABLE {0}.{1} (
+                    k int PRIMARY KEY,
+                    v1 text,
+                    v2 text,
+                    v3 text)'''.format(self.ks_name, self.function_table_name)
+        self.session.execute(ddl)
+        execute_until_pass(self.session, ddl)
+
+    def test_sanitizing(self):
+        """
+        Test to ensure that same named results are surfaced in the NamedTupleFactory
+
+        Creates a table with a few different text fields. Inserts a few values in that table.
+        It then fetches the values and confirms that despite all be being selected as the same name
+        they are propagated in the result set differently.
+
+        @since 3.3
+        @jira_ticket PYTHON-467
+        @expected_result duplicate named results have unique row names.
+
+        @test_category queries
+        """
+
+        for x in range(5):
+            insert1 = '''
+                INSERT INTO {0}.{1}
+                    ( k , v1, v2, v3 )
+                VALUES
+                    ( 1 , 'v1{2}', 'v2{2}','v3{2}' )
+          '''.format(self.keyspace_name, self.function_table_name, str(x))
+            self.session.execute(insert1)
+
+        query = "SELECT v1 AS duplicate, v2 AS duplicate, v3 AS duplicate from {0}.{1}".format(self.ks_name, self.function_table_name)
+        rs = self.session.execute(query)
+        row = rs[0]
+        self.assertTrue(hasattr(row, 'duplicate'))
+        self.assertTrue(hasattr(row, 'duplicate_'))
+        self.assertTrue(hasattr(row, 'duplicate__'))
 
 
 class RowFactoryTests(BasicSharedKeyspaceUnitTestCaseWFunctionTable):
