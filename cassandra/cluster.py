@@ -167,8 +167,11 @@ def run_in_executor(f):
 
 
 def _shutdown_cluster(cluster):
-    if cluster and not cluster.is_shutdown:
-        cluster.shutdown()
+    try:
+        if not cluster.is_shutdown:
+            cluster.shutdown()
+    except ReferenceError:
+        pass
 
 
 # murmur3 implementation required for TokenAware is only available for CPython
@@ -887,7 +890,7 @@ class Cluster(object):
                 log.debug("Connecting to cluster, contact points: %s; protocol version: %s",
                           self.contact_points, self.protocol_version)
                 self.connection_class.initialize_reactor()
-                atexit.register(partial(_shutdown_cluster, self))
+                atexit.register(partial(_shutdown_cluster, weakref.proxy(self)))
                 for address in self.contact_points_resolved:
                     host, new = self.add_host(address, signal=False)
                     if new:
