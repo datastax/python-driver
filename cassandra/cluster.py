@@ -27,7 +27,6 @@ import socket
 import sys
 import time
 from threading import Lock, RLock, Thread, Event
-import warnings
 
 import six
 from six.moves import range
@@ -166,12 +165,23 @@ def run_in_executor(f):
     return new_f
 
 
-def _shutdown_cluster(cluster):
-    try:
-        if not cluster.is_shutdown:
-            cluster.shutdown()
-    except ReferenceError:
-        pass
+_clusters_for_shutdown = set()
+
+
+def _register_cluster_shutdown(cluster):
+    _clusters_for_shutdown.add(cluster)
+
+
+def _discard_cluster_shutdown(cluster):
+    _clusters_for_shutdown.discard(cluster)
+
+
+def _shutdown_clusters():
+    clusters = _clusters_for_shutdown.copy()  # copy because shutdown modifies the global set "discard"
+    for cluster in clusters:
+        cluster.shutdown()
+
+atexit.register(_shutdown_clusters)
 
 
 # murmur3 implementation required for TokenAware is only available for CPython
@@ -890,7 +900,7 @@ class Cluster(object):
                 log.debug("Connecting to cluster, contact points: %s; protocol version: %s",
                           self.contact_points, self.protocol_version)
                 self.connection_class.initialize_reactor()
-                atexit.register(partial(_shutdown_cluster, weakref.proxy(self)))
+                _register_cluster_shutdown(self)
                 for address in self.contact_points_resolved:
                     host, new = self.add_host(address, signal=False)
                     if new:
@@ -953,6 +963,8 @@ class Cluster(object):
             session.shutdown()
 
         self.executor.shutdown()
+
+        _discard_cluster_shutdown(self)
 
     def _new_session(self):
         session = Session(self, self.metadata.all_hosts())
