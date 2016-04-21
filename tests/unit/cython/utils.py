@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from cassandra.cython_deps import HAVE_CYTHON, HAVE_NUMPY
+from tests.integration import VERIFY_CYTHON
 
 try:
     import unittest2 as unittest
@@ -34,6 +35,6 @@ def cyimport(import_path):
 
 # @cythontest
 # def test_something(self): ...
-cythontest = unittest.skipUnless(HAVE_CYTHON, 'Cython is not available')
+cythontest = unittest.skipUnless((HAVE_CYTHON or VERIFY_CYTHON) or VERIFY_CYTHON, 'Cython is not available')
 notcython = unittest.skipIf(HAVE_CYTHON, 'Cython not supported')
-numpytest = unittest.skipUnless(HAVE_CYTHON and HAVE_NUMPY, 'NumPy is not available')
+numpytest = unittest.skipUnless((HAVE_CYTHON and HAVE_NUMPY) or VERIFY_CYTHON, 'NumPy is not available')
