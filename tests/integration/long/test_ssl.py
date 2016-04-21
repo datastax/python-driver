@@ -147,7 +147,7 @@ class SSLConnectionTests(unittest.TestCase):
 
         @since 3.3
         @jira_ticket PYTHON-296
-        @expected_result The client can connect via SSL and preform some basic operations, with match_hostname specified
+        @expected_result The client can connect via SSL and preform some basic operations, with check_hostname specified
 
         @test_category connection:ssl
         """
@@ -157,7 +157,7 @@ class SSLConnectionTests(unittest.TestCase):
         ssl_options = {'ca_certs': abs_path_ca_cert_path,
                        'ssl_version': ssl.PROTOCOL_TLSv1,
                        'cert_reqs': ssl.CERT_REQUIRED,
-                       'match_hostname': True}
+                       'check_hostname': True}
 
         validate_ssl_options(ssl_options=ssl_options)
 
@@ -198,7 +198,7 @@ class SSLConnectionAuthTests(unittest.TestCase):
 
         This test will setup and use a c* cluster that has client authentication enabled. It will then attempt
         to connect using valid client keys, and certs (that are in the server's truststore), and attempt to preform some
-        basic operations, with match_hostname specified
+        basic operations, with check_hostname specified
         @jira_ticket PYTHON-296
         @since 3.3
 
@@ -217,7 +217,7 @@ class SSLConnectionAuthTests(unittest.TestCase):
                        'keyfile': abs_driver_keyfile,
                        'certfile': abs_driver_certfile,
                        'cert_reqs': ssl.CERT_REQUIRED,
-                       'match_hostname': True}
+                       'check_hostname': True}
         validate_ssl_options(ssl_options)
 
     def test_cannot_connect_without_client_auth(self):
