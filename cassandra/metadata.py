@@ -1397,12 +1397,18 @@ class TokenMap(object):
 
     def rebuild_keyspace(self, keyspace, build_if_absent=False):
         with self._rebuild_lock:
-            current = self.tokens_to_hosts_by_ks.get(keyspace, None)
-            if (build_if_absent and current is None) or (not build_if_absent and current is not None):
-                ks_meta = self._metadata.keyspaces.get(keyspace)
-                if ks_meta:
-                    replica_map = self.replica_map_for_keyspace(self._metadata.keyspaces[keyspace])
-                    self.tokens_to_hosts_by_ks[keyspace] = replica_map
+            try:
+                current = self.tokens_to_hosts_by_ks.get(keyspace, None)
+                if (build_if_absent and current is None) or (not build_if_absent and current is not None):
+                    ks_meta = self._metadata.keyspaces.get(keyspace)
+                    if ks_meta:
+                        replica_map = self.replica_map_for_keyspace(self._metadata.keyspaces[keyspace])
+                        self.tokens_to_hosts_by_ks[keyspace] = replica_map
+            except Exception:
+                # should not happen normally, but we don't want to blow up queries because of unexpected meta state
+                # bypass until new map is generated
+                self.tokens_to_hosts_by_ks[keyspace] = {}
+                log.exception("Failed creating a token map for keyspace '%s' with %s. PLEASE REPORT THIS: https://datastax-oss.atlassian.net/projects/PYTHON", keyspace, self.token_to_host_owner)
 
     def replica_map_for_keyspace(self, ks_metadata):
         strategy = ks_metadata.replication_strategy

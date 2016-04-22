@@ -2373,6 +2373,9 @@ class ControlConnection(object):
             cluster_name = local_row["cluster_name"]
             self._cluster.metadata.cluster_name = cluster_name
 
+            partitioner = local_row.get("partitioner")
+            tokens = local_row.get("tokens")
+
             host = self._cluster.metadata.get_host(connection.host)
             if host:
                 datacenter = local_row.get("data_center")
@@ -2382,10 +2385,8 @@ class ControlConnection(object):
                 host.broadcast_address = local_row.get("broadcast_address")
                 host.release_version = local_row.get("release_version")
 
-            partitioner = local_row.get("partitioner")
-            tokens = local_row.get("tokens")
-            if partitioner and tokens:
-                token_map[host] = tokens
+                if partitioner and tokens:
+                    token_map[host] = tokens
 
         # Check metadata.partitioner to see if we haven't built anything yet. If
         # every node in the cluster was in the contact points, we won't discover
@@ -2626,7 +2627,13 @@ class ControlConnection(object):
             self.refresh_node_list_and_token_map(force_token_rebuild=True)
 
     def on_remove(self, host):
-        self.refresh_node_list_and_token_map(force_token_rebuild=True)
+        c = self._connection
+        if c and c.host == host.address:
+            log.debug("[control connection] Control connection host (%s) is being removed. Reconnecting", host)
+            # refresh will be done on reconnect
+            self.reconnect()
+        else:
+            self.refresh_node_list_and_token_map(force_token_rebuild=True)
 
     def get_connections(self):
         c = getattr(self, '_connection', None)
