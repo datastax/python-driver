@@ -601,8 +601,8 @@ class Connection(object):
                 if isinstance(response, ProtocolException):
                     if 'unsupported protocol version' in response.message:
                         self.is_unsupported_proto_version = True
-
-                    log.error("Closing connection %s due to protocol error: %s", self, response.summary_msg())
+                    else:
+                        log.error("Closing connection %s due to protocol error: %s", self, response.summary_msg())
                     self.defunct(response)
                 if callback is not None:
                     callback(response)

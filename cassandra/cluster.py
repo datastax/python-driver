@@ -868,7 +868,9 @@ class Cluster(object):
         new_version = previous_version - 1
         if new_version < self.protocol_version:
             if new_version >= MIN_SUPPORTED_VERSION:
-                log.warning("Downgrading core protocol version from %d to %d for %s", self.protocol_version, new_version, host_addr)
+                log.warning("Downgrading core protocol version from %d to %d for %s. "
+                            "To avoid this, it is best practice to explicitly set Cluster(protocol_version) to the version supported by your cluster. "
+                            "http://datastax.github.io/python-driver/api/cassandra/cluster.html#cassandra.cluster.Cluster.protocol_version", self.protocol_version, new_version, host_addr)
                 self.protocol_version = new_version
             else:
                 raise DriverException("Cannot downgrade protocol version (%d) below minimum supported version: %d" % (new_version, MIN_SUPPORTED_VERSION))
