@@ -27,7 +27,6 @@ import socket
 import sys
 import time
 from threading import Lock, RLock, Thread, Event
-import warnings
 
 import six
 from six.moves import range
@@ -166,9 +165,23 @@ def run_in_executor(f):
     return new_f
 
 
-def _shutdown_cluster(cluster):
-    if cluster and not cluster.is_shutdown:
+_clusters_for_shutdown = set()
+
+
+def _register_cluster_shutdown(cluster):
+    _clusters_for_shutdown.add(cluster)
+
+
+def _discard_cluster_shutdown(cluster):
+    _clusters_for_shutdown.discard(cluster)
+
+
+def _shutdown_clusters():
+    clusters = _clusters_for_shutdown.copy()  # copy because shutdown modifies the global set "discard"
+    for cluster in clusters:
         cluster.shutdown()
+
+atexit.register(_shutdown_clusters)
 
 
 # murmur3 implementation required for TokenAware is only available for CPython
@@ -889,7 +902,7 @@ class Cluster(object):
                 log.debug("Connecting to cluster, contact points: %s; protocol version: %s",
                           self.contact_points, self.protocol_version)
                 self.connection_class.initialize_reactor()
-                atexit.register(partial(_shutdown_cluster, self))
+                _register_cluster_shutdown(self)
                 for address in self.contact_points_resolved:
                     host, new = self.add_host(address, signal=False)
                     if new:
@@ -952,6 +965,8 @@ class Cluster(object):
             session.shutdown()
 
         self.executor.shutdown()
+
+        _discard_cluster_shutdown(self)
 
     def _new_session(self):
         session = Session(self, self.metadata.all_hosts())
@@ -2632,7 +2647,7 @@ def _stop_scheduler(scheduler, thread):
     thread.join()
 
 
-class _Scheduler(object):
+class _Scheduler(Thread):
 
     _queue = None
     _scheduled_tasks = None
@@ -2645,13 +2660,9 @@ class _Scheduler(object):
         self._count = count()
         self._executor = executor
 
-        t = Thread(target=self.run, name="Task Scheduler")
-        t.daemon = True
-        t.start()
-
-        # although this runs on a daemonized thread, we prefer to stop
-        # it gracefully to avoid random errors during interpreter shutdown
-        atexit.register(partial(_stop_scheduler, weakref.proxy(self), t))
+        Thread.__init__(self, name="Task Scheduler")
+        self.daemon = True
+        self.start()
 
     def shutdown(self):
         try:
@@ -2661,6 +2672,7 @@ class _Scheduler(object):
             pass
         self.is_shutdown = True
         self._queue.put_nowait((0, 0, None))
+        self.join()
 
     def schedule(self, delay, fn, *args, **kwargs):
         self._insert_task(delay, (fn, args, tuple(kwargs.items())))
@@ -2689,7 +2701,8 @@ class _Scheduler(object):
                 while True:
                     run_at, i, task = self._queue.get(block=True, timeout=None)
                     if self.is_shutdown:
-                        log.debug("Not executing scheduled task due to Scheduler shutdown")
+                        if task:
+                            log.debug("Not executing scheduled task due to Scheduler shutdown")
                         return
                     if run_at <= time.time():
                         self._scheduled_tasks.discard(task)
