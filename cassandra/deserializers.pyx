@@ -59,7 +59,7 @@ cdef class DesDecimalType(Deserializer):
         cdef Buffer varint_buf
         slice_buffer(buf, &varint_buf, 4, buf.size - 4)
 
-        scale = unpack_num[int32_t](buf)
+        cdef int32_t scale = unpack_num[int32_t](buf)
         unscaled = varint_unpack(&varint_buf)
 
         return Decimal('%de%d' % (unscaled, -scale))
