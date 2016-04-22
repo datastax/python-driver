@@ -24,12 +24,15 @@ from threading import Thread, Event
 import time
 
 from cassandra import ConsistencyLevel, OperationTimedOut
-from cassandra.cluster import NoHostAvailable
+from cassandra.cluster import NoHostAvailable, Cluster
 from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.protocol import QueryMessage
+from cassandra.connection import Connection
+from cassandra.policies import WhiteListRoundRobinPolicy
+from cassandra.query import SimpleStatement
 
 from tests import is_monkey_patched
-from tests.integration import use_singledc, PROTOCOL_VERSION
+from tests.integration import use_singledc, PROTOCOL_VERSION, execute_with_long_wait_retry
 
 try:
     from cassandra.io.libevreactor import LibevConnection
@@ -39,6 +42,41 @@ except ImportError:
 
 def setup_module():
     use_singledc()
+
+
+class ConnectionTimeoutTest(unittest.TestCase):
+
+    def setUp(self):
+        self.defaultInFlight = Connection.max_in_flight
+        Connection.max_in_flight = 2
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1']))
+        self.session = self.cluster.connect()
+
+    def tearDown(self):
+        Connection.max_in_flight = self.defaultInFlight
+        self.cluster.shutdown()
+
+    def testInFlightTimeout(self):
+        """
+        Test to ensure that connection id fetching will block when max_id is reached/
+
+        In previous versions of the driver this test will cause a
+        NoHostAvailable exception to be thrown, when the max_id is restricted
+
+        @since 3.3
+        @jira_ticket PYTHON-514
+        @expected_result When many requests are run on a single node connection acquisition should block
+        until connection is available or the request times out.
+
+        @test_category connection timeout
+        """
+        futures = []
+        query = '''SELECT * FROM system.local'''
+        for i in range(100):
+            futures.append(self.session.execute_async(query))
+
+        for future in futures:
+            future.result()
 
 
 class ConnectionTests(object):
