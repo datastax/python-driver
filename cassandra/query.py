@@ -117,6 +117,7 @@ def named_tuple_factory(colnames, rows):
     try:
         Row = namedtuple('Row', clean_column_names)
     except Exception:
+        clean_column_names = list(map(_clean_column_name, colnames))  # create list because py3 map object will be consumed by first attempt
         log.warning("Failed creating named tuple for results with column names %s (cleaned: %s) "
                     "(see Python 'namedtuple' documentation for details on name rules). "
                     "Results will be returned with positional names. "
