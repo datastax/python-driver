@@ -111,6 +111,12 @@ class _AsyncoreUDPDispatcher(_AsyncoreDispatcher):
     it relies on local port binding.
     Port scanning is not implemented, so multiple clients on one host will collide. This address would need to be set per
     instance, or this could be specialized to scan until an address is found.
+
+    To use::
+
+        from cassandra.io.asyncorereactor import _AsyncoreUDPDispatcher, AsyncoreLoop
+        AsyncoreLoop._loop_dispatch_class = _AsyncoreUDPDispatcher
+
     """
     bind_address = ('localhost', 10000)
 
@@ -166,7 +172,7 @@ class AsyncoreLoop(object):
 
     timer_resolution = 0.1  # used as the max interval to be in the io loop before returning to service timeouts
 
-    _loop_dispatch_class = _AsyncorePipeDispatcher
+    _loop_dispatch_class = _AsyncorePipeDispatcher if os.name != 'nt' else _BusyWaitDispatcher
 
     def __init__(self):
         self._pid = os.getpid()
