@@ -25,8 +25,9 @@ class Runner(BenchmarkThread):
 
         self.start_profile()
 
-        for _ in range(self.num_queries):
-            future = self.session.execute_async(self.query, self.values)
+        for i in range(self.num_queries):
+            key = "{}-{}".format(self.thread_num, i)
+            future = self.session.execute_async(self.query.format(key=key))
             futures.append(future)
 
         for future in futures:

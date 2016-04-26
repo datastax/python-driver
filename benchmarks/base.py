@@ -136,7 +136,7 @@ def benchmark(thread_class):
         for i in range(options.num_columns):
             insert_query += ", col{}".format(i)
 
-        insert_query += ") VALUES ('{}'".format('key')
+        insert_query += ") VALUES ('{key}'"
 
         for i in range(options.num_columns):
             insert_query += ", {}".format(COLUMN_VALUES[options.column_type])
