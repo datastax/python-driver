@@ -62,15 +62,33 @@ class _PipeWrapper(object):
         return self.fd
 
 
-class _AsyncorePipeDispatcher(asyncore.dispatcher):
+class _AsyncoreDispatcher(asyncore.dispatcher):
+
+    def __init__(self, socket):
+        asyncore.dispatcher.__init__(self)
+        # inject after to avoid base class validation
+        self.set_socket(socket)
+        self._notified = False
+
+    def writable(self):
+        return False
+
+    def validate(self):
+        assert not self._notified
+        self.notify_loop()
+        assert self._notified
+        self.loop(0.1)
+        assert not self._notified
+
+    def loop(self, timeout):
+        asyncore.loop(timeout=timeout, use_poll=True, count=1)
+
+
+class _AsyncorePipeDispatcher(_AsyncoreDispatcher):
 
     def __init__(self):
         self.read_fd, self.write_fd = os.pipe()
-        asyncore.dispatcher.__init__(self)
-        self.set_socket(_PipeWrapper(self.read_fd))
-        self._notified = False
-        self._wrote = 0
-        self._read = 0
+        _AsyncoreDispatcher.__init__(self, _PipeWrapper(self.read_fd))
 
     def writable(self):
         return False
@@ -86,23 +104,26 @@ class _AsyncorePipeDispatcher(asyncore.dispatcher):
             os.write(self.write_fd, 'x')
 
 
-class _AsyncoreUDPDispatcher(asyncore.dispatcher):
+class _AsyncoreUDPDispatcher(_AsyncoreDispatcher):
+    """
+    Experimental alternate dispatcher for avoiding busy wait in the asyncore loop. It is not used by default because
+    it relies on local port binding.
+    Port scanning is not implemented, so multiple clients on one host will collide. This address would need to be set per
+    instance, or this could be specialized to scan until an address is found.
+    """
+    bind_address = ('localhost', 10000)
 
     def __init__(self):
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self._socket.bind(('localhost', 10000))
-        self._socket.setblocking(False)
-        asyncore.dispatcher.__init__(self)
-        self.set_socket(self._socket)
-        self._notified = False
-
-    def writable(self):
-        return False
+        self._socket.bind(self.bind_address)
+        self._socket.setblocking(0)
+        _AsyncoreDispatcher.__init__(self, self._socket)
 
     def handle_read(self):
         try:
-            while self._sock.recvfrom(0):
-                pass
+            d = self._socket.recvfrom(1)
+            while d and d[1]:
+                d = self._socket.recvfrom(1)
         except socket.error as e:
             pass
         self._notified = False
@@ -110,10 +131,35 @@ class _AsyncoreUDPDispatcher(asyncore.dispatcher):
     def notify_loop(self):
         if not self._notified:
             self._notified = True
-            self._socket.sendto('', ('localhost', 10000))
+            self._socket.sendto(b'', self.bind_address)
+
+    def loop(self, timeout):
+        asyncore.loop(timeout=timeout, use_poll=False, count=1)
+
+
+class _BusyWaitDispatcher(object):
+
+    max_write_latency = 0.001
+    """
+    Timeout pushed down to asyncore select/poll. Dictates the amount of time it will sleep before coming back to check
+    if anything is writable.
+    """
+
+    def notify_loop(self):
+        pass
+
+    def loop(self, timeout):
+        if not asyncore.socket_map:
+            time.sleep(0.005)
+        count = timeout // self.max_write_latency
+        asyncore.loop(timeout=self.max_write_latency, use_poll=True, count=count)
 
 
 class AsyncoreLoop(object):
+
+    timer_resolution = 0.1  # used as the max interval to be in the io loop before returning to service timeouts
+
+    _loop_dispatch_class = _AsyncorePipeDispatcher
 
     def __init__(self):
         self._pid = os.getpid()
@@ -125,7 +171,15 @@ class AsyncoreLoop(object):
 
         self._timers = TimerManager()
 
-        self._pipe_dispatcher = _AsyncoreUDPDispatcher()
+        try:
+            dispatcher = self._loop_dispatch_class()
+            dispatcher.validate()
+            log.debug("Validated loop dispatch with %s", self._loop_dispatch_class)
+        except Exception:
+            log.exception("Failed validating loop dispatch with %s. Using busy wait execution instead.", self._loop_dispatch_class)
+            dispatcher = _BusyWaitDispatcher()
+        self._loop_dispatcher = dispatcher
+
         atexit.register(partial(_cleanup, weakref.ref(self)))
 
     def maybe_start(self):
@@ -146,17 +200,15 @@ class AsyncoreLoop(object):
             self._thread.start()
 
     def wake_loop(self):
-        self._pipe_dispatcher.notify_loop()
+        self._loop_dispatcher.notify_loop()
 
     def _run_loop(self):
         log.debug("Starting asyncore event loop")
         with self._loop_lock:
             while not self._shutdown:
                 try:
-                    asyncore.loop(timeout=0.1, use_poll=True, count=1)
+                    self._loop_dispatcher.loop(self.timer_resolution)
                     self._timers.service_timeouts()
-                    if not asyncore.socket_map:
-                        time.sleep(0.005)
                 except Exception:
                     log.debug("Asyncore event loop stopped unexepectedly", exc_info=True)
                     break
