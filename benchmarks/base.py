@@ -71,10 +71,10 @@ def setup(options):
         session.execute("""
             CREATE KEYSPACE %s
             WITH replication = { 'class': 'SimpleStrategy', 'replication_factor': '2' }
-            """ % KEYSPACE)
+            """ % options.keyspace)
 
         log.debug("Setting keyspace...")
-        session.set_keyspace(KEYSPACE)
+        session.set_keyspace(options.keyspace)
 
         log.debug("Creating table...")
         create_table_query = """
@@ -93,7 +93,8 @@ def setup(options):
 def teardown(options):
     cluster = Cluster(options.hosts, protocol_version=options.protocol_version)
     session = cluster.connect()
-    session.execute("DROP KEYSPACE " + KEYSPACE)
+    if not options.keep_data:
+        session.execute("DROP KEYSPACE " + options.keyspace)
     cluster.shutdown()
 
 
@@ -108,7 +109,7 @@ def benchmark(thread_class):
         if options.protocol_version:
             kwargs['protocol_version'] = options.protocol_version
         cluster = Cluster(options.hosts, **kwargs)
-        session = cluster.connect(KEYSPACE)
+        session = cluster.connect(options.keyspace)
 
         log.debug("Sleeping for two seconds...")
         time.sleep(2.0)
@@ -201,6 +202,10 @@ def parse_options():
                       help='Native protocol version to use')
     parser.add_option('-c', '--num-columns', type='int', dest='num_columns', default=2,
                       help='Specify the number of columns for the schema')
+    parser.add_option('-k', '--keyspace', type='str', dest='keyspace', default=KEYSPACE,
+                      help='Specify the keyspace name for the schema')
+    parser.add_option('--keep-data', action='store_true', dest='keep_data', default=False,
+                      help='Keep the data after the benchmark')
 
     options, args = parser.parse_args()
 
