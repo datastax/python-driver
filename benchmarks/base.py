@@ -131,28 +131,30 @@ def benchmark(thread_class):
         log.debug("Sleeping for two seconds...")
         time.sleep(2.0)
 
-        # Generate the INSERT query
-        insert_query = "INSERT INTO {} (thekey".format(TABLE)
-        for i in range(options.num_columns):
-            insert_query += ", col{}".format(i)
 
-        insert_query += ") VALUES ('{key}'"
+        # Generate the query
+        if options.read:
+            query = "SELECT * FROM {}  WHERE thekey = '{{key}}'".format(TABLE)
+        else:
+            query = "INSERT INTO {} (thekey".format(TABLE)
+            for i in range(options.num_columns):
+                query += ", col{}".format(i)
 
-        for i in range(options.num_columns):
-            insert_query += ", {}".format(COLUMN_VALUES[options.column_type])
-        insert_query += ")"
+            query += ") VALUES ('{key}'"
+            for i in range(options.num_columns):
+                query += ", {}".format(COLUMN_VALUES[options.column_type])
+            query += ")"
 
-        values = None
-
+        values = None  # we don't use that anymore. Keeping it in case we go back to prepared statements.
         per_thread = options.num_ops // options.threads
         threads = []
 
-        log.debug("Beginning inserts...")
+        log.debug("Beginning {}...".format('reads' if options.read else 'inserts'))
         start = time.time()
         try:
             for i in range(options.threads):
                 thread = thread_class(
-                    i, session, insert_query, values, per_thread,
+                    i, session, query, values, per_thread,
                     cluster.protocol_version, options.profile)
                 thread.daemon = True
                 threads.append(thread)
@@ -225,6 +227,8 @@ def parse_options():
                       help='Keep the data after the benchmark')
     parser.add_option('--column-type', type='str', dest='column_type', default='text',
                       help='Specify the column type for the schema (supported: int, text, float, uuid, timestamp)')
+    parser.add_option('--read', action='store_true', dest='read', default=False,
+                      help='Read mode')
 
 
     options, args = parser.parse_args()
@@ -268,6 +272,9 @@ class BenchmarkThread(Thread):
     def start_profile(self):
         if self.profiler:
             self.profiler.enable()
+
+    def run_query(self, key, **kwargs):
+        return self.session.execute_async(self.query.format(key=key), **kwargs)
 
     def finish_profile(self):
         if self.profiler:

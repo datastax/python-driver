@@ -32,7 +32,7 @@ class Runner(BenchmarkThread):
                 old_future.result()
 
             key = "{}-{}".format(self.thread_num, i)
-            future = self.session.execute_async(self.query.format(key=key))
+            future = self.run_query(key)
             futures.put_nowait(future)
 
         while True:

@@ -27,7 +27,7 @@ class Runner(BenchmarkThread):
 
         for i in range(self.num_queries):
             key = "{}-{}".format(self.thread_num, i)
-            future = self.session.execute_async(self.query.format(key=key))
+            future = self.run_query(key)
             futures.append(future)
 
         for future in futures:
