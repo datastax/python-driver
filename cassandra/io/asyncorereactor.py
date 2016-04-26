@@ -30,19 +30,17 @@ except ImportError:
     from cassandra.util import WeakSet  # noqa
 
 import asyncore
-from errno import EWOULDBLOCK
 
 try:
     import ssl
 except ImportError:
     ssl = None  # NOQA
 
-from cassandra.connection import (Connection, ConnectionShutdown,
-                                  ConnectionException, NONBLOCKING,
-                                  Timer, TimerManager)
+from cassandra.connection import Connection, ConnectionShutdown, NONBLOCKING, Timer, TimerManager
 
 log = logging.getLogger(__name__)
 
+_dispatcher_map = {}
 
 def _cleanup(loop_weakref):
     try:
@@ -65,7 +63,7 @@ class _PipeWrapper(object):
 class _AsyncoreDispatcher(asyncore.dispatcher):
 
     def __init__(self, socket):
-        asyncore.dispatcher.__init__(self)
+        asyncore.dispatcher.__init__(self, map=_dispatcher_map)
         # inject after to avoid base class validation
         self.set_socket(socket)
         self._notified = False
@@ -81,7 +79,7 @@ class _AsyncoreDispatcher(asyncore.dispatcher):
         assert not self._notified
 
     def loop(self, timeout):
-        asyncore.loop(timeout=timeout, use_poll=True, count=1)
+        asyncore.loop(timeout=timeout, use_poll=True, map=_dispatcher_map, count=1)
 
 
 class _AsyncorePipeDispatcher(_AsyncoreDispatcher):
@@ -134,7 +132,7 @@ class _AsyncoreUDPDispatcher(_AsyncoreDispatcher):
             self._socket.sendto(b'', self.bind_address)
 
     def loop(self, timeout):
-        asyncore.loop(timeout=timeout, use_poll=False, count=1)
+        asyncore.loop(timeout=timeout, use_poll=False, map=_dispatcher_map, count=1)
 
 
 class _BusyWaitDispatcher(object):
@@ -149,10 +147,10 @@ class _BusyWaitDispatcher(object):
         pass
 
     def loop(self, timeout):
-        if not asyncore.socket_map:
+        if not _dispatcher_map:
             time.sleep(0.005)
         count = timeout // self.max_write_latency
-        asyncore.loop(timeout=self.max_write_latency, use_poll=True, count=count)
+        asyncore.loop(timeout=self.max_write_latency, use_poll=True, map=_dispatcher_map, count=count)
 
     def validate(self):
         pass
@@ -273,13 +271,12 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
 
     def __init__(self, *args, **kwargs):
         Connection.__init__(self, *args, **kwargs)
-        asyncore.dispatcher.__init__(self)
 
         self.deque = deque()
         self.deque_lock = Lock()
 
         self._connect_socket()
-        asyncore.dispatcher.__init__(self, self._socket)
+        asyncore.dispatcher.__init__(self, self._socket, _dispatcher_map)
 
         self._writable = True
         self._readable = True
