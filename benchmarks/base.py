@@ -60,10 +60,10 @@ KEYSPACE = "testkeyspace" + str(int(time.time()))
 TABLE = "testtable"
 
 
-def setup(hosts):
+def setup(options):
     log.info("Using 'cassandra' package from %s", cassandra.__path__)
 
-    cluster = Cluster(hosts)
+    cluster = Cluster(options.hosts, protocol_version=options.protocol_version)
     try:
         session = cluster.connect()
 
@@ -77,20 +77,21 @@ def setup(hosts):
         session.set_keyspace(KEYSPACE)
 
         log.debug("Creating table...")
-        session.execute("""
-            CREATE TABLE %s (
+        create_table_query = """
+            CREATE TABLE {} (
                 thekey text,
-                col1 text,
-                col2 text,
-                PRIMARY KEY (thekey, col1)
-            )
-            """ % TABLE)
+        """
+        for i in range(options.num_columns):
+            create_table_query += "col{} text,\n".format(i)
+        create_table_query += "PRIMARY KEY (thekey))"
+
+        session.execute(create_table_query.format(TABLE))
     finally:
         cluster.shutdown()
 
 
-def teardown(hosts):
-    cluster = Cluster(hosts)
+def teardown(options):
+    cluster = Cluster(options.hosts, protocol_version=options.protocol_version)
     session = cluster.connect()
     session.execute("DROP KEYSPACE " + KEYSPACE)
     cluster.shutdown()
@@ -99,7 +100,7 @@ def teardown(hosts):
 def benchmark(thread_class):
     options, args = parse_options()
     for conn_class in options.supported_reactors:
-        setup(options.hosts)
+        setup(options)
         log.info("==== %s ====" % (conn_class.__name__,))
 
         kwargs = {'metrics_enabled': options.enable_metrics,
@@ -112,10 +113,18 @@ def benchmark(thread_class):
         log.debug("Sleeping for two seconds...")
         time.sleep(2.0)
 
-        query = session.prepare("""
-            INSERT INTO {table} (thekey, col1, col2) VALUES (?, ?, ?)
-            """.format(table=TABLE))
-        values = ('key', 'a', 'b')
+        # Generate the INSERT query
+        insert_query = "INSERT INTO {} (thekey".format(TABLE)
+        for i in range(options.num_columns):
+            insert_query += ", col{}".format(i)
+
+        insert_query += ") VALUES ('{}'".format('key')
+
+        for i in range(options.num_columns):
+            insert_query += ", '{}'".format(i)
+        insert_query += ")"
+
+        values = None
 
         per_thread = options.num_ops // options.threads
         threads = []
@@ -125,7 +134,7 @@ def benchmark(thread_class):
         try:
             for i in range(options.threads):
                 thread = thread_class(
-                    i, session, query, values, per_thread,
+                    i, session, insert_query, values, per_thread,
                     cluster.protocol_version, options.profile)
                 thread.daemon = True
                 threads.append(thread)
@@ -140,7 +149,7 @@ def benchmark(thread_class):
             end = time.time()
         finally:
             cluster.shutdown()
-            teardown(options.hosts)
+            teardown(options)
 
         total = end - start
         log.info("Total time: %0.2fs" % total)
@@ -188,8 +197,10 @@ def parse_options():
                       help='logging level: debug, info, warning, or error')
     parser.add_option('-p', '--profile', action='store_true', dest='profile',
                       help='Profile the run')
-    parser.add_option('--protocol-version', type='int', dest='protocol_version',
+    parser.add_option('--protocol-version', type='int', dest='protocol_version', default=4,
                       help='Native protocol version to use')
+    parser.add_option('-c', '--num-columns', type='int', dest='num_columns', default=2,
+                      help='Specify the number of columns for the schema')
 
     options, args = parser.parse_args()
 
