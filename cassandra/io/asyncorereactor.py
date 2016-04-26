@@ -154,6 +154,9 @@ class _BusyWaitDispatcher(object):
         count = timeout // self.max_write_latency
         asyncore.loop(timeout=self.max_write_latency, use_poll=True, count=count)
 
+    def validate(self):
+        pass
+
 
 class AsyncoreLoop(object):
 
