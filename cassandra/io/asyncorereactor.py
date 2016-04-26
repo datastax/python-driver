@@ -30,6 +30,7 @@ except ImportError:
     from cassandra.util import WeakSet  # noqa
 
 import asyncore
+from errno import EWOULDBLOCK
 
 try:
     import ssl
@@ -85,6 +86,33 @@ class _AsyncorePipeDispatcher(asyncore.dispatcher):
             os.write(self.write_fd, 'x')
 
 
+class _AsyncoreUDPDispatcher(asyncore.dispatcher):
+
+    def __init__(self):
+        self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._socket.bind(('localhost', 10000))
+        self._socket.setblocking(False)
+        asyncore.dispatcher.__init__(self)
+        self.set_socket(self._socket)
+        self._notified = False
+
+    def writable(self):
+        return False
+
+    def handle_read(self):
+        try:
+            while self._sock.recvfrom(0):
+                pass
+        except socket.error as e:
+            pass
+        self._notified = False
+
+    def notify_loop(self):
+        if not self._notified:
+            self._notified = True
+            self._socket.sendto('', ('localhost', 10000))
+
+
 class AsyncoreLoop(object):
 
     def __init__(self):
@@ -97,7 +125,7 @@ class AsyncoreLoop(object):
 
         self._timers = TimerManager()
 
-        self._pipe_dispatcher = _AsyncorePipeDispatcher()
+        self._pipe_dispatcher = _AsyncoreUDPDispatcher()
         atexit.register(partial(_cleanup, weakref.ref(self)))
 
     def maybe_start(self):
