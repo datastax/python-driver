@@ -18,7 +18,7 @@ import logging
 import os
 import socket
 import sys
-from threading import Event, Lock, Thread
+from threading import Lock, Thread
 import time
 import weakref
 
@@ -52,8 +52,40 @@ def _cleanup(loop_weakref):
     loop._cleanup()
 
 
-class AsyncoreLoop(object):
+class _PipeWrapper(object):
 
+    def __init__(self, fd):
+        self.fd = fd
+
+    def fileno(self):
+        return self.fd
+
+
+class _AsyncorePipeDispatcher(asyncore.dispatcher):
+
+    def __init__(self):
+        self.read_fd, self.write_fd = os.pipe()
+        asyncore.dispatcher.__init__(self)
+        self.set_socket(_PipeWrapper(self.read_fd))
+        self._notified = False
+        self._wrote = 0
+        self._read = 0
+
+    def writable(self):
+        return False
+
+    def handle_read(self):
+        while len(os.read(self.read_fd, 4096)) == 4096:
+            pass
+        self._notified = False
+
+    def notify_loop(self):
+        if not self._notified:
+            self._notified = True
+            os.write(self.write_fd, 'x')
+
+
+class AsyncoreLoop(object):
 
     def __init__(self):
         self._pid = os.getpid()
@@ -65,6 +97,7 @@ class AsyncoreLoop(object):
 
         self._timers = TimerManager()
 
+        self._pipe_dispatcher = _AsyncorePipeDispatcher()
         atexit.register(partial(_cleanup, weakref.ref(self)))
 
     def maybe_start(self):
@@ -84,12 +117,15 @@ class AsyncoreLoop(object):
             self._thread.daemon = True
             self._thread.start()
 
+    def wake_loop(self):
+        self._pipe_dispatcher.notify_loop()
+
     def _run_loop(self):
         log.debug("Starting asyncore event loop")
         with self._loop_lock:
             while not self._shutdown:
                 try:
-                    asyncore.loop(timeout=0.001, use_poll=True, count=100)
+                    asyncore.loop(timeout=0.1, use_poll=True, count=1)
                     self._timers.service_timeouts()
                     if not asyncore.socket_map:
                         time.sleep(0.005)
@@ -254,6 +290,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         with self.deque_lock:
             self.deque.extend(chunks)
             self._writable = True
+        self._loop.wake_loop()
 
     def writable(self):
         return self._writable
