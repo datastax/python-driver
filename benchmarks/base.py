@@ -77,12 +77,16 @@ def setup(options):
         session = cluster.connect()
 
         log.debug("Creating keyspace...")
-        session.execute("""
-            CREATE KEYSPACE %s
-            WITH replication = { 'class': 'SimpleStrategy', 'replication_factor': '2' }
-            """ % options.keyspace)
+        try:
+            session.execute("""
+                CREATE KEYSPACE %s
+                WITH replication = { 'class': 'SimpleStrategy', 'replication_factor': '2' }
+                """ % options.keyspace)
 
-        log.debug("Setting keyspace...")
+            log.debug("Setting keyspace...")
+        except cassandra.AlreadyExists:
+            log.debug("Keyspace already exists")
+
         session.set_keyspace(options.keyspace)
 
         log.debug("Creating table...")
@@ -94,7 +98,11 @@ def setup(options):
             create_table_query += "col{} {},\n".format(i, options.column_type)
         create_table_query += "PRIMARY KEY (thekey))"
 
-        session.execute(create_table_query.format(TABLE))
+        try:
+            session.execute(create_table_query.format(TABLE))
+        except cassandra.AlreadyExists:
+            log.debug("Table already exists.")
+
     finally:
         cluster.shutdown()
 
