@@ -59,6 +59,9 @@ class _PipeWrapper(object):
     def fileno(self):
         return self.fd
 
+    def close(self):
+        os.close(self.fd)
+
 
 class _AsyncoreDispatcher(asyncore.dispatcher):
 
@@ -155,6 +158,9 @@ class _BusyWaitDispatcher(object):
     def validate(self):
         pass
 
+    def close(self):
+        pass
+
 
 class AsyncoreLoop(object):
 
@@ -178,6 +184,7 @@ class AsyncoreLoop(object):
             log.debug("Validated loop dispatch with %s", self._loop_dispatch_class)
         except Exception:
             log.exception("Failed validating loop dispatch with %s. Using busy wait execution instead.", self._loop_dispatch_class)
+            dispatcher.close()
             dispatcher = _BusyWaitDispatcher()
         self._loop_dispatcher = dispatcher
 
