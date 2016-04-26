@@ -19,6 +19,7 @@ import sys
 from threading import Thread
 import time
 from optparse import OptionParser
+import uuid
 
 from greplin import scales
 
@@ -59,6 +60,14 @@ except ImportError as exc:
 KEYSPACE = "testkeyspace" + str(int(time.time()))
 TABLE = "testtable"
 
+COLUMN_VALUES = {
+    'int': 42,
+    'text': "'42'",
+    'float': 42.0,
+    'uuid': uuid.uuid4(),
+    'timestamp': "'2016-02-03 04:05+0000'"
+}
+
 
 def setup(options):
     log.info("Using 'cassandra' package from %s", cassandra.__path__)
@@ -82,7 +91,7 @@ def setup(options):
                 thekey text,
         """
         for i in range(options.num_columns):
-            create_table_query += "col{} text,\n".format(i)
+            create_table_query += "col{} {},\n".format(i, options.column_type)
         create_table_query += "PRIMARY KEY (thekey))"
 
         session.execute(create_table_query.format(TABLE))
@@ -122,7 +131,7 @@ def benchmark(thread_class):
         insert_query += ") VALUES ('{}'".format('key')
 
         for i in range(options.num_columns):
-            insert_query += ", '{}'".format(i)
+            insert_query += ", {}".format(COLUMN_VALUES[options.column_type])
         insert_query += ")"
 
         values = None
@@ -206,6 +215,9 @@ def parse_options():
                       help='Specify the keyspace name for the schema')
     parser.add_option('--keep-data', action='store_true', dest='keep_data', default=False,
                       help='Keep the data after the benchmark')
+    parser.add_option('--column-type', type='str', dest='column_type', default='text',
+                      help='Specify the column type for the schema (supported: int, text, float, uuid, timestamp)')
+
 
     options, args = parser.parse_args()
 
