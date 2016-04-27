@@ -12,12 +12,15 @@ from cassandra.cluster import Cluster
 from cassandra.protocol import ProtocolHandler, LazyProtocolHandler, NumpyProtocolHandler
 from cassandra.cython_deps import HAVE_CYTHON, HAVE_NUMPY
 from tests.integration import use_singledc, PROTOCOL_VERSION, notprotocolv1, drop_keyspace_shutdown_cluster, VERIFY_CYTHON
-from tests.integration.datatype_utils import update_datatypes
+from tests.integration.datatype_utils import (
+    update_datatypes,
+    PRIMITIVE_DATATYPES,
+    get_sample,
+)
 from tests.integration.standard.utils import (
     create_table_with_all_types, get_all_primitive_params, get_primitive_datatypes)
 
 from tests.unit.cython.utils import cythontest, numpytest
-
 
 def setup_module():
     use_singledc()
@@ -120,6 +123,44 @@ class CythonProtocolHandlerTest(unittest.TestCase):
                     self.assertEqual(len(arr), 0)
             self.assertEqual(self._verify_numpy_page(page), len(arr))
         self.assertEqual(count, expected_pages + 1)  # see note about extra 'page' above
+
+        cluster.shutdown()
+
+    @notprotocolv1
+    @numpytest
+    def test_numpy_results_empty_ascii(self):
+        """
+        Test Numpy-based parser that returns a NumPy array
+        """
+        # arrays = { 'a': arr1, 'b': arr2, ... }
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        session = cluster.connect(keyspace="testspace")
+        session.row_factory = tuple_factory
+        session.client_protocol_handler = NumpyProtocolHandler
+        session.default_fetch_size = 2
+
+        placeholders = ', '.join(["%s"] * len(self.colnames))
+        n_items = self.N_ITEMS + 1
+        params = [n_items]
+
+        expected_pages = (n_items + session.default_fetch_size - 1)
+        for datatype in PRIMITIVE_DATATYPES:
+            if datatype == 'ascii':
+                params.append('')
+            else:
+                params.append(get_sample(datatype))
+
+        colnames = ', '.join(self.colnames)
+        session.execute(
+            "INSERT INTO {0} ({1}) VALUES ({2})".format(
+                'test_table', colnames, placeholders
+            ),
+            params, timeout=120
+        )
+        results = session.execute("SELECT * FROM test_table")
+        self.assertTrue(results.has_more_pages)
+        for count, page in enumerate(results):
+            self.assertIsInstance(page, dict)
 
         cluster.shutdown()
 
