@@ -145,8 +145,6 @@ cdef inline int unpack_row(
         get_buf(reader, &buf)
         arr = arrays[i]
 
-        if buf.size == 0:
-            raise ValueError("Cannot handle NULL value")
         if arr.is_object:
             deserializer = desc.deserializers[i]
             val = from_binary(deserializer, &buf, desc.protocol_version)
