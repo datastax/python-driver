@@ -45,7 +45,7 @@ cdef class Deserializer:
 cdef class DesBytesType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
         if buf.size == 0:
-            return ""
+            return b""
         return to_bytes(buf)
 
 # this is to facilitate cqlsh integration, which requires bytearrays for BytesType
