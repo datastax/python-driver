@@ -148,7 +148,7 @@ cdef inline int unpack_row(
         get_buf(reader, &buf)
         arr = arrays[i]
 
-        if buf.size < 0 or (buf.size == 0 and not arr.empty_binary_ok):
+        if (buf.size == 0 and not arr.empty_binary_ok) or (buf.size < 0 and not arr.is_object):
             raise ValueError("Cannot handle NULL value")
 
         if arr.is_object:
