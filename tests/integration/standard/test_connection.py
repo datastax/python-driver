@@ -29,6 +29,7 @@ from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.protocol import QueryMessage
 from cassandra.connection import Connection
 from cassandra.policies import WhiteListRoundRobinPolicy, HostStateListener
+from cassandra.pool import HostConnectionPool
 
 from tests import is_monkey_patched
 from tests.integration import use_singledc, PROTOCOL_VERSION, get_node
@@ -125,6 +126,7 @@ class HeartbeatTest(unittest.TestCase):
             rs.result()
             current_host = str(rs._current_host)
             count += 1
+            time.sleep(.1)
         self.assertLess(count, 100, "Never connected to the first node")
         new_connections = self.wait_for_connections(host, self.cluster)
         self.assertIsNone(test_listener.host_down)
@@ -138,8 +140,12 @@ class HeartbeatTest(unittest.TestCase):
         holders = cluster.get_connection_holders()
         for conn in holders:
             if host == str(getattr(conn, 'host', '')):
-                if conn._connection is not None:
-                    connections.append(conn._connection)
+                if isinstance(conn, HostConnectionPool):
+                    if conn._connections is not None:
+                        connections.append(conn._connections)
+                else:
+                    if conn._connection is not None:
+                        connections.append(conn._connection)
         return connections
 
     def wait_for_connections(self, host, cluster):
@@ -159,7 +165,7 @@ class HeartbeatTest(unittest.TestCase):
             connections = self.fetch_connections(host, cluster)
             if len(connections) is 0:
                 return
-            time.sleep(.1)
+            time.sleep(.5)
         self.fail("Connections never cleared")
 
 
