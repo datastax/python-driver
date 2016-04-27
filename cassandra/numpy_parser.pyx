@@ -52,13 +52,11 @@ ctypedef struct ArrDesc:
     Py_uintptr_t buf_ptr
     int stride # should be large enough as we allocate contiguous arrays
     int is_object
-    int empty_binary_ok
 
 arrDescDtype = np.dtype(
     [ ('buf_ptr', np.uintp)
     , ('stride', np.dtype('i'))
     , ('is_object', np.dtype('i'))
-    , ('empty_binary_ok', np.dtype('i'))
     ], align=True)
 
 _cqltype_to_numpy = {
@@ -119,7 +117,6 @@ def make_arrays(ParseDesc desc, array_size):
         array_descs[i]['buf_ptr'] = arr.ctypes.data
         array_descs[i]['stride'] = arr.strides[0]
         array_descs[i]['is_object'] = coltype not in _cqltype_to_numpy
-        array_descs[i]['empty_binary_ok'] = coltype.empty_binary_ok
         arrays.append(arr)
 
     return array_descs, arrays
@@ -148,14 +145,13 @@ cdef inline int unpack_row(
         get_buf(reader, &buf)
         arr = arrays[i]
 
-        if (buf.size == 0 and not arr.empty_binary_ok) or (buf.size < 0 and not arr.is_object):
-            raise ValueError("Cannot handle NULL value")
-
         if arr.is_object:
             deserializer = desc.deserializers[i]
             val = from_binary(deserializer, &buf, desc.protocol_version)
             Py_INCREF(val)
             (<PyObject **> arr.buf_ptr)[0] = <PyObject *> val
+        elif buf.size < 0:
+            raise ValueError("Cannot handle NULL value")
         else:
             memcpy(<char *> arr.buf_ptr, buf.ptr, buf.size)
 
