@@ -45,7 +45,11 @@ def get_all_primitive_params(key):
     """
     params = [key]
     for datatype in PRIMITIVE_DATATYPES:
-        params.append(get_sample(datatype))
+        # Also test for empty strings
+        if key == 1 and datatype == 'ascii':
+            params.append('')
+        else:
+            params.append(get_sample(datatype))
     return params
 
 

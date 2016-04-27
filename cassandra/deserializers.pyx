@@ -44,6 +44,8 @@ cdef class Deserializer:
 
 cdef class DesBytesType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
+        if buf.size == 0:
+            return ""
         return to_bytes(buf)
 
 # this is to facilitate cqlsh integration, which requires bytearrays for BytesType
@@ -51,6 +53,8 @@ cdef class DesBytesType(Deserializer):
 # deserializers.DesBytesType = deserializers.DesBytesTypeByteArray
 cdef class DesBytesTypeByteArray(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
+        if buf.size == 0:
+            return bytearray()
         return bytearray(buf.ptr[:buf.size])
 
 # TODO: Use libmpdec: http://www.bytereef.org/mpdecimal/index.html
@@ -84,6 +88,8 @@ cdef class DesByteType(Deserializer):
 
 cdef class DesAsciiType(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
+        if buf.size == 0:
+            return ""
         if PY2:
             return to_bytes(buf)
         return to_bytes(buf).decode('ascii')
@@ -169,6 +175,8 @@ cdef class DesTimeType(Deserializer):
 
 cdef class DesUTF8Type(Deserializer):
     cdef deserialize(self, Buffer *buf, int protocol_version):
+        if buf.size == 0:
+            return ""
         cdef val = to_bytes(buf)
         return val.decode('utf8')
 
