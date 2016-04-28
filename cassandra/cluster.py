@@ -1161,7 +1161,7 @@ class Cluster(object):
         if distance == HostDistance.IGNORED:
             log.debug("Not adding connection pool for new host %r because the "
                       "load balancing policy has marked it as IGNORED", host)
-            self._finalize_add(host)
+            self._finalize_add(host, set_up=False)
             return
 
         futures_lock = Lock()
@@ -1203,9 +1203,10 @@ class Cluster(object):
         if not have_future:
             self._finalize_add(host)
 
-    def _finalize_add(self, host):
-        # mark the host as up and notify all listeners
-        host.set_up()
+    def _finalize_add(self, host, set_up=True):
+        if set_up:
+            host.set_up()
+
         for listener in self.listeners:
             listener.on_add(host)
 
