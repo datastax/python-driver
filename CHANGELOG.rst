@@ -1,3 +1,30 @@
+3.3.0
+=====
+
+Features
+--------
+* Add an AddressTranslator interface (PYTHON-69)
+* New Retry Policy Decision - try next host (PYTHON-285)
+* Don't mark host down on timeout (PYTHON-286)
+* SSL hostname verification (PYTHON-296)
+* Add C* version to metadata or cluster objects (PYTHON-301)
+* Expose listen_address of node we get ring information from (PYTHON-332)
+* Use A-record with multiple IPs for contact points (PYTHON-415)
+* Custom consistency level for populating query traces (PYTHON-435)
+* Normalize Server Exception Types (PYTHON-443)
+* Propagate exception message when DDL schema agreement fails (PYTHON-444)
+* Specialized exceptions for metadata refresh methods failure (PYTHON-527)
+
+Bug Fixes
+---------
+* Resolve contact point hostnames to avoid duplicate hosts (PYTHON-103)
+* Options to Disable Schema, Token Metadata Processing (PYTHON-327)
+* GeventConnection stalls requests when read is a multiple of the input buffer size (PYTHON-429)
+* named_tuple_factory breaks with duplicate "cleaned" col names (PYTHON-467)
+* Connection leak if Cluster.shutdown() happens during reconnection (PYTHON-482)
+* HostConnection.borrow_connection does not block when all request ids are used (PYTHON-514)
+* Empty field not being handled by the NumpyProtocolHandler (PYTHON-550)
+
 3.2.2
 =====
 April 19, 2016
