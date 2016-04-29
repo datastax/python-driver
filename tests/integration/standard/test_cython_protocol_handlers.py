@@ -7,11 +7,12 @@ try:
 except ImportError:
     import unittest
 
+from cassandra import DriverException, Timeout, AlreadyExists
 from cassandra.query import tuple_factory
-from cassandra.cluster import Cluster
-from cassandra.protocol import ProtocolHandler, LazyProtocolHandler, NumpyProtocolHandler
+from cassandra.cluster import Cluster, NoHostAvailable
+from cassandra.protocol import ProtocolHandler, LazyProtocolHandler, NumpyProtocolHandler, ConfigurationException
 from cassandra.cython_deps import HAVE_CYTHON, HAVE_NUMPY
-from tests.integration import use_singledc, PROTOCOL_VERSION, notprotocolv1, drop_keyspace_shutdown_cluster, VERIFY_CYTHON
+from tests.integration import use_singledc, PROTOCOL_VERSION, notprotocolv1, drop_keyspace_shutdown_cluster, VERIFY_CYTHON, BasicSharedKeyspaceUnitTestCase, execute_with_retry_tolerant
 from tests.integration.datatype_utils import update_datatypes
 from tests.integration.standard.utils import (
     create_table_with_all_types, get_all_primitive_params, get_primitive_datatypes)
@@ -202,3 +203,69 @@ def verify_iterator_data(assertEqual, results):
         for expected, actual in zip(params, result):
             assertEqual(actual, expected)
     return count
+
+
+class NumpyNullTest(BasicSharedKeyspaceUnitTestCase):
+
+    # A dictionary containing table key to type.
+    # Boolean dictates whether or not the type can be deserialized with null value
+    NUMPY_TYPES = {"v1": ('bigint', False),
+                   "v2": ('double', False),
+                   "v3": ('float', False),
+                   "v4": ('int', False),
+                   "v5": ('smallint', False),
+                   "v6": ("ascii", True),
+                   "v7": ("blob", True),
+                   "v8": ("boolean", True),
+                   "v9": ("decimal", True),
+                   "v10": ("inet", True),
+                   "v11": ("text", True),
+                   "v12": ("timestamp", True),
+                   "v13": ("timeuuid", True),
+                   "v14": ("uuid", True),
+                   "v15": ("varchar", True),
+                   "v16": ("varint", True),
+                   }
+
+    def setUp(self):
+        self.session.client_protocol_handler = NumpyProtocolHandler
+        self.session.row_factory = tuple_factory
+
+    @numpytest
+    def test_null_types3(self):
+        """
+        Test to validate that the numpy protocol handler can deal with null values.
+        @since 3.3.0
+        @jira_ticket PYTHON-550
+        @expected_result Numpy can handle non mapped types' null values.
+
+        @test_category data_types:serialization
+        """
+
+        self.create_table_of_types()
+        self.session.execute("INSERT INTO {0}.{1} (k) VALUES (1)".format(self.keyspace_name, self.function_table_name))
+        self.validate_types()
+
+    def create_table_of_types(self):
+        """
+        Builds a table containing all the numpy types
+        """
+        base_ddl = '''CREATE TABLE {0}.{1} (k int PRIMARY KEY'''.format(self.keyspace_name, self.function_table_name, type)
+        for key, value in NumpyNullTest.NUMPY_TYPES.items():
+            base_ddl = base_ddl+", {0} {1}".format(key, value[0])
+        base_ddl = base_ddl+")"
+        execute_with_retry_tolerant(self.session, base_ddl, (DriverException, NoHostAvailable, Timeout), (ConfigurationException, AlreadyExists))
+
+    def validate_types(self):
+        """
+        Selects each type from the table and expects either an exception or None depending on type
+        """
+        for key, value in NumpyNullTest.NUMPY_TYPES.items():
+            select = "SELECT {0} from {1}.{2}".format(key,self.keyspace_name, self.function_table_name)
+            if value[1]:
+                rs = execute_with_retry_tolerant(self.session, select, (NoHostAvailable), ())
+                self.assertEqual(rs[0].get('v1'), None)
+            else:
+                with self.assertRaises(ValueError):
+                    execute_with_retry_tolerant(self.session, select, (NoHostAvailable), ())
+

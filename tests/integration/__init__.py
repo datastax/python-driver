@@ -359,6 +359,22 @@ def execute_with_long_wait_retry(session, query, timeout=30):
     raise RuntimeError("Failed to execute query after 100 attempts: {0}".format(query))
 
 
+def execute_with_retry_tolerant(session, query, retry_exceptions, escape_exception):
+    # TODO refactor above methods into this one for code reuse
+    tries = 0
+    while tries < 100:
+        try:
+            tries += 1
+            rs = session.execute(query)
+            return rs
+        except escape_exception:
+            return
+        except retry_exceptions:
+            time.sleep(.1)
+
+    raise RuntimeError("Failed to execute query after 100 attempts: {0}".format(query))
+
+
 def drop_keyspace_shutdown_cluster(keyspace_name, session, cluster):
     try:
         execute_with_long_wait_retry(session, "DROP KEYSPACE {0}".format(keyspace_name))
