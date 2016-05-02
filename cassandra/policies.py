@@ -16,11 +16,8 @@ from itertools import islice, cycle, groupby, repeat
 import logging
 from random import randint
 from threading import Lock
-import six
 
-from cassandra import ConsistencyLevel
-
-from six.moves import range
+from cassandra import ConsistencyLevel, OperationTimedOut
 
 log = logging.getLogger(__name__)
 
@@ -235,7 +232,7 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
             self._dc_live_hosts[dc] = tuple(set(dc_hosts))
 
         if not self.local_dc:
-            self._contact_points = cluster.contact_points
+            self._contact_points = cluster.contact_points_resolved
 
         self._position = randint(0, len(hosts) - 1) if hosts else 0
 
@@ -337,7 +334,7 @@ class TokenAwarePolicy(LoadBalancingPolicy):
 
     def check_supported(self):
         if not self._cluster_metadata.can_support_partitioner():
-            raise Exception(
+            raise RuntimeError(
                 '%s cannot be used with the cluster partitioner (%s) because '
                 'the relevant C extension for this driver was not compiled. '
                 'See the installation instructions for details on building '
@@ -468,7 +465,7 @@ class SimpleConvictionPolicy(ConvictionPolicy):
     """
 
     def add_failure(self, connection_exc):
-        return True
+        return not isinstance(connection_exc, OperationTimedOut)
 
     def reset(self):
         pass
@@ -554,8 +551,8 @@ class ExponentialReconnectionPolicy(ReconnectionPolicy):
         self.max_attempts = max_attempts
 
     def new_schedule(self):
-        i=0
-        while self.max_attempts == None or i < self.max_attempts:
+        i = 0
+        while self.max_attempts is None or i < self.max_attempts:
             yield min(self.base_delay * (2 ** i), self.max_delay)
             i += 1
 
@@ -650,6 +647,12 @@ class RetryPolicy(object):
     should be ignored but no more retries should be attempted.
     """
 
+    RETRY_NEXT_HOST = 3
+    """
+    This should be returned from the below methods if the operation
+    should be retried on another connection.
+    """
+
     def on_read_timeout(self, query, consistency, required_responses,
                         received_responses, data_retrieved, retry_num):
         """
@@ -677,11 +680,11 @@ class RetryPolicy(object):
         a sufficient number of replicas responded (with data digests).
         """
         if retry_num != 0:
-            return (self.RETHROW, None)
+            return self.RETHROW, None
         elif received_responses >= required_responses and not data_retrieved:
-            return (self.RETRY, consistency)
+            return self.RETRY, consistency
         else:
-            return (self.RETHROW, None)
+            return self.RETHROW, None
 
     def on_write_timeout(self, query, consistency, write_type,
                          required_responses, received_responses, retry_num):
@@ -710,11 +713,11 @@ class RetryPolicy(object):
         :attr:`~.WriteType.BATCH_LOG`.
         """
         if retry_num != 0:
-            return (self.RETHROW, None)
+            return self.RETHROW, None
         elif write_type == WriteType.BATCH_LOG:
-            return (self.RETRY, consistency)
+            return self.RETRY, consistency
         else:
-            return (self.RETHROW, None)
+            return self.RETHROW, None
 
     def on_unavailable(self, query, consistency, required_replicas, alive_replicas, retry_num):
         """
@@ -739,7 +742,7 @@ class RetryPolicy(object):
 
         By default, no retries will be attempted and the error will be re-raised.
         """
-        return (self.RETHROW, None)
+        return (self.RETRY_NEXT_HOST, consistency) if retry_num == 0 else (self.RETHROW, None)
 
 
 class FallthroughRetryPolicy(RetryPolicy):
@@ -749,13 +752,13 @@ class FallthroughRetryPolicy(RetryPolicy):
     """
 
     def on_read_timeout(self, *args, **kwargs):
-        return (self.RETHROW, None)
+        return self.RETHROW, None
 
     def on_write_timeout(self, *args, **kwargs):
-        return (self.RETHROW, None)
+        return self.RETHROW, None
 
     def on_unavailable(self, *args, **kwargs):
-        return (self.RETHROW, None)
+        return self.RETHROW, None
 
 
 class DowngradingConsistencyRetryPolicy(RetryPolicy):
@@ -807,45 +810,73 @@ class DowngradingConsistencyRetryPolicy(RetryPolicy):
     """
     def _pick_consistency(self, num_responses):
         if num_responses >= 3:
-            return (self.RETRY, ConsistencyLevel.THREE)
+            return self.RETRY, ConsistencyLevel.THREE
         elif num_responses >= 2:
-            return (self.RETRY, ConsistencyLevel.TWO)
+            return self.RETRY, ConsistencyLevel.TWO
         elif num_responses >= 1:
-            return (self.RETRY, ConsistencyLevel.ONE)
+            return self.RETRY, ConsistencyLevel.ONE
         else:
-            return (self.RETHROW, None)
+            return self.RETHROW, None
 
     def on_read_timeout(self, query, consistency, required_responses,
                         received_responses, data_retrieved, retry_num):
         if retry_num != 0:
-            return (self.RETHROW, None)
+            return self.RETHROW, None
         elif received_responses < required_responses:
             return self._pick_consistency(received_responses)
         elif not data_retrieved:
-            return (self.RETRY, consistency)
+            return self.RETRY, consistency
         else:
-            return (self.RETHROW, None)
+            return self.RETHROW, None
 
     def on_write_timeout(self, query, consistency, write_type,
                          required_responses, received_responses, retry_num):
         if retry_num != 0:
-            return (self.RETHROW, None)
+            return self.RETHROW, None
 
         if write_type in (WriteType.SIMPLE, WriteType.BATCH, WriteType.COUNTER):
             if received_responses > 0:
                 # persisted on at least one replica
-                return (self.IGNORE, None)
+                return self.IGNORE, None
             else:
-                return (self.RETHROW, None)
+                return self.RETHROW, None
         elif write_type == WriteType.UNLOGGED_BATCH:
             return self._pick_consistency(received_responses)
         elif write_type == WriteType.BATCH_LOG:
-            return (self.RETRY, consistency)
+            return self.RETRY, consistency
 
-        return (self.RETHROW, None)
+        return self.RETHROW, None
 
     def on_unavailable(self, query, consistency, required_replicas, alive_replicas, retry_num):
         if retry_num != 0:
-            return (self.RETHROW, None)
+            return self.RETHROW, None
         else:
             return self._pick_consistency(alive_replicas)
+
+
+class AddressTranslator(object):
+    """
+    Interface for translating cluster-defined endpoints.
+
+    The driver discovers nodes using server metadata and topology change events. Normally,
+    the endpoint defined by the server is the right way to connect to a node. In some environments,
+    these addresses may not be reachable, or not preferred (public vs. private IPs in cloud environments,
+    suboptimal routing, etc). This interface allows for translating from server defined endpoints to
+    preferred addresses for driver connections.
+
+    *Note:* :attr:`~Cluster.contact_points` provided while creating the :class:`~.Cluster` instance are not
+    translated using this mechanism -- only addresses received from Cassandra nodes are.
+    """
+    def translate(self, addr):
+        """
+        Accepts the node ip address, and returns a translated address to be used connecting to this node.
+        """
+        raise NotImplementedError
+
+
+class IdentityTranslator(AddressTranslator):
+    """
+    Returns the endpoint with no translation
+    """
+    def translate(self, addr):
+        return addr

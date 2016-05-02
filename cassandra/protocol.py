@@ -22,7 +22,7 @@ import six
 from six.moves import range
 import io
 
-from cassandra import type_codes
+from cassandra import type_codes, DriverException
 from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
                        WriteFailure, ReadFailure, FunctionFailure,
                        AlreadyExists, InvalidRequest, Unauthorized,
@@ -589,7 +589,7 @@ class ResultMessage(_MessageType):
         elif kind == RESULT_KIND_SCHEMA_CHANGE:
             results = cls.recv_results_schema_change(f, protocol_version)
         else:
-            raise Exception("Unknown RESULT kind: %d" % kind)
+            raise DriverException("Unknown RESULT kind: %d" % kind)
         return cls(kind, results, paging_state)
 
     @classmethod
@@ -971,7 +971,7 @@ class _ProtocolHandler(object):
         """
         if flags & COMPRESSED_FLAG:
             if decompressor is None:
-                raise Exception("No de-compressor available for compressed frame!")
+                raise RuntimeError("No de-compressor available for compressed frame!")
             body = decompressor(body)
             flags ^= COMPRESSED_FLAG
 

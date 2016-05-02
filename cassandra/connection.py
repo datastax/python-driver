@@ -125,6 +125,7 @@ class _Frame(object):
 
 NONBLOCKING = (errno.EAGAIN, errno.EWOULDBLOCK)
 
+
 class ConnectionException(Exception):
     """
     An unrecoverable error was hit when attempting to use a connection,
@@ -210,6 +211,12 @@ class Connection(object):
     # the number of request IDs that are currently in use.
     in_flight = 0
 
+    # Max concurrent requests allowed per connection. This is set optimistically high, allowing
+    # all request ids to be used in protocol version 3+. Normally concurrency would be controlled
+    # at a higher level by the application or concurrent.execute_concurrent. This attribute
+    # is for lower-level integrations that want some upper bound without reimplementing.
+    max_in_flight = 2 ** 15
+
     # A set of available request IDs.  When using the v3 protocol or higher,
     # this will not initially include all request IDs in order to save memory,
     # but the set will grow if it is exhausted.
@@ -231,8 +238,6 @@ class Connection(object):
     is_control_connection = False
     signaled_error = False  # used for flagging at the pool level
 
-    _server_version = None
-
     _iobuf = None
     _current_frame = None
 
@@ -241,6 +246,8 @@ class Connection(object):
     _socket_impl = socket
     _ssl_impl = ssl
 
+    _check_hostname = False
+
     def __init__(self, host='127.0.0.1', port=9042, authenticator=None,
                  ssl_options=None, sockopts=None, compression=True,
                  cql_version=None, protocol_version=MAX_SUPPORTED_VERSION, is_control_connection=False,
@@ -248,7 +255,7 @@ class Connection(object):
         self.host = host
         self.port = port
         self.authenticator = authenticator
-        self.ssl_options = ssl_options
+        self.ssl_options = ssl_options.copy() if ssl_options else None
         self.sockopts = sockopts
         self.compression = compression
         self.cql_version = cql_version
@@ -260,14 +267,22 @@ class Connection(object):
         self._requests = {}
         self._iobuf = io.BytesIO()
 
+        if ssl_options:
+            self._check_hostname = bool(self.ssl_options.pop('check_hostname', False))
+            if self._check_hostname:
+                if not getattr(ssl, 'match_hostname', None):
+                    raise RuntimeError("ssl_options specify 'check_hostname', but ssl.match_hostname is not provided. "
+                                       "Patch or upgrade Python to use this option.")
+
         if protocol_version >= 3:
-            self.max_request_id = (2 ** 15) - 1
-            # Don't fill the deque with 2**15 items right away. Start with 300 and add
+            self.max_request_id = min(self.max_in_flight - 1, (2 ** 15) - 1)
+            # Don't fill the deque with 2**15 items right away. Start with some and add
             # more if needed.
-            self.request_ids = deque(range(300))
-            self.highest_request_id = 299
+            initial_size = min(300, self.max_in_flight)
+            self.request_ids = deque(range(initial_size))
+            self.highest_request_id = initial_size - 1
         else:
-            self.max_request_id = (2 ** 7) - 1
+            self.max_request_id = min(self.max_in_flight, (2 ** 7) - 1)
             self.request_ids = deque(range(self.max_request_id + 1))
             self.highest_request_id = self.max_request_id
 
@@ -319,15 +334,19 @@ class Connection(object):
     def _connect_socket(self):
         sockerr = None
         addresses = socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        if not addresses:
+            raise ConnectionException("getaddrinfo returned empty list for %s" % (self.host,))
         for (af, socktype, proto, canonname, sockaddr) in addresses:
             try:
                 self._socket = self._socket_impl.socket(af, socktype, proto)
                 if self.ssl_options:
                     if not self._ssl_impl:
-                        raise Exception("This version of Python was not compiled with SSL support")
+                        raise RuntimeError("This version of Python was not compiled with SSL support")
                     self._socket = self._ssl_impl.wrap_socket(self._socket, **self.ssl_options)
                 self._socket.settimeout(self.connect_timeout)
                 self._socket.connect(sockaddr)
+                if self._check_hostname:
+                    ssl.match_hostname(self._socket.getpeercert(), self.host)
                 sockerr = None
                 break
             except socket.error as err:
@@ -461,7 +480,7 @@ class Connection(object):
         while True:
             needed = len(msgs) - messages_sent
             with self.lock:
-                available = min(needed, self.max_request_id - self.in_flight)
+                available = min(needed, self.max_request_id - self.in_flight + 1)
                 request_ids = [self.get_request_id() for _ in range(available)]
                 self.in_flight += available
 
@@ -826,18 +845,6 @@ class Connection(object):
     def reset_idle(self):
         self.msg_received = False
 
-    @property
-    def server_version(self):
-        if self._server_version is None:
-            query_message = QueryMessage(query="SELECT release_version FROM system.local", consistency_level=ConsistencyLevel.ONE)
-            message = self.wait_for_response(query_message)
-            self._server_version = message.results[1][0][0]  # (col names, rows)[rows][first row][only item]
-        return self._server_version
-
-    @server_version.setter
-    def server_version(self, version):
-        self._server_version = version
-
     def __str__(self):
         status = ""
         if self.is_defunct:
@@ -908,7 +915,7 @@ class HeartbeatFuture(object):
         log.debug("Sending options message heartbeat on idle connection (%s) %s",
                   id(connection), connection.host)
         with connection.lock:
-            if connection.in_flight < connection.max_request_id:
+            if connection.in_flight <= connection.max_request_id:
                 connection.in_flight += 1
                 connection.send_msg(OptionsMessage(), connection.get_request_id(), self._options_callback)
             else:
@@ -921,18 +928,18 @@ class HeartbeatFuture(object):
             if self._exception:
                 raise self._exception
         else:
-            raise OperationTimedOut()
+            raise OperationTimedOut("Connection heartbeat timeout after %s seconds" % (timeout,), self.connection.host)
 
     def _options_callback(self, response):
-        if not isinstance(response, SupportedMessage):
+        if isinstance(response, SupportedMessage):
+            log.debug("Received options response on connection (%s) from %s",
+                      id(self.connection), self.connection.host)
+        else:
             if isinstance(response, ConnectionException):
                 self._exception = response
             else:
                 self._exception = ConnectionException("Received unexpected response to OptionsMessage: %s"
                                                       % (response,))
-
-        log.debug("Received options response on connection (%s) from %s",
-                  id(self.connection), self.connection.host)
         self._event.set()
 
 
@@ -964,10 +971,10 @@ class ConnectionHeartbeat(Thread):
                             if connection.is_idle:
                                 try:
                                     futures.append(HeartbeatFuture(connection, owner))
-                                except Exception:
+                                except Exception as e:
                                     log.warning("Failed sending heartbeat message on connection (%s) to %s",
-                                                id(connection), connection.host, exc_info=True)
-                                    failed_connections.append((connection, owner))
+                                                id(connection), connection.host)
+                                    failed_connections.append((connection, owner, e))
                             else:
                                 connection.reset_idle()
                         else:
@@ -984,14 +991,14 @@ class ConnectionHeartbeat(Thread):
                         with connection.lock:
                             connection.in_flight -= 1
                         connection.reset_idle()
-                    except Exception:
+                    except Exception as e:
                         log.warning("Heartbeat failed for connection (%s) to %s",
-                                    id(connection), connection.host, exc_info=True)
-                        failed_connections.append((f.connection, f.owner))
+                                    id(connection), connection.host)
+                        failed_connections.append((f.connection, f.owner, e))
 
-                for connection, owner in failed_connections:
+                for connection, owner, exc in failed_connections:
                     self._raise_if_stopped()
-                    connection.defunct(Exception('Connection heartbeat failure'))
+                    connection.defunct(exc)
                     owner.return_connection(connection)
             except self.ShutdownException:
                 pass

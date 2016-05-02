@@ -31,7 +31,7 @@ from cassandra.util import unix_time_from_uuid1
 from cassandra.encoder import Encoder
 import cassandra.encoder
 from cassandra.protocol import _UNSET_VALUE
-from cassandra.util import OrderedDict, _positional_rename_invalid_identifiers
+from cassandra.util import OrderedDict, _sanitize_identifiers
 
 import logging
 log = logging.getLogger(__name__)
@@ -117,13 +117,14 @@ def named_tuple_factory(colnames, rows):
     try:
         Row = namedtuple('Row', clean_column_names)
     except Exception:
+        clean_column_names = list(map(_clean_column_name, colnames))  # create list because py3 map object will be consumed by first attempt
         log.warning("Failed creating named tuple for results with column names %s (cleaned: %s) "
                     "(see Python 'namedtuple' documentation for details on name rules). "
                     "Results will be returned with positional names. "
                     "Avoid this by choosing different names, using SELECT \"<col name>\" AS aliases, "
                     "or specifying a different row_factory on your Session" %
                     (colnames, clean_column_names))
-        Row = namedtuple('Row', _positional_rename_invalid_identifiers(clean_column_names))
+        Row = namedtuple('Row', _sanitize_identifiers(clean_column_names))
 
     return [Row(*row) for row in rows]
 
@@ -864,7 +865,7 @@ class QueryTrace(object):
         self.trace_id = trace_id
         self._session = session
 
-    def populate(self, max_wait=2.0, wait_for_complete=True):
+    def populate(self, max_wait=2.0, wait_for_complete=True, query_cl=None):
         """
         Retrieves the actual tracing details from Cassandra and populates the
         attributes of this instance.  Because tracing details are stored
@@ -875,6 +876,9 @@ class QueryTrace(object):
 
         `wait_for_complete=False` bypasses the wait for duration to be populated.
         This can be used to query events from partial sessions.
+
+        `query_cl` specifies a consistency level to use for polling the trace tables,
+        if it should be different than the session default.
         """
         attempt = 0
         start = time.time()
@@ -886,7 +890,7 @@ class QueryTrace(object):
 
             log.debug("Attempting to fetch trace info for trace ID: %s", self.trace_id)
             session_results = self._execute(
-                self._SELECT_SESSIONS_FORMAT, (self.trace_id,), time_spent, max_wait)
+                SimpleStatement(self._SELECT_SESSIONS_FORMAT, consistency_level=query_cl), (self.trace_id,), time_spent, max_wait)
 
             is_complete = session_results and session_results[0].duration is not None
             if not session_results or (wait_for_complete and not is_complete):
@@ -910,7 +914,7 @@ class QueryTrace(object):
             log.debug("Attempting to fetch trace events for trace ID: %s", self.trace_id)
             time_spent = time.time() - start
             event_results = self._execute(
-                self._SELECT_EVENTS_FORMAT, (self.trace_id,), time_spent, max_wait)
+                SimpleStatement(self._SELECT_EVENTS_FORMAT, consistency_level=query_cl), (self.trace_id,), time_spent, max_wait)
             log.debug("Fetched trace events for trace ID: %s", self.trace_id)
             self.events = tuple(TraceEvent(r.activity, r.event_id, r.source, r.source_elapsed, r.thread)
                                 for r in event_results)

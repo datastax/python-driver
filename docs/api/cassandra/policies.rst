@@ -24,6 +24,15 @@ Load Balancing
 .. autoclass:: TokenAwarePolicy
    :members:
 
+Translating Server Node Addresses
+---------------------------------
+
+.. autoclass:: AddressTranslator
+   :members:
+
+.. autoclass:: IdentityTranslator
+   :members:
+
 Marking Hosts Up or Down
 ------------------------
 

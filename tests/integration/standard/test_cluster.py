@@ -27,11 +27,11 @@ from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.concurrent import execute_concurrent
 from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
                                 RetryPolicy, SimpleConvictionPolicy, HostDistance,
-                                WhiteListRoundRobinPolicy)
+                                WhiteListRoundRobinPolicy, AddressTranslator)
 from cassandra.protocol import MAX_SUPPORTED_VERSION
 from cassandra.query import SimpleStatement, TraceUnavailable
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, get_node, CASSANDRA_VERSION, execute_until_pass, execute_with_long_wait_retry
+from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, get_node, CASSANDRA_VERSION, execute_until_pass, execute_with_long_wait_retry, BasicExistingKeyspaceUnitTestCase, get_node
 from tests.integration.util import assert_quiescent_pool_state
 
 
@@ -40,6 +40,39 @@ def setup_module():
 
 
 class ClusterTests(unittest.TestCase):
+
+
+    def test_host_resolution(self):
+        """
+        Test to insure A records are resolved appropriately.
+
+        @since 3.3
+        @jira_ticket PYTHON-415
+        @expected_result hostname will be transformed into IP
+
+        @test_category connection
+        """
+        cluster = Cluster(contact_points=["localhost"], protocol_version=PROTOCOL_VERSION, connect_timeout=1)
+        self.assertTrue('127.0.0.1' in cluster.contact_points_resolved)
+
+    def test_host_duplication(self):
+        """
+        Ensure that duplicate hosts in the contact points are surfaced in the cluster metadata
+
+        @since 3.3
+        @jira_ticket PYTHON-103
+        @expected_result duplicate hosts aren't surfaced in cluster.metadata
+
+        @test_category connection
+        """
+        cluster = Cluster(contact_points=["localhost", "127.0.0.1", "localhost", "localhost", "localhost"], protocol_version=PROTOCOL_VERSION, connect_timeout=1)
+        cluster.connect()
+        self.assertEqual(len(cluster.metadata.all_hosts()), 3)
+        cluster.shutdown()
+        cluster = Cluster(contact_points=["127.0.0.1", "localhost"], protocol_version=PROTOCOL_VERSION, connect_timeout=1)
+        cluster.connect()
+        self.assertEqual(len(cluster.metadata.all_hosts()), 3)
+        cluster.shutdown()
 
     def test_raise_error_on_control_connection_timeout(self):
         """
@@ -585,3 +618,54 @@ class ClusterTests(unittest.TestCase):
         cluster.shutdown()
 
 
+class LocalHostAdressTranslator(AddressTranslator):
+
+    def __init__(self, addr_map=None):
+        self.addr_map = addr_map
+
+    def translate(self, addr):
+        new_addr = self.addr_map.get(addr)
+        return new_addr
+
+
+class TestAddressTranslation(unittest.TestCase):
+
+    def test_address_translator_basic(self):
+        """
+        Test host address translation
+
+        Uses a custom Address Translator to map all ip back to one.
+        Validates AddressTranslator invocation by ensuring that only meta data associated with single
+        host is populated
+
+        @since 3.3
+        @jira_ticket PYTHON-69
+        @expected_result only one hosts' metadata will be populeated
+
+        @test_category metadata
+        """
+        lh_ad = LocalHostAdressTranslator({'127.0.0.1': '127.0.0.1', '127.0.0.2': '127.0.0.1', '127.0.0.3': '127.0.0.1'})
+        c = Cluster(address_translator=lh_ad)
+        c.connect()
+        self.assertEqual(len(c.metadata.all_hosts()), 1)
+        c.shutdown()
+
+    def test_address_translator_with_mixed_nodes(self):
+        """
+        Test host address translation
+
+        Uses a custom Address Translator to map ip's of non control_connection nodes to each other
+        Validates AddressTranslator invocation by ensuring that metadata for mapped hosts is also mapped
+
+        @since 3.3
+        @jira_ticket PYTHON-69
+        @expected_result metadata for crossed hosts will also be crossed
+
+        @test_category metadata
+        """
+        adder_map = {'127.0.0.1': '127.0.0.1', '127.0.0.2': '127.0.0.3', '127.0.0.3': '127.0.0.2'}
+        lh_ad = LocalHostAdressTranslator(adder_map)
+        c = Cluster(address_translator=lh_ad)
+        c.connect()
+        for host in c.metadata.all_hosts():
+            self.assertEqual(adder_map.get(str(host)), host.broadcast_address)

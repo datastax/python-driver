@@ -57,7 +57,7 @@ arrDescDtype = np.dtype(
     [ ('buf_ptr', np.uintp)
     , ('stride', np.dtype('i'))
     , ('is_object', np.dtype('i'))
-    ])
+    ], align=True)
 
 _cqltype_to_numpy = {
     cqltypes.LongType:          np.dtype('>i8'),
@@ -145,13 +145,13 @@ cdef inline int unpack_row(
         get_buf(reader, &buf)
         arr = arrays[i]
 
-        if buf.size == 0:
-            raise ValueError("Cannot handle NULL value")
         if arr.is_object:
             deserializer = desc.deserializers[i]
             val = from_binary(deserializer, &buf, desc.protocol_version)
             Py_INCREF(val)
             (<PyObject **> arr.buf_ptr)[0] = <PyObject *> val
+        elif buf.size < 0:
+            raise ValueError("Cannot handle NULL value")
         else:
             memcpy(<char *> arr.buf_ptr, buf.ptr, buf.size)
 

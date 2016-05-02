@@ -34,9 +34,10 @@ from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
 from tests.integration import get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass, \
-    BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster
+    BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase, BasicExistingKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster, CASSANDRA_VERSION
 
 from tests.unit.cython.utils import notcython
+
 
 def setup_module():
     use_singledc()
@@ -44,7 +45,72 @@ def setup_module():
     CASS_SERVER_VERSION = get_server_versions()[0]
 
 
+class HostMetatDataTests(BasicExistingKeyspaceUnitTestCase):
+    def test_broadcast_listen_address(self):
+        """
+        Check to ensure that the broadcast and listen adresss is populated correctly
+
+        @since 3.3
+        @jira_ticket PYTHON-332
+        @expected_result They are populated for C*> 2.0.16, 2.1.6, 2.2.0
+
+        @test_category metadata
+        """
+        # All nodes should have the broadcast_address set
+        for host in self.cluster.metadata.all_hosts():
+            self.assertIsNotNone(host.broadcast_address)
+        con = self.cluster.control_connection.get_connections()[0]
+        local_host = con.host
+        # The control connection node should have the listen address set.
+        listen_addrs = [host.listen_address for host in self.cluster.metadata.all_hosts()]
+        self.assertTrue(local_host in listen_addrs)
+
+    def test_host_release_version(self):
+        """
+        Checks the hosts release version and validates that it is equal to the
+        Cassandra version we are using in our test harness.
+
+        @since 3.3
+        @jira_ticket PYTHON-301
+        @expected_result host.release version should match our specified Cassandra version.
+
+        @test_category metadata
+        """
+        for host in self.cluster.metadata.all_hosts():
+            self.assertTrue(host.release_version.startswith(CASSANDRA_VERSION))
+
+
 class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
+
+    def test_schema_metadata_disable(self):
+        """
+        Checks to ensure that schema metadata_enabled, and token_metadata_enabled
+        flags work correctly.
+
+        @since 3.3
+        @jira_ticket PYTHON-327
+        @expected_result schema metadata will not be populated when schema_metadata_enabled is fause
+        token_metadata will be missing when token_metadata is set to false
+
+        @test_category metadata
+        """
+        # Validate metadata is missing where appropriate
+        no_schema = Cluster(schema_metadata_enabled=False)
+        no_schema_session = no_schema.connect()
+        self.assertEqual(len(no_schema.metadata.keyspaces), 0)
+        self.assertEqual(no_schema.metadata.export_schema_as_string(), '')
+        no_token = Cluster(token_metadata_enabled=False)
+        no_token_session = no_token.connect()
+        self.assertEqual(len(no_token.metadata.token_map.token_to_host_owner), 0)
+
+        # Do a simple query to ensure queries are working
+        query = "SELECT * FROM system.local"
+        no_schema_rs = no_schema_session.execute(query)
+        no_token_rs = no_token_session.execute(query)
+        self.assertIsNotNone(no_schema_rs[0])
+        self.assertIsNotNone(no_token_rs[0])
+        no_schema.shutdown()
+        no_token.shutdown()
 
     def make_create_statement(self, partition_cols, clustering_cols=None, other_cols=None, compact=False):
         clustering_cols = clustering_cols or []
@@ -120,7 +186,8 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertEqual([], tablemeta.clustering_key)
         self.assertEqual([u'a', u'b', u'c'], sorted(tablemeta.columns.keys()))
 
-        parser = get_schema_parser(self.cluster.control_connection._connection, 1)
+        cc = self.cluster.control_connection._connection
+        parser = get_schema_parser(cc, str(CASS_SERVER_VERSION[0]), 1)
 
         for option in tablemeta.options:
             self.assertIn(option, parser.recognized_table_options)
@@ -1067,14 +1134,14 @@ Approximate structure, for reference:
 
 CREATE TABLE legacy.composite_comp_with_col (
     key blob,
-    t timeuuid,
     b blob,
     s text,
+    t timeuuid,
     "b@6869746d65776974686d75736963" blob,
     "b@6d616d6d616a616d6d61" blob,
-    PRIMARY KEY (key, t, b, s)
+    PRIMARY KEY (key, b, s, t)
 ) WITH COMPACT STORAGE
-    AND CLUSTERING ORDER BY (t ASC, b ASC, s ASC)
+    AND CLUSTERING ORDER BY (b ASC, s ASC, t ASC)
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = 'Stores file meta data'
     AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
@@ -1195,8 +1262,8 @@ Approximate structure, for reference:
 
 CREATE TABLE legacy.composite_comp_no_col (
     key blob,
-    column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(org.apache.cassandra.db.marshal.TimeUUIDType, org.apache.cassandra.db.marshal.BytesType, org.apache.cassandra.db.marshal.UTF8Type)',
-    column2 text,
+    column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(org.apache.cassandra.db.marshal.BytesType, org.apache.cassandra.db.marshal.UTF8Type, org.apache.cassandra.db.marshal.TimeUUIDType)',
+    column2 timeuuid,
     value blob,
     PRIMARY KEY (key, column1, column1, column2)
 ) WITH COMPACT STORAGE
@@ -1897,7 +1964,7 @@ class BadMetaTest(unittest.TestCase):
         cls.session.execute("CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}" % cls.keyspace_name)
         cls.session.set_keyspace(cls.keyspace_name)
         connection = cls.cluster.control_connection._connection
-        cls.parser_class = get_schema_parser(connection, timeout=20).__class__
+        cls.parser_class = get_schema_parser(connection, str(CASS_SERVER_VERSION[0]), timeout=20).__class__
 
     @classmethod
     def teardown_class(cls):

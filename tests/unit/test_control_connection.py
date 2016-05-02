@@ -25,7 +25,7 @@ from cassandra.protocol import ResultMessage, RESULT_KIND_ROWS
 from cassandra.cluster import ControlConnection, _Scheduler
 from cassandra.pool import Host
 from cassandra.policies import (SimpleConvictionPolicy, RoundRobinPolicy,
-                                ConstantReconnectionPolicy)
+                                ConstantReconnectionPolicy, IdentityTranslator)
 
 PEER_IP = "foobar"
 
@@ -61,6 +61,7 @@ class MockCluster(object):
     max_schema_agreement_wait = 5
     load_balancing_policy = RoundRobinPolicy()
     reconnection_policy = ConstantReconnectionPolicy(2)
+    address_translator = IdentityTranslator()
     down_host = None
     contact_points = []
     is_shutdown = False

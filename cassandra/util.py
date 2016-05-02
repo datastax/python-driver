@@ -1101,7 +1101,7 @@ else:
         WSAAddressToStringA = ctypes.windll.ws2_32.WSAAddressToStringA
     else:
         def not_windows(*args):
-            raise Exception("IPv6 addresses cannot be handled on Windows. "
+            raise OSError("IPv6 addresses cannot be handled on Windows. "
                             "Missing ctypes.windll")
         WSAStringToAddressA = not_windows
         WSAAddressToStringA = not_windows
@@ -1170,4 +1170,15 @@ def _positional_rename_invalid_identifiers(field_names):
             or name[0].isdigit()
             or name.startswith('_')):
             names_out[index] = 'field_%d_' % index
+    return names_out
+
+
+def _sanitize_identifiers(field_names):
+    names_out = _positional_rename_invalid_identifiers(field_names)
+    if len(names_out) != len(set(names_out)):
+        observed_names = set()
+        for index, name in enumerate(names_out):
+            while names_out[index] in observed_names:
+                names_out[index] = "%s_" % (names_out[index],)
+            observed_names.add(names_out[index])
     return names_out

@@ -483,7 +483,7 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
         host_none = Host(1, SimpleConvictionPolicy)
 
         # contact point is '1'
-        cluster = Mock(contact_points=[1])
+        cluster = Mock(contact_points_resolved=[1])
 
         # contact DC first
         policy = DCAwareRoundRobinPolicy()
@@ -916,14 +916,14 @@ class RetryPolicyTest(unittest.TestCase):
         retry, consistency = policy.on_unavailable(
             query=None, consistency=ONE,
             required_replicas=1, alive_replicas=2, retry_num=0)
-        self.assertEqual(retry, RetryPolicy.RETHROW)
-        self.assertEqual(consistency, None)
+        self.assertEqual(retry, RetryPolicy.RETRY_NEXT_HOST)
+        self.assertEqual(consistency, ONE)
 
         retry, consistency = policy.on_unavailable(
             query=None, consistency=ONE,
             required_replicas=10000, alive_replicas=1, retry_num=0)
-        self.assertEqual(retry, RetryPolicy.RETHROW)
-        self.assertEqual(consistency, None)
+        self.assertEqual(retry, RetryPolicy.RETRY_NEXT_HOST)
+        self.assertEqual(consistency, ONE)
 
 
 class FallthroughRetryPolicyTest(unittest.TestCase):

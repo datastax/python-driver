@@ -86,6 +86,15 @@ def _tuple_version(version_string):
 
 USE_CASS_EXTERNAL = bool(os.getenv('USE_CASS_EXTERNAL', False))
 
+# If set to to true this will force the Cython tests to run regardless of whether they are installed
+cython_env = os.getenv('VERIFY_CYTHON', "False")
+
+
+VERIFY_CYTHON = False
+
+if(cython_env == 'True'):
+    VERIFY_CYTHON = True
+
 default_cassandra_version = '2.2.0'
 
 
@@ -346,6 +355,22 @@ def execute_with_long_wait_retry(session, query, timeout=30):
             log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
             del tb
             tries += 1
+
+    raise RuntimeError("Failed to execute query after 100 attempts: {0}".format(query))
+
+
+def execute_with_retry_tolerant(session, query, retry_exceptions, escape_exception):
+    # TODO refactor above methods into this one for code reuse
+    tries = 0
+    while tries < 100:
+        try:
+            tries += 1
+            rs = session.execute(query)
+            return rs
+        except escape_exception:
+            return
+        except retry_exceptions:
+            time.sleep(.1)
 
     raise RuntimeError("Failed to execute query after 100 attempts: {0}".format(query))
 

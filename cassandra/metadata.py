@@ -117,13 +117,15 @@ class Metadata(object):
 
     def refresh(self, connection, timeout, target_type=None, change_type=None, **kwargs):
 
+        server_version = self.get_host(connection.host).release_version
+        parser = get_schema_parser(connection, server_version, timeout)
+
         if not target_type:
-            self._rebuild_all(connection, timeout)
+            self._rebuild_all(parser)
             return
 
         tt_lower = target_type.lower()
         try:
-            parser = get_schema_parser(connection, timeout)
             parse_method = getattr(parser, 'get_' + tt_lower)
             meta = parse_method(self.keyspaces, **kwargs)
             if meta:
@@ -135,12 +137,7 @@ class Metadata(object):
         except AttributeError:
             raise ValueError("Unknown schema target_type: '%s'" % target_type)
 
-    def _rebuild_all(self, connection, timeout):
-        """
-        For internal use only.
-        """
-        parser = get_schema_parser(connection, timeout)
-
+    def _rebuild_all(self, parser):
         current_keyspaces = set()
         for keyspace_meta in parser.get_all_keyspaces():
             current_keyspaces.add(keyspace_meta.name)
@@ -1402,8 +1399,10 @@ class TokenMap(object):
         with self._rebuild_lock:
             current = self.tokens_to_hosts_by_ks.get(keyspace, None)
             if (build_if_absent and current is None) or (not build_if_absent and current is not None):
-                replica_map = self.replica_map_for_keyspace(self._metadata.keyspaces[keyspace])
-                self.tokens_to_hosts_by_ks[keyspace] = replica_map
+                ks_meta = self._metadata.keyspaces.get(keyspace)
+                if ks_meta:
+                    replica_map = self.replica_map_for_keyspace(self._metadata.keyspaces[keyspace])
+                    self.tokens_to_hosts_by_ks[keyspace] = replica_map
 
     def replica_map_for_keyspace(self, ks_metadata):
         strategy = ks_metadata.replication_strategy
@@ -2453,8 +2452,7 @@ class MaterializedViewMetadata(object):
         return self.as_cql_query(formatted=True) + ";"
 
 
-def get_schema_parser(connection, timeout):
-    server_version = connection.server_version
+def get_schema_parser(connection, server_version, timeout):
     if server_version.startswith('3'):
         return SchemaParserV3(connection, timeout)
     else:
