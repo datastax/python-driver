@@ -9,6 +9,7 @@ Features
 * Don't mark host down on timeout (PYTHON-286)
 * SSL hostname verification (PYTHON-296)
 * Add C* version to metadata or cluster objects (PYTHON-301)
+* Options to Disable Schema, Token Metadata Processing (PYTHON-327)
 * Expose listen_address of node we get ring information from (PYTHON-332)
 * Use A-record with multiple IPs for contact points (PYTHON-415)
 * Custom consistency level for populating query traces (PYTHON-435)
@@ -19,7 +20,6 @@ Features
 Bug Fixes
 ---------
 * Resolve contact point hostnames to avoid duplicate hosts (PYTHON-103)
-* Options to Disable Schema, Token Metadata Processing (PYTHON-327)
 * GeventConnection stalls requests when read is a multiple of the input buffer size (PYTHON-429)
 * named_tuple_factory breaks with duplicate "cleaned" col names (PYTHON-467)
 * Connection leak if Cluster.shutdown() happens during reconnection (PYTHON-482)
