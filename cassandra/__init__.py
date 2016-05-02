@@ -195,10 +195,16 @@ class UserAggregateDescriptor(SignatureDescriptor):
 
 
 class DriverException(Exception):
+    """
+    Base for all exceptions explicitly raised by the driver.
+    """
     pass
 
 
 class RequestExecutionException(DriverException):
+    """
+    Base for request execution exceptions returned from the server.
+    """
     pass
 
 
@@ -395,10 +401,16 @@ class FunctionFailure(RequestExecutionException):
 
 
 class RequestValidationException(DriverException):
+    """
+    Server request validation failed
+    """
     pass
 
 
 class ConfigurationException(RequestValidationException):
+    """
+    Server indicated request errro due to current configuration
+    """
     pass
 
 

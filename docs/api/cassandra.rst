@@ -22,6 +22,12 @@
    :members:
    :inherited-members:
 
+.. autoexception:: DriverException()
+   :members:
+
+.. autoexception:: RequestExecutionException()
+   :members:
+
 .. autoexception:: Unavailable()
    :members:
 
@@ -34,6 +40,9 @@
 .. autoexception:: WriteTimeout()
    :members:
 
+.. autoexception:: CoordinationFailure()
+   :members:
+
 .. autoexception:: ReadFailure()
    :members:
 
@@ -41,6 +50,12 @@
    :members:
 
 .. autoexception:: FunctionFailure()
+   :members:
+
+.. autoexception:: RequestValidationException()
+   :members:
+
+.. autoexception:: ConfigurationException()
    :members:
 
 .. autoexception:: AlreadyExists()
