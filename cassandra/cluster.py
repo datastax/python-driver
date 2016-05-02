@@ -1439,10 +1439,9 @@ class Cluster(object):
                 for ks_chunk in chunks:
                     messages = [PrepareMessage(query=s.query_string) for s in ks_chunk]
                     # TODO: make this timeout configurable somehow?
-                    responses = connection.wait_for_responses(*messages, timeout=5.0)
-                    for response in responses:
-                        if (not isinstance(response, ResultMessage) or
-                                response.kind != RESULT_KIND_PREPARED):
+                    responses = connection.wait_for_responses(*messages, timeout=5.0, fail_on_error=False)
+                    for success, response in responses:
+                        if not success:
                             log.debug("Got unexpected response when preparing "
                                       "statement on host %s: %r", host, response)
 
