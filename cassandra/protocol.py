@@ -134,12 +134,12 @@ class ErrorMessage(_MessageType, Exception):
         return subcls(code=code, message=msg, info=extra_info)
 
     def summary_msg(self):
-        msg = 'code=%04x [%s] message="%s"' \
+        msg = 'Error from server: code=%04x [%s] message="%s"' \
               % (self.code, self.summary, self.message)
         return msg
 
     def __str__(self):
-        return '<ErrorMessage %s>' % self.summary_msg()
+        return '<%s>' % self.summary_msg()
     __repr__ = __str__
 
     @staticmethod
@@ -544,6 +544,7 @@ class QueryMessage(_MessageType):
         if self.timestamp is not None:
             write_long(f, self.timestamp)
 
+
 CUSTOM_TYPE = object()
 
 RESULT_KIND_VOID = 0x0001
@@ -551,6 +552,7 @@ RESULT_KIND_ROWS = 0x0002
 RESULT_KIND_SET_KEYSPACE = 0x0003
 RESULT_KIND_PREPARED = 0x0004
 RESULT_KIND_SCHEMA_CHANGE = 0x0005
+
 
 class ResultMessage(_MessageType):
     opcode = 0x08

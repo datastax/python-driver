@@ -27,7 +27,6 @@ import socket
 import sys
 import time
 from threading import Lock, RLock, Thread, Event
-import warnings
 
 import six
 from six.moves import range
@@ -166,9 +165,23 @@ def run_in_executor(f):
     return new_f
 
 
-def _shutdown_cluster(cluster):
-    if cluster and not cluster.is_shutdown:
+_clusters_for_shutdown = set()
+
+
+def _register_cluster_shutdown(cluster):
+    _clusters_for_shutdown.add(cluster)
+
+
+def _discard_cluster_shutdown(cluster):
+    _clusters_for_shutdown.discard(cluster)
+
+
+def _shutdown_clusters():
+    clusters = _clusters_for_shutdown.copy()  # copy because shutdown modifies the global set "discard"
+    for cluster in clusters:
         cluster.shutdown()
+
+atexit.register(_shutdown_clusters)
 
 
 # murmur3 implementation required for TokenAware is only available for CPython
@@ -868,7 +881,9 @@ class Cluster(object):
         new_version = previous_version - 1
         if new_version < self.protocol_version:
             if new_version >= MIN_SUPPORTED_VERSION:
-                log.warning("Downgrading core protocol version from %d to %d for %s", self.protocol_version, new_version, host_addr)
+                log.warning("Downgrading core protocol version from %d to %d for %s. "
+                            "To avoid this, it is best practice to explicitly set Cluster(protocol_version) to the version supported by your cluster. "
+                            "http://datastax.github.io/python-driver/api/cassandra/cluster.html#cassandra.cluster.Cluster.protocol_version", self.protocol_version, new_version, host_addr)
                 self.protocol_version = new_version
             else:
                 raise DriverException("Cannot downgrade protocol version (%d) below minimum supported version: %d" % (new_version, MIN_SUPPORTED_VERSION))
@@ -887,7 +902,7 @@ class Cluster(object):
                 log.debug("Connecting to cluster, contact points: %s; protocol version: %s",
                           self.contact_points, self.protocol_version)
                 self.connection_class.initialize_reactor()
-                atexit.register(partial(_shutdown_cluster, self))
+                _register_cluster_shutdown(self)
                 for address in self.contact_points_resolved:
                     host, new = self.add_host(address, signal=False)
                     if new:
@@ -950,6 +965,8 @@ class Cluster(object):
             session.shutdown()
 
         self.executor.shutdown()
+
+        _discard_cluster_shutdown(self)
 
     def _new_session(self):
         session = Session(self, self.metadata.all_hosts())
@@ -1144,7 +1161,7 @@ class Cluster(object):
         if distance == HostDistance.IGNORED:
             log.debug("Not adding connection pool for new host %r because the "
                       "load balancing policy has marked it as IGNORED", host)
-            self._finalize_add(host)
+            self._finalize_add(host, set_up=False)
             return
 
         futures_lock = Lock()
@@ -1186,9 +1203,10 @@ class Cluster(object):
         if not have_future:
             self._finalize_add(host)
 
-    def _finalize_add(self, host):
-        # mark the host as up and notify all listeners
-        host.set_up()
+    def _finalize_add(self, host, set_up=True):
+        if set_up:
+            host.set_up()
+
         for listener in self.listeners:
             listener.on_add(host)
 
@@ -2356,6 +2374,9 @@ class ControlConnection(object):
             cluster_name = local_row["cluster_name"]
             self._cluster.metadata.cluster_name = cluster_name
 
+            partitioner = local_row.get("partitioner")
+            tokens = local_row.get("tokens")
+
             host = self._cluster.metadata.get_host(connection.host)
             if host:
                 datacenter = local_row.get("data_center")
@@ -2365,10 +2386,8 @@ class ControlConnection(object):
                 host.broadcast_address = local_row.get("broadcast_address")
                 host.release_version = local_row.get("release_version")
 
-            partitioner = local_row.get("partitioner")
-            tokens = local_row.get("tokens")
-            if partitioner and tokens:
-                token_map[host] = tokens
+                if partitioner and tokens:
+                    token_map[host] = tokens
 
         # Check metadata.partitioner to see if we haven't built anything yet. If
         # every node in the cluster was in the contact points, we won't discover
@@ -2550,13 +2569,14 @@ class ControlConnection(object):
             if local_row.get("schema_version"):
                 versions[local_row.get("schema_version")].add(local_address)
 
+        lbp = self._cluster.load_balancing_policy
         for row in peers_result:
             schema_ver = row.get('schema_version')
             if not schema_ver:
                 continue
             addr = self._rpc_from_peer_row(row)
             peer = self._cluster.metadata.get_host(addr)
-            if peer and peer.is_up:
+            if peer and peer.is_up and lbp.distance(peer) != HostDistance.IGNORED:
                 versions[schema_ver].add(addr)
 
         if len(versions) == 1:
@@ -2609,7 +2629,13 @@ class ControlConnection(object):
             self.refresh_node_list_and_token_map(force_token_rebuild=True)
 
     def on_remove(self, host):
-        self.refresh_node_list_and_token_map(force_token_rebuild=True)
+        c = self._connection
+        if c and c.host == host.address:
+            log.debug("[control connection] Control connection host (%s) is being removed. Reconnecting", host)
+            # refresh will be done on reconnect
+            self.reconnect()
+        else:
+            self.refresh_node_list_and_token_map(force_token_rebuild=True)
 
     def get_connections(self):
         c = getattr(self, '_connection', None)
@@ -2630,7 +2656,7 @@ def _stop_scheduler(scheduler, thread):
     thread.join()
 
 
-class _Scheduler(object):
+class _Scheduler(Thread):
 
     _queue = None
     _scheduled_tasks = None
@@ -2643,13 +2669,9 @@ class _Scheduler(object):
         self._count = count()
         self._executor = executor
 
-        t = Thread(target=self.run, name="Task Scheduler")
-        t.daemon = True
-        t.start()
-
-        # although this runs on a daemonized thread, we prefer to stop
-        # it gracefully to avoid random errors during interpreter shutdown
-        atexit.register(partial(_stop_scheduler, weakref.proxy(self), t))
+        Thread.__init__(self, name="Task Scheduler")
+        self.daemon = True
+        self.start()
 
     def shutdown(self):
         try:
@@ -2659,6 +2681,7 @@ class _Scheduler(object):
             pass
         self.is_shutdown = True
         self._queue.put_nowait((0, 0, None))
+        self.join()
 
     def schedule(self, delay, fn, *args, **kwargs):
         self._insert_task(delay, (fn, args, tuple(kwargs.items())))
@@ -2687,7 +2710,8 @@ class _Scheduler(object):
                 while True:
                     run_at, i, task = self._queue.get(block=True, timeout=None)
                     if self.is_shutdown:
-                        log.debug("Not executing scheduled task due to Scheduler shutdown")
+                        if task:
+                            log.debug("Not executing scheduled task due to Scheduler shutdown")
                         return
                     if run_at <= time.time():
                         self._scheduled_tasks.discard(task)
