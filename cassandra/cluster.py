@@ -500,6 +500,18 @@ class Cluster(object):
     See :attr:`.schema_event_refresh_window` for discussion of rationale
     """
 
+    status_event_refresh_window = 2
+    """
+    Window, in seconds, within which the driver will start the reconnect after
+    receiving a status_change event.
+
+    Setting this to zero will connect immediately.
+
+    This is primarily used to avoid 'thundering herd' in deployments with large fanout from cluster to clients.
+    When nodes come up, clients attempt to reprepare prepared statements (depending on :attr:`.reprepare_on_up`), and
+    establish connection pools. This can cause a rush of connections and queries if not mitigated with this factor.
+    """
+
     connect_timeout = 5
     """
     Timeout, in seconds, for creating new connections.
@@ -581,7 +593,8 @@ class Cluster(object):
                  connect_timeout=5,
                  schema_metadata_enabled=True,
                  token_metadata_enabled=True,
-                 address_translator=None):
+                 address_translator=None,
+                 status_event_refresh_window=2):
         """
         Any of the mutable Cluster attributes may be set as keyword arguments
         to the constructor.
@@ -642,6 +655,7 @@ class Cluster(object):
         self.idle_heartbeat_interval = idle_heartbeat_interval
         self.schema_event_refresh_window = schema_event_refresh_window
         self.topology_event_refresh_window = topology_event_refresh_window
+        self.status_event_refresh_window = status_event_refresh_window
         self.connect_timeout = connect_timeout
 
         self._listeners = set()
@@ -689,6 +703,7 @@ class Cluster(object):
         self.control_connection = ControlConnection(
             self, self.control_connection_timeout,
             self.schema_event_refresh_window, self.topology_event_refresh_window,
+            self.status_event_refresh_window,
             schema_metadata_enabled, token_metadata_enabled)
 
 
@@ -2105,6 +2120,7 @@ class ControlConnection(object):
 
     _schema_event_refresh_window = None
     _topology_event_refresh_window = None
+    _status_event_refresh_window = None
 
     _schema_meta_enabled = True
     _token_meta_enabled = True
@@ -2115,6 +2131,7 @@ class ControlConnection(object):
     def __init__(self, cluster, timeout,
                  schema_event_refresh_window,
                  topology_event_refresh_window,
+                 status_event_refresh_window,
                  schema_meta_enabled=True,
                  token_meta_enabled=True):
         # use a weak reference to allow the Cluster instance to be GC'ed (and
@@ -2125,6 +2142,7 @@ class ControlConnection(object):
 
         self._schema_event_refresh_window = schema_event_refresh_window
         self._topology_event_refresh_window = topology_event_refresh_window
+        self._status_event_refresh_window = status_event_refresh_window
         self._schema_meta_enabled = schema_meta_enabled
         self._token_meta_enabled = token_meta_enabled
 
@@ -2472,7 +2490,7 @@ class ControlConnection(object):
         addr = self._translate_address(event["address"][0])
         host = self._cluster.metadata.get_host(addr)
         if change_type == "UP":
-            delay = 1 + self._delay_for_event_type('status_change', 0.5)  # randomness to avoid thundering herd problem on events
+            delay = self._delay_for_event_type('status_change', self._status_event_refresh_window)
             if host is None:
                 # this is the first time we've seen the node
                 self._cluster.scheduler.schedule_unique(delay, self.refresh_node_list_and_token_map)
