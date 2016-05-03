@@ -99,6 +99,9 @@ class SchedulerTest(unittest.TestCase):
 
         PYTHON-473
         """
+        sched = _Scheduler(None)
+        sched.schedule(0, lambda: None)
+        sched.schedule(0, lambda: None)  # pre-473: "TypeError: unorderable types: function() < function()"t
 
 
 class SessionTest(unittest.TestCase):
