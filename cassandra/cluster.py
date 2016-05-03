@@ -494,8 +494,7 @@ class Cluster(object):
 
     Setting this to zero will execute refreshes immediately.
 
-    Setting this negative will disable node refreshes in response to push events
-    (refreshes will still occur in response to new nodes observed on "UP" events).
+    Setting this negative will disable node refreshes in response to push events.
 
     See :attr:`.schema_event_refresh_window` for discussion of rationale
     """
@@ -510,6 +509,24 @@ class Cluster(object):
     This is primarily used to avoid 'thundering herd' in deployments with large fanout from cluster to clients.
     When nodes come up, clients attempt to reprepare prepared statements (depending on :attr:`.reprepare_on_up`), and
     establish connection pools. This can cause a rush of connections and queries if not mitigated with this factor.
+    """
+
+    prepare_on_all_hosts = True
+    """
+    Specifies whether statements should be prepared on all hosts, or just one.
+
+    This can reasonably be disabled on long-running applications with numerous clients preparing statements on startup,
+    where a randomized initial condition of the load balancing policy can be expected to distribute prepares from
+    different clients across the cluster.
+    """
+
+    reprepare_on_up = True
+    """
+    Specifies whether all known prepared statements should be prepared on a node when it comes up.
+
+    May be used to avoid overwhelming a node on return, or if it is supposed that the node was only marked down due to
+    network. If statements are not reprepared, they are prepared on the first execution, causing
+    an extra roundtrip for one or more client requests.
     """
 
     connect_timeout = 5
@@ -594,7 +611,9 @@ class Cluster(object):
                  schema_metadata_enabled=True,
                  token_metadata_enabled=True,
                  address_translator=None,
-                 status_event_refresh_window=2):
+                 status_event_refresh_window=2,
+                 prepare_on_all_hosts=True,
+                 reprepare_on_up=True):
         """
         Any of the mutable Cluster attributes may be set as keyword arguments
         to the constructor.
@@ -657,6 +676,8 @@ class Cluster(object):
         self.topology_event_refresh_window = topology_event_refresh_window
         self.status_event_refresh_window = status_event_refresh_window
         self.connect_timeout = connect_timeout
+        self.prepare_on_all_hosts = prepare_on_all_hosts
+        self.reprepare_on_up = reprepare_on_up
 
         self._listeners = set()
         self._listener_lock = Lock()
@@ -1428,7 +1449,7 @@ class Cluster(object):
         self.token_metadata_enabled = enabled
 
     def _prepare_all_queries(self, host):
-        if not self._prepared_statements:
+        if not self._prepared_statements or not self.reprepare_on_up:
             return
 
         log.debug("Preparing all known prepared statements against host %s", host)
@@ -1829,11 +1850,12 @@ class Session(object):
 
         self.cluster.add_prepared(query_id, prepared_statement)
 
-        host = future._current_host
-        try:
-            self.prepare_on_all_hosts(prepared_statement.query_string, host)
-        except Exception:
-            log.exception("Error preparing query on all hosts:")
+        if self.cluster.prepare_on_all_hosts:
+            host = future._current_host
+            try:
+                self.prepare_on_all_hosts(prepared_statement.query_string, host)
+            except Exception:
+                log.exception("Error preparing query on all hosts:")
 
         return prepared_statement
 
