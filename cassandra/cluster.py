@@ -1456,11 +1456,6 @@ class Cluster(object):
         connection = None
         try:
             connection = self.connection_factory(host.address)
-            try:
-                self.control_connection.wait_for_schema_agreement(connection)
-            except Exception:
-                log.debug("Error waiting for schema agreement before preparing statements against host %s", host, exc_info=True)
-
             statements = self._prepared_statements.values()
             for keyspace, ks_statements in groupby(statements, lambda s: s.keyspace):
                 if keyspace is not None:
