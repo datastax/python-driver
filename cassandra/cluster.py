@@ -1471,11 +1471,9 @@ class Cluster(object):
             if connection:
                 connection.close()
 
-    def prepare_on_all_sessions(self, query_id, prepared_statement, excluded_host):
+    def add_prepared(self, query_id, prepared_statement):
         with self._prepared_statement_lock:
             self._prepared_statements[query_id] = prepared_statement
-        for session in self.sessions:
-            session.prepare_on_all_hosts(prepared_statement.query_string, excluded_host)
 
 
 class Session(object):
@@ -1829,9 +1827,11 @@ class Session(object):
             self._protocol_version)
         prepared_statement.custom_payload = future.custom_payload
 
+        self.cluster.add_prepared(query_id, prepared_statement)
+
         host = future._current_host
         try:
-            self.cluster.prepare_on_all_sessions(query_id, prepared_statement, host)
+            self.prepare_on_all_hosts(prepared_statement.query_string, host)
         except Exception:
             log.exception("Error preparing query on all hosts:")
 
