@@ -494,10 +494,39 @@ class Cluster(object):
 
     Setting this to zero will execute refreshes immediately.
 
-    Setting this negative will disable node refreshes in response to push events
-    (refreshes will still occur in response to new nodes observed on "UP" events).
+    Setting this negative will disable node refreshes in response to push events.
 
     See :attr:`.schema_event_refresh_window` for discussion of rationale
+    """
+
+    status_event_refresh_window = 2
+    """
+    Window, in seconds, within which the driver will start the reconnect after
+    receiving a status_change event.
+
+    Setting this to zero will connect immediately.
+
+    This is primarily used to avoid 'thundering herd' in deployments with large fanout from cluster to clients.
+    When nodes come up, clients attempt to reprepare prepared statements (depending on :attr:`.reprepare_on_up`), and
+    establish connection pools. This can cause a rush of connections and queries if not mitigated with this factor.
+    """
+
+    prepare_on_all_hosts = True
+    """
+    Specifies whether statements should be prepared on all hosts, or just one.
+
+    This can reasonably be disabled on long-running applications with numerous clients preparing statements on startup,
+    where a randomized initial condition of the load balancing policy can be expected to distribute prepares from
+    different clients across the cluster.
+    """
+
+    reprepare_on_up = True
+    """
+    Specifies whether all known prepared statements should be prepared on a node when it comes up.
+
+    May be used to avoid overwhelming a node on return, or if it is supposed that the node was only marked down due to
+    network. If statements are not reprepared, they are prepared on the first execution, causing
+    an extra roundtrip for one or more client requests.
     """
 
     connect_timeout = 5
@@ -581,7 +610,10 @@ class Cluster(object):
                  connect_timeout=5,
                  schema_metadata_enabled=True,
                  token_metadata_enabled=True,
-                 address_translator=None):
+                 address_translator=None,
+                 status_event_refresh_window=2,
+                 prepare_on_all_hosts=True,
+                 reprepare_on_up=True):
         """
         Any of the mutable Cluster attributes may be set as keyword arguments
         to the constructor.
@@ -642,7 +674,10 @@ class Cluster(object):
         self.idle_heartbeat_interval = idle_heartbeat_interval
         self.schema_event_refresh_window = schema_event_refresh_window
         self.topology_event_refresh_window = topology_event_refresh_window
+        self.status_event_refresh_window = status_event_refresh_window
         self.connect_timeout = connect_timeout
+        self.prepare_on_all_hosts = prepare_on_all_hosts
+        self.reprepare_on_up = reprepare_on_up
 
         self._listeners = set()
         self._listener_lock = Lock()
@@ -689,6 +724,7 @@ class Cluster(object):
         self.control_connection = ControlConnection(
             self, self.control_connection_timeout,
             self.schema_event_refresh_window, self.topology_event_refresh_window,
+            self.status_event_refresh_window,
             schema_metadata_enabled, token_metadata_enabled)
 
 
@@ -1414,18 +1450,13 @@ class Cluster(object):
         self.token_metadata_enabled = enabled
 
     def _prepare_all_queries(self, host):
-        if not self._prepared_statements:
+        if not self._prepared_statements or not self.reprepare_on_up:
             return
 
         log.debug("Preparing all known prepared statements against host %s", host)
         connection = None
         try:
             connection = self.connection_factory(host.address)
-            try:
-                self.control_connection.wait_for_schema_agreement(connection)
-            except Exception:
-                log.debug("Error waiting for schema agreement before preparing statements against host %s", host, exc_info=True)
-
             statements = self._prepared_statements.values()
             for keyspace, ks_statements in groupby(statements, lambda s: s.keyspace):
                 if keyspace is not None:
@@ -1440,10 +1471,9 @@ class Cluster(object):
                 for ks_chunk in chunks:
                     messages = [PrepareMessage(query=s.query_string) for s in ks_chunk]
                     # TODO: make this timeout configurable somehow?
-                    responses = connection.wait_for_responses(*messages, timeout=5.0)
-                    for response in responses:
-                        if (not isinstance(response, ResultMessage) or
-                                response.kind != RESULT_KIND_PREPARED):
+                    responses = connection.wait_for_responses(*messages, timeout=5.0, fail_on_error=False)
+                    for success, response in responses:
+                        if not success:
                             log.debug("Got unexpected response when preparing "
                                       "statement on host %s: %r", host, response)
 
@@ -1458,11 +1488,9 @@ class Cluster(object):
             if connection:
                 connection.close()
 
-    def prepare_on_all_sessions(self, query_id, prepared_statement, excluded_host):
+    def add_prepared(self, query_id, prepared_statement):
         with self._prepared_statement_lock:
             self._prepared_statements[query_id] = prepared_statement
-        for session in self.sessions:
-            session.prepare_on_all_hosts(prepared_statement.query_string, excluded_host)
 
 
 class Session(object):
@@ -1816,11 +1844,14 @@ class Session(object):
             self._protocol_version)
         prepared_statement.custom_payload = future.custom_payload
 
-        host = future._current_host
-        try:
-            self.cluster.prepare_on_all_sessions(query_id, prepared_statement, host)
-        except Exception:
-            log.exception("Error preparing query on all hosts:")
+        self.cluster.add_prepared(query_id, prepared_statement)
+
+        if self.cluster.prepare_on_all_hosts:
+            host = future._current_host
+            try:
+                self.prepare_on_all_hosts(prepared_statement.query_string, host)
+            except Exception:
+                log.exception("Error preparing query on all hosts:")
 
         return prepared_statement
 
@@ -2107,6 +2138,7 @@ class ControlConnection(object):
 
     _schema_event_refresh_window = None
     _topology_event_refresh_window = None
+    _status_event_refresh_window = None
 
     _schema_meta_enabled = True
     _token_meta_enabled = True
@@ -2117,6 +2149,7 @@ class ControlConnection(object):
     def __init__(self, cluster, timeout,
                  schema_event_refresh_window,
                  topology_event_refresh_window,
+                 status_event_refresh_window,
                  schema_meta_enabled=True,
                  token_meta_enabled=True):
         # use a weak reference to allow the Cluster instance to be GC'ed (and
@@ -2127,6 +2160,7 @@ class ControlConnection(object):
 
         self._schema_event_refresh_window = schema_event_refresh_window
         self._topology_event_refresh_window = topology_event_refresh_window
+        self._status_event_refresh_window = status_event_refresh_window
         self._schema_meta_enabled = schema_meta_enabled
         self._token_meta_enabled = token_meta_enabled
 
@@ -2474,7 +2508,7 @@ class ControlConnection(object):
         addr = self._translate_address(event["address"][0])
         host = self._cluster.metadata.get_host(addr)
         if change_type == "UP":
-            delay = 1 + self._delay_for_event_type('status_change', 0.5)  # randomness to avoid thundering herd problem on events
+            delay = self._delay_for_event_type('status_change', self._status_event_refresh_window)
             if host is None:
                 # this is the first time we've seen the node
                 self._cluster.scheduler.schedule_unique(delay, self.refresh_node_list_and_token_map)

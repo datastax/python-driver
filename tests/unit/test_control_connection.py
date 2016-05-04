@@ -131,7 +131,7 @@ class ControlConnectionTest(unittest.TestCase):
         self.connection = MockConnection()
         self.time = FakeTime()
 
-        self.control_connection = ControlConnection(self.cluster, 1, 0, 0)
+        self.control_connection = ControlConnection(self.cluster, 1, 0, 0, 0)
         self.control_connection._connection = self.connection
         self.control_connection._time = self.time
 
@@ -441,7 +441,7 @@ class ControlConnectionTest(unittest.TestCase):
             'address': ('1.2.3.4', 9000)
         }
 
-        cc_no_schema_refresh = ControlConnection(cluster, 1, -1, 0)
+        cc_no_schema_refresh = ControlConnection(cluster, 1, -1, 0, 0)
         cluster.scheduler.reset_mock()
 
         # no call on schema refresh
@@ -455,7 +455,7 @@ class ControlConnectionTest(unittest.TestCase):
         cluster.scheduler.schedule_unique.assert_has_calls([call(ANY, cc_no_schema_refresh.refresh_node_list_and_token_map),
                                                             call(ANY, cc_no_schema_refresh.refresh_node_list_and_token_map)])
 
-        cc_no_topo_refresh = ControlConnection(cluster, 1, 0, -1)
+        cc_no_topo_refresh = ControlConnection(cluster, 1, 0, -1, 0)
         cluster.scheduler.reset_mock()
 
         # no call on topo refresh
@@ -482,7 +482,7 @@ class EventTimingTest(unittest.TestCase):
         self.time = FakeTime()
 
         # Use 2 for the schema_event_refresh_window which is what we would normally default to.
-        self.control_connection = ControlConnection(self.cluster, 1, 2, 0)
+        self.control_connection = ControlConnection(self.cluster, 1, 2, 0, 0)
         self.control_connection._connection = self.connection
         self.control_connection._time = self.time
 
