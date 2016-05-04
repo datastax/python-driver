@@ -72,7 +72,7 @@ COLUMN_VALUES = {
 def setup(options):
     log.info("Using 'cassandra' package from %s", cassandra.__path__)
 
-    cluster = Cluster(hosts, schema_metadata_enabled=False, token_metadata_enabled=False)
+    cluster = Cluster(options.hosts, schema_metadata_enabled=False, token_metadata_enabled=False)
     try:
         session = cluster.connect()
 
@@ -107,8 +107,8 @@ def setup(options):
         cluster.shutdown()
 
 
-def teardown(hosts):
-    cluster = Cluster(hosts, schema_metadata_enabled=False, token_metadata_enabled=False)
+def teardown(options):
+    cluster = Cluster(options.hosts, schema_metadata_enabled=False, token_metadata_enabled=False)
     session = cluster.connect()
     if not options.keep_data:
         session.execute("DROP KEYSPACE " + options.keyspace)
