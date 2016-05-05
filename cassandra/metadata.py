@@ -1218,14 +1218,8 @@ class TableMetadata(object):
         return list(sorted(ret))
 
 
-if six.PY3:
-    def protect_name(name):
-        return maybe_escape_name(name)
-else:
-    def protect_name(name):  # NOQA
-        if isinstance(name, six.text_type):
-            name = name.encode('utf8')
-        return maybe_escape_name(name)
+def protect_name(name):
+    return maybe_escape_name(name)
 
 
 def protect_names(names):
@@ -2465,6 +2459,7 @@ def get_schema_parser(connection, server_version, timeout):
         # we could further specialize by version. Right now just refactoring the
         # multi-version parser we have as of C* 2.2.0rc1.
         return SchemaParserV22(connection, timeout)
+
 
 def _cql_from_cass_type(cass_type):
     """
