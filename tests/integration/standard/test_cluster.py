@@ -669,3 +669,50 @@ class TestAddressTranslation(unittest.TestCase):
         c.connect()
         for host in c.metadata.all_hosts():
             self.assertEqual(adder_map.get(str(host)), host.broadcast_address)
+
+class ContextManagementTest(unittest.TestCase):
+
+    load_balancing_policy = WhiteListRoundRobinPolicy(['127.0.0.1'])
+    cluster_kwargs = {'load_balancing_policy': load_balancing_policy,
+                      'schema_metadata_enabled': False,
+                      'token_metadata_enabled': False}
+
+    def test_no_connect(self):
+        with Cluster() as cluster:
+            self.assertFalse(cluster.is_shutdown)
+        self.assertTrue(cluster.is_shutdown)
+
+    def test_simple_nested(self):
+        with Cluster(**self.cluster_kwargs) as cluster:
+            with cluster.connect() as session:
+                self.assertFalse(cluster.is_shutdown)
+                self.assertFalse(session.is_shutdown)
+                self.assertTrue(session.execute('select release_version from system.local')[0])
+            self.assertTrue(session.is_shutdown)
+        self.assertTrue(cluster.is_shutdown)
+
+    def test_cluster_no_session(self):
+        with Cluster(**self.cluster_kwargs) as cluster:
+            session = cluster.connect()
+            self.assertFalse(cluster.is_shutdown)
+            self.assertFalse(session.is_shutdown)
+            self.assertTrue(session.execute('select release_version from system.local')[0])
+        self.assertTrue(session.is_shutdown)
+        self.assertTrue(cluster.is_shutdown)
+
+    def test_session_no_cluster(self):
+        cluster = Cluster(**self.cluster_kwargs)
+        unmanaged_session = cluster.connect()
+        with cluster.connect() as session:
+            self.assertFalse(cluster.is_shutdown)
+            self.assertFalse(session.is_shutdown)
+            self.assertFalse(unmanaged_session.is_shutdown)
+            self.assertTrue(session.execute('select release_version from system.local')[0])
+        self.assertTrue(session.is_shutdown)
+        self.assertFalse(cluster.is_shutdown)
+        self.assertFalse(unmanaged_session.is_shutdown)
+        unmanaged_session.shutdown()
+        self.assertTrue(unmanaged_session.is_shutdown)
+        self.assertFalse(cluster.is_shutdown)
+        cluster.shutdown()
+        self.assertTrue(cluster.is_shutdown)
