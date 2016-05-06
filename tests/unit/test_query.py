@@ -57,3 +57,12 @@ class BatchStatementTest(unittest.TestCase):
         self.assertFalse(batch.custom_payload)
 
         batch.add('something')
+
+    def test_add_all(self):
+        batch = BatchStatement()
+        statements = ['%s'] * 10
+        parameters = [(i,) for i in range(10)]
+        batch.add_all(statements, parameters)
+        bound_statements = [t[1] for t in batch._statements_and_parameters]
+        str_parameters = [str(i) for i in range(10)]
+        self.assertEqual(bound_statements, str_parameters)
