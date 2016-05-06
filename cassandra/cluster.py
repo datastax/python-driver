@@ -2402,7 +2402,9 @@ class ControlConnection(object):
         partitioner = None
         token_map = {}
 
+        found_hosts = set()
         if local_result.results:
+            found_hosts.add(connection.host)
             local_rows = dict_factory(*(local_result.results))
             local_row = local_rows[0]
             cluster_name = local_row["cluster_name"]
@@ -2427,13 +2429,15 @@ class ControlConnection(object):
         # every node in the cluster was in the contact points, we won't discover
         # any new nodes, so we need this additional check.  (See PYTHON-90)
         should_rebuild_token_map = force_token_rebuild or self._cluster.metadata.partitioner is None
-        found_hosts = set()
         for row in peers_result:
             addr = self._rpc_from_peer_row(row)
 
             tokens = row.get("tokens", None)
             if 'tokens' in row and not tokens:  # it was selected, but empty
                 log.warning("Excluding host (%s) with no tokens in system.peers table of %s." % (addr, connection.host))
+                continue
+            if addr in found_hosts:
+                log.warning("Found multiple hosts with the same rpc_address (%s). Excluding peer %s", addr, row.get("peer"))
                 continue
 
             found_hosts.add(addr)
