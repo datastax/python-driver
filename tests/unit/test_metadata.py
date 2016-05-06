@@ -28,7 +28,7 @@ from cassandra.metadata import (Murmur3Token, MD5Token,
                                 LocalStrategy, protect_name,
                                 protect_names, protect_value, is_valid_name,
                                 UserType, KeyspaceMetadata, get_schema_parser,
-                                _UnknownStrategy)
+                                _UnknownStrategy, ColumnMetadata, TableMetadata, IndexMetadata, Function, Aggregate)
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
@@ -392,3 +392,68 @@ class IndexTest(unittest.TestCase):
         index_meta = parser._build_index_metadata(column_meta, row)
         self.assertEqual(index_meta.as_cql_query(),
                 "CREATE CUSTOM INDEX index_name_here ON keyspace_name_here.table_name_here (column_name_here) USING 'class_name_here'")
+
+
+class UnicodeIdentifiersTests(unittest.TestCase):
+    """
+    Exercise cql generation with unicode characters. Keyspace, Table, and Index names
+    cannot have special chars because C* names files by those identifiers, but they are
+    tested anyway.
+
+    Looking for encoding errors like PYTHON-447
+    """
+
+    name = six.text_type(b'\'_-()"\xc2\xac'.decode('utf-8'))
+
+    def test_keyspace_name(self):
+        km = KeyspaceMetadata(self.name, False, 'SimpleStrategy', {'replication_factor': 1})
+        print(km.export_as_string())
+
+    def test_table_name(self):
+        tm = TableMetadata(self.name, self.name)
+        print(tm.export_as_string())
+
+    def test_column_name_single_partition(self):
+        tm = TableMetadata('ks', 'table')
+        cm = ColumnMetadata(tm, self.name, u'int')
+        tm.columns[cm.name] = cm
+        tm.partition_key.append(cm)
+        print(tm.export_as_string())
+
+    def test_column_name_single_partition_single_clustering(self):
+        tm = TableMetadata('ks', 'table')
+        cm = ColumnMetadata(tm, self.name, u'int')
+        tm.columns[cm.name] = cm
+        tm.partition_key.append(cm)
+        cm = ColumnMetadata(tm, self.name + 'x', u'int')
+        tm.columns[cm.name] = cm
+        tm.clustering_key.append(cm)
+        print(tm.export_as_string())
+
+    def test_column_name_multiple_partition(self):
+        tm = TableMetadata('ks', 'table')
+        cm = ColumnMetadata(tm, self.name, u'int')
+        tm.columns[cm.name] = cm
+        tm.partition_key.append(cm)
+        cm = ColumnMetadata(tm, self.name + 'x', u'int')
+        tm.columns[cm.name] = cm
+        tm.partition_key.append(cm)
+        print(tm.export_as_string())
+
+    def test_index(self):
+        im = IndexMetadata(self.name, self.name, self.name, kind='', index_options={'target': self.name})
+        print(im.export_as_string())
+        im = IndexMetadata(self.name, self.name, self.name, kind='CUSTOM', index_options={'target': self.name, 'class_name': 'Class'})
+        print(im.export_as_string())
+
+    def test_function(self):
+        fm = Function(self.name, self.name, (u'int', u'int'), (u'x', u'y'), u'int', u'language', self.name, False)
+        print(fm.export_as_string())
+
+    def test_aggregate(self):
+        am = Aggregate(self.name, self.name, (u'text',), self.name, u'text', self.name, self.name, u'text')
+        print(am.export_as_string())
+
+    def test_user_type(self):
+        um = UserType(self.name, self.name, [self.name, self.name], [u'int', u'text'])
+        print(um.export_as_string())

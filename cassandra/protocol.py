@@ -136,6 +136,8 @@ class ErrorMessage(_MessageType, Exception):
     def summary_msg(self):
         msg = 'Error from server: code=%04x [%s] message="%s"' \
               % (self.code, self.summary, self.message)
+        if six.PY2 and isinstance(msg, six.text_type):
+            msg = msg.encode('utf-8')
         return msg
 
     def __str__(self):
