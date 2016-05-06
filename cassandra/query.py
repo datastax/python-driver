@@ -699,6 +699,19 @@ class BatchStatement(Statement):
         Statement.__init__(self, retry_policy=retry_policy, consistency_level=consistency_level,
                            serial_consistency_level=serial_consistency_level, custom_payload=custom_payload)
 
+    def clear(self):
+        """
+        This is a convenience method to clear a batch statement for reuse.
+
+        *Note:* it should not be used concurrently with uncompleted execution futures executing the same
+        ``BatchStatement``.
+        """
+        del self._statements_and_parameters[:]
+        self.keyspace = None
+        self.routing_key = None
+        if self.custom_payload:
+            self.custom_payload.clear()
+
     def add(self, statement, parameters=None):
         """
         Adds a :class:`.Statement` and optional sequence of parameters
