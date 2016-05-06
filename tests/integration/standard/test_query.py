@@ -471,11 +471,6 @@ class BatchStatementTests(BasicSharedKeyspaceUnitTestCase):
         self.session.execute(batch)
         self.confirm_results()
 
-    def test_no_parameters_many_times(self):
-        for i in range(1000):
-            self.test_no_parameters()
-            self.session.execute("TRUNCATE test3rf.test")
-
     def test_unicode(self):
         ddl = '''
             CREATE TABLE test3rf.testtext (
