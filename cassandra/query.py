@@ -737,11 +737,11 @@ class BatchStatement(Statement):
     def add_all(self, statements, parameters):
         """
         Adds a sequence of :class:`.Statement` objects and a matching sequence
-        of parameters to the batch.  :const:`None` can be used in place of
-        parameters when no parameters are needed.
+        of parameters to the batch. Statement and parameter sequences must be of equal length or
+        one will be truncated. :const:`None` can be used in the parameters position where are needed.
         """
         for statement, value in zip(statements, parameters):
-            self.add(statement, parameters)
+            self.add(statement, value)
 
     def _add_statement_and_params(self, is_prepared, statement, parameters):
         if len(self._statements_and_parameters) >= 0xFFFF:
