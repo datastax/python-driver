@@ -801,6 +801,10 @@ class Cluster(object):
             raise UnsupportedOperation(
                 "Cluster.set_min_requests_per_connection() only has an effect "
                 "when using protocol_version 1 or 2.")
+        if min_requests < 0 or min_requests > 126 or \
+           min_requests >= self._max_requests_per_connection[host_distance]:
+            raise ValueError("min_requests must be in the range [0, 127) and less than the max_requests for this host_distance (%d)" %
+                             (self._min_requests_per_connection[host_distance],))
         self._min_requests_per_connection[host_distance] = min_requests
 
     def get_max_requests_per_connection(self, host_distance):
@@ -818,6 +822,10 @@ class Cluster(object):
             raise UnsupportedOperation(
                 "Cluster.set_max_requests_per_connection() only has an effect "
                 "when using protocol_version 1 or 2.")
+        if max_requests < 1 or max_requests > 127 or \
+           max_requests <= self._min_requests_per_connection[host_distance]:
+            raise ValueError("max_requests must be in the range (0, 127] and greater than the min_requests for this host_distance (%d)" %
+                             (self._min_requests_per_connection[host_distance],))
         self._max_requests_per_connection[host_distance] = max_requests
 
     def get_core_connections_per_host(self, host_distance):

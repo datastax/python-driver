@@ -19,9 +19,11 @@ except ImportError:
 
 from mock import patch, Mock
 
+
 from cassandra import ConsistencyLevel, DriverException, Timeout, Unavailable, RequestExecutionException, ReadTimeout, WriteTimeout, CoordinationFailure, ReadFailure, WriteFailure, FunctionFailure, AlreadyExists,\
     InvalidRequest, Unauthorized, AuthenticationFailed, OperationTimedOut, UnsupportedOperation, RequestValidationException, ConfigurationException
 from cassandra.cluster import _Scheduler, Session, Cluster
+from cassandra.policies import HostDistance
 from cassandra.query import SimpleStatement
 
 
@@ -79,13 +81,27 @@ class ExceptionTypeTest(unittest.TestCase):
         self.assertTrue(issubclass(UnsupportedOperation, DriverException))
 
 
-class ContactListTest(unittest.TestCase):
+class ClusterTest(unittest.TestCase):
 
-    def test_invalid_types(self, *args):
+    def test_invalid_contact_point_types(self):
         with self.assertRaises(ValueError):
             Cluster(contact_points=[None], protocol_version=4, connect_timeout=1)
         with self.assertRaises(TypeError):
             Cluster(contact_points="not a sequence", protocol_version=4, connect_timeout=1)
+
+    def test_requests_in_flight_threshold(self):
+        d = HostDistance.LOCAL
+        mn = 3
+        mx = 5
+        c = Cluster(protocol_version=2)
+        c.set_min_requests_per_connection(d, mn)
+        c.set_max_requests_per_connection(d, mx)
+        # min underflow, max, overflow
+        for n in (-1, mx, 127):
+            self.assertRaises(ValueError, c.set_min_requests_per_connection, d, n)
+        # max underflow, under min, overflow
+        for n in (0, mn, 128):
+            self.assertRaises(ValueError, c.set_max_requests_per_connection, d, n)
 
 
 class SchedulerTest(unittest.TestCase):
@@ -93,19 +109,22 @@ class SchedulerTest(unittest.TestCase):
 
     @patch('time.time', return_value=3)  # always queue at same time
     @patch('cassandra.cluster._Scheduler.run')  # don't actually run the thread
-    def test_event_delay_timing(self, *args):
+    def test_event_delay_timing(self, *_):
         """
         Schedule something with a time collision to make sure the heap comparison works
 
         PYTHON-473
         """
+        sched = _Scheduler(None)
+        sched.schedule(0, lambda: None)
+        sched.schedule(0, lambda: None)  # pre-473: "TypeError: unorderable types: function() < function()"t
 
 
 class SessionTest(unittest.TestCase):
     # TODO: this suite could be expanded; for now just adding a test covering a PR
 
     @patch('cassandra.cluster.ResponseFuture._make_query_plan')
-    def test_default_serial_consistency_level(self, *args):
+    def test_default_serial_consistency_level(self, *_):
         """
         Make sure default_serial_consistency_level passes through to a query message.
         Also make sure Statement.serial_consistency_level overrides the default.
