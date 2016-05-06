@@ -711,21 +711,19 @@ class BatchStatement(Statement):
             if parameters:
                 encoder = Encoder() if self._session is None else self._session.encoder
                 statement = bind_params(statement, parameters, encoder)
-            self._statements_and_parameters.append((False, statement, ()))
+            self._add_statement_and_params(False, statement, ())
         elif isinstance(statement, PreparedStatement):
             query_id = statement.query_id
             bound_statement = statement.bind(() if parameters is None else parameters)
             self._update_state(bound_statement)
-            self._statements_and_parameters.append(
-                (True, query_id, bound_statement.values))
+            self._add_statement_and_params(True, query_id, bound_statement.values)
         elif isinstance(statement, BoundStatement):
             if parameters:
                 raise ValueError(
                     "Parameters cannot be passed with a BoundStatement "
                     "to BatchStatement.add()")
             self._update_state(statement)
-            self._statements_and_parameters.append(
-                (True, statement.prepared_statement.query_id, statement.values))
+            self._add_statement_and_params(True, statement.prepared_statement.query_id, statement.values)
         else:
             # it must be a SimpleStatement
             query_string = statement.query_string
@@ -733,7 +731,7 @@ class BatchStatement(Statement):
                 encoder = Encoder() if self._session is None else self._session.encoder
                 query_string = bind_params(query_string, parameters, encoder)
             self._update_state(statement)
-            self._statements_and_parameters.append((False, query_string, ()))
+            self._add_statement_and_params(False, query_string, ())
         return self
 
     def add_all(self, statements, parameters):
@@ -744,6 +742,11 @@ class BatchStatement(Statement):
         """
         for statement, value in zip(statements, parameters):
             self.add(statement, parameters)
+
+    def _add_statement_and_params(self, is_prepared, statement, parameters):
+        if len(self._statements_and_parameters) >= 0xFFFF:
+            raise ValueError("Batch statement cannot contain more than %d statements." % 0xFFFF)
+        self._statements_and_parameters.append((is_prepared, statement, parameters))
 
     def _maybe_set_routing_attributes(self, statement):
         if self.routing_key is None:
