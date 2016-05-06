@@ -30,7 +30,6 @@ sys.path.append(os.path.join(dirname, '..'))
 import cassandra
 from cassandra.cluster import Cluster
 from cassandra.io.asyncorereactor import AsyncoreConnection
-from cassandra.policies import HostDistance
 
 log = logging.getLogger()
 handler = logging.StreamHandler()
@@ -38,6 +37,16 @@ handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(
 log.addHandler(handler)
 
 logging.getLogger('cassandra').setLevel(logging.WARN)
+
+_log_levels = {
+    'CRITICAL': logging.CRITICAL,
+    'ERROR': logging.ERROR,
+    'WARN': logging.WARNING,
+    'WARNING': logging.WARNING,
+    'INFO': logging.INFO,
+    'DEBUG': logging.DEBUG,
+    'NOTSET': logging.NOTSET,
+}
 
 have_libev = False
 supported_reactors = [AsyncoreConnection]
@@ -72,7 +81,7 @@ COLUMN_VALUES = {
 def setup(options):
     log.info("Using 'cassandra' package from %s", cassandra.__path__)
 
-    cluster = Cluster(hosts, schema_metadata_enabled=False, token_metadata_enabled=False)
+    cluster = Cluster(options.hosts, schema_metadata_enabled=False, token_metadata_enabled=False)
     try:
         session = cluster.connect()
 
@@ -91,11 +100,11 @@ def setup(options):
 
         log.debug("Creating table...")
         create_table_query = """
-            CREATE TABLE {} (
+            CREATE TABLE {0} (
                 thekey text,
         """
         for i in range(options.num_columns):
-            create_table_query += "col{} {},\n".format(i, options.column_type)
+            create_table_query += "col{0} {1},\n".format(i, options.column_type)
         create_table_query += "PRIMARY KEY (thekey))"
 
         try:
@@ -107,8 +116,8 @@ def setup(options):
         cluster.shutdown()
 
 
-def teardown(hosts):
-    cluster = Cluster(hosts, schema_metadata_enabled=False, token_metadata_enabled=False)
+def teardown(options):
+    cluster = Cluster(options.hosts, schema_metadata_enabled=False, token_metadata_enabled=False)
     session = cluster.connect()
     if not options.keep_data:
         session.execute("DROP KEYSPACE " + options.keyspace)
@@ -134,22 +143,22 @@ def benchmark(thread_class):
 
         # Generate the query
         if options.read:
-            query = "SELECT * FROM {}  WHERE thekey = '{{key}}'".format(TABLE)
+            query = "SELECT * FROM {0}  WHERE thekey = '{{key}}'".format(TABLE)
         else:
-            query = "INSERT INTO {} (thekey".format(TABLE)
+            query = "INSERT INTO {0} (thekey".format(TABLE)
             for i in range(options.num_columns):
-                query += ", col{}".format(i)
+                query += ", col{0}".format(i)
 
             query += ") VALUES ('{key}'"
             for i in range(options.num_columns):
-                query += ", {}".format(COLUMN_VALUES[options.column_type])
+                query += ", {0}".format(COLUMN_VALUES[options.column_type])
             query += ")"
 
         values = None  # we don't use that anymore. Keeping it in case we go back to prepared statements.
         per_thread = options.num_ops // options.threads
         threads = []
 
-        log.debug("Beginning {}...".format('reads' if options.read else 'inserts'))
+        log.debug("Beginning {0}...".format('reads' if options.read else 'inserts'))
         start = time.time()
         try:
             for i in range(options.threads):
@@ -235,7 +244,11 @@ def parse_options():
 
     options.hosts = options.hosts.split(',')
 
-    log.setLevel(options.log_level.upper())
+    level = options.log_level.upper()
+    try:
+        log.setLevel(_log_levels[level])
+    except KeyError:
+        log.warn("Unknown log level specified: %s; specify one of %s", options.log_level, _log_levels.keys())
 
     if options.asyncore_only:
         options.supported_reactors = [AsyncoreConnection]

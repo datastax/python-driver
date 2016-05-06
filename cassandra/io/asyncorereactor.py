@@ -102,7 +102,7 @@ class _AsyncorePipeDispatcher(_AsyncoreDispatcher):
     def notify_loop(self):
         if not self._notified:
             self._notified = True
-            os.write(self.write_fd, 'x')
+            os.write(self.write_fd, b'x')
 
 
 class _AsyncoreUDPDispatcher(_AsyncoreDispatcher):
