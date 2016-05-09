@@ -221,6 +221,8 @@ class Statement(object):
     def __init__(self, retry_policy=None, consistency_level=None, routing_key=None,
                  serial_consistency_level=None, fetch_size=FETCH_SIZE_UNSET, keyspace=None,
                  custom_payload=None):
+        if retry_policy and not hasattr(retry_policy, 'on_read_timeout'):  # just checking one method to detect positional parameter errors
+            raise ValueError('retry_policy should implement cassandra.policies.RetryPolicy')
         self.retry_policy = retry_policy
         if consistency_level is not None:
             self.consistency_level = consistency_level
