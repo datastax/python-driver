@@ -325,15 +325,18 @@ class SimpleStatement(Statement):
     A simple, un-prepared query.
     """
 
-    def __init__(self, query_string, *args, **kwargs):
+    def __init__(self, query_string, retry_policy=None, consistency_level=None, routing_key=None,
+                 serial_consistency_level=None, fetch_size=FETCH_SIZE_UNSET, keyspace=None,
+                 custom_payload=None):
         """
         `query_string` should be a literal CQL statement with the exception
         of parameter placeholders that will be filled through the
         `parameters` argument of :meth:`.Session.execute()`.
 
-        All arguments to :class:`Statement` apply to this class as well
+        See :class:`Statement` attributes for a description of the other parameters.
         """
-        Statement.__init__(self, *args, **kwargs)
+        Statement.__init__(self, retry_policy, consistency_level, routing_key,
+                           serial_consistency_level, fetch_size, keyspace, custom_payload)
         self._query_string = query_string
 
     @property
@@ -449,11 +452,13 @@ class BoundStatement(Statement):
     The sequence of values that were bound to the prepared statement.
     """
 
-    def __init__(self, prepared_statement, *args, **kwargs):
+    def __init__(self, prepared_statement, retry_policy=None, consistency_level=None, routing_key=None,
+                 serial_consistency_level=None, fetch_size=FETCH_SIZE_UNSET, keyspace=None,
+                 custom_payload=None):
         """
         `prepared_statement` should be an instance of :class:`PreparedStatement`.
 
-        All arguments to :class:`Statement` apply to this class as well
+        See :class:`Statement` attributes for a description of the other parameters.
         """
         self.prepared_statement = prepared_statement
 
@@ -467,7 +472,8 @@ class BoundStatement(Statement):
         if meta:
             self.keyspace = meta[0].keyspace_name
 
-        Statement.__init__(self, *args, **kwargs)
+        Statement.__init__(self, retry_policy, consistency_level, routing_key,
+                           serial_consistency_level, fetch_size, keyspace, custom_payload)
 
     def bind(self, values):
         """
