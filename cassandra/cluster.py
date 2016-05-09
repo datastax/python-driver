@@ -727,7 +727,6 @@ class Cluster(object):
             self.status_event_refresh_window,
             schema_metadata_enabled, token_metadata_enabled)
 
-
     def register_user_type(self, keyspace, user_type, klass):
         """
         Registers a class to use to represent a particular user-defined type.
@@ -803,7 +802,7 @@ class Cluster(object):
                 "when using protocol_version 1 or 2.")
         if min_requests < 0 or min_requests > 126 or \
            min_requests >= self._max_requests_per_connection[host_distance]:
-            raise ValueError("min_requests must be in the range [0, 127) and less than the max_requests for this host_distance (%d)" %
+            raise ValueError("min_requests must be 0-126 and less than the max_requests for this host_distance (%d)" %
                              (self._min_requests_per_connection[host_distance],))
         self._min_requests_per_connection[host_distance] = min_requests
 
@@ -824,7 +823,7 @@ class Cluster(object):
                 "when using protocol_version 1 or 2.")
         if max_requests < 1 or max_requests > 127 or \
            max_requests <= self._min_requests_per_connection[host_distance]:
-            raise ValueError("max_requests must be in the range (0, 127] and greater than the min_requests for this host_distance (%d)" %
+            raise ValueError("max_requests must be 1-127 and greater than the min_requests for this host_distance (%d)" %
                              (self._min_requests_per_connection[host_distance],))
         self._max_requests_per_connection[host_distance] = max_requests
 
@@ -3162,7 +3161,7 @@ class ResponseFuture(object):
                 retry_type, consistency = retry
                 if retry_type in (RetryPolicy.RETRY, RetryPolicy.RETRY_NEXT_HOST):
                     self._query_retries += 1
-                    reuse = retry_type  == RetryPolicy.RETRY
+                    reuse = retry_type == RetryPolicy.RETRY
                     self._retry(reuse_connection=reuse, consistency_level=consistency)
                 elif retry_type is RetryPolicy.RETHROW:
                     self._set_final_exception(response.to_exception())
@@ -3622,4 +3621,3 @@ class ResultSet(object):
             return row[0]
         else:
             return row['[applied]']
-
