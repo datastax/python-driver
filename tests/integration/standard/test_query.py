@@ -471,11 +471,6 @@ class BatchStatementTests(BasicSharedKeyspaceUnitTestCase):
         self.session.execute(batch)
         self.confirm_results()
 
-    def test_no_parameters_many_times(self):
-        for i in range(1000):
-            self.test_no_parameters()
-            self.session.execute("TRUNCATE test3rf.test")
-
     def test_unicode(self):
         ddl = '''
             CREATE TABLE test3rf.testtext (
@@ -490,6 +485,22 @@ class BatchStatementTests(BasicSharedKeyspaceUnitTestCase):
             self.session.execute(batch)
         finally:
             self.session.execute("DROP TABLE test3rf.testtext")
+
+    def test_too_many_statements(self):
+        max_statements = 0xFFFF
+        ss = SimpleStatement("INSERT INTO test3rf.test (k, v) VALUES (0, 0)")
+        b = BatchStatement(batch_type=BatchType.UNLOGGED, consistency_level=ConsistencyLevel.ONE)
+
+        # max works
+        b.add_all([ss] * max_statements, [None] * max_statements)
+        self.session.execute(b)
+
+        # max + 1 raises
+        self.assertRaises(ValueError, b.add, ss)
+
+        # also would have bombed trying to encode
+        b._statements_and_parameters.append((False, ss.query_string, ()))
+        self.assertRaises(NoHostAvailable, self.session.execute, b)
 
 
 class SerialConsistencyTests(unittest.TestCase):
