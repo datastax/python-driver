@@ -1012,6 +1012,12 @@ class Cluster(object):
 
         _discard_cluster_shutdown(self)
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.shutdown()
+
     def _new_session(self):
         session = Session(self, self.metadata.all_hosts())
         self._session_register_user_types(session)
@@ -1909,6 +1915,12 @@ class Session(object):
 
         for pool in self._pools.values():
             pool.shutdown()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.shutdown()
 
     def add_or_renew_pool(self, host, is_host_addition):
         """
