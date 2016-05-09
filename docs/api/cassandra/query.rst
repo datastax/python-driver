@@ -11,9 +11,6 @@
 
 .. autofunction:: ordered_dict_factory
 
-.. autoclass:: Statement
-   :members:
-
 .. autoclass:: SimpleStatement
    :members:
 
@@ -21,6 +18,9 @@
    :members:
 
 .. autoclass:: BoundStatement
+   :members:
+
+.. autoclass:: Statement ()
    :members:
 
 .. autodata:: UNSET_VALUE
