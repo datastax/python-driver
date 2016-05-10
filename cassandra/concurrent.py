@@ -13,6 +13,7 @@
 # limitations under the License.
 
 
+from collections import namedtuple
 from heapq import heappush, heappop
 from itertools import cycle
 import six
@@ -24,6 +25,9 @@ from cassandra.cluster import ResultSet
 
 import logging
 log = logging.getLogger(__name__)
+
+
+ExecutionResult = namedtuple('ExecutionResult', ['success', 'result_or_exc'])
 
 def execute_concurrent(session, statements_and_parameters, concurrency=100, raise_on_first_error=True, results_generator=False):
     """
@@ -153,7 +157,7 @@ class ConcurrentExecutorGenResults(_ConcurrentExecutor):
 
     def _put_result(self, result, idx, success):
         with self._condition:
-            heappush(self._results_queue, (idx, (success, result)))
+            heappush(self._results_queue, (idx, ExecutionResult(success, result)))
             self._execute_next()
             self._condition.notify()
 
@@ -183,7 +187,7 @@ class ConcurrentExecutorListResults(_ConcurrentExecutor):
         return super(ConcurrentExecutorListResults, self).execute(concurrency, fail_fast)
 
     def _put_result(self, result, idx, success):
-        self._results_queue.append((idx, (success, result)))
+        self._results_queue.append((idx, ExecutionResult(success, result)))
         with self._condition:
             self._current += 1
             if not success and self._fail_fast:
