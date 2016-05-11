@@ -924,6 +924,13 @@ class Time(object):
         """
         return self.nanosecond_time % Time.SECOND
 
+    def time(self):
+        """
+        Return a built-in datetime.time (nanosecond precision truncated to micros).
+        """
+        return datetime.time(hour=self.hour, minute=self.minute, second=self.second,
+                             microsecond=self.nanosecond // Time.MICRO)
+
     def _from_timestamp(self, t):
         if t >= Time.DAY:
             raise ValueError("value must be less than number of nanoseconds in a day (%d)" % Time.DAY)
