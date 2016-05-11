@@ -347,7 +347,7 @@ class ControlConnectionTest(unittest.TestCase):
         }
         self.cluster.scheduler.reset_mock()
         self.control_connection._handle_topology_change(event)
-        self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection.refresh_node_list_and_token_map)
+        self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection._refresh_nodes_if_not_up, '1.2.3.4')
 
         event = {
             'change_type': 'REMOVED_NODE',
@@ -363,7 +363,7 @@ class ControlConnectionTest(unittest.TestCase):
         }
         self.cluster.scheduler.reset_mock()
         self.control_connection._handle_topology_change(event)
-        self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection.refresh_node_list_and_token_map)
+        self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection._refresh_nodes_if_not_up, '1.2.3.4')
 
     def test_handle_status_change(self):
         event = {
@@ -453,7 +453,7 @@ class ControlConnectionTest(unittest.TestCase):
         cc_no_schema_refresh._handle_status_change(status_event)
         cc_no_schema_refresh._handle_topology_change(topo_event)
         cluster.scheduler.schedule_unique.assert_has_calls([call(ANY, cc_no_schema_refresh.refresh_node_list_and_token_map),
-                                                            call(ANY, cc_no_schema_refresh.refresh_node_list_and_token_map)])
+                                                            call(ANY, cc_no_schema_refresh._refresh_nodes_if_not_up, '1.2.3.4')])
 
         cc_no_topo_refresh = ControlConnection(cluster, 1, 0, -1, 0)
         cluster.scheduler.reset_mock()
