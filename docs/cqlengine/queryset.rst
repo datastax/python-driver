@@ -209,13 +209,14 @@ TimeUUID Functions
     .. code-block:: python
 
         class DataStream(Model):
-            time    = cqlengine.TimeUUID(primary_key=True)
-            data    = cqlengine.Bytes()
+            id      = columns.UUID(partition_key=True)
+            time    = columns.TimeUUID(primary_key=True)
+            data    = columns.Bytes()
 
         min_time = datetime(1982, 1, 1)
         max_time = datetime(1982, 3, 9)
 
-        DataStream.filter(time__gt=cqlengine.MinTimeUUID(min_time), time__lt=cqlengine.MaxTimeUUID(max_time))
+        DataStream.filter(time__gt=functions.MinTimeUUID(min_time), time__lt=functions.MaxTimeUUID(max_time))
 
 Token Function
 ==============
@@ -230,8 +231,8 @@ Token Function
     .. code-block:: python
 
         class Items(Model):
-            id      = cqlengine.Text(primary_key=True)
-            data    = cqlengine.Bytes()
+            id      = columns.Text(primary_key=True)
+            data    = columns.Bytes()
 
         query = Items.objects.all().limit(10)
 
