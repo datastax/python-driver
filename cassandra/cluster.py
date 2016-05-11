@@ -2515,13 +2515,22 @@ class ControlConnection(object):
         self._event_schedule_times[event_type] = this_time
         return delay
 
+    def _refresh_nodes_if_not_up(self, addr):
+        """
+        Used to mitigate refreshes for nodes that are already known.
+        Some versions of the server send superfluous NEW_NODE messages in addition to UP events.
+        """
+        host = self._cluster.metadata.get_host(addr)
+        if not host or not host.is_up:
+            self.refresh_node_list_and_token_map()
+
     def _handle_topology_change(self, event):
         change_type = event["change_type"]
         addr = self._translate_address(event["address"][0])
         if change_type == "NEW_NODE" or change_type == "MOVED_NODE":
             if self._topology_event_refresh_window >= 0:
                 delay = self._delay_for_event_type('topology_change', self._topology_event_refresh_window)
-                self._cluster.scheduler.schedule_unique(delay, self.refresh_node_list_and_token_map)
+                self._cluster.scheduler.schedule_unique(delay, self._refresh_nodes_if_not_up, addr)
         elif change_type == "REMOVED_NODE":
             host = self._cluster.metadata.get_host(addr)
             self._cluster.scheduler.schedule_unique(0, self._cluster.remove_host, host)
