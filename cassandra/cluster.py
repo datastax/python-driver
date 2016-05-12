@@ -2440,6 +2440,8 @@ class ControlConnection(object):
                 host.listen_address = local_row.get("listen_address")
                 host.broadcast_address = local_row.get("broadcast_address")
                 host.release_version = local_row.get("release_version")
+                host.dse_version = local_row.get("dse_version")
+                host.dse_workload = local_row.get("workload")
 
                 if partitioner and tokens:
                     token_map[host] = tokens
@@ -2473,6 +2475,8 @@ class ControlConnection(object):
 
             host.broadcast_address = row.get("peer")
             host.release_version = row.get("release_version")
+            host.dse_version = row.get("dse_version")
+            host.dse_workload = row.get("workload")
 
             if partitioner and tokens:
                 token_map[host] = tokens
