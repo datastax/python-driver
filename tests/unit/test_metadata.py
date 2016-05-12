@@ -315,12 +315,6 @@ class BytesTokensTest(unittest.TestCase):
         self.assertEqual(bytes_token.hash_fn(str(cassandra.metadata.MAX_LONG)), str(cassandra.metadata.MAX_LONG))
         self.assertEqual(str(bytes_token), "<BytesToken: -9223372036854775809>")
 
-        try:
-            bytes_token = BytesToken(cassandra.metadata.MIN_LONG - 1)
-            self.fail('Tokens for ByteOrderedPartitioner should be only strings')
-        except TypeError:
-            pass
-
 
 class KeyspaceMetadataTest(unittest.TestCase):
 
