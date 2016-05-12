@@ -641,7 +641,7 @@ class TestAddressTranslation(unittest.TestCase):
 
         @since 3.3
         @jira_ticket PYTHON-69
-        @expected_result only one hosts' metadata will be populeated
+        @expected_result only one hosts' metadata will be populated
 
         @test_category metadata
         """

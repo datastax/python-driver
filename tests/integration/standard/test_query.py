@@ -19,14 +19,14 @@ try:
     import unittest2 as unittest
 except ImportError:
     import unittest  # noqa
-
-from cassandra import ConsistencyLevel, Unavailable, InvalidRequest
+import logging
+from cassandra import ConsistencyLevel, Unavailable, InvalidRequest, cluster
 from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
                              BatchStatement, BatchType, dict_factory, TraceUnavailable)
 from cassandra.cluster import Cluster, NoHostAvailable
-from cassandra.policies import HostDistance
+from cassandra.policies import HostDistance, RoundRobinPolicy
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, greaterthanprotocolv3, get_node
+from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, greaterthanprotocolv3, MockLoggingHandler
 
 import time
 import re
@@ -338,6 +338,50 @@ class PreparedStatementTests(unittest.TestCase):
         self.assertIsInstance(prepared, PreparedStatement)
         bound = prepared.bind((1, 2))
         self.assertEqual(bound.keyspace, 'test3rf')
+
+
+class ForcedHostSwitchPolicy(RoundRobinPolicy):
+
+    def make_query_plan(self, working_keyspace=None, query=None):
+        if query is not None and "system.local" in str(query):
+            if hasattr(self, 'counter'):
+                self.counter += 1
+            else:
+                self.counter = 0
+            index = self.counter % 3
+            a = list(self._live_hosts)
+            value = [a[index]]
+            return value
+        else:
+            return list(self._live_hosts)
+
+
+class PreparedStatementArgTest(unittest.TestCase):
+
+    def test_prepare_on_all_hosts(self):
+        """
+        Test to validate prepare_on_all_hosts flag is honored.
+
+        Use a special ForcedHostSwitchPolicy to ensure prepared queries are cycled over nodes that should not
+        have them prepared. Check the logs to insure they are being re-prepared on those nodes
+
+        @since 3.4.0
+        @jira_ticket PYTHON-556
+        @expected_result queries will have to re-prepared on hosts that aren't the control connection
+        """
+        white_list = ForcedHostSwitchPolicy()
+        clus = Cluster(
+            load_balancing_policy=white_list,
+            protocol_version=PROTOCOL_VERSION, prepare_on_all_hosts=False, reprepare_on_up=False)
+        session = clus.connect()
+        mock_handler = MockLoggingHandler()
+        logger = logging.getLogger(cluster.__name__)
+        logger.addHandler(mock_handler)
+        select_statement = session.prepare("SELECT * FROM system.local")
+        session.execute(select_statement)
+        session.execute(select_statement)
+        session.execute(select_statement)
+        self.assertEqual(2, mock_handler.get_message_count('debug', "Re-preparing"))
 
 
 class PrintStatementTests(unittest.TestCase):

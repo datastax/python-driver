@@ -529,6 +529,12 @@ class MockLoggingHandler(logging.Handler):
             'critical': [],
         }
 
+    def get_message_count(self, level, sub_string):
+        count = 0
+        for msg in self.messages.get(level):
+            if sub_string in msg:
+                count+=1
+        return count
 
 class BasicExistingKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):
     """
