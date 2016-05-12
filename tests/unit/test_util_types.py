@@ -131,6 +131,11 @@ class TimeTests(unittest.TestCase):
         tt = Time(expected_time)
         self.assertEqual(tt, expected_time)
 
+    def test_as_time(self):
+        expected_time = datetime.time(12, 1, 2, 3)
+        tt = Time(expected_time)
+        self.assertEqual(tt.time(), expected_time)
+
     def test_equals(self):
         # util.Time self equality
         self.assertEqual(Time(1234), Time(1234))

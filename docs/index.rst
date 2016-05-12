@@ -42,6 +42,9 @@ Contents
 :doc:`security`
     An overview of the security features of the driver.
 
+:doc:`dates_and_times`
+    Some discussion on the driver's approach to working with timestamp, date, time types
+
 :doc:`faq`
     A collection of Frequently Asked Questions
 
@@ -58,6 +61,7 @@ Contents
    security
    user_defined_types
    object_mapper
+   dates_and_times
    faq
 
 Getting Help
