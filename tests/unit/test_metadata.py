@@ -311,7 +311,7 @@ class MD5TokensTest(unittest.TestCase):
 class BytesTokensTest(unittest.TestCase):
 
     def test_bytes_tokens(self):
-        bytes_token = BytesToken(unhexlify('01'))
+        bytes_token = BytesToken(unhexlify(six.b('01')))
         self.assertEqual(bytes_token.value, six.b('\x01'))
         self.assertEqual(str(bytes_token), "<BytesToken: %s>" % bytes_token.value)
         self.assertEqual(bytes_token.hash_fn('123'), '123')
