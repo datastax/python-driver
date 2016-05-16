@@ -671,6 +671,7 @@ class TestAddressTranslation(unittest.TestCase):
         for host in c.metadata.all_hosts():
             self.assertEqual(adder_map.get(str(host)), host.broadcast_address)
 
+
 class ContextManagementTest(unittest.TestCase):
 
     load_balancing_policy = WhiteListRoundRobinPolicy(['127.0.0.1'])
@@ -679,11 +680,29 @@ class ContextManagementTest(unittest.TestCase):
                       'token_metadata_enabled': False}
 
     def test_no_connect(self):
+        """
+        Test cluster context without connecting.
+
+        @since 3.4
+        @jira_ticket PYTHON-521
+        @expected_result context should still be valid
+
+        @test_category configuration
+        """
         with Cluster() as cluster:
             self.assertFalse(cluster.is_shutdown)
         self.assertTrue(cluster.is_shutdown)
 
     def test_simple_nested(self):
+        """
+        Test cluster and session contexts nested in one another.
+
+        @since 3.4
+        @jira_ticket PYTHON-521
+        @expected_result cluster/session should be crated and shutdown appropriately.
+
+        @test_category configuration
+        """
         with Cluster(**self.cluster_kwargs) as cluster:
             with cluster.connect() as session:
                 self.assertFalse(cluster.is_shutdown)
@@ -693,6 +712,15 @@ class ContextManagementTest(unittest.TestCase):
         self.assertTrue(cluster.is_shutdown)
 
     def test_cluster_no_session(self):
+        """
+        Test cluster context without session context.
+
+        @since 3.4
+        @jira_ticket PYTHON-521
+        @expected_result Session should be created correctly. Cluster should shutdown outside of context
+
+        @test_category configuration
+        """
         with Cluster(**self.cluster_kwargs) as cluster:
             session = cluster.connect()
             self.assertFalse(cluster.is_shutdown)
@@ -702,6 +730,15 @@ class ContextManagementTest(unittest.TestCase):
         self.assertTrue(cluster.is_shutdown)
 
     def test_session_no_cluster(self):
+        """
+        Test session context without cluster context.
+
+        @since 3.4
+        @jira_ticket PYTHON-521
+        @expected_result session should be created correctly. Session should shutdown correctly outside of context
+
+        @test_category configuration
+        """
         cluster = Cluster(**self.cluster_kwargs)
         unmanaged_session = cluster.connect()
         with cluster.connect() as session:
