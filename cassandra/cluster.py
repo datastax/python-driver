@@ -1981,9 +1981,11 @@ class Session(object):
         for host in self.cluster.metadata.all_hosts():
             distance = self._load_balancer.distance(host)
             pool = self._pools.get(host)
-
             if not pool or pool.is_shutdown:
-                if distance != HostDistance.IGNORED and host.is_up:
+                # we don't eagerly set is_up on previously ignored hosts. None is included here
+                # to allow us to attempt connections to hosts that have gone from ignored to something
+                # else.
+                if distance != HostDistance.IGNORED and host.is_up in (True, None):
                     self.add_or_renew_pool(host, False)
             elif distance != pool.host_distance:
                 # the distance has changed
