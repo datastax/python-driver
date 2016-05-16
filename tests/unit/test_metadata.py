@@ -424,18 +424,18 @@ class UnicodeIdentifiersTests(unittest.TestCase):
 
     def test_keyspace_name(self):
         km = KeyspaceMetadata(self.name, False, 'SimpleStrategy', {'replication_factor': 1})
-        print(km.export_as_string())
+        km.export_as_string()
 
     def test_table_name(self):
         tm = TableMetadata(self.name, self.name)
-        print(tm.export_as_string())
+        tm.export_as_string()
 
     def test_column_name_single_partition(self):
         tm = TableMetadata('ks', 'table')
         cm = ColumnMetadata(tm, self.name, u'int')
         tm.columns[cm.name] = cm
         tm.partition_key.append(cm)
-        print(tm.export_as_string())
+        tm.export_as_string()
 
     def test_column_name_single_partition_single_clustering(self):
         tm = TableMetadata('ks', 'table')
@@ -445,7 +445,7 @@ class UnicodeIdentifiersTests(unittest.TestCase):
         cm = ColumnMetadata(tm, self.name + 'x', u'int')
         tm.columns[cm.name] = cm
         tm.clustering_key.append(cm)
-        print(tm.export_as_string())
+        tm.export_as_string()
 
     def test_column_name_multiple_partition(self):
         tm = TableMetadata('ks', 'table')
@@ -455,22 +455,22 @@ class UnicodeIdentifiersTests(unittest.TestCase):
         cm = ColumnMetadata(tm, self.name + 'x', u'int')
         tm.columns[cm.name] = cm
         tm.partition_key.append(cm)
-        print(tm.export_as_string())
+        tm.export_as_string()
 
     def test_index(self):
         im = IndexMetadata(self.name, self.name, self.name, kind='', index_options={'target': self.name})
-        print(im.export_as_string())
+        im.export_as_string()
         im = IndexMetadata(self.name, self.name, self.name, kind='CUSTOM', index_options={'target': self.name, 'class_name': 'Class'})
-        print(im.export_as_string())
+        im.export_as_string()
 
     def test_function(self):
         fm = Function(self.name, self.name, (u'int', u'int'), (u'x', u'y'), u'int', u'language', self.name, False)
-        print(fm.export_as_string())
+        fm.export_as_string()
 
     def test_aggregate(self):
         am = Aggregate(self.name, self.name, (u'text',), self.name, u'text', self.name, self.name, u'text')
-        print(am.export_as_string())
+        am.export_as_string()
 
     def test_user_type(self):
         um = UserType(self.name, self.name, [self.name, self.name], [u'int', u'text'])
-        print(um.export_as_string())
+        um.export_as_string()
