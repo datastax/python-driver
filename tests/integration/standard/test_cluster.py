@@ -21,6 +21,7 @@ from collections import deque
 from mock import patch
 import time
 from uuid import uuid4
+import logging
 
 import cassandra
 from cassandra.cluster import Cluster, NoHostAvailable
@@ -31,7 +32,7 @@ from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
 from cassandra.protocol import MAX_SUPPORTED_VERSION
 from cassandra.query import SimpleStatement, TraceUnavailable
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, get_node, CASSANDRA_VERSION, execute_until_pass, execute_with_long_wait_retry, BasicExistingKeyspaceUnitTestCase, get_node
+from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, get_node, CASSANDRA_VERSION, execute_until_pass, execute_with_long_wait_retry, get_node, MockLoggingHandler
 from tests.integration.util import assert_quiescent_pool_state
 
 
@@ -716,3 +717,39 @@ class ContextManagementTest(unittest.TestCase):
         self.assertFalse(cluster.is_shutdown)
         cluster.shutdown()
         self.assertTrue(cluster.is_shutdown)
+
+
+class DuplicateRpcTest(unittest.TestCase):
+
+    load_balancing_policy = WhiteListRoundRobinPolicy(['127.0.0.1'])
+
+    def setUp(self):
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=self.load_balancing_policy)
+        self.session = self.cluster.connect()
+        self.session.execute("UPDATE system.peers SET rpc_address = '127.0.0.1' WHERE peer='127.0.0.2'")
+
+    def tearDown(self):
+        self.session.execute("UPDATE system.peers SET rpc_address = '127.0.0.2' WHERE peer='127.0.0.2'")
+        self.cluster.shutdown()
+
+    def test_duplicate(self):
+        """
+        Test duplicate RPC addresses.
+
+        Modifies the system.peers table to make hosts have the same rpc address. Ensures such hosts are filtered out and a message is logged
+
+        @since 3.4
+        @jira_ticket PYTHON-366
+        @expected_result only one hosts' metadata will be populated
+
+        @test_category metadata
+        """
+        mock_handler = MockLoggingHandler()
+        logger = logging.getLogger(cassandra.cluster.__name__)
+        logger.addHandler(mock_handler)
+        test_cluster = self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=self.load_balancing_policy)
+        test_cluster.connect()
+        warnings = mock_handler.messages.get("warning")
+        self.assertEqual(len(warnings), 1)
+        self.assertTrue('multiple' in warnings[0])
+        logger.removeHandler(mock_handler)
