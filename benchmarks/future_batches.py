@@ -35,7 +35,7 @@ class Runner(BenchmarkThread):
                     except queue.Empty:
                         break
 
-            key = "{}-{}".format(self.thread_num, i)
+            key = "{0}-{1}".format(self.thread_num, i)
             future = self.run_query(key)
             futures.put_nowait(future)
 
