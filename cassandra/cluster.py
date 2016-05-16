@@ -196,6 +196,55 @@ else:
         return DCAwareRoundRobinPolicy()
 
 
+class ExecutionProfile(object):
+    load_balancing_policy = None
+    retry_policy = None
+    consistency_level = None
+    serial_consistency_level = None
+    request_timeout = None
+    row_factory = None
+
+    def __init__(self, load_balancing_policy, retry_policy, consistency_level,
+                 serial_consistency_level, request_timeout, row_factory):
+        self.load_balancing_policy = load_balancing_policy
+        self.retry_policy = retry_policy
+        self.consistency_level = consistency_level
+        self.serial_consistency_level = serial_consistency_level
+        self.request_timeout = request_timeout
+        self.row_factory = row_factory
+
+
+class DefaultExecutionProfile(ExecutionProfile):
+    def __init__(self):
+        super(DefaultExecutionProfile).__init__(
+            default_lbp_factory(),
+            RetryPolicy(),
+            ConsistencyLevel.LOCAL_ONE,
+            None,
+            10,
+            named_tuple_factory)
+
+
+class ProfileManager(object):
+
+    def __init__(self):
+        self.profiles = dict()
+
+    def distance(self, host):
+        distances = set(p.load_balancing_policy.distance(host) for p in self._profiles.values())
+        return HostDistance.LOCAL if HostDistance.LOCAL in distances else \
+            HostDistance.REMOTE if HostDistance.REMOTE in distances else \
+            HostDistance.IGNORED
+
+    def populate(self, cluster, hosts):
+        for p in self._profiles.values():
+            p.load_balancing_policy.populate(cluster, hosts)
+
+    def check_supported(self):
+        for p in self._profiles.values():
+            p.load_balancing_policy.check_supported()
+
+
 class Cluster(object):
     """
     The main class to use when interacting with a Cassandra cluster.
@@ -570,6 +619,8 @@ class Cluster(object):
     def token_metadata_enabled(self, enabled):
         self.control_connection._token_meta_enabled = bool(enabled)
 
+    profile_manager = None
+
     sessions = None
     control_connection = None
     scheduler = None
@@ -668,6 +719,11 @@ class Cluster(object):
 
         if connection_class is not None:
             self.connection_class = connection_class
+
+        self.profile_manager = ProfileManager()
+        self.profile_manager.profiles[None] = ExecutionProfile(self.load_balancing_policy, self.default_retry_policy,
+                                                               Session.default_consistency_level, Session.default_timeout,
+                                                               Session.row_factory)
 
         self.metrics_enabled = metrics_enabled
         self.ssl_options = ssl_options
@@ -788,6 +844,13 @@ class Cluster(object):
         for session in self.sessions:
             session.user_type_registered(keyspace, user_type, klass)
         UserType.evict_udt_class(keyspace, user_type)
+
+    def add_execution_profile(self, name, profile):
+        if not isinstance(profile, ExecutionProfile):
+            raise TypeError("profile must be an instance of ExecutionProfile")
+        if name is None:
+            raise ValueError("'None' as profile name is reserved for the default profile")
+        self.profile_manager.profiles[name] = profile
 
     def get_min_requests_per_connection(self, host_distance):
         return self._min_requests_per_connection[host_distance]
