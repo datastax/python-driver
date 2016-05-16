@@ -62,6 +62,12 @@ class _PipeWrapper(object):
     def close(self):
         os.close(self.fd)
 
+    def getsockopt(self, level, optname, buflen=None):
+        # act like an unerrored socket for the asyncore error handling
+        if level == socket.SOL_SOCKET and optname == socket.SO_ERROR and not buflen:
+            return 0
+        raise NotImplementedError()
+
 
 class _AsyncoreDispatcher(asyncore.dispatcher):
 
