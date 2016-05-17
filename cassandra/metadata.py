@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from binascii import unhexlify
 from bisect import bisect_right
 from collections import defaultdict, Mapping
 from hashlib import md5
@@ -271,7 +272,7 @@ class Metadata(object):
         ring = []
         for host, token_strings in six.iteritems(token_map):
             for token_string in token_strings:
-                token = token_class(token_string)
+                token = token_class.from_string(token_string)
                 ring.append(token)
                 token_to_host_owner[token] = host
 
@@ -1441,6 +1442,9 @@ class Token(object):
     Abstract class representing a token.
     """
 
+    def __init__(self, token):
+        self.value = token
+
     @classmethod
     def hash_fn(cls, key):
         return key
@@ -1448,6 +1452,13 @@ class Token(object):
     @classmethod
     def from_key(cls, key):
         return cls(cls.hash_fn(key))
+
+    @classmethod
+    def from_string(cls, token_string):
+        raise NotImplementedError()
+        """ `token_string` should be the string representation from the server. """
+        # The hash partitioners just store the deciman value
+        return cls(int(token_string))
 
     def __cmp__(self, other):
         if self.value < other.value:
@@ -1478,7 +1489,16 @@ class NoMurmur3(Exception):
     pass
 
 
-class Murmur3Token(Token):
+class HashToken(Token):
+
+    @classmethod
+    def from_string(cls, token_string):
+        """ `token_string` should be the string representation from the server. """
+        # The hash partitioners just store the deciman value
+        return cls(int(token_string))
+
+
+class Murmur3Token(HashToken):
     """
     A token for ``Murmur3Partitioner``.
     """
@@ -1492,11 +1512,11 @@ class Murmur3Token(Token):
             raise NoMurmur3()
 
     def __init__(self, token):
-        """ `token` should be an int or string representing the token. """
+        """ `token` is an int or string representing the token. """
         self.value = int(token)
 
 
-class MD5Token(Token):
+class MD5Token(HashToken):
     """
     A token for ``RandomPartitioner``.
     """
@@ -1507,23 +1527,20 @@ class MD5Token(Token):
             key = key.encode('UTF-8')
         return abs(varint_unpack(md5(key).digest()))
 
-    def __init__(self, token):
-        """ `token` should be an int or string representing the token. """
-        self.value = int(token)
-
 
 class BytesToken(Token):
     """
     A token for ``ByteOrderedPartitioner``.
     """
 
-    def __init__(self, token_string):
-        """ `token_string` should be string representing the token. """
-        if not isinstance(token_string, six.string_types):
-            raise TypeError(
-                "Tokens for ByteOrderedPartitioner should be strings (got %s)"
-                % (type(token_string),))
-        self.value = token_string
+    @classmethod
+    def from_string(cls, token_string):
+        """ `token_string` should be the string representation from the server. """
+        # unhexlify works fine with unicode input in everythin but pypy3, where it Raises "TypeError: 'str' does not support the buffer interface"
+        if isinstance(token_string, six.text_type):
+            token_string = token_string.encode('ascii')
+        # The BOP stores a hex string
+        return cls(unhexlify(token_string))
 
 
 class TriggerMetadata(object):

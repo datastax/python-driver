@@ -17,11 +17,13 @@ try:
 except ImportError:
     import unittest  # noqa
 
+from binascii import unhexlify
 from mock import Mock
 import os
 import six
 
 import cassandra
+from cassandra.marshal import uint16_unpack, uint16_pack
 from cassandra.metadata import (Murmur3Token, MD5Token,
                                 BytesToken, ReplicationStrategy,
                                 NetworkTopologyStrategy, SimpleStrategy,
@@ -309,17 +311,32 @@ class MD5TokensTest(unittest.TestCase):
 class BytesTokensTest(unittest.TestCase):
 
     def test_bytes_tokens(self):
-        bytes_token = BytesToken(str(cassandra.metadata.MIN_LONG - 1))
+        bytes_token = BytesToken(unhexlify(six.b('01')))
+        self.assertEqual(bytes_token.value, six.b('\x01'))
+        self.assertEqual(str(bytes_token), "<BytesToken: %s>" % bytes_token.value)
         self.assertEqual(bytes_token.hash_fn('123'), '123')
         self.assertEqual(bytes_token.hash_fn(123), 123)
         self.assertEqual(bytes_token.hash_fn(str(cassandra.metadata.MAX_LONG)), str(cassandra.metadata.MAX_LONG))
-        self.assertEqual(str(bytes_token), "<BytesToken: -9223372036854775809>")
 
-        try:
-            bytes_token = BytesToken(cassandra.metadata.MIN_LONG - 1)
-            self.fail('Tokens for ByteOrderedPartitioner should be only strings')
-        except TypeError:
-            pass
+    def test_from_string(self):
+        from_unicode = BytesToken.from_string(six.text_type('0123456789abcdef'))
+        from_bin = BytesToken.from_string(six.b('0123456789abcdef'))
+        self.assertEqual(from_unicode, from_bin)
+        self.assertIsInstance(from_unicode.value, six.binary_type)
+        self.assertIsInstance(from_bin.value, six.binary_type)
+
+    def test_comparison(self):
+        tok = BytesToken.from_string(six.text_type('0123456789abcdef'))
+        token_high_order = uint16_unpack(tok.value[0:2])
+        self.assertLess(BytesToken(uint16_pack(token_high_order - 1)), tok)
+        self.assertGreater(BytesToken(uint16_pack(token_high_order + 1)), tok)
+
+    def test_comparison_unicode(self):
+        value = six.b('\'_-()"\xc2\xac')
+        t0 = BytesToken(value)
+        t1 = BytesToken.from_string('00')
+        self.assertGreater(t0, t1)
+        self.assertFalse(t0 < t1)
 
 
 class KeyspaceMetadataTest(unittest.TestCase):
@@ -407,18 +424,18 @@ class UnicodeIdentifiersTests(unittest.TestCase):
 
     def test_keyspace_name(self):
         km = KeyspaceMetadata(self.name, False, 'SimpleStrategy', {'replication_factor': 1})
-        print(km.export_as_string())
+        km.export_as_string()
 
     def test_table_name(self):
         tm = TableMetadata(self.name, self.name)
-        print(tm.export_as_string())
+        tm.export_as_string()
 
     def test_column_name_single_partition(self):
         tm = TableMetadata('ks', 'table')
         cm = ColumnMetadata(tm, self.name, u'int')
         tm.columns[cm.name] = cm
         tm.partition_key.append(cm)
-        print(tm.export_as_string())
+        tm.export_as_string()
 
     def test_column_name_single_partition_single_clustering(self):
         tm = TableMetadata('ks', 'table')
@@ -428,7 +445,7 @@ class UnicodeIdentifiersTests(unittest.TestCase):
         cm = ColumnMetadata(tm, self.name + 'x', u'int')
         tm.columns[cm.name] = cm
         tm.clustering_key.append(cm)
-        print(tm.export_as_string())
+        tm.export_as_string()
 
     def test_column_name_multiple_partition(self):
         tm = TableMetadata('ks', 'table')
@@ -438,22 +455,22 @@ class UnicodeIdentifiersTests(unittest.TestCase):
         cm = ColumnMetadata(tm, self.name + 'x', u'int')
         tm.columns[cm.name] = cm
         tm.partition_key.append(cm)
-        print(tm.export_as_string())
+        tm.export_as_string()
 
     def test_index(self):
         im = IndexMetadata(self.name, self.name, self.name, kind='', index_options={'target': self.name})
-        print(im.export_as_string())
+        im.export_as_string()
         im = IndexMetadata(self.name, self.name, self.name, kind='CUSTOM', index_options={'target': self.name, 'class_name': 'Class'})
-        print(im.export_as_string())
+        im.export_as_string()
 
     def test_function(self):
         fm = Function(self.name, self.name, (u'int', u'int'), (u'x', u'y'), u'int', u'language', self.name, False)
-        print(fm.export_as_string())
+        fm.export_as_string()
 
     def test_aggregate(self):
         am = Aggregate(self.name, self.name, (u'text',), self.name, u'text', self.name, self.name, u'text')
-        print(am.export_as_string())
+        am.export_as_string()
 
     def test_user_type(self):
         um = UserType(self.name, self.name, [self.name, self.name], [u'int', u'text'])
-        print(um.export_as_string())
+        um.export_as_string()

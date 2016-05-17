@@ -1312,7 +1312,7 @@ class TokenMetadataTest(unittest.TestCase):
         cluster.shutdown()
 
     def test_getting_replicas(self):
-        tokens = [MD5Token(str(i)) for i in range(0, (2 ** 127 - 1), 2 ** 125)]
+        tokens = [MD5Token(i) for i in range(0, (2 ** 127 - 1), 2 ** 125)]
         hosts = [Host("ip%d" % i, SimpleConvictionPolicy) for i in range(len(tokens))]
         token_to_primary_replica = dict(zip(tokens, hosts))
         keyspace = KeyspaceMetadata("ks", True, "SimpleStrategy", {"replication_factor": "1"})
@@ -1327,12 +1327,12 @@ class TokenMetadataTest(unittest.TestCase):
 
         # shift the tokens back by one
         for token, expected_host in zip(tokens, hosts):
-            replicas = token_map.get_replicas("ks", MD5Token(str(token.value - 1)))
+            replicas = token_map.get_replicas("ks", MD5Token(token.value - 1))
             self.assertEqual(set(replicas), set([expected_host]))
 
         # shift the tokens forward by one
         for i, token in enumerate(tokens):
-            replicas = token_map.get_replicas("ks", MD5Token(str(token.value + 1)))
+            replicas = token_map.get_replicas("ks", MD5Token(token.value + 1))
             expected_host = hosts[(i + 1) % len(hosts)]
             self.assertEqual(set(replicas), set([expected_host]))
 
