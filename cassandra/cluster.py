@@ -216,7 +216,7 @@ class ExecutionProfile(object):
 
 class DefaultExecutionProfile(ExecutionProfile):
     def __init__(self):
-        super(DefaultExecutionProfile).__init__(
+        super(DefaultExecutionProfile, self).__init__(
             default_lbp_factory(),
             RetryPolicy(),
             ConsistencyLevel.LOCAL_ONE,
@@ -231,18 +231,34 @@ class ProfileManager(object):
         self.profiles = dict()
 
     def distance(self, host):
-        distances = set(p.load_balancing_policy.distance(host) for p in self._profiles.values())
+        distances = set(p.load_balancing_policy.distance(host) for p in self.profiles.values())
         return HostDistance.LOCAL if HostDistance.LOCAL in distances else \
             HostDistance.REMOTE if HostDistance.REMOTE in distances else \
             HostDistance.IGNORED
 
     def populate(self, cluster, hosts):
-        for p in self._profiles.values():
+        for p in self.profiles.values():
             p.load_balancing_policy.populate(cluster, hosts)
 
     def check_supported(self):
-        for p in self._profiles.values():
+        for p in self.profiles.values():
             p.load_balancing_policy.check_supported()
+
+    def on_up(self, host):
+        for p in self.profiles.values():
+            p.load_balancing_policy.on_up(host)
+
+    def on_down(self, host):
+        for p in self.profiles.values():
+            p.load_balancing_policy.on_up(host)
+
+    def on_add(self, host):
+        for p in self.profiles.values():
+            p.load_balancing_policy.on_add(host)
+
+    def on_remove(self, host):
+        for p in self.profiles.values():
+            p.load_balancing_policy.on_remove(host)
 
 
 class Cluster(object):
@@ -666,7 +682,8 @@ class Cluster(object):
                  address_translator=None,
                  status_event_refresh_window=2,
                  prepare_on_all_hosts=True,
-                 reprepare_on_up=True):
+                 reprepare_on_up=True,
+                 execution_profiles=None):
         """
         ``executor_threads`` defines the number of threads in a pool for handling asynchronous tasks such as
         extablishing connection pools or refreshing metadata.
@@ -721,9 +738,16 @@ class Cluster(object):
             self.connection_class = connection_class
 
         self.profile_manager = ProfileManager()
-        self.profile_manager.profiles[None] = ExecutionProfile(self.load_balancing_policy, self.default_retry_policy,
-                                                               Session.default_consistency_level, Session.default_timeout,
+        self.profile_manager.profiles[None] = ExecutionProfile(self.load_balancing_policy,
+                                                               self.default_retry_policy,
+                                                               Session.default_consistency_level,
+                                                               Session.default_serial_consistency_level,
+                                                               Session.default_timeout,
                                                                Session.row_factory)
+        # TODO: validate value types
+        if execution_profiles:
+            self.profile_manager.profiles.update(execution_profiles)
+
 
         self.metrics_enabled = metrics_enabled
         self.ssl_options = ssl_options
@@ -851,6 +875,10 @@ class Cluster(object):
         if name is None:
             raise ValueError("'None' as profile name is reserved for the default profile")
         self.profile_manager.profiles[name] = profile
+        profile.load_balancing_policy.populate(self, self.metadata.all_hosts())
+        # todo: refacto
+        for session in self.sessions:
+            session.update_created_pools()
 
     def get_min_requests_per_connection(self, host_distance):
         return self._min_requests_per_connection[host_distance]
@@ -1020,7 +1048,7 @@ class Cluster(object):
                         for listener in self.listeners:
                             listener.on_add(host)
 
-                self.load_balancing_policy.populate(
+                self.profile_manager.populate(
                     weakref.proxy(self), self.metadata.all_hosts())
 
                 try:
@@ -1032,7 +1060,7 @@ class Cluster(object):
                     self.shutdown()
                     raise
 
-                self.load_balancing_policy.check_supported()
+                self.profile_manager.check_supported() #todo: rename this method
 
                 if self.idle_heartbeat_interval:
                     self._idle_heartbeat = ConnectionHeartbeat(self.idle_heartbeat_interval, self.get_connection_holders)
@@ -1096,7 +1124,7 @@ class Cluster(object):
                 session.user_type_registered(keyspace, udt_name, klass)
 
     def _cleanup_failed_on_up_handling(self, host):
-        self.load_balancing_policy.on_down(host)
+        self.profile_manager.on_down(host)
         self.control_connection.on_down(host)
         for session in self.sessions:
             session.remove_pool(host)
@@ -1177,7 +1205,7 @@ class Cluster(object):
                 session.remove_pool(host)
 
             log.debug("Signalling to load balancing policy that host %s is up", host)
-            self.load_balancing_policy.on_up(host)
+            self.profile_manager.on_up(host)
 
             log.debug("Signalling to control connection that host %s is up", host)
             self.control_connection.on_up(host)
@@ -1211,7 +1239,7 @@ class Cluster(object):
         return futures
 
     def _start_reconnector(self, host, is_host_addition):
-        if self.load_balancing_policy.distance(host) == HostDistance.IGNORED:
+        if self.profile_manager.distance(host) == HostDistance.IGNORED:
             return
 
         schedule = self.reconnection_policy.new_schedule()
@@ -1250,7 +1278,7 @@ class Cluster(object):
 
         log.warning("Host %s has been marked down", host)
 
-        self.load_balancing_policy.on_down(host)
+        self.profile_manager.on_down(host)
         self.control_connection.on_down(host)
         for session in self.sessions:
             session.on_down(host)
@@ -1266,12 +1294,12 @@ class Cluster(object):
 
         log.debug("Handling new host %r and notifying listeners", host)
 
-        distance = self.load_balancing_policy.distance(host)
+        distance = self.profile_manager.distance(host)
         if distance != HostDistance.IGNORED:
             self._prepare_all_queries(host)
             log.debug("Done preparing queries for new host %r", host)
 
-        self.load_balancing_policy.on_add(host)
+        self.profile_manager.on_add(host)
         self.control_connection.on_add(host, refresh_nodes)
 
         if distance == HostDistance.IGNORED:
@@ -1336,7 +1364,7 @@ class Cluster(object):
 
         log.debug("Removing host %s", host)
         host.set_down()
-        self.load_balancing_policy.on_remove(host)
+        self.profile_manager.on_remove(host)
         for session in self.sessions:
             session.on_remove(host)
         for listener in self.listeners:
@@ -1742,7 +1770,7 @@ class Session(object):
         for future in futures:
             future.result()
 
-    def execute(self, query, parameters=None, timeout=_NOT_SET, trace=False, custom_payload=None):
+    def execute(self, query, parameters=None, timeout=_NOT_SET, trace=False, custom_payload=None, execution_profile=None):
         """
         Execute the given query and synchronously wait for the response.
 
@@ -1770,9 +1798,9 @@ class Session(object):
         If `query` is a Statement with its own custom_payload. The message payload
         will be a union of the two, with the values specified here taking precedence.
         """
-        return self.execute_async(query, parameters, trace, custom_payload, timeout).result()
+        return self.execute_async(query, parameters, trace, custom_payload, timeout, execution_profile).result()
 
-    def execute_async(self, query, parameters=None, trace=False, custom_payload=None, timeout=_NOT_SET):
+    def execute_async(self, query, parameters=None, trace=False, custom_payload=None, timeout=_NOT_SET, execution_profile=None):
         """
         Execute the given query and return a :class:`~.ResponseFuture` object
         which callbacks may be attached to for asynchronous response
@@ -1817,26 +1845,38 @@ class Session(object):
             ...     log.exception("Operation failed:")
 
         """
-        if timeout is _NOT_SET:
-            timeout = self.default_timeout
-
-        future = self._create_response_future(query, parameters, trace, custom_payload, timeout)
+        future = self._create_response_future(query, parameters, trace, custom_payload, timeout, execution_profile)
         future._protocol_handler = self.client_protocol_handler
         future.send_request()
         return future
 
-    def _create_response_future(self, query, parameters, trace, custom_payload, timeout):
+    def _create_response_future(self, query, parameters, trace, custom_payload, timeout, execution_profile):
         """ Returns the ResponseFuture before calling send_request() on it """
 
         prepared_statement = None
+
+        profiles = self.cluster.profile_manager.profiles
+        try:
+            exec_profile = execution_profile if isinstance(execution_profile, ExecutionProfile) else profiles[execution_profile]
+        except KeyError:
+            raise ValueError("Invalid execution_profile: '%s'; valid profiles are %s" % (execution_profile, profiles.keys()))
+
+        # TODO: right now there is no guard making legacy config mutually exclusive
+        if timeout is _NOT_SET:
+            timeout = exec_profile.request_timeout
 
         if isinstance(query, six.string_types):
             query = SimpleStatement(query)
         elif isinstance(query, PreparedStatement):
             query = query.bind(parameters)
 
-        cl = query.consistency_level if query.consistency_level is not None else self.default_consistency_level
-        serial_cl = query.serial_consistency_level if query.serial_consistency_level is not None else self.default_serial_consistency_level
+        # TODO: why do some things come on the statement, and others through the execution?
+        cl = query.consistency_level if query.consistency_level is not None else exec_profile.consistency_level
+        serial_cl = query.serial_consistency_level if query.serial_consistency_level is not None else exec_profile.serial_consistency_level
+
+        retry_policy = query.retry_policy or exec_profile.retry_policy
+        row_factory = exec_profile.row_factory
+        load_balancing_policy = exec_profile.load_balancing_policy
 
         fetch_size = query.fetch_size
         if fetch_size is FETCH_SIZE_UNSET and self._protocol_version >= 2:
@@ -1879,7 +1919,7 @@ class Session(object):
 
         return ResponseFuture(
             self, message, query, timeout, metrics=self._metrics,
-            prepared_statement=prepared_statement)
+            prepared_statement=prepared_statement, retry_policy=retry_policy, row_factory=row_factory, load_balancer=load_balancing_policy)
 
     def prepare(self, query, custom_payload=None):
         """
@@ -2916,6 +2956,9 @@ class ResponseFuture(object):
     message = None
     default_timeout = None
 
+    _retry_policy = None
+    _load_balancer = None
+
     _req_id = None
     _final_result = _NOT_SET
     _col_names = None
@@ -2937,12 +2980,16 @@ class ResponseFuture(object):
 
     _warned_timeout = False
 
-    def __init__(self, session, message, query, timeout, metrics=None, prepared_statement=None):
+    def __init__(self, session, message, query, timeout, metrics=None, prepared_statement=None,
+                 retry_policy=RetryPolicy(), row_factory=None, load_balancer=None):
         self.session = session
-        self.row_factory = session.row_factory
+        # TODO: normalize handling of retry policy and row factory
+        self.row_factory = row_factory or session.row_factory
+        self._load_balancer = load_balancer or session._load_balancer
         self.message = message
         self.query = query
         self.timeout = timeout
+        self._retry_policy = retry_policy
         self._metrics = metrics
         self.prepared_statement = prepared_statement
         self._callback_lock = Lock()
@@ -2978,8 +3025,7 @@ class ResponseFuture(object):
         # convert the list/generator/etc to an iterator so that subsequent
         # calls to send_request (which retries may do) will resume where
         # they last left off
-        self.query_plan = iter(self.session._load_balancer.make_query_plan(
-            self.session.keyspace, self.query))
+        self.query_plan = iter(self._load_balancer.make_query_plan(self.session.keyspace, self.query))
 
     def send_request(self):
         """ Internal """
@@ -3160,11 +3206,7 @@ class ResponseFuture(object):
                         results = self.row_factory(*results)
                     self._set_final_result(results)
             elif isinstance(response, ErrorMessage):
-                retry_policy = None
-                if self.query:
-                    retry_policy = self.query.retry_policy
-                if not retry_policy:
-                    retry_policy = self.session.cluster.default_retry_policy
+                retry_policy = self._retry_policy
 
                 if isinstance(response, ReadTimeoutErrorMessage):
                     if self._metrics is not None:
