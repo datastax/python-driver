@@ -1456,9 +1456,6 @@ class Token(object):
     @classmethod
     def from_string(cls, token_string):
         raise NotImplementedError()
-        """ `token_string` should be the string representation from the server. """
-        # The hash partitioners just store the deciman value
-        return cls(int(token_string))
 
     def __cmp__(self, other):
         if self.value < other.value:
