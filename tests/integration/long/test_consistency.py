@@ -131,7 +131,7 @@ class ConsistencyTests(unittest.TestCase):
             load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
             protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
-        wait_for_up(cluster, 1, wait=False)
+        wait_for_up(cluster, 1)
         wait_for_up(cluster, 2)
 
         create_schema(cluster, session, keyspace, replication_factor=rf)
@@ -183,7 +183,7 @@ class ConsistencyTests(unittest.TestCase):
             load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
             protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
-        wait_for_up(cluster, 1, wait=False)
+        wait_for_up(cluster, 1)
         wait_for_up(cluster, 2)
 
         create_schema(cluster, session, keyspace, replication_factor=3)

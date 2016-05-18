@@ -123,14 +123,14 @@ def bootstrap(node, data_center=None, token=None):
 
 
 def ring(node):
-    print('From node%s:' % node)
     get_node(node).nodetool('ring')
 
 
-def wait_for_up(cluster, node, wait=True):
+def wait_for_up(cluster, node):
     tries = 0
+    addr = IP_FORMAT % node
     while tries < 100:
-        host = cluster.metadata.get_host(IP_FORMAT % node)
+        host = cluster.metadata.get_host(addr)
         if host and host.is_up:
             log.debug("Done waiting for node %s to be up", node)
             return
@@ -139,10 +139,11 @@ def wait_for_up(cluster, node, wait=True):
             tries += 1
             time.sleep(1)
 
-    raise RuntimeError("Host {0} is not up after 100 attempts".format(IP_FORMAT.format(node)))
+    # todo: don't mix string interpolation methods in the same package
+    raise RuntimeError("Host {0} is not up after {1} attempts".format(addr, tries))
 
 
-def wait_for_down(cluster, node, wait=True):
+def wait_for_down(cluster, node):
     log.debug("Waiting for node %s to be down", node)
     tries = 0
     while tries < 100:
@@ -155,4 +156,4 @@ def wait_for_down(cluster, node, wait=True):
             tries += 1
             time.sleep(1)
 
-    raise RuntimeError("Host {0} is not down after 100 attempts".format(IP_FORMAT.format(node)))
+    raise RuntimeError("Host {0} is not down after {1} attempts".format(addr, tries))
