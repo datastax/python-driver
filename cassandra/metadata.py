@@ -313,12 +313,13 @@ class Metadata(object):
             comparator = types.lookup_casstype(row["comparator"])
             table_meta.comparator = comparator
 
-            if issubclass(comparator, types.CompositeType):
+            is_dyn_composite_comparator = issubclass(comparator, types.DynamicCompositeType)
+            is_composite_comparator = issubclass(comparator, types.CompositeType) and not is_dyn_composite_comparator
+
+            if is_composite_comparator:
                 column_name_types = comparator.subtypes
-                is_composite_comparator = True
             else:
                 column_name_types = (comparator,)
-                is_composite_comparator = False
 
             num_column_name_components = len(column_name_types)
             last_col = column_name_types[-1]
@@ -332,7 +333,8 @@ class Metadata(object):
 
             if column_aliases is not None:
                 column_aliases = json.loads(column_aliases)
-            else:
+
+            if not column_aliases:  # json load failed or column_aliases was empty
                 column_aliases = [r.get('column_name') for r in clustering_rows]
 
             if is_composite_comparator:
@@ -355,10 +357,10 @@ class Metadata(object):
 
                     # Some thrift tables define names in composite types (see PYTHON-192)
                     if not column_aliases and hasattr(comparator, 'fieldnames'):
-                        column_aliases = comparator.fieldnames
+                        column_aliases = filter(None, comparator.fieldnames)
             else:
                 is_compact = True
-                if column_aliases or not cf_col_rows:
+                if column_aliases or not cf_col_rows or is_dyn_composite_comparator:
                     has_value = True
                     clustering_size = num_column_name_components
                 else:
@@ -403,7 +405,7 @@ class Metadata(object):
                 if len(column_aliases) > i:
                     column_name = column_aliases[i]
                 else:
-                    column_name = "column%d" % i
+                    column_name = "column%d" % (i + 1)
 
                 col = ColumnMetadata(table_meta, column_name, column_name_types[i])
                 table_meta.columns[column_name] = col
@@ -435,8 +437,13 @@ class Metadata(object):
 
             # other normal columns
             for col_row in cf_col_rows:
-                column_meta = self._build_column_metadata(table_meta, col_row)
-                table_meta.columns[column_meta.name] = column_meta
+                if col_row in partition_rows or col_row in clustering_rows:
+                    col_name = col_row['column_name']
+                    if col_name in table_meta.columns:
+                        self._maybe_add_index_metadata(table_meta, table_meta.columns[col_name], col_row)
+                else:
+                    column_meta = self._build_column_metadata(table_meta, col_row)
+                    table_meta.columns[column_meta.name] = column_meta
 
             if trigger_rows:
                 for trigger_row in trigger_rows[cfname]:
@@ -471,11 +478,14 @@ class Metadata(object):
         data_type = types.lookup_casstype(row["validator"])
         is_static = row.get("type", None) == "static"
         column_meta = ColumnMetadata(table_metadata, name, data_type, is_static=is_static)
+        self._maybe_add_index_metadata(table_metadata, column_meta, row)
+        return column_meta
+
+    def _maybe_add_index_metadata(self, table_meta, column_meta, row):
         index_meta = self._build_index_metadata(column_meta, row)
         column_meta.index = index_meta
         if index_meta:
-            table_metadata.indexes[index_meta.name] = index_meta
-        return column_meta
+            table_meta.indexes[index_meta.name] = index_meta
 
     def _build_index_metadata(self, column_metadata, row):
         index_name = row.get("index_name")
