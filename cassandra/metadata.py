@@ -332,7 +332,8 @@ class Metadata(object):
 
             if column_aliases is not None:
                 column_aliases = json.loads(column_aliases)
-            else:
+
+            if not column_aliases:  # json load failed or column_aliases was empty
                 column_aliases = [r.get('column_name') for r in clustering_rows]
 
             if is_composite_comparator:
@@ -402,7 +403,7 @@ class Metadata(object):
             for i in range(clustering_size):
                 if len(column_aliases) > i:
                     column_name = column_aliases[i]
-                else:
+                if not column_name:
                     column_name = "column%d" % i
 
                 col = ColumnMetadata(table_meta, column_name, column_name_types[i])
@@ -435,6 +436,8 @@ class Metadata(object):
 
             # other normal columns
             for col_row in cf_col_rows:
+                if col_row in partition_rows or col_row in clustering_rows:
+                    continue
                 column_meta = self._build_column_metadata(table_meta, col_row)
                 table_meta.columns[column_meta.name] = column_meta
 
