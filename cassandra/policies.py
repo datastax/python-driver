@@ -16,6 +16,7 @@ from itertools import islice, cycle, groupby, repeat
 import logging
 from random import randint
 from threading import Lock
+import socket
 
 from cassandra import ConsistencyLevel, OperationTimedOut
 
@@ -402,11 +403,15 @@ class WhiteListRoundRobinPolicy(RoundRobinPolicy):
         The `hosts` parameter should be a sequence of hosts to permit
         connections to.
         """
+
         self._allowed_hosts = hosts
+        self._allowed_hosts_resolved = [endpoint[4][0] for a in self._allowed_hosts
+                                        for endpoint in socket.getaddrinfo(a, None, socket.AF_UNSPEC, socket.SOCK_STREAM)]
+
         RoundRobinPolicy.__init__(self)
 
     def populate(self, cluster, hosts):
-        self._live_hosts = frozenset(h for h in hosts if h.address in self._allowed_hosts)
+        self._live_hosts = frozenset(h for h in hosts if h.address in self._allowed_hosts_resolved)
 
         if len(hosts) <= 1:
             self._position = 0
@@ -414,17 +419,17 @@ class WhiteListRoundRobinPolicy(RoundRobinPolicy):
             self._position = randint(0, len(hosts) - 1)
 
     def distance(self, host):
-        if host.address in self._allowed_hosts:
+        if host.address in self._allowed_hosts_resolved:
             return HostDistance.LOCAL
         else:
             return HostDistance.IGNORED
 
     def on_up(self, host):
-        if host.address in self._allowed_hosts:
+        if host.address in self._allowed_hosts_resolved:
             RoundRobinPolicy.on_up(self, host)
 
     def on_add(self, host):
-        if host.address in self._allowed_hosts:
+        if host.address in self._allowed_hosts_resolved:
             RoundRobinPolicy.on_add(self, host)
 
 
