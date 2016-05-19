@@ -29,6 +29,7 @@ from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster
 from cassandra.metadata import Metadata
 from cassandra.policies import (RoundRobinPolicy, DCAwareRoundRobinPolicy,
+                                BlackListPolicy,
                                 TokenAwarePolicy, SimpleConvictionPolicy,
                                 HostDistance, ExponentialReconnectionPolicy,
                                 RetryPolicy, WriteType,
@@ -517,6 +518,199 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
         policy.on_add(host_remote)
         self.assertFalse(policy.local_dc)
 
+class BlackListPolicyTest(unittest.TestCase):
+    def test_no_blacklisted(self):
+        ''' Check that no nodes from the blacklisted DC are present in the query plan
+        '''
+        hosts = []
+        for i in range(4):
+            h = Host(i, SimpleConvictionPolicy)
+            h.set_location_info("dc1", "rack1")
+            hosts.append(h)
+        bl_hosts = []
+        for i in range(2):
+            h = Host("bl_%s"%i, SimpleConvictionPolicy)
+            h.set_location_info("dc2", "rack1")
+            bl_hosts.append(h)
+
+        #explicitly blacklisted host in non-blacklisted DC
+        bh = Host("bl_x", SimpleConvictionPolicy)
+        bh.set_location_info("dc1", "rack1")
+        bl_hosts.append(bh)
+
+        policy = BlackListPolicy(DCAwareRoundRobinPolicy("dc1", 1), ["dc2"], ["bl_x"] )
+        policy.populate(None, hosts + bl_hosts)
+        qplan = list(policy.make_query_plan())
+        self.assertEqual(sorted(qplan), sorted(hosts))
+
+    def test_distance_blacklisted(self):
+        ''' Check that the distance of a node from the blacklisted DC is always IGNORED
+        '''
+        policy = BlackListPolicy(DCAwareRoundRobinPolicy("dc1", 0), ["dc3"], ["bl_x"])
+        host1 = Host("ip1", SimpleConvictionPolicy)
+        host1.set_location_info("dc1", "rack1")
+        host3 = Host("ip3", SimpleConvictionPolicy)
+        host3.set_location_info("dc3", "rack1")
+        #explicitly blacklisted host in non-blacklisted DC
+        bh = Host("bl_x", SimpleConvictionPolicy)
+        bh.set_location_info("dc1", "rack1")
+        policy.populate(Mock(), [host1, host3, bh])
+
+        self.assertEqual(policy.distance(host1), HostDistance.LOCAL)
+        self.assertEqual(policy.distance(host3), HostDistance.IGNORED)
+
+    def test_status_updates_blacklist(self):
+        hosts = [Host(i, SimpleConvictionPolicy) for i in range(4)]
+        for h in hosts[:2]:
+            h.set_location_info("dc1", "rack1")
+        for h in hosts[2:]:
+            h.set_location_info("dc2", "rack1")
+
+        bl_hosts = []
+        for i in range(2):
+            h = Host("bl_"+str(i), SimpleConvictionPolicy)
+            h.set_location_info("dc3", "rack1")
+            bl_hosts.append(h)
+
+        #explicitly blacklisted host in non-blacklisted DC
+        bh = Host("bl_x", SimpleConvictionPolicy)
+        bh.set_location_info("dc1", "rack1")
+        bl_hosts.append(bh)
+
+        policy = BlackListPolicy(child_policy=DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=1), blacklisted_dcs=["dc3"], blacklisted_hosts=["bl_x", "bl_x2"] )
+        policy.populate(Mock(), hosts + bl_hosts)
+        policy.on_down(hosts[0])
+        policy.on_remove(hosts[2])
+        policy.on_down(bl_hosts[1])
+
+        new_local_host = Host(4, SimpleConvictionPolicy)
+        new_local_host.set_location_info("dc1", "rack1")
+        policy.on_up(new_local_host)
+
+        new_remote_host = Host(5, SimpleConvictionPolicy)
+        new_remote_host.set_location_info("dc9000", "rack1")
+        policy.on_add(new_remote_host)
+
+        new_bl_host = Host("bl_2", SimpleConvictionPolicy)
+        new_bl_host.set_location_info("dc3", "rack1")
+        policy.on_add(new_bl_host)
+
+        new_bl_host2 = Host("bl_x2", SimpleConvictionPolicy)
+        new_bl_host2.set_location_info("dc1", "rack1")
+        policy.on_add(new_bl_host2)
+
+        # we now have two local hosts and two remote hosts in separate dcs plus two hosts in the blacklisted DC
+        qplan = list(policy.make_query_plan())
+        self.assertEqual(set(qplan[:2]), set([hosts[1], new_local_host]))
+        self.assertEqual(set(qplan[2:]), set([hosts[3], new_remote_host]))
+
+        # since we have hosts in dc9000, the distance shouldn't be IGNORED
+        self.assertEqual(policy.distance(new_remote_host), HostDistance.REMOTE)
+        self.assertEqual(policy.distance(new_bl_host), HostDistance.IGNORED)
+
+        policy.on_down(new_local_host)
+        policy.on_down(hosts[1])
+        qplan = list(policy.make_query_plan())
+        self.assertEqual(set(qplan), set([hosts[3], new_remote_host]))
+
+        policy.on_down(new_remote_host)
+        policy.on_down(hosts[3])
+        qplan = list(policy.make_query_plan())
+        self.assertEqual(qplan, [])
+
+    def test_no_live_nodes_blacklist(self):
+        """
+        Ensure query plan for a downed cluster will execute without errors
+        """
+
+        hosts = []
+        for i in range(4):
+            h = Host(i, SimpleConvictionPolicy)
+            h.set_location_info("dc1", "rack1")
+            hosts.append(h)
+
+        bl_hosts = []
+        for i in range(2):
+            h = Host("bl_"+str(i), SimpleConvictionPolicy)
+            h.set_location_info("dc3", "rack1")
+            bl_hosts.append(h)
+
+        #explicitly blacklisted host in non-blacklisted DC
+        bh = Host("bl_x", SimpleConvictionPolicy)
+        bh.set_location_info("dc1", "rack1")
+        bl_hosts.append(bh)
+
+        policy = BlackListPolicy(DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=1), blacklisted_dcs=["dc3"], blacklisted_hosts=["bl_x"])
+        policy.populate(Mock(), hosts)
+
+        for host in hosts:
+            policy.on_down(host)
+        for host in hosts:
+            policy.on_down(host)
+
+        qplan = list(policy.make_query_plan())
+        self.assertEqual(qplan, [])
+
+    def test_no_nodes_blacklist(self):
+        """
+        Ensure query plan for an empty cluster will execute without errors
+        """
+
+        policy = BlackListPolicy(DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=1), blacklisted_dcs=["dc3"], blacklisted_hosts=["bl_x"])
+        policy.populate(None, [])
+
+        qplan = list(policy.make_query_plan())
+        self.assertEqual(qplan, [])
+
+    def test_blacklist_local_dc(self):
+        h = Host("Host", SimpleConvictionPolicy)
+        h.set_location_info("dc1", "rack1")
+
+        bh = Host("BlackHost", SimpleConvictionPolicy)
+        bh.set_location_info("black_dc", "rack1")
+
+        policy = BlackListPolicy(DCAwareRoundRobinPolicy("black_dc", used_hosts_per_remote_dc=1), blacklisted_dcs=["black_dc"])
+        policy.populate(Mock(), [h, bh])
+        self.assertEqual(policy.distance(bh), HostDistance.IGNORED)
+        self.assertEqual(policy.distance(h), HostDistance.REMOTE)
+
+
+    def test_blacklist_token_aware_RR(self):
+        cluster = Mock(spec=Cluster)
+        cluster.metadata = Mock(spec=Metadata)
+        hosts = [Host(str(i), SimpleConvictionPolicy) for i in range(4)]
+        for host in hosts:
+            host.set_location_info('dc1', 'rack1')
+            host.set_up()
+
+        bl_hosts = [Host("bl_" + str(i), SimpleConvictionPolicy) for i in range(2)]
+        for bl_host in bl_hosts:
+            bl_host.set_location_info('bdc', 'rack1')
+            bl_host.set_up()
+
+        def get_replicas(keyspace, packed_key):
+            index = struct.unpack('>i', packed_key)[0]
+            return list(islice(cycle(hosts), index, index + 2))
+
+        cluster.metadata.get_replicas.side_effect = get_replicas
+
+        policy = TokenAwarePolicy(BlackListPolicy(DCAwareRoundRobinPolicy('dc1'), blacklisted_dcs=['bdc']))
+        policy.populate(cluster, hosts + bl_hosts)
+
+        for i in range(4):
+            query = Statement(routing_key=struct.pack('>i', i), keyspace='keyspace_name')
+            qplan = list(policy.make_query_plan(None, query))
+
+            replicas = get_replicas(None, struct.pack('>i', i))
+            other = set(h for h in hosts if h not in replicas)
+            self.assertEqual(replicas, qplan[:2])
+            self.assertEqual(other, set(qplan[2:]))
+
+        # Should use the secondary policy
+        for i in range(4):
+            qplan = list(policy.make_query_plan())
+
+            self.assertEqual(set(qplan), set(hosts))
 
 class TokenAwarePolicyTest(unittest.TestCase):
 

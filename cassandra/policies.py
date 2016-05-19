@@ -306,6 +306,47 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
     def on_remove(self, host):
         self.on_down(host)
 
+class BlackListPolicy(LoadBalancingPolicy):
+    """
+    A :class:`.LoadBalancingPolicy` wrapper that adds the possibility to blacklist
+    a list of datacenters and/or a list of hosts to a child policy.
+    """
+
+    _child_policy = None
+    _blacklisted_dcs = None
+    _blacklisted_hosts = None
+
+    def __init__(self, child_policy, blacklisted_dcs=[], blacklisted_hosts=[]):
+        self._child_policy = child_policy
+        self._blacklisted_dcs = blacklisted_dcs
+        self._blacklisted_hosts = blacklisted_hosts
+
+    def populate(self, cluster, hosts):
+        valid_hosts = [host for host in hosts if host.datacenter not in self._blacklisted_dcs and host.address not in self._blacklisted_hosts]
+        return self._child_policy.populate(cluster, valid_hosts)
+
+    def distance(self, host):
+        if host.address in self._blacklisted_hosts or host.datacenter in self._blacklisted_dcs:
+            return HostDistance.IGNORED
+        else:
+            return self._child_policy.distance(host)
+
+    def make_query_plan(self, working_keyspace=None, query=None):
+        return self._child_policy.make_query_plan(working_keyspace, query)
+
+    def on_up(self, host):
+        if host.address not in self._blacklisted_hosts and host.datacenter not in self._blacklisted_dcs:
+           return self._child_policy.on_up(host)
+
+    def on_down(self, host):
+        return self._child_policy.on_down(host)
+
+    def on_add(self, host):
+        if host.address not in self._blacklisted_hosts and host.datacenter not in self._blacklisted_dcs:
+            return self._child_policy.on_add(host)
+
+    def on_remove(self, host):
+        return self._child_policy.on_remove(host)
 
 class TokenAwarePolicy(LoadBalancingPolicy):
     """
