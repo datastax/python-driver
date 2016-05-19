@@ -28,7 +28,7 @@ from threading import Thread
 from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster
 from cassandra.metadata import Metadata
-from cassandra.policies import (RoundRobinPolicy, DCAwareRoundRobinPolicy,
+from cassandra.policies import (RoundRobinPolicy, WhiteListRoundRobinPolicy, DCAwareRoundRobinPolicy,
                                 TokenAwarePolicy, SimpleConvictionPolicy,
                                 HostDistance, ExponentialReconnectionPolicy,
                                 RetryPolicy, WriteType,
@@ -1113,3 +1113,17 @@ class DowngradingConsistencyRetryPolicyTest(unittest.TestCase):
             query=None, consistency=ONE, required_replicas=3, alive_replicas=1, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETRY)
         self.assertEqual(consistency, ConsistencyLevel.ONE)
+
+
+class WhiteListRoundRobinPolicyTest(unittest.TestCase):
+
+    def test_hosts_with_hostname(self):
+        hosts = ['localhost']
+        policy = WhiteListRoundRobinPolicy(hosts)
+        host = Host("127.0.0.1", SimpleConvictionPolicy)
+        policy.populate(None, [host])
+
+        qplan = list(policy.make_query_plan())
+        self.assertEqual(sorted(qplan), [host])
+
+        self.assertEqual(policy.distance(host), HostDistance.LOCAL)
