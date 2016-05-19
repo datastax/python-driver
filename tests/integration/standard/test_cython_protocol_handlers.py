@@ -12,7 +12,7 @@ from cassandra.query import tuple_factory
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.protocol import ProtocolHandler, LazyProtocolHandler, NumpyProtocolHandler, ConfigurationException
 from cassandra.cython_deps import HAVE_CYTHON, HAVE_NUMPY
-from tests.integration import use_singledc, PROTOCOL_VERSION, notprotocolv1, drop_keyspace_shutdown_cluster, VERIFY_CYTHON, BasicSharedKeyspaceUnitTestCase, execute_with_retry_tolerant
+from tests.integration import use_singledc, PROTOCOL_VERSION, notprotocolv1, drop_keyspace_shutdown_cluster, VERIFY_CYTHON, BasicSharedKeyspaceUnitTestCase, execute_with_retry_tolerant, greaterthancass20
 from tests.integration.datatype_utils import update_datatypes
 from tests.integration.standard.utils import (
     create_table_with_all_types, get_all_primitive_params, get_primitive_datatypes)
@@ -232,7 +232,8 @@ class NumpyNullTest(BasicSharedKeyspaceUnitTestCase):
         self.session.row_factory = tuple_factory
 
     @numpytest
-    def test_null_types3(self):
+    @greaterthancass20
+    def test_null_types(self):
         """
         Test to validate that the numpy protocol handler can deal with null values.
         @since 3.3.0
