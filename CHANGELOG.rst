@@ -1,3 +1,32 @@
+3.4.0
+=====
+
+Features
+--------
+*  Include DSE version and workload in Host data (PYTHON-555)
+*  Add a context manager to Cluster and Session (PYTHON-521)
+*  Better Error Message for Unsupported Protocol Version (PYTHON-157)
+*  Make the error message explicitly state when an error comes from the server (PYTHON-412)
+*  Short Circuit meta refresh on topo change if NEW_NODE already exists (PYTHON-557)
+*  Show warning when the wrong config is passed to SimpleStatement (PYTHON-219)
+*  Return namedtuple result pairs from execute_concurrent (PYTHON-362)
+*  BatchStatement should enforce batch size limit in a better way (PYTHON-151)
+*  Validate min/max request thresholds for connection pool scaling (PYTHON-220)
+*  Handle or warn about multiple hosts with the same rpc_address (PYTHON-365)
+*  Write docs around working with datetime and timezones (PYTHON-394)
+
+Bug Fixes
+--------
+*  High CPU utilization when using asyncore event loop (PYTHON-239)
+*  Fix CQL Export for non-ASCII Identifiers (PYTHON-447)
+*  Make stress scripts Python 2.6 compatible (PYTHON-434)
+*  UnicodeDecodeError when unicode characters in key in BOP (PYTHON-559)
+*  WhiteListRoundRobinPolicy should resolve hosts (PYTHON-565)
+*  Cluster and Session do not GC after leaving scope (PYTHON-135)
+*  Don't wait for schema agreement on ignored nodes (PYTHON-531)
+*  Reprepare on_up with many clients causes node overload (PYTHON-556)
+*  None inserted into host map when control connection node is decommissioned (PYTHON-548)
+
 3.3.0
 =====
 May 2, 2016
