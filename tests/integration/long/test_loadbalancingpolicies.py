@@ -60,15 +60,19 @@ class LoadBalancingPolicyTests(unittest.TestCase):
                                          schema_metadata_enabled=False, token_metadata_enabled=False)
             self.probe_session = self.probe_cluster.connect()
 
-    def _wait_for_nodes_up(self, nodes):
-        self._connect_probe_cluster()
+    def _wait_for_nodes_up(self, nodes, cluster=None):
+        if not cluster:
+            self._connect_probe_cluster()
+            cluster = self.probe_cluster
         for n in nodes:
-            wait_for_up(self.probe_cluster, n)
+            wait_for_up(cluster, n)
 
-    def _wait_for_nodes_down(self, nodes):
-        self._connect_probe_cluster()
+    def _wait_for_nodes_down(self, nodes, cluster=None):
+        if not cluster:
+            self._connect_probe_cluster()
+            cluster = self.probe_cluster
         for n in nodes:
-            wait_for_down(self.probe_cluster, n)
+            wait_for_down(cluster, n)
 
     def _cluster_session_with_lbp(self, lbp):
         # create a cluster with no delay on events
@@ -162,8 +166,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         use_singledc()
         keyspace = 'test_roundrobin'
         cluster, session = self._cluster_session_with_lbp(RoundRobinPolicy())
-        self._wait_for_nodes_up(range(1, 4))
-
+        self._wait_for_nodes_up(range(1, 4), cluster)
         create_schema(cluster, session, keyspace, replication_factor=3)
         self._insert(session, keyspace)
         self._query(session, keyspace)
@@ -173,7 +176,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 3, 4)
 
         force_stop(3)
-        self._wait_for_nodes_down([3])
+        self._wait_for_nodes_down([3], cluster)
 
         self.coordinator_stats.reset_counts()
         self._query(session, keyspace)
@@ -184,8 +187,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         decommission(1)
         start(3)
-        self._wait_for_nodes_down([1])
-        self._wait_for_nodes_up([3])
+        self._wait_for_nodes_down([1], cluster)
+        self._wait_for_nodes_up([3], cluster)
 
         self.coordinator_stats.reset_counts()
         self._query(session, keyspace)
@@ -199,7 +202,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         use_multidc([2, 2])
         keyspace = 'test_roundrobin_two_dcs'
         cluster, session = self._cluster_session_with_lbp(RoundRobinPolicy())
-        self._wait_for_nodes_up(range(1, 5))
+        self._wait_for_nodes_up(range(1, 5), cluster)
 
         create_schema(cluster, session, keyspace, replication_strategy=[2, 2])
         self._insert(session, keyspace)
@@ -216,7 +219,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         # reset control connection
         self._insert(session, keyspace, count=1000)
 
-        self._wait_for_nodes_up([5])
+        self._wait_for_nodes_up([5], cluster)
 
         self.coordinator_stats.reset_counts()
         self._query(session, keyspace)
@@ -233,7 +236,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         use_multidc([2, 2])
         keyspace = 'test_roundrobin_two_dcs_2'
         cluster, session = self._cluster_session_with_lbp(RoundRobinPolicy())
-        self._wait_for_nodes_up(range(1, 5))
+        self._wait_for_nodes_up(range(1, 5), cluster)
 
         create_schema(cluster, session, keyspace, replication_strategy=[2, 2])
         self._insert(session, keyspace)
@@ -250,7 +253,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         # reset control connection
         self._insert(session, keyspace, count=1000)
 
-        self._wait_for_nodes_up([5])
+        self._wait_for_nodes_up([5], cluster)
 
         self.coordinator_stats.reset_counts()
         self._query(session, keyspace)
@@ -388,7 +391,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
     def token_aware(self, keyspace, use_prepared=False):
         use_singledc()
         cluster, session = self._cluster_session_with_lbp(TokenAwarePolicy(RoundRobinPolicy()))
-        self._wait_for_nodes_up([1, 2, 3])
+        self._wait_for_nodes_up(range(1, 4), cluster)
 
         create_schema(cluster, session, keyspace, replication_factor=1)
         self._insert(session, keyspace)
@@ -407,7 +410,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         self.coordinator_stats.reset_counts()
         force_stop(2)
-        self._wait_for_nodes_down([2])
+        self._wait_for_nodes_down([2], cluster)
 
         try:
             self._query(session, keyspace, use_prepared=use_prepared)
@@ -419,7 +422,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         self.coordinator_stats.reset_counts()
         start(2)
-        self._wait_for_nodes_up([2])
+        self._wait_for_nodes_up([2], cluster)
 
         self._query(session, keyspace, use_prepared=use_prepared)
 
@@ -429,7 +432,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         self.coordinator_stats.reset_counts()
         stop(2)
-        self._wait_for_nodes_down([2])
+        self._wait_for_nodes_down([2], cluster)
 
         try:
             self._query(session, keyspace, use_prepared=use_prepared)
@@ -439,9 +442,9 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         self.coordinator_stats.reset_counts()
         start(2)
-        self._wait_for_nodes_up([2])
+        self._wait_for_nodes_up([2], cluster)
         decommission(2)
-        self._wait_for_nodes_down([2])
+        self._wait_for_nodes_down([2], cluster)
 
         self._query(session, keyspace, use_prepared=use_prepared)
 
@@ -459,7 +462,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         keyspace = 'test_token_aware_composite_key'
         table = 'composite'
         cluster, session = self._cluster_session_with_lbp(TokenAwarePolicy(RoundRobinPolicy()))
-        self._wait_for_nodes_up([1, 2, 3])
+        self._wait_for_nodes_up(range(1, 4), cluster)
 
         create_schema(cluster, session, keyspace, replication_factor=2)
         session.execute('CREATE TABLE %s ('
@@ -483,7 +486,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         use_singledc()
         keyspace = 'test_token_aware_with_rf_2'
         cluster, session = self._cluster_session_with_lbp(TokenAwarePolicy(RoundRobinPolicy()))
-        self._wait_for_nodes_up([1, 2, 3])
+        self._wait_for_nodes_up(range(1, 4), cluster)
 
         create_schema(cluster, session, keyspace, replication_factor=2)
         self._insert(session, keyspace)
@@ -495,7 +498,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         self.coordinator_stats.reset_counts()
         stop(2)
-        self._wait_for_nodes_down([2])
+        self._wait_for_nodes_down([2],cluster)
 
         self._query(session, keyspace)
 
@@ -508,7 +511,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
     def test_token_aware_with_local_table(self):
         use_singledc()
         cluster, session = self._cluster_session_with_lbp(TokenAwarePolicy(RoundRobinPolicy()))
-        self._wait_for_nodes_up([1, 2, 3])
+        self._wait_for_nodes_up(range(1, 4), cluster)
 
         p = session.prepare("SELECT * FROM system.local WHERE key=?")
         # this would blow up prior to 61b4fad
