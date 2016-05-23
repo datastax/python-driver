@@ -83,6 +83,18 @@ class Host(object):
     release_version as queried from the control connection system tables
     """
 
+    dse_version = None
+    """
+    dse_version as queried from the control connection system tables. Only populated when connecting to
+    DSE with this property available. Not queried if :attr:`~.Cluster.token_metadata_enabled` is ``False``.
+    """
+
+    dse_workload = None
+    """
+    DSE workload queried from the control connection system tables. Only populated when connecting to
+    DSE with this property available. Not queried if :attr:`~.Cluster.token_metadata_enabled` is ``False``.
+    """
+
     _datacenter = None
     _rack = None
     _reconnection_handler = None

@@ -221,6 +221,8 @@ class Statement(object):
     def __init__(self, retry_policy=None, consistency_level=None, routing_key=None,
                  serial_consistency_level=None, fetch_size=FETCH_SIZE_UNSET, keyspace=None,
                  custom_payload=None):
+        if retry_policy and not hasattr(retry_policy, 'on_read_timeout'):  # just checking one method to detect positional parameter errors
+            raise ValueError('retry_policy should implement cassandra.policies.RetryPolicy')
         self.retry_policy = retry_policy
         if consistency_level is not None:
             self.consistency_level = consistency_level
@@ -325,15 +327,18 @@ class SimpleStatement(Statement):
     A simple, un-prepared query.
     """
 
-    def __init__(self, query_string, *args, **kwargs):
+    def __init__(self, query_string, retry_policy=None, consistency_level=None, routing_key=None,
+                 serial_consistency_level=None, fetch_size=FETCH_SIZE_UNSET, keyspace=None,
+                 custom_payload=None):
         """
         `query_string` should be a literal CQL statement with the exception
         of parameter placeholders that will be filled through the
         `parameters` argument of :meth:`.Session.execute()`.
 
-        All arguments to :class:`Statement` apply to this class as well
+        See :class:`Statement` attributes for a description of the other parameters.
         """
-        Statement.__init__(self, *args, **kwargs)
+        Statement.__init__(self, retry_policy, consistency_level, routing_key,
+                           serial_consistency_level, fetch_size, keyspace, custom_payload)
         self._query_string = query_string
 
     @property
@@ -449,11 +454,13 @@ class BoundStatement(Statement):
     The sequence of values that were bound to the prepared statement.
     """
 
-    def __init__(self, prepared_statement, *args, **kwargs):
+    def __init__(self, prepared_statement, retry_policy=None, consistency_level=None, routing_key=None,
+                 serial_consistency_level=None, fetch_size=FETCH_SIZE_UNSET, keyspace=None,
+                 custom_payload=None):
         """
         `prepared_statement` should be an instance of :class:`PreparedStatement`.
 
-        All arguments to :class:`Statement` apply to this class as well
+        See :class:`Statement` attributes for a description of the other parameters.
         """
         self.prepared_statement = prepared_statement
 
@@ -467,7 +474,8 @@ class BoundStatement(Statement):
         if meta:
             self.keyspace = meta[0].keyspace_name
 
-        Statement.__init__(self, *args, **kwargs)
+        Statement.__init__(self, retry_policy, consistency_level, routing_key,
+                           serial_consistency_level, fetch_size, keyspace, custom_payload)
 
     def bind(self, values):
         """
@@ -699,6 +707,19 @@ class BatchStatement(Statement):
         Statement.__init__(self, retry_policy=retry_policy, consistency_level=consistency_level,
                            serial_consistency_level=serial_consistency_level, custom_payload=custom_payload)
 
+    def clear(self):
+        """
+        This is a convenience method to clear a batch statement for reuse.
+
+        *Note:* it should not be used concurrently with uncompleted execution futures executing the same
+        ``BatchStatement``.
+        """
+        del self._statements_and_parameters[:]
+        self.keyspace = None
+        self.routing_key = None
+        if self.custom_payload:
+            self.custom_payload.clear()
+
     def add(self, statement, parameters=None):
         """
         Adds a :class:`.Statement` and optional sequence of parameters
@@ -711,21 +732,19 @@ class BatchStatement(Statement):
             if parameters:
                 encoder = Encoder() if self._session is None else self._session.encoder
                 statement = bind_params(statement, parameters, encoder)
-            self._statements_and_parameters.append((False, statement, ()))
+            self._add_statement_and_params(False, statement, ())
         elif isinstance(statement, PreparedStatement):
             query_id = statement.query_id
             bound_statement = statement.bind(() if parameters is None else parameters)
             self._update_state(bound_statement)
-            self._statements_and_parameters.append(
-                (True, query_id, bound_statement.values))
+            self._add_statement_and_params(True, query_id, bound_statement.values)
         elif isinstance(statement, BoundStatement):
             if parameters:
                 raise ValueError(
                     "Parameters cannot be passed with a BoundStatement "
                     "to BatchStatement.add()")
             self._update_state(statement)
-            self._statements_and_parameters.append(
-                (True, statement.prepared_statement.query_id, statement.values))
+            self._add_statement_and_params(True, statement.prepared_statement.query_id, statement.values)
         else:
             # it must be a SimpleStatement
             query_string = statement.query_string
@@ -733,17 +752,22 @@ class BatchStatement(Statement):
                 encoder = Encoder() if self._session is None else self._session.encoder
                 query_string = bind_params(query_string, parameters, encoder)
             self._update_state(statement)
-            self._statements_and_parameters.append((False, query_string, ()))
+            self._add_statement_and_params(False, query_string, ())
         return self
 
     def add_all(self, statements, parameters):
         """
         Adds a sequence of :class:`.Statement` objects and a matching sequence
-        of parameters to the batch.  :const:`None` can be used in place of
-        parameters when no parameters are needed.
+        of parameters to the batch. Statement and parameter sequences must be of equal length or
+        one will be truncated. :const:`None` can be used in the parameters position where are needed.
         """
         for statement, value in zip(statements, parameters):
-            self.add(statement, parameters)
+            self.add(statement, value)
+
+    def _add_statement_and_params(self, is_prepared, statement, parameters):
+        if len(self._statements_and_parameters) >= 0xFFFF:
+            raise ValueError("Batch statement cannot contain more than %d statements." % 0xFFFF)
+        self._statements_and_parameters.append((is_prepared, statement, parameters))
 
     def _maybe_set_routing_attributes(self, statement):
         if self.routing_key is None:

@@ -156,6 +156,7 @@ greaterthancass20 = unittest.skipUnless(CASSANDRA_VERSION >= '2.1', 'Cassandra v
 greaterthancass21 = unittest.skipUnless(CASSANDRA_VERSION >= '2.2', 'Cassandra version 2.2 or greater required')
 greaterthanorequalcass30 = unittest.skipUnless(CASSANDRA_VERSION >= '3.0', 'Cassandra version 3.0 or greater required')
 lessthancass30 = unittest.skipUnless(CASSANDRA_VERSION < '3.0', 'Cassandra version less then 3.0 required')
+dseonly = unittest.skipUnless(DSE_VERSION, "Test is only applicalbe to DSE clusters")
 
 
 def wait_for_node_socket(node, timeout):
@@ -528,6 +529,12 @@ class MockLoggingHandler(logging.Handler):
             'critical': [],
         }
 
+    def get_message_count(self, level, sub_string):
+        count = 0
+        for msg in self.messages.get(level):
+            if sub_string in msg:
+                count+=1
+        return count
 
 class BasicExistingKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):
     """

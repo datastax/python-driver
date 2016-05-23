@@ -17,18 +17,20 @@ try:
 except ImportError:
     import unittest  # noqa
 
+from binascii import unhexlify
 from mock import Mock
 import os
 import six
 
 import cassandra
+from cassandra.marshal import uint16_unpack, uint16_pack
 from cassandra.metadata import (Murmur3Token, MD5Token,
                                 BytesToken, ReplicationStrategy,
                                 NetworkTopologyStrategy, SimpleStrategy,
                                 LocalStrategy, protect_name,
                                 protect_names, protect_value, is_valid_name,
                                 UserType, KeyspaceMetadata, get_schema_parser,
-                                _UnknownStrategy)
+                                _UnknownStrategy, ColumnMetadata, TableMetadata, IndexMetadata, Function, Aggregate)
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
@@ -309,17 +311,32 @@ class MD5TokensTest(unittest.TestCase):
 class BytesTokensTest(unittest.TestCase):
 
     def test_bytes_tokens(self):
-        bytes_token = BytesToken(str(cassandra.metadata.MIN_LONG - 1))
+        bytes_token = BytesToken(unhexlify(six.b('01')))
+        self.assertEqual(bytes_token.value, six.b('\x01'))
+        self.assertEqual(str(bytes_token), "<BytesToken: %s>" % bytes_token.value)
         self.assertEqual(bytes_token.hash_fn('123'), '123')
         self.assertEqual(bytes_token.hash_fn(123), 123)
         self.assertEqual(bytes_token.hash_fn(str(cassandra.metadata.MAX_LONG)), str(cassandra.metadata.MAX_LONG))
-        self.assertEqual(str(bytes_token), "<BytesToken: -9223372036854775809>")
 
-        try:
-            bytes_token = BytesToken(cassandra.metadata.MIN_LONG - 1)
-            self.fail('Tokens for ByteOrderedPartitioner should be only strings')
-        except TypeError:
-            pass
+    def test_from_string(self):
+        from_unicode = BytesToken.from_string(six.text_type('0123456789abcdef'))
+        from_bin = BytesToken.from_string(six.b('0123456789abcdef'))
+        self.assertEqual(from_unicode, from_bin)
+        self.assertIsInstance(from_unicode.value, six.binary_type)
+        self.assertIsInstance(from_bin.value, six.binary_type)
+
+    def test_comparison(self):
+        tok = BytesToken.from_string(six.text_type('0123456789abcdef'))
+        token_high_order = uint16_unpack(tok.value[0:2])
+        self.assertLess(BytesToken(uint16_pack(token_high_order - 1)), tok)
+        self.assertGreater(BytesToken(uint16_pack(token_high_order + 1)), tok)
+
+    def test_comparison_unicode(self):
+        value = six.b('\'_-()"\xc2\xac')
+        t0 = BytesToken(value)
+        t1 = BytesToken.from_string('00')
+        self.assertGreater(t0, t1)
+        self.assertFalse(t0 < t1)
 
 
 class KeyspaceMetadataTest(unittest.TestCase):
@@ -392,3 +409,68 @@ class IndexTest(unittest.TestCase):
         index_meta = parser._build_index_metadata(column_meta, row)
         self.assertEqual(index_meta.as_cql_query(),
                 "CREATE CUSTOM INDEX index_name_here ON keyspace_name_here.table_name_here (column_name_here) USING 'class_name_here'")
+
+
+class UnicodeIdentifiersTests(unittest.TestCase):
+    """
+    Exercise cql generation with unicode characters. Keyspace, Table, and Index names
+    cannot have special chars because C* names files by those identifiers, but they are
+    tested anyway.
+
+    Looking for encoding errors like PYTHON-447
+    """
+
+    name = six.text_type(b'\'_-()"\xc2\xac'.decode('utf-8'))
+
+    def test_keyspace_name(self):
+        km = KeyspaceMetadata(self.name, False, 'SimpleStrategy', {'replication_factor': 1})
+        km.export_as_string()
+
+    def test_table_name(self):
+        tm = TableMetadata(self.name, self.name)
+        tm.export_as_string()
+
+    def test_column_name_single_partition(self):
+        tm = TableMetadata('ks', 'table')
+        cm = ColumnMetadata(tm, self.name, u'int')
+        tm.columns[cm.name] = cm
+        tm.partition_key.append(cm)
+        tm.export_as_string()
+
+    def test_column_name_single_partition_single_clustering(self):
+        tm = TableMetadata('ks', 'table')
+        cm = ColumnMetadata(tm, self.name, u'int')
+        tm.columns[cm.name] = cm
+        tm.partition_key.append(cm)
+        cm = ColumnMetadata(tm, self.name + 'x', u'int')
+        tm.columns[cm.name] = cm
+        tm.clustering_key.append(cm)
+        tm.export_as_string()
+
+    def test_column_name_multiple_partition(self):
+        tm = TableMetadata('ks', 'table')
+        cm = ColumnMetadata(tm, self.name, u'int')
+        tm.columns[cm.name] = cm
+        tm.partition_key.append(cm)
+        cm = ColumnMetadata(tm, self.name + 'x', u'int')
+        tm.columns[cm.name] = cm
+        tm.partition_key.append(cm)
+        tm.export_as_string()
+
+    def test_index(self):
+        im = IndexMetadata(self.name, self.name, self.name, kind='', index_options={'target': self.name})
+        im.export_as_string()
+        im = IndexMetadata(self.name, self.name, self.name, kind='CUSTOM', index_options={'target': self.name, 'class_name': 'Class'})
+        im.export_as_string()
+
+    def test_function(self):
+        fm = Function(self.name, self.name, (u'int', u'int'), (u'x', u'y'), u'int', u'language', self.name, False)
+        fm.export_as_string()
+
+    def test_aggregate(self):
+        am = Aggregate(self.name, self.name, (u'text',), self.name, u'text', self.name, self.name, u'text')
+        am.export_as_string()
+
+    def test_user_type(self):
+        um = UserType(self.name, self.name, [self.name, self.name], [u'int', u'text'])
+        um.export_as_string()

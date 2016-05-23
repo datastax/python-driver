@@ -19,7 +19,7 @@ import sys, logging, traceback
 from cassandra import InvalidRequest, ConsistencyLevel, ReadTimeout, WriteTimeout, OperationTimedOut, \
     ReadFailure, WriteFailure
 from cassandra.cluster import Cluster
-from cassandra.concurrent import execute_concurrent, execute_concurrent_with_args
+from cassandra.concurrent import execute_concurrent, execute_concurrent_with_args, ExecutionResult
 from cassandra.policies import HostDistance
 from cassandra.query import tuple_factory, SimpleStatement
 
@@ -151,6 +151,12 @@ class ClusterTests(unittest.TestCase):
                 self.assertTrue(success)
                 self.assertFalse(result)
 
+            results = self.execute_concurrent_args_helper(self.session, statement, parameters, results_generator=True)
+            for result in results:
+                self.assertTrue(isinstance(result, ExecutionResult))
+                self.assertTrue(result.success)
+                self.assertFalse(result.result_or_exc)
+
             # read
             statement = SimpleStatement(
                 "SELECT v FROM test3rf.test WHERE k=%s",
@@ -158,6 +164,7 @@ class ClusterTests(unittest.TestCase):
             parameters = [(i, ) for i in range(num_statements)]
 
             results = self.execute_concurrent_args_helper(self.session, statement, parameters, results_generator=True)
+
             for i in range(num_statements):
                 result = next(results)
                 self.assertEqual((True, [(i,)]), result)

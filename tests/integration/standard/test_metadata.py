@@ -34,9 +34,8 @@ from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
 from tests.integration import get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass, \
-    BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase, BasicExistingKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster, CASSANDRA_VERSION
-
-from tests.unit.cython.utils import notcython
+    BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase, BasicExistingKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster, CASSANDRA_VERSION, \
+    BasicExistingSegregatedKeyspaceUnitTestCase, dseonly, DSE_VERSION
 
 
 def setup_module():
@@ -1312,7 +1311,7 @@ class TokenMetadataTest(unittest.TestCase):
         cluster.shutdown()
 
     def test_getting_replicas(self):
-        tokens = [MD5Token(str(i)) for i in range(0, (2 ** 127 - 1), 2 ** 125)]
+        tokens = [MD5Token(i) for i in range(0, (2 ** 127 - 1), 2 ** 125)]
         hosts = [Host("ip%d" % i, SimpleConvictionPolicy) for i in range(len(tokens))]
         token_to_primary_replica = dict(zip(tokens, hosts))
         keyspace = KeyspaceMetadata("ks", True, "SimpleStrategy", {"replication_factor": "1"})
@@ -1327,12 +1326,12 @@ class TokenMetadataTest(unittest.TestCase):
 
         # shift the tokens back by one
         for token, expected_host in zip(tokens, hosts):
-            replicas = token_map.get_replicas("ks", MD5Token(str(token.value - 1)))
+            replicas = token_map.get_replicas("ks", MD5Token(token.value - 1))
             self.assertEqual(set(replicas), set([expected_host]))
 
         # shift the tokens forward by one
         for i, token in enumerate(tokens):
-            replicas = token_map.get_replicas("ks", MD5Token(str(token.value + 1)))
+            replicas = token_map.get_replicas("ks", MD5Token(token.value + 1))
             expected_host = hosts[(i + 1) % len(hosts)]
             self.assertEqual(set(replicas), set([expected_host]))
 
@@ -2419,3 +2418,21 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         value_column = mv_columns[2]
         self.assertIsNotNone(value_column)
         self.assertEquals(value_column.name, 'the Value')
+
+
+@dseonly
+class DSEMetadataTest(BasicExistingSegregatedKeyspaceUnitTestCase):
+
+    def test_dse_specific_meta(self):
+        """
+        Test to ensure DSE metadata is populated appropriately.
+        @since 3.4
+        @jira_ticket PYTHON-555
+        @expected_result metadata for dse_version, and dse_workload should be populated on dse clusters
+
+        @test_category metadata
+        """
+        for host in self.cluster.metadata.all_hosts():
+            self.assertIsNotNone(host.dse_version, "Dse version not populated as expected")
+            self.assertEqual(host.dse_version, DSE_VERSION)
+            self.assertTrue("Cassandra" in host.dse_workload)

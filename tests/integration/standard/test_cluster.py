@@ -21,6 +21,7 @@ from collections import deque
 from mock import patch
 import time
 from uuid import uuid4
+import logging
 
 import cassandra
 from cassandra.cluster import Cluster, NoHostAvailable
@@ -31,7 +32,7 @@ from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
 from cassandra.protocol import MAX_SUPPORTED_VERSION
 from cassandra.query import SimpleStatement, TraceUnavailable
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, get_node, CASSANDRA_VERSION, execute_until_pass, execute_with_long_wait_retry, BasicExistingKeyspaceUnitTestCase, get_node
+from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, get_node, CASSANDRA_VERSION, execute_until_pass, execute_with_long_wait_retry, get_node, MockLoggingHandler
 from tests.integration.util import assert_quiescent_pool_state
 
 
@@ -640,7 +641,7 @@ class TestAddressTranslation(unittest.TestCase):
 
         @since 3.3
         @jira_ticket PYTHON-69
-        @expected_result only one hosts' metadata will be populeated
+        @expected_result only one hosts' metadata will be populated
 
         @test_category metadata
         """
@@ -669,3 +670,123 @@ class TestAddressTranslation(unittest.TestCase):
         c.connect()
         for host in c.metadata.all_hosts():
             self.assertEqual(adder_map.get(str(host)), host.broadcast_address)
+
+
+class ContextManagementTest(unittest.TestCase):
+
+    load_balancing_policy = WhiteListRoundRobinPolicy(['127.0.0.1'])
+    cluster_kwargs = {'load_balancing_policy': load_balancing_policy,
+                      'schema_metadata_enabled': False,
+                      'token_metadata_enabled': False}
+
+    def test_no_connect(self):
+        """
+        Test cluster context without connecting.
+
+        @since 3.4
+        @jira_ticket PYTHON-521
+        @expected_result context should still be valid
+
+        @test_category configuration
+        """
+        with Cluster() as cluster:
+            self.assertFalse(cluster.is_shutdown)
+        self.assertTrue(cluster.is_shutdown)
+
+    def test_simple_nested(self):
+        """
+        Test cluster and session contexts nested in one another.
+
+        @since 3.4
+        @jira_ticket PYTHON-521
+        @expected_result cluster/session should be crated and shutdown appropriately.
+
+        @test_category configuration
+        """
+        with Cluster(**self.cluster_kwargs) as cluster:
+            with cluster.connect() as session:
+                self.assertFalse(cluster.is_shutdown)
+                self.assertFalse(session.is_shutdown)
+                self.assertTrue(session.execute('select release_version from system.local')[0])
+            self.assertTrue(session.is_shutdown)
+        self.assertTrue(cluster.is_shutdown)
+
+    def test_cluster_no_session(self):
+        """
+        Test cluster context without session context.
+
+        @since 3.4
+        @jira_ticket PYTHON-521
+        @expected_result Session should be created correctly. Cluster should shutdown outside of context
+
+        @test_category configuration
+        """
+        with Cluster(**self.cluster_kwargs) as cluster:
+            session = cluster.connect()
+            self.assertFalse(cluster.is_shutdown)
+            self.assertFalse(session.is_shutdown)
+            self.assertTrue(session.execute('select release_version from system.local')[0])
+        self.assertTrue(session.is_shutdown)
+        self.assertTrue(cluster.is_shutdown)
+
+    def test_session_no_cluster(self):
+        """
+        Test session context without cluster context.
+
+        @since 3.4
+        @jira_ticket PYTHON-521
+        @expected_result session should be created correctly. Session should shutdown correctly outside of context
+
+        @test_category configuration
+        """
+        cluster = Cluster(**self.cluster_kwargs)
+        unmanaged_session = cluster.connect()
+        with cluster.connect() as session:
+            self.assertFalse(cluster.is_shutdown)
+            self.assertFalse(session.is_shutdown)
+            self.assertFalse(unmanaged_session.is_shutdown)
+            self.assertTrue(session.execute('select release_version from system.local')[0])
+        self.assertTrue(session.is_shutdown)
+        self.assertFalse(cluster.is_shutdown)
+        self.assertFalse(unmanaged_session.is_shutdown)
+        unmanaged_session.shutdown()
+        self.assertTrue(unmanaged_session.is_shutdown)
+        self.assertFalse(cluster.is_shutdown)
+        cluster.shutdown()
+        self.assertTrue(cluster.is_shutdown)
+
+
+class DuplicateRpcTest(unittest.TestCase):
+
+    load_balancing_policy = WhiteListRoundRobinPolicy(['127.0.0.1'])
+
+    def setUp(self):
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=self.load_balancing_policy)
+        self.session = self.cluster.connect()
+        self.session.execute("UPDATE system.peers SET rpc_address = '127.0.0.1' WHERE peer='127.0.0.2'")
+
+    def tearDown(self):
+        self.session.execute("UPDATE system.peers SET rpc_address = '127.0.0.2' WHERE peer='127.0.0.2'")
+        self.cluster.shutdown()
+
+    def test_duplicate(self):
+        """
+        Test duplicate RPC addresses.
+
+        Modifies the system.peers table to make hosts have the same rpc address. Ensures such hosts are filtered out and a message is logged
+
+        @since 3.4
+        @jira_ticket PYTHON-366
+        @expected_result only one hosts' metadata will be populated
+
+        @test_category metadata
+        """
+        mock_handler = MockLoggingHandler()
+        logger = logging.getLogger(cassandra.cluster.__name__)
+        logger.addHandler(mock_handler)
+        test_cluster = self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=self.load_balancing_policy)
+        test_cluster.connect()
+        warnings = mock_handler.messages.get("warning")
+        self.assertEqual(len(warnings), 1)
+        self.assertTrue('multiple' in warnings[0])
+        logger.removeHandler(mock_handler)
