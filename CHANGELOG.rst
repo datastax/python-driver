@@ -1,5 +1,6 @@
 3.4.0
 =====
+May 24, 2016
 
 Features
 --------
@@ -26,6 +27,7 @@ Bug Fixes
 *  Don't wait for schema agreement on ignored nodes (PYTHON-531)
 *  Reprepare on_up with many clients causes node overload (PYTHON-556)
 *  None inserted into host map when control connection node is decommissioned (PYTHON-548)
+*  weakref.ref does not accept keyword arguments (github #585)
 
 3.3.0
 =====
