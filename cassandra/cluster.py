@@ -260,6 +260,7 @@ class ProfileManager(object):
         for p in self.profiles.values():
             p.load_balancing_policy.on_remove(host)
 
+PROFILE_DEFAULT = None
 
 class Cluster(object):
     """
@@ -738,7 +739,8 @@ class Cluster(object):
             self.connection_class = connection_class
 
         self.profile_manager = ProfileManager()
-        self.profile_manager.profiles[None] = ExecutionProfile(self.load_balancing_policy,
+        # TODO: propagate profile_default to exec method
+        self.profile_manager.profiles[PROFILE_DEFAULT] = ExecutionProfile(self.load_balancing_policy,
                                                                self.default_retry_policy,
                                                                Session.default_consistency_level,
                                                                Session.default_serial_consistency_level,
