@@ -211,6 +211,8 @@ class Cluster(object):
         >>> ...
         >>> cluster.shutdown()
 
+    ``Cluster`` and ``Session`` also provide context management functions
+    which implicitly handle shutdown when leaving scope.
     """
 
     contact_points = ['127.0.0.1']

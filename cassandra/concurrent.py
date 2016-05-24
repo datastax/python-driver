@@ -57,8 +57,8 @@ def execute_concurrent(session, statements_and_parameters, concurrency=100, rais
         footprint is marginal CPU overhead (more thread coordination and sorting out-of-order results
         on-the-fly).
 
-    A sequence of ``(success, result_or_exc)`` tuples is returned in the same
-    order that the statements were passed in.  If ``success`` is :const:`False`,
+    A sequence of ``ExecutionResult(success, result_or_exc)`` namedtuples is returned
+    in the same order that the statements were passed in.  If ``success`` is :const:`False`,
     there was an error executing the statement, and ``result_or_exc`` will be
     an :class:`Exception`.  If ``success`` is :const:`True`, ``result_or_exc``
     will be the query result.
