@@ -163,11 +163,11 @@ class ResponseFutureTests(unittest.TestCase):
     def test_retry_policy_says_ignore(self):
         session = self.make_session()
         query = SimpleStatement("INSERT INFO foo (a, b) VALUES (1, 2)")
-        query.retry_policy = Mock()
-        query.retry_policy.on_unavailable.return_value = (RetryPolicy.IGNORE, None)
         message = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
 
-        rf = ResponseFuture(session, message, query, 1)
+        retry_policy = Mock()
+        retry_policy.on_unavailable.return_value = (RetryPolicy.IGNORE, None)
+        rf = ResponseFuture(session, message, query, 1, retry_policy=retry_policy)
         rf.send_request()
 
         result = Mock(spec=UnavailableErrorMessage, info={})
@@ -179,14 +179,15 @@ class ResponseFutureTests(unittest.TestCase):
         pool = session._pools.get.return_value
 
         query = SimpleStatement("INSERT INFO foo (a, b) VALUES (1, 2)")
-        query.retry_policy = Mock()
-        query.retry_policy.on_unavailable.return_value = (RetryPolicy.RETRY, ConsistencyLevel.ONE)
         message = QueryMessage(query=query, consistency_level=ConsistencyLevel.QUORUM)
 
         connection = Mock(spec=Connection)
         pool.borrow_connection.return_value = (connection, 1)
 
-        rf = ResponseFuture(session, message, query, 1)
+        retry_policy = Mock()
+        retry_policy.on_unavailable.return_value = (RetryPolicy.RETRY, ConsistencyLevel.ONE)
+
+        rf = ResponseFuture(session, message, query, 1, retry_policy=retry_policy)
         rf.send_request()
 
         rf.session._pools.get.assert_called_once_with('ip1')
@@ -399,11 +400,11 @@ class ResponseFutureTests(unittest.TestCase):
         pool.borrow_connection.return_value = (connection, 1)
 
         query = SimpleStatement("INSERT INFO foo (a, b) VALUES (1, 2)")
-        query.retry_policy = Mock()
-        query.retry_policy.on_unavailable.return_value = (RetryPolicy.RETHROW, None)
         message = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
 
-        rf = ResponseFuture(session, message, query, 1)
+        retry_policy = Mock()
+        retry_policy.on_unavailable.return_value = (RetryPolicy.RETHROW, None)
+        rf = ResponseFuture(session, message, query, 1, retry_policy=retry_policy)
         rf.send_request()
 
         callback = Mock()
