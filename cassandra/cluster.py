@@ -260,7 +260,9 @@ class ProfileManager(object):
         for p in self.profiles.values():
             p.load_balancing_policy.on_remove(host)
 
-PROFILE_DEFAULT = None
+
+EXEC_PROFILE_DEFAULT = object()
+
 
 class Cluster(object):
     """
@@ -739,13 +741,12 @@ class Cluster(object):
             self.connection_class = connection_class
 
         self.profile_manager = ProfileManager()
-        # TODO: propagate profile_default to exec method
-        self.profile_manager.profiles[PROFILE_DEFAULT] = ExecutionProfile(self.load_balancing_policy,
-                                                               self.default_retry_policy,
-                                                               Session.default_consistency_level,
-                                                               Session.default_serial_consistency_level,
-                                                               Session.default_timeout,
-                                                               Session.row_factory)
+        self.profile_manager.profiles[EXEC_PROFILE_DEFAULT] = ExecutionProfile(self.load_balancing_policy,
+                                                                               self.default_retry_policy,
+                                                                               Session.default_consistency_level,
+                                                                               Session.default_serial_consistency_level,
+                                                                               Session.default_timeout,
+                                                                               Session.row_factory)
         # TODO: validate value types
         if execution_profiles:
             self.profile_manager.profiles.update(execution_profiles)
@@ -1772,7 +1773,7 @@ class Session(object):
         for future in futures:
             future.result()
 
-    def execute(self, query, parameters=None, timeout=_NOT_SET, trace=False, custom_payload=None, execution_profile=None):
+    def execute(self, query, parameters=None, timeout=_NOT_SET, trace=False, custom_payload=None, execution_profile=EXEC_PROFILE_DEFAULT):
         """
         Execute the given query and synchronously wait for the response.
 
@@ -1802,7 +1803,7 @@ class Session(object):
         """
         return self.execute_async(query, parameters, trace, custom_payload, timeout, execution_profile).result()
 
-    def execute_async(self, query, parameters=None, trace=False, custom_payload=None, timeout=_NOT_SET, execution_profile=None):
+    def execute_async(self, query, parameters=None, trace=False, custom_payload=None, timeout=_NOT_SET, execution_profile=EXEC_PROFILE_DEFAULT):
         """
         Execute the given query and return a :class:`~.ResponseFuture` object
         which callbacks may be attached to for asynchronous response
@@ -1852,7 +1853,7 @@ class Session(object):
         future.send_request()
         return future
 
-    def _create_response_future(self, query, parameters, trace, custom_payload, timeout, execution_profile):
+    def _create_response_future(self, query, parameters, trace, custom_payload, timeout, execution_profile=EXEC_PROFILE_DEFAULT):
         """ Returns the ResponseFuture before calling send_request() on it """
 
         prepared_statement = None
