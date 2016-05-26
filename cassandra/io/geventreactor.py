@@ -135,6 +135,7 @@ class GeventConnection(Connection):
                     log.debug("Exception in read for %s: %s", self, err)
                     self.defunct(err)
                     return  # leave the read loop
+                continue
 
             if self._iobuf.tell():
                 self.process_io_buffer()
