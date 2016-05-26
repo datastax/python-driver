@@ -480,13 +480,16 @@ class UnicodeIdentifiersTests(unittest.TestCase):
 
 class HostsTests(unittest.TestCase):
     def test_iterate_all_hosts_and_modify(self):
+        """
+        PYTHON-572
+        """
         metadata = Metadata()
         metadata.add_or_return_host(Host('dc1.1', SimpleConvictionPolicy))
         metadata.add_or_return_host(Host('dc1.2', SimpleConvictionPolicy))
 
-        assert len(metadata.all_hosts()) == 2
+        self.assertEqual(len(metadata.all_hosts()), 2)
 
-        for host in metadata.all_hosts():
+        for host in metadata.all_hosts():  # this would previously raise in Py3
             metadata.remove_host(host)
 
-        assert len(metadata.all_hosts()) == 0
+        self.assertEqual(len(metadata.all_hosts()), 0)
