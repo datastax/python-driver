@@ -1,3 +1,12 @@
+3.4.1
+=====
+May 26, 2016
+
+Bug Fixes
+--------
+* Gevent connection closes on IO timeout (PYTHON-573)
+* "dictionary changed size during iteration" with Python 3 (PYTHON-572)
+
 3.4.0
 =====
 May 24, 2016
