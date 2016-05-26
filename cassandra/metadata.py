@@ -324,7 +324,7 @@ class Metadata(object):
         Returns a list of all known :class:`.Host` instances in the cluster.
         """
         with self._hosts_lock:
-            return self._hosts.values()
+            return list(self._hosts.values())
 
 
 REPLICATION_STRATEGY_CLASS_PREFIX = "org.apache.cassandra.locator."

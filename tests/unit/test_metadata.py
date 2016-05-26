@@ -30,7 +30,9 @@ from cassandra.metadata import (Murmur3Token, MD5Token,
                                 LocalStrategy, protect_name,
                                 protect_names, protect_value, is_valid_name,
                                 UserType, KeyspaceMetadata, get_schema_parser,
-                                _UnknownStrategy, ColumnMetadata, TableMetadata, IndexMetadata, Function, Aggregate)
+                                _UnknownStrategy, ColumnMetadata, TableMetadata,
+                                IndexMetadata, Function, Aggregate,
+                                Metadata)
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
@@ -474,3 +476,17 @@ class UnicodeIdentifiersTests(unittest.TestCase):
     def test_user_type(self):
         um = UserType(self.name, self.name, [self.name, self.name], [u'int', u'text'])
         um.export_as_string()
+
+
+class HostsTests(unittest.TestCase):
+    def test_iterate_all_hosts_and_modify(self):
+        metadata = Metadata()
+        metadata.add_or_return_host(Host('dc1.1', SimpleConvictionPolicy))
+        metadata.add_or_return_host(Host('dc1.2', SimpleConvictionPolicy))
+
+        assert len(metadata.all_hosts()) == 2
+
+        for host in metadata.all_hosts():
+            metadata.remove_host(host)
+
+        assert len(metadata.all_hosts()) == 0
