@@ -617,8 +617,10 @@ class Cluster(object):
                  prepare_on_all_hosts=True,
                  reprepare_on_up=True):
         """
-        Any of the mutable Cluster attributes may be set as keyword arguments
-        to the constructor.
+        ``executor_threads`` defines the number of threads in a pool for handling asynchronous tasks such as
+        extablishing connection pools or refreshing metadata.
+
+        Any of the mutable Cluster attributes may be set as keyword arguments to the constructor.
         """
         if contact_points is not None:
             if isinstance(contact_points, six.string_types):
