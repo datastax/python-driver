@@ -11,8 +11,6 @@
 
    .. autoattribute:: protocol_version
 
-   .. autoattribute:: port
-
    .. autoattribute:: compression
 
    .. autoattribute:: auth_provider
@@ -27,19 +25,19 @@
 
    .. autoattribute:: address_translator
 
-   .. autoattribute:: connection_class
-
    .. autoattribute:: metrics_enabled
 
    .. autoattribute:: metrics
-
-   .. autoattribute:: metadata
 
    .. autoattribute:: ssl_options
 
    .. autoattribute:: sockopts
 
    .. autoattribute:: max_schema_agreement_wait
+
+   .. autoattribute:: metadata
+
+   .. autoattribute:: connection_class
 
    .. autoattribute:: control_connection_timeout
 
@@ -48,6 +46,12 @@
    .. autoattribute:: schema_event_refresh_window
 
    .. autoattribute:: topology_event_refresh_window
+
+   .. autoattribute:: status_event_refresh_window
+
+   .. autoattribute:: prepare_on_all_hosts
+
+   .. autoattribute:: reprepare_on_up
 
    .. autoattribute:: connect_timeout
 
