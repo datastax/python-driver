@@ -264,6 +264,12 @@ class ProfileManager(object):
 EXEC_PROFILE_DEFAULT = object()
 
 
+class _ConfigMode(object):
+    UNCOMMITTED = 0
+    LEGACY = 1
+    PROFILES = 2
+
+
 class Cluster(object):
     """
     The main class to use when interacting with a Cassandra cluster.
@@ -416,12 +422,23 @@ class Cluster(object):
     a max delay of ten minutes.
     """
 
-    default_retry_policy = RetryPolicy()
-    """
-    A default :class:`.policies.RetryPolicy` instance to use for all
-    :class:`.Statement` objects which do not have a :attr:`~.Statement.retry_policy`
-    explicitly set.
-    """
+
+    _default_retry_policy = RetryPolicy()
+    @property
+    def default_retry_policy(self):
+        """
+        A default :class:`.policies.RetryPolicy` instance to use for all
+        :class:`.Statement` objects which do not have a :attr:`~.Statement.retry_policy`
+        explicitly set.
+        """
+        return self._default_retry_policy
+
+    @default_retry_policy.setter
+    def default_retry_policy(self, policy):
+        if self._config_mode == _ConfigMode.PROFILES:
+            raise ValueError("Cannot set Cluster.default_retry_policy while using Configuration Profiles. Set this in a profile instead.")
+        self._default_retry_policy = policy
+        self._config_mode = _ConfigMode.LEGACY
 
     conviction_policy_factory = SimpleConvictionPolicy
     """
@@ -639,6 +656,7 @@ class Cluster(object):
         self.control_connection._token_meta_enabled = bool(enabled)
 
     profile_manager = None
+    _config_mode = _ConfigMode.UNCOMMITTED
 
     sessions = None
     control_connection = None
@@ -743,14 +761,20 @@ class Cluster(object):
         self.profile_manager = ProfileManager()
         self.profile_manager.profiles[EXEC_PROFILE_DEFAULT] = ExecutionProfile(self.load_balancing_policy,
                                                                                self.default_retry_policy,
-                                                                               Session.default_consistency_level,
-                                                                               Session.default_serial_consistency_level,
-                                                                               Session.default_timeout,
-                                                                               Session.row_factory)
-        # TODO: validate value types
-        if execution_profiles:
-            self.profile_manager.profiles.update(execution_profiles)
-
+                                                                               Session._default_consistency_level,
+                                                                               Session._default_serial_consistency_level,
+                                                                               Session._default_timeout,
+                                                                               Session._row_factory)
+        # legacy mode if either of these is not default
+        if load_balancing_policy or default_retry_policy:
+            if execution_profiles:
+                raise ValueError("Clusters constructed with execution_profiles should not specify legacy parameters "
+                                 "load_balancing_policy or default_retry_policy. Configure this in a profile instead.")
+            self._config_mode = _ConfigMode.LEGACY
+        else:
+            if execution_profiles:
+                self.profile_manager.profiles.update(execution_profiles)
+                self._config_mode = _ConfigMode.PROFILES
 
         self.metrics_enabled = metrics_enabled
         self.ssl_options = ssl_options
@@ -1627,54 +1651,83 @@ class Session(object):
     keyspace = None
     is_shutdown = False
 
-    row_factory = staticmethod(named_tuple_factory)
-    """
-    The format to return row results in.  By default, each
-    returned row will be a named tuple.  You can alternatively
-    use any of the following:
+    _row_factory = staticmethod(named_tuple_factory)
+    @property
+    def row_factory(self):
+        """
+        The format to return row results in.  By default, each
+        returned row will be a named tuple.  You can alternatively
+        use any of the following:
 
-      - :func:`cassandra.query.tuple_factory` - return a result row as a tuple
-      - :func:`cassandra.query.named_tuple_factory` - return a result row as a named tuple
-      - :func:`cassandra.query.dict_factory` - return a result row as a dict
-      - :func:`cassandra.query.ordered_dict_factory` - return a result row as an OrderedDict
+          - :func:`cassandra.query.tuple_factory` - return a result row as a tuple
+          - :func:`cassandra.query.named_tuple_factory` - return a result row as a named tuple
+          - :func:`cassandra.query.dict_factory` - return a result row as a dict
+          - :func:`cassandra.query.ordered_dict_factory` - return a result row as an OrderedDict
 
-    """
+        """
+        return self._row_factory
 
-    default_timeout = 10.0
-    """
-    A default timeout, measured in seconds, for queries executed through
-    :meth:`.execute()` or :meth:`.execute_async()`.  This default may be
-    overridden with the `timeout` parameter for either of those methods.
+    @row_factory.setter
+    def row_factory(self, rf):
+        self._validate_set_legacy_config('row_factory', rf)
 
-    Setting this to :const:`None` will cause no timeouts to be set by default.
+    _default_timeout = 10.0
+    @property
+    def default_timeout(self):
+        """
+        A default timeout, measured in seconds, for queries executed through
+        :meth:`.execute()` or :meth:`.execute_async()`.  This default may be
+        overridden with the `timeout` parameter for either of those methods.
 
-    Please see :meth:`.ResponseFuture.result` for details on the scope and
-    effect of this timeout.
+        Setting this to :const:`None` will cause no timeouts to be set by default.
 
-    .. versionadded:: 2.0.0
-    """
+        Please see :meth:`.ResponseFuture.result` for details on the scope and
+        effect of this timeout.
 
-    default_consistency_level = ConsistencyLevel.LOCAL_ONE
-    """
-    The default :class:`~ConsistencyLevel` for operations executed through
-    this session.  This default may be overridden by setting the
-    :attr:`~.Statement.consistency_level` on individual statements.
+        .. versionadded:: 2.0.0
+        """
+        return self._default_timeout
 
-    .. versionadded:: 1.2.0
+    @default_timeout.setter
+    def default_timeout(self, timeout):
+        self._validate_set_legacy_config('default_timeout', timeout)
 
-    .. versionchanged:: 3.0.0
+    _default_consistency_level = ConsistencyLevel.LOCAL_ONE
+    @property
+    def default_consistency_level(self):
+        """
+        The default :class:`~ConsistencyLevel` for operations executed through
+        this session.  This default may be overridden by setting the
+        :attr:`~.Statement.consistency_level` on individual statements.
 
-        default changed from ONE to LOCAL_ONE
-    """
+        .. versionadded:: 1.2.0
 
-    default_serial_consistency_level = None
-    """
-    The default :class:`~ConsistencyLevel` for serial phase of  conditional updates executed through
-    this session.  This default may be overridden by setting the
-    :attr:`~.Statement.serial_consistency_level` on individual statements.
+        .. versionchanged:: 3.0.0
 
-    Only valid for ``protocol_version >= 2``.
-    """
+            default changed from ONE to LOCAL_ONE
+        """
+        return self._default_consistency_level
+
+    @default_consistency_level.setter
+    def default_consistency_level(self, cl):
+        self._validate_set_legacy_config('default_consistency_level', cl)
+
+
+    _default_serial_consistency_level = None
+    @property
+    def default_serial_consistency_level(self):
+        """
+        The default :class:`~ConsistencyLevel` for serial phase of  conditional updates executed through
+        this session.  This default may be overridden by setting the
+        :attr:`~.Statement.serial_consistency_level` on individual statements.
+
+        Only valid for ``protocol_version >= 2``.
+        """
+        return self._default_serial_consistency_level
+
+    @default_serial_consistency_level.setter
+    def default_serial_consistency_level(self, cl):
+        self._validate_set_legacy_config('default_serial_consistency_level', cl)
 
     max_trace_wait = 2.0
     """
@@ -1858,28 +1911,37 @@ class Session(object):
 
         prepared_statement = None
 
-        profiles = self.cluster.profile_manager.profiles
-        try:
-            exec_profile = execution_profile if isinstance(execution_profile, ExecutionProfile) else profiles[execution_profile]
-        except KeyError:
-            raise ValueError("Invalid execution_profile: '%s'; valid profiles are %s" % (execution_profile, profiles.keys()))
-
-        # TODO: right now there is no guard making legacy config mutually exclusive
-        if timeout is _NOT_SET:
-            timeout = exec_profile.request_timeout
-
         if isinstance(query, six.string_types):
             query = SimpleStatement(query)
         elif isinstance(query, PreparedStatement):
             query = query.bind(parameters)
 
-        # TODO: why do some things come on the statement, and others through the execution?
-        cl = query.consistency_level if query.consistency_level is not None else exec_profile.consistency_level
-        serial_cl = query.serial_consistency_level if query.serial_consistency_level is not None else exec_profile.serial_consistency_level
+        if self.cluster._config_mode == _ConfigMode.LEGACY:
+            if timeout is _NOT_SET:
+                timeout = self.default_timeout
 
-        retry_policy = query.retry_policy or exec_profile.retry_policy
-        row_factory = exec_profile.row_factory
-        load_balancing_policy = exec_profile.load_balancing_policy
+            cl = query.consistency_level if query.consistency_level is not None else self.default_consistency_level
+            serial_cl = query.serial_consistency_level if query.serial_consistency_level is not None else self.default_serial_consistency_level
+
+            retry_policy = query.retry_policy or self.cluster.default_retry_policy
+            row_factory = self.row_factory
+            load_balancing_policy = self.cluster.load_balancing_policy
+        else:
+            profiles = self.cluster.profile_manager.profiles
+            try:
+                exec_profile = execution_profile if isinstance(execution_profile, ExecutionProfile) else profiles[execution_profile]
+            except KeyError:
+                raise ValueError("Invalid execution_profile: '%s'; valid profiles are %s" % (execution_profile, profiles.keys()))
+
+            if timeout is _NOT_SET:
+                timeout = exec_profile.request_timeout
+
+            cl = query.consistency_level if query.consistency_level is not None else exec_profile.consistency_level
+            serial_cl = query.serial_consistency_level if query.serial_consistency_level is not None else exec_profile.serial_consistency_level
+
+            retry_policy = query.retry_policy or exec_profile.retry_policy
+            row_factory = exec_profile.row_factory
+            load_balancing_policy = exec_profile.load_balancing_policy
 
         fetch_size = query.fetch_size
         if fetch_size is FETCH_SIZE_UNSET and self._protocol_version >= 2:
@@ -2193,6 +2255,12 @@ class Session(object):
 
     def get_pools(self):
         return self._pools.values()
+
+    def _validate_set_legacy_config(self, attr_name, value):
+        if self.cluster._config_mode == _ConfigMode.PROFILES:
+            raise ValueError("Cannot set Session.%s while using Configuration Profiles. Set this in a profile instead." %(attr_name,))
+        setattr(self, '_' + attr_name, value)
+        self.cluster._config_mode = _ConfigMode.LEGACY
 
 
 class UserTypeDoesNotExist(Exception):

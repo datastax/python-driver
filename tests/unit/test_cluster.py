@@ -22,7 +22,7 @@ from mock import patch, Mock
 
 from cassandra import ConsistencyLevel, DriverException, Timeout, Unavailable, RequestExecutionException, ReadTimeout, WriteTimeout, CoordinationFailure, ReadFailure, WriteFailure, FunctionFailure, AlreadyExists,\
     InvalidRequest, Unauthorized, AuthenticationFailed, OperationTimedOut, UnsupportedOperation, RequestValidationException, ConfigurationException
-from cassandra.cluster import _Scheduler, Session, Cluster
+from cassandra.cluster import _Scheduler, Session, Cluster, DefaultExecutionProfile
 from cassandra.policies import HostDistance
 from cassandra.query import SimpleStatement
 
@@ -136,16 +136,17 @@ class SessionTest(unittest.TestCase):
         # default is None
         self.assertIsNone(s.default_serial_consistency_level)
 
+        default_exec_profile = DefaultExecutionProfile()
         sentinel = 1001
         for cl in (None, ConsistencyLevel.LOCAL_SERIAL, ConsistencyLevel.SERIAL, sentinel):
             s.default_serial_consistency_level = cl
 
             # default is passed through
-            f = s._create_response_future(query='', parameters=[], trace=False, custom_payload={}, timeout=100)
+            f = s._create_response_future(query='', parameters=[], trace=False, custom_payload={}, timeout=100, execution_profile=default_exec_profile)
             self.assertEqual(f.message.serial_consistency_level, cl)
 
             # any non-None statement setting takes precedence
             for cl_override in (ConsistencyLevel.LOCAL_SERIAL, ConsistencyLevel.SERIAL):
-                f = s._create_response_future(SimpleStatement(query_string='', serial_consistency_level=cl_override), parameters=[], trace=False, custom_payload={}, timeout=100)
+                f = s._create_response_future(SimpleStatement(query_string='', serial_consistency_level=cl_override), parameters=[], trace=False, custom_payload={}, timeout=100, execution_profile=default_exec_profile)
                 self.assertEqual(s.default_serial_consistency_level, cl)
                 self.assertEqual(f.message.serial_consistency_level, cl_override)
