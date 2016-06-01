@@ -11,20 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 try:
     import unittest2 as unittest
 except ImportError:
     import unittest  # noqa
 
+from copy import copy
 from mock import patch, Mock
-
 
 from cassandra import ConsistencyLevel, DriverException, Timeout, Unavailable, RequestExecutionException, ReadTimeout, WriteTimeout, CoordinationFailure, ReadFailure, WriteFailure, FunctionFailure, AlreadyExists,\
     InvalidRequest, Unauthorized, AuthenticationFailed, OperationTimedOut, UnsupportedOperation, RequestValidationException, ConfigurationException
-from cassandra.cluster import _Scheduler, Session, Cluster, DefaultExecutionProfile
-from cassandra.policies import HostDistance
-from cassandra.query import SimpleStatement
+from cassandra.cluster import _Scheduler, Session, Cluster, _NOT_SET, default_lbp_factory, \
+    ExecutionProfile, _ConfigMode, EXEC_PROFILE_DEFAULT
+from cassandra.policies import HostDistance, RetryPolicy, RoundRobinPolicy, DowngradingConsistencyRetryPolicy
+from cassandra.query import SimpleStatement, named_tuple_factory, tuple_factory
 
 
 class ExceptionTypeTest(unittest.TestCase):
@@ -136,17 +136,166 @@ class SessionTest(unittest.TestCase):
         # default is None
         self.assertIsNone(s.default_serial_consistency_level)
 
-        default_exec_profile = DefaultExecutionProfile()
         sentinel = 1001
         for cl in (None, ConsistencyLevel.LOCAL_SERIAL, ConsistencyLevel.SERIAL, sentinel):
             s.default_serial_consistency_level = cl
 
             # default is passed through
-            f = s._create_response_future(query='', parameters=[], trace=False, custom_payload={}, timeout=100, execution_profile=default_exec_profile)
+            f = s._create_response_future(query='', parameters=[], trace=False, custom_payload={}, timeout=100)
             self.assertEqual(f.message.serial_consistency_level, cl)
 
             # any non-None statement setting takes precedence
             for cl_override in (ConsistencyLevel.LOCAL_SERIAL, ConsistencyLevel.SERIAL):
-                f = s._create_response_future(SimpleStatement(query_string='', serial_consistency_level=cl_override), parameters=[], trace=False, custom_payload={}, timeout=100, execution_profile=default_exec_profile)
+                f = s._create_response_future(SimpleStatement(query_string='', serial_consistency_level=cl_override), parameters=[], trace=False, custom_payload={}, timeout=100)
                 self.assertEqual(s.default_serial_consistency_level, cl)
                 self.assertEqual(f.message.serial_consistency_level, cl_override)
+
+
+class ExecutionProfileTest(unittest.TestCase):
+
+    def _verify_response_future_profile(self, rf, prof):
+        self.assertEqual(rf._load_balancer, prof.load_balancing_policy)
+        self.assertEqual(rf._retry_policy, prof.retry_policy)
+        self.assertEqual(rf.message.consistency_level, prof.consistency_level)
+        self.assertEqual(rf.message.serial_consistency_level, prof.serial_consistency_level)
+        self.assertEqual(rf.timeout, prof.request_timeout)
+        self.assertEqual(rf.row_factory, prof.row_factory)
+
+    def test_default_exec_parameters(self):
+        cluster = Cluster()
+        self.assertEqual(cluster._config_mode, _ConfigMode.UNCOMMITTED)
+        self.assertEqual(cluster.load_balancing_policy.__class__, default_lbp_factory().__class__)
+        self.assertEqual(cluster.default_retry_policy.__class__, RetryPolicy)
+        session = Session(cluster, hosts=[])
+        self.assertEqual(session.default_timeout, 10.0)
+        self.assertEqual(session.default_consistency_level, ConsistencyLevel.LOCAL_ONE)
+        self.assertEqual(session.default_serial_consistency_level, None)
+        self.assertEqual(session.row_factory, named_tuple_factory)
+
+    def test_default_legacy(self):
+        cluster = Cluster(load_balancing_policy=RoundRobinPolicy(), default_retry_policy=DowngradingConsistencyRetryPolicy())
+        self.assertEqual(cluster._config_mode, _ConfigMode.LEGACY)
+        session = Session(cluster, hosts=[])
+        session.default_timeout = 3.7
+        session.default_consistency_level = ConsistencyLevel.ALL
+        session.default_serial_consistency_level = ConsistencyLevel.SERIAL
+        # _create_response_future(self, query, parameters, trace, custom_payload, timeout, execution_profile=EXEC_PROFILE_DEFAULT):
+        rf = session._create_response_future("query", [], False, {}, _NOT_SET)
+        expected_profile = ExecutionProfile(cluster.load_balancing_policy, cluster.default_retry_policy,
+                                            session.default_consistency_level, session.default_serial_consistency_level,
+                                            session.default_timeout, session.row_factory)
+        self._verify_response_future_profile(rf, expected_profile)
+
+    def test_default_profile(self):
+        non_default_profile = ExecutionProfile(RoundRobinPolicy(), *[object() for _ in range(5)])
+        cluster = Cluster(execution_profiles={'non-default': non_default_profile})
+        session = Session(cluster, hosts=[])
+
+        self.assertEqual(cluster._config_mode, _ConfigMode.PROFILES)
+
+        default_profile = cluster.profile_manager.profiles[EXEC_PROFILE_DEFAULT]
+        rf = session._create_response_future("query", [], False, {}, _NOT_SET)
+        self._verify_response_future_profile(rf, default_profile)
+
+        rf = session._create_response_future("query", [], False, {}, _NOT_SET, 'non-default')
+        self._verify_response_future_profile(rf, non_default_profile)
+
+    def test_statement_params_override_legacy(self):
+        cluster = Cluster(load_balancing_policy=RoundRobinPolicy(), default_retry_policy=DowngradingConsistencyRetryPolicy())
+        self.assertEqual(cluster._config_mode, _ConfigMode.LEGACY)
+        session = Session(cluster, hosts=[])
+
+        ss = SimpleStatement("query", retry_policy=DowngradingConsistencyRetryPolicy(),
+                             consistency_level=ConsistencyLevel.ALL, serial_consistency_level=ConsistencyLevel.SERIAL)
+        my_timeout = 1.1234
+
+        self.assertNotEqual(ss.retry_policy.__class__, cluster.default_retry_policy)
+        self.assertNotEqual(ss.consistency_level, session.default_consistency_level)
+        self.assertNotEqual(ss._serial_consistency_level, session.default_serial_consistency_level)
+        self.assertNotEqual(my_timeout, session.default_timeout)
+
+        rf = session._create_response_future(ss, [], False, {}, my_timeout)
+        expected_profile = ExecutionProfile(load_balancing_policy=cluster.load_balancing_policy, retry_policy=ss.retry_policy,
+                                            request_timeout=my_timeout, consistency_level=ss.consistency_level,
+                                            serial_consistency_level=ss._serial_consistency_level)
+        self._verify_response_future_profile(rf, expected_profile)
+
+    def test_statement_params_override_profile(self):
+        non_default_profile = ExecutionProfile(RoundRobinPolicy(), *[object() for _ in range(5)])
+        cluster = Cluster(execution_profiles={'non-default': non_default_profile})
+        session = Session(cluster, hosts=[])
+
+        self.assertEqual(cluster._config_mode, _ConfigMode.PROFILES)
+
+        rf = session._create_response_future("query", [], False, {}, _NOT_SET, 'non-default')
+
+        ss = SimpleStatement("query", retry_policy=DowngradingConsistencyRetryPolicy(),
+                             consistency_level=ConsistencyLevel.ALL, serial_consistency_level=ConsistencyLevel.SERIAL)
+        my_timeout = 1.1234
+
+        self.assertNotEqual(ss.retry_policy.__class__, rf._load_balancer.__class__)
+        self.assertNotEqual(ss.consistency_level, rf.message.consistency_level)
+        self.assertNotEqual(ss._serial_consistency_level, rf.message.serial_consistency_level)
+        self.assertNotEqual(my_timeout, rf.timeout)
+
+        rf = session._create_response_future(ss, [], False, {}, my_timeout, 'non-default')
+        expected_profile = ExecutionProfile(non_default_profile.load_balancing_policy, ss.retry_policy,
+                                            ss.consistency_level, ss._serial_consistency_level, my_timeout, non_default_profile.row_factory)
+        self._verify_response_future_profile(rf, expected_profile)
+
+    def test_no_profile_with_legacy(self):
+        # don't construct with both
+        self.assertRaises(ValueError, Cluster, load_balancing_policy=RoundRobinPolicy(), execution_profiles={'a': ExecutionProfile()})
+        self.assertRaises(ValueError, Cluster, default_retry_policy=DowngradingConsistencyRetryPolicy(), execution_profiles={'a': ExecutionProfile()})
+        self.assertRaises(ValueError, Cluster, load_balancing_policy=RoundRobinPolicy(),
+                          default_retry_policy=DowngradingConsistencyRetryPolicy(), execution_profiles={'a': ExecutionProfile()})
+
+        # can't add after
+        cluster = Cluster(load_balancing_policy=RoundRobinPolicy())
+        self.assertRaises(ValueError, cluster.add_execution_profile, 'name', ExecutionProfile())
+
+        # session settings lock out profiles
+        cluster = Cluster()
+        session = Session(cluster, hosts=[])
+        for attr, value in (('default_timeout', 1),
+                            ('default_consistency_level', ConsistencyLevel.ANY),
+                            ('default_serial_consistency_level', ConsistencyLevel.SERIAL),
+                            ('row_factory', tuple_factory)):
+            cluster._config_mode = _ConfigMode.UNCOMMITTED
+            setattr(session, attr, value)
+            self.assertRaises(ValueError, cluster.add_execution_profile, 'name', ExecutionProfile())
+
+        # don't accept profile
+        self.assertRaises(ValueError, session._create_response_future, "query", [], False, {}, _NOT_SET, execution_profile='some name here')
+
+    def test_no_legacy_with_profile(self):
+        cluster_init = Cluster(execution_profiles={'name': ExecutionProfile()})
+        cluster_add = Cluster()
+        cluster_add.add_execution_profile('name', ExecutionProfile())
+        # for clusters with profiles added either way...
+        for c in (cluster_init, cluster_init):
+            # don't allow legacy parameters set
+            with self.assertRaises(ValueError):
+                c.default_retry_policy = RetryPolicy()
+                # lbp is not guarded because it would never have worked
+                # TODO: guard?
+            session = Session(c, hosts=[])
+            for attr, value in (('default_timeout', 1),
+                                ('default_consistency_level', ConsistencyLevel.ANY),
+                                ('default_serial_consistency_level', ConsistencyLevel.SERIAL),
+                                ('row_factory', tuple_factory)):
+                self.assertRaises(ValueError, setattr, session, attr, value)
+
+    def test_profile_name_value(self):
+
+        internalized_profile = ExecutionProfile(RoundRobinPolicy(), *[object() for _ in range(5)])
+        cluster = Cluster(execution_profiles={'by-name': internalized_profile})
+        session = Session(cluster, hosts=[])
+        self.assertEqual(cluster._config_mode, _ConfigMode.PROFILES)
+
+        rf = session._create_response_future("query", [], False, {}, _NOT_SET, 'by-name')
+        self._verify_response_future_profile(rf, internalized_profile)
+
+        by_value = ExecutionProfile(RoundRobinPolicy(), *[object() for _ in range(5)])
+        rf = session._create_response_future("query", [], False, {}, _NOT_SET, by_value)
+        self._verify_response_future_profile(rf, by_value)
