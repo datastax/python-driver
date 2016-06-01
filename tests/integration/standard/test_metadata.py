@@ -975,14 +975,12 @@ Approximate structure, for reference:
 
 CREATE TABLE legacy.composite_comp_with_col (
     key blob,
-    t timeuuid,
-    b blob,
-    s text,
+    column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(org.apache.cassandra.db.marshal.BytesType, org.apache.cassandra.db.marshal.UTF8Type, org.apache.cassandra.db.marshal.TimeUUIDType)',
     "b@6869746d65776974686d75736963" blob,
     "b@6d616d6d616a616d6d61" blob,
-    PRIMARY KEY (key, t, b, s)
+    PRIMARY KEY (key, column1)
 ) WITH COMPACT STORAGE
-    AND CLUSTERING ORDER BY (t ASC, b ASC, s ASC)
+    AND CLUSTERING ORDER BY (column1 ASC)
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = 'Stores file meta data'
     AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
@@ -1103,12 +1101,11 @@ Approximate structure, for reference:
 
 CREATE TABLE legacy.composite_comp_no_col (
     key blob,
-    column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(org.apache.cassandra.db.marshal.TimeUUIDType, org.apache.cassandra.db.marshal.BytesType, org.apache.cassandra.db.marshal.UTF8Type)',
-    column2 text,
+    column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(org.apache.cassandra.db.marshal.BytesType, org.apache.cassandra.db.marshal.UTF8Type, org.apache.cassandra.db.marshal.TimeUUIDType)',
     value blob,
-    PRIMARY KEY (key, column1, column1, column2)
+    PRIMARY KEY (key, column1)
 ) WITH COMPACT STORAGE
-    AND CLUSTERING ORDER BY (column1 ASC, column1 ASC, column2 ASC)
+    AND CLUSTERING ORDER BY (column1 ASC)
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = 'Stores file meta data'
     AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
@@ -1842,7 +1839,7 @@ class BadMetaTest(unittest.TestCase):
         where_cls = " WHERE keyspace_name='%s' AND columnfamily_name='%s'" % (self.keyspace_name, self.function_name)
         comparator = self.session.execute('SELECT comparator FROM system.schema_columnfamilies' + where_cls)[0].comparator
         try:
-            self._run_on_all_nodes('UPDATE system.schema_columnfamilies SET comparator=%s' + where_cls, ('DynamicCompositeType()',))
+            self._run_on_all_nodes('UPDATE system.schema_columnfamilies SET comparator=%s' + where_cls, ('CompositeType()',))
             c = Cluster(protocol_version=PROTOCOL_VERSION)
             c.connect()
             meta = c.metadata.keyspaces[self.keyspace_name].tables[self.function_name]
