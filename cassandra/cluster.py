@@ -889,11 +889,10 @@ class Cluster(object):
     def add_execution_profile(self, name, profile):
         if not isinstance(profile, ExecutionProfile):
             raise TypeError("profile must be an instance of ExecutionProfile")
-        if name is None:
-            raise ValueError("'None' as profile name is reserved for the default profile")
+        if self._config_mode == _ConfigMode.LEGACY:
+            raise ValueError("Cannot add execution profiles when legacy parameters are set explicitly. TODO: link to doc")
         self.profile_manager.profiles[name] = profile
         profile.load_balancing_policy.populate(self, self.metadata.all_hosts())
-        # todo: refacto
         for session in self.sessions:
             session.update_created_pools()
 
