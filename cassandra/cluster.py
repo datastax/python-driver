@@ -390,20 +390,30 @@ class Cluster(object):
 
         self._auth_provider = value
 
-    load_balancing_policy = None
-    """
-    An instance of :class:`.policies.LoadBalancingPolicy` or
-    one of its subclasses.
+    _load_balancing_policy = None
+    @property
+    def load_balancing_policy(self):
+        """
+        An instance of :class:`.policies.LoadBalancingPolicy` or
+        one of its subclasses.
 
-    .. versionchanged:: 2.6.0
+        .. versionchanged:: 2.6.0
 
-    Defaults to :class:`~.TokenAwarePolicy` (:class:`~.DCAwareRoundRobinPolicy`).
-    when using CPython (where the murmur3 extension is available). :class:`~.DCAwareRoundRobinPolicy`
-    otherwise. Default local DC will be chosen from contact points.
+        Defaults to :class:`~.TokenAwarePolicy` (:class:`~.DCAwareRoundRobinPolicy`).
+        when using CPython (where the murmur3 extension is available). :class:`~.DCAwareRoundRobinPolicy`
+        otherwise. Default local DC will be chosen from contact points.
 
-    **Please see** :class:`~.DCAwareRoundRobinPolicy` **for a discussion on default behavior with respect to
-    DC locality and remote nodes.**
-    """
+        **Please see** :class:`~.DCAwareRoundRobinPolicy` **for a discussion on default behavior with respect to
+        DC locality and remote nodes.**
+        """
+        return self._load_balancing_policy
+
+    @load_balancing_policy.setter
+    def load_balancing_policy(self, lbp):
+        if self._config_mode == _ConfigMode.PROFILES:
+            raise ValueError("Cannot set Cluster.load_balancing_policy while using Configuration Profiles. Set this in a profile instead.")
+        self._load_balancing_policy = lbp
+        self._config_mode = _ConfigMode.LEGACY
 
     reconnection_policy = ExponentialReconnectionPolicy(1.0, 600.0)
     """
@@ -723,7 +733,7 @@ class Cluster(object):
                 raise TypeError("load_balancing_policy should not be a class, it should be an instance of that class")
             self.load_balancing_policy = load_balancing_policy
         else:
-            self.load_balancing_policy = default_lbp_factory()
+            self._load_balancing_policy = default_lbp_factory()  # set internal attribute to avoid committing to legacy config mode
 
         if reconnection_policy is not None:
             if isinstance(reconnection_policy, type):
