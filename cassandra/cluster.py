@@ -204,25 +204,15 @@ class ExecutionProfile(object):
     request_timeout = None
     row_factory = None
 
-    def __init__(self, load_balancing_policy, retry_policy, consistency_level,
-                 serial_consistency_level, request_timeout, row_factory):
-        self.load_balancing_policy = load_balancing_policy
-        self.retry_policy = retry_policy
+    def __init__(self, load_balancing_policy=None, retry_policy=None,
+                 consistency_level=ConsistencyLevel.LOCAL_ONE, serial_consistency_level=None,
+                 request_timeout=10.0, row_factory=named_tuple_factory):
+        self.load_balancing_policy = load_balancing_policy or default_lbp_factory()
+        self.retry_policy = retry_policy or RetryPolicy()
         self.consistency_level = consistency_level
         self.serial_consistency_level = serial_consistency_level
         self.request_timeout = request_timeout
         self.row_factory = row_factory
-
-
-class DefaultExecutionProfile(ExecutionProfile):
-    def __init__(self):
-        super(DefaultExecutionProfile, self).__init__(
-            default_lbp_factory(),
-            RetryPolicy(),
-            ConsistencyLevel.LOCAL_ONE,
-            None,
-            10,
-            named_tuple_factory)
 
 
 class ProfileManager(object):
