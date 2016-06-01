@@ -271,13 +271,12 @@ class ExecutionProfileTest(unittest.TestCase):
         cluster_add = Cluster()
         cluster_add.add_execution_profile('name', ExecutionProfile())
         # for clusters with profiles added either way...
-        for c in (cluster_init, cluster_init):
+        for cluster in (cluster_init, cluster_init):
             # don't allow legacy parameters set
-            with self.assertRaises(ValueError):
-                c.default_retry_policy = RetryPolicy()
-                # lbp is not guarded because it would never have worked
-                # TODO: guard?
-            session = Session(c, hosts=[])
+            for attr, value in (('default_retry_policy', RetryPolicy()),
+                                ('load_balancing_policy', default_lbp_factory())):
+                self.assertRaises(ValueError, setattr, cluster, attr, value)
+            session = Session(cluster, hosts=[])
             for attr, value in (('default_timeout', 1),
                                 ('default_consistency_level', ConsistencyLevel.ANY),
                                 ('default_serial_consistency_level', ConsistencyLevel.SERIAL),
