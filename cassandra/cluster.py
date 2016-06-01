@@ -1906,6 +1906,9 @@ class Session(object):
             query = query.bind(parameters)
 
         if self.cluster._config_mode == _ConfigMode.LEGACY:
+            if execution_profile is not EXEC_PROFILE_DEFAULT:
+                raise ValueError("Cannot specify execution_profile while using legacy parameters.")
+
             if timeout is _NOT_SET:
                 timeout = self.default_timeout
 
