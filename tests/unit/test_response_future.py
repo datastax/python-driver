@@ -40,7 +40,7 @@ class ResponseFutureTests(unittest.TestCase):
 
     def make_session(self):
         session = self.make_basic_session()
-        session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
+        session.cluster._default_load_balancing_policy.make_query_plan.return_value = ['ip1', 'ip2']
         session._pools.get.return_value.is_shutdown = False
         return session
 
@@ -54,7 +54,7 @@ class ResponseFutureTests(unittest.TestCase):
 
     def test_result_message(self):
         session = self.make_basic_session()
-        session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
+        session.cluster._default_load_balancing_policy.make_query_plan.return_value = ['ip1', 'ip2']
         pool = session._pools.get.return_value
         pool.is_shutdown = False
 
@@ -279,7 +279,7 @@ class ResponseFutureTests(unittest.TestCase):
 
     def test_all_pools_shutdown(self):
         session = self.make_basic_session()
-        session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
+        session.cluster._default_load_balancing_policy.make_query_plan.return_value = ['ip1', 'ip2']
         session._pools.get.return_value.is_shutdown = True
 
         rf = ResponseFuture(session, Mock(), Mock(), 1)
@@ -288,7 +288,7 @@ class ResponseFutureTests(unittest.TestCase):
 
     def test_first_pool_shutdown(self):
         session = self.make_basic_session()
-        session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
+        session.cluster._default_load_balancing_policy.make_query_plan.return_value = ['ip1', 'ip2']
         # first return a pool with is_shutdown=True, then is_shutdown=False
         session._pools.get.side_effect = [Mock(is_shutdown=True), Mock(is_shutdown=False)]
 
@@ -302,7 +302,7 @@ class ResponseFutureTests(unittest.TestCase):
 
     def test_timeout_getting_connection_from_pool(self):
         session = self.make_basic_session()
-        session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
+        session.cluster._default_load_balancing_policy.make_query_plan.return_value = ['ip1', 'ip2']
 
         # the first pool will raise an exception on borrow_connection()
         exc = NoConnectionsAvailable()
