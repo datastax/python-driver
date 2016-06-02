@@ -20,7 +20,7 @@ from __future__ import absolute_import
 
 import atexit
 from collections import defaultdict, Mapping
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, wait as wait_futures
 import logging
 from random import random
 import socket
@@ -906,15 +906,20 @@ class Cluster(object):
             session.user_type_registered(keyspace, user_type, klass)
         UserType.evict_udt_class(keyspace, user_type)
 
-    def add_execution_profile(self, name, profile):
+    def add_execution_profile(self, name, profile, pool_wait_timeout=5):
         if not isinstance(profile, ExecutionProfile):
             raise TypeError("profile must be an instance of ExecutionProfile")
         if self._config_mode == _ConfigMode.LEGACY:
             raise ValueError("Cannot add execution profiles when legacy parameters are set explicitly. TODO: link to doc")
         self.profile_manager.profiles[name] = profile
         profile.load_balancing_policy.populate(self, self.metadata.all_hosts())
+        futures = set()
         for session in self.sessions:
-            session.update_created_pools()
+            futures.update(session.update_created_pools())
+        _, not_done = wait_futures(futures, pool_wait_timeout)
+        if not_done:
+            raise OperationTimedOut("Failed to create all new connection pools in the %ss timeout.")
+
 
     def get_min_requests_per_connection(self, host_distance):
         return self._min_requests_per_connection[host_distance]
