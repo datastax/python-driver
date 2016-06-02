@@ -971,8 +971,8 @@ class ModelQuerySet(AbstractQuerySet):
             fields = self.model._columns.keys()
             if self._defer_fields:
                 fields = [f for f in fields if f not in self._defer_fields]
-            elif self._only_fields:
-                fields = self._only_fields
+            if self._only_fields:
+                fields = [f for f in fields if f in self._only_fields]
             return [self.model._columns[f].db_field_name for f in fields]
         return super(ModelQuerySet, self)._select_fields()
 
