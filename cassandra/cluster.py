@@ -240,7 +240,7 @@ class ProfileManager(object):
 
     def on_down(self, host):
         for p in self.profiles.values():
-            p.load_balancing_policy.on_up(host)
+            p.load_balancing_policy.on_down(host)
 
     def on_add(self, host):
         for p in self.profiles.values():
@@ -249,6 +249,13 @@ class ProfileManager(object):
     def on_remove(self, host):
         for p in self.profiles.values():
             p.load_balancing_policy.on_remove(host)
+
+    @property
+    def default(self):
+        """
+        internal-only; no checks are done because this entry is populated on cluster init
+        """
+        return self.profiles[EXEC_PROFILE_DEFAULT]
 
 
 EXEC_PROFILE_DEFAULT = object()
@@ -415,13 +422,16 @@ class Cluster(object):
         self._load_balancing_policy = lbp
         self._config_mode = _ConfigMode.LEGACY
 
+    @property
+    def _default_load_balancing_policy(self):
+        return self.profile_manager.default.load_balancing_policy
+
     reconnection_policy = ExponentialReconnectionPolicy(1.0, 600.0)
     """
     An instance of :class:`.policies.ReconnectionPolicy`. Defaults to an instance
     of :class:`.ExponentialReconnectionPolicy` with a base delay of one second and
     a max delay of ten minutes.
     """
-
 
     _default_retry_policy = RetryPolicy()
     @property
@@ -1086,7 +1096,7 @@ class Cluster(object):
                     self.shutdown()
                     raise
 
-                self.profile_manager.check_supported() #todo: rename this method
+                self.profile_manager.check_supported()  # todo: rename this method
 
                 if self.idle_heartbeat_interval:
                     self._idle_heartbeat = ConnectionHeartbeat(self.idle_heartbeat_interval, self.get_connection_holders)
@@ -1230,7 +1240,7 @@ class Cluster(object):
             for session in self.sessions:
                 session.remove_pool(host)
 
-            log.debug("Signalling to load balancing policy that host %s is up", host)
+            log.debug("Signalling to load balancing policies that host %s is up", host)
             self.profile_manager.on_up(host)
 
             log.debug("Signalling to control connection that host %s is up", host)
@@ -1711,7 +1721,6 @@ class Session(object):
     def default_consistency_level(self, cl):
         self._validate_set_legacy_config('default_consistency_level', cl)
 
-
     _default_serial_consistency_level = None
     @property
     def default_serial_consistency_level(self):
@@ -1800,7 +1809,7 @@ class Session(object):
 
     _lock = None
     _pools = None
-    _load_balancer = None
+    _profile_manager = None
     _metrics = None
 
     def __init__(self, cluster, hosts):
@@ -1809,7 +1818,7 @@ class Session(object):
 
         self._lock = RLock()
         self._pools = {}
-        self._load_balancer = cluster.load_balancing_policy
+        self._profile_manager = cluster.profile_manager
         self._metrics = cluster.metrics
         self._protocol_version = self.cluster.protocol_version
 
@@ -2099,7 +2108,7 @@ class Session(object):
         """
         For internal use only.
         """
-        distance = self._load_balancer.distance(host)
+        distance = self._profile_manager.distance(host)
         if distance == HostDistance.IGNORED:
             return None
 
@@ -2153,7 +2162,7 @@ class Session(object):
         For internal use only.
         """
         for host in self.cluster.metadata.all_hosts():
-            distance = self._load_balancer.distance(host)
+            distance = self._profile_manager.distance(host)
             pool = self._pools.get(host)
             if not pool or pool.is_shutdown:
                 # we don't eagerly set is_up on previously ignored hosts. None is included here
@@ -2260,7 +2269,7 @@ class Session(object):
 
     def _validate_set_legacy_config(self, attr_name, value):
         if self.cluster._config_mode == _ConfigMode.PROFILES:
-            raise ValueError("Cannot set Session.%s while using Configuration Profiles. Set this in a profile instead." %(attr_name,))
+            raise ValueError("Cannot set Session.%s while using Configuration Profiles. Set this in a profile instead." % (attr_name,))
         setattr(self, '_' + attr_name, value)
         self.cluster._config_mode = _ConfigMode.LEGACY
 
@@ -2402,7 +2411,7 @@ class ControlConnection(object):
         a connection to that host.
         """
         errors = {}
-        for host in self._cluster.load_balancing_policy.make_query_plan():
+        for host in self._cluster._default_load_balancing_policy.make_query_plan():
             try:
                 return self._try_connect(host)
             except ConnectionException as exc:
@@ -2682,9 +2691,9 @@ class ControlConnection(object):
         # If the dc/rack information changes, we need to update the load balancing policy.
         # For that, we remove and re-add the node against the policy. Not the most elegant, and assumes
         # that the policy will update correctly, but in practice this should work.
-        self._cluster.load_balancing_policy.on_down(host)
+        self._cluster.profile_manager.on_down(host)
         host.set_location_info(datacenter, rack)
-        self._cluster.load_balancing_policy.on_up(host)
+        self._cluster.profile_manager.on_up(host)
         return True
 
     def _delay_for_event_type(self, event_type, delay_window):
@@ -2821,14 +2830,14 @@ class ControlConnection(object):
             if local_row.get("schema_version"):
                 versions[local_row.get("schema_version")].add(local_address)
 
-        lbp = self._cluster.load_balancing_policy
+        pm = self._cluster.profile_manager
         for row in peers_result:
             schema_ver = row.get('schema_version')
             if not schema_ver:
                 continue
             addr = self._rpc_from_peer_row(row)
             peer = self._cluster.metadata.get_host(addr)
-            if peer and peer.is_up and lbp.distance(peer) != HostDistance.IGNORED:
+            if peer and peer.is_up and pm.distance(peer) != HostDistance.IGNORED:
                 versions[schema_ver].add(addr)
 
         if len(versions) == 1:
@@ -3030,7 +3039,7 @@ class ResponseFuture(object):
     default_timeout = None
 
     _retry_policy = None
-    _load_balancer = None
+    _profile_manager = None
 
     _req_id = None
     _final_result = _NOT_SET
@@ -3058,7 +3067,7 @@ class ResponseFuture(object):
         self.session = session
         # TODO: normalize handling of retry policy and row factory
         self.row_factory = row_factory or session.row_factory
-        self._load_balancer = load_balancer or session._load_balancer
+        self._load_balancer = load_balancer or session.cluster._default_load_balancing_policy
         self.message = message
         self.query = query
         self.timeout = timeout
