@@ -2161,21 +2161,26 @@ class Session(object):
 
         For internal use only.
         """
+        futures = set()
         for host in self.cluster.metadata.all_hosts():
             distance = self._profile_manager.distance(host)
             pool = self._pools.get(host)
+            future = None
             if not pool or pool.is_shutdown:
                 # we don't eagerly set is_up on previously ignored hosts. None is included here
                 # to allow us to attempt connections to hosts that have gone from ignored to something
                 # else.
                 if distance != HostDistance.IGNORED and host.is_up in (True, None):
-                    self.add_or_renew_pool(host, False)
+                    future = self.add_or_renew_pool(host, False)
             elif distance != pool.host_distance:
                 # the distance has changed
                 if distance == HostDistance.IGNORED:
-                    self.remove_pool(host)
+                    future = self.remove_pool(host)
                 else:
                     pool.host_distance = distance
+            if future:
+                futures.add(future)
+        return futures
 
     def on_down(self, host):
         """
