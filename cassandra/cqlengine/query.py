@@ -1151,6 +1151,7 @@ class ModelQuerySet(AbstractQuerySet):
             return
 
         nulled_columns = set()
+        updated_columns = set()
         us = UpdateStatement(self.column_family_name, where=self._where, ttl=self._ttl,
                              timestamp=self._timestamp, conditionals=self._conditional, if_exists=self._if_exists)
         for name, val in values.items():
@@ -1171,13 +1172,17 @@ class ModelQuerySet(AbstractQuerySet):
                 continue
 
             us.add_update(col, val, operation=col_op)
+            updated_columns.add(col_name)
 
         if us.assignments:
             self._execute(us)
 
+        null_conditional = [condition for condition in self._conditional
+                            if condition.field not in updated_columns]
+
         if nulled_columns:
             ds = DeleteStatement(self.column_family_name, fields=nulled_columns,
-                                 where=self._where, conditionals=self._conditional, if_exists=self._if_exists)
+                                 where=self._where, conditionals=null_conditional, if_exists=self._if_exists)
             self._execute(ds)
 
 
@@ -1262,6 +1267,8 @@ class DMLQuery(object):
                                     conditionals=self._conditional, if_exists=self._if_exists)
         for name, col in self.instance._clustering_keys.items():
             null_clustering_key = null_clustering_key and col._val_is_null(getattr(self.instance, name, None))
+
+        updated_columns = set()
         # get defined fields and their column names
         for name, col in self.model._columns.items():
             # if clustering key is null, don't include non static columns
@@ -1279,6 +1286,7 @@ class DMLQuery(object):
 
                 static_changed_only = static_changed_only and col.static
                 statement.add_update(col, val, previous=val_mgr.previous_value)
+                updated_columns.add(col.db_field_name)
 
         if statement.assignments:
             for name, col in self.model._primary_keys.items():
@@ -1287,6 +1295,10 @@ class DMLQuery(object):
                     continue
                 statement.add_where(col, EqualsOperator(), getattr(self.instance, name))
             self._execute(statement)
+
+        # remove conditions on fields that have been updated
+        self._conditional = [condition for condition in self._conditional
+                             if condition.field not in updated_columns]
 
         if not null_clustering_key:
             self._delete_null_columns()
