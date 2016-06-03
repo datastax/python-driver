@@ -223,15 +223,18 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         Tests defining only fields
         """
 
+        # simple only definition
         q = TestModel.objects.only(['attempt_id', 'description'])
         self.assertEqual(q._select_fields(), ['attempt_id', 'description'])
 
         with self.assertRaises(query.QueryException):
             TestModel.objects.only(['nonexistant_field'])
 
+        # Cannot define more than once only fields
         with self.assertRaises(query.QueryException):
             TestModel.objects.only(['description']).only(['attempt_id'])
 
+        # only with defer fields
         q = TestModel.objects.only(['attempt_id', 'description'])
         q = q.defer(['description'])
         self.assertEqual(q._select_fields(), ['attempt_id'])
@@ -240,24 +243,41 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         q = TestModel.objects.filter(test_id=0).only(['test_id', 'attempt_id', 'description'])
         self.assertEqual(q._select_fields(), ['attempt_id', 'description'])
 
+        # no fields to select
+        with self.assertRaises(query.QueryException):
+            q = TestModel.objects.only(['test_id']).defer(['test_id'])
+            q._select_fields()
+
+        with self.assertRaises(query.QueryException):
+            q = TestModel.objects.filter(test_id=0).only(['test_id'])
+            q._select_fields()
+
+
     def test_defining_defer_fields(self):
         """
         Tests defining defer fields
         """
 
+        # simple defer definition
         q = TestModel.objects.defer(['attempt_id', 'description'])
         self.assertEqual(q._select_fields(), ['test_id', 'expected_result', 'test_result'])
 
         with self.assertRaises(query.QueryException):
             TestModel.objects.defer(['nonexistant_field'])
 
+        # defer more than one
         q = TestModel.objects.defer(['attempt_id', 'description'])
         q = q.defer(['expected_result'])
         self.assertEqual(q._select_fields(), ['test_id', 'test_result'])
 
+        # defer with only
         q = TestModel.objects.defer(['description', 'attempt_id'])
         q = q.only(['description', 'test_id'])
         self.assertEqual(q._select_fields(), ['test_id'])
+
+        # implicit defer
+        q = TestModel.objects.filter(test_id=0)
+        self.assertEqual(q._select_fields(), ['attempt_id', 'description', 'expected_result', 'test_result'])
 
 
 class BaseQuerySetUsage(BaseCassEngTestCase):

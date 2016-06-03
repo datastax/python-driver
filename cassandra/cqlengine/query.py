@@ -973,6 +973,9 @@ class ModelQuerySet(AbstractQuerySet):
                 fields = [f for f in fields if f not in self._defer_fields]
             if self._only_fields:
                 fields = [f for f in fields if f in self._only_fields]
+            if not fields:
+                raise QueryException('No fields in select query. Only fields: "{0}", defer fields: "{1}"'.format(
+                    ','.join(self._only_fields), ','.join(self._defer_fields)))
             return [self.model._columns[f].db_field_name for f in fields]
         return super(ModelQuerySet, self)._select_fields()
 
