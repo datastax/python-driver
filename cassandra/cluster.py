@@ -198,11 +198,49 @@ else:
 
 class ExecutionProfile(object):
     load_balancing_policy = None
+    """
+    An instance of :class:`.policies.LoadBalancingPolicy` or one of its subclasses.
+
+    Used in determining host distance for establishing connections, and routing requests.
+
+    Defaults to ``TokenAwarePolicy(DCAwareRoundRobinPolicy())`` if not specified
+    """
+
     retry_policy = None
-    consistency_level = None
+    """
+    An instance of :class:`.policies.RetryPolicy` instance used when :class:`.Statement` objects do not have a
+    :attr:`~.Statement.retry_policy` explicitly set.
+
+    Defaults to :class:`.RetryPolicy` if not specified
+    """
+
+    consistency_level = ConsistencyLevel.LOCAL_ONE
+    """
+    :class:`.ConsistencyLevel` used when not specified on a :class:`.Statement`.
+    """
+
     serial_consistency_level = None
-    request_timeout = None
-    row_factory = None
+    """
+    Serial :class:`.ConsistencyLevel` used when not specified on a :class:`.Statement` (for LWT conditional statements).
+    """
+
+    request_timeout = 10.0
+    """
+    Request timeout used when not overridden in :meth:`.Session.execute`
+    """
+
+    row_factory = staticmethod(tuple_factory)
+    """
+    A callable to format results, accepting ``(colnames, rows)`` where ``colnames`` is a list of column names, and
+    ``rows`` is a list of tuples, with each tuple representing a row of parsed values.
+
+    Some example implementations:
+
+        - :func:`cassandra.query.tuple_factory` - return a result row as a tuple
+        - :func:`cassandra.query.named_tuple_factory` - return a result row as a named tuple
+        - :func:`cassandra.query.dict_factory` - return a result row as a dict
+        - :func:`cassandra.query.ordered_dict_factory` - return a result row as an OrderedDict
+    """
 
     def __init__(self, load_balancing_policy=None, retry_policy=None,
                  consistency_level=ConsistencyLevel.LOCAL_ONE, serial_consistency_level=None,
@@ -259,6 +297,12 @@ class ProfileManager(object):
 
 
 EXEC_PROFILE_DEFAULT = object()
+"""
+Key for the ``Cluster`` default execution profile, used when no other profile is selected in
+``Session.execute(execution_profile)``.
+
+Use this as the key in ``Cluster(execution_profiles)`` to override the default profile.
+"""
 
 
 class _ConfigMode(object):
@@ -907,6 +951,19 @@ class Cluster(object):
         UserType.evict_udt_class(keyspace, user_type)
 
     def add_execution_profile(self, name, profile, pool_wait_timeout=5):
+        """
+        Adds an :class:`.ExecutionProfile` to the cluster. This makes it available for use by ``name`` in :meth:`.Session.execute`
+        and :meth:`.Session.execute_async`.
+
+        Normally profiles will be injected at cluster initialization via ``Cluster(execution_profiles)``. This method
+        provides a way of adding them dynamically.
+
+        Adding a new profile updates the connection pools according to the specified ``load_balancing_policy``. By default,
+        this method will wait up to five seconds for the pool creation to complete, so the profile can be used immediately
+        upon return. This behavior can be controlled using ``pool_wait_timeout`` (see
+        `concurrent.futures.wait <https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.wait>`_
+        for timeout semantics).
+        """
         if not isinstance(profile, ExecutionProfile):
             raise TypeError("profile must be an instance of ExecutionProfile")
         if self._config_mode == _ConfigMode.LEGACY:

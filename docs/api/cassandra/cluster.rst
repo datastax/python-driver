@@ -74,6 +74,8 @@
 
    .. automethod:: unregister_listener
 
+   .. automethod:: add_execution_profile
+
    .. automethod:: set_max_requests_per_connection
 
    .. automethod:: get_max_requests_per_connection
@@ -106,6 +108,11 @@
 
    .. automethod:: set_meta_refresh_enabled
 
+.. autoclass:: ExecutionProfile
+   :members:
+
+.. autodata:: EXEC_PROFILE_DEFAULT
+   :annotation:
 
 .. autoclass:: Session ()
 
