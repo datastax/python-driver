@@ -42,6 +42,10 @@ The methods here are used to filter, order, and constrain results.
 
     .. automethod:: allow_filtering
 
+    .. automethod:: only
+
+    .. automethod:: defer
+
     .. automethod:: timestamp
 
     .. automethod:: ttl
