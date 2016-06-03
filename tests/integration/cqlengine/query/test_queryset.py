@@ -228,7 +228,7 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         self.assertEqual(q._select_fields(), ['attempt_id', 'description'])
 
         with self.assertRaises(query.QueryException):
-            TestModel.objects.only(['nonexistant_field'])
+            TestModel.objects.only(['nonexistent_field'])
 
         # Cannot define more than once only fields
         with self.assertRaises(query.QueryException):
@@ -263,7 +263,7 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         self.assertEqual(q._select_fields(), ['test_id', 'expected_result', 'test_result'])
 
         with self.assertRaises(query.QueryException):
-            TestModel.objects.defer(['nonexistant_field'])
+            TestModel.objects.defer(['nonexistent_field'])
 
         # defer more than one
         q = TestModel.objects.defer(['attempt_id', 'description'])
