@@ -221,8 +221,13 @@ class TestQuerySetOperation(BaseCassEngTestCase):
     def test_defining_only_fields(self):
         """
         Tests defining only fields
-        """
 
+        @since 3.5
+        @jira_ticket PYTHON-560
+        @expected_result deferred fields should not be returned
+
+        @test_category object_mapper
+        """
         # simple only definition
         q = TestModel.objects.only(['attempt_id', 'description'])
         self.assertEqual(q._select_fields(), ['attempt_id', 'description'])
@@ -239,7 +244,12 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         q = q.defer(['description'])
         self.assertEqual(q._select_fields(), ['attempt_id'])
 
-        # PYTHON-560
+        # Eliminate all results confirm exception is thrown
+        q = TestModel.objects.only(['description'])
+        q = q.defer(['description'])
+        with self.assertRaises(query.QueryException):
+            q._select_fields()
+
         q = TestModel.objects.filter(test_id=0).only(['test_id', 'attempt_id', 'description'])
         self.assertEqual(q._select_fields(), ['attempt_id', 'description'])
 
@@ -252,10 +262,15 @@ class TestQuerySetOperation(BaseCassEngTestCase):
             q = TestModel.objects.filter(test_id=0).only(['test_id'])
             q._select_fields()
 
-
     def test_defining_defer_fields(self):
         """
         Tests defining defer fields
+
+        @since 3.5
+        @jira_ticket PYTHON-560
+        @expected_result deferred fields should not be returned
+
+        @test_category object_mapper
         """
 
         # simple defer definition
@@ -274,6 +289,12 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         q = TestModel.objects.defer(['description', 'attempt_id'])
         q = q.only(['description', 'test_id'])
         self.assertEqual(q._select_fields(), ['test_id'])
+
+        # Eliminate all results confirm exception is thrown
+        q = TestModel.objects.defer(['description', 'attempt_id'])
+        q = q.only(['description'])
+        with self.assertRaises(query.QueryException):
+            q._select_fields()
 
         # implicit defer
         q = TestModel.objects.filter(test_id=0)
