@@ -222,7 +222,7 @@ Bug Fixes
 
 2.7.2
 =====
-Setpember 14, 2015
+September 14, 2015
 
 Bug Fixes
 ---------
