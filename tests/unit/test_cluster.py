@@ -297,6 +297,35 @@ class ExecutionProfileTest(unittest.TestCase):
         rf = session.execute_async("query", execution_profile=by_value)
         self._verify_response_future_profile(rf, by_value)
 
+    def test_exec_profile_clone(self):
+
+        cluster = Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(), 'one': ExecutionProfile()})
+        session = Session(cluster, hosts=[])
+
+        profile_attrs = {'request_timeout': 1,
+                         'consistency_level': ConsistencyLevel.ANY,
+                         'serial_consistency_level': ConsistencyLevel.SERIAL,
+                         'row_factory': tuple_factory,
+                         'retry_policy': RetryPolicy(),
+                         'load_balancing_policy': default_lbp_factory()}
+        reference_attributes = ('retry_policy', 'load_balancing_policy')
+
+        # default and one named
+        for profile in (EXEC_PROFILE_DEFAULT, 'one'):
+            active = cluster.profile_manager.profiles[profile]
+            clone = session.execution_profile_clone_update(profile)
+            self.assertIsNot(clone, active)
+
+            all_updated = session.execution_profile_clone_update(clone, **profile_attrs)
+            self.assertIsNot(all_updated, clone)
+            for attr, value in profile_attrs.items():
+                self.assertEqual(getattr(clone, attr), getattr(active, attr))
+                if attr in reference_attributes:
+                    self.assertIs(getattr(clone, attr), getattr(active, attr))
+                self.assertNotEqual(getattr(all_updated, attr), getattr(active, attr))
+
+        # cannot clone nonexistent profile
+        self.assertRaises(ValueError, session.execution_profile_clone_update, 'DOES NOT EXIST', **profile_attrs)
 
     def test_no_profiles_same_name(self):
         # can override default in init
