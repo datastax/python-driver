@@ -1360,6 +1360,14 @@ class Cluster(object):
             return SchemaTargetType.KEYSPACE
         return None
 
+    def get_control_connection_host(self):
+        """
+        Returns the control connection host metadata.
+        """
+        connection = getattr(self.control_connection, '_connection')
+        host = connection.host if connection else None
+        return self.metadata.get_host(host) if host else None
+
     def refresh_schema_metadata(self, max_schema_agreement_wait=None):
         """
         Synchronously refresh all schema metadata.

@@ -89,6 +89,8 @@
 
    .. automethod:: set_max_connections_per_host
 
+   .. automethod:: get_control_connection_host
+
    .. automethod:: refresh_schema_metadata
 
    .. automethod:: refresh_keyspace_metadata

@@ -39,7 +39,6 @@ class ControlConnectionTests(unittest.TestCase):
                 "Native protocol 3,0+ is required for UDTs using %r"
                 % (PROTOCOL_VERSION,))
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        self.session = self.cluster.connect()
 
     def tearDown(self):
         try:
@@ -65,6 +64,7 @@ class ControlConnectionTests(unittest.TestCase):
         @test_category connection
         """
 
+        self.session = self.cluster.connect()
         self.session.execute("""
             CREATE KEYSPACE keyspacetodrop
             WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1' }
@@ -76,3 +76,18 @@ class ControlConnectionTests(unittest.TestCase):
         self.session.execute("DROP KEYSPACE keyspacetodrop")
         cc_id_post_drop = id(self.cluster.control_connection._connection)
         self.assertEqual(cc_id_post_drop, cc_id_pre_drop)
+
+    def test_get_control_connection_host(self):
+        """
+        Test to validate Cluster.get_control_connection_host() metadata
+        """
+
+        host = self.cluster.get_control_connection_host()
+        self.assertEqual(host, None)
+
+        self.session = self.cluster.connect()
+        cc_host = self.cluster.control_connection._connection.host
+
+        host = self.cluster.get_control_connection_host()
+        self.assertEqual(host.address, cc_host)
+        self.assertEqual(host.is_up, True)
