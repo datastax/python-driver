@@ -1364,7 +1364,7 @@ class Cluster(object):
         """
         Returns the control connection host metadata.
         """
-        connection = getattr(self.control_connection, '_connection')
+        connection = self.control_connection._connection
         host = connection.host if connection else None
         return self.metadata.get_host(host) if host else None
 
@@ -2913,7 +2913,7 @@ class ResponseFuture(object):
             if self.is_schema_agreed:
                 errors = {self._current_host.address: "Client request timeout. See Session.execute[_async](timeout)"}
             else:
-                connection = getattr(self.session.cluster.control_connection, '_connection')
+                connection = self.session.cluster.control_connection._connection
                 host = connection.host if connection else 'unknown'
                 errors = {host: "Request timed out while waiting for schema agreement. See Session.execute[_async](timeout) and Cluster.max_schema_agreement_wait."}
 
