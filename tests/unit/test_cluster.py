@@ -261,7 +261,7 @@ class ExecutionProfileTest(unittest.TestCase):
                             ('row_factory', tuple_factory)):
             cluster._config_mode = _ConfigMode.UNCOMMITTED
             setattr(session, attr, value)
-            self.assertRaises(ValueError, cluster.add_execution_profile, 'name', ExecutionProfile())
+            self.assertRaises(ValueError, cluster.add_execution_profile, 'name' + attr, ExecutionProfile())
 
         # don't accept profile
         self.assertRaises(ValueError, session.execute_async, "query", execution_profile='some name here')
@@ -296,3 +296,20 @@ class ExecutionProfileTest(unittest.TestCase):
         by_value = ExecutionProfile(RoundRobinPolicy(), *[object() for _ in range(5)])
         rf = session.execute_async("query", execution_profile=by_value)
         self._verify_response_future_profile(rf, by_value)
+
+
+    def test_no_profiles_same_name(self):
+        # can override default in init
+        cluster = Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(), 'one': ExecutionProfile()})
+
+        # cannot update default
+        self.assertRaises(ValueError, cluster.add_execution_profile, EXEC_PROFILE_DEFAULT, ExecutionProfile())
+
+        # cannot update named init
+        self.assertRaises(ValueError, cluster.add_execution_profile, 'one', ExecutionProfile())
+
+        # can add new name
+        cluster.add_execution_profile('two', ExecutionProfile())
+
+        # cannot add a profile added dynamically
+        self.assertRaises(ValueError, cluster.add_execution_profile, 'two', ExecutionProfile())

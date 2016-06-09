@@ -954,7 +954,7 @@ class Cluster(object):
     def add_execution_profile(self, name, profile, pool_wait_timeout=5):
         """
         Adds an :class:`.ExecutionProfile` to the cluster. This makes it available for use by ``name`` in :meth:`.Session.execute`
-        and :meth:`.Session.execute_async`.
+        and :meth:`.Session.execute_async`. This method will raise if the profile already exists.
 
         Normally profiles will be injected at cluster initialization via ``Cluster(execution_profiles)``. This method
         provides a way of adding them dynamically.
@@ -969,6 +969,8 @@ class Cluster(object):
             raise TypeError("profile must be an instance of ExecutionProfile")
         if self._config_mode == _ConfigMode.LEGACY:
             raise ValueError("Cannot add execution profiles when legacy parameters are set explicitly. TODO: link to doc")
+        if name in self.profile_manager.profiles:
+            raise ValueError("Profile %s already exists")
         self.profile_manager.profiles[name] = profile
         profile.load_balancing_policy.populate(self, self.metadata.all_hosts())
         futures = set()
