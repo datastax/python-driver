@@ -2000,21 +2000,17 @@ class Session(object):
             row_factory = self.row_factory
             load_balancing_policy = self.cluster.load_balancing_policy
         else:
-            profiles = self.cluster.profile_manager.profiles
-            try:
-                exec_profile = execution_profile if isinstance(execution_profile, ExecutionProfile) else profiles[execution_profile]
-            except KeyError:
-                raise ValueError("Invalid execution_profile: '%s'; valid profiles are %s" % (execution_profile, profiles.keys()))
+            execution_profile = self._get_execution_profile(execution_profile)
 
             if timeout is _NOT_SET:
-                timeout = exec_profile.request_timeout
+                timeout = execution_profile.request_timeout
 
-            cl = query.consistency_level if query.consistency_level is not None else exec_profile.consistency_level
-            serial_cl = query.serial_consistency_level if query.serial_consistency_level is not None else exec_profile.serial_consistency_level
+            cl = query.consistency_level if query.consistency_level is not None else execution_profile.consistency_level
+            serial_cl = query.serial_consistency_level if query.serial_consistency_level is not None else execution_profile.serial_consistency_level
 
-            retry_policy = query.retry_policy or exec_profile.retry_policy
-            row_factory = exec_profile.row_factory
-            load_balancing_policy = exec_profile.load_balancing_policy
+            retry_policy = query.retry_policy or execution_profile.retry_policy
+            row_factory = execution_profile.row_factory
+            load_balancing_policy = execution_profile.load_balancing_policy
 
         fetch_size = query.fetch_size
         if fetch_size is FETCH_SIZE_UNSET and self._protocol_version >= 2:
@@ -2058,6 +2054,13 @@ class Session(object):
         return ResponseFuture(
             self, message, query, timeout, metrics=self._metrics,
             prepared_statement=prepared_statement, retry_policy=retry_policy, row_factory=row_factory, load_balancer=load_balancing_policy)
+
+    def _get_execution_profile(self, ep):
+        profiles = self.cluster.profile_manager.profiles
+        try:
+            return ep if isinstance(ep, ExecutionProfile) else profiles[ep]
+        except KeyError:
+            raise ValueError("Invalid execution_profile: '%s'; valid profiles are %s" % (ep, profiles.keys()))
 
     def prepare(self, query, custom_payload=None):
         """
