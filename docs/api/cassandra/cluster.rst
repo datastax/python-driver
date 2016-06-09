@@ -146,6 +146,8 @@
 
    .. automethod:: set_keyspace(keyspace)
 
+   .. automethod:: execution_profile_clone_update
+
 .. autoclass:: ResponseFuture ()
 
    .. autoattribute:: query

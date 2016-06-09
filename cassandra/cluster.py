@@ -21,6 +21,7 @@ from __future__ import absolute_import
 import atexit
 from collections import defaultdict, Mapping
 from concurrent.futures import ThreadPoolExecutor, wait as wait_futures
+from copy import copy
 import logging
 from random import random
 import socket
@@ -2061,6 +2062,21 @@ class Session(object):
             return ep if isinstance(ep, ExecutionProfile) else profiles[ep]
         except KeyError:
             raise ValueError("Invalid execution_profile: '%s'; valid profiles are %s" % (ep, profiles.keys()))
+
+    def execution_profile_clone_update(self, ep, **kwargs):
+        """
+        Returns a clone of the ``ep`` profile.  ``kwargs`` can be specified to update attributes
+        of the returned profile.
+
+        This is a shollow clone, so any objects referenced by the profile are shared. This means Load Balancing Policy
+        is maintained by inclusion in the active profiles. It also means updating any other rich objects will be seen
+        by the active profile. In cases where this is not desirable, be sure to replace the instance instead of manipulating
+        the shared object.
+        """
+        clone = copy(self._get_execution_profile(ep))
+        for attr, value in kwargs.items():
+            setattr(clone, attr, value)
+        return clone
 
     def prepare(self, query, custom_payload=None):
         """
