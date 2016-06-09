@@ -40,7 +40,7 @@ class ResponseFutureTests(unittest.TestCase):
 
     def make_session(self):
         session = self.make_basic_session()
-        session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
+        session.cluster._default_load_balancing_policy.make_query_plan.return_value = ['ip1', 'ip2']
         session._pools.get.return_value.is_shutdown = False
         return session
 
@@ -54,7 +54,7 @@ class ResponseFutureTests(unittest.TestCase):
 
     def test_result_message(self):
         session = self.make_basic_session()
-        session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
+        session.cluster._default_load_balancing_policy.make_query_plan.return_value = ['ip1', 'ip2']
         pool = session._pools.get.return_value
         pool.is_shutdown = False
 
@@ -163,11 +163,11 @@ class ResponseFutureTests(unittest.TestCase):
     def test_retry_policy_says_ignore(self):
         session = self.make_session()
         query = SimpleStatement("INSERT INFO foo (a, b) VALUES (1, 2)")
-        query.retry_policy = Mock()
-        query.retry_policy.on_unavailable.return_value = (RetryPolicy.IGNORE, None)
         message = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
 
-        rf = ResponseFuture(session, message, query, 1)
+        retry_policy = Mock()
+        retry_policy.on_unavailable.return_value = (RetryPolicy.IGNORE, None)
+        rf = ResponseFuture(session, message, query, 1, retry_policy=retry_policy)
         rf.send_request()
 
         result = Mock(spec=UnavailableErrorMessage, info={})
@@ -179,14 +179,15 @@ class ResponseFutureTests(unittest.TestCase):
         pool = session._pools.get.return_value
 
         query = SimpleStatement("INSERT INFO foo (a, b) VALUES (1, 2)")
-        query.retry_policy = Mock()
-        query.retry_policy.on_unavailable.return_value = (RetryPolicy.RETRY, ConsistencyLevel.ONE)
         message = QueryMessage(query=query, consistency_level=ConsistencyLevel.QUORUM)
 
         connection = Mock(spec=Connection)
         pool.borrow_connection.return_value = (connection, 1)
 
-        rf = ResponseFuture(session, message, query, 1)
+        retry_policy = Mock()
+        retry_policy.on_unavailable.return_value = (RetryPolicy.RETRY, ConsistencyLevel.ONE)
+
+        rf = ResponseFuture(session, message, query, 1, retry_policy=retry_policy)
         rf.send_request()
 
         rf.session._pools.get.assert_called_once_with('ip1')
@@ -278,7 +279,7 @@ class ResponseFutureTests(unittest.TestCase):
 
     def test_all_pools_shutdown(self):
         session = self.make_basic_session()
-        session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
+        session.cluster._default_load_balancing_policy.make_query_plan.return_value = ['ip1', 'ip2']
         session._pools.get.return_value.is_shutdown = True
 
         rf = ResponseFuture(session, Mock(), Mock(), 1)
@@ -287,7 +288,7 @@ class ResponseFutureTests(unittest.TestCase):
 
     def test_first_pool_shutdown(self):
         session = self.make_basic_session()
-        session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
+        session.cluster._default_load_balancing_policy.make_query_plan.return_value = ['ip1', 'ip2']
         # first return a pool with is_shutdown=True, then is_shutdown=False
         session._pools.get.side_effect = [Mock(is_shutdown=True), Mock(is_shutdown=False)]
 
@@ -301,7 +302,7 @@ class ResponseFutureTests(unittest.TestCase):
 
     def test_timeout_getting_connection_from_pool(self):
         session = self.make_basic_session()
-        session._load_balancer.make_query_plan.return_value = ['ip1', 'ip2']
+        session.cluster._default_load_balancing_policy.make_query_plan.return_value = ['ip1', 'ip2']
 
         # the first pool will raise an exception on borrow_connection()
         exc = NoConnectionsAvailable()
@@ -399,11 +400,11 @@ class ResponseFutureTests(unittest.TestCase):
         pool.borrow_connection.return_value = (connection, 1)
 
         query = SimpleStatement("INSERT INFO foo (a, b) VALUES (1, 2)")
-        query.retry_policy = Mock()
-        query.retry_policy.on_unavailable.return_value = (RetryPolicy.RETHROW, None)
         message = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
 
-        rf = ResponseFuture(session, message, query, 1)
+        retry_policy = Mock()
+        retry_policy.on_unavailable.return_value = (RetryPolicy.RETHROW, None)
+        rf = ResponseFuture(session, message, query, 1, retry_policy=retry_policy)
         rf.send_request()
 
         callback = Mock()

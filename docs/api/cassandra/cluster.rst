@@ -22,6 +22,7 @@
    .. autoattribute:: reconnection_policy
 
    .. autoattribute:: default_retry_policy
+      :annotation: = <cassandra.policies.RetryPolicy object>
 
    .. autoattribute:: conviction_policy_factory
 
@@ -73,6 +74,8 @@
 
    .. automethod:: unregister_listener
 
+   .. automethod:: add_execution_profile
+
    .. automethod:: set_max_requests_per_connection
 
    .. automethod:: get_max_requests_per_connection
@@ -105,17 +108,25 @@
 
    .. automethod:: set_meta_refresh_enabled
 
+.. autoclass:: ExecutionProfile
+   :members:
+
+.. autodata:: EXEC_PROFILE_DEFAULT
+   :annotation:
 
 .. autoclass:: Session ()
 
    .. autoattribute:: default_timeout
+      :annotation: = 10.0
 
    .. autoattribute:: default_consistency_level
       :annotation: = LOCAL_ONE
 
    .. autoattribute:: default_serial_consistency_level
+      :annotation: = None
 
    .. autoattribute:: row_factory
+      :annotation: = <function named_tuple_factory>
 
    .. autoattribute:: default_fetch_size
 
@@ -134,6 +145,8 @@
    .. automethod:: shutdown()
 
    .. automethod:: set_keyspace(keyspace)
+
+   .. automethod:: execution_profile_clone_update
 
 .. autoclass:: ResponseFuture ()
 
