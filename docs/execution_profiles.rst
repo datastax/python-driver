@@ -114,10 +114,7 @@ New profiles can be added constructing from scratch, or deriving from default:
 
 .. code:: python
 
-    from cassandra.cluster import ExecutionProfile
-    from cassandra.policies import WhiteListRoundRobinPolicy
-    locked_execution = ExecutionProfile()
-    locked_execution.load_balancing_policy = WhiteListRoundRobinPolicy(['127.0.0.1'])
+    locked_execution = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1']))
     node1_profile = 'node1_whitelist'
     cluster.add_execution_profile(node1_profile, locked_execution)
     
@@ -139,13 +136,10 @@ We also have the ability to pass profile instances to be used for execution, but
 
 .. code:: python
 
-    from copy import copy
     from cassandra.query import tuple_factory
     
-    tmp = copy(node1_profile)
-    tmp.request_timeout = 100
-    tmp.row_factory = tuple_factory
-    
+    tmp = session.execution_profile_clone_update('node1', request_timeout=100, row_factory=tuple_factory)
+
     print session.execute(local_query, execution_profile=tmp)[0]
     print session.execute(local_query, execution_profile='node1')[0]
 
@@ -154,6 +148,5 @@ We also have the ability to pass profile instances to be used for execution, but
     ('127.0.0.1',)
     Row(rpc_address='127.0.0.1')
 
-As shown above, the ``tmp`` profile shares a load balancing policy with one managed by the cluster. If this technique
-is not used, the application would need to initialize and maintain the policy state manually.
-
+The new profile is a shallow copy, so the ``tmp`` profile shares a load balancing policy with one managed by the cluster.
+If reference objects are to be updated in the clone, one would typically set those attributes to a new instance.
