@@ -1552,6 +1552,14 @@ class Cluster(object):
             return SchemaTargetType.KEYSPACE
         return None
 
+    def get_control_connection_host(self):
+        """
+        Returns the control connection host metadata.
+        """
+        connection = self.control_connection._connection
+        host = connection.host if connection else None
+        return self.metadata.get_host(host) if host else None
+
     def refresh_schema_metadata(self, max_schema_agreement_wait=None):
         """
         Synchronously refresh all schema metadata.
@@ -3185,7 +3193,7 @@ class ResponseFuture(object):
             if self.is_schema_agreed:
                 errors = {self._current_host.address: "Client request timeout. See Session.execute[_async](timeout)"}
             else:
-                connection = getattr(self.session.cluster.control_connection, '_connection')
+                connection = self.session.cluster.control_connection._connection
                 host = connection.host if connection else 'unknown'
                 errors = {host: "Request timed out while waiting for schema agreement. See Session.execute[_async](timeout) and Cluster.max_schema_agreement_wait."}
 
