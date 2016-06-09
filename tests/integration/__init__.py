@@ -281,11 +281,10 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[]):
         # This will enable the Mirroring query handler which will echo our custom payload k,v pairs back
         if PROTOCOL_VERSION >= 4:
             jvm_args = [" -Dcassandra.custom_query_handler_class=org.apache.cassandra.cql3.CustomPayloadMirroringQueryHandler"]
-
+        if(len(workloads) > 0):
+            for node in CCM_CLUSTER.nodes.values():
+                node.set_workloads(workloads)
         if start:
-            if(len(workloads) > 0):
-                for node in CCM_CLUSTER.nodes.values():
-                        node.set_workloads(workloads)
             log.debug("Starting CCM cluster: {0}".format(cluster_name))
             CCM_CLUSTER.start(wait_for_binary_proto=True, wait_other_notice=True, jvm_args=jvm_args)
             # Added to wait for slow nodes to start up
