@@ -80,6 +80,12 @@ class ControlConnectionTests(unittest.TestCase):
     def test_get_control_connection_host(self):
         """
         Test to validate Cluster.get_control_connection_host() metadata
+
+        @since 3.5.0
+        @jira_ticket PYTHON-583
+        @expected_result the control connection metadata should accurately reflect cluster state.
+
+        @test_category metadata
         """
 
         host = self.cluster.get_control_connection_host()
@@ -91,3 +97,9 @@ class ControlConnectionTests(unittest.TestCase):
         host = self.cluster.get_control_connection_host()
         self.assertEqual(host.address, cc_host)
         self.assertEqual(host.is_up, True)
+
+        # reconnect and make sure that the new host is reflected correctly
+        self.cluster.control_connection._reconnect()
+        new_host = self.cluster.get_control_connection_host()
+        self.assertNotEqual(host, new_host)
+
