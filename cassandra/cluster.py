@@ -1754,6 +1754,7 @@ class Session(object):
         self._validate_set_legacy_config('row_factory', rf)
 
     _default_timeout = 10.0
+
     @property
     def default_timeout(self):
         """
@@ -1775,6 +1776,7 @@ class Session(object):
         self._validate_set_legacy_config('default_timeout', timeout)
 
     _default_consistency_level = ConsistencyLevel.LOCAL_ONE
+
     @property
     def default_consistency_level(self):
         """
@@ -1795,6 +1797,7 @@ class Session(object):
         self._validate_set_legacy_config('default_consistency_level', cl)
 
     _default_serial_consistency_level = None
+
     @property
     def default_serial_consistency_level(self):
         """

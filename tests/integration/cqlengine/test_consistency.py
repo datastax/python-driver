@@ -68,7 +68,6 @@ class TestConsistency(BaseConsistencyTest):
         args = m.call_args
         self.assertEqual(CL.ALL, args[0][0].consistency_level)
 
-
     def test_batch_consistency(self):
 
         with mock.patch.object(self.session, 'execute') as m:
@@ -114,7 +113,7 @@ class TestConsistency(BaseConsistencyTest):
 
     def test_default_consistency(self):
         # verify global assumed default
-        self.assertEqual(Session.default_consistency_level, ConsistencyLevel.LOCAL_ONE)
+        self.assertEqual(Session._default_consistency_level, ConsistencyLevel.LOCAL_ONE)
 
         # verify that this session default is set according to connection.setup
         # assumes tests/cqlengine/__init__ setup uses CL.ONE
