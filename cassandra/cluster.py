@@ -22,16 +22,16 @@ import atexit
 from collections import defaultdict, Mapping
 from concurrent.futures import ThreadPoolExecutor, wait as wait_futures
 from copy import copy
+from functools import partial, wraps
+from itertools import groupby, count
 import logging
 from random import random
+import six
+from six.moves import filter, range, queue as Queue
 import socket
 import sys
 import time
 from threading import Lock, RLock, Thread, Event
-
-import six
-from six.moves import range
-from six.moves import queue as Queue
 
 import weakref
 from weakref import WeakValueDictionary
@@ -39,9 +39,6 @@ try:
     from weakref import WeakSet
 except ImportError:
     from cassandra.util import WeakSet  # NOQA
-
-from functools import partial, wraps
-from itertools import groupby, count
 
 from cassandra import (ConsistencyLevel, AuthenticationFailed,
                        OperationTimedOut, UnsupportedOperation,
@@ -973,6 +970,9 @@ class Cluster(object):
             raise ValueError("Profile %s already exists")
         self.profile_manager.profiles[name] = profile
         profile.load_balancing_policy.populate(self, self.metadata.all_hosts())
+        # on_up after populate allows things like DCA LBP to choose default local dc
+        for host in filter(lambda h: h.is_up, self.metadata.all_hosts()):
+            profile.load_balancing_policy.on_up(host)
         futures = set()
         for session in self.sessions:
             futures.update(session.update_created_pools())
