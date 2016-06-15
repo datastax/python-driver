@@ -702,6 +702,23 @@ class ClusterTests(unittest.TestCase):
 
             self.assertEqual(rr2_queried_hosts, rr1_queried_hosts)
 
+    def test_ta_lbp(self):
+        """
+        Test that execution profiles containing token aware LBP can be added
+
+        @since 3.5
+        @jira_ticket PYTHON-569
+        @expected_result Queries can run
+
+        @test_category config_profiles
+        """
+        query = "select release_version from system.local"
+        ta1 = ExecutionProfile()
+        with Cluster() as cluster:
+            session = cluster.connect()
+            cluster.add_execution_profile("ta1", ta1)
+            rs = session.execute(query, execution_profile='ta1')
+
     def test_clone_shared_lbp(self):
         """
         Tests that profile load balancing policies are shared on clone
