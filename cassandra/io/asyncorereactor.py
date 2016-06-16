@@ -278,6 +278,8 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
 
     @classmethod
     def handle_fork(cls):
+        global _dispatcher_map
+        _dispatcher_map = {}
         if cls._loop:
             cls._loop._cleanup()
             cls._loop = None
