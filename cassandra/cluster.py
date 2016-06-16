@@ -1945,7 +1945,7 @@ class Session(object):
         Execute the given query and return a :class:`~.ResponseFuture` object
         which callbacks may be attached to for asynchronous response
         delivery.  You may also call :meth:`~.ResponseFuture.result()`
-        on the :class:`.ResponseFuture` to syncronously block for results at
+        on the :class:`.ResponseFuture` to synchronously block for results at
         any time.
 
         If `trace` is set to :const:`True`, you may get the query trace descriptors using
