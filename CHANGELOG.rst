@@ -1,9 +1,25 @@
+3.5.0
+=====
+June X, 2016
+
+Features
+--------
+
+* Optional Configuration Profiles for the core driver (PYTHON-569)
+* API to get the host metadata associated with the control connection node (PYTHON-583)
+
+Bug Fixes
+---------
+
+* Clean up Asyncore socket map when fork is detected (PYTHON-577)
+* cqlengine: QuerySet only() is not respected when there are deferred fields (PYTHON-560)
+
 3.4.1
 =====
 May 26, 2016
 
 Bug Fixes
---------
+---------
 * Gevent connection closes on IO timeout (PYTHON-573)
 * "dictionary changed size during iteration" with Python 3 (PYTHON-572)
 
@@ -26,7 +42,7 @@ Features
 *  Write docs around working with datetime and timezones (PYTHON-394)
 
 Bug Fixes
---------
+---------
 *  High CPU utilization when using asyncore event loop (PYTHON-239)
 *  Fix CQL Export for non-ASCII Identifiers (PYTHON-447)
 *  Make stress scripts Python 2.6 compatible (PYTHON-434)
