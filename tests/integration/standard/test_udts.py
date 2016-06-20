@@ -676,7 +676,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertIn(type_name, s.cluster.metadata.keyspaces['udttests'].user_types)
 
         s.execute('CREATE TABLE %s (k int PRIMARY KEY, v frozen<%s>)' % (self.table_name, type_name))
-        s.execute('INSERT INTO %s (k, v) VALUES (0, 1)' % (self.table_name,))
+        s.execute('INSERT INTO %s (k, v) VALUES (0, {v0 : 1})' % (self.table_name,))
 
         s.cluster.register_user_type('udttests', type_name, dict)
 
@@ -688,14 +688,14 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         val = s.execute('SELECT v FROM %s' % self.table_name)[0][0]
         self.assertEqual(val['v0'], 1)
         self.assertIsNone(val['v1'])
-        s.execute("INSERT INTO %s (k, v) VALUES (0, (2, 'sometext'))" % (self.table_name,))
+        s.execute("INSERT INTO %s (k, v) VALUES (0, {v0 : 2, v1 : 'sometext'})" % (self.table_name,))
         val = s.execute('SELECT v FROM %s' % self.table_name)[0][0]
         self.assertEqual(val['v0'], 2)
         self.assertEqual(val['v1'], 'sometext')
 
         # alter field type
         s.execute('ALTER TYPE %s ALTER v1 TYPE blob' % (type_name,))
-        s.execute("INSERT INTO %s (k, v) VALUES (0, (3, 0xdeadbeef))" % (self.table_name,))
+        s.execute("INSERT INTO %s (k, v) VALUES (0, {v0 : 3, v1 : 0xdeadbeef})" % (self.table_name,))
         val = s.execute('SELECT v FROM %s' % self.table_name)[0][0]
         self.assertEqual(val['v0'], 3)
         self.assertEqual(val['v1'], six.b('\xde\xad\xbe\xef'))
