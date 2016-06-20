@@ -83,10 +83,3 @@ Please report any bugs and make any feature requests on the
 `JIRA <https://datastax-oss.atlassian.net/browse/PYTHON>`_ issue tracker.
 
 If you would like to contribute, please feel free to open a pull request.
-
-Indices and Tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
