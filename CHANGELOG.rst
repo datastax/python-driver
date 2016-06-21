@@ -5,7 +5,7 @@ June X, 2016
 Features
 --------
 
-* Optional Configuration Profiles for the core driver (PYTHON-569)
+* Optional Execution Profiles for the core driver (PYTHON-569)
 * API to get the host metadata associated with the control connection node (PYTHON-583)
 
 Bug Fixes
