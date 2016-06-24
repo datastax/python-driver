@@ -5,7 +5,7 @@ Execution profiles are an experimental API aimed at making it easier to execute 
 a single connected ``Session``. Execution profiles are being introduced to deal with the exploding number of
 configuration options, especially as the database platform evolves more complex workloads.
 
-The Execution Profile API is being introduced now, in an experimental capacity in order to take advantage of it in
+The Execution Profile API is being introduced now, in an experimental capacity, in order to take advantage of it in
 existing projects, and to gauge interest and feedback in the community. For now, the legacy configuration remains
 intact, but legacy and Execution Profile APIs cannot be used simultaneously on the same client ``Cluster``.
 
