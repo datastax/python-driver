@@ -2104,6 +2104,7 @@ class SchemaParserV3(SchemaParserV22):
     recognized_table_options = (
         'bloom_filter_fp_chance',
         'caching',
+        'cdc',
         'comment',
         'compaction',
         'compression',
