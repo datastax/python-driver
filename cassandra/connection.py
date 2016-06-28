@@ -149,8 +149,8 @@ class ProtocolVersionUnsupported(ConnectionException):
     Server rejected startup message due to unsupported protocol version
     """
     def __init__(self, host, startup_version):
-        super(ProtocolVersionUnsupported, self).__init__("Unsupported protocol version on %s: %d",
-                                                         (host, startup_version))
+        msg = "Unsupported protocol version on %s: %d" % (host, startup_version)
+        super(ProtocolVersionUnsupported, self).__init__(msg, host)
         self.startup_version = startup_version
 
 
