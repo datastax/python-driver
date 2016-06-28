@@ -218,15 +218,87 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         query3 = TestModel.objects.distinct(['test_id', 'attempt_id'])
         self.assertEqual(len(query3._distinct_fields), 2)
 
-    def test_defining_only_and_defer_fails(self):
+    def test_defining_only_fields(self):
         """
-        Tests that trying to add fields to either only or defer, or doing so more than once fails
+        Tests defining only fields
+
+        @since 3.5
+        @jira_ticket PYTHON-560
+        @expected_result deferred fields should not be returned
+
+        @test_category object_mapper
+        """
+        # simple only definition
+        q = TestModel.objects.only(['attempt_id', 'description'])
+        self.assertEqual(q._select_fields(), ['attempt_id', 'description'])
+
+        with self.assertRaises(query.QueryException):
+            TestModel.objects.only(['nonexistent_field'])
+
+        # Cannot define more than once only fields
+        with self.assertRaises(query.QueryException):
+            TestModel.objects.only(['description']).only(['attempt_id'])
+
+        # only with defer fields
+        q = TestModel.objects.only(['attempt_id', 'description'])
+        q = q.defer(['description'])
+        self.assertEqual(q._select_fields(), ['attempt_id'])
+
+        # Eliminate all results confirm exception is thrown
+        q = TestModel.objects.only(['description'])
+        q = q.defer(['description'])
+        with self.assertRaises(query.QueryException):
+            q._select_fields()
+
+        q = TestModel.objects.filter(test_id=0).only(['test_id', 'attempt_id', 'description'])
+        self.assertEqual(q._select_fields(), ['attempt_id', 'description'])
+
+        # no fields to select
+        with self.assertRaises(query.QueryException):
+            q = TestModel.objects.only(['test_id']).defer(['test_id'])
+            q._select_fields()
+
+        with self.assertRaises(query.QueryException):
+            q = TestModel.objects.filter(test_id=0).only(['test_id'])
+            q._select_fields()
+
+    def test_defining_defer_fields(self):
+        """
+        Tests defining defer fields
+
+        @since 3.5
+        @jira_ticket PYTHON-560
+        @expected_result deferred fields should not be returned
+
+        @test_category object_mapper
         """
 
-    def test_defining_only_or_defer_on_nonexistant_fields_fails(self):
-        """
-        Tests that setting only or defer fields that don't exist raises an exception
-        """
+        # simple defer definition
+        q = TestModel.objects.defer(['attempt_id', 'description'])
+        self.assertEqual(q._select_fields(), ['test_id', 'expected_result', 'test_result'])
+
+        with self.assertRaises(query.QueryException):
+            TestModel.objects.defer(['nonexistent_field'])
+
+        # defer more than one
+        q = TestModel.objects.defer(['attempt_id', 'description'])
+        q = q.defer(['expected_result'])
+        self.assertEqual(q._select_fields(), ['test_id', 'test_result'])
+
+        # defer with only
+        q = TestModel.objects.defer(['description', 'attempt_id'])
+        q = q.only(['description', 'test_id'])
+        self.assertEqual(q._select_fields(), ['test_id'])
+
+        # Eliminate all results confirm exception is thrown
+        q = TestModel.objects.defer(['description', 'attempt_id'])
+        q = q.only(['description'])
+        with self.assertRaises(query.QueryException):
+            q._select_fields()
+
+        # implicit defer
+        q = TestModel.objects.filter(test_id=0)
+        self.assertEqual(q._select_fields(), ['attempt_id', 'description', 'expected_result', 'test_result'])
 
 
 class BaseQuerySetUsage(BaseCassEngTestCase):

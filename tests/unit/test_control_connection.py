@@ -22,7 +22,7 @@ from mock import Mock, ANY, call
 
 from cassandra import OperationTimedOut, SchemaTargetType, SchemaChangeType
 from cassandra.protocol import ResultMessage, RESULT_KIND_ROWS
-from cassandra.cluster import ControlConnection, _Scheduler
+from cassandra.cluster import ControlConnection, _Scheduler, ProfileManager, EXEC_PROFILE_DEFAULT, ExecutionProfile
 from cassandra.pool import Host
 from cassandra.policies import (SimpleConvictionPolicy, RoundRobinPolicy,
                                 ConstantReconnectionPolicy, IdentityTranslator)
@@ -59,7 +59,7 @@ class MockMetadata(object):
 class MockCluster(object):
 
     max_schema_agreement_wait = 5
-    load_balancing_policy = RoundRobinPolicy()
+    profile_manager = ProfileManager()
     reconnection_policy = ConstantReconnectionPolicy(2)
     address_translator = IdentityTranslator()
     down_host = None
@@ -72,6 +72,7 @@ class MockCluster(object):
         self.removed_hosts = []
         self.scheduler = Mock(spec=_Scheduler)
         self.executor = Mock(spec=ThreadPoolExecutor)
+        self.profile_manager.profiles[EXEC_PROFILE_DEFAULT] = ExecutionProfile(RoundRobinPolicy())
 
     def add_host(self, address, datacenter, rack, signal=False, refresh_nodes=True):
         host = Host(address, SimpleConvictionPolicy, datacenter, rack)

@@ -18,19 +18,20 @@ except ImportError:
     import unittest  # noqa
 
 from collections import deque
+from copy import copy
 from mock import patch
 import time
 from uuid import uuid4
 import logging
 
 import cassandra
-from cassandra.cluster import Cluster, NoHostAvailable
+from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.concurrent import execute_concurrent
 from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
                                 RetryPolicy, SimpleConvictionPolicy, HostDistance,
                                 WhiteListRoundRobinPolicy, AddressTranslator)
 from cassandra.protocol import MAX_SUPPORTED_VERSION
-from cassandra.query import SimpleStatement, TraceUnavailable
+from cassandra.query import SimpleStatement, TraceUnavailable, tuple_factory
 
 from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, get_node, CASSANDRA_VERSION, execute_until_pass, execute_with_long_wait_retry, get_node, MockLoggingHandler
 from tests.integration.util import assert_quiescent_pool_state
@@ -41,7 +42,6 @@ def setup_module():
 
 
 class ClusterTests(unittest.TestCase):
-
 
     def test_host_resolution(self):
         """
@@ -617,6 +617,201 @@ class ClusterTests(unittest.TestCase):
         assert_quiescent_pool_state(self, cluster)
 
         cluster.shutdown()
+
+    def test_profile_load_balancing(self):
+        """
+        Tests that profile load balancing policies are honored.
+
+        @since 3.5
+        @jira_ticket PYTHON-569
+        @expected_result Execution Policy should be used when applicable.
+
+        @test_category config_profiles
+        """
+        query = "select release_version from system.local"
+        node1 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1']))
+        with Cluster(execution_profiles={'node1': node1}) as cluster:
+            session = cluster.connect()
+
+            # default is DCA RR for all hosts
+            expected_hosts = set(cluster.metadata.all_hosts())
+            queried_hosts = set()
+            for _ in expected_hosts:
+                rs = session.execute(query)
+                queried_hosts.add(rs.response_future._current_host)
+            self.assertEqual(queried_hosts, expected_hosts)
+
+            # by name we should only hit the one
+            expected_hosts = set(h for h in cluster.metadata.all_hosts() if h.address == '127.0.0.1')
+            queried_hosts = set()
+            for _ in cluster.metadata.all_hosts():
+                rs = session.execute(query, execution_profile='node1')
+                queried_hosts.add(rs.response_future._current_host)
+            self.assertEqual(queried_hosts, expected_hosts)
+
+            # use a copied instance and override the row factory
+            # assert last returned value can be accessed as a namedtuple so we can prove something different
+            named_tuple_row = rs[0]
+            self.assertIsInstance(named_tuple_row, tuple)
+            self.assertTrue(named_tuple_row.release_version)
+
+            tmp_profile = copy(node1)
+            tmp_profile.row_factory = tuple_factory
+            queried_hosts = set()
+            for _ in cluster.metadata.all_hosts():
+                rs = session.execute(query, execution_profile=tmp_profile)
+                queried_hosts.add(rs.response_future._current_host)
+            self.assertEqual(queried_hosts, expected_hosts)
+            tuple_row = rs[0]
+            self.assertIsInstance(tuple_row, tuple)
+            with self.assertRaises(AttributeError):
+                tuple_row.release_version
+
+            # make sure original profile is not impacted
+            self.assertTrue(session.execute(query, execution_profile='node1')[0].release_version)
+
+    def test_profile_lb_swap(self):
+        """
+        Tests that profile load balancing policies are not shared
+
+        Creates two LBP, runs a few queries, and validates that each LBP is execised
+        seperately between EP's
+
+        @since 3.5
+        @jira_ticket PYTHON-569
+        @expected_result LBP should not be shared.
+
+        @test_category config_profiles
+        """
+        query = "select release_version from system.local"
+        rr1 = ExecutionProfile(load_balancing_policy=RoundRobinPolicy())
+        rr2 = ExecutionProfile(load_balancing_policy=RoundRobinPolicy())
+        exec_profiles = {'rr1': rr1, 'rr2': rr2}
+        with Cluster(execution_profiles=exec_profiles) as cluster:
+            session = cluster.connect()
+
+            # default is DCA RR for all hosts
+            expected_hosts = set(cluster.metadata.all_hosts())
+            rr1_queried_hosts = set()
+            rr2_queried_hosts = set()
+           
+            rs = session.execute(query, execution_profile='rr1')
+            rr1_queried_hosts.add(rs.response_future._current_host)
+            rs = session.execute(query, execution_profile='rr2')
+            rr2_queried_hosts.add(rs.response_future._current_host)
+
+            self.assertEqual(rr2_queried_hosts, rr1_queried_hosts)
+
+    def test_ta_lbp(self):
+        """
+        Test that execution profiles containing token aware LBP can be added
+
+        @since 3.5
+        @jira_ticket PYTHON-569
+        @expected_result Queries can run
+
+        @test_category config_profiles
+        """
+        query = "select release_version from system.local"
+        ta1 = ExecutionProfile()
+        with Cluster() as cluster:
+            session = cluster.connect()
+            cluster.add_execution_profile("ta1", ta1)
+            rs = session.execute(query, execution_profile='ta1')
+
+    def test_clone_shared_lbp(self):
+        """
+        Tests that profile load balancing policies are shared on clone
+
+        Creates one LBP clones it, and ensures that the LBP is shared between
+        the two EP's
+
+        @since 3.5
+        @jira_ticket PYTHON-569
+        @expected_result LBP is shared
+
+        @test_category config_profiles
+        """
+        query = "select release_version from system.local"
+        rr1 = ExecutionProfile(load_balancing_policy=RoundRobinPolicy())
+        exec_profiles = {'rr1': rr1}
+        with Cluster(execution_profiles=exec_profiles) as cluster:
+            session = cluster.connect()
+            rr1_clone = session.execution_profile_clone_update('rr1', row_factory=tuple_factory)
+            cluster.add_execution_profile("rr1_clone", rr1_clone)
+            rr1_queried_hosts = set()
+            rr1_clone_queried_hosts = set()
+            rs = session.execute(query, execution_profile='rr1')
+            rr1_queried_hosts.add(rs.response_future._current_host)
+            rs = session.execute(query, execution_profile='rr1_clone')
+            rr1_clone_queried_hosts.add(rs.response_future._current_host)
+            self.assertNotEqual(rr1_clone_queried_hosts, rr1_queried_hosts)
+
+    def test_missing_exec_prof(self):
+        """
+        Tests to verify that using an unknown profile raises a ValueError
+
+        @since 3.5
+        @jira_ticket PYTHON-569
+        @expected_result ValueError
+
+        @test_category config_profiles
+        """
+        query = "select release_version from system.local"
+        rr1 = ExecutionProfile(load_balancing_policy=RoundRobinPolicy())
+        rr2 = ExecutionProfile(load_balancing_policy=RoundRobinPolicy())
+        exec_profiles = {'rr1': rr1, 'rr2': rr2}
+        with Cluster(execution_profiles=exec_profiles) as cluster:
+            session = cluster.connect()
+            with self.assertRaises(ValueError):
+                session.execute(query, execution_profile='rr3')
+
+    def test_profile_pool_management(self):
+        """
+        Tests that changes to execution profiles correctly impact our cluster's pooling
+
+        @since 3.5
+        @jira_ticket PYTHON-569
+        @expected_result pools should be correctly updated as EP's are added and removed
+
+        @test_category config_profiles
+        """
+
+        node1 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1']))
+        node2 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.2']))
+        with Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: node1, 'node2': node2}) as cluster:
+            session = cluster.connect()
+            pools = session.get_pool_state()
+            # there are more hosts, but we connected to the ones in the lbp aggregate
+            self.assertGreater(len(cluster.metadata.all_hosts()), 2)
+            self.assertEqual(set(h.address for h in pools), set(('127.0.0.1', '127.0.0.2')))
+
+            # dynamically update pools on add
+            node3 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.3']))
+            cluster.add_execution_profile('node3', node3)
+            pools = session.get_pool_state()
+            self.assertEqual(set(h.address for h in pools), set(('127.0.0.1', '127.0.0.2', '127.0.0.3')))
+
+    def test_add_profile_timeout(self):
+        """
+        Tests that EP Timeouts are honored.
+
+        @since 3.5
+        @jira_ticket PYTHON-569
+        @expected_result EP timeouts should override defaults
+
+        @test_category config_profiles
+        """
+
+        node1 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1']))
+        with Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: node1}) as cluster:
+            session = cluster.connect()
+            pools = session.get_pool_state()
+            self.assertGreater(len(cluster.metadata.all_hosts()), 2)
+            self.assertEqual(set(h.address for h in pools), set(('127.0.0.1',)))
+
+            node2 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.2']))
+            self.assertRaises(cassandra.OperationTimedOut, cluster.add_execution_profile, 'node2', node2, pool_wait_timeout=0.0000001)
 
 
 class LocalHostAdressTranslator(AddressTranslator):

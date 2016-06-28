@@ -5,7 +5,7 @@ Contributions are welcome in the form of bug reports or pull requests.
 
 Bug Reports
 -----------
-Quality bug reports are welcome at the `DataStax Python Drvier JIRA <https://datastax-oss.atlassian.net/browse/PYTHON>`_.
+Quality bug reports are welcome at the `DataStax Python Driver JIRA <https://datastax-oss.atlassian.net/browse/PYTHON>`_.
 
 There are plenty of `good resources <http://www.drmaciver.com/2013/09/how-to-submit-a-decent-bug-report/>`_ describing how to create
 good bug reports. They will not be repeated in detail here, but in general, the bug report include where appropriate:

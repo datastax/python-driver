@@ -70,10 +70,6 @@ and the IRC channel.
 For IRC, use the #datastax-drivers channel on irc.freenode.net.  If you don't have an IRC client,
 you can use `freenode's web-based client <http://webchat.freenode.net/?channels=#datastax-drivers>`_.
 
-Features to be Added
---------------------
-* C extension for encoding/decoding messages
-
 License
 -------
 Copyright 2013-2016 DataStax

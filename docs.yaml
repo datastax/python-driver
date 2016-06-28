@@ -1,0 +1,8 @@
+title: DataStax Python Driver for Apache Cassandra
+summary: DataStax Python Driver for Apache Cassandra Documentation
+output: docs/_build/
+sections:
+  - title: N/A
+    prefix: /
+    type: sphinx
+    directory: docs
