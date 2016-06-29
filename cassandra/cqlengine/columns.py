@@ -168,6 +168,36 @@ class Column(object):
         self.position = Column.instance_counter
         Column.instance_counter += 1
 
+    def __ne__(self, other):
+        if isinstance(other, Column):
+            return self.position != other.position
+        return NotImplemented
+
+    def __eq__(self, other):
+        if isinstance(other, Column):
+            return self.position == other.position
+        return NotImplemented
+
+    def __lt__(self, other):
+        if isinstance(other, Column):
+            return self.position < other.position
+        return NotImplemented
+
+    def __le__(self, other):
+        if isinstance(other, Column):
+            return self.position <= other.position
+        return NotImplemented
+
+    def __gt__(self, other):
+        if isinstance(other, Column):
+            return self.position > other.position
+        return NotImplemented
+
+    def __ge__(self, other):
+        if isinstance(other, Column):
+            return self.position >= other.position
+        return NotImplemented
+
     def validate(self, value):
         """
         Returns a cleaned and validated value. Raises a ValidationError
