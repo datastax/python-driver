@@ -894,7 +894,6 @@ class TestMinMaxTimeUUIDFunctions(BaseCassEngTestCase):
 
 
 class TestInOperator(BaseQuerySetUsage):
-
     @execute_count(1)
     def test_kwarg_success_case(self):
         """ Tests the in operator works with the kwarg query method """
@@ -906,6 +905,23 @@ class TestInOperator(BaseQuerySetUsage):
         """ Tests the in operator works with the query expression query method """
         q = TestModel.filter(TestModel.test_id.in_([0, 1]))
         assert q.count() == 8
+
+    @execute_count(5)
+    def test_bool(self):
+        """
+        PYTHON-596
+        """
+        class bool_model(Model):
+            k = columns.Integer(primary_key=True)
+            b = columns.Boolean(primary_key=True)
+            v = columns.Integer(default=3)
+        sync_table(bool_model)
+
+        bool_model.create(k=0, b=True)
+        bool_model.create(k=0, b=False)
+        self.assertEqual(len(bool_model.objects.all()), 2)
+        self.assertEqual(len(bool_model.objects.filter(k=0, b=True)), 1)
+        self.assertEqual(len(bool_model.objects.filter(k=0, b=False)), 1)
 
 
 @greaterthancass20
