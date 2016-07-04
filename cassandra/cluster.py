@@ -2144,7 +2144,7 @@ class ControlConnection(object):
         # _clear_watcher will be called when this ControlConnection is about to be finalized
         # _watch_callback will get the actual callback from the Connection and relay it to
         # this object (after a dereferencing a weakref)
-        self_weakref = weakref.ref(self, callback=partial(_clear_watcher, weakref.proxy(connection)))
+        self_weakref = weakref.ref(self, partial(_clear_watcher, weakref.proxy(connection)))
         try:
             connection.register_watchers({
                 "TOPOLOGY_CHANGE": partial(_watch_callback, self_weakref, '_handle_topology_change'),
