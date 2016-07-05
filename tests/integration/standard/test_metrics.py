@@ -14,6 +14,8 @@
 
 import time
 
+from cassandra.policies import WhiteListRoundRobinPolicy, FallthroughRetryPolicy
+
 try:
     import unittest2 as unittest
 except ImportError:
@@ -33,8 +35,11 @@ def setup_module():
 class MetricsTests(unittest.TestCase):
 
     def setUp(self):
-        self.cluster = Cluster(metrics_enabled=True, protocol_version=PROTOCOL_VERSION)
-        self.session = self.cluster.connect("test3rf")
+        contact_point = ['127.0.0.2']
+        self.cluster = Cluster(contact_points=contact_point, metrics_enabled=True, protocol_version=PROTOCOL_VERSION,
+                               load_balancing_policy=WhiteListRoundRobinPolicy(contact_point),
+                               default_retry_policy=FallthroughRetryPolicy())
+        self.session = self.cluster.connect("test3rf", wait_for_all_pools=True)
 
     def tearDown(self):
         self.cluster.shutdown()
@@ -44,8 +49,6 @@ class MetricsTests(unittest.TestCase):
         Trigger and ensure connection_errors are counted
         Stop all node with the driver knowing about the "DOWN" states.
         """
-
-
         # Test writes
         for i in range(0, 100):
             self.session.execute_async("INSERT INTO test (k, v) VALUES ({0}, {1})".format(i, i))
@@ -145,13 +148,13 @@ class MetricsTests(unittest.TestCase):
             query = SimpleStatement("INSERT INTO test (k, v) VALUES (2, 2)", consistency_level=ConsistencyLevel.ALL)
             with self.assertRaises(Unavailable):
                 self.session.execute(query)
-            self.assertEqual(2, self.cluster.metrics.stats.unavailables)
+            self.assertEqual(self.cluster.metrics.stats.unavailables, 1)
 
             # Test write
             query = SimpleStatement("SELECT * FROM test", consistency_level=ConsistencyLevel.ALL)
             with self.assertRaises(Unavailable):
                 self.session.execute(query, timeout=None)
-            self.assertEqual(4, self.cluster.metrics.stats.unavailables)
+            self.assertEqual(self.cluster.metrics.stats.unavailables, 2)
         finally:
             get_node(1).start(wait_other_notice=True, wait_for_binary_proto=True)
             # Give some time for the cluster to come back up, for the next test
