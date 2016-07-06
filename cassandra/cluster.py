@@ -1341,6 +1341,7 @@ class Cluster(object):
         else:
             if not have_future:
                 with host.lock:
+                    host.set_up()
                     host._currently_handling_node_up = False
 
         # for testing purposes
@@ -1379,10 +1380,11 @@ class Cluster(object):
             return
 
         with host.lock:
-            if (not host.is_up and not expect_host_to_be_down) or host.is_currently_reconnecting():
+            was_up = host.is_up
+            host.set_down()
+            if (not was_up and not expect_host_to_be_down) or host.is_currently_reconnecting():
                 return
 
-            host.set_down()
 
         log.warning("Host %s has been marked down", host)
 
