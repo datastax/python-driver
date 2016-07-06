@@ -86,7 +86,7 @@ def validate_ssl_options(ssl_options):
                 raise RuntimeError("Failed to connect to SSL cluster after 5 attempts")
             try:
                 cluster = Cluster(protocol_version=PROTOCOL_VERSION, ssl_options=ssl_options)
-                session = cluster.connect()
+                session = cluster.connect(wait_for_all_pools=True)
                 break
             except Exception:
                 ex_type, ex, tb = sys.exc_info()

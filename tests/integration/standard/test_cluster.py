@@ -67,11 +67,11 @@ class ClusterTests(unittest.TestCase):
         @test_category connection
         """
         cluster = Cluster(contact_points=["localhost", "127.0.0.1", "localhost", "localhost", "localhost"], protocol_version=PROTOCOL_VERSION, connect_timeout=1)
-        cluster.connect()
+        cluster.connect(wait_for_all_pools=True)
         self.assertEqual(len(cluster.metadata.all_hosts()), 3)
         cluster.shutdown()
         cluster = Cluster(contact_points=["127.0.0.1", "localhost"], protocol_version=PROTOCOL_VERSION, connect_timeout=1)
-        cluster.connect()
+        cluster.connect(wait_for_all_pools=True)
         self.assertEqual(len(cluster.metadata.all_hosts()), 3)
         cluster.shutdown()
 
@@ -805,7 +805,7 @@ class ClusterTests(unittest.TestCase):
 
         node1 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1']))
         with Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: node1}) as cluster:
-            session = cluster.connect()
+            session = cluster.connect(wait_for_all_pools=True)
             pools = session.get_pool_state()
             self.assertGreater(len(cluster.metadata.all_hosts()), 2)
             self.assertEqual(set(h.address for h in pools), set(('127.0.0.1',)))
