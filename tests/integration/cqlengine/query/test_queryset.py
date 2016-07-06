@@ -300,6 +300,10 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         q = TestModel.objects.filter(test_id=0)
         self.assertEqual(q._select_fields(), ['attempt_id', 'description', 'expected_result', 'test_result'])
 
+        # when all fields are defered, it fallbacks select the partition keys
+        q = TestModel.objects.defer(['test_id', 'attempt_id', 'description', 'expected_result', 'test_result'])
+        self.assertEqual(q._select_fields(), ['test_id'])
+
 
 class BaseQuerySetUsage(BaseCassEngTestCase):
 
