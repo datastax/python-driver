@@ -797,14 +797,6 @@ class ModelMetaClass(type):
         options = attrs.get('__options__') or {}
         attrs['__default_ttl__'] = options.get('default_time_to_live')
 
-        def _transform_column(col_name, col_obj):
-            column_dict[col_name] = col_obj
-            if col_obj.primary_key:
-                primary_keys[col_name] = col_obj
-            col_obj.set_column_name(col_name)
-            # set properties
-            attrs[col_name] = ColumnDescriptor(col_obj)
-
         column_definitions = [(k, v) for k, v in attrs.items() if isinstance(v, columns.Column)]
         column_definitions = sorted(column_definitions, key=lambda x: x[1].position)
 
@@ -849,6 +841,14 @@ class ModelMetaClass(type):
 
         has_partition_keys = any(v.partition_key for (k, v) in column_definitions)
 
+        def _transform_column(col_name, col_obj):
+            column_dict[col_name] = col_obj
+            if col_obj.primary_key:
+                primary_keys[col_name] = col_obj
+            col_obj.set_column_name(col_name)
+            # set properties
+            attrs[col_name] = ColumnDescriptor(col_obj)
+
         partition_key_index = 0
         # transform column definitions
         for k, v in column_definitions:
@@ -868,6 +868,12 @@ class ModelMetaClass(type):
             if v.partition_key:
                 v._partition_key_index = partition_key_index
                 partition_key_index += 1
+
+            overriding = column_dict.get(k)
+            if overriding:
+                v.position = overriding.position
+                v.partition_key = overriding.partition_key
+                v._partition_key_index = overriding._partition_key_index
             _transform_column(k, v)
 
         partition_keys = OrderedDict(k for k in primary_keys.items() if k[1].partition_key)
