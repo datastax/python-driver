@@ -126,7 +126,7 @@ class CustomResultMessageRaw(ResultMessage):
     type_codes = my_type_codes
 
     @classmethod
-    def recv_results_rows(cls, f, protocol_version, user_type_map):
+    def recv_results_rows(cls, f, protocol_version, user_type_map, result_metadata):
             paging_state, column_metadata = cls.recv_results_metadata(f, user_type_map)
             rowcount = read_int(f)
             rows = [cls.recv_row(f, len(column_metadata)) for _ in range(rowcount)]
@@ -155,7 +155,7 @@ class CustomResultMessageTracked(ResultMessage):
     checked_rev_row_set = set()
 
     @classmethod
-    def recv_results_rows(cls, f, protocol_version, user_type_map):
+    def recv_results_rows(cls, f, protocol_version, user_type_map, result_metadata):
         paging_state, column_metadata = cls.recv_results_metadata(f, user_type_map)
         rowcount = read_int(f)
         rows = [cls.recv_row(f, len(column_metadata)) for _ in range(rowcount)]
