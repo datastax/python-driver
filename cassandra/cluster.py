@@ -1154,6 +1154,13 @@ class Cluster(object):
 
                 try:
                     self.control_connection.connect()
+
+                    # we set all contact points up for connecting, but we won't infer state after this
+                    for address in self.contact_points_resolved:
+                        h = self.metadata.get_host(address)
+                        if h and self.profile_manager.distance(h) == HostDistance.IGNORED:
+                            h.is_up = None
+
                     log.debug("Control connection created")
                 except Exception:
                     log.exception("Control connection failed to connect, "
