@@ -971,6 +971,9 @@ class ModelQuerySet(AbstractQuerySet):
             fields = self.model._columns.keys()
             if self._defer_fields:
                 fields = [f for f in fields if f not in self._defer_fields]
+                # select the partition keys if all model fields are set defer
+                if not fields:
+                    fields = self.model._partition_keys
             if self._only_fields:
                 fields = [f for f in fields if f in self._only_fields]
             if not fields:
