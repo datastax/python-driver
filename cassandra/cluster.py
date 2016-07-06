@@ -20,7 +20,7 @@ from __future__ import absolute_import
 
 import atexit
 from collections import defaultdict, Mapping
-from concurrent.futures import ThreadPoolExecutor, wait as wait_futures
+from concurrent.futures import ThreadPoolExecutor, FIRST_COMPLETED, wait as wait_futures
 from copy import copy
 from functools import partial, wraps
 from itertools import groupby, count
@@ -1127,7 +1127,7 @@ class Cluster(object):
             else:
                 raise DriverException("Cannot downgrade protocol version (%d) below minimum supported version: %d" % (new_version, MIN_SUPPORTED_VERSION))
 
-    def connect(self, keyspace=None):
+    def connect(self, keyspace=None, wait_for_all_pools=False):
         """
         Creates and returns a new :class:`~.Session` object.  If `keyspace`
         is specified, that keyspace will be the default keyspace for
@@ -1167,9 +1167,9 @@ class Cluster(object):
                     self._idle_heartbeat = ConnectionHeartbeat(self.idle_heartbeat_interval, self.get_connection_holders)
                 self._is_setup = True
 
-        session = self._new_session()
-        if keyspace:
-            session.set_keyspace(keyspace)
+        session = self._new_session(keyspace)
+        if wait_for_all_pools:
+            wait_futures(session._initial_connect_futures)
         return session
 
     def get_connection_holders(self):
@@ -1213,8 +1213,8 @@ class Cluster(object):
     def __exit__(self, *args):
         self.shutdown()
 
-    def _new_session(self):
-        session = Session(self, self.metadata.all_hosts())
+    def _new_session(self, keyspace):
+        session = Session(self, self.metadata.all_hosts(), keyspace)
         self._session_register_user_types(session)
         self.sessions.add(session)
         return session
@@ -1888,9 +1888,10 @@ class Session(object):
     _profile_manager = None
     _metrics = None
 
-    def __init__(self, cluster, hosts):
+    def __init__(self, cluster, hosts, keyspace=None):
         self.cluster = cluster
         self.hosts = hosts
+        self.keyspace = keyspace
 
         self._lock = RLock()
         self._pools = {}
@@ -1901,14 +1902,13 @@ class Session(object):
         self.encoder = Encoder()
 
         # create connection pools in parallel
-        futures = []
+        self._initial_connect_futures = set()
         for host in hosts:
             future = self.add_or_renew_pool(host, is_host_addition=False)
-            if future is not None:
-                futures.append(future)
+            if future:
+                self._initial_connect_futures.add(future)
+        wait_futures(self._initial_connect_futures, return_when=FIRST_COMPLETED)
 
-        for future in futures:
-            future.result()
 
     def execute(self, query, parameters=None, timeout=_NOT_SET, trace=False, custom_payload=None, execution_profile=EXEC_PROFILE_DEFAULT):
         """

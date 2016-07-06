@@ -516,14 +516,14 @@ class ClusterTests(unittest.TestCase):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION, idle_heartbeat_interval=interval)
         if PROTOCOL_VERSION < 3:
             cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
-        session = cluster.connect()
+        session = cluster.connect(wait_for_all_pools=True)
 
         # This test relies on impl details of connection req id management to see if heartbeats 
         # are being sent. May need update if impl is changed
         connection_request_ids = {}
         for h in cluster.get_connection_holders():
             for c in h.get_connections():
-                # make sure none are idle (should have startup messages)
+                # make sure none are idle (should have startup messages
                 self.assertFalse(c.is_idle)
                 with c.lock:
                     connection_request_ids[id(c)] = deque(c.request_ids)  # copy of request ids
@@ -558,7 +558,7 @@ class ClusterTests(unittest.TestCase):
         self.assertEqual(len(holders), len(cluster.metadata.all_hosts()) + 1)  # hosts pools, 1 for cc
 
         # include additional sessions
-        session2 = cluster.connect()
+        session2 = cluster.connect(wait_for_all_pools=True)
 
         holders = cluster.get_connection_holders()
         self.assertIn(cluster.control_connection, holders)
@@ -631,7 +631,7 @@ class ClusterTests(unittest.TestCase):
         query = "select release_version from system.local"
         node1 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1']))
         with Cluster(execution_profiles={'node1': node1}) as cluster:
-            session = cluster.connect()
+            session = cluster.connect(wait_for_all_pools=True)
 
             # default is DCA RR for all hosts
             expected_hosts = set(cluster.metadata.all_hosts())
@@ -688,7 +688,7 @@ class ClusterTests(unittest.TestCase):
         rr2 = ExecutionProfile(load_balancing_policy=RoundRobinPolicy())
         exec_profiles = {'rr1': rr1, 'rr2': rr2}
         with Cluster(execution_profiles=exec_profiles) as cluster:
-            session = cluster.connect()
+            session = cluster.connect(wait_for_all_pools=True)
 
             # default is DCA RR for all hosts
             expected_hosts = set(cluster.metadata.all_hosts())
@@ -780,7 +780,7 @@ class ClusterTests(unittest.TestCase):
         node1 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1']))
         node2 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.2']))
         with Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: node1, 'node2': node2}) as cluster:
-            session = cluster.connect()
+            session = cluster.connect(wait_for_all_pools=True)
             pools = session.get_pool_state()
             # there are more hosts, but we connected to the ones in the lbp aggregate
             self.assertGreater(len(cluster.metadata.all_hosts()), 2)

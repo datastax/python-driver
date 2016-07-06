@@ -99,7 +99,7 @@ class HeartbeatTest(unittest.TestCase):
 
     def setUp(self):
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, idle_heartbeat_interval=1)
-        self.session = self.cluster.connect()
+        self.session = self.cluster.connect(wait_for_all_pools=True)
 
     def tearDown(self):
         self.cluster.shutdown()
