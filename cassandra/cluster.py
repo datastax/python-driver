@@ -2045,11 +2045,11 @@ class Session(object):
                 query_string, cl, serial_cl,
                 fetch_size, timestamp=timestamp)
         elif isinstance(query, BoundStatement):
-            message = ExecuteMessage(
-                query.prepared_statement.query_id, query.values, cl,
-                serial_cl, fetch_size,
-                timestamp=timestamp)
             prepared_statement = query.prepared_statement
+            message = ExecuteMessage(
+                prepared_statement.query_id, query.values, cl,
+                serial_cl, fetch_size,
+                timestamp=timestamp, skip_meta=bool(prepared_statement.result_metadata))
         elif isinstance(query, BatchStatement):
             if self._protocol_version < 2:
                 raise UnsupportedOperation(
@@ -2124,14 +2124,14 @@ class Session(object):
         future = ResponseFuture(self, message, query=None, timeout=self.default_timeout)
         try:
             future.send_request()
-            query_id, column_metadata, pk_indexes = future.result()
+            query_id, bind_metadata, pk_indexes, result_metadata = future.result()
         except Exception:
             log.exception("Error preparing query:")
             raise
 
         prepared_statement = PreparedStatement.from_message(
-            query_id, column_metadata, pk_indexes, self.cluster.metadata, query, self.keyspace,
-            self._protocol_version)
+            query_id, bind_metadata, pk_indexes, self.cluster.metadata, query, self.keyspace,
+            self._protocol_version, result_metadata)
         prepared_statement.custom_payload = future.custom_payload
 
         self.cluster.add_prepared(query_id, prepared_statement)
@@ -3254,7 +3254,9 @@ class ResponseFuture(object):
             # TODO get connectTimeout from cluster settings
             connection, request_id = pool.borrow_connection(timeout=2.0)
             self._connection = connection
-            connection.send_msg(message, request_id, cb=cb, encoder=self._protocol_handler.encode_message, decoder=self._protocol_handler.decode_message)
+            result_meta = self.prepared_statement.result_metadata if self.prepared_statement else []
+            connection.send_msg(message, request_id, cb=cb, encoder=self._protocol_handler.encode_message, decoder=self._protocol_handler.decode_message,
+                                result_metadata=result_meta)
             return request_id
         except NoConnectionsAvailable as exc:
             log.debug("All connections for host %s are at capacity, moving to the next host", host)
