@@ -1177,10 +1177,10 @@ class ModelQuerySet(AbstractQuerySet):
         if us.assignments:
             self._execute(us)
 
-        null_conditional = [condition for condition in self._conditional
-                            if condition.field not in updated_columns] if self._conditional else None
-
         if nulled_columns:
+            null_conditional = [condition for condition in self._conditional
+                                if condition.field not in updated_columns] if self._conditional else None
+
             ds = DeleteStatement(self.column_family_name, fields=nulled_columns,
                                  where=self._where, conditionals=null_conditional, if_exists=self._if_exists)
             self._execute(ds)
@@ -1296,11 +1296,10 @@ class DMLQuery(object):
                 statement.add_where(col, EqualsOperator(), getattr(self.instance, name))
             self._execute(statement)
 
-        # remove conditions on fields that have been updated
-        self._conditional = [condition for condition in self._conditional
-                             if condition.field not in updated_columns] if self._conditional else None
-
         if not null_clustering_key:
+            # remove conditions on fields that have been updated
+            self._conditional = [condition for condition in self._conditional
+                                 if condition.field not in updated_columns] if self._conditional else None
             self._delete_null_columns()
 
     def save(self):
