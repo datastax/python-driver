@@ -2783,9 +2783,8 @@ class ControlConnection(object):
         for old_host in self._cluster.metadata.all_hosts():
             if old_host.address != connection.host and old_host.address not in found_hosts:
                 should_rebuild_token_map = True
-                if old_host.address not in self._cluster.contact_points:
-                    log.debug("[control connection] Removing host not found in peers metadata: %r", old_host)
-                    self._cluster.remove_host(old_host)
+                log.debug("[control connection] Removing host not found in peers metadata: %r", old_host)
+                self._cluster.remove_host(old_host)
 
         log.debug("[control connection] Finished fetching ring info")
         if partitioner and should_rebuild_token_map:
