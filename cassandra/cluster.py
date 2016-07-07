@@ -2198,7 +2198,7 @@ class Session(object):
             else:
                 self.is_shutdown = True
 
-        for pool in self._pools.values():
+        for pool in list(self._pools.values()):
             pool.shutdown()
 
     def __enter__(self):
