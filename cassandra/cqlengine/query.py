@@ -1178,11 +1178,10 @@ class ModelQuerySet(AbstractQuerySet):
             self._execute(us)
 
         if nulled_columns:
-            null_conditional = [condition for condition in self._conditional
-                                if condition.field not in updated_columns] if self._conditional else None
-
+            delete_conditional = [condition for condition in self._conditional
+                                  if condition.field not in updated_columns] if self._conditional else None
             ds = DeleteStatement(self.column_family_name, fields=nulled_columns,
-                                 where=self._where, conditionals=null_conditional, if_exists=self._if_exists)
+                                 where=self._where, conditionals=delete_conditional, if_exists=self._if_exists)
             self._execute(ds)
 
 
@@ -1229,11 +1228,11 @@ class DMLQuery(object):
         self._batch = batch_obj
         return self
 
-    def _delete_null_columns(self):
+    def _delete_null_columns(self, conditionals=None):
         """
         executes a delete query to remove columns that have changed to null
         """
-        ds = DeleteStatement(self.column_family_name, conditionals=self._conditional, if_exists=self._if_exists)
+        ds = DeleteStatement(self.column_family_name, conditionals=conditionals, if_exists=self._if_exists)
         deleted_fields = False
         for _, v in self.instance._values.items():
             col = v.column
@@ -1298,9 +1297,9 @@ class DMLQuery(object):
 
         if not null_clustering_key:
             # remove conditions on fields that have been updated
-            self._conditional = [condition for condition in self._conditional
-                                 if condition.field not in updated_columns] if self._conditional else None
-            self._delete_null_columns()
+            delete_conditionals = [condition for condition in self._conditional
+                                   if condition.field not in updated_columns] if self._conditional else None
+            self._delete_null_columns(delete_conditionals)
 
     def save(self):
         """
