@@ -356,10 +356,11 @@ class Cluster(object):
     """
     The maximum version of the native protocol to use.
 
-    The driver will automatically downgrade version based on a negotiation with
-    the server, but it is most efficient to set this to the maximum supported
-    by your version of Cassandra. Setting this will also prevent conflicting
-    versions negotiated if your cluster is upgraded.
+    If not set in the constructor, the driver will automatically downgrade
+    version based on a negotiation with the server, but it is most efficient
+    to set this to the maximum supported by your version of Cassandra.
+    Setting this will also prevent conflicting versions negotiated if your
+    cluster is upgraded.
 
     Version 2 of the native protocol adds support for lightweight transactions,
     batch operations, and automatic query paging. The v2 protocol is
@@ -387,6 +388,8 @@ class Cluster(object):
     | 2.1               | 1, 2, 3           |
     +-------------------+-------------------+
     | 2.2               | 1, 2, 3, 4        |
+    +-------------------+-------------------+
+    | 3.x               | 3, 4              |
     +-------------------+-------------------+
     """
 
@@ -719,6 +722,7 @@ class Cluster(object):
     _prepared_statements = None
     _prepared_statement_lock = None
     _idle_heartbeat = None
+    _protocol_version_explicit = False
 
     _user_types = None
     """
@@ -742,7 +746,7 @@ class Cluster(object):
                  ssl_options=None,
                  sockopts=None,
                  cql_version=None,
-                 protocol_version=4,
+                 protocol_version=_NOT_SET,
                  executor_threads=2,
                  max_schema_agreement_wait=10,
                  control_connection_timeout=2.0,
@@ -777,7 +781,11 @@ class Cluster(object):
                                         for endpoint in socket.getaddrinfo(a, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM)]
 
         self.compression = compression
-        self.protocol_version = protocol_version
+
+        if protocol_version is not _NOT_SET:
+            self.protocol_version = protocol_version
+            self._protocol_version_explicit = True
+
         self.auth_provider = auth_provider
 
         if load_balancing_policy is not None:
@@ -1117,6 +1125,9 @@ class Cluster(object):
         return kwargs_dict
 
     def protocol_downgrade(self, host_addr, previous_version):
+        if self._protocol_version_explicit:
+            raise DriverException("ProtocolError returned from server while using explicitly set client protocol_version %d" % (previous_version,))
+
         new_version = previous_version - 1
         if new_version < self.protocol_version:
             if new_version >= MIN_SUPPORTED_VERSION:
