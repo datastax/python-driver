@@ -2945,7 +2945,10 @@ class ControlConnection(object):
                 continue
             addr = self._rpc_from_peer_row(row)
             peer = self._cluster.metadata.get_host(addr)
-            if peer and peer.is_up and pm.distance(peer) != HostDistance.IGNORED:
+            # Are we sure we need to consider the distance? Even if we do not contact
+            # a remote host directly, mutations are still propagated to it, can we at
+            # least have a parameter to ignore it?
+            if peer and peer.is_up is not False and pm.distance(peer) != HostDistance.IGNORED:
                 versions[schema_ver].add(addr)
 
         if len(versions) == 1:
