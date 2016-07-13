@@ -137,14 +137,47 @@ if DSE_VERSION:
             CCM_KWARGS['dse_credentials_file'] = DSE_CRED
 
 
-if CASSANDRA_VERSION >= '2.2':
-    default_protocol_version = 4
-elif CASSANDRA_VERSION >= '2.1':
-    default_protocol_version = 3
-elif CASSANDRA_VERSION >= '2.0':
-    default_protocol_version = 2
-else:
-    default_protocol_version = 1
+def get_default_protocol():
+
+    if CASSANDRA_VERSION >= '2.2':
+        return 4
+    elif CASSANDRA_VERSION >= '2.1':
+        return 3
+    elif CASSANDRA_VERSION >= '2.0':
+        return 2
+    else:
+        return 1
+
+
+def get_unsupported_lower_protocol():
+    """
+    This is used to determine the lowest protocol version that is NOT
+    supported by the version of C* running
+    """
+
+    if CASSANDRA_VERSION >= '3.0':
+        return 2
+    else:
+        return None
+
+
+def get_unsupported_upper_protocol():
+    """
+    This is used to determine the highest protocol version that is NOT
+    supported by the version of C* running
+    """
+
+    if CASSANDRA_VERSION >= '2.2':
+        return None
+    if CASSANDRA_VERSION >= '2.1':
+        return 4
+    elif CASSANDRA_VERSION >= '2.0':
+        return 3
+    else:
+        return None
+
+default_protocol_version = get_default_protocol()
+
 
 PROTOCOL_VERSION = int(os.getenv('PROTOCOL_VERSION', default_protocol_version))
 

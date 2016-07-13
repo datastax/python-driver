@@ -33,7 +33,8 @@ from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
 from cassandra.protocol import MAX_SUPPORTED_VERSION
 from cassandra.query import SimpleStatement, TraceUnavailable, tuple_factory
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, get_node, CASSANDRA_VERSION, execute_until_pass, execute_with_long_wait_retry, get_node, MockLoggingHandler
+from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, get_node, CASSANDRA_VERSION, execute_until_pass, execute_with_long_wait_retry, get_node,\
+    MockLoggingHandler, get_unsupported_lower_protocol, get_unsupported_upper_protocol
 from tests.integration.util import assert_quiescent_pool_state
 
 
@@ -174,6 +175,42 @@ class ClusterTests(unittest.TestCase):
             self.assertEqual(updated_cluster_version, 1)
 
         cluster.shutdown()
+
+    def test_invalid_protocol_negotation(self):
+        """
+        Test for protocol negotiation when explicit versions are set
+
+        If an explicit protocol version that is not compatible with the server version is set
+        an exception should be thrown. It should not attempt to negotiate
+
+        for reference supported protocol version to server versions is as follows/
+
+        1.2 -> 1
+        2.0 -> 2, 1
+        2.1 -> 3, 2, 1
+        2.2 -> 4, 3, 2, 1
+        3.X -> 4, 3
+
+        @since 3.6.0
+        @jira_ticket PYTHON-537
+        @expected_result downgrading should not be allowed when explicit protocol versions are set.
+
+        @test_category connection
+        """
+
+        upper_bound = get_unsupported_upper_protocol()
+        if upper_bound is not None:
+            cluster = Cluster(protocol_version=upper_bound)
+            with self.assertRaises(NoHostAvailable):
+                cluster.connect()
+            cluster.shutdown()
+
+        lower_bound = get_unsupported_lower_protocol()
+        if lower_bound is not None:
+            cluster = Cluster(protocol_version=lower_bound)
+            with self.assertRaises(NoHostAvailable):
+                cluster.connect()
+            cluster.shutdown()
 
     def test_connect_on_keyspace(self):
         """
