@@ -851,16 +851,12 @@ class TestMinMaxTimeUUIDFunctions(BaseCassEngTestCase):
     def test_success_case(self):
         """ Test that the min and max time uuid functions work as expected """
         pk = uuid4()
-        TimeUUIDQueryModel.create(partition=pk, time=uuid1(), data='1')
-        time.sleep(0.2)
-        TimeUUIDQueryModel.create(partition=pk, time=uuid1(), data='2')
-        time.sleep(0.2)
-        midpoint = datetime.utcnow()
-        time.sleep(0.2)
-        TimeUUIDQueryModel.create(partition=pk, time=uuid1(), data='3')
-        time.sleep(0.2)
-        TimeUUIDQueryModel.create(partition=pk, time=uuid1(), data='4')
-        time.sleep(0.2)
+        startpoint = datetime.utcnow()
+        TimeUUIDQueryModel.create(partition=pk, time=uuid_from_time(startpoint + timedelta(seconds=1)), data='1')
+        TimeUUIDQueryModel.create(partition=pk, time=uuid_from_time(startpoint + timedelta(seconds=2)), data='2')
+        midpoint = startpoint + timedelta(seconds=3)
+        TimeUUIDQueryModel.create(partition=pk, time=uuid_from_time(startpoint + timedelta(seconds=4)), data='3')
+        TimeUUIDQueryModel.create(partition=pk, time=uuid_from_time(startpoint + timedelta(seconds=5)), data='4')
 
         # test kwarg filtering
         q = TimeUUIDQueryModel.filter(partition=pk, time__lte=functions.MaxTimeUUID(midpoint))
@@ -1373,5 +1369,3 @@ class TestModelQueryWithDifferedFeld(BaseCassEngTestCase):
         smiths = list(People2.filter(last_name="Smith"))
         self.assertEqual(len(smiths), 5)
         self.assertTrue(smiths[0].last_name is not None)
-
-
