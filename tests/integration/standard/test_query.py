@@ -938,7 +938,6 @@ class MaterializedViewQueryTest(BasicSharedKeyspaceUnitTestCase):
         self.assertEquals(results[1].day, 2)
         self.assertEquals(results[1].score, 1000)
         self.assertEquals(results[1].user, "tjake")
-        #import pdb; pdb.set_trace()
 
         # Test montly high range queries
         prepared_query = self.session.prepare("SELECT * FROM {0}.monthlyhigh WHERE game=? AND year=? AND month=? and score >= ? and score <= ?".format(self.keyspace_name))
