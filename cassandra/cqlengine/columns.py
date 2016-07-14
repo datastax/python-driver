@@ -21,7 +21,7 @@ from uuid import UUID as _UUID
 from cassandra import util
 from cassandra.cqltypes import SimpleDateType, _cqltypes, UserType
 from cassandra.cqlengine import ValidationError
-from cassandra.cqlengine.functions import get_total_seconds
+from cassandra.cqlengine.functions import get_total_seconds, QueryValue
 
 log = logging.getLogger(__name__)
 
@@ -278,6 +278,9 @@ class Column(object):
     def get_cql(self):
         return '"{0}"'.format(self.db_field_name)
 
+    def _val_is_function(self, val):
+        return isinstance(val, QueryValue)
+
     def _val_is_null(self, val):
         """ determines if the given value equates to a null value for the given column type """
         return val is None
@@ -340,6 +343,9 @@ class Text(Column):
         super(Text, self).__init__(**kwargs)
 
     def validate(self, value):
+        if self._val_is_function(value):
+            return value
+
         value = super(Text, self).validate(value)
         if value is None:
             return
@@ -362,6 +368,9 @@ class Integer(Column):
     db_type = 'int'
 
     def validate(self, value):
+        if self._val_is_function(value):
+            return value
+
         val = super(Integer, self).validate(value)
         if val is None:
             return
@@ -413,6 +422,9 @@ class VarInt(Column):
     db_type = 'varint'
 
     def validate(self, value):
+        if self._val_is_function(value):
+            return value
+
         val = super(VarInt, self).validate(value)
         if val is None:
             return
@@ -553,6 +565,9 @@ class UUID(Column):
     db_type = 'uuid'
 
     def validate(self, value):
+        if self._val_is_function(value):
+            return value
+
         val = super(UUID, self).validate(value)
         if val is None:
             return
@@ -590,6 +605,9 @@ class Boolean(Column):
 
     def validate(self, value):
         """ Always returns a Python boolean. """
+        if self._val_is_function(value):
+            return value
+
         value = super(Boolean, self).validate(value)
 
         if value is not None:
@@ -603,6 +621,9 @@ class Boolean(Column):
 
 class BaseFloat(Column):
     def validate(self, value):
+        if self._val_is_function(value):
+            return value
+
         value = super(BaseFloat, self).validate(value)
         if value is None:
             return
@@ -639,6 +660,9 @@ class Decimal(Column):
     db_type = 'decimal'
 
     def validate(self, value):
+        if self._val_is_function(value):
+            return value
+
         from decimal import Decimal as _Decimal
         from decimal import InvalidOperation
         val = super(Decimal, self).validate(value)

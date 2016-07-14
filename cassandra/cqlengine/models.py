@@ -362,7 +362,8 @@ class BaseModel(object):
         self._values = {}
         for name, column in self._columns.items():
             value = values.get(name)
-            if value is not None or isinstance(column, columns.BaseContainerColumn):
+            if (value is not None and not column._val_is_function(value)) or \
+                    isinstance(column, columns.BaseContainerColumn):
                 value = column.to_python(value)
             value_mngr = column.value_manager(self, column, value)
             value_mngr.explicit = name in values

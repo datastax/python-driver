@@ -16,11 +16,15 @@ try:
 except ImportError:
     import unittest  # noqa
 
+import datetime
+
 from cassandra.cqlengine.columns import Column, Set, List, Text
 from cassandra.cqlengine.operators import *
 from cassandra.cqlengine.statements import (UpdateStatement, WhereClause,
                                   AssignmentClause, SetUpdateClause,
                                   ListUpdateClause)
+from cassandra.cqlengine.functions import MaxTimeUUID
+
 import six
 
 
@@ -63,6 +67,12 @@ class UpdateStatementTests(unittest.TestCase):
         us.add_assignment(Column(db_field='a'), 'b')
         us.add_where(Column(db_field='a'), EqualsOperator(), 'x')
         self.assertIn('USING TTL 60', six.text_type(us))
+
+    def test_function_rendering(self):
+        us = UpdateStatement('table')
+        us.add_assignment(Column(db_field='a'), MaxTimeUUID(datetime.datetime.now()))
+        us.add_where(Column(db_field='a'), EqualsOperator(), 'x')
+        self.assertEqual(six.text_type(us), 'UPDATE table SET "a" = MaxTimeUUID(%(0)s) WHERE "a" = %(1)s', six.text_type(us))
 
     def test_update_set_add(self):
         us = UpdateStatement('table')
