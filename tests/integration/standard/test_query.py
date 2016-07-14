@@ -26,7 +26,7 @@ from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.policies import HostDistance, RoundRobinPolicy
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, greaterthanprotocolv3, MockLoggingHandler
+from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions
 
 import time
 import re
@@ -354,6 +354,39 @@ class ForcedHostSwitchPolicy(RoundRobinPolicy):
             return value
         else:
             return list(self._live_hosts)
+
+
+class PreparedStatementMetdataTest(unittest.TestCase):
+
+    def test_prepared_metadata_generation(self):
+        """
+        Test to validate that result metadata is appropriately populated across protocol version
+
+        In protocol version 1 result metadata is retrieved everytime the statement is issued. In all
+        other protocol versions it's set once upon the prepare, then re-used. This test ensures that it manifests
+        it's self the same across multiple protocol versions.
+
+        @since 3.6.0
+        @jira_ticket PYTHON-71
+        @expected_result result metadata is consistent.
+        """
+
+        base_line = None
+        for proto_version in get_supported_protocol_versions():
+            cluster = Cluster(protocol_version=proto_version)
+            session = cluster.connect()
+            select_statement = session.prepare("SELECT * FROM system.local")
+            if proto_version == 1:
+                self.assertEqual(select_statement.result_metadata, None)
+            else:
+                self.assertNotEqual(select_statement.result_metadata, None)
+            future = session.execute_async(select_statement)
+            results = future.result()
+            if base_line is None:
+                base_line = results[0].__dict__.keys()
+            else:
+                self.assertEqual(base_line, results[0].__dict__.keys())
+            cluster.shutdown()
 
 
 class PreparedStatementArgTest(unittest.TestCase):
@@ -905,6 +938,7 @@ class MaterializedViewQueryTest(BasicSharedKeyspaceUnitTestCase):
         self.assertEquals(results[1].day, 2)
         self.assertEquals(results[1].score, 1000)
         self.assertEquals(results[1].user, "tjake")
+        #import pdb; pdb.set_trace()
 
         # Test montly high range queries
         prepared_query = self.session.prepare("SELECT * FROM {0}.monthlyhigh WHERE game=? AND year=? AND month=? and score >= ? and score <= ?".format(self.keyspace_name))

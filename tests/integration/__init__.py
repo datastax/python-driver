@@ -149,6 +149,26 @@ def get_default_protocol():
         return 1
 
 
+def get_supported_protocol_versions():
+    """
+    1.2 -> 1
+    2.0 -> 2, 1
+    2.1 -> 3, 2, 1
+    2.2 -> 4, 3, 2, 1
+    3.X -> 4, 3
+`   """
+    if CASSANDRA_VERSION >= '3.0':
+        return (3, 4)
+    elif CASSANDRA_VERSION >= '2.2':
+        return (1, 2, 3, 4)
+    elif CASSANDRA_VERSION >= '2.1':
+        return (1, 2, 3)
+    elif CASSANDRA_VERSION >= '2.0':
+        return (1, 2)
+    else:
+        return (1)
+
+
 def get_unsupported_lower_protocol():
     """
     This is used to determine the lowest protocol version that is NOT
