@@ -1354,7 +1354,7 @@ class DMLQuery(object):
         ds = DeleteStatement(self.column_family_name, timestamp=self._timestamp, conditionals=self._conditional, if_exists=self._if_exists)
         for name, col in self.model._primary_keys.items():
             val = getattr(self.instance, name)
-            if val is None and not col.parition_key:
+            if val is None and not col.partition_key:
                 continue
             ds.add_where(col, EqualsOperator(), val)
         self._execute(ds)
