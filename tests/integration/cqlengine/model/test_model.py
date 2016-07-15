@@ -22,7 +22,8 @@ from cassandra.cqlengine import columns, CQLEngineException
 from cassandra.cqlengine.management import sync_table, drop_table, create_keyspace_simple, drop_keyspace
 from cassandra.cqlengine import models
 from cassandra.cqlengine.models import Model, ModelDefinitionException
-
+from uuid import uuid1
+from tests.integration import pypy
 
 class TestModel(unittest.TestCase):
     """ Tests the non-io functionality of models """
@@ -172,4 +173,37 @@ class BuiltInAttributeConflictTest(unittest.TestCase):
                 my_primary_key = columns.Integer(primary_key=True)
                 filter = columns.Text()
 
+@pypy
+class ModelOverWriteTest(unittest.TestCase):
+
+    def test_model_over_write(self):
+        """
+        Test to ensure overwriting of primary keys in model inheritance is allowed
+
+        This is currently only an issue in PyPy. When PYTHON-504 is introduced this should
+        be updated error out and warn the user
+
+        @since 3.6.0
+        @jira_ticket PYTHON-576
+        @expected_result primary keys can be overwritten via inheritance
+
+        @test_category object_mapper
+        """
+        class TimeModelBase(Model):
+            uuid = columns.TimeUUID(primary_key=True)
+
+        class DerivedTimeModel(TimeModelBase):
+            __table_name__ = 'derived_time'
+            uuid = columns.TimeUUID(primary_key=True, partition_key=True)
+            value = columns.Text(required=False)
+
+        # In case the table already exists in keyspace
+        drop_table(DerivedTimeModel)
+
+        sync_table(DerivedTimeModel)
+        uuid_value = uuid1()
+        uuid_value2 = uuid1()
+        DerivedTimeModel.create(uuid=uuid_value, value="first")
+        DerivedTimeModel.create(uuid=uuid_value2, value="second")
+        DerivedTimeModel.objects.filter(uuid=uuid_value)
 
