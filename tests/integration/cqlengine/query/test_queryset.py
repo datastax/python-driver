@@ -268,6 +268,7 @@ class TestQuerySetOperation(BaseCassEngTestCase):
 
         @since 3.5
         @jira_ticket PYTHON-560
+        @jira_ticket PYTHON-599
         @expected_result deferred fields should not be returned
 
         @test_category object_mapper
