@@ -910,7 +910,13 @@ class TestInOperator(BaseQuerySetUsage):
     @execute_count(5)
     def test_bool(self):
         """
-        PYTHON-596
+        Adding coverage to cqlengine for bool types.
+
+        @since 3.6
+        @jira_ticket PYTHON-596
+        @expected_result bool results should be filtered appropriately
+
+        @test_category object_mapper
         """
         class bool_model(Model):
             k = columns.Integer(primary_key=True)
@@ -923,6 +929,28 @@ class TestInOperator(BaseQuerySetUsage):
         self.assertEqual(len(bool_model.objects.all()), 2)
         self.assertEqual(len(bool_model.objects.filter(k=0, b=True)), 1)
         self.assertEqual(len(bool_model.objects.filter(k=0, b=False)), 1)
+
+    @execute_count(3)
+    def test_bool_filter(self):
+        """
+        Test to ensure that we don't translate boolean objects to String unnecessarily in filter clauses
+
+        @since 3.6
+        @jira_ticket PYTHON-596
+        @expected_result We should not receive a server error
+
+        @test_category object_mapper
+        """
+        class bool_model2(Model):
+            k = columns.Boolean(primary_key=True)
+            b = columns.Integer(primary_key=True)
+            v = columns.Text()
+        drop_table(bool_model2)
+        sync_table(bool_model2)
+
+        bool_model2.create(k=True, b=1, v='a')
+        bool_model2.create(k=False, b=1, v='b')
+        self.assertEqual(len(list(bool_model2.objects(k__in=(True, False)))), 2)
 
 
 @greaterthancass20
