@@ -42,7 +42,39 @@ def setup_module():
     use_singledc()
 
 
+class IgnoredHostPolicy(RoundRobinPolicy):
+
+    def __init__(self, ignored_hosts):
+        self.ignored_hosts = ignored_hosts
+        RoundRobinPolicy.__init__(self)
+
+    def distance(self, host):
+        if(str(host) in self.ignored_hosts):
+            return HostDistance.IGNORED
+        else:
+            return HostDistance.LOCAL
+
+
 class ClusterTests(unittest.TestCase):
+
+    def test_ignored_host_up(self):
+        """
+        Test to ensure that is_up is not set by default on ignored hosts
+
+        @since 3.6
+        @jira_ticket PYTHON-551
+        @expected_result ignored hosts should have None set for is_up
+
+        @test_category connection
+        """
+        ingored_host_policy = IgnoredHostPolicy(["127.0.0.2", "127.0.0.3"])
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=ingored_host_policy)
+        session = cluster.connect()
+        for host in cluster.metadata.all_hosts():
+            if str(host) == "127.0.0.1":
+                self.assertTrue(host.is_up)
+            else:
+                self.assertIsNone(host.is_up)
 
     def test_host_resolution(self):
         """
