@@ -352,7 +352,7 @@ class BaseModel(object):
     _table_name = None  # used internally to cache a derived table name
 
     def __init__(self, **values):
-        self._ttl = self.__default_ttl__
+        self._ttl = None
         self._timestamp = None
         self._conditional = None
         self._batch = None
@@ -691,7 +691,6 @@ class BaseModel(object):
 
         self._set_persisted()
 
-        self._ttl = self.__default_ttl__
         self._timestamp = None
 
         return self
@@ -738,7 +737,6 @@ class BaseModel(object):
 
         self._set_persisted()
 
-        self._ttl = self.__default_ttl__
         self._timestamp = None
 
         return self
@@ -794,6 +792,7 @@ class ModelMetaClass(type):
         # short circuit __discriminator_value__ inheritance
         attrs['__discriminator_value__'] = attrs.get('__discriminator_value__')
 
+        # TODO __default__ttl__ should be removed in the next major release
         options = attrs.get('__options__') or {}
         attrs['__default_ttl__'] = options.get('default_time_to_live')
 
