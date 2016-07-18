@@ -23,6 +23,7 @@ from uuid import uuid4, uuid1
 
 from cassandra import InvalidRequest
 from cassandra.cqlengine.columns import TimeUUID
+from cassandra.cqlengine.columns import Ascii
 from cassandra.cqlengine.columns import Text
 from cassandra.cqlengine.columns import Integer
 from cassandra.cqlengine.columns import BigInt
@@ -337,28 +338,130 @@ class TestBigInt(BaseCassEngTestCase):
         it.validate()
 
 
+class TestAscii(BaseCassEngTestCase):
+
+    def test_min_length(self):
+        """ Test arbitrary minimal lengths requirements. """
+        Ascii(min_length=0).validate('')
+        Ascii(min_length=0).validate(None)
+        Ascii(min_length=0).validate('kevin')
+
+        Ascii(min_length=1).validate('k')
+
+        Ascii(min_length=5).validate('kevin')
+        Ascii(min_length=5).validate('kevintastic')
+
+        with self.assertRaises(ValidationError):
+            Ascii(min_length=1).validate('')
+
+        with self.assertRaises(ValidationError):
+            Ascii(min_length=1).validate(None)
+
+        with self.assertRaises(ValidationError):
+            Ascii(min_length=6).validate('')
+
+        with self.assertRaises(ValidationError):
+            Ascii(min_length=6).validate(None)
+
+        with self.assertRaises(ValidationError):
+            Ascii(min_length=6).validate('kevin')
+
+    def test_max_length(self):
+        """ Test arbitrary maximal lengths requirements. """
+        Ascii(max_length=0).validate('')
+        Ascii(max_length=0).validate(None)
+
+        Ascii(max_length=1).validate('')
+        Ascii(max_length=1).validate(None)
+        Ascii(max_length=1).validate('b')
+
+        Ascii(max_length=5).validate('')
+        Ascii(max_length=5).validate(None)
+        Ascii(max_length=5).validate('b')
+        Ascii(max_length=5).validate('blake')
+
+        with self.assertRaises(ValidationError):
+            Ascii(max_length=0).validate('b')
+
+        with self.assertRaises(ValidationError):
+            Ascii(max_length=5).validate('blaketastic')
+
+    def test_type_checking(self):
+        Ascii().validate('string')
+        Ascii().validate(u'unicode')
+        Ascii().validate(bytearray('bytearray', encoding='ascii'))
+
+        with self.assertRaises(ValidationError):
+            Ascii().validate(5)
+
+        with self.assertRaises(ValidationError):
+            Ascii().validate(True)
+
+    def test_unaltering_validation(self):
+        """ Test the validation step doesn't re-interpret values. """
+        self.assertEquals(Ascii().validate(''), '')
+        self.assertEquals(Ascii().validate(None), None)
+        self.assertEquals(Ascii().validate('yo'), 'yo')
+
+    def test_non_required_validation(self):
+        """ Tests that validation is ok on none and blank values if required is False. """
+        Ascii().validate('')
+        Ascii().validate(None)
+
+    def test_required_validation(self):
+        """ Tests that validation raise on none and blank values if value required. """
+        with self.assertRaises(ValidationError):
+            Ascii(required=True).validate('')
+
+        with self.assertRaises(ValidationError):
+            Ascii(required=True).validate(None)
+
+
 class TestText(BaseCassEngTestCase):
 
     def test_min_length(self):
-        # not required defaults to 0
-        col = Text()
-        col.validate('')
-        col.validate('b')
-
-        # required defaults to 1
-        with self.assertRaises(ValidationError):
-            Text(required=True).validate('')
-
-        #test arbitrary lengths
+        """ Test arbitrary minimal lengths requirements. """
         Text(min_length=0).validate('')
+        Text(min_length=0).validate(None)
+        Text(min_length=0).validate('blake')
+
+        Text(min_length=1).validate('b')
+
         Text(min_length=5).validate('blake')
         Text(min_length=5).validate('blaketastic')
+
+        with self.assertRaises(ValidationError):
+            Text(min_length=1).validate('')
+
+        with self.assertRaises(ValidationError):
+            Text(min_length=1).validate(None)
+
+        with self.assertRaises(ValidationError):
+            Text(min_length=6).validate('')
+
+        with self.assertRaises(ValidationError):
+            Text(min_length=6).validate(None)
+
         with self.assertRaises(ValidationError):
             Text(min_length=6).validate('blake')
 
     def test_max_length(self):
+        """ Test arbitrary maximal lengths requirements. """
+        Text(max_length=0).validate('')
+        Text(max_length=0).validate(None)
 
+        Text(max_length=1).validate('')
+        Text(max_length=1).validate(None)
+        Text(max_length=1).validate('b')
+
+        Text(max_length=5).validate('')
+        Text(max_length=5).validate(None)
+        Text(max_length=5).validate('b')
         Text(max_length=5).validate('blake')
+
+        with self.assertRaises(ValidationError):
+            Text(max_length=0).validate('b')
+
         with self.assertRaises(ValidationError):
             Text(max_length=5).validate('blaketastic')
 
@@ -368,18 +471,29 @@ class TestText(BaseCassEngTestCase):
         Text().validate(bytearray('bytearray', encoding='ascii'))
 
         with self.assertRaises(ValidationError):
-            Text(required=True).validate(None)
-
-        with self.assertRaises(ValidationError):
             Text().validate(5)
 
         with self.assertRaises(ValidationError):
             Text().validate(True)
 
+    def test_unaltering_validation(self):
+        """ Test the validation step doesn't re-interpret values. """
+        self.assertEquals(Text().validate(''), '')
+        self.assertEquals(Text().validate(None), None)
+        self.assertEquals(Text().validate('yo'), 'yo')
+
     def test_non_required_validation(self):
         """ Tests that validation is ok on none and blank values if required is False """
         Text().validate('')
         Text().validate(None)
+
+    def test_required_validation(self):
+        """ Tests that validation raise on none and blank values if value required. """
+        with self.assertRaises(ValidationError):
+            Text(required=True).validate('')
+
+        with self.assertRaises(ValidationError):
+            Text(required=True).validate(None)
 
 
 class TestExtraFieldsRaiseException(BaseCassEngTestCase):
