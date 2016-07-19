@@ -299,7 +299,7 @@ class AbstractQuerySet(object):
         self._count = None
 
         self._batch = None
-        self._ttl = getattr(model, '__default_ttl__', None)
+        self._ttl =  None
         self._consistency = None
         self._timestamp = None
         self._if_not_exists = False
