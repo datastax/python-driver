@@ -91,13 +91,11 @@ class ModelUpdateTests(BaseCassEngTestCase):
             m0.update(count=5)
         assert execute.call_count == 0
 
-        with patch.object(self.session, 'execute') as execute:
+        with self.assertRaises(ValidationError):
             m0.update(partition=m0.partition)
-        assert execute.call_count == 0
 
-        with patch.object(self.session, 'execute') as execute:
+        with self.assertRaises(ValidationError):
             m0.update(cluster=m0.cluster)
-        assert execute.call_count == 0
 
     def test_noop_model_assignation_update(self):
         """ Tests that assigning the same value on a model will do nothing. """
