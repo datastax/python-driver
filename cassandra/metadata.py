@@ -1058,7 +1058,6 @@ class TableMetadata(object):
         """
         comparator = getattr(self, 'comparator', None)
         if comparator:
-            # no such thing as DCT in CQL
             incompatible = issubclass(self.comparator, types.DynamicCompositeType)
 
             # no compact storage with more than one column beyond PK if there

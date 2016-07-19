@@ -107,7 +107,7 @@ class CassandraTypeType(type):
         cls = type.__new__(metacls, name, bases, dct)
         if not name.startswith('_'):
             _casstypes[name] = cls
-            if not cls.typename.startswith("'org"):
+            if not cls.typename.startswith(apache_cassandra_type_prefix):
                 _cqltypes[cls.typename] = cls
         return cls
 
@@ -853,7 +853,7 @@ class TupleType(_ParameterizedType):
 
 
 class UserType(TupleType):
-    typename = "'org.apache.cassandra.db.marshal.UserType'"
+    typename = "org.apache.cassandra.db.marshal.UserType"
 
     _cache = {}
     _module = sys.modules[__name__]
@@ -956,7 +956,7 @@ class UserType(TupleType):
 
 
 class CompositeType(_ParameterizedType):
-    typename = "'org.apache.cassandra.db.marshal.CompositeType'"
+    typename = "org.apache.cassandra.db.marshal.CompositeType"
     num_subtypes = 'UNKNOWN'
 
     @classmethod
@@ -986,7 +986,7 @@ class CompositeType(_ParameterizedType):
 
 
 class DynamicCompositeType(CompositeType):
-    typename = "'org.apache.cassandra.db.marshal.DynamicCompositeType'"
+    typename = "org.apache.cassandra.db.marshal.DynamicCompositeType"
 
 
 class ColumnToCollectionType(_ParameterizedType):
@@ -995,12 +995,12 @@ class ColumnToCollectionType(_ParameterizedType):
     Cassandra includes this. We don't actually need or want the extra
     information.
     """
-    typename = "'org.apache.cassandra.db.marshal.ColumnToCollectionType'"
+    typename = "org.apache.cassandra.db.marshal.ColumnToCollectionType"
     num_subtypes = 'UNKNOWN'
 
 
 class ReversedType(_ParameterizedType):
-    typename = "'org.apache.cassandra.db.marshal.ReversedType'"
+    typename = "org.apache.cassandra.db.marshal.ReversedType"
     num_subtypes = 1
 
     @classmethod
