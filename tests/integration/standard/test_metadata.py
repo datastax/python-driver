@@ -79,6 +79,28 @@ class HostMetatDataTests(BasicExistingKeyspaceUnitTestCase):
             self.assertTrue(host.release_version.startswith(CASSANDRA_VERSION))
 
 
+class MetaDataRemovalTest(unittest.TestCase):
+
+    def setUp(self):
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=['127.0.0.1','127.0.0.2', '127.0.0.3', '126.0.0.186'])
+        self.cluster.connect()
+
+    def tearDown(self):
+        self.cluster.shutdown()
+
+    def test_bad_contact_point(self):
+        """
+        Checks to ensure that hosts that are not resolvable are excluded from the contact point list.
+
+        @since 3.6
+        @jira_ticket PYTHON-549
+        @expected_result Invalid hosts on the contact list should be excluded
+
+        @test_category metadata
+        """
+        self.assertEqual(len(self.cluster.metadata.all_hosts()), 3)
+
+
 class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
     def test_schema_metadata_disable(self):
