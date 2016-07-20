@@ -366,6 +366,9 @@ class TestAscii(BaseCassEngTestCase):
         with self.assertRaises(ValidationError):
             Ascii(min_length=6).validate('kevin')
 
+        with self.assertRaises(ValueError):
+            Ascii(min_length=-1)
+
     def test_max_length(self):
         """ Test arbitrary maximal lengths requirements. """
         Ascii(max_length=0).validate('')
@@ -385,6 +388,9 @@ class TestAscii(BaseCassEngTestCase):
 
         with self.assertRaises(ValidationError):
             Ascii(max_length=5).validate('blaketastic')
+
+        with self.assertRaises(ValueError):
+            Ascii(max_length=-1)
 
     def test_type_checking(self):
         Ascii().validate('string')
@@ -445,6 +451,9 @@ class TestText(BaseCassEngTestCase):
         with self.assertRaises(ValidationError):
             Text(min_length=6).validate('blake')
 
+        with self.assertRaises(ValueError):
+            Text(min_length=-1)
+
     def test_max_length(self):
         """ Test arbitrary maximal lengths requirements. """
         Text(max_length=0).validate('')
@@ -464,6 +473,9 @@ class TestText(BaseCassEngTestCase):
 
         with self.assertRaises(ValidationError):
             Text(max_length=5).validate('blaketastic')
+
+        with self.assertRaises(ValueError):
+            Text(max_length=-1)
 
     def test_type_checking(self):
         Text().validate('string')

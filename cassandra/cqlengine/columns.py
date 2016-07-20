@@ -330,6 +330,18 @@ class Text(Column):
         """
         self.min_length = min_length or (1 if kwargs.get('required', False) else None)
         self.max_length = max_length
+
+        if self.min_length is not None:
+            if self.min_length < 0:
+                raise ValueError(
+                    'Minimum length is not allowed to be negative.')
+
+        self.max_length = max_length
+        if self.max_length is not None:
+            if self.max_length < 0:
+                raise ValueError(
+                    'Maximum length is not allowed to be negative.')
+
         super(Text, self).__init__(**kwargs)
 
     def validate(self, value):
