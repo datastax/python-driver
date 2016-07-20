@@ -135,7 +135,6 @@ class LibevLoop(object):
                 "Please call Cluster.shutdown() to avoid this.")
 
         log.debug("Event loop thread was joined")
-        self._loop = None
 
     def add_timer(self, timer):
         self._timers.add_timer(timer)
