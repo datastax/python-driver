@@ -985,7 +985,7 @@ class CompositeType(_ParameterizedType):
         return tuple(result)
 
 
-class DynamicCompositeType(CompositeType):
+class DynamicCompositeType(_ParameterizedType):
     typename = "org.apache.cassandra.db.marshal.DynamicCompositeType"
 
     @classmethod
