@@ -399,9 +399,9 @@ class TestAscii(BaseCassEngTestCase):
 
     def test_unaltering_validation(self):
         """ Test the validation step doesn't re-interpret values. """
-        self.assertEquals(Ascii().validate(''), '')
-        self.assertEquals(Ascii().validate(None), None)
-        self.assertEquals(Ascii().validate('yo'), 'yo')
+        self.assertEqual(Ascii().validate(''), '')
+        self.assertEqual(Ascii().validate(None), None)
+        self.assertEqual(Ascii().validate('yo'), 'yo')
 
     def test_non_required_validation(self):
         """ Tests that validation is ok on none and blank values if required is False. """
@@ -478,9 +478,9 @@ class TestText(BaseCassEngTestCase):
 
     def test_unaltering_validation(self):
         """ Test the validation step doesn't re-interpret values. """
-        self.assertEquals(Text().validate(''), '')
-        self.assertEquals(Text().validate(None), None)
-        self.assertEquals(Text().validate('yo'), 'yo')
+        self.assertEqual(Text().validate(''), '')
+        self.assertEqual(Text().validate(None), None)
+        self.assertEqual(Text().validate('yo'), 'yo')
 
     def test_non_required_validation(self):
         """ Tests that validation is ok on none and blank values if required is False """

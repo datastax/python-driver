@@ -309,7 +309,37 @@ class Blob(Column):
 Bytes = Blob
 
 
-class Ascii(Column):
+class BaseStringColumn(Column):
+
+    def __init__(self, min_length=None, max_length=None, **kwargs):
+        """
+        :param int min_length: Sets the minimum length of this string, for validation purposes.
+            Defaults to 1 if this is a ``required`` column. Otherwise, None.
+        :param int max_length: Sets the maximum length of this string, for validation purposes.
+        """
+        self.min_length = min_length or (1 if kwargs.get('required', False) else None)
+        self.max_length = max_length
+        super(BaseStringColumn, self).__init__(**kwargs)
+
+    def validate(self, value):
+        value = super(BaseStringColumn, self).validate(value)
+        if value is None and self.min_length is None:
+            return
+        if not isinstance(value, (six.string_types, bytearray)) and value is not None:
+            raise ValidationError('{0} {1} is not a string'.format(self.column_name, type(value)))
+        if self.max_length is not None:
+            if len(value) > self.max_length:
+                raise ValidationError('{0} is longer than {1} characters'.format(self.column_name, self.max_length))
+        if self.min_length is not None:
+            if value is None and self.min_length > 0:
+                raise ValidationError('{0} is none which is shorter than {1} characters'.format(self.column_name, self.min_length))
+            if len(value) < self.min_length:
+                raise ValidationError('{0} is shorter than {1} characters'.format(self.column_name, self.min_length))
+
+        return value
+
+
+class Ascii(BaseStringColumn):
     """
     Stores a US-ASCII character string
     """
@@ -323,35 +353,11 @@ class Inet(Column):
     db_type = 'inet'
 
 
-class Text(Column):
+class Text(BaseStringColumn):
     """
     Stores a UTF-8 encoded string
     """
     db_type = 'text'
-
-    def __init__(self, min_length=None, max_length=None, **kwargs):
-        """
-        :param int min_length: Sets the minimum length of this string, for validation purposes.
-            Defaults to 1 if this is a ``required`` column. Otherwise, None.
-        :param int max_length: Sets the maximum length of this string, for validation purposes.
-        """
-        self.min_length = min_length or (1 if kwargs.get('required', False) else None)
-        self.max_length = max_length
-        super(Text, self).__init__(**kwargs)
-
-    def validate(self, value):
-        value = super(Text, self).validate(value)
-        if value is None:
-            return
-        if not isinstance(value, (six.string_types, bytearray)) and value is not None:
-            raise ValidationError('{0} {1} is not a string'.format(self.column_name, type(value)))
-        if self.max_length:
-            if len(value) > self.max_length:
-                raise ValidationError('{0} is longer than {1} characters'.format(self.column_name, self.max_length))
-        if self.min_length:
-            if len(value) < self.min_length:
-                raise ValidationError('{0} is shorter than {1} characters'.format(self.column_name, self.min_length))
-        return value
 
 
 class Integer(Column):
