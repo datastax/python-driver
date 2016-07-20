@@ -392,6 +392,18 @@ class TestAscii(BaseCassEngTestCase):
         with self.assertRaises(ValueError):
             Ascii(max_length=-1)
 
+    def test_length_range(self):
+        Ascii(min_length=0, max_length=0)
+        Ascii(min_length=0, max_length=1)
+        Ascii(min_length=10, max_length=10)
+        Ascii(min_length=10, max_length=11)
+
+        with self.assertRaises(ValueError):
+            Ascii(min_length=10, max_length=9)
+
+        with self.assertRaises(ValueError):
+            Ascii(min_length=1, max_length=0)
+
     def test_type_checking(self):
         Ascii().validate('string')
         Ascii().validate(u'unicode')
@@ -416,11 +428,29 @@ class TestAscii(BaseCassEngTestCase):
 
     def test_required_validation(self):
         """ Tests that validation raise on none and blank values if value required. """
+        Ascii(required=True).validate('k')
+
         with self.assertRaises(ValidationError):
             Ascii(required=True).validate('')
 
         with self.assertRaises(ValidationError):
             Ascii(required=True).validate(None)
+
+        # With min_length set.
+        Ascii(required=True, min_length=0).validate('k')
+        Ascii(required=True, min_length=1).validate('k')
+
+        with self.assertRaises(ValidationError):
+            Ascii(required=True, min_length=2).validate('k')
+
+        # With max_length set.
+        Ascii(required=True, max_length=1).validate('k')
+
+        with self.assertRaises(ValidationError):
+            Ascii(required=True, max_length=2).validate('kevin')
+
+        with self.assertRaises(ValueError):
+            Ascii(required=True, max_length=0)
 
 
 class TestText(BaseCassEngTestCase):
@@ -477,6 +507,18 @@ class TestText(BaseCassEngTestCase):
         with self.assertRaises(ValueError):
             Text(max_length=-1)
 
+    def test_length_range(self):
+        Text(min_length=0, max_length=0)
+        Text(min_length=0, max_length=1)
+        Text(min_length=10, max_length=10)
+        Text(min_length=10, max_length=11)
+
+        with self.assertRaises(ValueError):
+            Text(min_length=10, max_length=9)
+
+        with self.assertRaises(ValueError):
+            Text(min_length=1, max_length=0)
+
     def test_type_checking(self):
         Text().validate('string')
         Text().validate(u'unicode')
@@ -501,11 +543,29 @@ class TestText(BaseCassEngTestCase):
 
     def test_required_validation(self):
         """ Tests that validation raise on none and blank values if value required. """
+        Text(required=True).validate('b')
+
         with self.assertRaises(ValidationError):
             Text(required=True).validate('')
 
         with self.assertRaises(ValidationError):
             Text(required=True).validate(None)
+
+        # With min_length set.
+        Text(required=True, min_length=0).validate('b')
+        Text(required=True, min_length=1).validate('b')
+
+        with self.assertRaises(ValidationError):
+            Text(required=True, min_length=2).validate('b')
+
+        # With max_length set.
+        Text(required=True, max_length=1).validate('b')
+
+        with self.assertRaises(ValidationError):
+            Text(required=True, max_length=2).validate('blake')
+
+        with self.assertRaises(ValueError):
+            Text(required=True, max_length=0)
 
 
 class TestExtraFieldsRaiseException(BaseCassEngTestCase):
