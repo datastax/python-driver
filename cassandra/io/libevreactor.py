@@ -102,10 +102,10 @@ class LibevLoop(object):
 
     def _run_loop(self):
         while True:
-            end_condition = self._loop.start()
+            self._loop.start()
             # there are still active watchers, no deadlock
             with self._lock:
-                if not self._shutdown and (end_condition or self._live_conns):
+                if not self._shutdown and self._live_conns:
                     log.debug("Restarting event loop")
                     continue
                 else:
