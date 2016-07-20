@@ -682,6 +682,8 @@ class VarcharType(UTF8Type):
 
 
 class _ParameterizedType(_CassandraType):
+    num_subtypes = 'UNKNOWN'
+
     @classmethod
     def deserialize(cls, byts, protocol_version):
         if not cls.subtypes:
@@ -802,7 +804,6 @@ class MapType(_ParameterizedType):
 
 class TupleType(_ParameterizedType):
     typename = 'tuple'
-    num_subtypes = 'UNKNOWN'
 
     @classmethod
     def deserialize_safe(cls, byts, protocol_version):
@@ -957,7 +958,6 @@ class UserType(TupleType):
 
 class CompositeType(_ParameterizedType):
     typename = "org.apache.cassandra.db.marshal.CompositeType"
-    num_subtypes = 'UNKNOWN'
 
     @classmethod
     def cql_parameterized_type(cls):
@@ -1004,7 +1004,6 @@ class ColumnToCollectionType(_ParameterizedType):
     information.
     """
     typename = "org.apache.cassandra.db.marshal.ColumnToCollectionType"
-    num_subtypes = 'UNKNOWN'
 
 
 class ReversedType(_ParameterizedType):
