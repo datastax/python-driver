@@ -309,13 +309,6 @@ class Blob(Column):
 Bytes = Blob
 
 
-class Ascii(Column):
-    """
-    Stores a US-ASCII character string
-    """
-    db_type = 'ascii'
-
-
 class Inet(Column):
     """
     Stores an IP address in IPv4 or IPv6 format
@@ -352,6 +345,13 @@ class Text(Column):
             if len(value) < self.min_length:
                 raise ValidationError('{0} is shorter than {1} characters'.format(self.column_name, self.min_length))
         return value
+
+
+class Ascii(Text):
+    """
+    Stores a US-ASCII character string
+    """
+    db_type = 'ascii'
 
 
 class Integer(Column):
