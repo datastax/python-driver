@@ -2057,7 +2057,31 @@ class BadMetaTest(unittest.TestCase):
             self.assertIn("/*\nWarning:", m.export_as_string())
 
 
-class MaterializedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
+class DynamicCompositeTypeTest(BasicSharedKeyspaceUnitTestCase):
+
+    def test_dct_alias(self):
+        """
+        Tests to make sure DCT's have correct string formatting
+
+        Constructs a DCT and check the format as generated. To insure it matches what is expected
+
+        @since 3.6.0
+        @jira_ticket PYTHON-579
+        @expected_result DCT subtypes should always have fully qualified names
+
+        @test_category metadata
+        """
+        self.session.execute("CREATE TABLE {0}.{1} ("
+                             "k int PRIMARY KEY,"
+                             "c1 'DynamicCompositeType(s => UTF8Type, i => Int32Type)',"
+                             "c2 Text)".format(self.ks_name, self.function_table_name))
+        dct_table = self.cluster.metadata.keyspaces.get(self.ks_name).tables.get(self.function_table_name)
+
+        # Format can very slightly between versions, strip out whitespace for consistency sake
+        self.assertTrue("c1'org.apache.cassandra.db.marshal.DynamicCompositeType(s=>org.apache.cassandra.db.marshal.UTF8Type,i=>org.apache.cassandra.db.marshal.Int32Type)'" in dct_table.as_cql_query().replace(" ", ""))
+
+
+class Materia3lizedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
 
     def setUp(self):
         if CASS_SERVER_VERSION < (3, 0):
