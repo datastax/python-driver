@@ -338,7 +338,6 @@ class Text(Column):
                 raise ValueError(
                     'Minimum length is not allowed to be negative.')
 
-        self.max_length = max_length
         if self.max_length is not None:
             if self.max_length < 0:
                 raise ValueError(
@@ -348,15 +347,13 @@ class Text(Column):
 
     def validate(self, value):
         value = super(Text, self).validate(value)
-        if value is None:
-            return
         if not isinstance(value, (six.string_types, bytearray)) and value is not None:
             raise ValidationError('{0} {1} is not a string'.format(self.column_name, type(value)))
         if self.max_length is not None:
-            if len(value) > self.max_length:
+            if value and len(value) > self.max_length:
                 raise ValidationError('{0} is longer than {1} characters'.format(self.column_name, self.max_length))
-        if self.min_length is not None:
-            if len(value) < self.min_length:
+        if self.min_length:
+            if (self.min_length and not value) or len(value) < self.min_length:
                 raise ValidationError('{0} is shorter than {1} characters'.format(self.column_name, self.min_length))
         return value
 
