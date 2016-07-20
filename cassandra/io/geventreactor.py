@@ -18,24 +18,14 @@ from gevent import socket
 import gevent.ssl
 
 import logging
-import os
 import time
 
 from six.moves import range
-
-from errno import EINVAL
 
 from cassandra.connection import Connection, ConnectionShutdown, Timer, TimerManager
 
 
 log = logging.getLogger(__name__)
-
-
-def is_timeout(err):
-    return (
-        (err == EINVAL and os.name in ('nt', 'ce')) or
-        isinstance(err, socket.timeout)
-    )
 
 
 class GeventConnection(Connection):
@@ -131,11 +121,9 @@ class GeventConnection(Connection):
                 buf = self._socket.recv(self.in_buffer_size)
                 self._iobuf.write(buf)
             except socket.error as err:
-                if not is_timeout(err):
-                    log.debug("Exception in read for %s: %s", self, err)
-                    self.defunct(err)
-                    return  # leave the read loop
-                continue
+                log.debug("Exception in read for %s: %s", self, err)
+                self.defunct(err)
+                return  # leave the read loop
 
             if self._iobuf.tell():
                 self.process_io_buffer()
