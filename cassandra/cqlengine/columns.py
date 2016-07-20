@@ -328,7 +328,9 @@ class Text(Column):
             Defaults to 1 if this is a ``required`` column. Otherwise, None.
         :param int max_length: Sets the maximum length of this string, for validation purposes.
         """
-        self.min_length = min_length or (1 if kwargs.get('required', False) else None)
+        self.min_length = (
+            1 if not min_length and kwargs.get('required', False)
+            else min_length)
         self.max_length = max_length
 
         if self.min_length is not None:
