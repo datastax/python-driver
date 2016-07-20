@@ -338,10 +338,10 @@ class Text(Column):
             return
         if not isinstance(value, (six.string_types, bytearray)) and value is not None:
             raise ValidationError('{0} {1} is not a string'.format(self.column_name, type(value)))
-        if self.max_length:
+        if self.max_length is not None:
             if len(value) > self.max_length:
                 raise ValidationError('{0} is longer than {1} characters'.format(self.column_name, self.max_length))
-        if self.min_length:
+        if self.min_length is not None:
             if len(value) < self.min_length:
                 raise ValidationError('{0} is shorter than {1} characters'.format(self.column_name, self.min_length))
         return value
