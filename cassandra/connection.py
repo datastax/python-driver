@@ -345,6 +345,7 @@ class Connection(object):
                     self._socket = self._ssl_impl.wrap_socket(self._socket, **self.ssl_options)
                 self._socket.settimeout(self.connect_timeout)
                 self._socket.connect(sockaddr)
+                self._socket.settimeout(None)
                 if self._check_hostname:
                     ssl.match_hostname(self._socket.getpeercert(), self.host)
                 sockerr = None

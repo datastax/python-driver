@@ -16,13 +16,10 @@
 # Originally derived from MagnetoDB source:
 #   https://github.com/stackforge/magnetodb/blob/2015.1.0b1/magnetodb/common/cassandra/io/eventletreactor.py
 
-from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, EINVAL
 import eventlet
 from eventlet.green import socket
-import ssl
 from eventlet.queue import Queue
 import logging
-import os
 from threading import Event
 import time
 
@@ -32,15 +29,6 @@ from cassandra.connection import Connection, ConnectionShutdown, Timer, TimerMan
 
 
 log = logging.getLogger(__name__)
-
-
-def is_timeout(err):
-    return (
-        err in (EINPROGRESS, EALREADY, EWOULDBLOCK) or
-        (err == EINVAL and os.name in ('nt', 'ce')) or
-        (isinstance(err, ssl.SSLError) and err.args[0] == 'timed out') or
-        isinstance(err, socket.timeout)
-    )
 
 
 class EventletConnection(Connection):
@@ -145,8 +133,6 @@ class EventletConnection(Connection):
                 buf = self._socket.recv(self.in_buffer_size)
                 self._iobuf.write(buf)
             except socket.error as err:
-                if is_timeout(err):
-                    continue
                 log.debug("Exception during socket recv for %s: %s",
                           self, err)
                 self.defunct(err)
