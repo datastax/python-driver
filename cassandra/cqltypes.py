@@ -989,12 +989,9 @@ class DynamicCompositeType(_ParameterizedType):
     typename = "org.apache.cassandra.db.marshal.DynamicCompositeType"
 
     @classmethod
-    def cass_parameterized_type_with(cls, subtypes, full=False, **kwargs):
-        if not full:  # short-circuit for unparsed type
-            return super(DynamicCompositeType, cls).cass_parameterized_type_with(subtypes)
-        # DCT is always formatted "full", and will always have subtypes (otherwise it is normalized to CompositeType by the server)
-        sublist = ', '.join('%s=>%s' % (alias, typ.cass_parameterized_type(full=True)) for alias, typ in zip(cls.fieldnames, subtypes))
-        return '%s(%s)' % (cls.typename, sublist)
+    def cql_parameterized_type(cls):
+        sublist = ', '.join('%s=>%s' % (alias, typ.cass_parameterized_type(full=True)) for alias, typ in zip(cls.fieldnames, cls.subtypes))
+        return "'%s(%s)'" % (cls.typename, sublist)
 
 
 class ColumnToCollectionType(_ParameterizedType):
