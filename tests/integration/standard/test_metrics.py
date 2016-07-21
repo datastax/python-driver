@@ -173,3 +173,38 @@ class MetricsTests(unittest.TestCase):
     # def test_retry(self):
     #     # TODO: Look for ways to generate retries
     #     pass
+
+    def test_metrics_per_cluster(self):
+        """
+        Test that metrics are per cluster.
+        """
+
+        cluster2 = Cluster(metrics_enabled=True, protocol_version=PROTOCOL_VERSION,
+                           default_retry_policy=FallthroughRetryPolicy())
+        session2 = cluster2.connect("test3rf", wait_for_all_pools=True)
+
+        query = SimpleStatement("SELECT * FROM test", consistency_level=ConsistencyLevel.ALL)
+        self.session.execute(query)
+
+        # Pause node so it shows as unreachable to coordinator
+        get_node(1).pause()
+
+        try:
+            # Test write
+            query = SimpleStatement("INSERT INTO test (k, v) VALUES (2, 2)", consistency_level=ConsistencyLevel.ALL)
+            with self.assertRaises(WriteTimeout):
+                self.session.execute(query, timeout=None)
+        finally:
+            get_node(1).resume()
+
+        stats_cluster1 = self.cluster.metrics.get_stats()
+        stats_cluster2 = cluster2.metrics.get_stats()
+
+        self.assertEqual(1, self.cluster.metrics.stats.write_timeouts)
+        self.assertEqual(0, cluster2.metrics.stats.write_timeouts)
+
+        self.assertNotEqual(0.0, self.cluster.metrics.request_timer['mean'])
+        self.assertEqual(0.0, cluster2.metrics.request_timer['mean'])
+
+        self.assertNotEqual(0.0, stats_cluster1['request_timer']['mean'])
+        self.assertEqual(0.0, stats_cluster2['request_timer']['mean'])
