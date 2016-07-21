@@ -1155,14 +1155,12 @@ Approximate structure, for reference:
 
 CREATE TABLE legacy.composite_comp_with_col (
     key blob,
-    b blob,
-    s text,
-    t timeuuid,
+    column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(b=>org.apache.cassandra.db.marshal.BytesType, s=>org.apache.cassandra.db.marshal.UTF8Type, t=>org.apache.cassandra.db.marshal.TimeUUIDType)',
     "b@6869746d65776974686d75736963" blob,
     "b@6d616d6d616a616d6d61" blob,
-    PRIMARY KEY (key, b, s, t)
+    PRIMARY KEY (key, column1)
 ) WITH COMPACT STORAGE
-    AND CLUSTERING ORDER BY (b ASC, s ASC, t ASC)
+    AND CLUSTERING ORDER BY (column1 ASC)
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = 'Stores file meta data'
     AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
@@ -1283,12 +1281,11 @@ Approximate structure, for reference:
 
 CREATE TABLE legacy.composite_comp_no_col (
     key blob,
-    column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(org.apache.cassandra.db.marshal.BytesType, org.apache.cassandra.db.marshal.UTF8Type, org.apache.cassandra.db.marshal.TimeUUIDType)',
-    column2 timeuuid,
+    column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(b=>org.apache.cassandra.db.marshal.BytesType, s=>org.apache.cassandra.db.marshal.UTF8Type, t=>org.apache.cassandra.db.marshal.TimeUUIDType)',
     value blob,
-    PRIMARY KEY (key, column1, column1, column2)
+    PRIMARY KEY (key, column1)
 ) WITH COMPACT STORAGE
-    AND CLUSTERING ORDER BY (column1 ASC, column1 ASC, column2 ASC)
+    AND CLUSTERING ORDER BY (column1 ASC)
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = 'Stores file meta data'
     AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
