@@ -17,7 +17,7 @@ try:
 except ImportError:
     import unittest
 
-import os, sys, traceback, logging, ssl
+import os, sys, traceback, logging, ssl, time
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
@@ -134,9 +134,45 @@ class SSLConnectionTests(unittest.TestCase):
 
         # find absolute path to client CA_CERTS
         abs_path_ca_cert_path = os.path.abspath(CLIENT_CA_CERTS)
+        ssl_options = {'ca_certs': abs_path_ca_cert_path,'ssl_version': ssl.PROTOCOL_TLSv1}
+        validate_ssl_options(ssl_options=ssl_options)
+
+    def test_can_connect_with_ssl_long_running(self):
+        """
+        Test to validate that long running ssl connections continue to function past thier timeout window
+
+        @since 3.6.0
+        @jira_ticket PYTHON-600
+        @expected_result The client can connect via SSL and preform some basic operations over a period of longer then a minute
+
+        @test_category connection:ssl
+        """
+
+        # find absolute path to client CA_CERTS
+        abs_path_ca_cert_path = os.path.abspath(CLIENT_CA_CERTS)
         ssl_options = {'ca_certs': abs_path_ca_cert_path,
                        'ssl_version': ssl.PROTOCOL_TLSv1}
-        validate_ssl_options(ssl_options=ssl_options)
+        tries = 0
+        while True:
+            if tries > 5:
+                raise RuntimeError("Failed to connect to SSL cluster after 5 attempts")
+            try:
+                cluster = Cluster(protocol_version=PROTOCOL_VERSION, ssl_options=ssl_options)
+                session = cluster.connect(wait_for_all_pools=True)
+                break
+            except Exception:
+                ex_type, ex, tb = sys.exc_info()
+                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                del tb
+                tries += 1
+
+        # attempt a few simple commands.
+
+        for i in range(8):
+            rs = session.execute("SELECT * FROM system.local")
+            time.sleep(10)
+
+        cluster.shutdown()
 
     def test_can_connect_with_ssl_ca_host_match(self):
         """

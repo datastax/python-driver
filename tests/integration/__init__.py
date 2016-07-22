@@ -296,6 +296,7 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[]):
             log.debug("Using external CCM cluster {0}".format(CCM_CLUSTER.name))
         else:
             log.debug("Using unnamed external cluster")
+        setup_keyspace(ipformat=ipformat, wait=False)
         return
 
     if is_current_cluster(cluster_name, nodes):
@@ -442,9 +443,10 @@ def drop_keyspace_shutdown_cluster(keyspace_name, session, cluster):
     cluster.shutdown()
 
 
-def setup_keyspace(ipformat=None):
+def setup_keyspace(ipformat=None, wait=True):
     # wait for nodes to startup
-    time.sleep(10)
+    if wait:
+        time.sleep(10)
 
     if not ipformat:
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
