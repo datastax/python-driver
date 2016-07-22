@@ -370,6 +370,25 @@ class Ascii(Text):
     """
     db_type = 'ascii'
 
+    def validate(self, value):
+        """ Only allow ASCII and None values.
+
+        Check against US-ASCII, a.k.a. 7-bit ASCII, a.k.a. ISO646-US, a.k.a.
+        the Basic Latin block of the Unicode character set.
+
+        Source: https://github.com/apache/cassandra/blob
+        /3dcbe90e02440e6ee534f643c7603d50ca08482b/src/java/org/apache/cassandra
+        /serializers/AsciiSerializer.java#L29
+        """
+        value = super(Ascii, self).validate(value)
+        if value:
+            charset = value if isinstance(
+                value, (bytearray, )) else map(ord, value)
+            if not set(range(128)).issuperset(charset):
+                raise ValidationError(
+                    '{!r} is not an ASCII string.'.format(value))
+        return value
+
 
 class Integer(Column):
     """

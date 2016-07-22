@@ -415,6 +415,14 @@ class TestAscii(BaseCassEngTestCase):
         with self.assertRaises(ValidationError):
             Ascii().validate(True)
 
+        Ascii().validate("!#$%&\'()*+,-./")
+
+        with self.assertRaises(ValidationError):
+            Ascii().validate('Beyonc' + chr(233))
+
+        with self.assertRaises(ValidationError):
+            Ascii().validate(u'Beyonc' + unichr(233))
+
     def test_unaltering_validation(self):
         """ Test the validation step doesn't re-interpret values. """
         self.assertEqual(Ascii().validate(''), '')
@@ -529,6 +537,10 @@ class TestText(BaseCassEngTestCase):
 
         with self.assertRaises(ValidationError):
             Text().validate(True)
+
+        Text().validate("!#$%&\'()*+,-./")
+        Text().validate('Beyonc' + chr(233))
+        Text().validate(u'Beyonc' + unichr(233))
 
     def test_unaltering_validation(self):
         """ Test the validation step doesn't re-interpret values. """
