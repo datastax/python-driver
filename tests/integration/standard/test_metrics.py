@@ -26,7 +26,7 @@ from cassandra import ConsistencyLevel, WriteTimeout, Unavailable, ReadTimeout
 
 from cassandra.cluster import Cluster, NoHostAvailable
 from tests.integration import get_cluster, get_node, use_singledc, PROTOCOL_VERSION, execute_until_pass
-
+from greplin import scales
 
 def setup_module():
     use_singledc()
@@ -197,14 +197,23 @@ class MetricsTests(unittest.TestCase):
         finally:
             get_node(1).resume()
 
+        # Change the scales stats_name of the cluster2
+        cluster2.metrics.set_stats_name('cluster2-metrics')
+
         stats_cluster1 = self.cluster.metrics.get_stats()
         stats_cluster2 = cluster2.metrics.get_stats()
 
+        # Test direct access to stats
         self.assertEqual(1, self.cluster.metrics.stats.write_timeouts)
         self.assertEqual(0, cluster2.metrics.stats.write_timeouts)
 
+        # Test direct access to a child stats
         self.assertNotEqual(0.0, self.cluster.metrics.request_timer['mean'])
         self.assertEqual(0.0, cluster2.metrics.request_timer['mean'])
 
+        # Test access via metrics.get_stats()
         self.assertNotEqual(0.0, stats_cluster1['request_timer']['mean'])
         self.assertEqual(0.0, stats_cluster2['request_timer']['mean'])
+
+        # Test access by stats_name
+        self.assertEqual(0.0, scales.getStats()['cluster2-metrics']['request_timer']['mean'])

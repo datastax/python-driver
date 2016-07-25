@@ -111,12 +111,14 @@ class Metrics(object):
     the driver currently has open.
     """
 
+    _stats_counter = 0
+
     def __init__(self, cluster_proxy):
         log.debug("Starting metric capture")
 
-        # TODO, modify the path to /cassandra/{clusterid} in 4.0
-        self.stats_id = str(id(cluster_proxy))
-        self.stats = scales.collection('/_cassandra/{0}'.format(self.stats_id),
+        self.stats_name = 'cassandra-{0}'.format(str(self._stats_counter))
+        Metrics._stats_counter += 1
+        self.stats = scales.collection(self.stats_name,
             scales.PmfStat('request_timer'),
             scales.IntStat('connection_errors'),
             scales.IntStat('write_timeouts'),
@@ -137,7 +139,7 @@ class Metrics(object):
         # TODO, to be removed in 4.0
         # /cassandra contains the metrics of the first cluster registered
         if 'cassandra' not in scales._Stats.stats:
-            scales._Stats.stats['cassandra'] = scales._Stats.stats['_cassandra'][self.stats_id]
+            scales._Stats.stats['cassandra'] = scales._Stats.stats[self.stats_name]
 
         self.request_timer = self.stats.request_timer
         self.connection_errors = self.stats.connection_errors
@@ -176,4 +178,19 @@ class Metrics(object):
         """
         Returns the metrics for the registered cluster instance.
         """
-        return scales.getStats()['_cassandra'][self.stats_id]
+        return scales.getStats()[self.stats_name]
+
+    def set_stats_name(self, stats_name):
+        """
+        Set the metrics stats name.
+        The stats_name is a string used to access the metris through scales: scales.getStats()[<stats_name>]
+        Default is 'cassandra-<num>'.
+        """
+
+        if stats_name in scales._Stats.stats:
+            raise ValueError('"{0}" already exists in stats.'.format(stats_name))
+
+        stats = scales._Stats.stats[self.stats_name]
+        del scales._Stats.stats[self.stats_name]
+        self.stats_name = stats_name
+        scales._Stats.stats[self.stats_name] = stats
