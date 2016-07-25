@@ -538,8 +538,8 @@ class BasicKeyspaceUnitTestCase(unittest.TestCase):
         execute_with_long_wait_retry(cls.session, ddl)
 
     @classmethod
-    def common_setup(cls, rf, keyspace_creation=True, create_class_table=False):
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+    def common_setup(cls, rf, keyspace_creation=True, create_class_table=False, metrics=False):
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, metrics_enabled=metrics)
         cls.session = cls.cluster.connect()
         cls.ks_name = cls.__name__.lower()
         if keyspace_creation:
@@ -591,6 +591,7 @@ class MockLoggingHandler(logging.Handler):
             if sub_string in msg:
                 count+=1
         return count
+
 
 class BasicExistingKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):
     """
@@ -646,7 +647,7 @@ class BasicSharedKeyspaceUnitTestCaseWTable(BasicSharedKeyspaceUnitTestCase):
     """
     @classmethod
     def setUpClass(self):
-        self.common_setup(2, True)
+        self.common_setup(3, True, True, True)
 
 
 class BasicSharedKeyspaceUnitTestCaseRF3(BasicSharedKeyspaceUnitTestCase):

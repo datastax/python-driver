@@ -187,6 +187,9 @@ class Metrics(object):
         Default is 'cassandra-<num>'.
         """
 
+        if self.stats_name == stats_name:
+            return
+
         if stats_name in scales._Stats.stats:
             raise ValueError('"{0}" already exists in stats.'.format(stats_name))
 

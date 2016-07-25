@@ -27,6 +27,7 @@ from cassandra import ConsistencyLevel, WriteTimeout, Unavailable, ReadTimeout
 from cassandra.cluster import Cluster, NoHostAvailable
 from tests.integration import get_cluster, get_node, use_singledc, PROTOCOL_VERSION, execute_until_pass
 from greplin import scales
+from tests.integration import BasicSharedKeyspaceUnitTestCaseWTable
 
 def setup_module():
     use_singledc()
@@ -174,16 +175,24 @@ class MetricsTests(unittest.TestCase):
     #     # TODO: Look for ways to generate retries
     #     pass
 
+
+class MetricsNamespaceTest(BasicSharedKeyspaceUnitTestCaseWTable):
+
     def test_metrics_per_cluster(self):
         """
-        Test that metrics are per cluster.
+        Test to validate that metrics can be scopped to invdividual clusters
+        @since 3.6.0
+        @jira_ticket PYTHON-561
+        @expected_result metrics should be scopped to a cluster level
+
+        @test_category metrics
         """
 
         cluster2 = Cluster(metrics_enabled=True, protocol_version=PROTOCOL_VERSION,
                            default_retry_policy=FallthroughRetryPolicy())
-        session2 = cluster2.connect("test3rf", wait_for_all_pools=True)
+        cluster2.connect(self.ks_name, wait_for_all_pools=True)
 
-        query = SimpleStatement("SELECT * FROM test", consistency_level=ConsistencyLevel.ALL)
+        query = SimpleStatement("SELECT * FROM {0}.{0}".format(self.ks_name), consistency_level=ConsistencyLevel.ALL)
         self.session.execute(query)
 
         # Pause node so it shows as unreachable to coordinator
@@ -191,7 +200,7 @@ class MetricsTests(unittest.TestCase):
 
         try:
             # Test write
-            query = SimpleStatement("INSERT INTO test (k, v) VALUES (2, 2)", consistency_level=ConsistencyLevel.ALL)
+            query = SimpleStatement("INSERT INTO {0}.{0} (k, v) VALUES (2, 2)".format(self.ks_name), consistency_level=ConsistencyLevel.ALL)
             with self.assertRaises(WriteTimeout):
                 self.session.execute(query, timeout=None)
         finally:
@@ -217,3 +226,50 @@ class MetricsTests(unittest.TestCase):
 
         # Test access by stats_name
         self.assertEqual(0.0, scales.getStats()['cluster2-metrics']['request_timer']['mean'])
+
+        cluster2.shutdown()
+
+    def test_duplicate_metrics_per_cluster(self):
+        """
+        Test to validate that cluster metrics names can't overlap.
+        @since 3.6.0
+        @jira_ticket PYTHON-561
+        @expected_result metric names should not be allowed to be same.
+
+        @test_category metrics
+        """
+        cluster2 = Cluster(metrics_enabled=True, protocol_version=PROTOCOL_VERSION,
+                           default_retry_policy=FallthroughRetryPolicy())
+
+        cluster3 = Cluster(metrics_enabled=True, protocol_version=PROTOCOL_VERSION,
+                           default_retry_policy=FallthroughRetryPolicy())
+
+        # Ensure duplicate metric names are not allowed
+        cluster2.metrics.set_stats_name("appcluster")
+        cluster2.metrics.set_stats_name("appcluster")
+        with self.assertRaises(ValueError):
+            cluster3.metrics.set_stats_name("appcluster")
+        cluster3.metrics.set_stats_name("devops")
+
+        session2 = cluster2.connect(self.ks_name, wait_for_all_pools=True)
+        session3 = cluster3.connect(self.ks_name, wait_for_all_pools=True)
+
+        # Basic validation that naming metrics doesn't impact their segration or accuracy
+        for i in range(10):
+            query = SimpleStatement("SELECT * FROM {0}.{0}".format(self.ks_name), consistency_level=ConsistencyLevel.ALL)
+            session2.execute(query)
+
+        for i in range(5):
+            query = SimpleStatement("SELECT * FROM {0}.{0}".format(self.ks_name), consistency_level=ConsistencyLevel.ALL)
+            session3.execute(query)
+
+        self.assertEqual(cluster2.metrics.get_stats().values()[2]['count'], 10)
+        self.assertEqual(cluster3.metrics.get_stats().values()[2]['count'], 5)
+
+        # Check scales to ensure they are appropriately named
+        self.assertTrue("appcluster" in scales._Stats.stats.keys())
+        self.assertTrue("devops" in scales._Stats.stats.keys())
+
+
+
+
