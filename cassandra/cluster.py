@@ -3777,8 +3777,8 @@ class ResponseFuture(object):
 
     def clear_callbacks(self):
         with self._callback_lock:
-            self._callback = []
-            self._errback = []
+            self._callbacks = []
+            self._errbacks = []
 
     def __str__(self):
         result = "(no result yet)" if self._final_result is _NOT_SET else self._final_result
