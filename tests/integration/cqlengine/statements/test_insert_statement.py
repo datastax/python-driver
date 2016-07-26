@@ -16,10 +16,13 @@ try:
 except ImportError:
     import unittest  # noqa
 
+import datetime
+
 import six
 
 from cassandra.cqlengine.columns import Column
 from cassandra.cqlengine.statements import InsertStatement
+from cassandra.cqlengine.functions import MaxTimeUUID
 
 
 class InsertStatementTests(unittest.TestCase):
@@ -52,3 +55,12 @@ class InsertStatementTests(unittest.TestCase):
         ist.add_assignment(Column(db_field='a'), 'b')
         ist.add_assignment(Column(db_field='c'), 'd')
         self.assertIn('USING TTL 60', six.text_type(ist))
+
+    def test_function_rendering(self):
+        ist = InsertStatement('table')
+        ist.add_assignment(Column(db_field='a'), MaxTimeUUID(datetime.datetime.now()))
+
+        self.assertEqual(
+            six.text_type(ist),
+            'INSERT INTO table ("a") VALUES (MaxTimeUUID(%(0)s))'
+        )

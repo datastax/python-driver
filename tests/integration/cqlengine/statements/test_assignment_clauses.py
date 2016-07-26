@@ -27,7 +27,7 @@ class AssignmentClauseTests(unittest.TestCase):
     def test_insert_tuple(self):
         ac = AssignmentClause('a', 'b')
         ac.set_context_id(10)
-        self.assertEqual(ac.insert_tuple(), ('a', 10))
+        self.assertEqual(ac.insert_tuple(), ('a', '%(10)s'))
 
 
 class SetUpdateClauseTests(unittest.TestCase):

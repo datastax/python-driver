@@ -88,7 +88,10 @@ class BaseClause(UnicodeMixin):
     def update_context(self, ctx):
         """ updates the query context with this clauses values """
         assert isinstance(ctx, dict)
-        ctx[str(self.context_id)] = self.value
+        if isinstance(self.value, QueryValue):
+            self.value.update_context(ctx)
+        else:
+            ctx[str(self.context_id)] = self.value
 
 
 class WhereClause(BaseClause):
@@ -142,20 +145,19 @@ class AssignmentClause(BaseClause):
     """ a single variable st statement """
 
     def __unicode__(self):
-        return u'"{0}" = %({1})s'.format(self.field, self.context_id)
+        return u'"{0}" = {1}'.format(self.field, self.value) if isinstance(self.value, QueryValue) \
+            else u'"{0}" = %({1})s'.format(self.field, self.context_id)
 
     def insert_tuple(self):
-        return self.field, self.context_id
-
+        v = '{0}'.format(self.value) if isinstance(self.value, QueryValue) else '%({0})s'.format(self.context_id)
+        return self.field, v
 
 class ConditionalClause(BaseClause):
     """ A single variable iff statement """
 
     def __unicode__(self):
-        return u'"{0}" = %({1})s'.format(self.field, self.context_id)
-
-    def insert_tuple(self):
-        return self.field, self.context_id
+        return u'"{0}" = {1}'.format(self.field, self.value) if isinstance(self.value, QueryValue) \
+                else u'"{0}" = %({1})s'.format(self.field, self.context_id)
 
 
 class ContainerUpdateTypeMapMeta(type):
@@ -673,7 +675,10 @@ class AssignmentStatement(BaseCQLStatement):
         return parts
 
     def add_assignment(self, column, value):
-        value = column.to_database(value)
+        if column._val_is_function(value):
+            value.set_context_id(self.context_counter)
+        else:
+            value = column.to_database(value)
         clause = AssignmentClause(column.db_field_name, value)
         self._add_assignment_clause(clause)
 
@@ -720,7 +725,7 @@ class InsertStatement(AssignmentStatement):
 
         qs += ["({0})".format(', '.join(['"{0}"'.format(c) for c in columns]))]
         qs += ['VALUES']
-        qs += ["({0})".format(', '.join(['%({0})s'.format(v) for v in values]))]
+        qs += ["({0})".format(', '.join(['{0}'.format(v) for v in values]))]
 
         if self.if_not_exists:
             qs += ["IF NOT EXISTS"]
@@ -795,7 +800,10 @@ class UpdateStatement(AssignmentStatement):
             self.context_counter += conditional.get_context_size()
 
     def add_update(self, column, value, operation=None, previous=None):
-        value = column.to_database(value)
+        if column._val_is_function(value):
+            value.set_context_id(self.context_counter)
+        else:
+            value = column.to_database(value)
         col_type = type(column)
         container_update_type = ContainerUpdateClause.type_map.get(col_type)
         if container_update_type:
