@@ -21,7 +21,7 @@ import warnings
 
 from cassandra import metadata
 from cassandra.cqlengine import CQLEngineException
-from cassandra.cqlengine import columns
+from cassandra.cqlengine import columns, query
 from cassandra.cqlengine.connection import execute, get_cluster
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.named import NamedTable
@@ -119,9 +119,9 @@ def _get_index_name_by_column(table, column_name):
             return index_metadata.name
 
 
-def sync_table(model):
+def sync_table(model, keyspaces=None):
     """
-    Inspects the model and creates / updates the corresponding table and columns.
+    Inspects the model and creates / updates the corresponding table and columns for all keyspaces.
 
     Any User Defined Types used in the table are implicitly synchronized.
 
@@ -135,6 +135,20 @@ def sync_table(model):
 
     *There are plans to guard schema-modifying functions with an environment-driven conditional.*
     """
+
+    if keyspaces:
+        if not isinstance(keyspaces, (list, tuple)):
+            raise ValueError('keyspaces must be a list or a tuple.')
+
+        for keyspace in keyspaces:
+            with query.ContextQuery(model, keyspace=keyspace) as m:
+                _sync_table(m)
+    else:
+        _sync_table(model)
+
+
+def _sync_table(model):
+
     if not _allow_schema_modification():
         return
 
@@ -431,15 +445,27 @@ def _update_options(model):
     return False
 
 
-def drop_table(model):
+def drop_table(model, keyspaces=None):
     """
-    Drops the table indicated by the model, if it exists.
+    Drops the table indicated by the model, if it exists, for all keyspaces.
 
     **This function should be used with caution, especially in production environments.
     Take care to execute schema modifications in a single context (i.e. not concurrently with other clients).**
 
     *There are plans to guard schema-modifying functions with an environment-driven conditional.*
     """
+
+    if keyspaces:
+        if not isinstance(keyspaces, (list, tuple)):
+            raise ValueError('keyspaces must be a list or a tuple.')
+
+        for keyspace in keyspaces:
+            with query.ContextQuery(model, keyspace=keyspace) as m:
+                _drop_table(m)
+    else:
+        _drop_table(model)
+
+def _drop_table(model):
     if not _allow_schema_modification():
         return
 

@@ -259,6 +259,26 @@ class BatchQuery(object):
         self.execute()
 
 
+class ContextQuery(object):
+
+    def __init__(self, model, keyspace=None):
+        from cassandra.cqlengine import models
+
+        if not issubclass(model, models.Model):
+            raise CQLEngineException("Models must be derived from base Model.")
+
+        ks = keyspace if keyspace else model.__keyspace__
+        new_type = type(model.__name__, (model,), {'__keyspace__': ks})
+
+        self.model = new_type
+
+    def __enter__(self):
+        return self.model
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        return
+
+
 class AbstractQuerySet(object):
 
     def __init__(self, model):
