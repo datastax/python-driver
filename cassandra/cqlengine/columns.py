@@ -309,13 +309,6 @@ class Blob(Column):
 Bytes = Blob
 
 
-class Ascii(Column):
-    """
-    Stores a US-ASCII character string
-    """
-    db_type = 'ascii'
-
-
 class Inet(Column):
     """
     Stores an IP address in IPv4 or IPv6 format
@@ -335,22 +328,65 @@ class Text(Column):
             Defaults to 1 if this is a ``required`` column. Otherwise, None.
         :param int max_length: Sets the maximum length of this string, for validation purposes.
         """
-        self.min_length = min_length or (1 if kwargs.get('required', False) else None)
+        self.min_length = (
+            1 if not min_length and kwargs.get('required', False)
+            else min_length)
         self.max_length = max_length
+
+        if self.min_length is not None:
+            if self.min_length < 0:
+                raise ValueError(
+                    'Minimum length is not allowed to be negative.')
+
+        if self.max_length is not None:
+            if self.max_length < 0:
+                raise ValueError(
+                    'Maximum length is not allowed to be negative.')
+
+        if self.min_length is not None and self.max_length is not None:
+            if self.max_length < self.min_length:
+                raise ValueError(
+                    'Maximum length must be greater or equal '
+                    'to minimum length.')
+
         super(Text, self).__init__(**kwargs)
 
     def validate(self, value):
         value = super(Text, self).validate(value)
-        if value is None:
-            return
         if not isinstance(value, (six.string_types, bytearray)) and value is not None:
             raise ValidationError('{0} {1} is not a string'.format(self.column_name, type(value)))
-        if self.max_length:
-            if len(value) > self.max_length:
+        if self.max_length is not None:
+            if value and len(value) > self.max_length:
                 raise ValidationError('{0} is longer than {1} characters'.format(self.column_name, self.max_length))
         if self.min_length:
-            if len(value) < self.min_length:
+            if (self.min_length and not value) or len(value) < self.min_length:
                 raise ValidationError('{0} is shorter than {1} characters'.format(self.column_name, self.min_length))
+        return value
+
+
+class Ascii(Text):
+    """
+    Stores a US-ASCII character string
+    """
+    db_type = 'ascii'
+
+    def validate(self, value):
+        """ Only allow ASCII and None values.
+
+        Check against US-ASCII, a.k.a. 7-bit ASCII, a.k.a. ISO646-US, a.k.a.
+        the Basic Latin block of the Unicode character set.
+
+        Source: https://github.com/apache/cassandra/blob
+        /3dcbe90e02440e6ee534f643c7603d50ca08482b/src/java/org/apache/cassandra
+        /serializers/AsciiSerializer.java#L29
+        """
+        value = super(Ascii, self).validate(value)
+        if value:
+            charset = value if isinstance(
+                value, (bytearray, )) else map(ord, value)
+            if not set(range(128)).issuperset(charset):
+                raise ValidationError(
+                    '{!r} is not an ASCII string.'.format(value))
         return value
 
 
