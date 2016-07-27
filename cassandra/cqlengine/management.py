@@ -121,7 +121,9 @@ def _get_index_name_by_column(table, column_name):
 
 def sync_table(model, keyspaces=None):
     """
-    Inspects the model and creates / updates the corresponding table and columns for all keyspaces.
+    Inspects the model and creates / updates the corresponding table and columns.
+
+    If `keyspaces` is specified, the table will be synched for all specified keyspaces. Note that the `Model.__keyspace__` is ignored in that case.
 
     Any User Defined Types used in the table are implicitly synchronized.
 
@@ -447,7 +449,9 @@ def _update_options(model):
 
 def drop_table(model, keyspaces=None):
     """
-    Drops the table indicated by the model, if it exists, for all keyspaces.
+    Drops the table indicated by the model, if it exists.
+
+    If `keyspaces` is specified, the table will be dropped for all specified keyspaces. Note that the `Model.__keyspace__` is ignored in that case.
 
     **This function should be used with caution, especially in production environments.
     Take care to execute schema modifications in a single context (i.e. not concurrently with other clients).**
