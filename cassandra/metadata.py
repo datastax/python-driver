@@ -1058,13 +1058,11 @@ class TableMetadata(object):
         """
         comparator = getattr(self, 'comparator', None)
         if comparator:
-            incompatible = issubclass(self.comparator, types.DynamicCompositeType)
-
             # no compact storage with more than one column beyond PK if there
             # are clustering columns
-            incompatible |= (self.is_compact_storage and
-                             len(self.columns) > len(self.primary_key) + 1 and
-                             len(self.clustering_key) >= 1)
+            incompatible = (self.is_compact_storage and
+                            len(self.columns) > len(self.primary_key) + 1 and
+                            len(self.clustering_key) >= 1)
 
             return not incompatible
         return True
