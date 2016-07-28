@@ -17,6 +17,7 @@ try:
 except ImportError:
     import unittest  # noqa
 
+import sys
 from datetime import datetime, timedelta, date, tzinfo
 from decimal import Decimal as D
 from uuid import uuid4, uuid1
@@ -420,8 +421,9 @@ class TestAscii(BaseCassEngTestCase):
         with self.assertRaises(ValidationError):
             Ascii().validate('Beyonc' + chr(233))
 
-        with self.assertRaises(ValidationError):
-            Ascii().validate(u'Beyonc' + unichr(233))
+        if sys.version_info < (3, 1):
+            with self.assertRaises(ValidationError):
+                Ascii().validate(u'Beyonc' + unichr(233))
 
     def test_unaltering_validation(self):
         """ Test the validation step doesn't re-interpret values. """
