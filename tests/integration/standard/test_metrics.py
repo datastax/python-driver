@@ -263,8 +263,8 @@ class MetricsNamespaceTest(BasicSharedKeyspaceUnitTestCaseWTable):
             query = SimpleStatement("SELECT * FROM {0}.{0}".format(self.ks_name), consistency_level=ConsistencyLevel.ALL)
             session3.execute(query)
 
-        self.assertEqual(cluster2.metrics.get_stats().values()[2]['count'], 10)
-        self.assertEqual(cluster3.metrics.get_stats().values()[2]['count'], 5)
+        self.assertEqual(cluster2.metrics.get_stats()['request_timer']['count'], 10)
+        self.assertEqual(cluster3.metrics.get_stats()['request_timer']['count'], 5)
 
         # Check scales to ensure they are appropriately named
         self.assertTrue("appcluster" in scales._Stats.stats.keys())
