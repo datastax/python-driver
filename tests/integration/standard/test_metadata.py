@@ -1273,12 +1273,6 @@ CREATE TABLE legacy.simple_no_col (
     AND read_repair_chance = 0.0
     AND speculative_retry = 'NONE';
 
-/*
-Warning: Table legacy.composite_comp_no_col omitted because it has constructs not compatible with CQL (was created via legacy API).
-
-Approximate structure, for reference:
-(this should not be used to reproduce this schema)
-
 CREATE TABLE legacy.composite_comp_no_col (
     key blob,
     column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(b=>org.apache.cassandra.db.marshal.BytesType, s=>org.apache.cassandra.db.marshal.UTF8Type, t=>org.apache.cassandra.db.marshal.TimeUUIDType)',
@@ -1297,8 +1291,7 @@ CREATE TABLE legacy.composite_comp_no_col (
     AND memtable_flush_period_in_ms = 0
     AND min_index_interval = 128
     AND read_repair_chance = 0.0
-    AND speculative_retry = 'NONE';
-*/"""
+    AND speculative_retry = 'NONE';"""
 
         ccm = get_cluster()
         ccm.run_cli(cli_script)

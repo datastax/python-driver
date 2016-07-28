@@ -191,7 +191,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         self.assertTrue(self._wait_for_trace_to_populate(trace.trace_id))
 
         # Delete trace duration from the session (this is what the driver polls for "complete")
-        delete_statement = SimpleStatement("DELETE duration FROM system_traces.sessions WHERE session_id = {}".format(trace.trace_id), consistency_level=ConsistencyLevel.ALL)
+        delete_statement = SimpleStatement("DELETE duration FROM system_traces.sessions WHERE session_id = {0}".format(trace.trace_id), consistency_level=ConsistencyLevel.ALL)
         self.session.execute(delete_statement)
         self.assertTrue(self._wait_for_trace_to_delete(trace.trace_id))
 
@@ -225,7 +225,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         return count != retry_max
 
     def _is_trace_present(self, trace_id):
-        select_statement = SimpleStatement("SElECT duration FROM system_traces.sessions WHERE session_id = {}".format(trace_id), consistency_level=ConsistencyLevel.ALL)
+        select_statement = SimpleStatement("SElECT duration FROM system_traces.sessions WHERE session_id = {0}".format(trace_id), consistency_level=ConsistencyLevel.ALL)
         ssrs = self.session.execute(select_statement)
         if(ssrs[0].duration is None):
             return False
