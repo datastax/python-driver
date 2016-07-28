@@ -47,7 +47,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         inst = TestModel()
         self.assertHasAttr(inst, 'id')
         self.assertHasAttr(inst, 'text')
-        self.assertIsNone(inst.id)
+        self.assertIsNotNone(inst.id)
         self.assertIsNone(inst.text)
 
     def test_db_map(self):

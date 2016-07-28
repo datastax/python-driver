@@ -368,6 +368,13 @@ class BaseModel(object):
             value_mngr.explicit = name in values
             self._values[name] = value_mngr
 
+        # Set default values on instantiation. Thanks to this, we don't have
+        # to wait anylonger for a call to validate() to have CQLengine set
+        # default columns values.
+        for column_id, column_obj in self._columns.items():
+            if column_id not in values and column_obj.has_default:
+                setattr(self, column_id, column_obj.get_default())
+
     def __repr__(self):
         return '{0}({1})'.format(self.__class__.__name__,
                                ', '.join('{0}={1!r}'.format(k, getattr(self, k))
