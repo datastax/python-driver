@@ -38,8 +38,6 @@ from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine import DEFAULT_KEYSPACE
 
 
-
-
 class TestModel(Model):
 
     id = columns.UUID(primary_key=True, default=lambda: uuid4())
