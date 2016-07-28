@@ -342,7 +342,7 @@ class TestNamedWithMV(BasicSharedKeyspaceUnitTestCase):
 
         # Populate the base table with data
         prepared_insert = self.session.prepare("""INSERT INTO {0}.scores (user, game, year, month, day, score) VALUES  (?, ?, ? ,? ,?, ?)""".format(ks))
-        parameters = {('pcmanus', 'Coup', 2015, 5, 1, 4000),
+        parameters = (('pcmanus', 'Coup', 2015, 5, 1, 4000),
                       ('jbellis', 'Coup', 2015, 5, 3, 1750),
                       ('yukim', 'Coup', 2015, 5, 3, 2250),
                       ('tjake', 'Coup', 2015, 5, 3, 500),
@@ -353,7 +353,7 @@ class TestNamedWithMV(BasicSharedKeyspaceUnitTestCase):
                       ('jbellis', 'Coup', 2015, 6, 20, 3500),
                       ('jbellis', 'Checkers', 2015, 6, 20, 1200),
                       ('jbellis', 'Chess', 2015, 6, 21, 3500),
-                      ('pcmanus', 'Chess', 2015, 1, 25, 3200)}
+                      ('pcmanus', 'Chess', 2015, 1, 25, 3200))
         prepared_insert.consistency_level = ConsistencyLevel.ALL
         execute_concurrent_with_args(self.session, prepared_insert, parameters)
 
