@@ -63,13 +63,13 @@ class TestModelClassFunction(BaseCassEngTestCase):
         inst1 = TestPerson()
         self.assertHasAttr(inst1, 'first_name')
         self.assertHasAttr(inst1, 'last_name')
-        self.assertEquals(inst1.first_name, 'kevin')
-        self.assertEquals(inst1.last_name, 'deldycke')
+        self.assertEqual(inst1.first_name, 'kevin')
+        self.assertEqual(inst1.last_name, 'deldycke')
 
         # Check that values on instantiation overrides defaults.
         inst2 = TestPerson(first_name='bob', last_name='joe')
-        self.assertEquals(inst2.first_name, 'bob')
-        self.assertEquals(inst2.last_name, 'joe')
+        self.assertEqual(inst2.first_name, 'bob')
+        self.assertEqual(inst2.last_name, 'joe')
 
     def test_db_map(self):
         """

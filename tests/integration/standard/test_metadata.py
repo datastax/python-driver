@@ -2226,37 +2226,37 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         self.assertIsNotNone(score_table.columns['score'])
 
         # Validate basic mv information
-        self.assertEquals(mv.keyspace_name, self.keyspace_name)
-        self.assertEquals(mv.name, "monthlyhigh")
-        self.assertEquals(mv.base_table_name, "scores")
+        self.assertEqual(mv.keyspace_name, self.keyspace_name)
+        self.assertEqual(mv.name, "monthlyhigh")
+        self.assertEqual(mv.base_table_name, "scores")
         self.assertFalse(mv.include_all_columns)
 
         # Validate that all columns are preset and correct
         mv_columns = list(mv.columns.values())
-        self.assertEquals(len(mv_columns), 6)
+        self.assertEqual(len(mv_columns), 6)
 
         game_column = mv_columns[0]
         self.assertIsNotNone(game_column)
-        self.assertEquals(game_column.name, 'game')
-        self.assertEquals(game_column, mv.partition_key[0])
+        self.assertEqual(game_column.name, 'game')
+        self.assertEqual(game_column, mv.partition_key[0])
 
         year_column = mv_columns[1]
         self.assertIsNotNone(year_column)
-        self.assertEquals(year_column.name, 'year')
-        self.assertEquals(year_column, mv.partition_key[1])
+        self.assertEqual(year_column.name, 'year')
+        self.assertEqual(year_column, mv.partition_key[1])
 
         month_column = mv_columns[2]
         self.assertIsNotNone(month_column)
-        self.assertEquals(month_column.name, 'month')
-        self.assertEquals(month_column, mv.partition_key[2])
+        self.assertEqual(month_column.name, 'month')
+        self.assertEqual(month_column, mv.partition_key[2])
 
         def compare_columns(a, b, name):
-            self.assertEquals(a.name, name)
-            self.assertEquals(a.name, b.name)
-            self.assertEquals(a.table, b.table)
-            self.assertEquals(a.cql_type, b.cql_type)
-            self.assertEquals(a.is_static, b.is_static)
-            self.assertEquals(a.is_reversed, b.is_reversed)
+            self.assertEqual(a.name, name)
+            self.assertEqual(a.name, b.name)
+            self.assertEqual(a.table, b.table)
+            self.assertEqual(a.cql_type, b.cql_type)
+            self.assertEqual(a.is_static, b.is_static)
+            self.assertEqual(a.is_reversed, b.is_reversed)
 
         score_column = mv_columns[3]
         compare_columns(score_column, mv.clustering_key[0], 'score')
@@ -2333,7 +2333,7 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         self.assertIn("fouls", mv_alltime.columns)
 
         mv_alltime_fouls_comumn = self.cluster.metadata.keyspaces[self.keyspace_name].views["alltimehigh"].columns['fouls']
-        self.assertEquals(mv_alltime_fouls_comumn.cql_type, 'int')
+        self.assertEqual(mv_alltime_fouls_comumn.cql_type, 'int')
 
     def test_base_table_type_alter_mv(self):
         """
@@ -2374,7 +2374,7 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         self.assertEqual(len(self.cluster.metadata.keyspaces[self.keyspace_name].views), 1)
 
         score_column = self.cluster.metadata.keyspaces[self.keyspace_name].tables['scores'].columns['score']
-        self.assertEquals(score_column.cql_type, 'blob')
+        self.assertEqual(score_column.cql_type, 'blob')
 
         # until CASSANDRA-9920+CASSANDRA-10500 MV updates are only available later with an async event
         for i in range(10):
@@ -2383,7 +2383,7 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
                 break
             time.sleep(.2)
 
-        self.assertEquals(score_mv_column.cql_type, 'blob')
+        self.assertEqual(score_mv_column.cql_type, 'blob')
 
     def test_metadata_with_quoted_identifiers(self):
         """
@@ -2436,31 +2436,31 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         self.assertIsNotNone(t1_table.columns['the Value'])
 
         # Validate basic mv information
-        self.assertEquals(mv.keyspace_name, self.keyspace_name)
-        self.assertEquals(mv.name, "mv1")
-        self.assertEquals(mv.base_table_name, "t1")
+        self.assertEqual(mv.keyspace_name, self.keyspace_name)
+        self.assertEqual(mv.name, "mv1")
+        self.assertEqual(mv.base_table_name, "t1")
         self.assertFalse(mv.include_all_columns)
 
         # Validate that all columns are preset and correct
         mv_columns = list(mv.columns.values())
-        self.assertEquals(len(mv_columns), 3)
+        self.assertEqual(len(mv_columns), 3)
 
         theKey_column = mv_columns[0]
         self.assertIsNotNone(theKey_column)
-        self.assertEquals(theKey_column.name, 'theKey')
-        self.assertEquals(theKey_column, mv.partition_key[0])
+        self.assertEqual(theKey_column.name, 'theKey')
+        self.assertEqual(theKey_column, mv.partition_key[0])
 
         cluster_column = mv_columns[1]
         self.assertIsNotNone(cluster_column)
-        self.assertEquals(cluster_column.name, 'the;Clustering')
-        self.assertEquals(cluster_column.name, mv.clustering_key[0].name)
-        self.assertEquals(cluster_column.table, mv.clustering_key[0].table)
-        self.assertEquals(cluster_column.is_static, mv.clustering_key[0].is_static)
-        self.assertEquals(cluster_column.is_reversed, mv.clustering_key[0].is_reversed)
+        self.assertEqual(cluster_column.name, 'the;Clustering')
+        self.assertEqual(cluster_column.name, mv.clustering_key[0].name)
+        self.assertEqual(cluster_column.table, mv.clustering_key[0].table)
+        self.assertEqual(cluster_column.is_static, mv.clustering_key[0].is_static)
+        self.assertEqual(cluster_column.is_reversed, mv.clustering_key[0].is_reversed)
 
         value_column = mv_columns[2]
         self.assertIsNotNone(value_column)
-        self.assertEquals(value_column.name, 'the Value')
+        self.assertEqual(value_column.name, 'the Value')
 
 
 @dseonly

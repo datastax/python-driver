@@ -89,13 +89,13 @@ class TestModelIO(BaseCassEngTestCase):
         tm = TestModel(count=8, text='123456789')
         # Tests that values are available on instantiation.
         self.assertIsNotNone(tm['id'])
-        self.assertEquals(tm.count, 8)
-        self.assertEquals(tm.text, '123456789')
+        self.assertEqual(tm.count, 8)
+        self.assertEqual(tm.text, '123456789')
         tm.save()
         tm2 = TestModel.objects(id=tm.id).first()
 
         for cname in tm._columns.keys():
-            self.assertEquals(getattr(tm, cname), getattr(tm2, cname))
+            self.assertEqual(getattr(tm, cname), getattr(tm2, cname))
 
     def test_model_read_as_dict(self):
         """
@@ -499,15 +499,15 @@ class TestUpdating(BaseCassEngTestCase):
             int3=7777,
             int5=5555)
 
-        self.assertEquals(instance.id, 1)
-        self.assertEquals(instance.int1, 9999)
-        self.assertEquals(instance.int2, 456)
-        self.assertEquals(instance.int3, 7777)
+        self.assertEqual(instance.id, 1)
+        self.assertEqual(instance.int1, 9999)
+        self.assertEqual(instance.int2, 456)
+        self.assertEqual(instance.int3, 7777)
         self.assertIsNotNone(instance.int4)
         self.assertIsInstance(instance.int4, int)
         self.assertGreaterEqual(instance.int4, 0)
         self.assertLessEqual(instance.int4, 1000)
-        self.assertEquals(instance.int5, 5555)
+        self.assertEqual(instance.int5, 5555)
         self.assertTrue(instance.int6 is None)
 
         # All previous values are unset as the object hasn't been persisted
