@@ -361,7 +361,11 @@ class BaseModel(object):
 
         self._values = {}
         for name, column in self._columns.items():
-            value = values.get(name)
+            # Set default values on instantiation. Thanks to this, we don't have
+            # to wait anylonger for a call to validate() to have CQLengine set
+            # default columns values.
+            column_default = column.get_default() if column.has_default else None
+            value = values.get(name, column_default)
             if value is not None or isinstance(column, columns.BaseContainerColumn):
                 value = column.to_python(value)
             value_mngr = column.value_manager(self, column, value)

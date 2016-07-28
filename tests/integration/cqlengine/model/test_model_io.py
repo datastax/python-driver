@@ -38,8 +38,6 @@ from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine import DEFAULT_KEYSPACE
 
 
-
-
 class TestModel(Model):
 
     id = columns.UUID(primary_key=True, default=lambda: uuid4())
@@ -72,7 +70,7 @@ class TestModelIO(BaseCassEngTestCase):
 
     def test_model_save_and_load(self):
         """
-        Tests that models can be saved and retrieved
+        Tests that models can be saved and retrieved, using the create method.
         """
         tm = TestModel.create(count=8, text='123456789')
         self.assertIsInstance(tm, TestModel)
@@ -82,6 +80,22 @@ class TestModelIO(BaseCassEngTestCase):
 
         for cname in tm._columns.keys():
             self.assertEqual(getattr(tm, cname), getattr(tm2, cname))
+
+    def test_model_instantiation_save_and_load(self):
+        """
+        Tests that models can be saved and retrieved, this time using the
+        natural model instantiation.
+        """
+        tm = TestModel(count=8, text='123456789')
+        # Tests that values are available on instantiation.
+        self.assertIsNotNone(tm['id'])
+        self.assertEquals(tm.count, 8)
+        self.assertEquals(tm.text, '123456789')
+        tm.save()
+        tm2 = TestModel.objects(id=tm.id).first()
+
+        for cname in tm._columns.keys():
+            self.assertEquals(getattr(tm, cname), getattr(tm2, cname))
 
     def test_model_read_as_dict(self):
         """
@@ -467,6 +481,49 @@ class TestUpdating(BaseCassEngTestCase):
         self.assertTrue(self.instance.get_changed_columns() == [])
         self.assertTrue(self.instance._values['count'].previous_value is None)
         self.assertTrue(self.instance.count is None)
+
+    def test_previous_value_tracking_on_instantiation_with_default(self):
+
+        class TestDefaultValueTracking(Model):
+            id = columns.Integer(partition_key=True)
+            int1 = columns.Integer(default=123)
+            int2 = columns.Integer(default=456)
+            int3 = columns.Integer(default=lambda: random.randint(0, 1000))
+            int4 = columns.Integer(default=lambda: random.randint(0, 1000))
+            int5 = columns.Integer()
+            int6 = columns.Integer()
+
+        instance = TestDefaultValueTracking(
+            id=1,
+            int1=9999,
+            int3=7777,
+            int5=5555)
+
+        self.assertEquals(instance.id, 1)
+        self.assertEquals(instance.int1, 9999)
+        self.assertEquals(instance.int2, 456)
+        self.assertEquals(instance.int3, 7777)
+        self.assertIsNotNone(instance.int4)
+        self.assertIsInstance(instance.int4, int)
+        self.assertGreaterEqual(instance.int4, 0)
+        self.assertLessEqual(instance.int4, 1000)
+        self.assertEquals(instance.int5, 5555)
+        self.assertTrue(instance.int6 is None)
+
+        # All previous values are unset as the object hasn't been persisted
+        # yet.
+        self.assertTrue(instance._values['id'].previous_value is None)
+        self.assertTrue(instance._values['int1'].previous_value is None)
+        self.assertTrue(instance._values['int2'].previous_value is None)
+        self.assertTrue(instance._values['int3'].previous_value is None)
+        self.assertTrue(instance._values['int4'].previous_value is None)
+        self.assertTrue(instance._values['int5'].previous_value is None)
+        self.assertTrue(instance._values['int6'].previous_value is None)
+
+        # All explicitely set columns, and those with default values are
+        # flagged has changed.
+        self.assertTrue(set(instance.get_changed_columns()) == set([
+            'id', 'int1', 'int2', 'int3', 'int4', 'int5']))
 
     def test_save_to_none(self):
         """
