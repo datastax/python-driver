@@ -54,13 +54,33 @@ class ContextQueryTests(BaseCassEngTestCase):
                     obj.delete()
 
     def test_context_manager(self):
+        """
+        Validates that when a context query is constructed that the
+        keyspace of the returned model is toggled appropriately
 
+        @since 3.6
+        @jira_ticket PYTHON-598
+        @expected_result default keyspace should be used
+
+        @test_category query
+        """
+        # model keyspace write/read
         for ks in self.KEYSPACES:
             with ContextQuery(TestModel, keyspace=ks) as tm:
                 self.assertEqual(tm.__keyspace__, ks)
 
-    def test_default_keyspace(self):
+        self.assertEqual(TestModel._get_keyspace(), 'ks1')
 
+    def test_default_keyspace(self):
+        """
+        Tests the use of context queries with the default model keyspsace
+
+        @since 3.6
+        @jira_ticket PYTHON-598
+        @expected_result default keyspace should be used
+
+        @test_category query
+        """
         # model keyspace write/read
         for i in range(5):
             TestModel.objects.create(partition=i, cluster=i)
@@ -76,7 +96,15 @@ class ContextQueryTests(BaseCassEngTestCase):
                 self.assertEqual(0, len(tm.objects.all()))
 
     def test_context_keyspace(self):
+        """
+        Tests the use of context queries with non default keyspaces
 
+        @since 3.6
+        @jira_ticket PYTHON-598
+        @expected_result queries should be routed to appropriate keyspaces
+
+        @test_category query
+        """
         for i in range(5):
             with ContextQuery(TestModel, keyspace='ks4') as tm:
                 tm.objects.create(partition=i, cluster=i)

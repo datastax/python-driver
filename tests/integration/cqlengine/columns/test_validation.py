@@ -542,7 +542,8 @@ class TestText(BaseCassEngTestCase):
 
         Text().validate("!#$%&\'()*+,-./")
         Text().validate('Beyonc' + chr(233))
-        Text().validate(u'Beyonc' + unichr(233))
+        if sys.version_info < (3, 1):
+            Text().validate(u'Beyonc' + unichr(233))
 
     def test_unaltering_validation(self):
         """ Test the validation step doesn't re-interpret values. """
