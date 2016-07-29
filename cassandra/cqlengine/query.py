@@ -175,11 +175,6 @@ class BatchQuery(object):
         self._context_entered = False
 
     def add_query(self, query):
-        """
-        Adds a query to the batch.
-
-        :param query: The query
-        """
         if not isinstance(query, BaseCQLStatement):
             raise CQLEngineException('only BaseCQLStatements can be added to a batch query')
         self.queries.append(query)
@@ -209,9 +204,6 @@ class BatchQuery(object):
         self._callbacks.append((fn, args, kwargs))
 
     def execute(self):
-        """
-        Executes the batch.
-        """
         if self._executed and self.warn_multiple_exec:
             msg = "Batch executed multiple times."
             if self._context_entered:
@@ -271,7 +263,7 @@ class BatchQuery(object):
 
 class ContextQuery(object):
     """
-    A Context manager to allow  a Model to switch context easily. Presently, the context only
+    A Context manager to allow a Model to switch context easily. Presently, the context only
     specifies a keyspace for model IO.
 
     For example:
@@ -289,7 +281,7 @@ class ContextQuery(object):
 
     def __init__(self, model, keyspace=None):
         """
-        :param model: A model
+        :param model: A model. This should be a class type, not an instance.
         :param keyspace: (optional) A keyspace name
         """
         from cassandra.cqlengine import models
