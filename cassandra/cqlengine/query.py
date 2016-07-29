@@ -136,6 +136,8 @@ class BatchQuery(object):
     Handles the batching of queries
 
     http://www.datastax.com/docs/1.2/cql_cli/cql/BATCH
+
+    See :doc:`/cqlengine/batches` for more details.
     """
     warn_multiple_exec = True
 
@@ -173,6 +175,11 @@ class BatchQuery(object):
         self._context_entered = False
 
     def add_query(self, query):
+        """
+        Adds a query to the batch.
+
+        :param query: The query
+        """
         if not isinstance(query, BaseCQLStatement):
             raise CQLEngineException('only BaseCQLStatements can be added to a batch query')
         self.queries.append(query)
@@ -202,6 +209,9 @@ class BatchQuery(object):
         self._callbacks.append((fn, args, kwargs))
 
     def execute(self):
+        """
+        Executes the batch.
+        """
         if self._executed and self.warn_multiple_exec:
             msg = "Batch executed multiple times."
             if self._context_entered:
@@ -260,8 +270,28 @@ class BatchQuery(object):
 
 
 class ContextQuery(object):
+    """
+    A Context manager to allow  a Model to switch context easily. Presently, the context only
+    specifies a keyspace for model IO.
+
+    For example:
+
+    .. code-block:: python
+
+            with ContextQuery(Automobile, keyspace='test2') as A:
+                A.objects.create(manufacturer='honda', year=2008, model='civic')
+                print len(A.objects.all())  # 1 result
+
+            with ContextQuery(Automobile, keyspace='test4') as A:
+                print len(A.objects.all())  # 0 result
+
+    """
 
     def __init__(self, model, keyspace=None):
+        """
+        :param model: A model
+        :param keyspace: (optional) A keyspace name
+        """
         from cassandra.cqlengine import models
 
         if not issubclass(model, models.Model):
