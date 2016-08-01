@@ -196,8 +196,8 @@ class BatchQuery(object):
 
         :param fn: Callable object
         :type fn: callable
-        :param *args: Positional arguments to be passed to the callback at the time of execution
-        :param **kwargs: Named arguments to be passed to the callback at the time of execution
+        :param \*args: Positional arguments to be passed to the callback at the time of execution
+        :param \*\*kwargs: Named arguments to be passed to the callback at the time of execution
         """
         if not callable(fn):
             raise ValueError("Value for argument 'fn' is {0} and is not a callable object.".format(type(fn)))
