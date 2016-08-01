@@ -26,7 +26,7 @@ from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.policies import HostDistance, RoundRobinPolicy
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, greaterthanprotocolv3, MockLoggingHandler
+from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions
 
 import time
 import re
@@ -191,7 +191,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         self.assertTrue(self._wait_for_trace_to_populate(trace.trace_id))
 
         # Delete trace duration from the session (this is what the driver polls for "complete")
-        delete_statement = SimpleStatement("DELETE duration FROM system_traces.sessions WHERE session_id = {}".format(trace.trace_id), consistency_level=ConsistencyLevel.ALL)
+        delete_statement = SimpleStatement("DELETE duration FROM system_traces.sessions WHERE session_id = {0}".format(trace.trace_id), consistency_level=ConsistencyLevel.ALL)
         self.session.execute(delete_statement)
         self.assertTrue(self._wait_for_trace_to_delete(trace.trace_id))
 
@@ -225,7 +225,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         return count != retry_max
 
     def _is_trace_present(self, trace_id):
-        select_statement = SimpleStatement("SElECT duration FROM system_traces.sessions WHERE session_id = {}".format(trace_id), consistency_level=ConsistencyLevel.ALL)
+        select_statement = SimpleStatement("SElECT duration FROM system_traces.sessions WHERE session_id = {0}".format(trace_id), consistency_level=ConsistencyLevel.ALL)
         ssrs = self.session.execute(select_statement)
         if(ssrs[0].duration is None):
             return False
@@ -354,6 +354,39 @@ class ForcedHostSwitchPolicy(RoundRobinPolicy):
             return value
         else:
             return list(self._live_hosts)
+
+
+class PreparedStatementMetdataTest(unittest.TestCase):
+
+    def test_prepared_metadata_generation(self):
+        """
+        Test to validate that result metadata is appropriately populated across protocol version
+
+        In protocol version 1 result metadata is retrieved everytime the statement is issued. In all
+        other protocol versions it's set once upon the prepare, then re-used. This test ensures that it manifests
+        it's self the same across multiple protocol versions.
+
+        @since 3.6.0
+        @jira_ticket PYTHON-71
+        @expected_result result metadata is consistent.
+        """
+
+        base_line = None
+        for proto_version in get_supported_protocol_versions():
+            cluster = Cluster(protocol_version=proto_version)
+            session = cluster.connect()
+            select_statement = session.prepare("SELECT * FROM system.local")
+            if proto_version == 1:
+                self.assertEqual(select_statement.result_metadata, None)
+            else:
+                self.assertNotEqual(select_statement.result_metadata, None)
+            future = session.execute_async(select_statement)
+            results = future.result()
+            if base_line is None:
+                base_line = results[0].__dict__.keys()
+            else:
+                self.assertEqual(base_line, results[0].__dict__.keys())
+            cluster.shutdown()
 
 
 class PreparedStatementArgTest(unittest.TestCase):
@@ -881,73 +914,73 @@ class MaterializedViewQueryTest(BasicSharedKeyspaceUnitTestCase):
         query_statement = SimpleStatement("SELECT * FROM {0}.alltimehigh WHERE game='Coup'".format(self.keyspace_name),
                                           consistency_level=ConsistencyLevel.QUORUM)
         results = self.session.execute(query_statement)
-        self.assertEquals(results[0].game, 'Coup')
-        self.assertEquals(results[0].year, 2015)
-        self.assertEquals(results[0].month, 5)
-        self.assertEquals(results[0].day, 1)
-        self.assertEquals(results[0].score, 4000)
-        self.assertEquals(results[0].user, "pcmanus")
+        self.assertEqual(results[0].game, 'Coup')
+        self.assertEqual(results[0].year, 2015)
+        self.assertEqual(results[0].month, 5)
+        self.assertEqual(results[0].day, 1)
+        self.assertEqual(results[0].score, 4000)
+        self.assertEqual(results[0].user, "pcmanus")
 
         # Test prepared statement and daily high filtering
         prepared_query = self.session.prepare("SELECT * FROM {0}.dailyhigh WHERE game=? AND year=? AND month=? and day=?".format(self.keyspace_name))
         bound_query = prepared_query.bind(("Coup", 2015, 6, 2))
         results = self.session.execute(bound_query)
-        self.assertEquals(results[0].game, 'Coup')
-        self.assertEquals(results[0].year, 2015)
-        self.assertEquals(results[0].month, 6)
-        self.assertEquals(results[0].day, 2)
-        self.assertEquals(results[0].score, 2000)
-        self.assertEquals(results[0].user, "pcmanus")
+        self.assertEqual(results[0].game, 'Coup')
+        self.assertEqual(results[0].year, 2015)
+        self.assertEqual(results[0].month, 6)
+        self.assertEqual(results[0].day, 2)
+        self.assertEqual(results[0].score, 2000)
+        self.assertEqual(results[0].user, "pcmanus")
 
-        self.assertEquals(results[1].game, 'Coup')
-        self.assertEquals(results[1].year, 2015)
-        self.assertEquals(results[1].month, 6)
-        self.assertEquals(results[1].day, 2)
-        self.assertEquals(results[1].score, 1000)
-        self.assertEquals(results[1].user, "tjake")
+        self.assertEqual(results[1].game, 'Coup')
+        self.assertEqual(results[1].year, 2015)
+        self.assertEqual(results[1].month, 6)
+        self.assertEqual(results[1].day, 2)
+        self.assertEqual(results[1].score, 1000)
+        self.assertEqual(results[1].user, "tjake")
 
         # Test montly high range queries
         prepared_query = self.session.prepare("SELECT * FROM {0}.monthlyhigh WHERE game=? AND year=? AND month=? and score >= ? and score <= ?".format(self.keyspace_name))
         bound_query = prepared_query.bind(("Coup", 2015, 6, 2500, 3500))
         results = self.session.execute(bound_query)
-        self.assertEquals(results[0].game, 'Coup')
-        self.assertEquals(results[0].year, 2015)
-        self.assertEquals(results[0].month, 6)
-        self.assertEquals(results[0].day, 20)
-        self.assertEquals(results[0].score, 3500)
-        self.assertEquals(results[0].user, "jbellis")
+        self.assertEqual(results[0].game, 'Coup')
+        self.assertEqual(results[0].year, 2015)
+        self.assertEqual(results[0].month, 6)
+        self.assertEqual(results[0].day, 20)
+        self.assertEqual(results[0].score, 3500)
+        self.assertEqual(results[0].user, "jbellis")
 
-        self.assertEquals(results[1].game, 'Coup')
-        self.assertEquals(results[1].year, 2015)
-        self.assertEquals(results[1].month, 6)
-        self.assertEquals(results[1].day, 9)
-        self.assertEquals(results[1].score, 2700)
-        self.assertEquals(results[1].user, "jmckenzie")
+        self.assertEqual(results[1].game, 'Coup')
+        self.assertEqual(results[1].year, 2015)
+        self.assertEqual(results[1].month, 6)
+        self.assertEqual(results[1].day, 9)
+        self.assertEqual(results[1].score, 2700)
+        self.assertEqual(results[1].user, "jmckenzie")
 
-        self.assertEquals(results[2].game, 'Coup')
-        self.assertEquals(results[2].year, 2015)
-        self.assertEquals(results[2].month, 6)
-        self.assertEquals(results[2].day, 1)
-        self.assertEquals(results[2].score, 2500)
-        self.assertEquals(results[2].user, "iamaleksey")
+        self.assertEqual(results[2].game, 'Coup')
+        self.assertEqual(results[2].year, 2015)
+        self.assertEqual(results[2].month, 6)
+        self.assertEqual(results[2].day, 1)
+        self.assertEqual(results[2].score, 2500)
+        self.assertEqual(results[2].user, "iamaleksey")
 
         # Test filtered user high scores
         query_statement = SimpleStatement("SELECT * FROM {0}.filtereduserhigh WHERE game='Chess'".format(self.keyspace_name),
                                           consistency_level=ConsistencyLevel.QUORUM)
         results = self.session.execute(query_statement)
-        self.assertEquals(results[0].game, 'Chess')
-        self.assertEquals(results[0].year, 2015)
-        self.assertEquals(results[0].month, 6)
-        self.assertEquals(results[0].day, 21)
-        self.assertEquals(results[0].score, 3500)
-        self.assertEquals(results[0].user, "jbellis")
+        self.assertEqual(results[0].game, 'Chess')
+        self.assertEqual(results[0].year, 2015)
+        self.assertEqual(results[0].month, 6)
+        self.assertEqual(results[0].day, 21)
+        self.assertEqual(results[0].score, 3500)
+        self.assertEqual(results[0].user, "jbellis")
 
-        self.assertEquals(results[1].game, 'Chess')
-        self.assertEquals(results[1].year, 2015)
-        self.assertEquals(results[1].month, 1)
-        self.assertEquals(results[1].day, 25)
-        self.assertEquals(results[1].score, 3200)
-        self.assertEquals(results[1].user, "pcmanus")
+        self.assertEqual(results[1].game, 'Chess')
+        self.assertEqual(results[1].year, 2015)
+        self.assertEqual(results[1].month, 1)
+        self.assertEqual(results[1].day, 25)
+        self.assertEqual(results[1].score, 3200)
+        self.assertEqual(results[1].user, "pcmanus")
 
 
 class UnicodeQueryTest(BasicSharedKeyspaceUnitTestCase):

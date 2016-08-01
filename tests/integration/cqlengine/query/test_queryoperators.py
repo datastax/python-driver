@@ -72,7 +72,7 @@ class TestTokenFunction(BaseCassEngTestCase):
         super(TestTokenFunction, self).tearDown()
         drop_table(TokenTestModel)
 
-    @execute_count(14)
+    @execute_count(15)
     def test_token_function(self):
         """ Tests that token functions work properly """
         assert TokenTestModel.objects().count() == 0
@@ -90,6 +90,10 @@ class TestTokenFunction(BaseCassEngTestCase):
 
         assert len(seen_keys) == 10
         assert all([i in seen_keys for i in range(10)])
+
+        # pk__token equality
+        r = TokenTestModel.objects(pk__token=functions.Token(last_token))
+        self.assertEqual(len(r), 1)
 
     def test_compound_pk_token_function(self):
 

@@ -343,6 +343,42 @@ None means no timeout.
     Setting the timeout on the model is meaningless and will raise an AssertionError.
 
 
+.. _ttl-change:
+
+Default TTL and Per Query TTL
+=============================
+
+Model default TTL now relies on the *default_time_to_live* feature, introduced in Cassandra 2.0. It is not handled anymore in the CQLEngine Model (cassandra-driver >=3.6). You can set the default TTL of a table like this:
+
+    Example:
+
+    .. code-block:: python
+
+        class User(Model):
+            __options__ = {'default_time_to_live': 20}
+
+            user_id = columns.UUID(primary_key=True)
+            ...
+
+You can set TTL per-query if needed. Here are a some examples:
+
+    Example:
+
+    .. code-block:: python
+
+        class User(Model):
+            __options__ = {'default_time_to_live': 20}
+
+            user_id = columns.UUID(primary_key=True)
+            ...
+
+        user = User.objects.create(user_id=1)  # Default TTL 20 will be set automatically on the server
+
+        user.ttl(30).update(age=21)            # Update the TTL to 30
+        User.objects.ttl(10).create(user_id=1)  # TTL 10
+        User(user_id=1, age=21).ttl(10).save()  # TTL 10
+
+
 Named Tables
 ===================
 
