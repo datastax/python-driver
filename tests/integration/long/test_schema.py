@@ -37,7 +37,7 @@ class SchemaTests(unittest.TestCase):
     @classmethod
     def setup_class(cls):
         cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        cls.session = cls.cluster.connect()
+        cls.session = cls.cluster.connect(wait_for_all_pools=True)
 
     @classmethod
     def teardown_class(cls):
@@ -98,7 +98,7 @@ class SchemaTests(unittest.TestCase):
         """
 
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
+        session = cluster.connect(wait_for_all_pools=True)
 
         for i in range(30):
             try:
@@ -131,7 +131,7 @@ class SchemaTests(unittest.TestCase):
         """
         # This should yield a schema disagreement
         cluster = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=0.001)
-        session = cluster.connect()
+        session = cluster.connect(wait_for_all_pools=True)
 
         rs = session.execute("CREATE KEYSPACE test_schema_disagreement WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
         self.check_and_wait_for_agreement(session, rs, False)

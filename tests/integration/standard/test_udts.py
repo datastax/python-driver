@@ -56,7 +56,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         """
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect(self.keyspace_name)
+        s = c.connect(self.keyspace_name, wait_for_all_pools=True)
 
         s.execute("CREATE TYPE user (age int, name text)")
         s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b frozen<user>)")
@@ -100,7 +100,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         """
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect()
+        s = c.connect(wait_for_all_pools=True)
 
         s.execute("""
             CREATE KEYSPACE udt_test_register_before_connecting
@@ -128,7 +128,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         c.register_user_type("udt_test_register_before_connecting", "user", User1)
         c.register_user_type("udt_test_register_before_connecting2", "user", User2)
 
-        s = c.connect()
+        s = c.connect(wait_for_all_pools=True)
 
         s.set_keyspace("udt_test_register_before_connecting")
         s.execute("INSERT INTO mytable (a, b) VALUES (%s, %s)", (0, User1(42, 'bob')))
@@ -158,7 +158,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         """
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect(self.keyspace_name)
+        s = c.connect(self.keyspace_name, wait_for_all_pools=True)
 
         s.execute("CREATE TYPE user (age int, name text)")
         s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b frozen<user>)")
@@ -202,7 +202,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         """
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect(self.keyspace_name)
+        s = c.connect(self.keyspace_name, wait_for_all_pools=True)
 
         s.execute("CREATE TYPE user (age int, name text)")
         User = namedtuple('user', ('age', 'name'))
@@ -252,7 +252,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         """
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect(self.keyspace_name)
+        s = c.connect(self.keyspace_name, wait_for_all_pools=True)
 
         s.execute("CREATE TYPE user (a text, b int, c uuid, d blob)")
         User = namedtuple('user', ('a', 'b', 'c', 'd'))
@@ -282,7 +282,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         """
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect(self.keyspace_name)
+        s = c.connect(self.keyspace_name, wait_for_all_pools=True)
 
         MAX_TEST_LENGTH = 254
 
@@ -366,7 +366,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         """
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect(self.keyspace_name)
+        s = c.connect(self.keyspace_name, wait_for_all_pools=True)
         s.row_factory = dict_factory
 
         MAX_NESTING_DEPTH = 16
@@ -397,7 +397,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         """
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect(self.keyspace_name)
+        s = c.connect(self.keyspace_name, wait_for_all_pools=True)
         s.row_factory = dict_factory
 
         MAX_NESTING_DEPTH = 16
@@ -437,7 +437,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         """
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect(self.keyspace_name)
+        s = c.connect(self.keyspace_name, wait_for_all_pools=True)
         s.row_factory = dict_factory
 
         MAX_NESTING_DEPTH = 16
@@ -468,7 +468,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         """
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect(self.keyspace_name)
+        s = c.connect(self.keyspace_name, wait_for_all_pools=True)
         User = namedtuple('user', ('age', 'name'))
 
         with self.assertRaises(UserTypeDoesNotExist):
@@ -488,7 +488,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         """
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect(self.keyspace_name)
+        s = c.connect(self.keyspace_name, wait_for_all_pools=True)
 
         # create UDT
         alpha_type_list = []
@@ -533,7 +533,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         """
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect(self.keyspace_name)
+        s = c.connect(self.keyspace_name, wait_for_all_pools=True)
 
         # create UDT
         alpha_type_list = []
@@ -600,7 +600,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
             raise unittest.SkipTest("Support for nested collections was introduced in Cassandra 2.1.3")
 
         c = Cluster(protocol_version=PROTOCOL_VERSION)
-        s = c.connect(self.keyspace_name)
+        s = c.connect(self.keyspace_name, wait_for_all_pools=True)
         s.encoder.mapping[tuple] = s.encoder.cql_encode_tuple
 
         name = self._testMethodName
