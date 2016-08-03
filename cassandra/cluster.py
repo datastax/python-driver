@@ -1927,8 +1927,10 @@ class Session(object):
             future = self.add_or_renew_pool(host, is_host_addition=False)
             if future:
                 self._initial_connect_futures.add(future)
-        wait_futures(self._initial_connect_futures, return_when=FIRST_COMPLETED)
 
+        futures = wait_futures(self._initial_connect_futures, return_when=FIRST_COMPLETED)
+        while futures.not_done and not any(f.result() for f in futures.done):
+            futures = wait_futures(futures.not_done, return_when=FIRST_COMPLETED)
 
     def execute(self, query, parameters=None, timeout=_NOT_SET, trace=False, custom_payload=None, execution_profile=EXEC_PROFILE_DEFAULT):
         """
