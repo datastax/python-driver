@@ -54,14 +54,6 @@ The methods here are used to filter, order, and constrain results.
 
     .. automethod:: update
 
-.. autoclass:: BatchQuery
-   :members:
-
-   .. automethod:: add_query
-   .. automethod:: execute
-
-.. autoclass:: ContextQuery
-
 .. autoclass:: DoesNotExist
 
 .. autoclass:: MultipleObjectsReturned

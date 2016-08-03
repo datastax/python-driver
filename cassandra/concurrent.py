@@ -94,8 +94,6 @@ def execute_concurrent(session, statements_and_parameters, concurrency=100, rais
 
 class _ConcurrentExecutor(object):
 
-    max_error_recursion = 100
-
     def __init__(self, session, statements_and_params):
         self.session = session
         self._enum_statements = enumerate(iter(statements_and_params))
@@ -104,7 +102,6 @@ class _ConcurrentExecutor(object):
         self._results_queue = []
         self._current = 0
         self._exec_count = 0
-        self._exec_depth = 0
 
     def execute(self, concurrency, fail_fast):
         self._fail_fast = fail_fast
@@ -128,7 +125,6 @@ class _ConcurrentExecutor(object):
             pass
 
     def _execute(self, idx, statement, params):
-        self._exec_depth += 1
         try:
             future = self.session.execute_async(statement, params, timeout=None)
             args = (future, idx)
@@ -139,15 +135,7 @@ class _ConcurrentExecutor(object):
             # exc_info with fail_fast to preserve stack trace info when raising on the client thread
             # (matches previous behavior -- not sure why we wouldn't want stack trace in the other case)
             e = sys.exc_info() if self._fail_fast and six.PY2 else exc
-
-            # If we're not failing fast and all executions are raising, there is a chance of recursing
-            # here as subsequent requests are attempted. If we hit this threshold, schedule this result/retry
-            # and let the event loop thread return.
-            if self._exec_depth < self.max_error_recursion:
-                self._put_result(e, idx, False)
-            else:
-                self.session.submit(self._put_result, e, idx, False)
-        self._exec_depth -= 1
+            self._put_result(e, idx, False)
 
     def _on_success(self, result, future, idx):
         future.clear_callbacks()

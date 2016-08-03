@@ -219,7 +219,8 @@ class Statement(object):
     _routing_key = None
 
     def __init__(self, retry_policy=None, consistency_level=None, routing_key=None,
-                 serial_consistency_level=None, fetch_size=FETCH_SIZE_UNSET, keyspace=None, custom_payload=None):
+                 serial_consistency_level=None, fetch_size=FETCH_SIZE_UNSET, keyspace=None,
+                 custom_payload=None):
         if retry_policy and not hasattr(retry_policy, 'on_read_timeout'):  # just checking one method to detect positional parameter errors
             raise ValueError('retry_policy should implement cassandra.policies.RetryPolicy')
         self.retry_policy = retry_policy
@@ -361,34 +362,36 @@ class PreparedStatement(object):
     may affect performance (as the operation requires a network roundtrip).
     """
 
-    column_metadata = None  #TODO: make this bind_metadata in next major
-    consistency_level = None
-    custom_payload = None
-    fetch_size = FETCH_SIZE_UNSET
-    keyspace = None  # change to prepared_keyspace in major release
-    protocol_version = None
+    column_metadata = None
     query_id = None
     query_string = None
-    result_metadata = None
+    keyspace = None  # change to prepared_keyspace in major release
+
     routing_key_indexes = None
     _routing_key_index_set = None
+
+    consistency_level = None
     serial_consistency_level = None
 
+    protocol_version = None
+
+    fetch_size = FETCH_SIZE_UNSET
+
+    custom_payload = None
+
     def __init__(self, column_metadata, query_id, routing_key_indexes, query,
-                 keyspace, protocol_version, result_metadata):
+                 keyspace, protocol_version):
         self.column_metadata = column_metadata
         self.query_id = query_id
         self.routing_key_indexes = routing_key_indexes
         self.query_string = query
         self.keyspace = keyspace
         self.protocol_version = protocol_version
-        self.result_metadata = result_metadata
 
     @classmethod
-    def from_message(cls, query_id, column_metadata, pk_indexes, cluster_metadata,
-                     query, prepared_keyspace, protocol_version, result_metadata):
+    def from_message(cls, query_id, column_metadata, pk_indexes, cluster_metadata, query, prepared_keyspace, protocol_version):
         if not column_metadata:
-            return PreparedStatement(column_metadata, query_id, None, query, prepared_keyspace, protocol_version, result_metadata)
+            return PreparedStatement(column_metadata, query_id, None, query, prepared_keyspace, protocol_version)
 
         if pk_indexes:
             routing_key_indexes = pk_indexes
@@ -413,7 +416,7 @@ class PreparedStatement(object):
                         pass          # statement; just leave routing_key_indexes as None
 
         return PreparedStatement(column_metadata, query_id, routing_key_indexes,
-                                 query, prepared_keyspace, protocol_version, result_metadata)
+                                 query, prepared_keyspace, protocol_version)
 
     def bind(self, values):
         """

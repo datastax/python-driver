@@ -179,7 +179,7 @@ Named place-holders use the ``%(name)s`` form:
         """
         INSERT INTO users (name, credits, user_id, username)
         VALUES (%(name)s, %(credits)s, %(user_id)s, %(name)s)
-        """,
+        """
         {'name': "John O'Reilly", 'credits': 42, 'user_id': uuid.uuid1()}
     )
 

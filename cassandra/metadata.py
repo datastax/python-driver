@@ -1058,11 +1058,14 @@ class TableMetadata(object):
         """
         comparator = getattr(self, 'comparator', None)
         if comparator:
+            # no such thing as DCT in CQL
+            incompatible = issubclass(self.comparator, types.DynamicCompositeType)
+
             # no compact storage with more than one column beyond PK if there
             # are clustering columns
-            incompatible = (self.is_compact_storage and
-                            len(self.columns) > len(self.primary_key) + 1 and
-                            len(self.clustering_key) >= 1)
+            incompatible |= (self.is_compact_storage and
+                             len(self.columns) > len(self.primary_key) + 1 and
+                             len(self.clustering_key) >= 1)
 
             return not incompatible
         return True
@@ -1774,9 +1777,12 @@ class SchemaParserV22(_SchemaParser):
             comparator = types.lookup_casstype(row["comparator"])
             table_meta.comparator = comparator
 
-            is_dct_comparator = issubclass(comparator, types.DynamicCompositeType)
-            is_composite_comparator = issubclass(comparator, types.CompositeType)
-            column_name_types = comparator.subtypes if is_composite_comparator else (comparator,)
+            if issubclass(comparator, types.CompositeType):
+                column_name_types = comparator.subtypes
+                is_composite_comparator = True
+            else:
+                column_name_types = (comparator,)
+                is_composite_comparator = False
 
             num_column_name_components = len(column_name_types)
             last_col = column_name_types[-1]
@@ -1790,8 +1796,7 @@ class SchemaParserV22(_SchemaParser):
 
             if column_aliases is not None:
                 column_aliases = json.loads(column_aliases)
-
-            if not column_aliases:  # json load failed or column_aliases empty PYTHON-562
+            else:
                 column_aliases = [r.get('column_name') for r in clustering_rows]
 
             if is_composite_comparator:
@@ -1814,10 +1819,10 @@ class SchemaParserV22(_SchemaParser):
 
                     # Some thrift tables define names in composite types (see PYTHON-192)
                     if not column_aliases and hasattr(comparator, 'fieldnames'):
-                        column_aliases = filter(None, comparator.fieldnames)
+                        column_aliases = comparator.fieldnames
             else:
                 is_compact = True
-                if column_aliases or not col_rows or is_dct_comparator:
+                if column_aliases or not col_rows:
                     has_value = True
                     clustering_size = num_column_name_components
                 else:
@@ -1862,7 +1867,7 @@ class SchemaParserV22(_SchemaParser):
                 if len(column_aliases) > i:
                     column_name = column_aliases[i]
                 else:
-                    column_name = "column%d" % (i + 1)
+                    column_name = "column%d" % i
 
                 data_type = column_name_types[i]
                 cql_type = _cql_from_cass_type(data_type)

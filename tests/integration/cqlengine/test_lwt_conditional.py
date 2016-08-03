@@ -234,18 +234,3 @@ class TestConditional(BaseCassEngTestCase):
         self.assertIsNotNone(TestConditionalModel.objects(id=t.id).first().text)
         TestConditionalModel.objects(id=t.id).iff(count=5).update(text=None)
         self.assertIsNone(TestConditionalModel.objects(id=t.id).first().text)
-
-    def test_column_delete_after_update(self):
-        # DML path
-        t = TestConditionalModel.create(text='something', count=5)
-        t.iff(count=5).update(text=None, count=6)
-
-        self.assertIsNone(t.text)
-        self.assertEqual(t.count, 6)
-
-        # QuerySet path
-        t = TestConditionalModel.create(text='something', count=5)
-        TestConditionalModel.objects(id=t.id).iff(count=5).update(text=None, count=6)
-
-        self.assertIsNone(TestConditionalModel.objects(id=t.id).first().text)
-        self.assertEqual(TestConditionalModel.objects(id=t.id).first().count, 6)

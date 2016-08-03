@@ -126,7 +126,7 @@ class ErrorMessage(_MessageType, Exception):
         self.info = info
 
     @classmethod
-    def recv_body(cls, f, *args):
+    def recv_body(cls, f, protocol_version, user_type_map):
         code = read_int(f)
         msg = read_string(f)
         subcls = error_classes.get(code, cls)
@@ -378,7 +378,7 @@ class ReadyMessage(_MessageType):
     name = 'READY'
 
     @classmethod
-    def recv_body(cls, *args):
+    def recv_body(cls, f, protocol_version, user_type_map):
         return cls()
 
 
@@ -390,7 +390,7 @@ class AuthenticateMessage(_MessageType):
         self.authenticator = authenticator
 
     @classmethod
-    def recv_body(cls, f, *args):
+    def recv_body(cls, f, protocol_version, user_type_map):
         authname = read_string(f)
         return cls(authenticator=authname)
 
@@ -422,7 +422,7 @@ class AuthChallengeMessage(_MessageType):
         self.challenge = challenge
 
     @classmethod
-    def recv_body(cls, f, *args):
+    def recv_body(cls, f, protocol_version, user_type_map):
         return cls(read_binary_longstring(f))
 
 
@@ -445,7 +445,7 @@ class AuthSuccessMessage(_MessageType):
         self.token = token
 
     @classmethod
-    def recv_body(cls, f, *args):
+    def recv_body(cls, f, protocol_version, user_type_map):
         return cls(read_longstring(f))
 
 
@@ -466,7 +466,7 @@ class SupportedMessage(_MessageType):
         self.options = options
 
     @classmethod
-    def recv_body(cls, f, *args):
+    def recv_body(cls, f, protocol_version, user_type_map):
         options = read_stringmultimap(f)
         cql_versions = options.pop('CQL_VERSION')
         return cls(cql_versions=cql_versions, options=options)
@@ -474,7 +474,7 @@ class SupportedMessage(_MessageType):
 
 # used for QueryMessage and ExecuteMessage
 _VALUES_FLAG = 0x01
-_SKIP_METADATA_FLAG = 0x02
+_SKIP_METADATA_FLAG = 0x01
 _PAGE_SIZE_FLAG = 0x04
 _WITH_PAGING_STATE_FLAG = 0x08
 _WITH_SERIAL_CONSISTENCY_FLAG = 0x10
@@ -577,14 +577,14 @@ class ResultMessage(_MessageType):
         self.paging_state = paging_state
 
     @classmethod
-    def recv_body(cls, f, protocol_version, user_type_map, result_metadata):
+    def recv_body(cls, f, protocol_version, user_type_map):
         kind = read_int(f)
         paging_state = None
         if kind == RESULT_KIND_VOID:
             results = None
         elif kind == RESULT_KIND_ROWS:
             paging_state, results = cls.recv_results_rows(
-                f, protocol_version, user_type_map, result_metadata)
+                f, protocol_version, user_type_map)
         elif kind == RESULT_KIND_SET_KEYSPACE:
             ksname = read_string(f)
             results = ksname
@@ -597,9 +597,8 @@ class ResultMessage(_MessageType):
         return cls(kind, results, paging_state)
 
     @classmethod
-    def recv_results_rows(cls, f, protocol_version, user_type_map, result_metadata):
+    def recv_results_rows(cls, f, protocol_version, user_type_map):
         paging_state, column_metadata = cls.recv_results_metadata(f, user_type_map)
-        column_metadata = column_metadata or result_metadata
         rowcount = read_int(f)
         rows = [cls.recv_row(f, len(column_metadata)) for _ in range(rowcount)]
         colnames = [c[2] for c in column_metadata]
@@ -608,29 +607,24 @@ class ResultMessage(_MessageType):
             tuple(ctype.from_binary(val, protocol_version)
                   for ctype, val in zip(coltypes, row))
             for row in rows]
-        return paging_state, (colnames, parsed_rows)
+        return (paging_state, (colnames, parsed_rows))
 
     @classmethod
     def recv_results_prepared(cls, f, protocol_version, user_type_map):
         query_id = read_binary_string(f)
-        bind_metadata, pk_indexes, result_metadata = cls.recv_prepared_metadata(f, protocol_version, user_type_map)
-        return query_id, bind_metadata, pk_indexes, result_metadata
+        column_metadata, pk_indexes = cls.recv_prepared_metadata(f, protocol_version, user_type_map)
+        return (query_id, column_metadata, pk_indexes)
 
     @classmethod
     def recv_results_metadata(cls, f, user_type_map):
         flags = read_int(f)
+        glob_tblspec = bool(flags & cls._FLAGS_GLOBAL_TABLES_SPEC)
         colcount = read_int(f)
 
         if flags & cls._HAS_MORE_PAGES_FLAG:
             paging_state = read_binary_longstring(f)
         else:
             paging_state = None
-
-        no_meta = bool(flags & cls._NO_METADATA_FLAG)
-        if no_meta:
-            return paging_state, []
-
-        glob_tblspec = bool(flags & cls._FLAGS_GLOBAL_TABLES_SPEC)
         if glob_tblspec:
             ksname = read_string(f)
             cfname = read_string(f)
@@ -650,17 +644,17 @@ class ResultMessage(_MessageType):
     @classmethod
     def recv_prepared_metadata(cls, f, protocol_version, user_type_map):
         flags = read_int(f)
+        glob_tblspec = bool(flags & cls._FLAGS_GLOBAL_TABLES_SPEC)
         colcount = read_int(f)
         pk_indexes = None
         if protocol_version >= 4:
             num_pk_indexes = read_int(f)
             pk_indexes = [read_short(f) for _ in range(num_pk_indexes)]
 
-        glob_tblspec = bool(flags & cls._FLAGS_GLOBAL_TABLES_SPEC)
         if glob_tblspec:
             ksname = read_string(f)
             cfname = read_string(f)
-        bind_metadata = []
+        column_metadata = []
         for _ in range(colcount):
             if glob_tblspec:
                 colksname = ksname
@@ -670,13 +664,8 @@ class ResultMessage(_MessageType):
                 colcfname = read_string(f)
             colname = read_string(f)
             coltype = cls.read_type(f, user_type_map)
-            bind_metadata.append(ColumnMetadata(colksname, colcfname, colname, coltype))
-
-        if protocol_version >= 2:
-            _, result_metadata = cls.recv_results_metadata(f, user_type_map)
-            return bind_metadata, pk_indexes, result_metadata
-        else:
-            return bind_metadata, pk_indexes, None
+            column_metadata.append(ColumnMetadata(colksname, colcfname, colname, coltype))
+        return column_metadata, pk_indexes
 
     @classmethod
     def recv_results_schema_change(cls, f, protocol_version):
@@ -738,7 +727,7 @@ class ExecuteMessage(_MessageType):
 
     def __init__(self, query_id, query_params, consistency_level,
                  serial_consistency_level=None, fetch_size=None,
-                 paging_state=None, timestamp=None, skip_meta=False):
+                 paging_state=None, timestamp=None):
         self.query_id = query_id
         self.query_params = query_params
         self.consistency_level = consistency_level
@@ -746,7 +735,6 @@ class ExecuteMessage(_MessageType):
         self.fetch_size = fetch_size
         self.paging_state = paging_state
         self.timestamp = timestamp
-        self.skip_meta = skip_meta
 
     def send_body(self, f, protocol_version):
         write_string(f, self.query_id)
@@ -780,8 +768,6 @@ class ExecuteMessage(_MessageType):
                     raise UnsupportedOperation(
                         "Protocol-level timestamps may only be used with protocol version "
                         "3 or higher. Consider setting Cluster.protocol_version to 3.")
-            if self.skip_meta:
-                flags |= _SKIP_METADATA_FLAG
             write_byte(f, flags)
             write_short(f, len(self.query_params))
             for param in self.query_params:
@@ -794,7 +780,6 @@ class ExecuteMessage(_MessageType):
                 write_consistency_level(f, self.serial_consistency_level)
             if self.timestamp is not None:
                 write_long(f, self.timestamp)
-
 
 
 class BatchMessage(_MessageType):
@@ -866,7 +851,7 @@ class EventMessage(_MessageType):
         self.event_args = event_args
 
     @classmethod
-    def recv_body(cls, f, protocol_version, *args):
+    def recv_body(cls, f, protocol_version, user_type_map):
         event_type = read_string(f).upper()
         if event_type in known_event_types:
             read_method = getattr(cls, 'recv_' + event_type.lower())
@@ -975,7 +960,7 @@ class _ProtocolHandler(object):
 
     @classmethod
     def decode_message(cls, protocol_version, user_type_map, stream_id, flags, opcode, body,
-                       decompressor, result_metadata):
+                       decompressor):
         """
         Decodes a native protocol message body
 
@@ -1017,7 +1002,7 @@ class _ProtocolHandler(object):
             log.warning("Unknown protocol flags set: %02x. May cause problems.", flags)
 
         msg_class = cls.message_types_by_opcode[opcode]
-        msg = msg_class.recv_body(body, protocol_version, user_type_map, result_metadata)
+        msg = msg_class.recv_body(body, protocol_version, user_type_map)
         msg.stream_id = stream_id
         msg.trace_id = trace_id
         msg.custom_payload = custom_payload

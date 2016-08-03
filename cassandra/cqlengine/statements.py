@@ -35,7 +35,9 @@ class ValueQuoter(UnicodeMixin):
 
     def __unicode__(self):
         from cassandra.encoder import cql_quote
-        if isinstance(self.value, (list, tuple)):
+        if isinstance(self.value, bool):
+            return 'true' if self.value else 'false'
+        elif isinstance(self.value, (list, tuple)):
             return '[' + ', '.join([cql_quote(v) for v in self.value]) + ']'
         elif isinstance(self.value, dict):
             return '{' + ', '.join([cql_quote(k) + ':' + cql_quote(v) for k, v in self.value.items()]) + '}'

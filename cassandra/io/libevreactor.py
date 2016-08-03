@@ -102,10 +102,10 @@ class LibevLoop(object):
 
     def _run_loop(self):
         while True:
-            self._loop.start()
+            end_condition = self._loop.start()
             # there are still active watchers, no deadlock
             with self._lock:
-                if not self._shutdown and self._live_conns:
+                if not self._shutdown and (end_condition or self._live_conns):
                     log.debug("Restarting event loop")
                     continue
                 else:
@@ -121,7 +121,10 @@ class LibevLoop(object):
 
         for conn in self._live_conns | self._new_conns | self._closed_conns:
             conn.close()
-            map(lambda w: w.stop(), (w for w in (conn._write_watcher, conn._read_watcher) if w))
+            if conn._write_watcher:
+                conn._write_watcher.stop()
+            if conn._read_watcher:
+                conn._read_watcher.stop()
 
         self.notify()  # wake the timer watcher
         log.debug("Waiting for event loop thread to join...")
@@ -132,6 +135,7 @@ class LibevLoop(object):
                 "Please call Cluster.shutdown() to avoid this.")
 
         log.debug("Event loop thread was joined")
+        self._loop = None
 
     def add_timer(self, timer):
         self._timers.add_timer(timer)

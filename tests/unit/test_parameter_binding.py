@@ -91,7 +91,7 @@ class BoundStatementTestV1(unittest.TestCase):
                                          routing_key_indexes=[1, 0],
                                          query=None,
                                          keyspace='keyspace',
-                                         protocol_version=cls.protocol_version, result_metadata=None)
+                                         protocol_version=cls.protocol_version)
         cls.bound = BoundStatement(prepared_statement=cls.prepared)
 
     def test_invalid_argument_type(self):
@@ -130,8 +130,7 @@ class BoundStatementTestV1(unittest.TestCase):
                                                routing_key_indexes=[],
                                                query=None,
                                                keyspace=keyspace,
-                                               protocol_version=self.protocol_version,
-                                               result_metadata=None)
+                                               protocol_version=self.protocol_version)
         prepared_statement.fetch_size = 1234
         bound_statement = BoundStatement(prepared_statement=prepared_statement)
         self.assertEqual(1234, bound_statement.fetch_size)
@@ -164,8 +163,7 @@ class BoundStatementTestV1(unittest.TestCase):
                                                routing_key_indexes=[],
                                                query=None,
                                                keyspace='whatever',
-                                               protocol_version=self.protocol_version,
-                                               result_metadata=None)
+                                               protocol_version=self.protocol_version)
         bound = prepared_statement.bind(None)
         self.assertListEqual(bound.values, [])
 

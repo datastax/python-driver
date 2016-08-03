@@ -79,28 +79,6 @@ class HostMetatDataTests(BasicExistingKeyspaceUnitTestCase):
             self.assertTrue(host.release_version.startswith(CASSANDRA_VERSION))
 
 
-class MetaDataRemovalTest(unittest.TestCase):
-
-    def setUp(self):
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=['127.0.0.1','127.0.0.2', '127.0.0.3', '126.0.0.186'])
-        self.cluster.connect()
-
-    def tearDown(self):
-        self.cluster.shutdown()
-
-    def test_bad_contact_point(self):
-        """
-        Checks to ensure that hosts that are not resolvable are excluded from the contact point list.
-
-        @since 3.6
-        @jira_ticket PYTHON-549
-        @expected_result Invalid hosts on the contact list should be excluded
-
-        @test_category metadata
-        """
-        self.assertEqual(len(self.cluster.metadata.all_hosts()), 3)
-
-
 class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
     def test_schema_metadata_disable(self):
@@ -1155,12 +1133,14 @@ Approximate structure, for reference:
 
 CREATE TABLE legacy.composite_comp_with_col (
     key blob,
-    column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(b=>org.apache.cassandra.db.marshal.BytesType, s=>org.apache.cassandra.db.marshal.UTF8Type, t=>org.apache.cassandra.db.marshal.TimeUUIDType)',
+    b blob,
+    s text,
+    t timeuuid,
     "b@6869746d65776974686d75736963" blob,
     "b@6d616d6d616a616d6d61" blob,
-    PRIMARY KEY (key, column1)
+    PRIMARY KEY (key, b, s, t)
 ) WITH COMPACT STORAGE
-    AND CLUSTERING ORDER BY (column1 ASC)
+    AND CLUSTERING ORDER BY (b ASC, s ASC, t ASC)
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = 'Stores file meta data'
     AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
@@ -1273,13 +1253,20 @@ CREATE TABLE legacy.simple_no_col (
     AND read_repair_chance = 0.0
     AND speculative_retry = 'NONE';
 
+/*
+Warning: Table legacy.composite_comp_no_col omitted because it has constructs not compatible with CQL (was created via legacy API).
+
+Approximate structure, for reference:
+(this should not be used to reproduce this schema)
+
 CREATE TABLE legacy.composite_comp_no_col (
     key blob,
-    column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(b=>org.apache.cassandra.db.marshal.BytesType, s=>org.apache.cassandra.db.marshal.UTF8Type, t=>org.apache.cassandra.db.marshal.TimeUUIDType)',
+    column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(org.apache.cassandra.db.marshal.BytesType, org.apache.cassandra.db.marshal.UTF8Type, org.apache.cassandra.db.marshal.TimeUUIDType)',
+    column2 timeuuid,
     value blob,
-    PRIMARY KEY (key, column1)
+    PRIMARY KEY (key, column1, column1, column2)
 ) WITH COMPACT STORAGE
-    AND CLUSTERING ORDER BY (column1 ASC)
+    AND CLUSTERING ORDER BY (column1 ASC, column1 ASC, column2 ASC)
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = 'Stores file meta data'
     AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
@@ -1291,7 +1278,8 @@ CREATE TABLE legacy.composite_comp_no_col (
     AND memtable_flush_period_in_ms = 0
     AND min_index_interval = 128
     AND read_repair_chance = 0.0
-    AND speculative_retry = 'NONE';"""
+    AND speculative_retry = 'NONE';
+*/"""
 
         ccm = get_cluster()
         ccm.run_cli(cli_script)
@@ -2047,31 +2035,7 @@ class BadMetaTest(unittest.TestCase):
             self.assertIn("/*\nWarning:", m.export_as_string())
 
 
-class DynamicCompositeTypeTest(BasicSharedKeyspaceUnitTestCase):
-
-    def test_dct_alias(self):
-        """
-        Tests to make sure DCT's have correct string formatting
-
-        Constructs a DCT and check the format as generated. To insure it matches what is expected
-
-        @since 3.6.0
-        @jira_ticket PYTHON-579
-        @expected_result DCT subtypes should always have fully qualified names
-
-        @test_category metadata
-        """
-        self.session.execute("CREATE TABLE {0}.{1} ("
-                             "k int PRIMARY KEY,"
-                             "c1 'DynamicCompositeType(s => UTF8Type, i => Int32Type)',"
-                             "c2 Text)".format(self.ks_name, self.function_table_name))
-        dct_table = self.cluster.metadata.keyspaces.get(self.ks_name).tables.get(self.function_table_name)
-
-        # Format can very slightly between versions, strip out whitespace for consistency sake
-        self.assertTrue("c1'org.apache.cassandra.db.marshal.DynamicCompositeType(s=>org.apache.cassandra.db.marshal.UTF8Type,i=>org.apache.cassandra.db.marshal.Int32Type)'" in dct_table.as_cql_query().replace(" ", ""))
-
-
-class Materia3lizedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
+class MaterializedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
 
     def setUp(self):
         if CASS_SERVER_VERSION < (3, 0):
@@ -2219,37 +2183,37 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         self.assertIsNotNone(score_table.columns['score'])
 
         # Validate basic mv information
-        self.assertEqual(mv.keyspace_name, self.keyspace_name)
-        self.assertEqual(mv.name, "monthlyhigh")
-        self.assertEqual(mv.base_table_name, "scores")
+        self.assertEquals(mv.keyspace_name, self.keyspace_name)
+        self.assertEquals(mv.name, "monthlyhigh")
+        self.assertEquals(mv.base_table_name, "scores")
         self.assertFalse(mv.include_all_columns)
 
         # Validate that all columns are preset and correct
         mv_columns = list(mv.columns.values())
-        self.assertEqual(len(mv_columns), 6)
+        self.assertEquals(len(mv_columns), 6)
 
         game_column = mv_columns[0]
         self.assertIsNotNone(game_column)
-        self.assertEqual(game_column.name, 'game')
-        self.assertEqual(game_column, mv.partition_key[0])
+        self.assertEquals(game_column.name, 'game')
+        self.assertEquals(game_column, mv.partition_key[0])
 
         year_column = mv_columns[1]
         self.assertIsNotNone(year_column)
-        self.assertEqual(year_column.name, 'year')
-        self.assertEqual(year_column, mv.partition_key[1])
+        self.assertEquals(year_column.name, 'year')
+        self.assertEquals(year_column, mv.partition_key[1])
 
         month_column = mv_columns[2]
         self.assertIsNotNone(month_column)
-        self.assertEqual(month_column.name, 'month')
-        self.assertEqual(month_column, mv.partition_key[2])
+        self.assertEquals(month_column.name, 'month')
+        self.assertEquals(month_column, mv.partition_key[2])
 
         def compare_columns(a, b, name):
-            self.assertEqual(a.name, name)
-            self.assertEqual(a.name, b.name)
-            self.assertEqual(a.table, b.table)
-            self.assertEqual(a.cql_type, b.cql_type)
-            self.assertEqual(a.is_static, b.is_static)
-            self.assertEqual(a.is_reversed, b.is_reversed)
+            self.assertEquals(a.name, name)
+            self.assertEquals(a.name, b.name)
+            self.assertEquals(a.table, b.table)
+            self.assertEquals(a.cql_type, b.cql_type)
+            self.assertEquals(a.is_static, b.is_static)
+            self.assertEquals(a.is_reversed, b.is_reversed)
 
         score_column = mv_columns[3]
         compare_columns(score_column, mv.clustering_key[0], 'score')
@@ -2326,7 +2290,7 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         self.assertIn("fouls", mv_alltime.columns)
 
         mv_alltime_fouls_comumn = self.cluster.metadata.keyspaces[self.keyspace_name].views["alltimehigh"].columns['fouls']
-        self.assertEqual(mv_alltime_fouls_comumn.cql_type, 'int')
+        self.assertEquals(mv_alltime_fouls_comumn.cql_type, 'int')
 
     def test_base_table_type_alter_mv(self):
         """
@@ -2367,7 +2331,7 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         self.assertEqual(len(self.cluster.metadata.keyspaces[self.keyspace_name].views), 1)
 
         score_column = self.cluster.metadata.keyspaces[self.keyspace_name].tables['scores'].columns['score']
-        self.assertEqual(score_column.cql_type, 'blob')
+        self.assertEquals(score_column.cql_type, 'blob')
 
         # until CASSANDRA-9920+CASSANDRA-10500 MV updates are only available later with an async event
         for i in range(10):
@@ -2376,7 +2340,7 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
                 break
             time.sleep(.2)
 
-        self.assertEqual(score_mv_column.cql_type, 'blob')
+        self.assertEquals(score_mv_column.cql_type, 'blob')
 
     def test_metadata_with_quoted_identifiers(self):
         """
@@ -2429,31 +2393,31 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         self.assertIsNotNone(t1_table.columns['the Value'])
 
         # Validate basic mv information
-        self.assertEqual(mv.keyspace_name, self.keyspace_name)
-        self.assertEqual(mv.name, "mv1")
-        self.assertEqual(mv.base_table_name, "t1")
+        self.assertEquals(mv.keyspace_name, self.keyspace_name)
+        self.assertEquals(mv.name, "mv1")
+        self.assertEquals(mv.base_table_name, "t1")
         self.assertFalse(mv.include_all_columns)
 
         # Validate that all columns are preset and correct
         mv_columns = list(mv.columns.values())
-        self.assertEqual(len(mv_columns), 3)
+        self.assertEquals(len(mv_columns), 3)
 
         theKey_column = mv_columns[0]
         self.assertIsNotNone(theKey_column)
-        self.assertEqual(theKey_column.name, 'theKey')
-        self.assertEqual(theKey_column, mv.partition_key[0])
+        self.assertEquals(theKey_column.name, 'theKey')
+        self.assertEquals(theKey_column, mv.partition_key[0])
 
         cluster_column = mv_columns[1]
         self.assertIsNotNone(cluster_column)
-        self.assertEqual(cluster_column.name, 'the;Clustering')
-        self.assertEqual(cluster_column.name, mv.clustering_key[0].name)
-        self.assertEqual(cluster_column.table, mv.clustering_key[0].table)
-        self.assertEqual(cluster_column.is_static, mv.clustering_key[0].is_static)
-        self.assertEqual(cluster_column.is_reversed, mv.clustering_key[0].is_reversed)
+        self.assertEquals(cluster_column.name, 'the;Clustering')
+        self.assertEquals(cluster_column.name, mv.clustering_key[0].name)
+        self.assertEquals(cluster_column.table, mv.clustering_key[0].table)
+        self.assertEquals(cluster_column.is_static, mv.clustering_key[0].is_static)
+        self.assertEquals(cluster_column.is_reversed, mv.clustering_key[0].is_reversed)
 
         value_column = mv_columns[2]
         self.assertIsNotNone(value_column)
-        self.assertEqual(value_column.name, 'the Value')
+        self.assertEquals(value_column.name, 'the Value')
 
 
 @dseonly

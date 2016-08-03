@@ -112,7 +112,7 @@ class ConnectionTest(unittest.TestCase):
 
     def test_unsupported_cql_version(self, *args):
         c = self.make_connection()
-        c._requests = {0: (c._handle_options_response, ProtocolHandler.decode_message, [])}
+        c._requests = {0: (c._handle_options_response, ProtocolHandler.decode_message)}
         c.defunct = Mock()
         c.cql_version = "3.0.3"
 
@@ -135,7 +135,7 @@ class ConnectionTest(unittest.TestCase):
 
     def test_prefer_lz4_compression(self, *args):
         c = self.make_connection()
-        c._requests = {0: (c._handle_options_response, ProtocolHandler.decode_message, [])}
+        c._requests = {0: (c._handle_options_response, ProtocolHandler.decode_message)}
         c.defunct = Mock()
         c.cql_version = "3.0.3"
 
@@ -158,7 +158,7 @@ class ConnectionTest(unittest.TestCase):
 
     def test_requested_compression_not_available(self, *args):
         c = self.make_connection()
-        c._requests = {0: (c._handle_options_response, ProtocolHandler.decode_message, [])}
+        c._requests = {0: (c._handle_options_response, ProtocolHandler.decode_message)}
         c.defunct = Mock()
         # request lz4 compression
         c.compression = "lz4"
@@ -188,7 +188,7 @@ class ConnectionTest(unittest.TestCase):
 
     def test_use_requested_compression(self, *args):
         c = self.make_connection()
-        c._requests = {0: (c._handle_options_response, ProtocolHandler.decode_message, [])}
+        c._requests = {0: (c._handle_options_response, ProtocolHandler.decode_message)}
         c.defunct = Mock()
         # request snappy compression
         c.compression = "snappy"

@@ -7,12 +7,10 @@ try:
 except ImportError:
     import unittest
 
-from itertools import count
-
+from cassandra import DriverException, Timeout, AlreadyExists
 from cassandra.query import tuple_factory
 from cassandra.cluster import Cluster, NoHostAvailable
-from cassandra.concurrent import execute_concurrent_with_args
-from cassandra.protocol import ProtocolHandler, LazyProtocolHandler, NumpyProtocolHandler
+from cassandra.protocol import ProtocolHandler, LazyProtocolHandler, NumpyProtocolHandler, ConfigurationException
 from cassandra.cython_deps import HAVE_CYTHON, HAVE_NUMPY
 from tests.integration import use_singledc, PROTOCOL_VERSION, notprotocolv1, drop_keyspace_shutdown_cluster, VERIFY_CYTHON, BasicSharedKeyspaceUnitTestCase, execute_with_retry_tolerant, greaterthancass21
 from tests.integration.datatype_utils import update_datatypes
@@ -209,49 +207,66 @@ def verify_iterator_data(assertEqual, results):
 
 class NumpyNullTest(BasicSharedKeyspaceUnitTestCase):
 
+    # A dictionary containing table key to type.
+    # Boolean dictates whether or not the type can be deserialized with null value
+    NUMPY_TYPES = {"v1": ('bigint', False),
+                   "v2": ('double', False),
+                   "v3": ('float', False),
+                   "v4": ('int', False),
+                   "v5": ('smallint', False),
+                   "v6": ("ascii", True),
+                   "v7": ("blob", True),
+                   "v8": ("boolean", True),
+                   "v9": ("decimal", True),
+                   "v10": ("inet", True),
+                   "v11": ("text", True),
+                   "v12": ("timestamp", True),
+                   "v13": ("timeuuid", True),
+                   "v14": ("uuid", True),
+                   "v15": ("varchar", True),
+                   "v16": ("varint", True),
+                   }
+
+    def setUp(self):
+        self.session.client_protocol_handler = NumpyProtocolHandler
+        self.session.row_factory = tuple_factory
+
     @numpytest
     @greaterthancass21
     def test_null_types(self):
         """
         Test to validate that the numpy protocol handler can deal with null values.
         @since 3.3.0
-         - updated 3.6.0: now numeric types used masked array
         @jira_ticket PYTHON-550
         @expected_result Numpy can handle non mapped types' null values.
 
         @test_category data_types:serialization
         """
-        s = self.session
-        s.row_factory = tuple_factory
-        s.client_protocol_handler = NumpyProtocolHandler
 
-        table = "%s.%s" % (self.keyspace_name, self.function_table_name)
-        create_table_with_all_types(table, s, 10)
+        self.create_table_of_types()
+        self.session.execute("INSERT INTO {0}.{1} (k) VALUES (1)".format(self.keyspace_name, self.function_table_name))
+        self.validate_types()
 
-        begin_unset = max(s.execute('select primkey from %s' % (table,))[0]['primkey']) + 1
-        keys_null = range(begin_unset, begin_unset + 10)
+    def create_table_of_types(self):
+        """
+        Builds a table containing all the numpy types
+        """
+        base_ddl = '''CREATE TABLE {0}.{1} (k int PRIMARY KEY'''.format(self.keyspace_name, self.function_table_name, type)
+        for key, value in NumpyNullTest.NUMPY_TYPES.items():
+            base_ddl = base_ddl+", {0} {1}".format(key, value[0])
+        base_ddl = base_ddl+")"
+        execute_with_retry_tolerant(self.session, base_ddl, (DriverException, NoHostAvailable, Timeout), (ConfigurationException, AlreadyExists))
 
-        # scatter some emptry rows in here
-        insert = "insert into %s (primkey) values (%%s)" % (table,)
-        execute_concurrent_with_args(s, insert, ((k,) for k in keys_null))
-
-        result = s.execute("select * from %s" % (table,))[0]
-
-        from numpy.ma import masked, MaskedArray
-        result_keys = result.pop('primkey')
-        mapped_index = [v[1] for v in sorted(zip(result_keys, count()))]
-
-        had_masked = had_none = False
-        for col_array in result.values():
-            # these have to be different branches (as opposed to comparing against an 'unset value')
-            # because None and `masked` have different identity and equals semantics
-            if isinstance(col_array, MaskedArray):
-                had_masked = True
-                [self.assertIsNot(col_array[i], masked) for i in mapped_index[:begin_unset]]
-                [self.assertIs(col_array[i], masked) for i in mapped_index[begin_unset:]]
+    def validate_types(self):
+        """
+        Selects each type from the table and expects either an exception or None depending on type
+        """
+        for key, value in NumpyNullTest.NUMPY_TYPES.items():
+            select = "SELECT {0} from {1}.{2}".format(key,self.keyspace_name, self.function_table_name)
+            if value[1]:
+                rs = execute_with_retry_tolerant(self.session, select, (NoHostAvailable), ())
+                self.assertEqual(rs[0].get('v1'), None)
             else:
-                had_none = True
-                [self.assertIsNotNone(col_array[i]) for i in mapped_index[:begin_unset]]
-                [self.assertIsNone(col_array[i]) for i in mapped_index[begin_unset:]]
-        self.assertTrue(had_masked)
-        self.assertTrue(had_none)
+                with self.assertRaises(ValueError):
+                    execute_with_retry_tolerant(self.session, select, (NoHostAvailable), ())
+

@@ -17,15 +17,12 @@ try:
     import unittest2 as unittest
 except ImportError:
     import unittest  # noqa
-
 from itertools import cycle
 from mock import Mock
 import time
 import threading
 from six.moves.queue import PriorityQueue
-import sys
 
-from cassandra.cluster import Cluster, Session
 from cassandra.concurrent import execute_concurrent, execute_concurrent_with_args
 
 
@@ -232,19 +229,3 @@ class ConcurrencyTest((unittest.TestCase)):
             current_time_added = list(result)[0]
             self.assertLess(last_time_added, current_time_added)
             last_time_added = current_time_added
-
-    def test_recursion_limited(self):
-        """
-        Verify that recursion is controlled when raise_on_first_error=False and something is wrong with the query.
-
-        PYTHON-585
-        """
-        max_recursion = sys.getrecursionlimit()
-        s = Session(Cluster(), [])
-        self.assertRaises(TypeError, execute_concurrent_with_args, s, "doesn't matter", [('param',)] * max_recursion, raise_on_first_error=True)
-
-        results = execute_concurrent_with_args(s, "doesn't matter", [('param',)] * max_recursion, raise_on_first_error=False)  # previously
-        self.assertEqual(len(results), max_recursion)
-        for r in results:
-            self.assertFalse(r[0])
-            self.assertIsInstance(r[1], TypeError)

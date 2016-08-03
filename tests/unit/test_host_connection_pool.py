@@ -165,8 +165,7 @@ class HostConnectionPoolTests(unittest.TestCase):
     def test_return_defunct_connection(self):
         host = Mock(spec=Host, address='ip1')
         session = self.make_session()
-        conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=False,
-                                    max_request_id=100, signaled_error=False)
+        conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=False, max_request_id=100)
         session.cluster.connection_factory.return_value = conn
 
         pool = HostConnectionPool(host, HostDistance.LOCAL, session)
@@ -178,14 +177,14 @@ class HostConnectionPoolTests(unittest.TestCase):
         pool.return_connection(conn)
 
         # the connection should be closed a new creation scheduled
-        self.assertTrue(session.submit.call_args)
+        conn.close.assert_called_once()
+        session.submit.assert_called_once()
         self.assertFalse(pool.is_shutdown)
 
     def test_return_defunct_connection_on_down_host(self):
         host = Mock(spec=Host, address='ip1')
         session = self.make_session()
-        conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=False,
-                                    max_request_id=100, signaled_error=False)
+        conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=False, max_request_id=100, signaled_error=False)
         session.cluster.connection_factory.return_value = conn
 
         pool = HostConnectionPool(host, HostDistance.LOCAL, session)
@@ -197,15 +196,15 @@ class HostConnectionPoolTests(unittest.TestCase):
         pool.return_connection(conn)
 
         # the connection should be closed a new creation scheduled
-        self.assertTrue(session.cluster.signal_connection_failure.call_args)
-        self.assertTrue(conn.close.call_args)
+        session.cluster.signal_connection_failure.assert_called_once()
+        conn.close.assert_called_once()
         self.assertFalse(session.submit.called)
         self.assertTrue(pool.is_shutdown)
 
     def test_return_closed_connection(self):
         host = Mock(spec=Host, address='ip1')
         session = self.make_session()
-        conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=True, max_request_id=100, signaled_error=False)
+        conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=True, max_request_id=100)
         session.cluster.connection_factory.return_value = conn
 
         pool = HostConnectionPool(host, HostDistance.LOCAL, session)
@@ -217,7 +216,7 @@ class HostConnectionPoolTests(unittest.TestCase):
         pool.return_connection(conn)
 
         # a new creation should be scheduled
-        self.assertTrue(session.submit.call_args)
+        session.submit.assert_called_once()
         self.assertFalse(pool.is_shutdown)
 
     def test_host_instantiations(self):

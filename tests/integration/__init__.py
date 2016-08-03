@@ -23,7 +23,6 @@ import socket
 import sys
 import time
 import traceback
-import platform
 from threading import Event
 from subprocess import call
 from itertools import groupby
@@ -138,67 +137,14 @@ if DSE_VERSION:
             CCM_KWARGS['dse_credentials_file'] = DSE_CRED
 
 
-def get_default_protocol():
-
-    if CASSANDRA_VERSION >= '2.2':
-        return 4
-    elif CASSANDRA_VERSION >= '2.1':
-        return 3
-    elif CASSANDRA_VERSION >= '2.0':
-        return 2
-    else:
-        return 1
-
-
-def get_supported_protocol_versions():
-    """
-    1.2 -> 1
-    2.0 -> 2, 1
-    2.1 -> 3, 2, 1
-    2.2 -> 4, 3, 2, 1
-    3.X -> 4, 3
-`   """
-    if CASSANDRA_VERSION >= '3.0':
-        return (3, 4)
-    elif CASSANDRA_VERSION >= '2.2':
-        return (1, 2, 3, 4)
-    elif CASSANDRA_VERSION >= '2.1':
-        return (1, 2, 3)
-    elif CASSANDRA_VERSION >= '2.0':
-        return (1, 2)
-    else:
-        return (1)
-
-
-def get_unsupported_lower_protocol():
-    """
-    This is used to determine the lowest protocol version that is NOT
-    supported by the version of C* running
-    """
-
-    if CASSANDRA_VERSION >= '3.0':
-        return 2
-    else:
-        return None
-
-
-def get_unsupported_upper_protocol():
-    """
-    This is used to determine the highest protocol version that is NOT
-    supported by the version of C* running
-    """
-
-    if CASSANDRA_VERSION >= '2.2':
-        return None
-    if CASSANDRA_VERSION >= '2.1':
-        return 4
-    elif CASSANDRA_VERSION >= '2.0':
-        return 3
-    else:
-        return None
-
-default_protocol_version = get_default_protocol()
-
+if CASSANDRA_VERSION >= '2.2':
+    default_protocol_version = 4
+elif CASSANDRA_VERSION >= '2.1':
+    default_protocol_version = 3
+elif CASSANDRA_VERSION >= '2.0':
+    default_protocol_version = 2
+else:
+    default_protocol_version = 1
 
 PROTOCOL_VERSION = int(os.getenv('PROTOCOL_VERSION', default_protocol_version))
 
@@ -211,7 +157,6 @@ greaterthancass21 = unittest.skipUnless(CASSANDRA_VERSION >= '2.2', 'Cassandra v
 greaterthanorequalcass30 = unittest.skipUnless(CASSANDRA_VERSION >= '3.0', 'Cassandra version 3.0 or greater required')
 lessthancass30 = unittest.skipUnless(CASSANDRA_VERSION < '3.0', 'Cassandra version less then 3.0 required')
 dseonly = unittest.skipUnless(DSE_VERSION, "Test is only applicalbe to DSE clusters")
-pypy = unittest.skipUnless(platform.python_implementation() == "PyPy", "Test is skipped unless it's on PyPy")
 
 
 def wait_for_node_socket(node, timeout):
@@ -296,7 +241,6 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[]):
             log.debug("Using external CCM cluster {0}".format(CCM_CLUSTER.name))
         else:
             log.debug("Using unnamed external cluster")
-        setup_keyspace(ipformat=ipformat, wait=False)
         return
 
     if is_current_cluster(cluster_name, nodes):
@@ -443,10 +387,9 @@ def drop_keyspace_shutdown_cluster(keyspace_name, session, cluster):
     cluster.shutdown()
 
 
-def setup_keyspace(ipformat=None, wait=True):
+def setup_keyspace(ipformat=None):
     # wait for nodes to startup
-    if wait:
-        time.sleep(10)
+    time.sleep(10)
 
     if not ipformat:
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
@@ -538,8 +481,8 @@ class BasicKeyspaceUnitTestCase(unittest.TestCase):
         execute_with_long_wait_retry(cls.session, ddl)
 
     @classmethod
-    def common_setup(cls, rf, keyspace_creation=True, create_class_table=False, metrics=False):
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, metrics_enabled=metrics)
+    def common_setup(cls, rf, keyspace_creation=True, create_class_table=False):
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         cls.session = cls.cluster.connect()
         cls.ks_name = cls.__name__.lower()
         if keyspace_creation:
@@ -591,7 +534,6 @@ class MockLoggingHandler(logging.Handler):
             if sub_string in msg:
                 count+=1
         return count
-
 
 class BasicExistingKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):
     """
@@ -647,7 +589,7 @@ class BasicSharedKeyspaceUnitTestCaseWTable(BasicSharedKeyspaceUnitTestCase):
     """
     @classmethod
     def setUpClass(self):
-        self.common_setup(3, True, True, True)
+        self.common_setup(2, True)
 
 
 class BasicSharedKeyspaceUnitTestCaseRF3(BasicSharedKeyspaceUnitTestCase):

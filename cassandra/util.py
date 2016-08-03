@@ -973,8 +973,6 @@ class Time(object):
                           microsecond=self.nanosecond // Time.MICRO) == other
 
     def __lt__(self, other):
-        if not isinstance(other, Time):
-            return NotImplemented
         return self.nanosecond_time < other.nanosecond_time
 
     def __repr__(self):
@@ -1063,8 +1061,6 @@ class Date(object):
             return False
 
     def __lt__(self, other):
-        if not isinstance(other, Date):
-            return NotImplemented
         return self.days_from_epoch < other.days_from_epoch
 
     def __repr__(self):

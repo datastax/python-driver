@@ -268,7 +268,6 @@ class TestQuerySetOperation(BaseCassEngTestCase):
 
         @since 3.5
         @jira_ticket PYTHON-560
-        @jira_ticket PYTHON-599
         @expected_result deferred fields should not be returned
 
         @test_category object_mapper
@@ -300,10 +299,6 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         # implicit defer
         q = TestModel.objects.filter(test_id=0)
         self.assertEqual(q._select_fields(), ['attempt_id', 'description', 'expected_result', 'test_result'])
-
-        # when all fields are defered, it fallbacks select the partition keys
-        q = TestModel.objects.defer(['test_id', 'attempt_id', 'description', 'expected_result', 'test_result'])
-        self.assertEqual(q._select_fields(), ['test_id'])
 
 
 class BaseQuerySetUsage(BaseCassEngTestCase):
@@ -852,12 +847,16 @@ class TestMinMaxTimeUUIDFunctions(BaseCassEngTestCase):
     def test_success_case(self):
         """ Test that the min and max time uuid functions work as expected """
         pk = uuid4()
-        startpoint = datetime.utcnow()
-        TimeUUIDQueryModel.create(partition=pk, time=uuid_from_time(startpoint + timedelta(seconds=1)), data='1')
-        TimeUUIDQueryModel.create(partition=pk, time=uuid_from_time(startpoint + timedelta(seconds=2)), data='2')
-        midpoint = startpoint + timedelta(seconds=3)
-        TimeUUIDQueryModel.create(partition=pk, time=uuid_from_time(startpoint + timedelta(seconds=4)), data='3')
-        TimeUUIDQueryModel.create(partition=pk, time=uuid_from_time(startpoint + timedelta(seconds=5)), data='4')
+        TimeUUIDQueryModel.create(partition=pk, time=uuid1(), data='1')
+        time.sleep(0.2)
+        TimeUUIDQueryModel.create(partition=pk, time=uuid1(), data='2')
+        time.sleep(0.2)
+        midpoint = datetime.utcnow()
+        time.sleep(0.2)
+        TimeUUIDQueryModel.create(partition=pk, time=uuid1(), data='3')
+        time.sleep(0.2)
+        TimeUUIDQueryModel.create(partition=pk, time=uuid1(), data='4')
+        time.sleep(0.2)
 
         # test kwarg filtering
         q = TimeUUIDQueryModel.filter(partition=pk, time__lte=functions.MaxTimeUUID(midpoint))
@@ -895,6 +894,7 @@ class TestMinMaxTimeUUIDFunctions(BaseCassEngTestCase):
 
 
 class TestInOperator(BaseQuerySetUsage):
+
     @execute_count(1)
     def test_kwarg_success_case(self):
         """ Tests the in operator works with the kwarg query method """
@@ -906,51 +906,6 @@ class TestInOperator(BaseQuerySetUsage):
         """ Tests the in operator works with the query expression query method """
         q = TestModel.filter(TestModel.test_id.in_([0, 1]))
         assert q.count() == 8
-
-    @execute_count(5)
-    def test_bool(self):
-        """
-        Adding coverage to cqlengine for bool types.
-
-        @since 3.6
-        @jira_ticket PYTHON-596
-        @expected_result bool results should be filtered appropriately
-
-        @test_category object_mapper
-        """
-        class bool_model(Model):
-            k = columns.Integer(primary_key=True)
-            b = columns.Boolean(primary_key=True)
-            v = columns.Integer(default=3)
-        sync_table(bool_model)
-
-        bool_model.create(k=0, b=True)
-        bool_model.create(k=0, b=False)
-        self.assertEqual(len(bool_model.objects.all()), 2)
-        self.assertEqual(len(bool_model.objects.filter(k=0, b=True)), 1)
-        self.assertEqual(len(bool_model.objects.filter(k=0, b=False)), 1)
-
-    @execute_count(3)
-    def test_bool_filter(self):
-        """
-        Test to ensure that we don't translate boolean objects to String unnecessarily in filter clauses
-
-        @since 3.6
-        @jira_ticket PYTHON-596
-        @expected_result We should not receive a server error
-
-        @test_category object_mapper
-        """
-        class bool_model2(Model):
-            k = columns.Boolean(primary_key=True)
-            b = columns.Integer(primary_key=True)
-            v = columns.Text()
-        drop_table(bool_model2)
-        sync_table(bool_model2)
-
-        bool_model2.create(k=True, b=1, v='a')
-        bool_model2.create(k=False, b=1, v='b')
-        self.assertEqual(len(list(bool_model2.objects(k__in=(True, False)))), 2)
 
 
 @greaterthancass20
@@ -1398,3 +1353,5 @@ class TestModelQueryWithDifferedFeld(BaseCassEngTestCase):
         smiths = list(People2.filter(last_name="Smith"))
         self.assertEqual(len(smiths), 5)
         self.assertTrue(smiths[0].last_name is not None)
+
+

@@ -31,7 +31,7 @@ from cassandra.util import sortedset
 from tests.unit.cython.utils import cythontest
 
 from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass, notprotocolv1, \
-    BasicSharedKeyspaceUnitTestCase, greaterthancass21, lessthancass30
+    BasicSharedKeyspaceUnitTestCase, greaterthancass20, lessthancass30
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, COLLECTION_TYPES, \
     get_sample, get_collection_sample
 
@@ -796,7 +796,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
 
 class TypeTestsProtocol(BasicSharedKeyspaceUnitTestCase):
 
-    @greaterthancass21
+    @greaterthancass20
     @lessthancass30
     def test_nested_types_with_protocol_version(self):
         """
