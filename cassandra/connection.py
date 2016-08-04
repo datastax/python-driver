@@ -238,6 +238,8 @@ class Connection(object):
     is_control_connection = False
     signaled_error = False  # used for flagging at the pool level
 
+    allow_beta_protocol_version = False
+
     _iobuf = None
     _current_frame = None
 
@@ -251,7 +253,7 @@ class Connection(object):
     def __init__(self, host='127.0.0.1', port=9042, authenticator=None,
                  ssl_options=None, sockopts=None, compression=True,
                  cql_version=None, protocol_version=MAX_SUPPORTED_VERSION, is_control_connection=False,
-                 user_type_map=None, connect_timeout=None):
+                 user_type_map=None, connect_timeout=None, allow_beta_protocol_version=False):
         self.host = host
         self.port = port
         self.authenticator = authenticator
@@ -263,6 +265,7 @@ class Connection(object):
         self.is_control_connection = is_control_connection
         self.user_type_map = user_type_map
         self.connect_timeout = connect_timeout
+        self.allow_beta_protocol_version = allow_beta_protocol_version
         self._push_watchers = defaultdict(set)
         self._requests = {}
         self._iobuf = io.BytesIO()
@@ -455,7 +458,7 @@ class Connection(object):
         # queue the decoder function with the request
         # this allows us to inject custom functions per request to encode, decode messages
         self._requests[request_id] = (cb, decoder, result_metadata)
-        self.push(encoder(msg, request_id, self.protocol_version, compressor=self.compressor))
+        self.push(encoder(msg, request_id, self.protocol_version, compressor=self.compressor, allow_beta_protocol_version=self.allow_beta_protocol_version))
         return request_id
 
     def wait_for_response(self, msg, timeout=None):
