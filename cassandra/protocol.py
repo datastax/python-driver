@@ -1017,6 +1017,8 @@ class _ProtocolHandler(object):
         else:
             custom_payload = None
 
+        flags ^= USE_BETA_FLAG  # will only be set if we asserted it in connection estabishment
+
         if flags:
             log.warning("Unknown protocol flags set: %02x. May cause problems.", flags)
 
