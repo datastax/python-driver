@@ -56,7 +56,7 @@ class InternalError(Exception):
 ColumnMetadata = namedtuple("ColumnMetadata", ['keyspace_name', 'table_name', 'name', 'type'])
 
 MIN_SUPPORTED_VERSION = 1
-MAX_SUPPORTED_VERSION = 4
+MAX_SUPPORTED_VERSION = 5
 
 HEADER_DIRECTION_TO_CLIENT = 0x80
 HEADER_DIRECTION_MASK = 0x80
@@ -65,6 +65,7 @@ COMPRESSED_FLAG = 0x01
 TRACING_FLAG = 0x02
 CUSTOM_PAYLOAD_FLAG = 0x04
 WARNING_FLAG = 0x08
+USE_BETA_FLAG = 0x10
 
 _message_types_by_opcode = {}
 
@@ -932,7 +933,7 @@ class _ProtocolHandler(object):
     """
 
     @classmethod
-    def encode_message(cls, msg, stream_id, protocol_version, compressor):
+    def encode_message(cls, msg, stream_id, protocol_version, compressor, allow_beta_protocol_version):
         """
         Encodes a message using the specified frame parameters, and compressor
 
@@ -957,6 +958,9 @@ class _ProtocolHandler(object):
 
         if msg.tracing:
             flags |= TRACING_FLAG
+
+        if allow_beta_protocol_version:
+            flags |= USE_BETA_FLAG
 
         buff = io.BytesIO()
         cls._write_header(buff, protocol_version, flags, stream_id, msg.opcode, len(body))
@@ -1012,6 +1016,8 @@ class _ProtocolHandler(object):
             flags ^= CUSTOM_PAYLOAD_FLAG
         else:
             custom_payload = None
+
+        flags ^= USE_BETA_FLAG  # will only be set if we asserted it in connection estabishment
 
         if flags:
             log.warning("Unknown protocol flags set: %02x. May cause problems.", flags)

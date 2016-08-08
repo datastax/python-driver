@@ -188,7 +188,7 @@ class ClusterTests(unittest.TestCase):
         """
 
         cluster = Cluster()
-        self.assertEqual(cluster.protocol_version,  MAX_SUPPORTED_VERSION)
+        self.assertLessEqual(cluster.protocol_version,  MAX_SUPPORTED_VERSION)
         session = cluster.connect()
         updated_protocol_version = session._protocol_version
         updated_cluster_version = cluster.protocol_version
