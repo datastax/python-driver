@@ -325,16 +325,34 @@ class CoordinationFailure(RequestExecutionException):
     The number of replicas that sent a failure message
     """
 
-    def __init__(self, summary_message, consistency=None, required_responses=None, received_responses=None, failures=None):
+    error_code_map = None
+    """
+    A map of inet addresses to error codes representing replicas that sent
+    a failure message.  Only set when `protocol_version` is 5 or higher.
+    """
+
+    def __init__(self, summary_message, consistency=None, required_responses=None,
+                 received_responses=None, failures=None, error_code_map=None):
         self.consistency = consistency
         self.required_responses = required_responses
         self.received_responses = received_responses
         self.failures = failures
-        Exception.__init__(self, summary_message + ' info=' +
-                           repr({'consistency': consistency_value_to_name(consistency),
-                                 'required_responses': required_responses,
-                                 'received_responses': received_responses,
-                                 'failures': failures}))
+        self.error_code_map = error_code_map
+
+        info_dict = {
+            'consistency': consistency_value_to_name(consistency),
+            'required_responses': required_responses,
+            'received_responses': received_responses,
+            'failures': failures
+        }
+
+        if error_code_map is not None:
+            # make error codes look like "0x002a"
+            formatted_map = dict((addr, '0x%04x' % err_code)
+                                 for (addr, err_code) in error_code_map.items())
+            info_dict['error_code_map'] = formatted_map
+
+        Exception.__init__(self, summary_message + ' info=' + repr(info_dict))
 
 
 class ReadFailure(CoordinationFailure):
