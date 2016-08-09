@@ -3162,6 +3162,11 @@ class ResponseFuture(object):
     Always ``True`` for non-DDL requests.
     """
 
+    request_encoded_size = None
+    """
+    Size of the request message sent
+    """
+
     session = None
     row_factory = None
     message = None
@@ -3285,8 +3290,10 @@ class ResponseFuture(object):
             connection, request_id = pool.borrow_connection(timeout=2.0)
             self._connection = connection
             result_meta = self.prepared_statement.result_metadata if self.prepared_statement else []
-            connection.send_msg(message, request_id, cb=cb, encoder=self._protocol_handler.encode_message, decoder=self._protocol_handler.decode_message,
-                                result_metadata=result_meta)
+            self.request_encoded_size = connection.send_msg(message, request_id, cb=cb,
+                                                            encoder=self._protocol_handler.encode_message,
+                                                            decoder=self._protocol_handler.decode_message,
+                                                            result_metadata=result_meta)
             return request_id
         except NoConnectionsAvailable as exc:
             log.debug("All connections for host %s are at capacity, moving to the next host", host)
