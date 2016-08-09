@@ -306,3 +306,46 @@ class ConsistencyTests(unittest.TestCase):
     #       instead we should create these elsewhere
     # def test_rfthree_downgradingcl_twodcs(self):
     # def test_rfthree_downgradingcl_twodcs_dcaware(self):
+
+
+class ConnectivityTest(unittest.TestCase):
+
+    def setUp(self):
+        self.coordinator_stats = CoordinatorStats()
+
+    def test_pool_with_host_down(self):
+        """
+        Test to ensure that cluster.connect() doesn't return prior to pools being initialized.
+
+        This test will figure out which host our pool logic will connect to first. It then shuts that server down.
+        Previouly the cluster.connect() would return prior to the pools being initialized, and the first queries would
+        return a no host exception
+
+        @since 3.7.0
+        @jira_ticket PYTHON-617
+        @expected_result query should complete successfully
+
+        @test_category connection
+        """
+
+        # find the first node, we will try create connections to, shut it down.
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster.connect()
+        hosts = cluster.metadata.all_hosts()
+        address = hosts[0].address
+        node_to_stop = int(address.split('.')[-1:][0])
+        try:
+            force_stop(node_to_stop)
+            wait_for_down(cluster, node_to_stop)
+            # Attempt a query against that node. It should complete
+            cluster2 = Cluster(protocol_version=PROTOCOL_VERSION)
+            session2 = cluster2.connect()
+            session2.execute("SELECT * FROM system.local")
+            cluster2.shutdown()
+        finally:
+            start(node_to_stop)
+            wait_for_up(cluster, node_to_stop)
+            cluster.shutdown()
+
+
+
