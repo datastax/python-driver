@@ -2140,6 +2140,9 @@ class Session(object):
         synchronization if you have multiple threads. Any callbacks added to the response future will be executed
         on the event loop thread, so the normal advice about minimizing cycles and avoiding blocking apply (see Note in
         :meth:`.ResponseFuture.add_callbacks`.
+
+        See `this example <https://github.com/datastax/python-driver/blob/master/examples/request_init_listener.py>`_ in the
+        source tree for an example.
         """
         self._request_init_callbacks.append((fn, args, kwargs))
 
