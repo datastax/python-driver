@@ -66,6 +66,7 @@ TRACING_FLAG = 0x02
 CUSTOM_PAYLOAD_FLAG = 0x04
 WARNING_FLAG = 0x08
 USE_BETA_FLAG = 0x10
+USE_BETA_MASK = ~USE_BETA_FLAG
 
 _message_types_by_opcode = {}
 
@@ -1045,7 +1046,7 @@ class _ProtocolHandler(object):
         else:
             custom_payload = None
 
-        flags ^= USE_BETA_FLAG  # will only be set if we asserted it in connection estabishment
+        flags &= USE_BETA_MASK # will only be set if we asserted it in connection estabishment
 
         if flags:
             log.warning("Unknown protocol flags set: %02x. May cause problems.", flags)
