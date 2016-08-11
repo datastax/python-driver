@@ -150,6 +150,10 @@
 
    .. automethod:: execution_profile_clone_update
 
+   .. automethod:: add_request_init_listener
+
+   .. automethod:: remove_request_init_listener
+
 .. autoclass:: ResponseFuture ()
 
    .. autoattribute:: query
