@@ -536,7 +536,12 @@ class NetworkTopologyStrategy(ReplicationStrategy):
                 racks_placed = set()
                 racks_this_dc = dc_racks[dc]
                 hosts_this_dc = len(hosts_per_dc[dc])
-                for token_offset in islice(cycle(token_offsets), index, index + num_tokens):
+
+                for token_offset_index in six.moves.range(index, index+num_tokens):
+                    if token_offset_index >= len(token_offsets):
+                        token_offset_index = token_offset_index - len(token_offsets)
+
+                    token_offset = token_offsets[token_offset_index]
                     host = token_to_host_owner[ring[token_offset]]
                     if replicas_remaining == 0 or replicas_this_dc == hosts_this_dc:
                         break

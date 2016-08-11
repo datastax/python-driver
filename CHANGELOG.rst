@@ -16,6 +16,8 @@ Bug Fixes
 * Call ConnectionException with correct kwargs (PYTHON-1117)
 * Can't connect to clusters built from source because version parsing doesn't handle 'x.y-SNAPSHOT' (PYTHON-1118)
 * Set the proper default ExecutionProfile.row_factory value (PYTHON-1119)
+* NTS Token Replica Map Generation is slow (PYTHON-622)
+
 3.18.0
 ======
 May 27, 2019
