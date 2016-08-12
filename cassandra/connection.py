@@ -149,8 +149,8 @@ class ProtocolVersionUnsupported(ConnectionException):
     Server rejected startup message due to unsupported protocol version
     """
     def __init__(self, host, startup_version):
-        super(ProtocolVersionUnsupported, self).__init__("Unsupported protocol version on %s: %d",
-                                                         (host, startup_version))
+        msg = "Unsupported protocol version on %s: %d" % (host, startup_version)
+        super(ProtocolVersionUnsupported, self).__init__(msg, host)
         self.startup_version = startup_version
 
 
@@ -345,6 +345,7 @@ class Connection(object):
                     self._socket = self._ssl_impl.wrap_socket(self._socket, **self.ssl_options)
                 self._socket.settimeout(self.connect_timeout)
                 self._socket.connect(sockaddr)
+                self._socket.settimeout(None)
                 if self._check_hostname:
                     ssl.match_hostname(self._socket.getpeercert(), self.host)
                 sockerr = None
@@ -404,7 +405,7 @@ class Connection(object):
                             id(self), self.host, exc_info=True)
 
         # run first callback from this thread to ensure pool state before leaving
-        cb, _ = requests.popitem()[1]
+        cb, _, _ = requests.popitem()[1]
         try_callback(cb)
 
         if not requests:
@@ -414,7 +415,7 @@ class Connection(object):
         # The default callback and retry logic is fairly expensive -- we don't
         # want to tie up the event thread when there are many requests
         def err_all_callbacks():
-            for cb, _ in requests.values():
+            for cb, _, _ in requests.values():
                 try_callback(cb)
         if len(requests) < Connection.CALLBACK_ERR_THREAD_THRESHOLD:
             err_all_callbacks()
@@ -445,7 +446,7 @@ class Connection(object):
             except Exception:
                 log.exception("Pushed event handler errored, ignoring:")
 
-    def send_msg(self, msg, request_id, cb, encoder=ProtocolHandler.encode_message, decoder=ProtocolHandler.decode_message):
+    def send_msg(self, msg, request_id, cb, encoder=ProtocolHandler.encode_message, decoder=ProtocolHandler.decode_message, result_metadata=None):
         if self.is_defunct:
             raise ConnectionShutdown("Connection to %s is defunct" % self.host)
         elif self.is_closed:
@@ -453,7 +454,7 @@ class Connection(object):
 
         # queue the decoder function with the request
         # this allows us to inject custom functions per request to encode, decode messages
-        self._requests[request_id] = (cb, decoder)
+        self._requests[request_id] = (cb, decoder, result_metadata)
         self.push(encoder(msg, request_id, self.protocol_version, compressor=self.compressor))
         return request_id
 
@@ -578,8 +579,9 @@ class Connection(object):
         if stream_id < 0:
             callback = None
             decoder = ProtocolHandler.decode_message
+            result_metadata = None
         else:
-            callback, decoder = self._requests.pop(stream_id, None)
+            callback, decoder, result_metadata = self._requests.pop(stream_id)
             with self.lock:
                 self.request_ids.append(stream_id)
 
@@ -587,7 +589,7 @@ class Connection(object):
 
         try:
             response = decoder(header.version, self.user_type_map, stream_id,
-                               header.flags, header.opcode, body, self.decompressor)
+                               header.flags, header.opcode, body, self.decompressor, result_metadata)
         except Exception as exc:
             log.exception("Error decoding response from Cassandra. "
                           "%s; buffer: %r", header, self._iobuf.getvalue())

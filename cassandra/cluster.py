@@ -20,7 +20,7 @@ from __future__ import absolute_import
 
 import atexit
 from collections import defaultdict, Mapping
-from concurrent.futures import ThreadPoolExecutor, wait as wait_futures
+from concurrent.futures import ThreadPoolExecutor, FIRST_COMPLETED, wait as wait_futures
 from copy import copy
 from functools import partial, wraps
 from itertools import groupby, count
@@ -356,10 +356,11 @@ class Cluster(object):
     """
     The maximum version of the native protocol to use.
 
-    The driver will automatically downgrade version based on a negotiation with
-    the server, but it is most efficient to set this to the maximum supported
-    by your version of Cassandra. Setting this will also prevent conflicting
-    versions negotiated if your cluster is upgraded.
+    If not set in the constructor, the driver will automatically downgrade
+    version based on a negotiation with the server, but it is most efficient
+    to set this to the maximum supported by your version of Cassandra.
+    Setting this will also prevent conflicting versions negotiated if your
+    cluster is upgraded.
 
     Version 2 of the native protocol adds support for lightweight transactions,
     batch operations, and automatic query paging. The v2 protocol is
@@ -387,6 +388,8 @@ class Cluster(object):
     | 2.1               | 1, 2, 3           |
     +-------------------+-------------------+
     | 2.2               | 1, 2, 3, 4        |
+    +-------------------+-------------------+
+    | 3.x               | 3, 4              |
     +-------------------+-------------------+
     """
 
@@ -719,6 +722,7 @@ class Cluster(object):
     _prepared_statements = None
     _prepared_statement_lock = None
     _idle_heartbeat = None
+    _protocol_version_explicit = False
 
     _user_types = None
     """
@@ -742,7 +746,7 @@ class Cluster(object):
                  ssl_options=None,
                  sockopts=None,
                  cql_version=None,
-                 protocol_version=4,
+                 protocol_version=_NOT_SET,
                  executor_threads=2,
                  max_schema_agreement_wait=10,
                  control_connection_timeout=2.0,
@@ -777,7 +781,11 @@ class Cluster(object):
                                         for endpoint in socket.getaddrinfo(a, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM)]
 
         self.compression = compression
-        self.protocol_version = protocol_version
+
+        if protocol_version is not _NOT_SET:
+            self.protocol_version = protocol_version
+            self._protocol_version_explicit = True
+
         self.auth_provider = auth_provider
 
         if load_balancing_policy is not None:
@@ -1117,6 +1125,9 @@ class Cluster(object):
         return kwargs_dict
 
     def protocol_downgrade(self, host_addr, previous_version):
+        if self._protocol_version_explicit:
+            raise DriverException("ProtocolError returned from server while using explicitly set client protocol_version %d" % (previous_version,))
+
         new_version = previous_version - 1
         if new_version < self.protocol_version:
             if new_version >= MIN_SUPPORTED_VERSION:
@@ -1127,7 +1138,7 @@ class Cluster(object):
             else:
                 raise DriverException("Cannot downgrade protocol version (%d) below minimum supported version: %d" % (new_version, MIN_SUPPORTED_VERSION))
 
-    def connect(self, keyspace=None):
+    def connect(self, keyspace=None, wait_for_all_pools=False):
         """
         Creates and returns a new :class:`~.Session` object.  If `keyspace`
         is specified, that keyspace will be the default keyspace for
@@ -1154,6 +1165,13 @@ class Cluster(object):
 
                 try:
                     self.control_connection.connect()
+
+                    # we set all contact points up for connecting, but we won't infer state after this
+                    for address in self.contact_points_resolved:
+                        h = self.metadata.get_host(address)
+                        if h and self.profile_manager.distance(h) == HostDistance.IGNORED:
+                            h.is_up = None
+
                     log.debug("Control connection created")
                 except Exception:
                     log.exception("Control connection failed to connect, "
@@ -1167,9 +1185,9 @@ class Cluster(object):
                     self._idle_heartbeat = ConnectionHeartbeat(self.idle_heartbeat_interval, self.get_connection_holders)
                 self._is_setup = True
 
-        session = self._new_session()
-        if keyspace:
-            session.set_keyspace(keyspace)
+        session = self._new_session(keyspace)
+        if wait_for_all_pools:
+            wait_futures(session._initial_connect_futures)
         return session
 
     def get_connection_holders(self):
@@ -1213,8 +1231,8 @@ class Cluster(object):
     def __exit__(self, *args):
         self.shutdown()
 
-    def _new_session(self):
-        session = Session(self, self.metadata.all_hosts())
+    def _new_session(self, keyspace):
+        session = Session(self, self.metadata.all_hosts(), keyspace)
         self._session_register_user_types(session)
         self.sessions.add(session)
         return session
@@ -1334,6 +1352,7 @@ class Cluster(object):
         else:
             if not have_future:
                 with host.lock:
+                    host.set_up()
                     host._currently_handling_node_up = False
 
         # for testing purposes
@@ -1372,10 +1391,11 @@ class Cluster(object):
             return
 
         with host.lock:
-            if (not host.is_up and not expect_host_to_be_down) or host.is_currently_reconnecting():
+            was_up = host.is_up
+            host.set_down()
+            if (not was_up and not expect_host_to_be_down) or host.is_currently_reconnecting():
                 return
 
-            host.set_down()
 
         log.warning("Host %s has been marked down", host)
 
@@ -1888,9 +1908,10 @@ class Session(object):
     _profile_manager = None
     _metrics = None
 
-    def __init__(self, cluster, hosts):
+    def __init__(self, cluster, hosts, keyspace=None):
         self.cluster = cluster
         self.hosts = hosts
+        self.keyspace = keyspace
 
         self._lock = RLock()
         self._pools = {}
@@ -1901,14 +1922,13 @@ class Session(object):
         self.encoder = Encoder()
 
         # create connection pools in parallel
-        futures = []
+        self._initial_connect_futures = set()
         for host in hosts:
             future = self.add_or_renew_pool(host, is_host_addition=False)
-            if future is not None:
-                futures.append(future)
+            if future:
+                self._initial_connect_futures.add(future)
+        wait_futures(self._initial_connect_futures, return_when=FIRST_COMPLETED)
 
-        for future in futures:
-            future.result()
 
     def execute(self, query, parameters=None, timeout=_NOT_SET, trace=False, custom_payload=None, execution_profile=EXEC_PROFILE_DEFAULT):
         """
@@ -2045,11 +2065,11 @@ class Session(object):
                 query_string, cl, serial_cl,
                 fetch_size, timestamp=timestamp)
         elif isinstance(query, BoundStatement):
-            message = ExecuteMessage(
-                query.prepared_statement.query_id, query.values, cl,
-                serial_cl, fetch_size,
-                timestamp=timestamp)
             prepared_statement = query.prepared_statement
+            message = ExecuteMessage(
+                prepared_statement.query_id, query.values, cl,
+                serial_cl, fetch_size,
+                timestamp=timestamp, skip_meta=bool(prepared_statement.result_metadata))
         elif isinstance(query, BatchStatement):
             if self._protocol_version < 2:
                 raise UnsupportedOperation(
@@ -2124,14 +2144,14 @@ class Session(object):
         future = ResponseFuture(self, message, query=None, timeout=self.default_timeout)
         try:
             future.send_request()
-            query_id, column_metadata, pk_indexes = future.result()
+            query_id, bind_metadata, pk_indexes, result_metadata = future.result()
         except Exception:
             log.exception("Error preparing query:")
             raise
 
         prepared_statement = PreparedStatement.from_message(
-            query_id, column_metadata, pk_indexes, self.cluster.metadata, query, self.keyspace,
-            self._protocol_version)
+            query_id, bind_metadata, pk_indexes, self.cluster.metadata, query, self.keyspace,
+            self._protocol_version, result_metadata)
         prepared_statement.custom_payload = future.custom_payload
 
         self.cluster.add_prepared(query_id, prepared_statement)
@@ -2189,7 +2209,7 @@ class Session(object):
             else:
                 self.is_shutdown = True
 
-        for pool in self._pools.values():
+        for pool in list(self._pools.values()):
             pool.shutdown()
 
     def __enter__(self):
@@ -2774,9 +2794,8 @@ class ControlConnection(object):
         for old_host in self._cluster.metadata.all_hosts():
             if old_host.address != connection.host and old_host.address not in found_hosts:
                 should_rebuild_token_map = True
-                if old_host.address not in self._cluster.contact_points:
-                    log.debug("[control connection] Removing host not found in peers metadata: %r", old_host)
-                    self._cluster.remove_host(old_host)
+                log.debug("[control connection] Removing host not found in peers metadata: %r", old_host)
+                self._cluster.remove_host(old_host)
 
         log.debug("[control connection] Finished fetching ring info")
         if partitioner and should_rebuild_token_map:
@@ -2929,14 +2948,13 @@ class ControlConnection(object):
             if local_row.get("schema_version"):
                 versions[local_row.get("schema_version")].add(local_address)
 
-        pm = self._cluster.profile_manager
         for row in peers_result:
             schema_ver = row.get('schema_version')
             if not schema_ver:
                 continue
             addr = self._rpc_from_peer_row(row)
             peer = self._cluster.metadata.get_host(addr)
-            if peer and peer.is_up and pm.distance(peer) != HostDistance.IGNORED:
+            if peer and peer.is_up is not False:
                 versions[schema_ver].add(addr)
 
         if len(versions) == 1:
@@ -3254,7 +3272,9 @@ class ResponseFuture(object):
             # TODO get connectTimeout from cluster settings
             connection, request_id = pool.borrow_connection(timeout=2.0)
             self._connection = connection
-            connection.send_msg(message, request_id, cb=cb, encoder=self._protocol_handler.encode_message, decoder=self._protocol_handler.decode_message)
+            result_meta = self.prepared_statement.result_metadata if self.prepared_statement else []
+            connection.send_msg(message, request_id, cb=cb, encoder=self._protocol_handler.encode_message, decoder=self._protocol_handler.decode_message,
+                                result_metadata=result_meta)
             return request_id
         except NoConnectionsAvailable as exc:
             log.debug("All connections for host %s are at capacity, moving to the next host", host)
@@ -3757,8 +3777,8 @@ class ResponseFuture(object):
 
     def clear_callbacks(self):
         with self._callback_lock:
-            self._callback = []
-            self._errback = []
+            self._callbacks = []
+            self._errbacks = []
 
     def __str__(self):
         result = "(no result yet)" if self._final_result is _NOT_SET else self._final_result

@@ -1,3 +1,34 @@
+3.6.0
+=====
+August 1, 2016
+
+Features
+--------
+* Handle null values in NumpyProtocolHandler (PYTHON-553)
+* Collect greplin scales stats per cluster (PYTHON-561)
+* Update mock unit test dependency requirement (PYTHON-591)
+* Handle Missing CompositeType metadata following C* upgrade (PYTHON-562)
+* Improve Host.is_up state for HostDistance.IGNORED hosts (PYTHON-551)
+* Utilize v2 protocol's ability to skip result set metadata for prepared statement execution (PYTHON-71)
+* Return from Cluster.connect() when first contact point connection(pool) is opened (PYTHON-105)
+* cqlengine: Add ContextQuery to allow cqlengine models to switch the keyspace context easily (PYTHON-598)
+
+Bug Fixes
+---------
+* Fix geventreactor with SSL support (PYTHON-600)
+* Don't downgrade protocol version if explicitly set (PYTHON-537)
+* Nonexistent contact point tries to connect indefinitely (PYTHON-549)
+* Execute_concurrent can exceed max recursion depth in failure mode (PYTHON-585)
+* Libev loop shutdown race (PYTHON-578)
+* Include aliases in DCT type string (PYTHON-579)
+* cqlengine: Comparison operators for Columns (PYTHON-595)
+* cqlengine: disentangle default_time_to_live table option from model query default TTL (PYTHON-538)
+* cqlengine: pk__token column name issue with the equality operator (PYTHON-584)
+* cqlengine: Fix "__in" filtering operator converts True to string "True" automatically (PYTHON-596)
+* cqlengine: Avoid LWTExceptions when updating columns that are part of the condition (PYTHON-580)
+* cqlengine: Cannot execute a query when the filter contains all columns (PYTHON-599)
+* cqlengine: routing key computation issue when a primary key column is overriden by model inheritance (PYTHON-576)
+
 3.5.0
 =====
 June 27, 2016

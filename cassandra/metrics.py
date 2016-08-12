@@ -111,10 +111,14 @@ class Metrics(object):
     the driver currently has open.
     """
 
+    _stats_counter = 0
+
     def __init__(self, cluster_proxy):
         log.debug("Starting metric capture")
 
-        self.stats = scales.collection('/cassandra',
+        self.stats_name = 'cassandra-{0}'.format(str(self._stats_counter))
+        Metrics._stats_counter += 1
+        self.stats = scales.collection(self.stats_name,
             scales.PmfStat('request_timer'),
             scales.IntStat('connection_errors'),
             scales.IntStat('write_timeouts'),
@@ -131,6 +135,11 @@ class Metrics(object):
                 lambda: len(set(chain.from_iterable(s._pools.keys() for s in cluster_proxy.sessions)))),
             scales.Stat('open_connections',
                 lambda: sum(sum(p.open_count for p in s._pools.values()) for s in cluster_proxy.sessions)))
+
+        # TODO, to be removed in 4.0
+        # /cassandra contains the metrics of the first cluster registered
+        if 'cassandra' not in scales._Stats.stats:
+            scales._Stats.stats['cassandra'] = scales._Stats.stats[self.stats_name]
 
         self.request_timer = self.stats.request_timer
         self.connection_errors = self.stats.connection_errors
@@ -164,3 +173,27 @@ class Metrics(object):
 
     def on_retry(self):
         self.stats.retries += 1
+
+    def get_stats(self):
+        """
+        Returns the metrics for the registered cluster instance.
+        """
+        return scales.getStats()[self.stats_name]
+
+    def set_stats_name(self, stats_name):
+        """
+        Set the metrics stats name.
+        The stats_name is a string used to access the metris through scales: scales.getStats()[<stats_name>]
+        Default is 'cassandra-<num>'.
+        """
+
+        if self.stats_name == stats_name:
+            return
+
+        if stats_name in scales._Stats.stats:
+            raise ValueError('"{0}" already exists in stats.'.format(stats_name))
+
+        stats = scales._Stats.stats[self.stats_name]
+        del scales._Stats.stats[self.stats_name]
+        self.stats_name = stats_name
+        scales._Stats.stats[self.stats_name] = stats

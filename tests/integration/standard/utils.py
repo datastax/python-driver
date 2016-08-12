@@ -4,6 +4,7 @@ Helper module to populate a dummy Cassandra tables with data.
 
 from tests.integration.datatype_utils import PRIMITIVE_DATATYPES, get_sample
 
+
 def create_table_with_all_types(table_name, session, N):
     """
     Method that given a table_name and session construct a table that contains
