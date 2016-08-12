@@ -196,8 +196,8 @@ class BatchQuery(object):
 
         :param fn: Callable object
         :type fn: callable
-        :param *args: Positional arguments to be passed to the callback at the time of execution
-        :param **kwargs: Named arguments to be passed to the callback at the time of execution
+        :param \*args: Positional arguments to be passed to the callback at the time of execution
+        :param \*\*kwargs: Named arguments to be passed to the callback at the time of execution
         """
         if not callable(fn):
             raise ValueError("Value for argument 'fn' is {0} and is not a callable object.".format(type(fn)))
@@ -1283,19 +1283,23 @@ class DMLQuery(object):
         """
         ds = DeleteStatement(self.column_family_name, conditionals=conditionals, if_exists=self._if_exists)
         deleted_fields = False
+        static_only = True
         for _, v in self.instance._values.items():
             col = v.column
             if v.deleted:
                 ds.add_field(col.db_field_name)
                 deleted_fields = True
+                static_only &= col.static
             elif isinstance(col, columns.Map):
                 uc = MapDeleteClause(col.db_field_name, v.value, v.previous_value)
                 if uc.get_context_size() > 0:
                     ds.add_field(uc)
                     deleted_fields = True
+                    static_only |= col.static
 
         if deleted_fields:
-            for name, col in self.model._primary_keys.items():
+            keys = self.model._partition_keys if static_only else self.model._primary_keys
+            for name, col in keys.items():
                 ds.add_where(col, EqualsOperator(), getattr(self.instance, name))
             self._execute(ds)
 

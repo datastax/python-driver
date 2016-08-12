@@ -12,6 +12,7 @@ Features
 * Utilize v2 protocol's ability to skip result set metadata for prepared statement execution (PYTHON-71)
 * Return from Cluster.connect() when first contact point connection(pool) is opened (PYTHON-105)
 * cqlengine: Add ContextQuery to allow cqlengine models to switch the keyspace context easily (PYTHON-598)
+* Standardize Validation between Ascii and Text types in Cqlengine (PYTHON-609)
 
 Bug Fixes
 ---------

@@ -393,6 +393,12 @@ class Cluster(object):
     +-------------------+-------------------+
     """
 
+    allow_beta_protocol_version = False
+    """
+    Setting true injects a flag in all messages that makes the server accept and use "beta" protocol version.
+    Used for testing new protocol features incrementally before the new version is complete.
+    """
+
     compression = True
     """
     Controls compression for communications between the driver and Cassandra.
@@ -760,7 +766,8 @@ class Cluster(object):
                  status_event_refresh_window=2,
                  prepare_on_all_hosts=True,
                  reprepare_on_up=True,
-                 execution_profiles=None):
+                 execution_profiles=None,
+                 allow_beta_protocol_version=False):
         """
         ``executor_threads`` defines the number of threads in a pool for handling asynchronous tasks such as
         extablishing connection pools or refreshing metadata.
@@ -785,6 +792,7 @@ class Cluster(object):
         if protocol_version is not _NOT_SET:
             self.protocol_version = protocol_version
             self._protocol_version_explicit = True
+        self.allow_beta_protocol_version = allow_beta_protocol_version
 
         self.auth_provider = auth_provider
 
@@ -1121,6 +1129,7 @@ class Cluster(object):
         kwargs_dict.setdefault('cql_version', self.cql_version)
         kwargs_dict.setdefault('protocol_version', self.protocol_version)
         kwargs_dict.setdefault('user_type_map', self._user_types)
+        kwargs_dict.setdefault('allow_beta_protocol_version', self.allow_beta_protocol_version)
 
         return kwargs_dict
 
@@ -1927,8 +1936,10 @@ class Session(object):
             future = self.add_or_renew_pool(host, is_host_addition=False)
             if future:
                 self._initial_connect_futures.add(future)
-        wait_futures(self._initial_connect_futures, return_when=FIRST_COMPLETED)
 
+        futures = wait_futures(self._initial_connect_futures, return_when=FIRST_COMPLETED)
+        while futures.not_done and not any(f.result() for f in futures.done):
+            futures = wait_futures(futures.not_done, return_when=FIRST_COMPLETED)
 
     def execute(self, query, parameters=None, timeout=_NOT_SET, trace=False, custom_payload=None, execution_profile=EXEC_PROFILE_DEFAULT):
         """
@@ -2084,6 +2095,7 @@ class Session(object):
 
         message.update_custom_payload(query.custom_payload)
         message.update_custom_payload(custom_payload)
+        message.allow_beta_protocol_version = self.cluster.allow_beta_protocol_version
 
         return ResponseFuture(
             self, message, query, timeout, metrics=self._metrics,
@@ -3537,6 +3549,10 @@ class ResponseFuture(object):
 
         if isinstance(response, ResultMessage):
             if response.kind == RESULT_KIND_PREPARED:
+                # result metadata is the only thing that could have changed from an alter
+                _, _, _, result_metadata = response.results
+                self.prepared_statement.result_metadata = result_metadata
+
                 # use self._query to re-use the same host and
                 # at the same time properly borrow the connection
                 request_id = self._query(self._current_host)

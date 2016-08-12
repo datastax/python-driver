@@ -56,7 +56,7 @@ class InternalError(Exception):
 ColumnMetadata = namedtuple("ColumnMetadata", ['keyspace_name', 'table_name', 'name', 'type'])
 
 MIN_SUPPORTED_VERSION = 1
-MAX_SUPPORTED_VERSION = 4
+MAX_SUPPORTED_VERSION = 5
 
 HEADER_DIRECTION_TO_CLIENT = 0x80
 HEADER_DIRECTION_MASK = 0x80
@@ -65,6 +65,8 @@ COMPRESSED_FLAG = 0x01
 TRACING_FLAG = 0x02
 CUSTOM_PAYLOAD_FLAG = 0x04
 WARNING_FLAG = 0x08
+USE_BETA_FLAG = 0x10
+USE_BETA_MASK = ~USE_BETA_FLAG
 
 _message_types_by_opcode = {}
 
@@ -126,11 +128,11 @@ class ErrorMessage(_MessageType, Exception):
         self.info = info
 
     @classmethod
-    def recv_body(cls, f, *args):
+    def recv_body(cls, f, protocol_version, *args):
         code = read_int(f)
         msg = read_string(f)
         subcls = error_classes.get(code, cls)
-        extra_info = subcls.recv_error_info(f)
+        extra_info = subcls.recv_error_info(f, protocol_version)
         return subcls(code=code, message=msg, info=extra_info)
 
     def summary_msg(self):
@@ -145,7 +147,7 @@ class ErrorMessage(_MessageType, Exception):
     __repr__ = __str__
 
     @staticmethod
-    def recv_error_info(f):
+    def recv_error_info(f, protocol_version):
         pass
 
     def to_exception(self):
@@ -191,7 +193,7 @@ class UnavailableErrorMessage(RequestExecutionException):
     error_code = 0x1000
 
     @staticmethod
-    def recv_error_info(f):
+    def recv_error_info(f, protocol_version):
         return {
             'consistency': read_consistency_level(f),
             'required_replicas': read_int(f),
@@ -222,7 +224,7 @@ class WriteTimeoutErrorMessage(RequestExecutionException):
     error_code = 0x1100
 
     @staticmethod
-    def recv_error_info(f):
+    def recv_error_info(f, protocol_version):
         return {
             'consistency': read_consistency_level(f),
             'received_responses': read_int(f),
@@ -239,7 +241,7 @@ class ReadTimeoutErrorMessage(RequestExecutionException):
     error_code = 0x1200
 
     @staticmethod
-    def recv_error_info(f):
+    def recv_error_info(f, protocol_version):
         return {
             'consistency': read_consistency_level(f),
             'received_responses': read_int(f),
@@ -256,13 +258,27 @@ class ReadFailureMessage(RequestExecutionException):
     error_code = 0x1300
 
     @staticmethod
-    def recv_error_info(f):
+    def recv_error_info(f, protocol_version):
+        consistency = read_consistency_level(f)
+        received_responses = read_int(f)
+        required_responses = read_int(f)
+
+        if protocol_version >= 5:
+            error_code_map = read_error_code_map(f)
+            failures = len(error_code_map)
+        else:
+            error_code_map = None
+            failures = read_int(f)
+
+        data_retrieved = bool(read_byte(f))
+
         return {
-            'consistency': read_consistency_level(f),
-            'received_responses': read_int(f),
-            'required_responses': read_int(f),
-            'failures': read_int(f),
-            'data_retrieved': bool(read_byte(f)),
+            'consistency': consistency,
+            'received_responses': received_responses,
+            'required_responses': required_responses,
+            'failures': failures,
+            'error_code_map': error_code_map,
+            'data_retrieved': data_retrieved
         }
 
     def to_exception(self):
@@ -274,7 +290,7 @@ class FunctionFailureMessage(RequestExecutionException):
     error_code = 0x1400
 
     @staticmethod
-    def recv_error_info(f):
+    def recv_error_info(f, protocol_version):
         return {
             'keyspace': read_string(f),
             'function': read_string(f),
@@ -290,13 +306,27 @@ class WriteFailureMessage(RequestExecutionException):
     error_code = 0x1500
 
     @staticmethod
-    def recv_error_info(f):
+    def recv_error_info(f, protocol_version):
+        consistency = read_consistency_level(f)
+        received_responses = read_int(f)
+        required_responses = read_int(f)
+
+        if protocol_version >= 5:
+            error_code_map = read_error_code_map(f)
+            failures = len(error_code_map)
+        else:
+            error_code_map = None
+            failures = read_int(f)
+
+        write_type = WriteType.name_to_value[read_string(f)]
+
         return {
-            'consistency': read_consistency_level(f),
-            'received_responses': read_int(f),
-            'required_responses': read_int(f),
-            'failures': read_int(f),
-            'write_type': WriteType.name_to_value[read_string(f)],
+            'consistency': consistency,
+            'received_responses': received_responses,
+            'required_responses': required_responses,
+            'failures': failures,
+            'error_code_map': error_code_map,
+            'write_type': write_type
         }
 
     def to_exception(self):
@@ -334,7 +364,7 @@ class PreparedQueryNotFound(RequestValidationException):
     error_code = 0x2500
 
     @staticmethod
-    def recv_error_info(f):
+    def recv_error_info(f, protocol_version):
         # return the query ID
         return read_binary_string(f)
 
@@ -344,7 +374,7 @@ class AlreadyExistsException(ConfigurationException):
     error_code = 0x2400
 
     @staticmethod
-    def recv_error_info(f):
+    def recv_error_info(f, protocol_version):
         return {
             'keyspace': read_string(f),
             'table': read_string(f),
@@ -932,7 +962,7 @@ class _ProtocolHandler(object):
     """
 
     @classmethod
-    def encode_message(cls, msg, stream_id, protocol_version, compressor):
+    def encode_message(cls, msg, stream_id, protocol_version, compressor, allow_beta_protocol_version):
         """
         Encodes a message using the specified frame parameters, and compressor
 
@@ -957,6 +987,9 @@ class _ProtocolHandler(object):
 
         if msg.tracing:
             flags |= TRACING_FLAG
+
+        if allow_beta_protocol_version:
+            flags |= USE_BETA_FLAG
 
         buff = io.BytesIO()
         cls._write_header(buff, protocol_version, flags, stream_id, msg.opcode, len(body))
@@ -1012,6 +1045,8 @@ class _ProtocolHandler(object):
             flags ^= CUSTOM_PAYLOAD_FLAG
         else:
             custom_payload = None
+
+        flags &= USE_BETA_MASK # will only be set if we asserted it in connection estabishment
 
         if flags:
             log.warning("Unknown protocol flags set: %02x. May cause problems.", flags)
@@ -1220,6 +1255,15 @@ def write_stringmultimap(f, strmmap):
         write_stringlist(f, v)
 
 
+def read_error_code_map(f):
+    numpairs = read_int(f)
+    error_code_map = {}
+    for _ in range(numpairs):
+        endpoint = read_inet_addr_only(f)
+        error_code_map[endpoint] = read_short(f)
+    return error_code_map
+
+
 def read_value(f):
     size = read_int(f)
     if size < 0:
@@ -1237,17 +1281,22 @@ def write_value(f, v):
         f.write(v)
 
 
-def read_inet(f):
+def read_inet_addr_only(f):
     size = read_byte(f)
     addrbytes = f.read(size)
-    port = read_int(f)
     if size == 4:
         addrfam = socket.AF_INET
     elif size == 16:
         addrfam = socket.AF_INET6
     else:
         raise InternalError("bad inet address: %r" % (addrbytes,))
-    return (util.inet_ntop(addrfam, addrbytes), port)
+    return util.inet_ntop(addrfam, addrbytes)
+
+
+def read_inet(f):
+    addr = read_inet_addr_only(f)
+    port = read_int(f)
+    return (addr, port)
 
 
 def write_inet(f, addrtuple):

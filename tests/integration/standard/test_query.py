@@ -406,15 +406,18 @@ class PreparedStatementArgTest(unittest.TestCase):
         clus = Cluster(
             load_balancing_policy=white_list,
             protocol_version=PROTOCOL_VERSION, prepare_on_all_hosts=False, reprepare_on_up=False)
-        session = clus.connect()
-        mock_handler = MockLoggingHandler()
-        logger = logging.getLogger(cluster.__name__)
-        logger.addHandler(mock_handler)
-        select_statement = session.prepare("SELECT * FROM system.local")
-        session.execute(select_statement)
-        session.execute(select_statement)
-        session.execute(select_statement)
-        self.assertEqual(2, mock_handler.get_message_count('debug', "Re-preparing"))
+        try:
+            session = clus.connect(wait_for_all_pools=True)
+            mock_handler = MockLoggingHandler()
+            logger = logging.getLogger(cluster.__name__)
+            logger.addHandler(mock_handler)
+            select_statement = session.prepare("SELECT * FROM system.local")
+            session.execute(select_statement)
+            session.execute(select_statement)
+            session.execute(select_statement)
+            self.assertEqual(2, mock_handler.get_message_count('debug', "Re-preparing"))
+        finally:
+            clus.shutdown()
 
 
 class PrintStatementTests(unittest.TestCase):

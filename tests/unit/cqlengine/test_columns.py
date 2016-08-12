@@ -65,4 +65,7 @@ class ColumnTest(unittest.TestCase):
         except TypeError:
             pass
 
+    def test_hash(self):
+        c0 = Column()
+        self.assertEqual(id(c0), c0.__hash__())
 

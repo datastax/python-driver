@@ -241,3 +241,39 @@ class QueryUpdateTests(BaseCassEngTestCase):
                 text_map__update={"bar": None})
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
         self.assertEqual(obj.text_map, {"foo": '1'})
+
+
+class StaticDeleteModel(Model):
+    example_id = columns.Integer(partition_key=True, primary_key=True, default=uuid4)
+    example_static1 = columns.Integer(static=True)
+    example_static2 = columns.Integer(static=True)
+    example_clust = columns.Integer(primary_key=True)
+
+
+class StaticDeleteTests(BaseCassEngTestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super(StaticDeleteTests, cls).setUpClass()
+        sync_table(StaticDeleteModel)
+
+    @classmethod
+    def tearDownClass(cls):
+        super(StaticDeleteTests, cls).tearDownClass()
+        drop_table(StaticDeleteModel)
+
+    def test_static_deletion(self):
+        """
+        Test to ensure that cluster keys are not included when removing only static columns
+
+        @since 3.6
+        @jira_ticket PYTHON-608
+        @expected_result Server should not throw an exception, and the static column should be deleted
+
+        @test_category object_mapper
+        """
+        StaticDeleteModel.create(example_id=5, example_clust=5, example_static2=1)
+        sdm = StaticDeleteModel.filter(example_id=5).first()
+        self.assertEqual(1, sdm.example_static2)
+        sdm.update(example_static2=None)
+        self.assertIsNone(sdm.example_static2)

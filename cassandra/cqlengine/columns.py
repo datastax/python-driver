@@ -198,6 +198,9 @@ class Column(object):
             return self.position >= other.position
         return NotImplemented
 
+    def __hash__(self):
+        return id(self)
+
     def validate(self, value):
         """
         Returns a cleaned and validated value. Raises a ValidationError
