@@ -458,8 +458,9 @@ class Connection(object):
         # queue the decoder function with the request
         # this allows us to inject custom functions per request to encode, decode messages
         self._requests[request_id] = (cb, decoder, result_metadata)
-        self.push(encoder(msg, request_id, self.protocol_version, compressor=self.compressor, allow_beta_protocol_version=self.allow_beta_protocol_version))
-        return request_id
+        msg = encoder(msg, request_id, self.protocol_version, compressor=self.compressor, allow_beta_protocol_version=self.allow_beta_protocol_version)
+        self.push(msg)
+        return len(msg)
 
     def wait_for_response(self, msg, timeout=None):
         return self.wait_for_responses(msg, timeout=timeout)[0]
