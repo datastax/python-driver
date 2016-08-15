@@ -1943,7 +1943,7 @@ class Session(object):
         while futures.not_done and not any(f.result() for f in futures.done):
             futures = wait_futures(futures.not_done, return_when=FIRST_COMPLETED)
 
-    def execute(self, query, parameters=None, timeout=_NOT_SET, trace=False, custom_payload=None, execution_profile=EXEC_PROFILE_DEFAULT):
+    def execute(self, query, parameters=None, timeout=_NOT_SET, trace=False, custom_payload=None, execution_profile=EXEC_PROFILE_DEFAULT, paging_state=None):
         """
         Execute the given query and synchronously wait for the response.
 
@@ -1970,10 +1970,16 @@ class Session(object):
         `custom_payload` is a :ref:`custom_payload` dict to be passed to the server.
         If `query` is a Statement with its own custom_payload. The message payload
         will be a union of the two, with the values specified here taking precedence.
-        """
-        return self.execute_async(query, parameters, trace, custom_payload, timeout, execution_profile).result()
 
-    def execute_async(self, query, parameters=None, trace=False, custom_payload=None, timeout=_NOT_SET, execution_profile=EXEC_PROFILE_DEFAULT):
+        `execution_profile` is the execution profile to use for this request. It can be a key to a profile configured
+        via :meth:`Cluster.add_execution_profile` or an instance (from :meth:`Session.execution_profile_clone_update`,
+        for example
+
+        `paging_state` is an optiional paging state, reused from a previous :class:`ResultSet`.
+        """
+        return self.execute_async(query, parameters, trace, custom_payload, timeout, execution_profile, paging_state).result()
+
+    def execute_async(self, query, parameters=None, trace=False, custom_payload=None, timeout=_NOT_SET, execution_profile=EXEC_PROFILE_DEFAULT, paging_state=None):
         """
         Execute the given query and return a :class:`~.ResponseFuture` object
         which callbacks may be attached to for asynchronous response
@@ -1981,17 +1987,7 @@ class Session(object):
         on the :class:`.ResponseFuture` to synchronously block for results at
         any time.
 
-        If `trace` is set to :const:`True`, you may get the query trace descriptors using
-        :meth:`.ResponseFuture.get_query_trace()` or :meth:`.ResponseFuture.get_all_query_traces()`
-        on the future result.
-
-        `custom_payload` is a :ref:`custom_payload` dict to be passed to the server.
-        If `query` is a Statement with its own custom_payload. The message payload
-        will be a union of the two, with the values specified here taking precedence.
-
-        If the server sends a custom payload in the response message,
-        the dict can be obtained following :meth:`.ResponseFuture.result` via
-        :attr:`.ResponseFuture.custom_payload`
+        See :meth:`Session.execute` for parameter definitions.
 
         Example usage::
 
@@ -2018,13 +2014,13 @@ class Session(object):
             ...     log.exception("Operation failed:")
 
         """
-        future = self._create_response_future(query, parameters, trace, custom_payload, timeout, execution_profile)
+        future = self._create_response_future(query, parameters, trace, custom_payload, timeout, execution_profile, paging_state)
         future._protocol_handler = self.client_protocol_handler
         self._on_request(future)
         future.send_request()
         return future
 
-    def _create_response_future(self, query, parameters, trace, custom_payload, timeout, execution_profile=EXEC_PROFILE_DEFAULT):
+    def _create_response_future(self, query, parameters, trace, custom_payload, timeout, execution_profile=EXEC_PROFILE_DEFAULT, paging_state=None):
         """ Returns the ResponseFuture before calling send_request() on it """
 
         prepared_statement = None
@@ -2099,6 +2095,7 @@ class Session(object):
         message.update_custom_payload(query.custom_payload)
         message.update_custom_payload(custom_payload)
         message.allow_beta_protocol_version = self.cluster.allow_beta_protocol_version
+        message.paging_state = paging_state
 
         return ResponseFuture(
             self, message, query, timeout, metrics=self._metrics,
@@ -4004,3 +4001,13 @@ class ResultSet(object):
             return row[0]
         else:
             return row['[applied]']
+
+    @property
+    def paging_state(self):
+        """
+        Server paging state of the query. Can be `None` if the query was not paged.
+
+        The driver treats paging state as opaque, but it may contain primary key data, so applications may want to
+        avoid sending this to untrusted parties.
+        """
+        return self.response_future._paging_state
