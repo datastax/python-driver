@@ -153,7 +153,7 @@ class StrategiesTest(unittest.TestCase):
         nts.make_token_replica_map(token_to_host_owner, ring)
         elapsed_bad = timeit.default_timer() - start_time
         difference = elapsed_bad - elapsed_base
-        self.assertTrue(difference < .2 and difference > -.2)
+        self.assertTrue(difference < .5 and difference > -.5)
 
     def test_nts_make_token_replica_map_multi_rack(self):
         token_to_host_owner = {}

@@ -23,11 +23,12 @@ except ImportError:
 
 from cassandra.query import SimpleStatement
 from cassandra import ConsistencyLevel, WriteTimeout, Unavailable, ReadTimeout
+from cassandra.protocol import SyntaxException
 
 from cassandra.cluster import Cluster, NoHostAvailable
 from tests.integration import get_cluster, get_node, use_singledc, PROTOCOL_VERSION, execute_until_pass
 from greplin import scales
-from tests.integration import BasicSharedKeyspaceUnitTestCaseWTable
+from tests.integration import BasicSharedKeyspaceUnitTestCaseWTable, BasicExistingKeyspaceUnitTestCase
 
 def setup_module():
     use_singledc()
@@ -271,5 +272,84 @@ class MetricsNamespaceTest(BasicSharedKeyspaceUnitTestCaseWTable):
         self.assertTrue("devops" in scales._Stats.stats.keys())
 
 
+class RequestAnalyzer(object):
+    """
+    Class used to track request and error counts for a Session.
+    Also computes statistics on encoded request size.
+    """
+
+    requests = scales.PmfStat('request size')
+    errors = scales.IntStat('errors')
+    successful = scales.IntStat("success")
+    # Throw exceptions when invoked.
+    throw_on_success = False
+    throw_on_fail = False
+
+    def __init__(self, session, throw_on_success=False, throw_on_fail=False):
+        scales.init(self, '/request')
+        # each instance will be registered with a session, and receive a callback for each request generated
+        session.add_request_init_listener(self.on_request)
+        self.throw_on_fail = throw_on_fail
+        self.throw_on_success = throw_on_success
+
+    def on_request(self, rf):
+        # This callback is invoked each time a request is created, on the thread creating the request.
+        # We can use this to count events, or add callbacks
+        rf.add_callbacks(self.on_success, self.on_error, callback_args=(rf,), errback_args=(rf,))
+
+    def on_success(self, _, response_future):
+        # future callback on a successful request; just record the size
+        self.requests.addValue(response_future.request_encoded_size)
+        self.successful += 1
+        if self.throw_on_success:
+            raise AttributeError
+
+    def on_error(self, _, response_future):
+        # future callback for failed; record size and increment errors
+        self.requests.addValue(response_future.request_encoded_size)
+        self.errors += 1
+        if self.throw_on_fail:
+            raise AttributeError
+
+    def __str__(self):
+        # just extracting request count from the size stats (which are recorded on all requests)
+        request_sizes = dict(self.requests)
+        count = request_sizes.pop('count')
+        return "%d requests (%d errors)\nRequest size statistics:\n%s" % (count, self.errors, pp.pformat(request_sizes))
 
 
+class MetricsRequestSize(BasicExistingKeyspaceUnitTestCase):
+
+    def test_metrics_per_cluster(self):
+        """
+        Test to validate that requests listeners.
+
+        This test creates a simple metrics based request listener to track request size, it then
+        check to ensure that on_success and on_error methods are invoked appropriately.
+        @since 3.7.0
+        @jira_ticket PYTHON-284
+        @expected_result in_error, and on_success should be invoked apropriately
+
+        @test_category metrics
+        """
+
+        ra = RequestAnalyzer(self.session)
+        for _ in range(10):
+            self.session.execute("SELECT release_version FROM system.local")
+
+        for _ in range(3):
+            try:
+                self.session.execute("nonesense")
+            except SyntaxException:
+                continue
+
+        self.assertEqual(ra.errors, 3)
+        self.assertEqual(ra.successful, 10)
+
+        # Make sure a poorly coded RA doesn't cause issues
+        RequestAnalyzer(self.session, throw_on_success=False, throw_on_fail=True)
+        self.session.execute("SELECT release_version FROM system.local")
+        try:
+            self.session.execute("nonesense")
+        except SyntaxException:
+            pass
