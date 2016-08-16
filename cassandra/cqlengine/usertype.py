@@ -31,7 +31,8 @@ class BaseUserType(object):
             values = dict((self._db_map.get(k, k), v) for k, v in values.items())
 
         for name, field in self._fields.items():
-            value = values.get(name, None)
+            field_default = field.get_default() if field.has_default else None
+            value = values.get(name, field_default)
             if value is not None or isinstance(field, columns.BaseContainerColumn):
                 value = field.to_python(value)
             value_mngr = field.value_manager(self, field, value)
