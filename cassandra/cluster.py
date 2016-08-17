@@ -1684,13 +1684,15 @@ class Cluster(object):
                                                       schema_agreement_wait=max_schema_agreement_wait, force=True):
             raise DriverException("User Aggregate metadata was not refreshed. See log for details.")
 
-    def refresh_nodes(self):
+    def refresh_nodes(self, force_token_rebuild=False):
         """
         Synchronously refresh the node list and token metadata
 
+        `force_token_rebuild` can be used to rebuild the token map metadata, even if no new nodes are discovered.
+
         An Exception is raised if node refresh fails for any reason.
         """
-        if not self.control_connection.refresh_node_list_and_token_map():
+        if not self.control_connection.refresh_node_list_and_token_map(force_token_rebuild):
             raise DriverException("Node list was not refreshed. See log for details.")
 
     def set_meta_refresh_enabled(self, enabled):
