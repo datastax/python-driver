@@ -1975,7 +1975,7 @@ class Session(object):
         via :meth:`Cluster.add_execution_profile` or an instance (from :meth:`Session.execution_profile_clone_update`,
         for example
 
-        `paging_state` is an optiional paging state, reused from a previous :class:`ResultSet`.
+        `paging_state` is an optional paging state, reused from a previous :class:`ResultSet`.
         """
         return self.execute_async(query, parameters, trace, custom_payload, timeout, execution_profile, paging_state).result()
 
