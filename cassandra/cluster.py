@@ -729,6 +729,7 @@ class Cluster(object):
     _prepared_statement_lock = None
     _idle_heartbeat = None
     _protocol_version_explicit = False
+    _discount_down_events = True
 
     _user_types = None
     """
@@ -1401,10 +1402,22 @@ class Cluster(object):
 
         with host.lock:
             was_up = host.is_up
+
+            # ignore down signals if we have open pools to the host
+            # this is to avoid closing pools when a control connection host became isolated
+            if self._discount_down_events and self.profile_manager.distance(host) != HostDistance.IGNORED:
+                connected = False
+                for session in self.sessions:
+                    pool_states = session.get_pool_state()
+                    pool_state = pool_states.get(host)
+                    if pool_state:
+                        connected |= pool_state['open_count'] > 0
+                if connected:
+                    return
+
             host.set_down()
             if (not was_up and not expect_host_to_be_down) or host.is_currently_reconnecting():
                 return
-
 
         log.warning("Host %s has been marked down", host)
 
