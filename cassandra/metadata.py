@@ -1598,9 +1598,16 @@ class _SchemaParser(object):
 
     def _query_build_rows(self, query_string, build_func):
         query = QueryMessage(query=query_string, consistency_level=ConsistencyLevel.ONE)
-        response = self.connection.wait_for_response(query, self.timeout)
-        result = dict_factory(*response.results)
-        return [build_func(row) for row in result]
+        responses = self.connection.wait_for_responses((query), timeout=self.timeout, fail_on_error=False)
+        (success, response) = responses[0]
+        if success:
+            result = dict_factory(*response.results)
+            return [build_func(row) for row in result]
+        elif isinstance(response, InvalidRequest):
+            log.debug("user types table not found")
+            return []
+        else:
+            raise response
 
 
 class SchemaParserV22(_SchemaParser):
