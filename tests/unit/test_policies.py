@@ -18,7 +18,7 @@ except ImportError:
     import unittest  # noqa
 
 from itertools import islice, cycle
-from mock import Mock
+from mock import Mock, patch
 from random import randint
 import six
 import sys
@@ -33,7 +33,8 @@ from cassandra.policies import (RoundRobinPolicy, WhiteListRoundRobinPolicy, DCA
                                 HostDistance, ExponentialReconnectionPolicy,
                                 RetryPolicy, WriteType,
                                 DowngradingConsistencyRetryPolicy, ConstantReconnectionPolicy,
-                                LoadBalancingPolicy, ConvictionPolicy, ReconnectionPolicy, FallthroughRetryPolicy)
+                                LoadBalancingPolicy, ConvictionPolicy, ReconnectionPolicy, FallthroughRetryPolicy,
+                                IdentityTranslator, EC2MultiRegionTranslator)
 from cassandra.pool import Host
 from cassandra.query import Statement
 
@@ -1127,3 +1128,17 @@ class WhiteListRoundRobinPolicyTest(unittest.TestCase):
         self.assertEqual(sorted(qplan), [host])
 
         self.assertEqual(policy.distance(host), HostDistance.LOCAL)
+
+class AddressTranslatorTest(unittest.TestCase):
+
+    def test_identity_translator(self):
+        it = IdentityTranslator()
+        addr = '127.0.0.1'
+
+    @patch('socket.getfqdn', return_value='localhost')
+    def test_ec2_multi_region_translator(self, *_):
+        ec2t = EC2MultiRegionTranslator()
+        addr = '127.0.0.1'
+        translated = ec2t.translate(addr)
+        self.assertIsNot(translated, addr)  # verifies that the resolver path is followed
+        self.assertEqual(translated, addr)  # and that it resolves to the same address

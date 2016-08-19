@@ -16,8 +16,7 @@ try:
 except ImportError:
     import unittest  # noqa
 
-from copy import copy
-from mock import patch, Mock
+from mock import patch
 
 from cassandra import ConsistencyLevel, DriverException, Timeout, Unavailable, RequestExecutionException, ReadTimeout, WriteTimeout, CoordinationFailure, ReadFailure, WriteFailure, FunctionFailure, AlreadyExists,\
     InvalidRequest, Unauthorized, AuthenticationFailed, OperationTimedOut, UnsupportedOperation, RequestValidationException, ConfigurationException
