@@ -403,6 +403,7 @@ def run_setup(extensions):
         description='Python driver for Cassandra',
         long_description=long_description,
         url='http://github.com/datastax/python-driver',
+        license='ASL 2.0',
         author='Tyler Hobbs',
         author_email='tyler@datastax.com',
         packages=['cassandra', 'cassandra.io', 'cassandra.cqlengine'],
