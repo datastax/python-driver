@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import namedtuple, defaultdict
+from collections import defaultdict
 import logging
 import six
 import threading
 
 from cassandra.cluster import Cluster, _NOT_SET, NoHostAvailable, UserTypeDoesNotExist
-from cassandra.query import SimpleStatement, Statement, dict_factory
+from cassandra.query import SimpleStatement, dict_factory
 
 from cassandra.cqlengine import CQLEngineException
 from cassandra.cqlengine.statements import BaseCQLStatement
@@ -28,13 +28,8 @@ log = logging.getLogger(__name__)
 
 NOT_SET = _NOT_SET  # required for passing timeout to Session.execute
 
-Host = namedtuple('Host', ['name', 'port'])
-
-cluster = None
-session = None
-lazy_connect_args = None
-lazy_connect_lock = threading.RLock()
-
+# connections registry
+_connections = {}
 
 # Because type models may be registered before a connection is present,
 # and because sessions may be replaced, we must register UDTs here, in order
@@ -46,20 +41,123 @@ class UndefinedKeyspaceException(CQLEngineException):
     pass
 
 
+class Connection(object):
+    """CQLEngine Connection"""
+
+    name = None
+    hosts = None
+
+    consistency = None
+    retry_connect = False
+    lazy_connect = False
+    lazy_connect_lock = None
+    cluster_options = None
+
+    cluster = None
+    session = None
+
+    def __init__(self, name, hosts, consistency=None,
+                 lazy_connect=False, retry_connect=False, cluster_options=None):
+        self.hosts = hosts
+        self.name = name
+        self.consistency = consistency
+        self.lazy_connect = lazy_connect
+        self.retry_connect = retry_connect
+        self.cluster_options = cluster_options if cluster_options else {}
+        self.lazy_connect_lock = threading.RLock()
+
+    def setup(self):
+        """Setup the connection"""
+
+        if 'username' in self.cluster_options or 'password' in self.cluster_options:
+            raise CQLEngineException("Username & Password are now handled by using the native driver's auth_provider")
+
+        if self.lazy_connect:
+            return
+
+        self.cluster = Cluster(self.hosts, **self.cluster_options)
+        try:
+            self.session = self.cluster.connect()
+            log.debug("cqlengine connection '{0}' initialized with internally created session".format(self.name))
+        except NoHostAvailable:
+            if self.retry_connect:
+                log.warning("connect failed for '{0}', setting up for re-attempt on first use".format(self.name))
+                self.lazy_connect = True
+            raise
+
+        if self.consistency is not None:
+            self.session.default_consistency_level = self.consistency
+
+        self.setup_session()
+
+    def setup_session(self):
+        self.session.row_factory = dict_factory
+        enc = self.session.encoder
+        enc.mapping[tuple] = enc.cql_encode_tuple
+        _register_known_types(self.session.cluster)
+
+    def handle_lazy_connect(self):
+
+        # if lazy_connect is False, it means the cluster is setup and ready
+        # No need to acquire the lock
+        if not self.lazy_connect:
+            return
+
+        with self.lazy_connect_lock:
+            # lazy_connect might have been set to False by another thread while waiting the lock
+            # In this case, do nothing.
+            if self.lazy_connect:
+                log.debug("Lazy connect for connection '{0}'".format(self.name))
+                self.lazy_connect = False
+                self.setup()
+
+
+def register_connection(name, hosts, consistency=None, lazy_connect=False,
+                        retry_connect=False, cluster_options=None, default=False):
+
+    if name in _connections:
+        log.warning("Registering connection '{0}' when it already exists.".format(name))
+
+    conn = Connection(name, hosts, consistency=consistency,lazy_connect=lazy_connect,
+                      retry_connect=retry_connect, cluster_options=cluster_options)
+
+    _connections[name] = conn
+
+    if default:
+        _connections['_default_'] = conn
+
+    return conn
+
+
+def get_connection(name=None):
+
+    if not name:
+        name = '_default_'
+
+    if name not in _connections:
+        raise ValueError("Connection name '{0}' doesn't exist in the registry.".format(name))
+
+    conn = _connections[name]
+    conn.handle_lazy_connect()
+
+    return conn
+
+
 def default():
     """
     Configures the global mapper connection to localhost, using the driver defaults
     (except for row_factory)
     """
-    global cluster, session
 
-    if session:
-        log.warning("configuring new connection for cqlengine when one was already set")
+    try:
+        conn = get_connection()
+        if conn.session:
+            log.warning("configuring new connection for cqlengine when one was already set")
+    except:
+        pass
 
-    cluster = Cluster()
-    session = cluster.connect()
-
-    _setup_session(session)
+    conn = register_connection('default', hosts=None, default=True)
+    conn.setup()
 
     log.debug("cqlengine connection initialized with default session to localhost")
 
@@ -71,22 +169,23 @@ def set_session(s):
     Note: the mapper presently requires a Session :attr:`~.row_factory` set to ``dict_factory``.
     This may be relaxed in the future
     """
-    global cluster, session
 
-    if session:
+    conn = get_connection()
+
+    if conn.session:
         log.warning("configuring new connection for cqlengine when one was already set")
 
     if s.row_factory is not dict_factory:
         raise CQLEngineException("Failed to initialize: 'Session.row_factory' must be 'dict_factory'.")
-    session = s
-    cluster = s.cluster
+    conn.session = s
+    conn.cluster = s.cluster
 
     # Set default keyspace from given session's keyspace
-    if session.keyspace:
+    if conn.session.keyspace:
         from cassandra.cqlengine import models
-        models.DEFAULT_KEYSPACE = session.keyspace
+        models.DEFAULT_KEYSPACE = conn.session.keyspace
 
-    _setup_session(session)
+    conn.setup_session()
 
     log.debug("cqlengine connection initialized with %s", s)
 
@@ -108,53 +207,20 @@ def setup(
     :param bool retry_connect: True if we should retry to connect even if there was a connection failure initially
     :param \*\*kwargs: Pass-through keyword arguments for :class:`cassandra.cluster.Cluster`
     """
-    global cluster, session, lazy_connect_args
-
-    if 'username' in kwargs or 'password' in kwargs:
-        raise CQLEngineException("Username & Password are now handled by using the native driver's auth_provider")
 
     from cassandra.cqlengine import models
     models.DEFAULT_KEYSPACE = default_keyspace
 
-    if lazy_connect:
-        kwargs['default_keyspace'] = default_keyspace
-        kwargs['consistency'] = consistency
-        kwargs['lazy_connect'] = False
-        kwargs['retry_connect'] = retry_connect
-        lazy_connect_args = (hosts, kwargs)
-        return
-
-    cluster = Cluster(hosts, **kwargs)
-    try:
-        session = cluster.connect()
-        log.debug("cqlengine connection initialized with internally created session")
-    except NoHostAvailable:
-        if retry_connect:
-            log.warning("connect failed, setting up for re-attempt on first use")
-            kwargs['default_keyspace'] = default_keyspace
-            kwargs['consistency'] = consistency
-            kwargs['lazy_connect'] = False
-            kwargs['retry_connect'] = retry_connect
-            lazy_connect_args = (hosts, kwargs)
-        raise
-    if consistency is not None:
-        session.default_consistency_level = consistency
-
-    _setup_session(session)
-
-
-def _setup_session(session):
-    session.row_factory = dict_factory
-    enc = session.encoder
-    enc.mapping[tuple] = enc.cql_encode_tuple
-    _register_known_types(session.cluster)
+    conn = register_connection('default', hosts=hosts, consistency=consistency, lazy_connect=lazy_connect,
+                               retry_connect=retry_connect, cluster_options=kwargs, default=True)
+    conn.setup()
 
 
 def execute(query, params=None, consistency_level=None, timeout=NOT_SET):
 
-    handle_lazy_connect()
+    conn = get_connection()
 
-    if not session:
+    if not conn.session:
         raise CQLEngineException("It is required to setup() cqlengine before executing queries")
 
     if isinstance(query, SimpleStatement):
@@ -167,45 +233,27 @@ def execute(query, params=None, consistency_level=None, timeout=NOT_SET):
 
     log.debug(query.query_string)
 
-    result = session.execute(query, params, timeout=timeout)
+    result = conn.session.execute(query, params, timeout=timeout)
 
     return result
 
 
 def get_session():
-    handle_lazy_connect()
-    return session
+    conn = get_connection()
+    return conn.session
 
 
 def get_cluster():
-    handle_lazy_connect()
-    if not cluster:
+    conn = get_connection()
+    if not conn.cluster:
         raise CQLEngineException("%s.cluster is not configured. Call one of the setup or default functions first." % __name__)
-    return cluster
-
-
-def handle_lazy_connect():
-    global lazy_connect_args
-
-    # if lazy_connect_args is None, it means the cluster is setup and ready
-    # No need to acquire the lock
-    if not lazy_connect_args:
-        return
-
-    with lazy_connect_lock:
-        # lazy_connect_args might have been set to None by another thread while waiting the lock
-        # In this case, do nothing.
-        if lazy_connect_args:
-            log.debug("lazy connect")
-            hosts, kwargs = lazy_connect_args
-            setup(hosts, **kwargs)
-            lazy_connect_args = None
+    return conn.cluster
 
 
 def register_udt(keyspace, type_name, klass):
     udt_by_keyspace[keyspace][type_name] = klass
 
-    global cluster
+    cluster = get_cluster()
     if cluster:
         try:
             cluster.register_user_type(keyspace, type_name, klass)
