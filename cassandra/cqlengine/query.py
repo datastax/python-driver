@@ -965,6 +965,18 @@ class AbstractQuerySet(object):
         clone._timeout = timeout
         return clone
 
+    def using(self, keyspace=None):
+        """
+        Change the context on-the-fly of the Model class (connection, keyspace)
+        """
+
+        clone = copy.deepcopy(self)
+        if keyspace:
+            new_type = type(self.model.__name__, (self.model,), {'__keyspace__': keyspace})
+            clone.model = new_type
+
+        return clone
+
 
 class ResultObject(dict):
     """
