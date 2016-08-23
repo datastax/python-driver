@@ -29,6 +29,7 @@ log = logging.getLogger(__name__)
 NOT_SET = _NOT_SET  # required for passing timeout to Session.execute
 
 # connections registry
+DEFAULT_CONNECTION = '_default_'
 _connections = {}
 
 # Because type models may be registered before a connection is present,
@@ -124,18 +125,19 @@ def register_connection(name, hosts, consistency=None, lazy_connect=False,
     _connections[name] = conn
 
     if default:
-        _connections['_default_'] = conn
+        _connections[DEFAULT_CONNECTION] = conn
 
+    conn.setup()
     return conn
 
 
 def get_connection(name=None):
 
     if not name:
-        name = '_default_'
+        name = DEFAULT_CONNECTION
 
     if name not in _connections:
-        raise ValueError("Connection name '{0}' doesn't exist in the registry.".format(name))
+        raise CQLEngineException("Connection name '{0}' doesn't exist in the registry.".format(name))
 
     conn = _connections[name]
     conn.handle_lazy_connect()
@@ -211,14 +213,13 @@ def setup(
     from cassandra.cqlengine import models
     models.DEFAULT_KEYSPACE = default_keyspace
 
-    conn = register_connection('default', hosts=hosts, consistency=consistency, lazy_connect=lazy_connect,
-                               retry_connect=retry_connect, cluster_options=kwargs, default=True)
-    conn.setup()
+    register_connection('default', hosts=hosts, consistency=consistency, lazy_connect=lazy_connect,
+                        retry_connect=retry_connect, cluster_options=kwargs, default=True)
 
 
-def execute(query, params=None, consistency_level=None, timeout=NOT_SET):
+def execute(query, params=None, consistency_level=None, timeout=NOT_SET, connection=None):
 
-    conn = get_connection()
+    conn = get_connection(connection)
 
     if not conn.session:
         raise CQLEngineException("It is required to setup() cqlengine before executing queries")
@@ -238,22 +239,22 @@ def execute(query, params=None, consistency_level=None, timeout=NOT_SET):
     return result
 
 
-def get_session():
-    conn = get_connection()
+def get_session(connection=None):
+    conn = get_connection(connection)
     return conn.session
 
 
-def get_cluster():
-    conn = get_connection()
+def get_cluster(connection=None):
+    conn = get_connection(connection)
     if not conn.cluster:
         raise CQLEngineException("%s.cluster is not configured. Call one of the setup or default functions first." % __name__)
     return conn.cluster
 
 
-def register_udt(keyspace, type_name, klass):
+def register_udt(keyspace, type_name, klass, connection=None):
     udt_by_keyspace[keyspace][type_name] = klass
 
-    cluster = get_cluster()
+    cluster = get_cluster(connection)
     if cluster:
         try:
             cluster.register_user_type(keyspace, type_name, klass)

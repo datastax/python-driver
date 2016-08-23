@@ -290,7 +290,7 @@ class ContextQuery(object):
             raise CQLEngineException("Models must be derived from base Model.")
 
         ks = keyspace if keyspace else model.__keyspace__
-        new_type = type(model.__name__, (model,), {'__keyspace__': ks})
+        new_type = type(model.__name__, (model,), {'__keyspace__': ks, '__abstract__': model.__abstract__})
 
         self.model = new_type
 
@@ -972,7 +972,7 @@ class AbstractQuerySet(object):
 
         clone = copy.deepcopy(self)
         if keyspace:
-            new_type = type(self.model.__name__, (self.model,), {'__keyspace__': keyspace})
+            new_type = type(self.model.__name__, (self.model,), {'__keyspace__': keyspace, '__abstract__': self.model.__abstract__})
             clone.model = new_type
 
         return clone

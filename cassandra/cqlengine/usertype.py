@@ -4,7 +4,7 @@ import six
 from cassandra.util import OrderedDict
 from cassandra.cqlengine import CQLEngineException
 from cassandra.cqlengine import columns
-from cassandra.cqlengine import connection
+from cassandra.cqlengine import connection as conn
 from cassandra.cqlengine import models
 
 
@@ -112,8 +112,8 @@ class BaseUserType(object):
         return [(k, self[k]) for k in self]
 
     @classmethod
-    def register_for_keyspace(cls, keyspace):
-        connection.register_udt(keyspace, cls.type_name(), cls)
+    def register_for_keyspace(cls, keyspace, connection=None):
+        conn.register_udt(keyspace, cls.type_name(), cls, connection=connection)
 
     @classmethod
     def type_name(cls):
