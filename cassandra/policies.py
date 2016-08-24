@@ -884,3 +884,23 @@ class IdentityTranslator(AddressTranslator):
     """
     def translate(self, addr):
         return addr
+
+
+class EC2MultiRegionTranslator(AddressTranslator):
+    """
+    Resolves private ips of the hosts in the same datacenter as the client, and public ips of hosts in other datacenters.
+    """
+    def translate(self, addr):
+        """
+        Reverse DNS the public broadcast_address, then lookup that hostname to get the AWS-resolved IP, which
+        will point to the private IP address within the same datacenter.
+        """
+        # get family of this address so we translate to the same
+        family = socket.getaddrinfo(addr, 0, socket.AF_UNSPEC, socket.SOCK_STREAM)[0][0]
+        host = socket.getfqdn(addr)
+        for a in socket.getaddrinfo(host, 0, family, socket.SOCK_STREAM):
+            try:
+                return a[4][0]
+            except Exception:
+                pass
+        return addr
