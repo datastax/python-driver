@@ -35,7 +35,7 @@ from cassandra.pool import Host
 
 from tests.integration import get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass, \
     BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase, BasicExistingKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster, CASSANDRA_VERSION, \
-    BasicExistingSegregatedKeyspaceUnitTestCase, dseonly, DSE_VERSION
+    BasicExistingSegregatedKeyspaceUnitTestCase, dseonly, DSE_VERSION, get_supported_protocol_versions
 
 
 def setup_module():
@@ -711,6 +711,43 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertIn("user", cluster2.metadata.keyspaces[self.keyspace_name].user_types)
 
         cluster2.shutdown()
+
+    def test_refresh_user_type_metadata_proto_2(self):
+        """
+        Test to insure that protocol v1/v2 surface UDT metadata changes
+
+        @since 3.7.0
+        @jira_ticket PYTHON-106
+        @expected_result UDT metadata in the keyspace should be updated regardless of protocol version
+
+        @test_category metadata
+        """
+        if 1 not in get_supported_protocol_versions() and 2 not in get_supported_protocol_versions():
+                raise unittest.SkipTest("Protocol 1 or 2 is not support in Cassandra version ".format(CASSANDRA_VERSION))
+        cluster2 = None
+        if 2 in get_supported_protocol_versions():
+            cluster2 = Cluster(protocol_version=2)
+            session2 = cluster2.connect()
+        cluster1 = None
+        if 1 in get_supported_protocol_versions():
+            cluster1 = Cluster(protocol_version=1)
+            session1 = cluster1.connect()
+
+        if cluster2:
+            self.assertEqual(cluster2.metadata.keyspaces[self.keyspace_name].user_types, {})
+            session2.execute("CREATE TYPE {0}.user (age int, name text)".format(self.keyspace_name))
+            self.assertIn("user", cluster2.metadata.keyspaces[self.keyspace_name].user_types)
+            session2.execute("DROP TYPE {0}.user".format(self.keyspace_name))
+            self.assertEqual(cluster2.metadata.keyspaces[self.keyspace_name].user_types, {})
+            cluster2.shutdown()
+
+        if cluster1:
+            self.assertEqual(cluster1.metadata.keyspaces[self.keyspace_name].user_types, {})
+            session1.execute("CREATE TYPE {0}.user (age int, name text)".format(self.keyspace_name))
+            self.assertIn("user", cluster1.metadata.keyspaces[self.keyspace_name].user_types)
+            session1.execute("DROp TYPE {0}.user".format(self.keyspace_name))
+            self.assertEqual(cluster1.metadata.keyspaces[self.keyspace_name].user_types, {})
+            cluster1.shutdown()
 
     def test_refresh_user_function_metadata(self):
         """
