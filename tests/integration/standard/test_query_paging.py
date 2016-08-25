@@ -69,6 +69,34 @@ class QueryPagingTests(unittest.TestCase):
 
             self.assertEqual(100, len(list(self.session.execute(prepared))))
 
+    def test_paging_state(self):
+        """
+        Test to validate paging state api
+        @since 3.7.0
+        @jira_ticket PYTHON-200
+        @expected_result paging state should returned should be accurate, and allow for queries to be resumed.
+
+        @test_category queries
+        """
+        statements_and_params = zip(cycle(["INSERT INTO test3rf.test (k, v) VALUES (%s, 0)"]),
+                                    [(i, ) for i in range(100)])
+        execute_concurrent(self.session, list(statements_and_params))
+
+        list_all_results = []
+        self.session.default_fetch_size = 3
+
+        result_set = self.session.execute("SELECT * FROM test3rf.test")
+        while(result_set.has_more_pages):
+            for row in result_set.current_rows:
+                self.assertNotIn(row, list_all_results)
+            list_all_results.extend(result_set.current_rows)
+            page_state = result_set.paging_state
+            result_set = self.session.execute("SELECT * FROM test3rf.test", paging_state=page_state)
+
+        if(len(result_set.current_rows) > 0):
+            list_all_results.append(result_set.current_rows)
+        self.assertEqual(len(list_all_results), 100)
+
     def test_paging_verify_writes(self):
         statements_and_params = zip(cycle(["INSERT INTO test3rf.test (k, v) VALUES (%s, 0)"]),
                                     [(i, ) for i in range(100)])
