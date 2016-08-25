@@ -143,8 +143,12 @@ class BatchQuery(object):
 
     _consistency = None
 
+    _connection = None
+    _connection_explicit = False
+
+
     def __init__(self, batch_type=None, timestamp=None, consistency=None, execute_on_exception=False,
-                 timeout=conn.NOT_SET):
+                 timeout=conn.NOT_SET, connection=None):
         """
         :param batch_type: (optional) One of batch type values available through BatchType enum
         :type batch_type: str or None
@@ -161,6 +165,7 @@ class BatchQuery(object):
         :param timeout: (optional) Timeout for the entire batch (in seconds), if not specified fallback
             to default session timeout
         :type timeout: float or None
+        :param str connection: Connection name to use for the batch execution
         """
         self.queries = []
         self.batch_type = batch_type
@@ -173,6 +178,9 @@ class BatchQuery(object):
         self._callbacks = []
         self._executed = False
         self._context_entered = False
+        self._connection = connection
+        if connection:
+            self._connection_explicit = True
 
     def add_query(self, query):
         if not isinstance(query, BaseCQLStatement):
@@ -244,7 +252,7 @@ class BatchQuery(object):
 
         query_list.append('APPLY BATCH;')
 
-        tmp = conn.execute('\n'.join(query_list), parameters, self._consistency, self._timeout)
+        tmp = conn.execute('\n'.join(query_list), parameters, self._consistency, self._timeout, connection=self._connection)
         check_applied(tmp)
 
         self.queries = []
@@ -544,6 +552,9 @@ class AbstractQuerySet(object):
 
         Note: running a select query with a batch object will raise an exception
         """
+        if self._connection:
+            raise CQLEngineException("Cannot specify the connection on model in batch mode.")
+
         if batch_obj is not None and not isinstance(batch_obj, BatchQuery):
             raise CQLEngineException('batch_obj must be a BatchQuery instance or None')
         clone = copy.deepcopy(self)
@@ -974,6 +985,9 @@ class AbstractQuerySet(object):
         Change the context on-the-fly of the Model class (connection, keyspace)
         """
 
+        if connection and self._batch:
+            raise CQLEngineException("Cannot specify a connection on model in batch mode.")
+
         clone = copy.deepcopy(self)
         if keyspace:
             new_type = type(self.model.__name__, (self.model,), {'__keyspace__': keyspace})
@@ -1282,10 +1296,17 @@ class DMLQuery(object):
         self._timeout = timeout
 
     def _execute(self, statement):
+        connection = self.instance._get_connection() if self.instance else self.model._get_connection()
         if self._batch:
+            if self._batch._connection:
+                if not self._batch._connection_explicit and connection and \
+                        connection != self._batch._connection:
+                            raise CQLEngineException('BatchQuery queries must be executed on the same connection')
+            else:
+                # set the BatchQuery connection from the model
+                self._batch._connection = connection
             return self._batch.add_query(statement)
         else:
-            connection = self.instance._get_connection() if self.instance else self.model._get_connection()
             results = _execute_statement(self.model, statement, self._consistency, self._timeout, connection=connection)
             if self._if_not_exists or self._if_exists or self._conditional:
                 check_applied(results)
