@@ -810,7 +810,7 @@ class BaseModel(object):
 
     @classmethod
     def _class_get_connection(cls):
-        return cls.__connection__
+        return cls._connection or cls.__connection__
 
     def _inst_get_connection(self):
         return self._connection or self.__connection__

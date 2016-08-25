@@ -287,7 +287,7 @@ class ContextQuery(object):
 
     """
 
-    def __init__(self, model, keyspace=None):
+    def __init__(self, model, keyspace=None, connection=None):
         """
         :param model: A model. This should be a class type, not an instance.
         :param keyspace: (optional) A keyspace name
@@ -304,10 +304,14 @@ class ContextQuery(object):
             ks = keyspace
             self.model = _copy_model_class(model, {'__keyspace__': ks})
 
+        if connection:
+            self.model._connection = connection
+
     def __enter__(self):
         return self.model
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        self.model._connection = None
         return
 
 
@@ -991,7 +995,7 @@ class AbstractQuerySet(object):
         clone = copy.deepcopy(self)
         if keyspace:
             from cassandra.cqlengine.models import _copy_model_class
-            clone.model = type(self.model, {'__keyspace__': keyspace})
+            clone.model = _copy_model_class(self.model, {'__keyspace__': keyspace})
 
         if connection:
             clone._connection = connection
