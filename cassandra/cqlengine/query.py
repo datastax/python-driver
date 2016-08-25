@@ -285,33 +285,54 @@ class ContextQuery(object):
             with ContextQuery(Automobile, keyspace='test4') as A:
                 print len(A.objects.all())  # 0 result
 
+            # Multiple models
+            with ContextQuery(Automobile, Automobile2, connection='cluster2') as (A, A2):
+                print len(A.objects.all())
+                print len(A2.objects.all())
+
     """
 
-    def __init__(self, model, keyspace=None, connection=None):
+    def __init__(self, *args, **kwargs):
         """
-        :param model: A model. This should be a class type, not an instance.
-        :param keyspace: (optional) A keyspace name
+        :param *args: One or more models. A model should be a class type, not an instance.
+        :param **kwargs: (optional) Context parameters: can be keyspace or connection
         """
         from cassandra.cqlengine import models
 
-        if not issubclass(model, models.Model):
-            raise CQLEngineException("Models must be derived from base Model.")
+        self.models = []
 
-        self.model = model
+        if len(args) < 1:
+            raise CQLEngineException("No model provided.")
 
-        if keyspace:
-            from cassandra.cqlengine.models import _copy_model_class
-            ks = keyspace
-            self.model = _copy_model_class(model, {'__keyspace__': ks})
+        keyspace = kwargs.pop('keyspace', None)
+        connection = kwargs.pop('connection', None)
 
-        if connection:
-            self.model._connection = connection
+        if kwargs:
+            raise CQLEngineException("Unknown keyword argument(s): {0}".format(
+                ','.join(kwargs.keys())))
+
+        for model in args:
+            if not issubclass(model, models.Model):
+                raise CQLEngineException("Models must be derived from base Model.")
+
+            m = copy.deepcopy(model) if not keyspace else None
+
+            if keyspace:
+                from cassandra.cqlengine.models import _copy_model_class
+                ks = keyspace
+                m = _copy_model_class(model, {'__keyspace__': ks})
+
+            if connection:
+                m._connection = connection
+
+            self.models.append(m)
 
     def __enter__(self):
-        return self.model
+        if len(self.models) > 1:
+            return tuple(self.models)
+        return self.models[0]
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.model._connection = None
         return
 
 
