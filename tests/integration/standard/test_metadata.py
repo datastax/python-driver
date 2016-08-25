@@ -35,7 +35,7 @@ from cassandra.pool import Host
 
 from tests.integration import get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass, \
     BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase, BasicExistingKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster, CASSANDRA_VERSION, \
-    BasicExistingSegregatedKeyspaceUnitTestCase, dseonly, DSE_VERSION
+    BasicExistingSegregatedKeyspaceUnitTestCase, dseonly, DSE_VERSION, get_supported_protocol_versions
 
 
 def setup_module():
@@ -711,6 +711,40 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertIn("user", cluster2.metadata.keyspaces[self.keyspace_name].user_types)
 
         cluster2.shutdown()
+
+    def test_refresh_user_type_metadata_proto_2(self):
+        """
+        Test to insure that protocol v1/v2 surface UDT metadata changes
+
+        @since 3.7.0
+        @jira_ticket PYTHON-106
+        @expected_result UDT metadata in the keyspace should be updated regardless of protocol version
+
+        @test_category metadata
+        """
+        supported_versions = get_supported_protocol_versions()
+        if 2 not in supported_versions:  # 1 and 2 were dropped in the same version
+                raise unittest.SkipTest("Protocol versions 1 and 2 are not supported in Cassandra version ".format(CASSANDRA_VERSION))
+
+        for protocol_version in (1, 2):
+            cluster = Cluster(protocol_version=protocol_version)
+            session = cluster.connect()
+            self.assertEqual(cluster.metadata.keyspaces[self.keyspace_name].user_types, {})
+
+            session.execute("CREATE TYPE {0}.user (age int, name text)".format(self.keyspace_name))
+            self.assertIn("user", cluster.metadata.keyspaces[self.keyspace_name].user_types)
+            self.assertIn("age", cluster.metadata.keyspaces[self.keyspace_name].user_types["user"].field_names)
+            self.assertIn("name", cluster.metadata.keyspaces[self.keyspace_name].user_types["user"].field_names)
+
+            session.execute("ALTER TYPE {0}.user ADD flag boolean".format(self.keyspace_name))
+            self.assertIn("flag", cluster.metadata.keyspaces[self.keyspace_name].user_types["user"].field_names)
+
+            session.execute("ALTER TYPE {0}.user RENAME flag TO something".format(self.keyspace_name))
+            self.assertIn("something", cluster.metadata.keyspaces[self.keyspace_name].user_types["user"].field_names)
+
+            session.execute("DROP TYPE {0}.user".format(self.keyspace_name))
+            self.assertEqual(cluster.metadata.keyspaces[self.keyspace_name].user_types, {})
+            cluster.shutdown()
 
     def test_refresh_user_function_metadata(self):
         """
