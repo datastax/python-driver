@@ -300,9 +300,9 @@ class ContextQuery(object):
         self.model = model
 
         if keyspace:
+            from cassandra.cqlengine.models import _copy_model_class
             ks = keyspace
-            new_type = type(model.__name__, (model,), {'__keyspace__': ks})
-            self.model = new_type
+            self.model = _copy_model_class(model, {'__keyspace__': ks})
 
     def __enter__(self):
         return self.model
@@ -990,8 +990,8 @@ class AbstractQuerySet(object):
 
         clone = copy.deepcopy(self)
         if keyspace:
-            new_type = type(self.model.__name__, (self.model,), {'__keyspace__': keyspace})
-            clone.model = new_type
+            from cassandra.cqlengine.models import _copy_model_class
+            clone.model = type(self.model, {'__keyspace__': keyspace})
 
         if connection:
             clone._connection = connection

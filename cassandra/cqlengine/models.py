@@ -29,6 +29,14 @@ from cassandra.util import OrderedDict
 log = logging.getLogger(__name__)
 
 
+def _copy_model_class(model, attrs):
+    new_type = type(model.__name__, (model,), attrs)
+    new_type.__abstract__ = model.__abstract__
+    new_type.__discriminator_value__ = model.__discriminator_value__
+    new_type.__default_ttl__ = model.__default_ttl__
+    return new_type
+
+
 class ModelException(CQLEngineException):
     pass
 
