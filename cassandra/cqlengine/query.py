@@ -21,7 +21,7 @@ from warnings import warn
 
 from cassandra.query import SimpleStatement
 from cassandra.cqlengine import columns, CQLEngineException, ValidationError, UnicodeMixin
-from cassandra.cqlengine import connection
+from cassandra.cqlengine import connection as conn
 from cassandra.cqlengine.functions import Token, BaseQueryFunction, QueryValue
 from cassandra.cqlengine.operators import (InOperator, EqualsOperator, GreaterThanOperator,
                                            GreaterThanOrEqualOperator, LessThanOperator,
@@ -144,7 +144,7 @@ class BatchQuery(object):
     _consistency = None
 
     def __init__(self, batch_type=None, timestamp=None, consistency=None, execute_on_exception=False,
-                 timeout=connection.NOT_SET):
+                 timeout=conn.NOT_SET):
         """
         :param batch_type: (optional) One of batch type values available through BatchType enum
         :type batch_type: str or None
@@ -244,7 +244,7 @@ class BatchQuery(object):
 
         query_list.append('APPLY BATCH;')
 
-        tmp = connection.execute('\n'.join(query_list), parameters, self._consistency, self._timeout)
+        tmp = conn.execute('\n'.join(query_list), parameters, self._consistency, self._timeout)
         check_applied(tmp)
 
         self.queries = []
@@ -289,10 +289,12 @@ class ContextQuery(object):
         if not issubclass(model, models.Model):
             raise CQLEngineException("Models must be derived from base Model.")
 
-        ks = keyspace if keyspace else model.__keyspace__
-        new_type = type(model.__name__, (model,), {'__keyspace__': ks, '__abstract__': model.__abstract__})
+        self.model = model
 
-        self.model = new_type
+        if keyspace:
+            ks = keyspace
+            new_type = type(model.__name__, (model,), {'__keyspace__': ks})
+            self.model = new_type
 
     def __enter__(self):
         return self.model
@@ -345,9 +347,10 @@ class AbstractQuerySet(object):
         self._consistency = None
         self._timestamp = None
         self._if_not_exists = False
-        self._timeout = connection.NOT_SET
+        self._timeout = conn.NOT_SET
         self._if_exists = False
         self._fetch_size = None
+        self._connection = None
 
     @property
     def column_family_name(self):
@@ -357,7 +360,7 @@ class AbstractQuerySet(object):
         if self._batch:
             return self._batch.add_query(statement)
         else:
-            result = _execute_statement(self.model, statement, self._consistency, self._timeout)
+            result = _execute_statement(self.model, statement, self._consistency, self._timeout, connection=self._connection)
             if self._if_not_exists or self._if_exists or self._conditional:
                 check_applied(result)
             return result
@@ -928,6 +931,7 @@ class AbstractQuerySet(object):
             .if_not_exists(self._if_not_exists) \
             .timestamp(self._timestamp) \
             .if_exists(self._if_exists) \
+            .using(connection=self._connection) \
             .save()
 
     def delete(self):
@@ -965,15 +969,18 @@ class AbstractQuerySet(object):
         clone._timeout = timeout
         return clone
 
-    def using(self, keyspace=None):
+    def using(self, keyspace=None, connection=None):
         """
         Change the context on-the-fly of the Model class (connection, keyspace)
         """
 
         clone = copy.deepcopy(self)
         if keyspace:
-            new_type = type(self.model.__name__, (self.model,), {'__keyspace__': keyspace, '__abstract__': self.model.__abstract__})
+            new_type = type(self.model.__name__, (self.model,), {'__keyspace__': keyspace})
             clone.model = new_type
+
+        if connection:
+            clone._connection = connection
 
         return clone
 
@@ -1261,7 +1268,7 @@ class DMLQuery(object):
     _if_exists = False
 
     def __init__(self, model, instance=None, batch=None, ttl=None, consistency=None, timestamp=None,
-                 if_not_exists=False, conditional=None, timeout=connection.NOT_SET, if_exists=False):
+                 if_not_exists=False, conditional=None, timeout=conn.NOT_SET, if_exists=False):
         self.model = model
         self.column_family_name = self.model.column_family_name()
         self.instance = instance
@@ -1278,7 +1285,8 @@ class DMLQuery(object):
         if self._batch:
             return self._batch.add_query(statement)
         else:
-            results = _execute_statement(self.model, statement, self._consistency, self._timeout)
+            connection = self.instance._get_connection() if self.instance else self.model._get_connection()
+            results = _execute_statement(self.model, statement, self._consistency, self._timeout, connection=connection)
             if self._if_not_exists or self._if_exists or self._conditional:
                 check_applied(results)
             return results
@@ -1419,13 +1427,14 @@ class DMLQuery(object):
         self._execute(ds)
 
 
-def _execute_statement(model, statement, consistency_level, timeout):
+def _execute_statement(model, statement, consistency_level, timeout, connection=None):
     params = statement.get_context()
     s = SimpleStatement(str(statement), consistency_level=consistency_level, fetch_size=statement.fetch_size)
     if model._partition_key_index:
         key_values = statement.partition_key_values(model._partition_key_index)
         if not any(v is None for v in key_values):
-            parts = model._routing_key_from_values(key_values, connection.get_cluster().protocol_version)
+            parts = model._routing_key_from_values(key_values, conn.get_cluster(connection).protocol_version)
             s.routing_key = parts
             s.keyspace = model._get_keyspace()
-    return connection.execute(s, params, timeout=timeout)
+    connection = connection if connection else model._get_connection()
+    return conn.execute(s, params, timeout=timeout, connection=connection)

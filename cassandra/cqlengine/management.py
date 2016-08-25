@@ -23,7 +23,7 @@ from itertools import product
 from cassandra import metadata
 from cassandra.cqlengine import CQLEngineException
 from cassandra.cqlengine import columns, query
-from cassandra.cqlengine.connection import execute, get_cluster, DEFAULT_CONNECTION
+from cassandra.cqlengine.connection import execute, get_cluster, format_log_context
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.named import NamedTable
 from cassandra.cqlengine.usertype import UserType
@@ -53,16 +53,6 @@ def get_context(keyspaces, connections):
     connections = connections if connections else [None]
 
     return product(connections, keyspaces)
-
-
-def log_msg(msg, connection=None, keyspace=None):
-    """Format log message to add keyspace and connection context"""
-    connection_info = connection if connection else DEFAULT_CONNECTION
-    if keyspace:
-        msg = '[Connection: {0}, Keyspace: {1}] {2}'.format(connection_info, keyspace, msg)
-    else:
-        msg = '[Connection: {0}] {1}'.format(connection_info, msg)
-    return msg
 
 
 def create_keyspace_simple(name, replication_factor, durable_writes=True, connections=None):
@@ -116,11 +106,11 @@ def _create_keyspace(name, durable_writes, strategy_class, strategy_options, con
         cluster = get_cluster(connection)
 
         if name not in cluster.metadata.keyspaces:
-            log.info(log_msg("Creating keyspace %s", connection=connection), name)
+            log.info(format_log_context("Creating keyspace %s", connection=connection), name)
             ks_meta = metadata.KeyspaceMetadata(name, durable_writes, strategy_class, strategy_options)
             execute(ks_meta.as_cql_query(), connection=connection)
         else:
-            log.info(log_msg("Not creating keyspace %s because it already exists", connection=connection), name)
+            log.info(format_log_context("Not creating keyspace %s because it already exists", connection=connection), name)
 
     if connections:
         for connection in connections:
@@ -216,7 +206,7 @@ def _sync_table(model, connection=None):
     try:
         keyspace = cluster.metadata.keyspaces[ks_name]
     except KeyError:
-        msg = log_msg("Keyspace '{0}' for model {1} does not exist.", connection=connection)
+        msg = format_log_context("Keyspace '{0}' for model {1} does not exist.", connection=connection)
         raise CQLEngineException(msg.format(ks_name, model))
 
     tables = keyspace.tables
@@ -229,7 +219,7 @@ def _sync_table(model, connection=None):
             _sync_type(ks_name, udt, syncd_types, connection=connection)
 
     if raw_cf_name not in tables:
-        log.debug(log_msg("sync_table creating new table %s", keyspace=ks_name, connection=connection), cf_name)
+        log.debug(format_log_context("sync_table creating new table %s", keyspace=ks_name, connection=connection), cf_name)
         qs = _get_create_table(model)
 
         try:
@@ -240,7 +230,7 @@ def _sync_table(model, connection=None):
             if "Cannot add already existing column family" not in unicode(ex):
                 raise
     else:
-        log.debug(log_msg("sync_table checking existing table %s", keyspace=ks_name, connection=connection), cf_name)
+        log.debug(format_log_context("sync_table checking existing table %s", keyspace=ks_name, connection=connection), cf_name)
         table_meta = tables[raw_cf_name]
 
         _validate_pk(model, table_meta)
@@ -254,7 +244,7 @@ def _sync_table(model, connection=None):
             if db_name in table_columns:
                 col_meta = table_columns[db_name]
                 if col_meta.cql_type != col.db_type:
-                    msg = log_msg('Existing table {0} has column "{1}" with a type ({2}) differing from the model type ({3}).'
+                    msg = format_log_context('Existing table {0} has column "{1}" with a type ({2}) differing from the model type ({3}).'
                                   ' Model should be updated.', keyspace=ks_name, connection=connection)
                     msg = msg.format(cf_name, db_name, col_meta.cql_type, col.db_type)
                     warnings.warn(msg)
@@ -263,7 +253,7 @@ def _sync_table(model, connection=None):
                 continue
 
             if col.primary_key or col.primary_key:
-                msg = log_msg("Cannot add primary key '{0}' (with db_field '{1}') to existing table {2}", keyspace=ks_name, connection=connection)
+                msg = format_log_context("Cannot add primary key '{0}' (with db_field '{1}') to existing table {2}", keyspace=ks_name, connection=connection)
                 raise CQLEngineException(msg.format(model_name, db_name, cf_name))
 
             query = "ALTER TABLE {0} add {1}".format(cf_name, col.get_column_def())
@@ -271,7 +261,7 @@ def _sync_table(model, connection=None):
 
         db_fields_not_in_model = model_fields.symmetric_difference(table_columns)
         if db_fields_not_in_model:
-            msg = log_msg("Table {0} has fields not referenced by model: {1}", keyspace=ks_name, connection=connection)
+            msg = format_log_context("Table {0} has fields not referenced by model: {1}", keyspace=ks_name, connection=connection)
             log.info(msg.format(cf_name, db_fields_not_in_model))
 
         _update_options(model, connection=connection)
@@ -349,7 +339,7 @@ def _sync_type(ks_name, type_model, omit_subtypes=None, connection=None):
     defined_types = keyspace.user_types
 
     if type_name not in defined_types:
-        log.debug(log_msg("sync_type creating new type %s", keyspace=ks_name, connection=connection), type_name_qualified)
+        log.debug(format_log_context("sync_type creating new type %s", keyspace=ks_name, connection=connection), type_name_qualified)
         cql = get_create_type(type_model, ks_name)
         execute(cql, connection=connection)
         cluster.refresh_user_type_metadata(ks_name, type_name)
@@ -365,7 +355,7 @@ def _sync_type(ks_name, type_model, omit_subtypes=None, connection=None):
             else:
                 field_type = type_meta.field_types[defined_fields.index(field.db_field_name)]
                 if field_type != field.db_type:
-                    msg = log_msg('Existing user type {0} has field "{1}" with a type ({2}) differing from the model user type ({3}).'
+                    msg = format_log_context('Existing user type {0} has field "{1}" with a type ({2}) differing from the model user type ({3}).'
                                   ' UserType should be updated.', keyspace=ks_name, connection=connection)
                     msg = msg.format(type_name_qualified, field.db_field_name, field_type, field.db_type)
                     warnings.warn(msg)
@@ -374,12 +364,12 @@ def _sync_type(ks_name, type_model, omit_subtypes=None, connection=None):
         type_model.register_for_keyspace(ks_name, connection=connection)
 
         if len(defined_fields) == len(model_fields):
-            log.info(log_msg("Type %s did not require synchronization", keyspace=ks_name, connection=connection), type_name_qualified)
+            log.info(format_log_context("Type %s did not require synchronization", keyspace=ks_name, connection=connection), type_name_qualified)
             return
 
         db_fields_not_in_model = model_fields.symmetric_difference(defined_fields)
         if db_fields_not_in_model:
-            msg = log_msg("Type %s has fields not referenced by model: %s", keyspace=ks_name, connection=connection)
+            msg = format_log_context("Type %s has fields not referenced by model: %s", keyspace=ks_name, connection=connection)
             log.info(msg, type_name_qualified, db_fields_not_in_model)
 
 
@@ -464,7 +454,7 @@ def _update_options(model, connection=None):
     :rtype: bool
     """
     ks_name = model._get_keyspace()
-    msg = log_msg("Checking %s for option differences", keyspace=ks_name, connection=connection)
+    msg = format_log_context("Checking %s for option differences", keyspace=ks_name, connection=connection)
     log.debug(msg, model)
     model_options = model.__options__ or {}
 
@@ -480,7 +470,7 @@ def _update_options(model, connection=None):
         try:
             existing_value = existing_options[name]
         except KeyError:
-            msg = log_msg("Invalid table option: '%s'; known options: %s", keyspace=ks_name, connection=connection)
+            msg = format_log_context("Invalid table option: '%s'; known options: %s", keyspace=ks_name, connection=connection)
             raise KeyError(msg % (name, existing_options.keys()))
         if isinstance(existing_value, six.string_types):
             if value != existing_value:

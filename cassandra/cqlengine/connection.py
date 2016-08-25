@@ -38,6 +38,16 @@ _connections = {}
 udt_by_keyspace = defaultdict(dict)
 
 
+def format_log_context(msg, connection=None, keyspace=None):
+    """Format log message to add keyspace and connection context"""
+    connection_info = connection if connection else DEFAULT_CONNECTION
+    if keyspace:
+        msg = '[Connection: {0}, Keyspace: {1}] {2}'.format(connection_info, keyspace, msg)
+    else:
+        msg = '[Connection: {0}] {1}'.format(connection_info, msg)
+    return msg
+
+
 class UndefinedKeyspaceException(CQLEngineException):
     pass
 
@@ -79,10 +89,10 @@ class Connection(object):
         self.cluster = Cluster(self.hosts, **self.cluster_options)
         try:
             self.session = self.cluster.connect()
-            log.debug("cqlengine connection '{0}' initialized with internally created session".format(self.name))
+            log.debug(format_log_context("connection initialized with internally created session", connection=self.name))
         except NoHostAvailable:
             if self.retry_connect:
-                log.warning("connect failed for '{0}', setting up for re-attempt on first use".format(self.name))
+                log.warning(format_log_context("connect failed, setting up for re-attempt on first use", connection=self.name))
                 self.lazy_connect = True
             raise
 
@@ -108,7 +118,7 @@ class Connection(object):
             # lazy_connect might have been set to False by another thread while waiting the lock
             # In this case, do nothing.
             if self.lazy_connect:
-                log.debug("Lazy connect for connection '{0}'".format(self.name))
+                log.debug(format_log_context("Lazy connect for connection", connection=self.name))
                 self.lazy_connect = False
                 self.setup()
 
@@ -154,7 +164,7 @@ def default():
     try:
         conn = get_connection()
         if conn.session:
-            log.warning("configuring new connection for cqlengine when one was already set")
+            log.warning("configuring new default connection for cqlengine when one was already set")
     except:
         pass
 
@@ -175,7 +185,7 @@ def set_session(s):
     conn = get_connection()
 
     if conn.session:
-        log.warning("configuring new connection for cqlengine when one was already set")
+        log.warning("configuring new default connection for cqlengine when one was already set")
 
     if s.row_factory is not dict_factory:
         raise CQLEngineException("Failed to initialize: 'Session.row_factory' must be 'dict_factory'.")
@@ -189,7 +199,7 @@ def set_session(s):
 
     conn.setup_session()
 
-    log.debug("cqlengine connection initialized with %s", s)
+    log.debug("cqlengine default connection initialized with %s", s)
 
 
 def setup(
@@ -232,7 +242,7 @@ def execute(query, params=None, consistency_level=None, timeout=NOT_SET, connect
     elif isinstance(query, six.string_types):
         query = SimpleStatement(query, consistency_level=consistency_level)
 
-    log.debug(query.query_string)
+    log.debug(format_log_context(query.query_string, connection=connection))
 
     result = conn.session.execute(query, params, timeout=timeout)
 
