@@ -168,7 +168,7 @@ class Metadata(object):
         self.keyspaces[ks_name] = keyspace_meta
         if old_keyspace_meta:
             keyspace_meta.tables = old_keyspace_meta.tables
-            keyspace_meta.user_types = new_user_types or old_keyspace_meta.user_types
+            keyspace_meta.user_types = new_user_types if new_user_types is not None else old_keyspace_meta.user_types
             keyspace_meta.indexes = old_keyspace_meta.indexes
             keyspace_meta.functions = old_keyspace_meta.functions
             keyspace_meta.aggregates = old_keyspace_meta.aggregates

@@ -722,32 +722,29 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         @test_category metadata
         """
-        if 1 not in get_supported_protocol_versions() and 2 not in get_supported_protocol_versions():
-                raise unittest.SkipTest("Protocol 1 or 2 is not support in Cassandra version ".format(CASSANDRA_VERSION))
-        cluster2 = None
-        if 2 in get_supported_protocol_versions():
-            cluster2 = Cluster(protocol_version=2)
-            session2 = cluster2.connect()
-        cluster1 = None
-        if 1 in get_supported_protocol_versions():
-            cluster1 = Cluster(protocol_version=1)
-            session1 = cluster1.connect()
+        supported_versions = get_supported_protocol_versions()
+        if 2 not in supported_versions:  # 1 and 2 were dropped in the same version
+                raise unittest.SkipTest("Protocol versions 1 and 2 are not supported in Cassandra version ".format(CASSANDRA_VERSION))
 
-        if cluster2:
-            self.assertEqual(cluster2.metadata.keyspaces[self.keyspace_name].user_types, {})
-            session2.execute("CREATE TYPE {0}.user (age int, name text)".format(self.keyspace_name))
-            self.assertIn("user", cluster2.metadata.keyspaces[self.keyspace_name].user_types)
-            session2.execute("DROP TYPE {0}.user".format(self.keyspace_name))
-            self.assertEqual(cluster2.metadata.keyspaces[self.keyspace_name].user_types, {})
-            cluster2.shutdown()
+        for protocol_version in (1, 2):
+            cluster = Cluster(protocol_version=protocol_version)
+            session = cluster.connect()
+            self.assertEqual(cluster.metadata.keyspaces[self.keyspace_name].user_types, {})
 
-        if cluster1:
-            self.assertEqual(cluster1.metadata.keyspaces[self.keyspace_name].user_types, {})
-            session1.execute("CREATE TYPE {0}.user (age int, name text)".format(self.keyspace_name))
-            self.assertIn("user", cluster1.metadata.keyspaces[self.keyspace_name].user_types)
-            session1.execute("DROp TYPE {0}.user".format(self.keyspace_name))
-            self.assertEqual(cluster1.metadata.keyspaces[self.keyspace_name].user_types, {})
-            cluster1.shutdown()
+            session.execute("CREATE TYPE {0}.user (age int, name text)".format(self.keyspace_name))
+            self.assertIn("user", cluster.metadata.keyspaces[self.keyspace_name].user_types)
+            self.assertIn("age", cluster.metadata.keyspaces[self.keyspace_name].user_types["user"].field_names)
+            self.assertIn("name", cluster.metadata.keyspaces[self.keyspace_name].user_types["user"].field_names)
+
+            session.execute("ALTER TYPE {0}.user ADD flag boolean".format(self.keyspace_name))
+            self.assertIn("flag", cluster.metadata.keyspaces[self.keyspace_name].user_types["user"].field_names)
+
+            session.execute("ALTER TYPE {0}.user RENAME flag TO something".format(self.keyspace_name))
+            self.assertIn("something", cluster.metadata.keyspaces[self.keyspace_name].user_types["user"].field_names)
+
+            session.execute("DROP TYPE {0}.user".format(self.keyspace_name))
+            self.assertEqual(cluster.metadata.keyspaces[self.keyspace_name].user_types, {})
+            cluster.shutdown()
 
     def test_refresh_user_function_metadata(self):
         """
