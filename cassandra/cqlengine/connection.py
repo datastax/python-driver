@@ -141,6 +141,28 @@ def register_connection(name, hosts, consistency=None, lazy_connect=False,
     return conn
 
 
+def unregister_connection(name):
+
+    if name not in _connections:
+        return
+
+    if _connections[name] == _connections[DEFAULT_CONNECTION]:
+        del _connections[DEFAULT_CONNECTION]
+        log.warning("Unregistering default connection '{0}'. Use set_default_connection to set a new one.".format(name))
+
+    log.debug("Connection '{0}' has been removed from the registry.".format(name))
+    del _connections[name]
+
+
+def set_default_connection(name):
+
+    if name not in _connections:
+        raise CQLEngineException("Connection '{0}' doesn't exist.".format(name))
+
+    log.debug("Connection '{0}' has been set as default.".format(name))
+    _connections[DEFAULT_CONNECTION] = _connections[name]
+
+
 def get_connection(name=None):
 
     if not name:
