@@ -179,7 +179,7 @@ def get_connection(name=None):
 
 def default():
     """
-    Configures the global mapper connection to localhost, using the driver defaults
+    Configures the default connection to localhost, using the driver defaults
     (except for row_factory)
     """
 
@@ -198,7 +198,7 @@ def default():
 
 def set_session(s):
     """
-    Configures the global mapper connection with a preexisting :class:`cassandra.cluster.Session`
+    Configures the default connection with a preexisting :class:`cassandra.cluster.Session`
 
     Note: the mapper presently requires a Session :attr:`~.row_factory` set to ``dict_factory``.
     This may be relaxed in the future
