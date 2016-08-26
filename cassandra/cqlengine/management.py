@@ -182,7 +182,6 @@ def sync_table(model, keyspaces=None, connections=None):
 
     context = get_context(keyspaces, connections)
     for connection, keyspace in context:
-        connection = connection if connection else model._get_connection()
         with query.ContextQuery(model, keyspace=keyspace) as m:
             _sync_table(m, connection=connection)
 
@@ -201,6 +200,7 @@ def _sync_table(model, connection=None):
     raw_cf_name = model._raw_column_family_name()
 
     ks_name = model._get_keyspace()
+    connection = connection if connection else model._get_connection()
 
     cluster = get_cluster(connection)
 
@@ -508,13 +508,15 @@ def drop_table(model, keyspaces=None, connections=None):
 
     context = get_context(keyspaces, connections)
     for connection, keyspace in context:
-        connection = connection if connection else model._get_connection()
         with query.ContextQuery(model, keyspace=keyspace) as m:
             _drop_table(m, connection=connection)
+
 
 def _drop_table(model, connection=None):
     if not _allow_schema_modification():
         return
+
+    connection = connection if connection else model._get_connection()
 
     # don't try to delete non existant tables
     meta = get_cluster(connection).metadata
