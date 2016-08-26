@@ -1020,6 +1020,42 @@ class ContextManagementTest(unittest.TestCase):
         self.assertTrue(cluster.is_shutdown)
 
 
+class HostStateTest(unittest.TestCase):
+
+    def test_down_event_with_active_connection(self):
+        """
+        Test to ensure that on down calls to clusters with connections still active don't result in
+        a host being marked down. The second part of the test kills the connection then invokes
+        on_down, and ensures the state changes for host's metadata.
+
+        @since 3.7
+        @jira_ticket PYTHON-498
+        @expected_result host should never be toggled down while a connection is active.
+
+        @test_category connection
+        """
+        with Cluster(protocol_version=PROTOCOL_VERSION) as cluster:
+            session = cluster.connect()
+            random_host = cluster.metadata.all_hosts()[0]
+            cluster.on_down(random_host, False)
+            for _ in range(10):
+                new_host = cluster.metadata.all_hosts()[0]
+                self.assertTrue(new_host.is_up)
+                time.sleep(.01)
+
+            pool = session._pools.get(random_host)
+            pool.shutdown()
+            cluster.on_down(random_host, False)
+            was_marked_down = False
+            for _ in range(10):
+                new_host = cluster.metadata.all_hosts()[0]
+                if not new_host.is_up:
+                    was_marked_down = True
+                    break
+
+            self.assertTrue(was_marked_down)
+
+
 class DuplicateRpcTest(unittest.TestCase):
 
     load_balancing_policy = WhiteListRoundRobinPolicy(['127.0.0.1'])
