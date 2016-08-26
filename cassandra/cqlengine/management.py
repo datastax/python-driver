@@ -39,7 +39,7 @@ schema_columnfamilies = NamedTable('system', 'schema_columnfamilies')
 
 
 def get_context(keyspaces, connections):
-    """Return the execution context"""
+    """Return all the execution contexts"""
 
     if keyspaces:
         if not isinstance(keyspaces, (list, tuple)):
@@ -69,7 +69,7 @@ def create_keyspace_simple(name, replication_factor, durable_writes=True, connec
     :param str name: name of keyspace to create
     :param int replication_factor: keyspace replication factor, used with :attr:`~.SimpleStrategy`
     :param bool durable_writes: Write log is bypassed if set to False
-    :param str connections: List of connection names
+    :param list connections: List of connection names
     """
     _create_keyspace(name, durable_writes, 'SimpleStrategy',
                      {'replication_factor': replication_factor}, connections=connections)
@@ -89,7 +89,7 @@ def create_keyspace_network_topology(name, dc_replication_map, durable_writes=Tr
     :param str name: name of keyspace to create
     :param dict dc_replication_map: map of dc_names: replication_factor
     :param bool durable_writes: Write log is bypassed if set to False
-    :param str connections: List of connection names
+    :param list connections: List of connection names
     """
     _create_keyspace(name, durable_writes, 'NetworkTopologyStrategy', dc_replication_map, connections=connections)
 
@@ -129,7 +129,7 @@ def drop_keyspace(name, connections=None):
     Take care to execute schema modifications in a single context (i.e. not concurrently with other clients).**
 
     :param str name: name of keyspace to drop
-    :param str connections: List of connection names
+    :param list connections: List of connection names
     """
     if not _allow_schema_modification():
         return
@@ -182,6 +182,7 @@ def sync_table(model, keyspaces=None, connections=None):
 
     context = get_context(keyspaces, connections)
     for connection, keyspace in context:
+        connection = connection if connection else model._get_connection()
         with query.ContextQuery(model, keyspace=keyspace) as m:
             _sync_table(m, connection=connection)
 
@@ -507,6 +508,7 @@ def drop_table(model, keyspaces=None, connections=None):
 
     context = get_context(keyspaces, connections)
     for connection, keyspace in context:
+        connection = connection if connection else model._get_connection()
         with query.ContextQuery(model, keyspace=keyspace) as m:
             _drop_table(m, connection=connection)
 
