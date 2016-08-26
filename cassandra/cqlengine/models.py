@@ -29,7 +29,7 @@ from cassandra.util import OrderedDict
 log = logging.getLogger(__name__)
 
 
-def _copy_model_class(model, attrs):
+def _clone_model_class(model, attrs):
     new_type = type(model.__name__, (model,), attrs)
     new_type.__abstract__ = model.__abstract__
     new_type.__discriminator_value__ = model.__discriminator_value__
@@ -810,7 +810,7 @@ class BaseModel(object):
 
     @classmethod
     def _class_get_connection(cls):
-        return cls._connection or cls.__connection__
+        return cls.__connection__
 
     def _inst_get_connection(self):
         return self._connection or self.__connection__

@@ -315,15 +315,12 @@ class ContextQuery(object):
             if not issubclass(model, models.Model):
                 raise CQLEngineException("Models must be derived from base Model.")
 
-            m = copy.deepcopy(model) if not keyspace else None
+            m = models._clone_model_class(model, {})
 
             if keyspace:
-                from cassandra.cqlengine.models import _copy_model_class
-                ks = keyspace
-                m = _copy_model_class(model, {'__keyspace__': ks})
-
+                m.__keyspace__ = keyspace
             if connection:
-                m._connection = connection
+                m.__connection__ = connection
 
             self.models.append(m)
 
@@ -1015,8 +1012,8 @@ class AbstractQuerySet(object):
 
         clone = copy.deepcopy(self)
         if keyspace:
-            from cassandra.cqlengine.models import _copy_model_class
-            clone.model = _copy_model_class(self.model, {'__keyspace__': keyspace})
+            from cassandra.cqlengine.models import _clone_model_class
+            clone.model = _clone_model_class(self.model, {'__keyspace__': keyspace})
 
         if connection:
             clone._connection = connection
