@@ -723,7 +723,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         @test_category metadata
         """
         supported_versions = get_supported_protocol_versions()
-        if 2 not in supported_versions:  # 1 and 2 were dropped in the same version
+        if 2 not in supported_versions or CASSANDRA_VERSION < "2.1":  # 1 and 2 were dropped in the same version
                 raise unittest.SkipTest("Protocol versions 1 and 2 are not supported in Cassandra version ".format(CASSANDRA_VERSION))
 
         for protocol_version in (1, 2):
