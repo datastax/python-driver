@@ -113,11 +113,13 @@ class HeartbeatTest(unittest.TestCase):
         self.assertNotEqual(len(initial_connections), 0)
         self.cluster.register_listener(test_listener)
         # Pause the node
-        node.pause()
-        # Wait for connections associated with this host go away
-        self.wait_for_no_connections(host, self.cluster)
-        # Resume paused node
-        node.resume()
+        try:
+            node.pause()
+            # Wait for connections associated with this host go away
+            self.wait_for_no_connections(host, self.cluster)
+            # Resume paused node
+        finally:
+            node.resume()
         # Run a query to ensure connections are re-established
         current_host = ""
         count = 0

@@ -1047,12 +1047,12 @@ class HostStateTest(unittest.TestCase):
             pool.shutdown()
             cluster.on_down(random_host, False)
             was_marked_down = False
-            for _ in range(10):
+            for _ in range(20):
                 new_host = cluster.metadata.all_hosts()[0]
                 if not new_host.is_up:
                     was_marked_down = True
                     break
-
+                time.sleep(.01)
             self.assertTrue(was_marked_down)
 
 
