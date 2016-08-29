@@ -875,7 +875,7 @@ class AddressTranslator(object):
         """
         Accepts the node ip address, and returns a translated address to be used connecting to this node.
         """
-        raise NotImplementedError
+        raise NotImplementedError()
 
 
 class IdentityTranslator(AddressTranslator):
@@ -904,3 +904,57 @@ class EC2MultiRegionTranslator(AddressTranslator):
             except Exception:
                 pass
         return addr
+
+
+class SpeculativeExecutionPolicy(object):
+    """
+    Interface for specifying speculative execution plans
+    """
+
+    def new_plan(self, keyspace, statement):
+        """
+        Returns
+
+        :param keyspace:
+        :param statement:
+        :return:
+        """
+        raise NotImplementedError()
+
+
+class SpeculativeExecutionPlan(object):
+    def next_execution(self, host):
+        raise NotImplementedError()
+
+
+class NoSpeculativeExecutionPlan(SpeculativeExecutionPlan):
+    def next_execution(self, host):
+        return -1
+
+
+class NoSpeculativeExecutionPolicy(SpeculativeExecutionPolicy):
+
+    def new_plan(self, keyspace, statement):
+        return self.NoSpeculativeExecutionPlan()
+
+
+class ConstantSpeculativeExecutionPolicy(SpeculativeExecutionPolicy):
+
+    def __init__(self, delay, max_attempts):
+        self.delay = delay
+        self.max_attempts = max_attempts
+
+    class ConstantSpeculativeExecutionPlan(SpeculativeExecutionPlan):
+        def __init__(self, delay, max_attempts):
+            self.delay = delay
+            self.remaining = max_attempts
+
+        def next_execution(self, host):
+            if self.remaining > 0:
+                self.remaining -= 1
+                return self.delay
+            else:
+                return -1
+
+    def new_plan(self, keyspace, statement):
+        return self.ConstantSpeculativeExecutionPlan(self.delay, self.max_attempts)

@@ -215,11 +215,17 @@ class Statement(object):
     .. versionadded:: 2.6.0
     """
 
+    is_idempotent = False
+    """
+    Flag indicating whether this statement is safe to run multiple times in speculative execution.
+    """
+
     _serial_consistency_level = None
     _routing_key = None
 
     def __init__(self, retry_policy=None, consistency_level=None, routing_key=None,
-                 serial_consistency_level=None, fetch_size=FETCH_SIZE_UNSET, keyspace=None, custom_payload=None):
+                 serial_consistency_level=None, fetch_size=FETCH_SIZE_UNSET, keyspace=None, custom_payload=None,
+                 is_idempotent=False):
         if retry_policy and not hasattr(retry_policy, 'on_read_timeout'):  # just checking one method to detect positional parameter errors
             raise ValueError('retry_policy should implement cassandra.policies.RetryPolicy')
         self.retry_policy = retry_policy
@@ -234,6 +240,7 @@ class Statement(object):
             self.keyspace = keyspace
         if custom_payload is not None:
             self.custom_payload = custom_payload
+        self.is_idempotent = is_idempotent
 
     def _key_parts_packed(self, parts):
         for p in parts:
@@ -328,7 +335,7 @@ class SimpleStatement(Statement):
 
     def __init__(self, query_string, retry_policy=None, consistency_level=None, routing_key=None,
                  serial_consistency_level=None, fetch_size=FETCH_SIZE_UNSET, keyspace=None,
-                 custom_payload=None):
+                 custom_payload=None, is_idempotent=False):
         """
         `query_string` should be a literal CQL statement with the exception
         of parameter placeholders that will be filled through the
@@ -337,7 +344,7 @@ class SimpleStatement(Statement):
         See :class:`Statement` attributes for a description of the other parameters.
         """
         Statement.__init__(self, retry_policy, consistency_level, routing_key,
-                           serial_consistency_level, fetch_size, keyspace, custom_payload)
+                           serial_consistency_level, fetch_size, keyspace, custom_payload, is_idempotent)
         self._query_string = query_string
 
     @property
@@ -383,6 +390,7 @@ class PreparedStatement(object):
         self.keyspace = keyspace
         self.protocol_version = protocol_version
         self.result_metadata = result_metadata
+        self.is_idempotent = False
 
     @classmethod
     def from_message(cls, query_id, column_metadata, pk_indexes, cluster_metadata,
@@ -465,6 +473,7 @@ class BoundStatement(Statement):
         self.serial_consistency_level = prepared_statement.serial_consistency_level
         self.fetch_size = prepared_statement.fetch_size
         self.custom_payload = prepared_statement.custom_payload
+        self.is_idempotent = prepared_statement.is_idempotent
         self.values = []
 
         meta = prepared_statement.column_metadata

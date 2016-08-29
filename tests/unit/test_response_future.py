@@ -69,7 +69,7 @@ class ResponseFutureTests(unittest.TestCase):
 
         connection.send_msg.assert_called_once_with(rf.message, 1, cb=ANY, encoder=ProtocolHandler.encode_message, decoder=ProtocolHandler.decode_message, result_metadata=[])
 
-        rf._set_result(self.make_mock_response([{'col': 'val'}]))
+        rf._set_result(None, None, None, self.make_mock_response([{'col': 'val'}]))
         result = rf.result()
         self.assertEqual(result, [{'col': 'val'}])
 
@@ -81,7 +81,7 @@ class ResponseFutureTests(unittest.TestCase):
 
         rf = self.make_response_future(session)
         rf.send_request()
-        rf._set_result(object())
+        rf._set_result(None, None, None, object())
         self.assertRaises(ConnectionException, rf.result)
 
     def test_set_keyspace_result(self):
@@ -92,7 +92,7 @@ class ResponseFutureTests(unittest.TestCase):
         result = Mock(spec=ResultMessage,
                       kind=RESULT_KIND_SET_KEYSPACE,
                       results="keyspace1")
-        rf._set_result(result)
+        rf._set_result(None, None, None, result)
         rf._set_keyspace_completed({})
         self.assertFalse(rf.result())
 
@@ -106,15 +106,16 @@ class ResponseFutureTests(unittest.TestCase):
         result = Mock(spec=ResultMessage,
                       kind=RESULT_KIND_SCHEMA_CHANGE,
                       results=event_results)
-        rf._set_result(result)
-        session.submit.assert_called_once_with(ANY, ANY, rf, **event_results)
+        connection = Mock()
+        rf._set_result(None, connection, None, result)
+        session.submit.assert_called_once_with(ANY, ANY, rf, connection, **event_results)
 
     def test_other_result_message_kind(self):
         session = self.make_session()
         rf = self.make_response_future(session)
         rf.send_request()
         result = [1, 2, 3]
-        rf._set_result(Mock(spec=ResultMessage, kind=999, results=result))
+        rf._set_result(None, None, None, Mock(spec=ResultMessage, kind=999, results=result))
         self.assertListEqual(list(rf.result()), result)
 
     def test_read_timeout_error_message(self):
@@ -128,7 +129,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf.send_request()
 
         result = Mock(spec=ReadTimeoutErrorMessage, info={})
-        rf._set_result(result)
+        rf._set_result(None, None, None, result)
 
         self.assertRaises(Exception, rf.result)
 
@@ -143,7 +144,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf.send_request()
 
         result = Mock(spec=WriteTimeoutErrorMessage, info={})
-        rf._set_result(result)
+        rf._set_result(None, None, None, result)
         self.assertRaises(Exception, rf.result)
 
     def test_unavailable_error_message(self):
@@ -157,7 +158,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf.send_request()
 
         result = Mock(spec=UnavailableErrorMessage, info={})
-        rf._set_result(result)
+        rf._set_result(None, None, None, result)
         self.assertRaises(Exception, rf.result)
 
     def test_retry_policy_says_ignore(self):
@@ -171,7 +172,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf.send_request()
 
         result = Mock(spec=UnavailableErrorMessage, info={})
-        rf._set_result(result)
+        rf._set_result(None, None, None, result)
         self.assertFalse(rf.result())
 
     def test_retry_policy_says_retry(self):
@@ -195,20 +196,21 @@ class ResponseFutureTests(unittest.TestCase):
         connection.send_msg.assert_called_once_with(rf.message, 1, cb=ANY, encoder=ProtocolHandler.encode_message, decoder=ProtocolHandler.decode_message, result_metadata=[])
 
         result = Mock(spec=UnavailableErrorMessage, info={})
-        rf._set_result(result)
+        host = Mock()
+        rf._set_result(host, None, None, result)
 
-        session.submit.assert_called_once_with(rf._retry_task, True)
+        session.submit.assert_called_once_with(rf._retry_task, True, host)
         self.assertEqual(1, rf._query_retries)
 
         connection = Mock(spec=Connection)
         pool.borrow_connection.return_value = (connection, 2)
 
         # simulate the executor running this
-        rf._retry_task(True)
+        rf._retry_task(True, host)
 
         # it should try again with the same host since this was
         # an UnavailableException
-        rf.session._pools.get.assert_called_with('ip1')
+        rf.session._pools.get.assert_called_with(host)
         pool.borrow_connection.assert_called_with(timeout=ANY)
         connection.send_msg.assert_called_with(rf.message, 2, cb=ANY, encoder=ProtocolHandler.encode_message, decoder=ProtocolHandler.decode_message, result_metadata=[])
 
@@ -229,16 +231,17 @@ class ResponseFutureTests(unittest.TestCase):
         self.assertEqual(ConsistencyLevel.QUORUM, rf.message.consistency_level)
 
         result = Mock(spec=OverloadedErrorMessage, info={})
-        rf._set_result(result)
+        host = Mock()
+        rf._set_result(host, None, None, result)
 
-        session.submit.assert_called_once_with(rf._retry_task, False)
+        session.submit.assert_called_once_with(rf._retry_task, False, host)
         # query_retries does not get incremented for Overloaded/Bootstrapping errors
         self.assertEqual(0, rf._query_retries)
 
         connection = Mock(spec=Connection)
         pool.borrow_connection.return_value = (connection, 2)
         # simulate the executor running this
-        rf._retry_task(False)
+        rf._retry_task(False, host)
 
         # it should try with a different host
         rf.session._pools.get.assert_called_with('ip2')
@@ -259,21 +262,22 @@ class ResponseFutureTests(unittest.TestCase):
         rf.session._pools.get.assert_called_once_with('ip1')
 
         result = Mock(spec=IsBootstrappingErrorMessage, info={})
-        rf._set_result(result)
+        host = Mock()
+        rf._set_result(host, None, None, result)
 
         # simulate the executor running this
-        session.submit.assert_called_once_with(rf._retry_task, False)
-        rf._retry_task(False)
+        session.submit.assert_called_once_with(rf._retry_task, False, host)
+        rf._retry_task(False, host)
 
         # it should try with a different host
         rf.session._pools.get.assert_called_with('ip2')
 
         result = Mock(spec=IsBootstrappingErrorMessage, info={})
-        rf._set_result(result)
+        rf._set_result(host, None, None, result)
 
         # simulate the executor running this
-        session.submit.assert_called_with(rf._retry_task, False)
-        rf._retry_task(False)
+        session.submit.assert_called_with(rf._retry_task, False, host)
+        rf._retry_task(False, host)
 
         self.assertRaises(NoHostAvailable, rf.result)
 
@@ -295,7 +299,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf = self.make_response_future(session)
         rf.send_request()
 
-        rf._set_result(self.make_mock_response([{'col': 'val'}]))
+        rf._set_result(None, None, None, self.make_mock_response([{'col': 'val'}]))
 
         result = rf.result()
         self.assertEqual(result, [{'col': 'val'}])
@@ -319,7 +323,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf = self.make_response_future(session)
         rf.send_request()
 
-        rf._set_result(self.make_mock_response([{'col': 'val'}]))
+        rf._set_result(None, None, None, self.make_mock_response([{'col': 'val'}]))
         self.assertEqual(rf.result(), [{'col': 'val'}])
 
         # make sure the exception is recorded correctly
@@ -336,7 +340,7 @@ class ResponseFutureTests(unittest.TestCase):
         kwargs = {'one': 1, 'two': 2}
         rf.add_callback(callback, arg, **kwargs)
 
-        rf._set_result(self.make_mock_response(expected_result))
+        rf._set_result(None, None, None, self.make_mock_response(expected_result))
 
         result = rf.result()
         self.assertEqual(result, expected_result)
@@ -363,7 +367,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf.add_errback(self.assertIsInstance, Exception)
 
         result = Mock(spec=UnavailableErrorMessage, info={})
-        rf._set_result(result)
+        rf._set_result(None, None, None, result)
         self.assertRaises(Exception, rf.result)
 
         # this should get called immediately now that the error is set
@@ -385,7 +389,7 @@ class ResponseFutureTests(unittest.TestCase):
         kwargs2 = {'three': 3, 'four': 4}
         rf.add_callback(callback2, arg2, **kwargs2)
 
-        rf._set_result(self.make_mock_response(expected_result))
+        rf._set_result(None, None, None, self.make_mock_response(expected_result))
 
         result = rf.result()
         self.assertEqual(result, expected_result)
@@ -420,7 +424,7 @@ class ResponseFutureTests(unittest.TestCase):
         expected_exception = Unavailable("message", 1, 2, 3)
         result = Mock(spec=UnavailableErrorMessage, info={'something': 'here'})
         result.to_exception.return_value = expected_exception
-        rf._set_result(result)
+        rf._set_result(None, None, None, result)
         self.assertRaises(Exception, rf.result)
 
         callback.assert_called_once_with(expected_exception, arg, **kwargs)
@@ -442,7 +446,7 @@ class ResponseFutureTests(unittest.TestCase):
             errback=self.assertIsInstance, errback_args=(Exception,))
 
         result = Mock(spec=UnavailableErrorMessage, info={})
-        rf._set_result(result)
+        rf._set_result(None, None, None, result)
         self.assertRaises(Exception, rf.result)
 
         # test callback
@@ -457,7 +461,7 @@ class ResponseFutureTests(unittest.TestCase):
             callback=callback, callback_args=(arg,), callback_kwargs=kwargs,
             errback=self.assertIsInstance, errback_args=(Exception,))
 
-        rf._set_result(self.make_mock_response(expected_result))
+        rf._set_result(None, None, None, self.make_mock_response(expected_result))
         self.assertEqual(rf.result(), expected_result)
 
         callback.assert_called_once_with(expected_result, arg, **kwargs)
@@ -478,7 +482,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf._connection.keyspace = "FooKeyspace"
 
         result = Mock(spec=PreparedQueryNotFound, info='a' * 16)
-        rf._set_result(result)
+        rf._set_result(None, None, None, result)
 
         self.assertTrue(session.submit.call_args)
         args, kwargs = session.submit.call_args
@@ -502,5 +506,5 @@ class ResponseFutureTests(unittest.TestCase):
         rf._connection.keyspace = "BarKeyspace"
 
         result = Mock(spec=PreparedQueryNotFound, info='a' * 16)
-        rf._set_result(result)
+        rf._set_result(None, None, None, result)
         self.assertRaises(ValueError, rf.result)
