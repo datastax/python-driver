@@ -320,6 +320,17 @@ class RequestAnalyzer(object):
 
 class MetricsRequestSize(BasicExistingKeyspaceUnitTestCase):
 
+    def wait_for_count(self, ra, expected_count, error=False):
+        for _ in range(10):
+            if not error:
+                if ra.successful is expected_count:
+                    return True
+            else:
+                if ra.errors is expected_count:
+                    return True
+            time.sleep(.01)
+        return False
+
     def test_metrics_per_cluster(self):
         """
         Test to validate that requests listeners.
@@ -343,8 +354,9 @@ class MetricsRequestSize(BasicExistingKeyspaceUnitTestCase):
             except SyntaxException:
                 continue
 
-        self.assertEqual(ra.errors, 3)
-        self.assertEqual(ra.successful, 10)
+        self.assertTrue(self.wait_for_count(ra, 10))
+        self.assertTrue(self.wait_for_count(ra, 3, error=True))
+
 
         # Make sure a poorly coded RA doesn't cause issues
         RequestAnalyzer(self.session, throw_on_success=False, throw_on_fail=True)
