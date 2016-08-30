@@ -3231,10 +3231,12 @@ class ResponseFuture(object):
 
     coordinator_host = None
     """
-    The host an actual result from (
+    The host from which we recieved a response
     """
 
+    attempted_hosts = None
     """
+    A list of hosts tried, including all speculative executions, retries, and pages
     """
 
     session = None
@@ -3287,7 +3289,7 @@ class ResponseFuture(object):
         self._callbacks = []
         self._errbacks = []
         self._spec_execution_plan = speculative_execution_plan or self._spec_execution_plan
-        self._queried_hosts = []
+        self.attempted_hosts = []
 
     def _start_timer(self):
         if self._timer is None:
@@ -3385,6 +3387,7 @@ class ResponseFuture(object):
                                                             encoder=self._protocol_handler.encode_message,
                                                             decoder=self._protocol_handler.decode_message,
                                                             result_metadata=result_meta)
+            self.attempted_hosts.append(host)
             return request_id
         except NoConnectionsAvailable as exc:
             log.debug("All connections for host %s are at capacity, moving to the next host", host)
@@ -3640,7 +3643,6 @@ class ResponseFuture(object):
         Handle the response to our attempt to prepare a statement.
         If it succeeded, run the original query again against the same host.
         """
-        "AFTER PREPARE"
         if pool:
             pool.return_connection(connection)
 
