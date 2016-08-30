@@ -19,7 +19,6 @@ except ImportError:
     import unittest # noqa
 
 from mock import Mock, PropertyMock
-import warnings
 
 from cassandra.cluster import ResultSet
 

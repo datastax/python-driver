@@ -62,7 +62,8 @@ from cassandra.protocol import (QueryMessage, ResultMessage,
 from cassandra.metadata import Metadata, protect_name, murmur3
 from cassandra.policies import (TokenAwarePolicy, DCAwareRoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
-                                RetryPolicy, IdentityTranslator)
+                                RetryPolicy, IdentityTranslator, NoSpeculativeExecutionPlan,
+                                NoSpeculativeExecutionPolicy)
 from cassandra.pool import (Host, _ReconnectionHandler, _HostReconnectionHandler,
                             HostConnectionPool, HostConnection,
                             NoConnectionsAvailable)
@@ -240,15 +241,23 @@ class ExecutionProfile(object):
         - :func:`cassandra.query.ordered_dict_factory` - return a result row as an OrderedDict
     """
 
+    speculative_execution_policy = None
+    """
+    An instance of :class:`.policies.SpeculativeExecutionPolicy`
+
+    Defaults to :class:`.NoSpeculativeExecutionPolicy` if not specified
+    """
+
     def __init__(self, load_balancing_policy=None, retry_policy=None,
                  consistency_level=ConsistencyLevel.LOCAL_ONE, serial_consistency_level=None,
-                 request_timeout=10.0, row_factory=named_tuple_factory):
+                 request_timeout=10.0, row_factory=named_tuple_factory, speculative_execution_policy=None):
         self.load_balancing_policy = load_balancing_policy or default_lbp_factory()
         self.retry_policy = retry_policy or RetryPolicy()
         self.consistency_level = consistency_level
         self.serial_consistency_level = serial_consistency_level
         self.request_timeout = request_timeout
         self.row_factory = row_factory
+        self.speculative_execution_policy = speculative_execution_policy or NoSpeculativeExecutionPolicy()
 
 
 class ProfileManager(object):
@@ -2058,6 +2067,7 @@ class Session(object):
             retry_policy = query.retry_policy or self.cluster.default_retry_policy
             row_factory = self.row_factory
             load_balancing_policy = self.cluster.load_balancing_policy
+            spec_exec_policy = None
         else:
             execution_profile = self._get_execution_profile(execution_profile)
 
@@ -2070,6 +2080,8 @@ class Session(object):
             retry_policy = query.retry_policy or execution_profile.retry_policy
             row_factory = execution_profile.row_factory
             load_balancing_policy = execution_profile.load_balancing_policy
+            spec_exec_policy = execution_profile.speculative_execution_policy
+
 
         fetch_size = query.fetch_size
         if fetch_size is FETCH_SIZE_UNSET and self._protocol_version >= 2:
@@ -2077,8 +2089,9 @@ class Session(object):
         elif self._protocol_version == 1:
             fetch_size = None
 
+        start_time = time.time()
         if self._protocol_version >= 3 and self.use_client_timestamp:
-            timestamp = int(time.time() * 1e6)
+            timestamp = int(start_time * 1e6)
         else:
             timestamp = None
 
@@ -2112,9 +2125,11 @@ class Session(object):
         message.allow_beta_protocol_version = self.cluster.allow_beta_protocol_version
         message.paging_state = paging_state
 
+        spec_exec_plan = spec_exec_policy.new_plan(query.keyspace or self.keyspace, query) if query.is_idempotent and spec_exec_policy else None
         return ResponseFuture(
             self, message, query, timeout, metrics=self._metrics,
-            prepared_statement=prepared_statement, retry_policy=retry_policy, row_factory=row_factory, load_balancer=load_balancing_policy)
+            prepared_statement=prepared_statement, retry_policy=retry_policy, row_factory=row_factory,
+            load_balancer=load_balancing_policy, start_time=start_time, speculative_execution_plan=spec_exec_plan)
 
     def _get_execution_profile(self, ep):
         profiles = self.cluster.profile_manager.profiles
@@ -3172,11 +3187,11 @@ class _Scheduler(Thread):
                 exc_info=exc)
 
 
-def refresh_schema_and_set_result(control_conn, response_future, **kwargs):
+def refresh_schema_and_set_result(control_conn, response_future, connection, **kwargs):
     try:
         log.debug("Refreshing schema in response to schema change. "
                   "%s", kwargs)
-        response_future.is_schema_agreed = control_conn._refresh_schema(response_future._connection, **kwargs)
+        response_future.is_schema_agreed = control_conn._refresh_schema(connection, **kwargs)
     except Exception:
         log.exception("Exception refreshing schema in response to schema change:")
         response_future.session.submit(control_conn.refresh_schema, **kwargs)
@@ -3214,6 +3229,16 @@ class ResponseFuture(object):
     Size of the request message sent
     """
 
+    coordinator_host = None
+    """
+    The host from which we recieved a response
+    """
+
+    attempted_hosts = None
+    """
+    A list of hosts tried, including all speculative executions, retries, and pages
+    """
+
     session = None
     row_factory = None
     message = None
@@ -3230,7 +3255,6 @@ class ResponseFuture(object):
     _callbacks = None
     _errbacks = None
     _current_host = None
-    _current_pool = None
     _connection = None
     _query_retries = 0
     _start_time = None
@@ -3240,11 +3264,12 @@ class ResponseFuture(object):
     _warnings = None
     _timer = None
     _protocol_handler = ProtocolHandler
+    _spec_execution_plan = NoSpeculativeExecutionPlan()
 
     _warned_timeout = False
 
     def __init__(self, session, message, query, timeout, metrics=None, prepared_statement=None,
-                 retry_policy=RetryPolicy(), row_factory=None, load_balancer=None):
+                 retry_policy=RetryPolicy(), row_factory=None, load_balancer=None, start_time=None, speculative_execution_plan=None):
         self.session = session
         # TODO: normalize handling of retry policy and row factory
         self.row_factory = row_factory or session.row_factory
@@ -3252,21 +3277,29 @@ class ResponseFuture(object):
         self.message = message
         self.query = query
         self.timeout = timeout
+        self._time_remaining = timeout
         self._retry_policy = retry_policy
         self._metrics = metrics
         self.prepared_statement = prepared_statement
         self._callback_lock = Lock()
-        if metrics is not None:
-            self._start_time = time.time()
+        self._start_time = start_time or time.time()
         self._make_query_plan()
         self._event = Event()
         self._errors = {}
         self._callbacks = []
         self._errbacks = []
+        self._spec_execution_plan = speculative_execution_plan or self._spec_execution_plan
+        self.attempted_hosts = []
 
     def _start_timer(self):
-        if self.timeout is not None:
-            self._timer = self.session.cluster.connection_class.create_timer(self.timeout, self._on_timeout)
+        if self._timer is None:
+            spec_delay = self._spec_execution_plan.next_execution(self._current_host)
+            if spec_delay >= 0:
+                if self._time_remaining is None or self._time_remaining > spec_delay:
+                    self._timer = self.session.cluster.connection_class.create_timer(spec_delay, self._on_speculative_execute)
+                    return
+            if self._time_remaining is not None:
+                self._timer = self.session.cluster.connection_class.create_timer(self._time_remaining, self._on_timeout)
 
     def _cancel_timer(self):
         if self._timer:
@@ -3284,17 +3317,29 @@ class ResponseFuture(object):
 
         self._set_final_exception(OperationTimedOut(errors, self._current_host))
 
+    def _on_speculative_execute(self):
+        self._timer = None
+        if not self._event.is_set():
+            if self._time_remaining is not None:
+                elapsed = time.time() - self._start_time
+                self._time_remaining -= elapsed
+                if self._time_remaining <= 0:
+                    self._on_timeout()
+                    return
+            if not self.send_request(error_no_hosts=False):
+                self._start_timer()
+
+
     def _make_query_plan(self):
         # convert the list/generator/etc to an iterator so that subsequent
         # calls to send_request (which retries may do) will resume where
         # they last left off
         self.query_plan = iter(self._load_balancer.make_query_plan(self.session.keyspace, self.query))
 
-    def send_request(self):
+    def send_request(self, error_no_hosts=True):
         """ Internal """
         # query_plan is an iterator, so this will resume where we last left
         # off if send_request() is called multiple times
-        start = time.time()
         for host in self.query_plan:
             req_id = self._query(host)
             if req_id is not None:
@@ -3303,22 +3348,20 @@ class ResponseFuture(object):
                 # timer is only started here, after we have at least one message queued
                 # this is done to avoid overrun of timers with unfettered client requests
                 # in the case of full disconnect, where no hosts will be available
-                if self._timer is None:
-                    self._start_timer()
-                return
-            if self.timeout is not None and time.time() - start > self.timeout:
+                self._start_timer()
+                return True
+            if self.timeout is not None and time.time() - self._start_time > self.timeout:
                 self._on_timeout()
-                return
+                return True
 
-        self._set_final_exception(NoHostAvailable(
-            "Unable to complete the operation against any hosts", self._errors))
+        if error_no_hosts:
+            self._set_final_exception(NoHostAvailable(
+                "Unable to complete the operation against any hosts", self._errors))
+        return False
 
     def _query(self, host, message=None, cb=None):
         if message is None:
             message = self.message
-
-        if cb is None:
-            cb = self._set_result
 
         pool = self.session._pools.get(host)
         if not pool:
@@ -3329,7 +3372,6 @@ class ResponseFuture(object):
             return None
 
         self._current_host = host
-        self._current_pool = pool
 
         connection = None
         try:
@@ -3337,10 +3379,15 @@ class ResponseFuture(object):
             connection, request_id = pool.borrow_connection(timeout=2.0)
             self._connection = connection
             result_meta = self.prepared_statement.result_metadata if self.prepared_statement else []
+
+            if cb is None:
+                cb = partial(self._set_result, host, connection, pool)
+
             self.request_encoded_size = connection.send_msg(message, request_id, cb=cb,
                                                             encoder=self._protocol_handler.encode_message,
                                                             decoder=self._protocol_handler.decode_message,
                                                             result_metadata=result_meta)
+            self.attempted_hosts.append(host)
             return request_id
         except NoConnectionsAvailable as exc:
             log.debug("All connections for host %s are at capacity, moving to the next host", host)
@@ -3423,17 +3470,18 @@ class ResponseFuture(object):
         self._timer = None  # clear cancelled timer; new one will be set when request is queued
         self.send_request()
 
-    def _reprepare(self, prepare_message):
-        cb = partial(self.session.submit, self._execute_after_prepare)
-        request_id = self._query(self._current_host, prepare_message, cb=cb)
+    def _reprepare(self, prepare_message, host, connection, pool):
+        cb = partial(self.session.submit, self._execute_after_prepare, host, connection, pool)
+        request_id = self._query(host, prepare_message, cb=cb)
         if request_id is None:
             # try to submit the original prepared statement on some other host
             self.send_request()
 
-    def _set_result(self, response):
+    def _set_result(self, host, connection, pool, response):
         try:
-            if self._current_pool and self._connection:
-                self._current_pool.return_connection(self._connection)
+            self.coordinator_host = host
+            if pool:
+                pool.return_connection(connection)
 
             trace_id = getattr(response, 'trace_id', None)
             if trace_id:
@@ -3464,7 +3512,7 @@ class ResponseFuture(object):
                     self.session.submit(
                         refresh_schema_and_set_result,
                         self.session.cluster.control_connection,
-                        self, **response.results)
+                        self, connection, **response.results)
                 else:
                     results = getattr(response, 'results', None)
                     if results is not None and response.kind == RESULT_KIND_ROWS:
@@ -3495,14 +3543,14 @@ class ResponseFuture(object):
                         self._metrics.on_other_error()
                     # need to retry against a different host here
                     log.warning("Host %s is overloaded, retrying against a different "
-                                "host", self._current_host)
-                    self._retry(reuse_connection=False, consistency_level=None)
+                                "host", host)
+                    self._retry(reuse_connection=False, consistency_level=None, host=host)
                     return
                 elif isinstance(response, IsBootstrappingErrorMessage):
                     if self._metrics is not None:
                         self._metrics.on_other_error()
                     # need to retry against a different host here
-                    self._retry(reuse_connection=False, consistency_level=None)
+                    self._retry(reuse_connection=False, consistency_level=None, host=host)
                     return
                 elif isinstance(response, PreparedQueryNotFound):
                     if self.prepared_statement:
@@ -3536,11 +3584,11 @@ class ResponseFuture(object):
                         return
 
                     log.debug("Re-preparing unrecognized prepared statement against host %s: %s",
-                              self._current_host, prepared_statement.query_string)
+                              host, prepared_statement.query_string)
                     prepare_message = PrepareMessage(query=prepared_statement.query_string)
                     # since this might block, run on the executor to avoid hanging
                     # the event loop thread
-                    self.session.submit(self._reprepare, prepare_message)
+                    self.session.submit(self._reprepare, prepare_message, host, connection, pool)
                     return
                 else:
                     if hasattr(response, 'to_exception'):
@@ -3553,20 +3601,20 @@ class ResponseFuture(object):
                 if retry_type in (RetryPolicy.RETRY, RetryPolicy.RETRY_NEXT_HOST):
                     self._query_retries += 1
                     reuse = retry_type == RetryPolicy.RETRY
-                    self._retry(reuse_connection=reuse, consistency_level=consistency)
+                    self._retry(reuse, consistency, host)
                 elif retry_type is RetryPolicy.RETHROW:
                     self._set_final_exception(response.to_exception())
                 else:  # IGNORE
                     if self._metrics is not None:
                         self._metrics.on_ignore()
                     self._set_final_result(None)
-                self._errors[self._current_host] = response.to_exception()
+                self._errors[host] = response.to_exception()
             elif isinstance(response, ConnectionException):
                 if self._metrics is not None:
                     self._metrics.on_connection_error()
                 if not isinstance(response, ConnectionShutdown):
                     self._connection.defunct(response)
-                self._retry(reuse_connection=False, consistency_level=None)
+                self._retry(reuse_connection=False, consistency_level=None, host=host)
             elif isinstance(response, Exception):
                 if hasattr(response, 'to_exception'):
                     self._set_final_exception(response.to_exception())
@@ -3575,7 +3623,7 @@ class ResponseFuture(object):
             else:
                 # we got some other kind of response message
                 msg = "Got unexpected message: %r" % (response,)
-                exc = ConnectionException(msg, self._current_host)
+                exc = ConnectionException(msg, host)
                 self._connection.defunct(exc)
                 self._set_final_exception(exc)
         except Exception as exc:
@@ -3590,13 +3638,13 @@ class ResponseFuture(object):
             self._set_final_exception(ConnectionException(
                 "Failed to set keyspace on all hosts: %s" % (errors,)))
 
-    def _execute_after_prepare(self, response):
+    def _execute_after_prepare(self, host, connection, pool, response):
         """
         Handle the response to our attempt to prepare a statement.
         If it succeeded, run the original query again against the same host.
         """
-        if self._current_pool and self._connection:
-            self._current_pool.return_connection(self._connection)
+        if pool:
+            pool.return_connection(connection)
 
         if self._final_exception:
             return
@@ -3609,14 +3657,14 @@ class ResponseFuture(object):
 
                 # use self._query to re-use the same host and
                 # at the same time properly borrow the connection
-                request_id = self._query(self._current_host)
+                request_id = self._query(host)
                 if request_id is None:
                     # this host errored out, move on to the next
                     self.send_request()
             else:
                 self._set_final_exception(ConnectionException(
                     "Got unexpected response when preparing statement "
-                    "on host %s: %s" % (self._current_host, response)))
+                    "on host %s: %s" % (host, response)))
         elif isinstance(response, ErrorMessage):
             if hasattr(response, 'to_exception'):
                 self._set_final_exception(response.to_exception())
@@ -3624,14 +3672,14 @@ class ResponseFuture(object):
                 self._set_final_exception(response)
         elif isinstance(response, ConnectionException):
             log.debug("Connection error when preparing statement on host %s: %s",
-                      self._current_host, response)
+                      host, response)
             # try again on a different host, preparing again if necessary
-            self._errors[self._current_host] = response
+            self._errors[host] = response
             self.send_request()
         else:
             self._set_final_exception(ConnectionException(
                 "Got unexpected response type when preparing "
-                "statement on host %s: %s" % (self._current_host, response)))
+                "statement on host %s: %s" % (host, response)))
 
     def _set_final_result(self, response):
         self._cancel_timer()
@@ -3661,7 +3709,7 @@ class ResponseFuture(object):
             fn, args, kwargs = errback
             fn(response, *args, **kwargs)
 
-    def _retry(self, reuse_connection, consistency_level):
+    def _retry(self, reuse_connection, consistency_level, host):
         if self._final_exception:
             # the connection probably broke while we were waiting
             # to retry the operation
@@ -3673,15 +3721,15 @@ class ResponseFuture(object):
             self.message.consistency_level = consistency_level
 
         # don't retry on the event loop thread
-        self.session.submit(self._retry_task, reuse_connection)
+        self.session.submit(self._retry_task, reuse_connection, host)
 
-    def _retry_task(self, reuse_connection):
+    def _retry_task(self, reuse_connection, host):
         if self._final_exception:
             # the connection probably broke while we were waiting
             # to retry the operation
             return
 
-        if reuse_connection and self._query(self._current_host) is not None:
+        if reuse_connection and self._query(host) is not None:
             return
 
         # otherwise, move onto another host
@@ -3852,8 +3900,8 @@ class ResponseFuture(object):
 
     def __str__(self):
         result = "(no result yet)" if self._final_result is _NOT_SET else self._final_result
-        return "<ResponseFuture: query='%s' request_id=%s result=%s exception=%s host=%s>" \
-               % (self.query, self._req_id, result, self._final_exception, self._current_host)
+        return "<ResponseFuture: query='%s' request_id=%s result=%s exception=%s coordinator_host=%s>" \
+               % (self.query, self._req_id, result, self._final_exception, self.coordinator_host)
     __repr__ = __str__
 
 
