@@ -29,6 +29,17 @@ from cassandra.util import OrderedDict
 log = logging.getLogger(__name__)
 
 
+def _clone_model_class(model, attrs):
+    new_type = type(model.__name__, (model,), attrs)
+    try:
+        new_type.__abstract__ = model.__abstract__
+        new_type.__discriminator_value__ = model.__discriminator_value__
+        new_type.__default_ttl__ = model.__default_ttl__
+    except AttributeError:
+        pass
+    return new_type
+
+
 class ModelException(CQLEngineException):
     pass
 
@@ -231,6 +242,25 @@ class ConsistencyDescriptor(object):
         raise NotImplementedError
 
 
+class UsingDescriptor(object):
+    """
+    return a query set descriptor with a connection context specified
+    """
+    def __get__(self, instance, model):
+        if instance:
+            # instance method
+            def using_setter(connection=None):
+                if connection:
+                    instance._connection = connection
+                return instance
+            return using_setter
+
+        return model.objects.using
+
+    def __call__(self, *args, **kwargs):
+        raise NotImplementedError
+
+
 class ColumnQueryEvaluator(query.AbstractQueryableColumn):
     """
     Wraps a column and allows it to be used in comparator
@@ -323,6 +353,8 @@ class BaseModel(object):
 
     if_exists = IfExistsDescriptor()
 
+    using = UsingDescriptor()
+
     # _len is lazily created by __len__
 
     __table_name__ = None
@@ -330,6 +362,8 @@ class BaseModel(object):
     __table_name_case_sensitive__ = False
 
     __keyspace__ = None
+
+    __connection__ = None
 
     __discriminator_value__ = None
 
@@ -351,6 +385,8 @@ class BaseModel(object):
 
     _table_name = None  # used internally to cache a derived table name
 
+    _connection = None
+
     def __init__(self, **values):
         self._ttl = None
         self._timestamp = None
@@ -358,6 +394,7 @@ class BaseModel(object):
         self._batch = None
         self._timeout = connection.NOT_SET
         self._is_persisted = False
+        self._connection = None
 
         self._values = {}
         for name, column in self._columns.items():
@@ -769,10 +806,21 @@ class BaseModel(object):
 
     def _inst_batch(self, batch):
         assert self._timeout is connection.NOT_SET, 'Setting both timeout and batch is not supported'
+        if self._connection:
+            raise CQLEngineException("Cannot specify a connection on model in batch mode.")
         self._batch = batch
         return self
 
     batch = hybrid_classmethod(_class_batch, _inst_batch)
+
+    @classmethod
+    def _class_get_connection(cls):
+        return cls.__connection__
+
+    def _inst_get_connection(self):
+        return self._connection or self.__connection__
+
+    _get_connection = hybrid_classmethod(_class_get_connection, _inst_get_connection)
 
 
 class ModelMetaClass(type):
@@ -1000,6 +1048,11 @@ class Model(BaseModel):
     __keyspace__ = None
     """
     Sets the name of the keyspace used by this model.
+    """
+
+    __connection__ = None
+    """
+    Sets the name of the default connection used by this model.
     """
 
     __options__ = None

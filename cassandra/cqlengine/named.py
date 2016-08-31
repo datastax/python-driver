@@ -17,6 +17,7 @@ from cassandra.util import OrderedDict
 from cassandra.cqlengine import CQLEngineException
 from cassandra.cqlengine.columns import Column
 from cassandra.cqlengine.connection import get_cluster
+from cassandra.cqlengine.models import UsingDescriptor, BaseModel
 from cassandra.cqlengine.query import AbstractQueryableColumn, SimpleQuerySet
 from cassandra.cqlengine.query import DoesNotExist as _DoesNotExist
 from cassandra.cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
@@ -86,6 +87,13 @@ class NamedTable(object):
 
     _partition_key_index = None
 
+    __connection__ = None
+    _connection = None
+
+    using = UsingDescriptor()
+
+    _get_connection = BaseModel._get_connection
+
     class DoesNotExist(_DoesNotExist):
         pass
 
@@ -95,6 +103,7 @@ class NamedTable(object):
     def __init__(self, keyspace, name):
         self.keyspace = keyspace
         self.name = name
+        self._connection = None
 
     @property
     def _partition_keys(self):
@@ -104,7 +113,7 @@ class NamedTable(object):
 
     def _get_partition_keys(self):
         try:
-            table_meta = get_cluster().metadata.keyspaces[self.keyspace].tables[self.name]
+            table_meta = get_cluster(self._get_connection()).metadata.keyspaces[self.keyspace].tables[self.name]
             self.__partition_keys = OrderedDict((pk.name, Column(primary_key=True, partition_key=True, db_field=pk.name)) for pk in table_meta.partition_key)
         except Exception as e:
             raise CQLEngineException("Failed inspecting partition keys for {0}."

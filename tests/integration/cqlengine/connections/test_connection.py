@@ -40,7 +40,7 @@ class ConnectionTest(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.original_cluster = connection.cluster
+        cls.original_cluster = connection.get_cluster()
         cls.keyspace1 = 'ctest1'
         cls.keyspace2 = 'ctest2'
         super(ConnectionTest, cls).setUpClass()
@@ -95,4 +95,3 @@ class ConnectionTest(BaseCassEngTestCase):
         connection.set_session(self.session2)
         self.assertEqual(1, TestConnectModel.objects.count())
         self.assertEqual(TestConnectModel.objects.first(), TCM2)
-
