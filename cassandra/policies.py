@@ -935,7 +935,7 @@ class NoSpeculativeExecutionPlan(SpeculativeExecutionPlan):
 class NoSpeculativeExecutionPolicy(SpeculativeExecutionPolicy):
 
     def new_plan(self, keyspace, statement):
-        return self.NoSpeculativeExecutionPlan()
+        return NoSpeculativeExecutionPlan()
 
 
 class ConstantSpeculativeExecutionPolicy(SpeculativeExecutionPolicy):
