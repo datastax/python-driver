@@ -392,7 +392,7 @@ class AbstractQuerySet(object):
         if self._batch:
             return self._batch.add_query(statement)
         else:
-            connection = self._connection if self._connection else self.model._get_connection()
+            connection = self._connection or self.model._get_connection()
             result = _execute_statement(self.model, statement, self._consistency, self._timeout, connection=connection)
             if self._if_not_exists or self._if_exists or self._conditional:
                 check_applied(result)
@@ -1482,5 +1482,5 @@ def _execute_statement(model, statement, consistency_level, timeout, connection=
             parts = model._routing_key_from_values(key_values, conn.get_cluster(connection).protocol_version)
             s.routing_key = parts
             s.keyspace = model._get_keyspace()
-    connection = connection if connection else model._get_connection()
+    connection = connection or model._get_connection()
     return conn.execute(s, params, timeout=timeout, connection=connection)

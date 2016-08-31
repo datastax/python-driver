@@ -204,7 +204,7 @@ def _sync_table(model, connection=None):
     raw_cf_name = model._raw_column_family_name()
 
     ks_name = model._get_keyspace()
-    connection = connection if connection else model._get_connection()
+    connection = connection or model._get_connection()
 
     cluster = get_cluster(connection)
 
@@ -524,7 +524,7 @@ def _drop_table(model, connection=None):
     if not _allow_schema_modification():
         return
 
-    connection = connection if connection else model._get_connection()
+    connection = connection or model._get_connection()
 
     # don't try to delete non existant tables
     meta = get_cluster(connection).metadata
