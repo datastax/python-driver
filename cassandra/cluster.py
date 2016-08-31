@@ -2320,7 +2320,27 @@ class Session(object):
                 return False
 
             previous = self._pools.get(host)
-            self._pools[host] = new_pool
+            with self._lock:
+                while new_pool._keyspace != self.keyspace:
+                    self._lock.release()
+                    set_keyspace_event = Event()
+                    errors_returned = []
+
+                    def callback(pool, errors):
+                        errors_returned.extend(errors)
+                        set_keyspace_event.set()
+
+                    new_pool._set_keyspace_for_all_conns(self.keyspace, callback)
+                    set_keyspace_event.wait(self.cluster.connect_timeout)
+                    if not set_keyspace_event.is_set() or errors_returned:
+                        log.warning("Failed setting keyspace for pool after keyspace changed during connect: %s", errors_returned)
+                        self.cluster.on_down(host, is_host_addition)
+                        new_pool.shutdown()
+                        self._lock.acquire()
+                        return False
+                    self._lock.acquire()
+                self._pools[host] = new_pool
+
             log.debug("Added pool for host %s to session", host)
             if previous:
                 previous.shutdown()
@@ -2397,9 +2417,9 @@ class Session(object):
         called with a dictionary of all errors that occurred, keyed
         by the `Host` that they occurred against.
         """
-        self.keyspace = keyspace
-
-        remaining_callbacks = set(self._pools.values())
+        with self._lock:
+            self.keyspace = keyspace
+            remaining_callbacks = set(self._pools.values())
         errors = {}
 
         if not remaining_callbacks:
