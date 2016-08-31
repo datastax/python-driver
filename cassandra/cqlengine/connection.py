@@ -32,7 +32,7 @@ cluster = None
 session = None
 
 # connections registry
-DEFAULT_CONNECTION = '_default_'
+DEFAULT_CONNECTION = object()
 _connections = {}
 
 # Because type models may be registered before a connection is present,
@@ -43,7 +43,9 @@ udt_by_keyspace = defaultdict(dict)
 
 def format_log_context(msg, connection=None, keyspace=None):
     """Format log message to add keyspace and connection context"""
-    connection_info = connection if connection else DEFAULT_CONNECTION
+    connection_info = connection
+    if not connection_info:
+        connection_info = 'DEFAULT_CONNECTION'
     if keyspace:
         msg = '[Connection: {0}, Keyspace: {1}] {2}'.format(connection_info, keyspace, msg)
     else:
