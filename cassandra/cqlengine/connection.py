@@ -146,7 +146,7 @@ def unregister_connection(name):
     if name not in _connections:
         return
 
-    if _connections[name] == _connections[DEFAULT_CONNECTION]:
+    if DEFAULT_CONNECTION in _connections and _connections[name] == _connections[DEFAULT_CONNECTION]:
         del _connections[DEFAULT_CONNECTION]
         log.warning("Unregistering default connection '{0}'. Use set_default_connection to set a new one.".format(name))
 

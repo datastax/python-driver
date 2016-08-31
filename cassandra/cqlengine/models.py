@@ -31,9 +31,12 @@ log = logging.getLogger(__name__)
 
 def _clone_model_class(model, attrs):
     new_type = type(model.__name__, (model,), attrs)
-    new_type.__abstract__ = model.__abstract__
-    new_type.__discriminator_value__ = model.__discriminator_value__
-    new_type.__default_ttl__ = model.__default_ttl__
+    try:
+        new_type.__abstract__ = model.__abstract__
+        new_type.__discriminator_value__ = model.__discriminator_value__
+        new_type.__default_ttl__ = model.__default_ttl__
+    except AttributeError:
+        pass
     return new_type
 
 
@@ -803,6 +806,8 @@ class BaseModel(object):
 
     def _inst_batch(self, batch):
         assert self._timeout is connection.NOT_SET, 'Setting both timeout and batch is not supported'
+        if self._connection:
+            raise CQLEngineException("Cannot specify a connection on model in batch mode.")
         self._batch = batch
         return self
 

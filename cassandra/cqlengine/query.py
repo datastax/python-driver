@@ -302,18 +302,20 @@ class ContextQuery(object):
         self.models = []
 
         if len(args) < 1:
-            raise CQLEngineException("No model provided.")
+            raise ValueError("No model provided.")
 
         keyspace = kwargs.pop('keyspace', None)
         connection = kwargs.pop('connection', None)
 
         if kwargs:
-            raise CQLEngineException("Unknown keyword argument(s): {0}".format(
+            raise ValueError("Unknown keyword argument(s): {0}".format(
                 ','.join(kwargs.keys())))
 
         for model in args:
-            if not issubclass(model, models.Model):
-                raise CQLEngineException("Models must be derived from base Model.")
+            try:
+                issubclass(model, models.Model)
+            except TypeError:
+                raise ValueError("Models must be derived from base Model.")
 
             m = models._clone_model_class(model, {})
 
@@ -390,7 +392,8 @@ class AbstractQuerySet(object):
         if self._batch:
             return self._batch.add_query(statement)
         else:
-            result = _execute_statement(self.model, statement, self._consistency, self._timeout, connection=self._connection)
+            connection = self._connection if self._connection else self.model._get_connection()
+            result = _execute_statement(self.model, statement, self._consistency, self._timeout, connection=connection)
             if self._if_not_exists or self._if_exists or self._conditional:
                 check_applied(result)
             return result
