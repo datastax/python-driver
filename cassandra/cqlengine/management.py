@@ -38,7 +38,7 @@ log = logging.getLogger(__name__)
 schema_columnfamilies = NamedTable('system', 'schema_columnfamilies')
 
 
-def get_context(keyspaces, connections):
+def _get_context(keyspaces, connections):
     """Return all the execution contexts"""
 
     if keyspaces:
@@ -165,7 +165,11 @@ def sync_table(model, keyspaces=None, connections=None):
     """
     Inspects the model and creates / updates the corresponding table and columns.
 
-    If `keyspaces` is specified, the table will be synched for all specified keyspaces. Note that the `Model.__keyspace__` is ignored in that case.
+    If `keyspaces` is specified, the table will be synched for all specified keyspaces.
+    Note that the `Model.__keyspace__` is ignored in that case.
+
+    If `connections` is specified, the table will be synched for all specified connections. Note that the `Model.__connection__` is ignored in that case.
+    If not specified, it will try to get the connection from the Model.
 
     Any User Defined Types used in the table are implicitly synchronized.
 
@@ -180,7 +184,7 @@ def sync_table(model, keyspaces=None, connections=None):
     *There are plans to guard schema-modifying functions with an environment-driven conditional.*
     """
 
-    context = get_context(keyspaces, connections)
+    context = _get_context(keyspaces, connections)
     for connection, keyspace in context:
         with query.ContextQuery(model, keyspace=keyspace) as m:
             _sync_table(m, connection=connection)
@@ -500,13 +504,17 @@ def drop_table(model, keyspaces=None, connections=None):
 
     If `keyspaces` is specified, the table will be dropped for all specified keyspaces. Note that the `Model.__keyspace__` is ignored in that case.
 
+    If `connections` is specified, the table will be synched for all specified connections. Note that the `Model.__connection__` is ignored in that case.
+    If not specified, it will try to get the connection from the Model.
+
+
     **This function should be used with caution, especially in production environments.
     Take care to execute schema modifications in a single context (i.e. not concurrently with other clients).**
 
     *There are plans to guard schema-modifying functions with an environment-driven conditional.*
     """
 
-    context = get_context(keyspaces, connections)
+    context = _get_context(keyspaces, connections)
     for connection, keyspace in context:
         with query.ContextQuery(model, keyspace=keyspace) as m:
             _drop_table(m, connection=connection)
