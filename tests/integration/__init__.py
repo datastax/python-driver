@@ -31,6 +31,7 @@ from itertools import groupby
 from cassandra import OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure, AlreadyExists
 from cassandra.cluster import Cluster
 from cassandra.protocol import ConfigurationException
+from cassandra.policies import RoundRobinPolicy
 
 try:
     from ccmlib.cluster import Cluster as CCMCluster
