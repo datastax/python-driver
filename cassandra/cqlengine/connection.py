@@ -28,6 +28,9 @@ log = logging.getLogger(__name__)
 
 NOT_SET = _NOT_SET  # required for passing timeout to Session.execute
 
+cluster = None
+session = None
+
 # connections registry
 DEFAULT_CONNECTION = '_default_'
 _connections = {}
@@ -79,6 +82,7 @@ class Connection(object):
 
     def setup(self):
         """Setup the connection"""
+        global cluster, session
 
         if 'username' in self.cluster_options or 'password' in self.cluster_options:
             raise CQLEngineException("Username & Password are now handled by using the native driver's auth_provider")
@@ -98,6 +102,10 @@ class Connection(object):
 
         if self.consistency is not None:
             self.session.default_consistency_level = self.consistency
+
+        if DEFAULT_CONNECTION in _connections and _connections[DEFAULT_CONNECTION] == self:
+            cluster = _connections[DEFAULT_CONNECTION].cluster
+            session = _connections[DEFAULT_CONNECTION].session
 
         self.setup_session()
 
@@ -135,19 +143,22 @@ def register_connection(name, hosts, consistency=None, lazy_connect=False,
     _connections[name] = conn
 
     if default:
-        _connections[DEFAULT_CONNECTION] = conn
+        set_default_connection(name)
 
     conn.setup()
     return conn
 
 
 def unregister_connection(name):
+    global cluster, session
 
     if name not in _connections:
         return
 
     if DEFAULT_CONNECTION in _connections and _connections[name] == _connections[DEFAULT_CONNECTION]:
         del _connections[DEFAULT_CONNECTION]
+        cluster = None
+        session = None
         log.warning("Unregistering default connection '{0}'. Use set_default_connection to set a new one.".format(name))
 
     log.debug("Connection '{0}' has been removed from the registry.".format(name))
@@ -155,12 +166,15 @@ def unregister_connection(name):
 
 
 def set_default_connection(name):
+    global cluster, session
 
     if name not in _connections:
         raise CQLEngineException("Connection '{0}' doesn't exist.".format(name))
 
     log.debug("Connection '{0}' has been set as default.".format(name))
     _connections[DEFAULT_CONNECTION] = _connections[name]
+    cluster = _connections[name].cluster
+    session = _connections[name].session
 
 
 def get_connection(name=None):
