@@ -699,7 +699,7 @@ class BaseCollectionColumn(Column):
     """
     Base Container type for collection-like columns.
 
-    https://cassandra.apache.org/doc/cql3/CQL.html#collections
+    http://cassandra.apache.org/doc/cql3/CQL-3.0.html#collections
     """
     def __init__(self, types, **kwargs):
         """

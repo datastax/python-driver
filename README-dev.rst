@@ -7,6 +7,7 @@ Releasing
   * For beta releases, use a version like ``(2, 1, '0b1')``
   * For release candidates, use a version like ``(2, 1, '0rc1')``
   * When in doubt, follow PEP 440 versioning
+* Update the version in ``docs.yaml``
 
 * Commit the changelog and version changes
 * Tag the release.  For example: ``git tag -a 1.0.0 -m 'version 1.0.0'``
@@ -25,7 +26,7 @@ Releasing
 
 * Commit and push
 * Update 'cassandra-test' branch to reflect new release
-  
+
     * this is typically a matter of merging or rebasing onto master
     * test and push updated branch to origin
 
