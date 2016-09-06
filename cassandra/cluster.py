@@ -183,16 +183,10 @@ def _shutdown_clusters():
 atexit.register(_shutdown_clusters)
 
 
-# murmur3 implementation required for TokenAware is only available for CPython
-import platform
-if platform.python_implementation() == 'CPython':
-    def default_lbp_factory():
-        if murmur3 is not None:
-            return TokenAwarePolicy(DCAwareRoundRobinPolicy())
-        return DCAwareRoundRobinPolicy()
-else:
-    def default_lbp_factory():
-        return DCAwareRoundRobinPolicy()
+def default_lbp_factory():
+    if murmur3 is not None:
+        return TokenAwarePolicy(DCAwareRoundRobinPolicy())
+    return DCAwareRoundRobinPolicy()
 
 
 class ExecutionProfile(object):
