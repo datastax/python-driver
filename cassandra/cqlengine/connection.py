@@ -127,7 +127,7 @@ class Connection(object):
             # lazy_connect might have been set to False by another thread while waiting the lock
             # In this case, do nothing.
             if self.lazy_connect:
-                log.debug(format_log_context("Lazy connect for connection", connection=self.name))
+                log.debug(format_log_context("Lazy connect enabled", connection=self.name))
                 self.lazy_connect = False
                 self.setup()
 
@@ -162,8 +162,11 @@ def unregister_connection(name):
         session = None
         log.warning("Unregistering default connection '{0}'. Use set_default_connection to set a new one.".format(name))
 
-    log.debug("Connection '{0}' has been removed from the registry.".format(name))
+    conn = _connections[name]
+    if conn.cluster:
+        conn.cluster.shutdown()
     del _connections[name]
+    log.debug("Connection '{0}' has been removed from the registry.".format(name))
 
 
 def set_default_connection(name):
