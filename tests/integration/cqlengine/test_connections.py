@@ -17,10 +17,11 @@ from cassandra.cluster import NoHostAvailable
 from cassandra.cqlengine import columns, CQLEngineException
 from cassandra.cqlengine import connection as conn
 from cassandra.cqlengine.management import drop_keyspace, sync_table, drop_table, create_keyspace_simple
-from cassandra.cqlengine.models import Model
-from cassandra.cqlengine.query import ContextQuery, BatchQuery
+from cassandra.cqlengine.models import Model, QuerySetDescriptor
+from cassandra.cqlengine.query import ContextQuery, BatchQuery, ModelQuerySet
 from tests.integration.cqlengine import setup_connection, DEFAULT_KEYSPACE
 from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.integration.cqlengine.query import test_queryset
 
 
 class TestModel(Model):
@@ -71,11 +72,24 @@ class ContextQueryConnectionTests(BaseCassEngTestCase):
         conn.unregister_connection('cluster')
         setup_connection(DEFAULT_KEYSPACE)
 
-
     def setUp(self):
         super(BaseCassEngTestCase, self).setUp()
 
     def test_context_connection_priority(self):
+        """
+        Tests to ensure the proper connection priority is honored.
+
+        Explicit connection should have higest priority,
+        Followed by context query connection
+        Default connection should be honored last.
+
+        @since 3.7
+        @jira_ticket PYTHON-613
+        @expected_result priorities should be honored
+
+        @test_category object_mapper
+        """
+        # model keyspace write/read
 
         # Set the default connection on the Model
         TestModel.__connection__ = 'cluster'
@@ -100,6 +114,15 @@ class ContextQueryConnectionTests(BaseCassEngTestCase):
                 tm.objects.create(partition=1, cluster=1)
 
     def test_context_connection_with_keyspace(self):
+        """
+        Tests to ensure keyspace param is honored
+
+        @since 3.7
+        @jira_ticket PYTHON-613
+        @expected_result Invalid request is thrown
+
+        @test_category object_mapper
+        """
 
         # ks2 doesn't exist
         with ContextQuery(TestModel, connection='cluster', keyspace='ks2') as tm:
@@ -119,7 +142,6 @@ class ManagementConnectionTests(BaseCassEngTestCase):
         conn.register_connection('fake_cluster', ['127.0.0.100'], lazy_connect=True, retry_connect=True, default=True)
         conn.register_connection('cluster', ['127.0.0.1'])
 
-
     @classmethod
     def tearDownClass(cls):
         super(ManagementConnectionTests, cls).tearDownClass()
@@ -133,6 +155,15 @@ class ManagementConnectionTests(BaseCassEngTestCase):
         super(BaseCassEngTestCase, self).setUp()
 
     def test_create_drop_keyspace(self):
+        """
+        Tests drop and create keyspace with connections explicitly set
+
+        @since 3.7
+        @jira_ticket PYTHON-613
+        @expected_result keyspaces should be created and dropped
+
+        @test_category object_mapper
+        """
 
         # No connection (default is fake)
         with self.assertRaises(NoHostAvailable):
@@ -146,7 +177,15 @@ class ManagementConnectionTests(BaseCassEngTestCase):
             drop_keyspace(ks, connections=self.conns)
 
     def test_create_drop_table(self):
+        """
+        Tests drop and create Table with connections explicitly set
 
+        @since 3.7
+        @jira_ticket PYTHON-613
+        @expected_result Tables should be created and dropped
+
+        @test_category object_mapper
+        """
         for ks in self.keyspaces:
             create_keyspace_simple(ks, 1, connections=self.conns)
 
@@ -195,7 +234,6 @@ class BatchQueryConnectionTests(BaseCassEngTestCase):
         conn.register_connection('fake_cluster', ['127.0.0.100'], lazy_connect=True, retry_connect=True, default=True)
         conn.register_connection('cluster', ['127.0.0.1'])
 
-
     @classmethod
     def tearDownClass(cls):
         super(BatchQueryConnectionTests, cls).tearDownClass()
@@ -211,7 +249,15 @@ class BatchQueryConnectionTests(BaseCassEngTestCase):
         super(BaseCassEngTestCase, self).setUp()
 
     def test_basic_batch_query(self):
-        """Test BatchQuery requests"""
+        """
+        Test Batch queries with connections explicitly set
+
+        @since 3.7
+        @jira_ticket PYTHON-613
+        @expected_result queries should execute appropriately
+
+        @test_category object_mapper
+        """
 
         # No connection with a QuerySet (default is a fake one)
         with self.assertRaises(NoHostAvailable):
@@ -239,7 +285,15 @@ class BatchQueryConnectionTests(BaseCassEngTestCase):
             obj.batch(b).save()
 
     def test_batch_query_different_connection(self):
-        """Test BatchQuery with Models that have a different connection"""
+        """
+        Test BatchQuery with Models that have a different connection
+
+        @since 3.7
+        @jira_ticket PYTHON-613
+        @expected_result queries should execute appropriately
+
+        @test_category object_mapper
+        """
 
         # Testing on a model class
         TestModel.__connection__ = 'cluster'
@@ -274,7 +328,15 @@ class BatchQueryConnectionTests(BaseCassEngTestCase):
                 obj2.batch(b).save()
 
     def test_batch_query_connection_override(self):
-        """Test that we cannot override a BatchQuery connection per model"""
+        """
+        Test that we cannot override a BatchQuery connection per model
+
+        @since 3.7
+        @jira_ticket PYTHON-613
+        @expected_result Proper exceptions should be raised
+
+        @test_category object_mapper
+        """
 
         with self.assertRaises(CQLEngineException):
             with BatchQuery(connection='cluster') as b:
@@ -310,7 +372,6 @@ class UsingDescriptorTests(BaseCassEngTestCase):
         conn.register_connection('fake_cluster', ['127.0.0.100'], lazy_connect=True, retry_connect=True, default=True)
         conn.register_connection('cluster', ['127.0.0.1'])
 
-
     @classmethod
     def tearDownClass(cls):
         super(UsingDescriptorTests, cls).tearDownClass()
@@ -336,7 +397,15 @@ class UsingDescriptorTests(BaseCassEngTestCase):
         sync_table(TestModel, keyspaces=self.keyspaces, connections=self.conns)
 
     def test_keyspace(self):
+        """
+        Test keyspace segregation when same connection is used
 
+        @since 3.7
+        @jira_ticket PYTHON-613
+        @expected_result Keyspace segration is honored
+
+        @test_category object_mapper
+        """
         self._reset_data()
 
         with ContextQuery(TestModel, connection='cluster') as tm:
@@ -368,7 +437,15 @@ class UsingDescriptorTests(BaseCassEngTestCase):
             TestModel.objects.using(connection='cluster', keyspace='ks2').get(partition=2, cluster=2)
 
     def test_connection(self):
+        """
+        Test basic connection functionality
 
+        @since 3.7
+        @jira_ticket PYTHON-613
+        @expected_result proper connection should be used
+
+        @test_category object_mapper
+        """
         self._reset_data()
 
         # Model class
@@ -387,3 +464,151 @@ class UsingDescriptorTests(BaseCassEngTestCase):
         obj1.using(connection='cluster').delete()
         with self.assertRaises(TestModel.DoesNotExist):
             TestModel.objects.using(connection='cluster').get(partition=1, cluster=1)
+
+
+class ModelQuerySetNew(ModelQuerySet):
+    def __init__(self, *args, **kwargs):
+        super(ModelQuerySetNew, self).__init__(*args, **kwargs)
+        self._connection = "cluster"
+
+
+class BaseConnectionTestNoDefault(object):
+    conns = ['cluster']
+
+    @classmethod
+    def setUpClass(cls):
+        conn.register_connection('cluster', ['127.0.0.1'])
+        test_queryset.TestModel.__queryset__ = ModelQuerySetNew
+        test_queryset.IndexedTestModel.__queryset__ = ModelQuerySetNew
+        test_queryset.IndexedCollectionsTestModel.__queryset__ = ModelQuerySetNew
+        test_queryset.TestMultiClusteringModel.__queryset__ = ModelQuerySetNew
+
+        super(BaseConnectionTestNoDefault, cls).setUpClass()
+        conn.unregister_connection('default')
+
+    @classmethod
+    def tearDownClass(cls):
+        conn.unregister_connection('cluster')
+        setup_connection(DEFAULT_KEYSPACE)
+        super(BaseConnectionTestNoDefault, cls).tearDownClass()
+        # reset the default connection
+
+    def setUp(self):
+        super(BaseCassEngTestCase, self).setUp()
+
+
+class TestQuerySetOperationConnection(BaseConnectionTestNoDefault, test_queryset.TestQuerySetOperation):
+    """
+    Execute test_queryset.TestQuerySetOperation using non default connection
+
+    @since 3.7
+    @jira_ticket PYTHON-613
+    @expected_result proper connection should be used
+
+    @test_category object_mapper
+    """
+    pass
+
+
+class TestQuerySetDistinctNoDefault(BaseConnectionTestNoDefault, test_queryset.TestQuerySetDistinct):
+    """
+    Execute test_queryset.TestQuerySetDistinct using non default connection
+
+    @since 3.7
+    @jira_ticket PYTHON-613
+    @expected_result proper connection should be used
+
+    @test_category object_mapper
+    """
+    pass
+
+
+class TestQuerySetOrderingNoDefault(BaseConnectionTestNoDefault, test_queryset.TestQuerySetOrdering):
+    """
+    Execute test_queryset.TestQuerySetOrdering using non default connection
+
+    @since 3.7
+    @jira_ticket PYTHON-613
+    @expected_result proper connection should be used
+
+    @test_category object_mapper
+    """
+    pass
+
+
+class TestQuerySetCountSelectionAndIterationNoDefault(BaseConnectionTestNoDefault, test_queryset.TestQuerySetCountSelectionAndIteration):
+    """
+    Execute test_queryset.TestQuerySetOrdering using non default connection
+
+    @since 3.7
+    @jira_ticket PYTHON-613
+    @expected_result proper connection should be used
+
+    @test_category object_mapper
+    """
+    pass
+
+
+class TestQuerySetSlicingNoDefault(BaseConnectionTestNoDefault, test_queryset.TestQuerySetSlicing):
+    """
+    Execute test_queryset.TestQuerySetOrdering using non default connection
+
+    @since 3.7
+    @jira_ticket PYTHON-613
+    @expected_result proper connection should be used
+
+    @test_category object_mapper
+    """
+    pass
+
+
+class TestQuerySetValidationNoDefault(BaseConnectionTestNoDefault, test_queryset.TestQuerySetValidation):
+    """
+    Execute test_queryset.TestQuerySetOrdering using non default connection
+
+    @since 3.7
+    @jira_ticket PYTHON-613
+    @expected_result proper connection should be used
+
+    @test_category object_mapper
+    """
+    pass
+
+
+class TestQuerySetDeleteNoDefault(BaseConnectionTestNoDefault, test_queryset.TestQuerySetDelete):
+    """
+    Execute test_queryset.TestQuerySetDelete using non default connection
+
+    @since 3.7
+    @jira_ticket PYTHON-613
+    @expected_result proper connection should be used
+
+    @test_category object_mapper
+    """
+    pass
+
+
+class TestValuesListNoDefault(BaseConnectionTestNoDefault, test_queryset.TestValuesList):
+    """
+    Execute test_queryset.TestValuesList using non default connection
+
+    @since 3.7
+    @jira_ticket PYTHON-613
+    @expected_result proper connection should be used
+
+    @test_category object_mapper
+    """
+    pass
+
+
+class TestObjectsPropertyNoDefault(BaseConnectionTestNoDefault, test_queryset.TestObjectsProperty):
+    """
+    Execute test_queryset.TestObjectsProperty using non default connection
+
+    @since 3.7
+    @jira_ticket PYTHON-613
+    @expected_result proper connection should be used
+
+    @test_category object_mapper
+    """
+    pass
