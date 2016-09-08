@@ -119,7 +119,7 @@ extend the model's validation method:
             if self.name == 'jon':
                 raise ValidationError('no jon\'s allowed')
 
-*Note*: while not required, the convention is to raise a ``ValidationError`` (``from cqlengine import ValidationError``)
+*Note*: while not required, the convention is to raise a ``ValidationError`` (``from cassandra.cqlengine import ValidationError``)
 if validation fails.
 
 .. _model_inheritance:

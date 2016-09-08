@@ -12,7 +12,7 @@ Batch Query General Use Pattern
 
     .. code-block:: python
 
-        from cqlengine import BatchQuery
+        from cassandra.cqlengine import BatchQuery
 
         #using a context manager
         with BatchQuery() as b:
@@ -102,7 +102,7 @@ Logged vs Unlogged Batches
 
     .. code-block:: python
 
-        from cqlengine.query import BatchType
+        from cassandra.cqlengine.query import BatchType
         with BatchQuery(batch_type=BatchType.Unlogged) as b:
             LogEntry.batch(b).create(k=1, v=1)
             LogEntry.batch(b).create(k=1, v=2)

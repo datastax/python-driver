@@ -50,6 +50,8 @@ The methods here are used to filter, order, and constrain results.
 
     .. automethod:: ttl
 
+    .. automethod:: using
+
     .. _blind_updates:
 
     .. automethod:: update

@@ -274,6 +274,9 @@ class ContextQuery(object):
     A Context manager to allow a Model to switch context easily. Presently, the context only
     specifies a keyspace for model IO.
 
+    :param *args: One or more models. A model should be a class type, not an instance.
+    :param **kwargs: (optional) Context parameters: can be *keyspace* or *connection*
+
     For example:
 
     .. code-block:: python
@@ -293,10 +296,6 @@ class ContextQuery(object):
     """
 
     def __init__(self, *args, **kwargs):
-        """
-        :param *args: One or more models. A model should be a class type, not an instance.
-        :param **kwargs: (optional) Context parameters: can be keyspace or connection
-        """
         from cassandra.cqlengine import models
 
         self.models = []
@@ -1007,7 +1006,7 @@ class AbstractQuerySet(object):
 
     def using(self, keyspace=None, connection=None):
         """
-        Change the context on-the-fly of the Model class (connection, keyspace)
+        Change the context on-the-fly of the Model class (keyspace, connection)
         """
 
         if connection and self._batch:

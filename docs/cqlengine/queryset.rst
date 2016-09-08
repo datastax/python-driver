@@ -387,10 +387,10 @@ Named tables are a way of querying a table without creating an class.  They're u
 
     .. code-block:: python
 
-        from cqlengine.connection import setup
+        from cassandra.cqlengine.connection import setup
         setup("127.0.0.1", "cqlengine_test")
 
-        from cqlengine.named import NamedTable
+        from cassandra.cqlengine.named import NamedTable
         user = NamedTable("cqlengine_test", "user")
         user.objects()
         user.objects()[0]
