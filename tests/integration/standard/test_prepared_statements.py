@@ -386,6 +386,8 @@ class PreparedStatementTests(unittest.TestCase):
         with self.assertRaises(InvalidRequest):
             self.session.execute(prepared, [0])
 
+    # TODO revisit this test
+    @unittest.skip
     def test_invalidated_result_metadata(self):
         """
         Tests to make sure cached metadata is updated when an invalidated prepared statement is reprepared.
@@ -417,6 +419,7 @@ class PreparedStatementTests(unittest.TestCase):
         # Get a bunch of requests in the pipeline with varying states of result_meta, reprepare, resolved
         futures = set(s.execute_async(wildcard_prepared.bind(None)) for _ in range(200))
         for f in futures:
+
             self.assertEqual(f.result()[0], (0, 0, 0))
         self.assertIsNot(wildcard_prepared.result_metadata, original_result_metadata)
         s.execute("DROP TABLE %s" % table)

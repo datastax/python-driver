@@ -22,7 +22,7 @@ from cassandra import OperationTimedOut
 from cassandra.cluster import ExecutionProfile
 from cassandra.query import SimpleStatement
 from cassandra.policies import ConstantSpeculativeExecutionPolicy, RoundRobinPolicy
-from tests.integration import BasicSharedKeyspaceUnitTestCase
+from tests.integration import BasicSharedKeyspaceUnitTestCase, greaterthancass21
 
 
 def setup_module():
@@ -52,6 +52,7 @@ class SpecExecTest(BasicSharedKeyspaceUnitTestCase):
         self.cluster.add_execution_profile("spec_ep_rr", spec_ep_rr)
         self.cluster.add_execution_profile("spec_ep_rr_lim", spec_ep_rr_lim)
 
+    @greaterthancass21
     def test_speculative_execution(self):
         """
         Test to ensure that speculative execution honors LBP, and that they retry appropriately.
