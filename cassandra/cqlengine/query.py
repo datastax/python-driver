@@ -135,7 +135,7 @@ class BatchQuery(object):
     """
     Handles the batching of queries
 
-    http://www.datastax.com/docs/1.2/cql_cli/cql/BATCH
+    http://docs.datastax.com/en/cql/3.0/cql/cql_reference/batch_r.html
 
     See :doc:`/cqlengine/batches` for more details.
     """
