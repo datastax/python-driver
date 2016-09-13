@@ -32,6 +32,8 @@ Model
 
     .. autoattribute:: __keyspace__
 
+    .. autoattribute:: __connection__
+
     .. attribute:: __default_ttl__
         :annotation:  = None
 
@@ -168,6 +170,10 @@ Model
     .. method:: ttl(ttl_in_sec)
 
        Sets the ttl values to run instance updates and inserts queries with.
+
+    .. method:: using(keyspace=None, connection=None)
+
+        Change the context on the fly of the model instance (keyspace, connection)
 
     .. automethod:: column_family_name
 
