@@ -7,6 +7,8 @@ sections:
     type: sphinx
     directory: docs
 versions:
+  - name: 3.7
+    ref: 3.7-doc
   - name: 3.6
     ref: 3.6-doc
   - name: 3.5
