@@ -527,3 +527,38 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         u = User()
         u.age = 20
         self.assertEqual(20, u.age)
+
+    def test_default_values(self):
+        """
+        Test that default types are set on object creation for UDTs
+
+        @since 3.7.0
+        @jira_ticket PYTHON-606
+        @expected_result Default values should be set.
+
+        @test_category data_types:udt
+        """
+
+        class NestedUdt(UserType):
+
+            test_id = columns.UUID(default=uuid4)
+            something = columns.Text()
+            default_text = columns.Text(default="default text")
+
+        class OuterModel(Model):
+
+            name = columns.Text(primary_key=True)
+            first_name = columns.Text()
+            nested = columns.List(columns.UserDefinedType(NestedUdt))
+            simple = columns.UserDefinedType(NestedUdt)
+
+        sync_table(OuterModel)
+
+        t = OuterModel.create(name='test1')
+        t.nested = [NestedUdt(something='test')]
+        t.simple = NestedUdt(something="")
+        t.save()
+        self.assertIsNotNone(t.nested[0].test_id)
+        self.assertEqual(t.nested[0].default_text, "default text")
+        self.assertIsNotNone(t.simple.test_id)
+        self.assertEqual(t.simple.default_text, "default text")

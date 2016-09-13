@@ -250,7 +250,7 @@ See :ref:`query-paging` for full details.
 Protocol-Level Batch Statements
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 With version 1 of the native protocol, batching of statements required
-using a `BATCH cql query <http://cassandra.apache.org/doc/cql3/CQL.html#batchStmt>`_.
+using a `BATCH cql query <http://cassandra.apache.org/doc/cql3/CQL-3.0.html#batchStmt>`_.
 With version 2 of the native protocol, you can now batch statements at
 the protocol level. This allows you to use many different prepared
 statements within a single batch.

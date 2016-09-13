@@ -156,4 +156,3 @@ class TestTokenFunction(BaseCassEngTestCase):
         self.assertTrue(len(first_page) is 1)
         next_page = list(query.filter(pk__token__gt=functions.Token(last.key)))
         self.assertTrue(len(next_page) is 1)
-

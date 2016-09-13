@@ -13,7 +13,7 @@
 # limitations under the License.
 import os
 from cassandra.concurrent import execute_concurrent
-
+from cassandra import DriverException
 
 try:
     import unittest2 as unittest
@@ -25,7 +25,7 @@ from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
                              BatchStatement, BatchType, dict_factory, TraceUnavailable)
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.policies import HostDistance, RoundRobinPolicy
-
+from tests.unit.cython.utils import notcython
 from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions
 
 import time
@@ -69,6 +69,23 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         str(trace)
         for event in trace.events:
             str(event)
+
+    @notcython
+    def test_row_error_message(self):
+        """
+        Test to validate, new column deserialization message
+        @since 3.7.0
+        @jira_ticket PYTHON-361
+        @expected_result Special failed decoding message should be present
+
+        @test_category tracing
+        """
+        self.session.execute("CREATE TABLE {0}.{1} (k int PRIMARY KEY, v timestamp)".format(self.keyspace_name,self.function_table_name))
+        ss = SimpleStatement("INSERT INTO {0}.{1} (k, v) VALUES (1, 1000000000000000)".format(self.keyspace_name, self.function_table_name))
+        self.session.execute(ss)
+        with self.assertRaises(DriverException) as context:
+            self.session.execute("SELECT * FROM {0}.{1}".format(self.keyspace_name, self.function_table_name))
+        self.assertIn("Failed decoding result column", context.exception.message)
 
     def test_trace_id_to_resultset(self):
 

@@ -33,8 +33,8 @@ from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
 from cassandra.protocol import MAX_SUPPORTED_VERSION
 from cassandra.query import SimpleStatement, TraceUnavailable, tuple_factory
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, get_node, CASSANDRA_VERSION, execute_until_pass, execute_with_long_wait_retry, get_node,\
-    MockLoggingHandler, get_unsupported_lower_protocol, get_unsupported_upper_protocol
+from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, CASSANDRA_VERSION, execute_until_pass, execute_with_long_wait_retry, get_node,\
+    MockLoggingHandler, get_unsupported_lower_protocol, get_unsupported_upper_protocol, protocolv5
 from tests.integration.util import assert_quiescent_pool_state
 
 
@@ -460,7 +460,7 @@ class ClusterTests(unittest.TestCase):
             end_time = time.time()
             self.assertGreaterEqual(end_time - start_time, agreement_timeout)
             self.assertIs(original_meta, c.metadata.keyspaces)
-            
+
             # refresh wait overrides cluster value
             original_meta = c.metadata.keyspaces
             start_time = time.time()
@@ -489,7 +489,7 @@ class ClusterTests(unittest.TestCase):
             self.assertLess(end_time - start_time, refresh_threshold)
             self.assertIsNot(original_meta, c.metadata.keyspaces)
             self.assertEqual(original_meta, c.metadata.keyspaces)
-            
+
             # refresh wait overrides cluster value
             original_meta = c.metadata.keyspaces
             start_time = time.time()
@@ -587,7 +587,7 @@ class ClusterTests(unittest.TestCase):
             cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         session = cluster.connect(wait_for_all_pools=True)
 
-        # This test relies on impl details of connection req id management to see if heartbeats 
+        # This test relies on impl details of connection req id management to see if heartbeats
         # are being sent. May need update if impl is changed
         connection_request_ids = {}
         for h in cluster.get_connection_holders():
@@ -763,7 +763,7 @@ class ClusterTests(unittest.TestCase):
             expected_hosts = set(cluster.metadata.all_hosts())
             rr1_queried_hosts = set()
             rr2_queried_hosts = set()
-           
+
             rs = session.execute(query, execution_profile='rr1')
             rr1_queried_hosts.add(rs.response_future._current_host)
             rs = session.execute(query, execution_profile='rr2')
@@ -1020,6 +1020,42 @@ class ContextManagementTest(unittest.TestCase):
         self.assertTrue(cluster.is_shutdown)
 
 
+class HostStateTest(unittest.TestCase):
+
+    def test_down_event_with_active_connection(self):
+        """
+        Test to ensure that on down calls to clusters with connections still active don't result in
+        a host being marked down. The second part of the test kills the connection then invokes
+        on_down, and ensures the state changes for host's metadata.
+
+        @since 3.7
+        @jira_ticket PYTHON-498
+        @expected_result host should never be toggled down while a connection is active.
+
+        @test_category connection
+        """
+        with Cluster(protocol_version=PROTOCOL_VERSION) as cluster:
+            session = cluster.connect()
+            random_host = cluster.metadata.all_hosts()[0]
+            cluster.on_down(random_host, False)
+            for _ in range(10):
+                new_host = cluster.metadata.all_hosts()[0]
+                self.assertTrue(new_host.is_up)
+                time.sleep(.01)
+
+            pool = session._pools.get(random_host)
+            pool.shutdown()
+            cluster.on_down(random_host, False)
+            was_marked_down = False
+            for _ in range(20):
+                new_host = cluster.metadata.all_hosts()[0]
+                if not new_host.is_up:
+                    was_marked_down = True
+                    break
+                time.sleep(.01)
+            self.assertTrue(was_marked_down)
+
+
 class DuplicateRpcTest(unittest.TestCase):
 
     load_balancing_policy = WhiteListRoundRobinPolicy(['127.0.0.1'])
@@ -1054,3 +1090,48 @@ class DuplicateRpcTest(unittest.TestCase):
         self.assertEqual(len(warnings), 1)
         self.assertTrue('multiple' in warnings[0])
         logger.removeHandler(mock_handler)
+
+
+@protocolv5
+class BetaProtocolTest(unittest.TestCase):
+
+    @protocolv5
+    def test_invalid_protocol_version_beta_option(self):
+        """
+        Test cluster connection with protocol v5 and beta flag not set
+
+        @since 3.7.0
+        @jira_ticket PYTHON-614
+        @expected_result client shouldn't connect with V5 and no beta flag set
+
+        @test_category connection
+        """
+
+        cluster = Cluster(protocol_version=MAX_SUPPORTED_VERSION, allow_beta_protocol_version=False)
+        try:
+            with self.assertRaises(NoHostAvailable):
+                cluster.connect()
+        except Exception as e:
+            self.fail("Unexpected error encountered {0}".format(e.message))
+            cluster.shutdown()
+
+    @protocolv5
+    def test_valid_protocol_version_beta_options_connect(self):
+        """
+        Test cluster connection with protocol version 5 and beta flag set
+
+        @since 3.7.0
+        @jira_ticket PYTHON-614
+        @expected_result client should connect with protocol v5 and beta flag set.
+
+        @test_category connection
+        """
+        cluster = Cluster(protocol_version=MAX_SUPPORTED_VERSION, allow_beta_protocol_version=True)
+        session = cluster.connect()
+        self.assertEqual(cluster.protocol_version, MAX_SUPPORTED_VERSION)
+        self.assertTrue(session.execute("select release_version from system.local")[0])
+
+
+
+
+

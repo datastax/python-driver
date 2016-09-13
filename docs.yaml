@@ -7,7 +7,11 @@ sections:
     type: sphinx
     directory: docs
 versions:
-  - name: 3.5.0
-    ref: 3.5.0
-redirects:
-  - \A\/(.*)/\Z: /\1.html
+  - name: 3.7
+    ref: 3.7-doc
+  - name: 3.6
+    ref: 3.6-doc
+  - name: 3.5
+    ref: 3.5-doc
+-redirects:
+-  - \A\/(.*)/\Z: /\1.html

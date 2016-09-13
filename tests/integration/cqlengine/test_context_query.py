@@ -46,6 +46,7 @@ class ContextQueryTests(BaseCassEngTestCase):
         for ks in cls.KEYSPACES:
             drop_keyspace(ks)
 
+
     def setUp(self):
         super(ContextQueryTests, self).setUp()
         for ks in self.KEYSPACES:
@@ -125,3 +126,50 @@ class ContextQueryTests(BaseCassEngTestCase):
 
             self.assertEqual(42, tm.objects.get(partition=1).count)
 
+    def test_context_multiple_models(self):
+        """
+        Tests the use of multiple models with the context manager
+
+        @since 3.7
+        @jira_ticket PYTHON-613
+        @expected_result all models are properly updated with the context
+
+        @test_category query
+        """
+
+        with ContextQuery(TestModel, TestModel, keyspace='ks4') as (tm1, tm2):
+
+            self.assertNotEqual(tm1, tm2)
+            self.assertEqual(tm1.__keyspace__, 'ks4')
+            self.assertEqual(tm2.__keyspace__, 'ks4')
+
+    def test_context_invalid_parameters(self):
+        """
+        Tests that invalid parameters are raised by the context manager
+
+        @since 3.7
+        @jira_ticket PYTHON-613
+        @expected_result a ValueError is raised when passing invalid parameters
+
+        @test_category query
+        """
+
+        with self.assertRaises(ValueError):
+            with ContextQuery(keyspace='ks2'):
+                pass
+
+        with self.assertRaises(ValueError):
+            with ContextQuery(42) as tm:
+                pass
+
+        with self.assertRaises(ValueError):
+            with ContextQuery(TestModel, 42):
+                pass
+
+        with self.assertRaises(ValueError):
+            with ContextQuery(TestModel, unknown_param=42):
+                pass
+
+        with self.assertRaises(ValueError):
+            with ContextQuery(TestModel, keyspace='ks2', unknown_param=42):
+                pass

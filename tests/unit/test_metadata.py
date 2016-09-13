@@ -21,6 +21,7 @@ from binascii import unhexlify
 from mock import Mock
 import os
 import six
+import timeit
 
 import cassandra
 from cassandra.marshal import uint16_unpack, uint16_pack
@@ -114,6 +115,45 @@ class StrategiesTest(unittest.TestCase):
         replica_map = nts.make_token_replica_map(token_to_host_owner, ring)
 
         self.assertItemsEqual(replica_map[MD5Token(0)], (dc1_1, dc1_2, dc2_1, dc2_2, dc3_1))
+
+    def test_nts_token_performance(self):
+        """
+        Tests to ensure that when rf exceeds the number of nodes available, that we dont'
+        needlessly iterate trying to construct tokens for nodes that don't exist.
+
+        @since 3.7
+        @jira_ticket PYTHON-379
+        @expected_result timing with 1500 rf should be same/similar to 3rf if we have 3 nodes
+
+        @test_category metadata
+        """
+
+        token_to_host_owner = {}
+        ring = []
+        dc1hostnum = 3
+        current_token = 0
+        vnodes_per_host = 500
+        for i in range(dc1hostnum):
+
+            host = Host('dc1.{0}'.format(i), SimpleConvictionPolicy)
+            host.set_location_info('dc1', "rack1")
+            for vnode_num in range(vnodes_per_host):
+                md5_token = MD5Token(current_token+vnode_num)
+                token_to_host_owner[md5_token] = host
+                ring.append(md5_token)
+            current_token += 1000
+
+        nts = NetworkTopologyStrategy({'dc1': 3})
+        start_time = timeit.default_timer()
+        nts.make_token_replica_map(token_to_host_owner, ring)
+        elapsed_base = timeit.default_timer() - start_time
+
+        nts = NetworkTopologyStrategy({'dc1': 1500})
+        start_time = timeit.default_timer()
+        nts.make_token_replica_map(token_to_host_owner, ring)
+        elapsed_bad = timeit.default_timer() - start_time
+        difference = elapsed_bad - elapsed_base
+        self.assertTrue(difference < 1 and difference > -1)
 
     def test_nts_make_token_replica_map_multi_rack(self):
         token_to_host_owner = {}

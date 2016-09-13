@@ -19,6 +19,9 @@ Contents
 :doc:`cqlengine/batches`
     Working with batch mutations
 
+:doc:`cqlengine/connections`
+    Working with multiple sessions
+
 :ref:`API Documentation <om_api>`
     Index of API documentation
 
@@ -34,6 +37,7 @@ Contents
     cqlengine/models
     cqlengine/queryset
     cqlengine/batches
+    cqlengine/connections
     cqlengine/third_party
     cqlengine/faq
 

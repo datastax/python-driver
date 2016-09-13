@@ -634,10 +634,19 @@ class ResultMessage(_MessageType):
         rows = [cls.recv_row(f, len(column_metadata)) for _ in range(rowcount)]
         colnames = [c[2] for c in column_metadata]
         coltypes = [c[3] for c in column_metadata]
-        parsed_rows = [
-            tuple(ctype.from_binary(val, protocol_version)
-                  for ctype, val in zip(coltypes, row))
-            for row in rows]
+        try:
+            parsed_rows = [
+                tuple(ctype.from_binary(val, protocol_version)
+                      for ctype, val in zip(coltypes, row))
+                for row in rows]
+        except Exception:
+            for i in range(len(row)):
+                try:
+                    coltypes[i].from_binary(row[i], protocol_version)
+                except Exception as e:
+                    raise DriverException('Failed decoding result column "%s" of type %s: %s' % (colnames[i],
+                                                                                                 coltypes[i].cql_parameterized_type(),
+                                                                                                 e.message))
         return paging_state, (colnames, parsed_rows)
 
     @classmethod

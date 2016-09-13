@@ -224,7 +224,7 @@ Token Function
     Token functon may be used only on special, virtual column pk__token, representing token of partition key (it also works for composite partition keys).
     Cassandra orders returned items by value of partition key token, so using cqlengine.Token we can easy paginate through all table rows.
 
-    See http://cassandra.apache.org/doc/cql3/CQL.html#tokenFun
+    See http://cassandra.apache.org/doc/cql3/CQL-3.0.html#tokenFun
 
     *Example*
 
@@ -387,10 +387,10 @@ Named tables are a way of querying a table without creating an class.  They're u
 
     .. code-block:: python
 
-        from cqlengine.connection import setup
+        from cassandra.cqlengine.connection import setup
         setup("127.0.0.1", "cqlengine_test")
 
-        from cqlengine.named import NamedTable
+        from cassandra.cqlengine.named import NamedTable
         user = NamedTable("cqlengine_test", "user")
         user.objects()
         user.objects()[0]

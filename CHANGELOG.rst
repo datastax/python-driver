@@ -1,3 +1,33 @@
+3.7.0
+=====
+September 13, 2016
+
+Features
+--------
+* Add v5 protocol failure map (PYTHON-619)
+* Don't return from initial connect on first error (PYTHON-617)
+* Indicate failed column when deserialization fails (PYTHON-361)
+* Let Cluster.refresh_nodes force a token map rebuild (PYTHON-349)
+* Refresh UDTs after "keyspace updated" event with v1/v2 protocol (PYTHON-106)
+* EC2 Address Resolver (PYTHON-198)
+* Speculative query retries (PYTHON-218)
+* Expose paging state in API (PYTHON-200)
+* Don't mark host down while one connection is active (PYTHON-498)
+* Query request size information (PYTHON-284)
+* Avoid quadratic ring processing with invalid replication factors (PYTHON-379)
+* Improve Connection/Pool creation concurrency on startup (PYTHON-82)
+* Add beta version native protocol flag (PYTHON-614)
+* cqlengine: Connections: support of multiple keyspaces and sessions (PYTHON-613)
+
+Bug Fixes
+---------
+* Race when adding a pool while setting keyspace (PYTHON-628)
+* Update results_metadata when prepared statement is reprepared (PYTHON-621)
+* CQL Export for Thrift Tables (PYTHON-213)
+* cqlengine: default value not applied to UserDefinedType (PYTHON-606)
+* cqlengine: columns are no longer hashable (PYTHON-618)
+* cqlengine: remove clustering keys from where clause when deleting only static columns (PYTHON-608)
+
 3.6.0
 =====
 August 1, 2016

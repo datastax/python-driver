@@ -4,7 +4,7 @@ import six
 from cassandra.util import OrderedDict
 from cassandra.cqlengine import CQLEngineException
 from cassandra.cqlengine import columns
-from cassandra.cqlengine import connection
+from cassandra.cqlengine import connection as conn
 from cassandra.cqlengine import models
 
 
@@ -31,7 +31,8 @@ class BaseUserType(object):
             values = dict((self._db_map.get(k, k), v) for k, v in values.items())
 
         for name, field in self._fields.items():
-            value = values.get(name, None)
+            field_default = field.get_default() if field.has_default else None
+            value = values.get(name, field_default)
             if value is not None or isinstance(field, columns.BaseContainerColumn):
                 value = field.to_python(value)
             value_mngr = field.value_manager(self, field, value)
@@ -111,8 +112,8 @@ class BaseUserType(object):
         return [(k, self[k]) for k in self]
 
     @classmethod
-    def register_for_keyspace(cls, keyspace):
-        connection.register_udt(keyspace, cls.type_name(), cls)
+    def register_for_keyspace(cls, keyspace, connection=None):
+        conn.register_udt(keyspace, cls.type_name(), cls, connection=connection)
 
     @classmethod
     def type_name(cls):

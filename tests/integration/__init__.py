@@ -16,7 +16,7 @@ try:
     import unittest2 as unittest
 except ImportError:
     import unittest  # noqa
-
+from packaging.version import Version
 import logging
 import os
 import socket
@@ -31,6 +31,7 @@ from itertools import groupby
 from cassandra import OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure, AlreadyExists
 from cassandra.cluster import Cluster
 from cassandra.protocol import ConfigurationException
+from cassandra.policies import RoundRobinPolicy
 
 try:
     from ccmlib.cluster import Cluster as CCMCluster
@@ -140,11 +141,11 @@ if DSE_VERSION:
 
 def get_default_protocol():
 
-    if CASSANDRA_VERSION >= '2.2':
+    if Version(CASSANDRA_VERSION) >= Version('2.2'):
         return 4
-    elif CASSANDRA_VERSION >= '2.1':
+    elif Version(CASSANDRA_VERSION) >= Version('2.1'):
         return 3
-    elif CASSANDRA_VERSION >= '2.0':
+    elif Version(CASSANDRA_VERSION) >= Version('2.0'):
         return 2
     else:
         return 1
@@ -157,14 +158,17 @@ def get_supported_protocol_versions():
     2.1 -> 3, 2, 1
     2.2 -> 4, 3, 2, 1
     3.X -> 4, 3
+    3.10 -> 5(beta),4,3
 `   """
-    if CASSANDRA_VERSION >= '3.0':
+    if Version(CASSANDRA_VERSION) >= Version('3.10'):
+        return (3, 4, 5)
+    elif Version(CASSANDRA_VERSION) >= Version('3.0'):
         return (3, 4)
-    elif CASSANDRA_VERSION >= '2.2':
+    elif Version(CASSANDRA_VERSION) >= Version('2.2'):
         return (1, 2, 3, 4)
-    elif CASSANDRA_VERSION >= '2.1':
+    elif Version(CASSANDRA_VERSION) >= Version('2.1'):
         return (1, 2, 3)
-    elif CASSANDRA_VERSION >= '2.0':
+    elif Version(CASSANDRA_VERSION) >= Version('2.0'):
         return (1, 2)
     else:
         return (1)
@@ -176,7 +180,7 @@ def get_unsupported_lower_protocol():
     supported by the version of C* running
     """
 
-    if CASSANDRA_VERSION >= '3.0':
+    if Version(CASSANDRA_VERSION) >= Version('3.0'):
         return 2
     else:
         return None
@@ -188,11 +192,11 @@ def get_unsupported_upper_protocol():
     supported by the version of C* running
     """
 
-    if CASSANDRA_VERSION >= '2.2':
+    if Version(CASSANDRA_VERSION) >= Version('2.2'):
         return None
-    if CASSANDRA_VERSION >= '2.1':
+    if Version(CASSANDRA_VERSION) >= Version('2.1'):
         return 4
-    elif CASSANDRA_VERSION >= '2.0':
+    elif Version(CASSANDRA_VERSION) >= Version('2.0'):
         return 3
     else:
         return None
@@ -205,10 +209,12 @@ PROTOCOL_VERSION = int(os.getenv('PROTOCOL_VERSION', default_protocol_version))
 notprotocolv1 = unittest.skipUnless(PROTOCOL_VERSION > 1, 'Protocol v1 not supported')
 lessthenprotocolv4 = unittest.skipUnless(PROTOCOL_VERSION < 4, 'Protocol versions 4 or greater not supported')
 greaterthanprotocolv3 = unittest.skipUnless(PROTOCOL_VERSION >= 4, 'Protocol versions less than 4 are not supported')
+protocolv5 = unittest.skipUnless(5 in get_supported_protocol_versions(), 'Protocol versions less than 5 are not supported')
 
 greaterthancass20 = unittest.skipUnless(CASSANDRA_VERSION >= '2.1', 'Cassandra version 2.1 or greater required')
 greaterthancass21 = unittest.skipUnless(CASSANDRA_VERSION >= '2.2', 'Cassandra version 2.2 or greater required')
 greaterthanorequalcass30 = unittest.skipUnless(CASSANDRA_VERSION >= '3.0', 'Cassandra version 3.0 or greater required')
+greaterthanorequalcass36 = unittest.skipUnless(CASSANDRA_VERSION >= '3.6', 'Cassandra version 3.6 or greater required')
 lessthancass30 = unittest.skipUnless(CASSANDRA_VERSION < '3.0', 'Cassandra version less then 3.0 required')
 dseonly = unittest.skipUnless(DSE_VERSION, "Test is only applicalbe to DSE clusters")
 pypy = unittest.skipUnless(platform.python_implementation() == "PyPy", "Test is skipped unless it's on PyPy")

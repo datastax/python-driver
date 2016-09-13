@@ -875,7 +875,7 @@ class AddressTranslator(object):
         """
         Accepts the node ip address, and returns a translated address to be used connecting to this node.
         """
-        raise NotImplementedError
+        raise NotImplementedError()
 
 
 class IdentityTranslator(AddressTranslator):
@@ -884,3 +884,80 @@ class IdentityTranslator(AddressTranslator):
     """
     def translate(self, addr):
         return addr
+
+
+class EC2MultiRegionTranslator(AddressTranslator):
+    """
+    Resolves private ips of the hosts in the same datacenter as the client, and public ips of hosts in other datacenters.
+    """
+    def translate(self, addr):
+        """
+        Reverse DNS the public broadcast_address, then lookup that hostname to get the AWS-resolved IP, which
+        will point to the private IP address within the same datacenter.
+        """
+        # get family of this address so we translate to the same
+        family = socket.getaddrinfo(addr, 0, socket.AF_UNSPEC, socket.SOCK_STREAM)[0][0]
+        host = socket.getfqdn(addr)
+        for a in socket.getaddrinfo(host, 0, family, socket.SOCK_STREAM):
+            try:
+                return a[4][0]
+            except Exception:
+                pass
+        return addr
+
+
+class SpeculativeExecutionPolicy(object):
+    """
+    Interface for specifying speculative execution plans
+    """
+
+    def new_plan(self, keyspace, statement):
+        """
+        Returns
+
+        :param keyspace:
+        :param statement:
+        :return:
+        """
+        raise NotImplementedError()
+
+
+class SpeculativeExecutionPlan(object):
+    def next_execution(self, host):
+        raise NotImplementedError()
+
+
+class NoSpeculativeExecutionPlan(SpeculativeExecutionPlan):
+    def next_execution(self, host):
+        return -1
+
+
+class NoSpeculativeExecutionPolicy(SpeculativeExecutionPolicy):
+
+    def new_plan(self, keyspace, statement):
+        return NoSpeculativeExecutionPlan()
+
+
+class ConstantSpeculativeExecutionPolicy(SpeculativeExecutionPolicy):
+    """
+    A speculative execution policy that sends a new query every X seconds (**delay**) for a maximum of Y attempts (**max_attempts**).
+    """
+
+    def __init__(self, delay, max_attempts):
+        self.delay = delay
+        self.max_attempts = max_attempts
+
+    class ConstantSpeculativeExecutionPlan(SpeculativeExecutionPlan):
+        def __init__(self, delay, max_attempts):
+            self.delay = delay
+            self.remaining = max_attempts
+
+        def next_execution(self, host):
+            if self.remaining > 0:
+                self.remaining -= 1
+                return self.delay
+            else:
+                return -1
+
+    def new_plan(self, keyspace, statement):
+        return self.ConstantSpeculativeExecutionPlan(self.delay, self.max_attempts)

@@ -26,7 +26,7 @@ from cassandra.cluster import Cluster, UserTypeDoesNotExist
 from cassandra.query import dict_factory
 from cassandra.util import OrderedMap
 
-from tests.integration import get_server_versions, use_singledc, PROTOCOL_VERSION, execute_until_pass, BasicSegregatedKeyspaceUnitTestCase, greaterthancass20
+from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass, BasicSegregatedKeyspaceUnitTestCase, greaterthancass20, greaterthanorequalcass36
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, COLLECTION_TYPES, \
     get_sample, get_collection_sample
 
@@ -49,6 +49,29 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
     def setUp(self):
         super(UDTTests, self).setUp()
         self.session.set_keyspace(self.keyspace_name)
+
+    @greaterthanorequalcass36
+    def test_non_frozen_udts(self):
+        """
+        Test to ensure that non frozen udt's work with C* >3.6.
+
+        @since 3.7.0
+        @jira_ticket PYTHON-498
+        @expected_result Non frozen UDT's are supported
+
+        @test_category data_types, udt
+        """
+        self.session.execute("USE {0}".format(self.keyspace_name))
+        self.session.execute("CREATE TYPE user (state text, has_corn boolean)")
+        self.session.execute("CREATE TABLE {0} (a int PRIMARY KEY, b user)".format(self.function_table_name))
+        User = namedtuple('user', ('state', 'has_corn'))
+        self.cluster.register_user_type(self.keyspace_name, "user", User)
+        self.session.execute("INSERT INTO {0} (a, b) VALUES (%s, %s)".format(self.function_table_name), (0, User("Nebraska", True)))
+        self.session.execute("UPDATE {0} SET b.has_corn = False where a = 0".format(self.function_table_name))
+        result = self.session.execute("SELECT * FROM {0}".format(self.function_table_name))
+        self.assertFalse(result[0].b.has_corn)
+        table_sql = self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].as_cql_query()
+        self.assertNotIn("<frozen>", table_sql)
 
     def test_can_insert_unprepared_registered_udts(self):
         """

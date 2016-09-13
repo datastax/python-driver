@@ -40,7 +40,7 @@ Imports
 cqlengine is now integrated as a sub-package of the driver base package 'cassandra'.
 Upgrading will require adjusting imports to cqlengine. For example::
 
-    from cqlengine import columns
+    from cassandra.cqlengine import columns
 
 is now::
 
