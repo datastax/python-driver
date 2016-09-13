@@ -939,6 +939,9 @@ class NoSpeculativeExecutionPolicy(SpeculativeExecutionPolicy):
 
 
 class ConstantSpeculativeExecutionPolicy(SpeculativeExecutionPolicy):
+    """
+    A speculative execution policy that sends a new query every X seconds (**delay**) for a maximum of Y attempts (**max_attempts**).
+    """
 
     def __init__(self, delay, max_attempts):
         self.delay = delay
