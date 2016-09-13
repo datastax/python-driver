@@ -68,3 +68,12 @@ Retrying Failed Operations
 
 .. autoclass:: DowngradingConsistencyRetryPolicy
    :members:
+
+Retrying Idempotent Operations
+------------------------------
+
+.. autoclass:: SpeculativeExecutionPolicy
+   :members:
+
+.. autoclass:: ConstantSpeculativeExecutionPolicy
+   :members:
