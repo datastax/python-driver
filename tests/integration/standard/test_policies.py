@@ -29,12 +29,14 @@ from cassandra.pool import Host
 
 from tests.integration import BasicSharedKeyspaceUnitTestCase, greaterthancass21, PROTOCOL_VERSION
 from tests import notwindows
+from tests.integration.simulacron.utils import start_and_prime_singledc, prime_query, stopt_simulacron, NO_THEN
 
 from mock import patch
 from concurrent.futures import wait as wait_futures
 
 def setup_module():
-    use_singledc()
+    #use_singledc()
+    pass
 
 
 class BadRoundRobinPolicy(RoundRobinPolicy):
@@ -100,6 +102,8 @@ class SpecExecTest(BasicSharedKeyspaceUnitTestCase):
 
     @classmethod
     def setUpClass(cls):
+        start_and_prime_singledc()
+
         cls.common_setup(1)
 
         spec_ep_brr = ExecutionProfile(load_balancing_policy=BadRoundRobinPolicy(), speculative_execution_policy=ConstantSpeculativeExecutionPolicy(.01, 20))
@@ -111,6 +115,10 @@ class SpecExecTest(BasicSharedKeyspaceUnitTestCase):
         cls.cluster.add_execution_profile("spec_ep_rr", spec_ep_rr)
         cls.cluster.add_execution_profile("spec_ep_rr_lim", spec_ep_rr_lim)
         cls.cluster.add_execution_profile("spec_ep_brr_lim", spec_ep_brr_lim)
+
+    @classmethod
+    def tearDownClass(cls):
+        stopt_simulacron()
 
     @greaterthancass21
     def test_speculative_execution(self):
@@ -124,12 +132,11 @@ class SpecExecTest(BasicSharedKeyspaceUnitTestCase):
 
         @test_category metadata
         """
-        self.session.execute("""USE {0}""".format(self.keyspace_name))
-        self.session.execute("""create or replace function timeout (arg int) RETURNS NULL ON NULL INPUT RETURNS int LANGUAGE java AS $$ long start = System.currentTimeMillis(); while(System.currentTimeMillis() - start < arg){} return arg; $$;""")
-        self.session.execute("""CREATE TABLE  d (k int PRIMARY KEY , i int);""")
-        self.session.execute("""INSERT INTO d (k,i) VALUES (0, 1000);""")
-        statement = SimpleStatement("""SELECT timeout(i) FROM d WHERE k =0""", is_idempotent=True)
-        statement_non_idem = SimpleStatement("""SELECT timeout(i) FROM d WHERE k =0""", is_idempotent=False)
+        query_to_prime = "INSERT INTO test3rf.test (k, v) VALUES (0, 1);"
+        prime_query(query_to_prime, then={"delay_in_ms": 4000})
+
+        statement = SimpleStatement(query_to_prime, is_idempotent=True)
+        statement_non_idem = SimpleStatement(query_to_prime, is_idempotent=False)
 
         # This LBP should repeat hosts up to around 30
         result = self.session.execute(statement, execution_profile='spec_ep_brr')
@@ -159,6 +166,7 @@ class SpecExecTest(BasicSharedKeyspaceUnitTestCase):
         with self.assertRaises(OperationTimedOut):
             result = self.session.execute(statement, execution_profile='spec_ep_rr', timeout=.5)
 
+        """
         # PYTHON-736 Test speculation policy works with a prepared statement
         statement = self.session.prepare("SELECT timeout(i) FROM d WHERE k = ?")
         # non-idempotent
@@ -168,8 +176,9 @@ class SpecExecTest(BasicSharedKeyspaceUnitTestCase):
         statement.is_idempotent = True
         result = self.session.execute(statement, (0,), execution_profile='spec_ep_brr')
         self.assertLess(1, len(result.response_future.attempted_hosts))
+        """
 
-    #TODO redo this tests with Scassandra
+
     def test_speculative_and_timeout(self):
         """
         Test to ensure the timeout is honored when using speculative execution
@@ -182,16 +191,17 @@ class SpecExecTest(BasicSharedKeyspaceUnitTestCase):
         """
         # We mock this so no messages are sent, otherwise a reponse might arrive
         # and we would not know how many hosts we queried
-        with patch.object(Connection, "send_msg", return_value = 100) as mocked_send_msg:
+        prime_query("INSERT INTO test3rf.test (k, v) VALUES (0, 1);", then=NO_THEN)
 
-            statement = SimpleStatement("INSERT INTO test3rf.test (k, v) VALUES (0, 1);", is_idempotent=True)
+        statement = SimpleStatement("INSERT INTO test3rf.test (k, v) VALUES (0, 1);", is_idempotent=True)
 
-            # An OperationTimedOut is placed here in response_future,
-            # that's why we can't call session.execute,which would raise it, but
-            # we have to directly wait for the event
-            response_future = self.session.execute_async(statement, execution_profile='spec_ep_brr_lim', timeout=2.2)
-            response_future._event.wait(4)
-            self.assertIsInstance(response_future._final_exception, OperationTimedOut)
+        # An OperationTimedOut is placed here in response_future,
+        # that's why we can't call session.execute,which would raise it, but
+        # we have to directly wait for the event
+        response_future = self.session.execute_async(statement, execution_profile='spec_ep_brr_lim',
+                                                     timeout=2.2)
+        response_future._event.wait(4)
+        self.assertIsInstance(response_future._final_exception, OperationTimedOut)
 
-            # This is because 2.2 / 0.4 + 1 = 6
-            self.assertEqual(len(response_future.attempted_hosts), 6)
+        # This is because 2.2 / 0.4 + 1 = 6
+        self.assertEqual(len(response_future.attempted_hosts), 6)
