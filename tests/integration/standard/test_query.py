@@ -26,7 +26,7 @@ from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.policies import HostDistance, RoundRobinPolicy
 from tests.unit.cython.utils import notcython
-from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions
+from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions, notpy3
 
 import time
 import re
@@ -71,6 +71,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
             str(event)
 
     @notcython
+    @notpy3
     def test_row_error_message(self):
         """
         Test to validate, new column deserialization message
@@ -483,7 +484,7 @@ class BatchStatementTests(BasicSharedKeyspaceUnitTestCase):
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         if PROTOCOL_VERSION < 3:
             self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
-        self.session = self.cluster.connect()
+        self.session = self.cluster.connect(wait_for_all_pools=True)
 
     def tearDown(self):
         self.cluster.shutdown()

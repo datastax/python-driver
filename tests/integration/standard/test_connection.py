@@ -162,7 +162,7 @@ class HeartbeatTest(unittest.TestCase):
 
     def wait_for_no_connections(self, host, cluster):
         retry = 0
-        while(retry < 100):
+        while(retry < 200):
             retry += 1
             connections = self.fetch_connections(host, cluster)
             if len(connections) is 0:
