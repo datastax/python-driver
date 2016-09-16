@@ -2137,7 +2137,7 @@ class Session(object):
         Returns a clone of the ``ep`` profile.  ``kwargs`` can be specified to update attributes
         of the returned profile.
 
-        This is a shollow clone, so any objects referenced by the profile are shared. This means Load Balancing Policy
+        This is a shallow clone, so any objects referenced by the profile are shared. This means Load Balancing Policy
         is maintained by inclusion in the active profiles. It also means updating any other rich objects will be seen
         by the active profile. In cases where this is not desirable, be sure to replace the instance instead of manipulating
         the shared object.
