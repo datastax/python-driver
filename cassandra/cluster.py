@@ -985,7 +985,7 @@ class Cluster(object):
         if not isinstance(profile, ExecutionProfile):
             raise TypeError("profile must be an instance of ExecutionProfile")
         if self._config_mode == _ConfigMode.LEGACY:
-            raise ValueError("Cannot add execution profiles when legacy parameters are set explicitly. TODO: link to doc")
+            raise ValueError("Cannot add execution profiles when legacy parameters are set explicitly.")
         if name in self.profile_manager.profiles:
             raise ValueError("Profile %s already exists")
         self.profile_manager.profiles[name] = profile
