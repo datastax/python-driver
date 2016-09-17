@@ -28,7 +28,8 @@ from threading import Thread
 from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster
 from cassandra.metadata import Metadata
-from cassandra.policies import (RoundRobinPolicy, WhiteListRoundRobinPolicy, DCAwareRoundRobinPolicy,
+from cassandra.policies import (RoundRobinPolicy, WhiteListRoundRobinPolicy,
+                                DCAwareRoundRobinPolicy, NetworkAwareRoundRobinPolicy,
                                 TokenAwarePolicy, SimpleConvictionPolicy,
                                 HostDistance, ExponentialReconnectionPolicy,
                                 RetryPolicy, WriteType,
@@ -176,6 +177,152 @@ class RoundRobinPolicyTest(unittest.TestCase):
 
         qplan = list(policy.make_query_plan())
         self.assertEqual(qplan, [])
+
+
+class NetworkAwareRoundRobinPolicyTest(unittest.TestCase):
+    def test_local_rack(self):
+        hosts = []
+        for i in range(2):
+            for j in range(2):
+                h = Host(2*i + j, SimpleConvictionPolicy)
+                h.set_location_info("dc1", "rack{0}".format(i + 1))
+                hosts.append(h)
+
+        policy = NetworkAwareRoundRobinPolicy("dc1", "rack1")
+        policy.populate(Mock(), hosts)
+
+        plans = {}
+        # Do a few query plans to ensure we're always getting rack1 first
+        for _ in range(10):
+            qplan = tuple(policy.make_query_plan())
+            if qplan not in plans:
+                plans[qplan] = 0
+            plans[qplan] += 1
+            self.assertEqual(sorted(qplan[:2]), sorted(hosts[:2]))
+            self.assertEqual(sorted(qplan[2:]), sorted(hosts[2:]))
+
+        # In 10 qplans we expect exactly even load balancing between the two
+        # nodes because round robin should guarantee that
+        self.assertEqual(len(plans), 2)
+        for key in plans:
+            self.assertEqual(plans[key], 5)
+
+    def test_fallback_to_local_hosts(self):
+        hosts = []
+        for i in range(3):
+            h = Host(i, SimpleConvictionPolicy)
+            h.set_location_info("dc1", "rack1")
+
+        policy = NetworkAwareRoundRobinPolicy("dc1", "rack2")
+        policy.populate(Mock(), hosts)
+        qplan = list(policy.make_query_plan())
+        self.assertEqual(sorted(qplan), sorted(hosts))
+
+    def test_fallback_to_local_and_remote_hosts(self):
+        hosts = []
+        for dc in ("dc1", "dc2"):
+            for i in range(3):
+                h = Host("{0}_{1}".format(dc, i), SimpleConvictionPolicy)
+                h.set_location_info(dc, "rack{0}".format(i + 1))
+                hosts.append(h)
+
+        # allow all of the remote hosts to be used
+        policy = NetworkAwareRoundRobinPolicy(
+            "dc1", "rack2", used_hosts_per_remote_dc=3
+        )
+        policy.populate(Mock(), hosts)
+
+        qplan = list(policy.make_query_plan())
+        self.assertEqual(qplan[0], hosts[1])
+        self.assertEqual(set(qplan[:3]), set(hosts[:3]))
+        self.assertEqual(set(qplan[3:]), set(hosts[3:]))
+
+    def test_distance(self):
+        hosts = []
+        for dc in ("dc1", "dc2", "dc3"):
+            for i in range(3):
+                h = Host("{0}_{1}".format(dc, i), SimpleConvictionPolicy)
+                h.set_location_info(dc, "rack{0}".format(i + 1))
+                hosts.append(h)
+
+        # allow all of the remote hosts to be used
+        policy = NetworkAwareRoundRobinPolicy(
+            "dc1", "rack2", used_hosts_per_remote_dc=1
+        )
+        policy.populate(Mock(), hosts)
+
+        local_distances = [policy.distance(i) for i in hosts[:3]]
+        expected_distances = [
+            HostDistance.REMOTE, HostDistance.LOCAL, HostDistance.REMOTE,
+        ]
+        self.assertEqual(local_distances, expected_distances)
+
+        # We expect a single remote node from each other datacenter
+        remote_distances = [policy.distance(i) for i in hosts[3:]]
+        expected_distances = [
+            HostDistance.REMOTE, HostDistance.IGNORED, HostDistance.IGNORED,
+            HostDistance.REMOTE, HostDistance.IGNORED, HostDistance.IGNORED
+        ]
+        self.assertEqual(sorted(remote_distances), sorted(expected_distances))
+
+    def test_rack_deduction(self):
+        hosts = []
+        for i in range(2):
+            h = Host(i, SimpleConvictionPolicy)
+            h.set_location_info("dc1", "rack1")
+            hosts.append(h)
+
+        policy = NetworkAwareRoundRobinPolicy()
+        policy.populate(Mock(contact_points_resolved=[0, 1]), hosts)
+
+        self.assertFalse(policy.local_dc)
+        self.assertFalse(policy.local_rack)
+        policy.on_add(hosts[0])
+        self.assertEqual(policy.local_dc, "dc1")
+        self.assertEqual(policy.local_rack, "rack1")
+
+        new_hosts = []
+        for i in range(2):
+            h = Host("new_{0}".format(i), SimpleConvictionPolicy)
+            h.set_location_info("dc1", "rack2")
+            new_hosts.append(h)
+            policy.on_add(h)
+
+        qplan = list(policy.make_query_plan())
+        self.assertEqual(set(qplan[:2]), set(hosts))
+        self.assertEqual(set(qplan[2:]), set(new_hosts))
+
+    def test_rack_deduction_no_dc(self):
+        hosts = []
+        for i in range(2):
+            for j in range(2):
+                h = Host(2*i + j, SimpleConvictionPolicy)
+                h.set_location_info("dc1", "rack{0}".format(i + 1))
+                hosts.append(h)
+
+        policy = NetworkAwareRoundRobinPolicy("dc1")
+        policy.populate(Mock(contact_points_resolved=[0, 1]), hosts)
+
+        # local_rack should remain '' as a datacenter was supplied
+        self.assertFalse(policy.local_rack)
+        policy.on_add(hosts[0])
+        self.assertFalse(policy.local_rack)
+        self.assertEqual(policy.local_dc, "dc1")
+
+        # We expect to RR across the entire DC, do a few
+        plans = {}
+        for i in range(8):
+            qplan = tuple(policy.make_query_plan())
+            if qplan not in plans:
+                plans[qplan] = 0
+            plans[qplan] += 1
+            self.assertEqual(sorted(qplan), sorted(hosts))
+
+        # In 8 qplans we expect exactly even load balancing between the two
+        # nodes because round robin should guarantee that
+        self.assertEqual(len(plans), 4)
+        for key in plans:
+            self.assertEqual(plans[key], 2)
 
 
 class DCAwareRoundRobinPolicyTest(unittest.TestCase):
