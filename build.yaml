@@ -1,4 +1,4 @@
-schedule:
+schedules:
   commit:
     schedule: per_commit
     branches:
