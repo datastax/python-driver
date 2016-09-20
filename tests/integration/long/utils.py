@@ -146,6 +146,7 @@ def wait_for_up(cluster, node):
 def wait_for_down(cluster, node):
     log.debug("Waiting for node %s to be down", node)
     tries = 0
+    addr = IP_FORMAT % node
     while tries < 100:
         host = cluster.metadata.get_host(IP_FORMAT % node)
         if not host or not host.is_up:

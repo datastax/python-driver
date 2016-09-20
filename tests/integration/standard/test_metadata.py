@@ -1189,7 +1189,7 @@ Approximate structure, for reference:
 
 CREATE TABLE legacy.composite_comp_with_col (
     key blob,
-    column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(b=>org.apache.cassandra.db.marshal.BytesType, s=>org.apache.cassandra.db.marshal.UTF8Type, t=>org.apache.cassandra.db.marshal.TimeUUIDType)',
+    column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(t=>org.apache.cassandra.db.marshal.TimeUUIDType, b=>org.apache.cassandra.db.marshal.BytesType, s=>org.apache.cassandra.db.marshal.UTF8Type)',
     "b@6869746d65776974686d75736963" blob,
     "b@6d616d6d616a616d6d61" blob,
     PRIMARY KEY (key, column1)
@@ -1309,7 +1309,7 @@ CREATE TABLE legacy.simple_no_col (
 
 CREATE TABLE legacy.composite_comp_no_col (
     key blob,
-    column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(b=>org.apache.cassandra.db.marshal.BytesType, s=>org.apache.cassandra.db.marshal.UTF8Type, t=>org.apache.cassandra.db.marshal.TimeUUIDType)',
+    column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(t=>org.apache.cassandra.db.marshal.TimeUUIDType, b=>org.apache.cassandra.db.marshal.BytesType, s=>org.apache.cassandra.db.marshal.UTF8Type)',
     value blob,
     PRIMARY KEY (key, column1)
 ) WITH COMPACT STORAGE
@@ -1328,12 +1328,14 @@ CREATE TABLE legacy.composite_comp_no_col (
     AND speculative_retry = 'NONE';"""
 
         ccm = get_cluster()
-        ccm.run_cli(cli_script)
+        livenodes = [node for node in list(ccm.nodelist()) if node.is_live()]
+        livenodes[0].run_cli(cli_script)
 
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         legacy_meta = cluster.metadata.keyspaces['legacy']
+        print(legacy_meta.export_as_string())
         self.assert_equal_diff(legacy_meta.export_as_string(), expected_string)
 
         session.execute('DROP KEYSPACE legacy')
