@@ -47,7 +47,7 @@ class QueryPagingTests(unittest.TestCase):
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         if PROTOCOL_VERSION < 3:
             self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
-        self.session = self.cluster.connect()
+        self.session = self.cluster.connect(wait_for_all_pools=True)
         self.session.execute("TRUNCATE test3rf.test")
 
     def tearDown(self):
@@ -262,7 +262,7 @@ class QueryPagingTests(unittest.TestCase):
 
         for fetch_size in (2, 3, 7, 10, 99, 100, 101, 10000):
             self.session.default_fetch_size = fetch_size
-            future = self.session.execute_async("SELECT * FROM test3rf.test")
+            future = self.session.execute_async("SELECT * FROM test3rf.test", timeout=20)
 
             event = Event()
             counter = count()
@@ -285,7 +285,7 @@ class QueryPagingTests(unittest.TestCase):
             self.assertEqual(next(counter), 100)
 
             # simple statement
-            future = self.session.execute_async(SimpleStatement("SELECT * FROM test3rf.test"))
+            future = self.session.execute_async(SimpleStatement("SELECT * FROM test3rf.test"), timeout=20)
             event.clear()
             counter = count()
 
@@ -294,7 +294,7 @@ class QueryPagingTests(unittest.TestCase):
             self.assertEqual(next(counter), 100)
 
             # prepared statement
-            future = self.session.execute_async(prepared)
+            future = self.session.execute_async(prepared, timeout=20)
             event.clear()
             counter = count()
 

@@ -130,7 +130,7 @@ class ConsistencyTests(unittest.TestCase):
         cluster = Cluster(
             load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
             protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
+        session = cluster.connect(wait_for_all_pools=True)
         wait_for_up(cluster, 1)
         wait_for_up(cluster, 2)
 
@@ -182,7 +182,7 @@ class ConsistencyTests(unittest.TestCase):
         cluster = Cluster(
             load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
             protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
+        session = cluster.connect(wait_for_all_pools=True)
         wait_for_up(cluster, 1)
         wait_for_up(cluster, 2)
 
@@ -207,7 +207,7 @@ class ConsistencyTests(unittest.TestCase):
             load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
             default_retry_policy=DowngradingConsistencyRetryPolicy(),
             protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
+        session = cluster.connect(wait_for_all_pools=True)
 
         create_schema(cluster, session, keyspace, replication_factor=rf)
         self._insert(session, keyspace, 1)
@@ -262,7 +262,7 @@ class ConsistencyTests(unittest.TestCase):
         self.rfthree_downgradingcl(cluster, keyspace, False)
 
     def rfthree_downgradingcl(self, cluster, keyspace, roundrobin):
-        session = cluster.connect()
+        session = cluster.connect(wait_for_all_pools=True)
 
         create_schema(cluster, session, keyspace, replication_factor=2)
         self._insert(session, keyspace, count=12)
@@ -330,7 +330,7 @@ class ConnectivityTest(unittest.TestCase):
 
         # find the first node, we will try create connections to, shut it down.
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        cluster.connect()
+        cluster.connect(wait_for_all_pools=True)
         hosts = cluster.metadata.all_hosts()
         address = hosts[0].address
         node_to_stop = int(address.split('.')[-1:][0])

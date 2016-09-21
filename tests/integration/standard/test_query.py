@@ -245,7 +245,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
     def _is_trace_present(self, trace_id):
         select_statement = SimpleStatement("SElECT duration FROM system_traces.sessions WHERE session_id = {0}".format(trace_id), consistency_level=ConsistencyLevel.ALL)
         ssrs = self.session.execute(select_statement)
-        if(ssrs[0].duration is None):
+        if not len(ssrs.current_rows) or ssrs[0].duration is None:
             return False
         return True
 
