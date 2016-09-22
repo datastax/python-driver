@@ -335,8 +335,8 @@ class ConnectivityTest(unittest.TestCase):
         address = hosts[0].address
         node_to_stop = int(address.split('.')[-1:][0])
         cluster.shutdown()
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        cluster.connect(contact_points=["127.0.0.2"], wait_for_all_pools=True)
+        cluster = Cluster(contact_points=["127.0.0.2"],protocol_version=PROTOCOL_VERSION)
+        cluster.connect(wait_for_all_pools=True)
         try:
             force_stop(node_to_stop)
             wait_for_down(cluster, node_to_stop)
