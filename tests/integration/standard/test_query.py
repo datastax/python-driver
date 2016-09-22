@@ -146,7 +146,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         response_future.result()
 
         # Fetch the client_ip from the trace.
-        trace = response_future.get_query_trace(max_wait=2.0)
+        trace = response_future.get_query_trace(max_wait=5.0)
         client_ip = trace.client
 
         # Ip address should be in the local_host range
