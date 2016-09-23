@@ -14,6 +14,7 @@
 
 import struct, time, traceback, sys, logging
 
+from random import randint
 from cassandra import ConsistencyLevel, OperationTimedOut, ReadTimeout, WriteTimeout, Unavailable
 from cassandra.cluster import Cluster
 from cassandra.policies import TokenAwarePolicy, RoundRobinPolicy, DowngradingConsistencyRetryPolicy
@@ -310,15 +311,18 @@ class ConsistencyTests(unittest.TestCase):
 
 class ConnectivityTest(unittest.TestCase):
 
-    def setUp(self):
-        self.coordinator_stats = CoordinatorStats()
+    def get_node_not_x(self, node_to_stop):
+        nodes = [1, 2, 3]
+        for num in nodes:
+            if num is not node_to_stop:
+                return num
 
     def test_pool_with_host_down(self):
         """
         Test to ensure that cluster.connect() doesn't return prior to pools being initialized.
 
         This test will figure out which host our pool logic will connect to first. It then shuts that server down.
-        Previouly the cluster.connect() would return prior to the pools being initialized, and the first queries would
+        Previously the cluster.connect() would return prior to the pools being initialized, and the first queries would
         return a no host exception
 
         @since 3.7.0
@@ -329,23 +333,32 @@ class ConnectivityTest(unittest.TestCase):
         """
 
         # find the first node, we will try create connections to, shut it down.
+
+        # We will be shuting down a random house, so we need a complete contact list
+        all_contact_points = ["127.0.0.1", "127.0.0.2", "127.0.0.3"]
+
+        # Connect up and find out which host will bet queries routed to to first
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         cluster.connect(wait_for_all_pools=True)
         hosts = cluster.metadata.all_hosts()
         address = hosts[0].address
         node_to_stop = int(address.split('.')[-1:][0])
         cluster.shutdown()
-        cluster = Cluster(contact_points=["127.0.0.2"],protocol_version=PROTOCOL_VERSION)
+
+        # We now register a cluster that has it's Control Connection NOT on the node that we are shutting down.
+        # We do this so we don't miss the event
+        contact_point = '127.0.0.{0}'.format(self.get_node_not_x(node_to_stop))
+        cluster = Cluster(contact_points=[contact_point], protocol_version=PROTOCOL_VERSION)
         cluster.connect(wait_for_all_pools=True)
         try:
             force_stop(node_to_stop)
             wait_for_down(cluster, node_to_stop)
             # Attempt a query against that node. It should complete
-            cluster2 = Cluster(protocol_version=PROTOCOL_VERSION)
+            cluster2 = Cluster(contact_points=all_contact_points, protocol_version=PROTOCOL_VERSION)
             session2 = cluster2.connect()
             session2.execute("SELECT * FROM system.local")
-            cluster2.shutdown()
         finally:
+            cluster2.shutdown()
             start(node_to_stop)
             wait_for_up(cluster, node_to_stop)
             cluster.shutdown()
