@@ -119,7 +119,7 @@ class LargeDataTests(unittest.TestCase):
 
         # Verify
         for i, row in enumerate(results):
-            self.assertEqual(row['i'], i)
+            self.assertAlmostEqual(row['i'], i, delta=3)
 
         session.cluster.shutdown()
 
