@@ -2487,7 +2487,8 @@ class MaterializedViewMetadata(object):
 
 
 def get_schema_parser(connection, server_version, timeout):
-    if server_version.startswith('3'):
+    server_major_version = int(server_version.split('.')[0])
+    if server_major_version >= 3:
         return SchemaParserV3(connection, timeout)
     else:
         # we could further specialize by version. Right now just refactoring the

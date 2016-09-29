@@ -311,6 +311,9 @@ class RequestAnalyzer(object):
         if self.throw_on_fail:
             raise AttributeError
 
+    def remove_ra(self, session):
+        session.remove_request_init_listener(self.on_request)
+
     def __str__(self):
         # just extracting request count from the size stats (which are recorded on all requests)
         request_sizes = dict(self.requests)
@@ -357,6 +360,7 @@ class MetricsRequestSize(BasicExistingKeyspaceUnitTestCase):
         self.assertTrue(self.wait_for_count(ra, 10))
         self.assertTrue(self.wait_for_count(ra, 3, error=True))
 
+        ra.remove_ra(self.session)
 
         # Make sure a poorly coded RA doesn't cause issues
         RequestAnalyzer(self.session, throw_on_success=False, throw_on_fail=True)

@@ -1035,12 +1035,12 @@ class HostStateTest(unittest.TestCase):
         @test_category connection
         """
         with Cluster(protocol_version=PROTOCOL_VERSION) as cluster:
-            session = cluster.connect()
+            session = cluster.connect(wait_for_all_pools=True)
             random_host = cluster.metadata.all_hosts()[0]
             cluster.on_down(random_host, False)
             for _ in range(10):
                 new_host = cluster.metadata.all_hosts()[0]
-                self.assertTrue(new_host.is_up)
+                self.assertTrue(new_host.is_up, "Host was not up on iteration {0}".format(_))
                 time.sleep(.01)
 
             pool = session._pools.get(random_host)

@@ -143,7 +143,7 @@ class HeartbeatTest(unittest.TestCase):
         for conn in holders:
             if host == str(getattr(conn, 'host', '')):
                 if isinstance(conn, HostConnectionPool):
-                    if conn._connections is not None:
+                    if conn._connections is not None and len(conn._connections) > 0:
                         connections.append(conn._connections)
                 else:
                     if conn._connection is not None:

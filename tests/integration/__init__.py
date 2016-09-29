@@ -218,6 +218,7 @@ greaterthanorequalcass36 = unittest.skipUnless(CASSANDRA_VERSION >= '3.6', 'Cass
 lessthancass30 = unittest.skipUnless(CASSANDRA_VERSION < '3.0', 'Cassandra version less then 3.0 required')
 dseonly = unittest.skipUnless(DSE_VERSION, "Test is only applicalbe to DSE clusters")
 pypy = unittest.skipUnless(platform.python_implementation() == "PyPy", "Test is skipped unless it's on PyPy")
+notpy3 = unittest.skipIf(sys.version_info >= (3, 0), "Test not applicable for Python 3.x runtime")
 
 
 def wait_for_node_socket(node, timeout):
@@ -546,7 +547,7 @@ class BasicKeyspaceUnitTestCase(unittest.TestCase):
     @classmethod
     def common_setup(cls, rf, keyspace_creation=True, create_class_table=False, metrics=False):
         cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, metrics_enabled=metrics)
-        cls.session = cls.cluster.connect()
+        cls.session = cls.cluster.connect(wait_for_all_pools=True)
         cls.ks_name = cls.__name__.lower()
         if keyspace_creation:
             cls.create_keyspace(rf)

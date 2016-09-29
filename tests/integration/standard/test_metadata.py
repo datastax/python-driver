@@ -1328,12 +1328,14 @@ CREATE TABLE legacy.composite_comp_no_col (
     AND speculative_retry = 'NONE';"""
 
         ccm = get_cluster()
-        ccm.run_cli(cli_script)
+        livenodes = [node for node in list(ccm.nodelist()) if node.is_live()]
+        livenodes[0].run_cli(cli_script)
 
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         legacy_meta = cluster.metadata.keyspaces['legacy']
+        print(legacy_meta.export_as_string())
         self.assert_equal_diff(legacy_meta.export_as_string(), expected_string)
 
         session.execute('DROP KEYSPACE legacy')

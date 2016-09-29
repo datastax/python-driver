@@ -33,6 +33,9 @@ Translating Server Node Addresses
 .. autoclass:: IdentityTranslator
    :members:
 
+.. autoclass:: EC2MultiRegionTranslator
+   :members:
+
 Marking Hosts Up or Down
 ------------------------
 

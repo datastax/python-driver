@@ -1010,7 +1010,7 @@ class ReversedType(_ParameterizedType):
     @classmethod
     def deserialize_safe(cls, byts, protocol_version):
         subtype, = cls.subtypes
-        return subtype.from_binary(byts)
+        return subtype.from_binary(byts, protocol_version)
 
     @classmethod
     def serialize_safe(cls, val, protocol_version):
@@ -1025,7 +1025,7 @@ class FrozenType(_ParameterizedType):
     @classmethod
     def deserialize_safe(cls, byts, protocol_version):
         subtype, = cls.subtypes
-        return subtype.from_binary(byts)
+        return subtype.from_binary(byts, protocol_version)
 
     @classmethod
     def serialize_safe(cls, val, protocol_version):
