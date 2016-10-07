@@ -50,7 +50,7 @@ class ResponseFutureTests(unittest.TestCase):
         return ResponseFuture(session, message, query, 1)
 
     def make_mock_response(self, results):
-        return Mock(spec=ResultMessage, kind=RESULT_KIND_ROWS, results=results, paging_state=None)
+        return Mock(spec=ResultMessage, kind=RESULT_KIND_ROWS, results=results, paging_state=None, col_types=None)
 
     def test_result_message(self):
         session = self.make_basic_session()
