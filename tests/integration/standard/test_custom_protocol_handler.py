@@ -130,8 +130,9 @@ class CustomResultMessageRaw(ResultMessage):
             paging_state, column_metadata = cls.recv_results_metadata(f, user_type_map)
             rowcount = read_int(f)
             rows = [cls.recv_row(f, len(column_metadata)) for _ in range(rowcount)]
+            colnames = [c[2] for c in column_metadata]
             coltypes = [c[3] for c in column_metadata]
-            return (paging_state, (coltypes, rows))
+            return paging_state, coltypes, (colnames, rows)
 
 
 class CustomTestRawRowType(ProtocolHandler):
@@ -166,7 +167,7 @@ class CustomResultMessageTracked(ResultMessage):
             tuple(ctype.from_binary(val, protocol_version)
                   for ctype, val in zip(coltypes, row))
             for row in rows]
-        return (paging_state, (colnames, parsed_rows))
+        return paging_state, coltypes, (colnames, parsed_rows)
 
 
 class CustomProtocolHandlerResultMessageTracked(ProtocolHandler):
