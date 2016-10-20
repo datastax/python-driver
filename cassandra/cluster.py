@@ -2693,7 +2693,7 @@ class ControlConnection(object):
             self._set_new_connection(self._reconnect_internal())
         except NoHostAvailable:
             # make a retry schedule (which includes backoff)
-            schedule = self.cluster.reconnection_policy.new_schedule()
+            schedule = self._cluster.reconnection_policy.new_schedule()
 
             with self._reconnection_lock:
 
