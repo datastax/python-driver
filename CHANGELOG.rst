@@ -1,3 +1,11 @@
+3.7.1
+=====
+October 26, 2016
+
+Bug Fixes
+---------
+* Cython upgrade has broken stable version of cassandra-driver (PYTHON-656)
+
 3.7.0
 =====
 September 13, 2016
