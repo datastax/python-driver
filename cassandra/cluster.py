@@ -2693,7 +2693,7 @@ class ControlConnection(object):
             self._set_new_connection(self._reconnect_internal())
         except NoHostAvailable:
             # make a retry schedule (which includes backoff)
-            schedule = self.cluster.reconnection_policy.new_schedule()
+            schedule = self._cluster.reconnection_policy.new_schedule()
 
             with self._reconnection_lock:
 
@@ -3264,6 +3264,7 @@ class ResponseFuture(object):
     _req_id = None
     _final_result = _NOT_SET
     _col_names = None
+    _col_types = None
     _final_exception = None
     _query_traces = None
     _callbacks = None
@@ -3531,6 +3532,7 @@ class ResponseFuture(object):
                     results = getattr(response, 'results', None)
                     if results is not None and response.kind == RESULT_KIND_ROWS:
                         self._paging_state = response.paging_state
+                        self._col_types = response.col_types
                         self._col_names = results[0]
                         results = self.row_factory(*results)
                     self._set_final_result(results)
@@ -3954,6 +3956,7 @@ class ResultSet(object):
     def __init__(self, response_future, initial_response):
         self.response_future = response_future
         self.column_names = response_future._col_names
+        self.column_types = response_future._col_types
         self._set_current_rows(initial_response)
         self._page_iter = None
         self._list_mode = False

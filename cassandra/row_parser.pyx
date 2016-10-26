@@ -35,6 +35,6 @@ def make_recv_results_rows(ColumnParser colparser):
         reader = BytesIOReader(f.read())
         parsed_rows = colparser.parse_rows(reader, desc)
 
-        return (paging_state, (colnames, parsed_rows))
+        return (paging_state, coltypes, (colnames, parsed_rows))
 
     return recv_results_rows

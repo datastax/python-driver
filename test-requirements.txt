@@ -11,5 +11,5 @@ pure-sasl
 twisted
 gevent>=1.0
 eventlet
-cython>=0.21
+cython>=0.20,<0.25
 packaging
