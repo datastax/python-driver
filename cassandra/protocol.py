@@ -560,7 +560,10 @@ class QueryMessage(_MessageType):
         if self.timestamp is not None:
             flags |= _PROTOCOL_TIMESTAMP
 
-        write_byte(f, flags)
+        if protocol_version >= 5:
+            write_int(f, flags)
+        else:
+            write_byte(f, flags)
 
         if self._query_params is not None:
             write_short(f, len(self._query_params))
@@ -823,7 +826,12 @@ class ExecuteMessage(_MessageType):
                         "3 or higher. Consider setting Cluster.protocol_version to 3.")
             if self.skip_meta:
                 flags |= _SKIP_METADATA_FLAG
-            write_byte(f, flags)
+
+            if protocol_version >= 5:
+                write_int(f, flags)
+            else:
+                write_byte(f, flags)
+
             write_short(f, len(self.query_params))
             for param in self.query_params:
                 write_value(f, param)
@@ -872,7 +880,11 @@ class BatchMessage(_MessageType):
                 flags |= _WITH_SERIAL_CONSISTENCY_FLAG
             if self.timestamp is not None:
                 flags |= _PROTOCOL_TIMESTAMP
-            write_byte(f, flags)
+
+            if protocol_version >= 5:
+                write_int(f, flags)
+            else:
+                write_byte(f, flags)
 
             if self.serial_consistency_level:
                 write_consistency_level(f, self.serial_consistency_level)
