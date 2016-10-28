@@ -1007,6 +1007,9 @@ CREATE TABLE export_udts.users (
         session.execute("""
             CREATE INDEX myindex ON "%s"."%s" ("MyColumn")
             """ % (ksname, cfname))
+        session.execute("""
+            CREATE INDEX "AnotherIndex" ON "%s"."%s" ("B")
+            """ % (ksname, cfname))
 
         ksmeta = cluster.metadata.keyspaces[ksname]
         schema = ksmeta.export_as_string()
@@ -1018,6 +1021,7 @@ CREATE TABLE export_udts.users (
         self.assertIn('PRIMARY KEY (k, "A")', schema)
         self.assertIn('WITH CLUSTERING ORDER BY ("A" DESC)', schema)
         self.assertIn('CREATE INDEX myindex ON "AnInterestingKeyspace"."AnInterestingTable" ("MyColumn")', schema)
+        self.assertIn('CREATE INDEX "AnotherIndex" ON "AnInterestingKeyspace"."AnInterestingTable" ("B")', schema)
         cluster.shutdown()
 
     def test_already_exists_exceptions(self):
