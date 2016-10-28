@@ -1336,14 +1336,14 @@ class IndexMetadata(object):
         index_target = options.pop("target")
         if self.kind != "CUSTOM":
             return "CREATE INDEX %s ON %s.%s (%s)" % (
-                self.name,  # Cassandra doesn't like quoted index names for some reason
+                protect_name(self.name),
                 protect_name(self.keyspace_name),
                 protect_name(self.table_name),
                 index_target)
         else:
             class_name = options.pop("class_name")
             ret = "CREATE CUSTOM INDEX %s ON %s.%s (%s) USING '%s'" % (
-                self.name,  # Cassandra doesn't like quoted index names for some reason
+                protect_name(self.name),
                 protect_name(self.keyspace_name),
                 protect_name(self.table_name),
                 index_target,
