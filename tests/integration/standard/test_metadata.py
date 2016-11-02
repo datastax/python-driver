@@ -29,13 +29,13 @@ from cassandra.cluster import Cluster
 from cassandra.encoder import Encoder
 from cassandra.metadata import (Metadata, KeyspaceMetadata, IndexMetadata,
                                 Token, MD5Token, TokenMap, murmur3, Function, Aggregate, protect_name, protect_names,
-                                get_schema_parser)
+                                get_schema_parser, RegisteredTableExtension)
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
 from tests.integration import get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass, \
     BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase, BasicExistingKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster, CASSANDRA_VERSION, \
-    BasicExistingSegregatedKeyspaceUnitTestCase, dseonly, DSE_VERSION, get_supported_protocol_versions
+    BasicExistingSegregatedKeyspaceUnitTestCase, dseonly, DSE_VERSION, get_supported_protocol_versions, greaterthanorequalcass30
 
 
 def setup_module():
@@ -857,6 +857,73 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertEqual(index_2.kind, "COMPOSITES")
         self.assertEqual(index_2.index_options["target"], "keys(b)")
         self.assertEqual(index_2.keyspace_name, "schemametadatatests")
+
+    @greaterthanorequalcass30
+    def test_table_extensions(self):
+        s = self.session
+        ks = self.keyspace_name
+        ks_meta = s.cluster.metadata.keyspaces[ks]
+        t = self.function_table_name
+
+        s.execute("CREATE TABLE %s.%s (k text PRIMARY KEY, v int)" % (ks, t))
+
+        table_meta = ks_meta.tables[t]
+
+        self.assertFalse(table_meta.extensions)
+        self.assertNotIn(t, table_meta._extension_registry)
+
+        original_cql = table_meta.export_as_string()
+
+        # extensions registered, not present
+        # --------------------------------------
+        class Ext0(RegisteredTableExtension):
+            name = t
+
+            @classmethod
+            def after_table_cql(cls, table_meta, ext_key, ext_blob):
+                return "%s %s %s %s" % (cls.name, table_meta.name, ext_key, ext_blob)
+
+        class Ext1(Ext0):
+            name = t + '##'
+
+        self.assertFalse(table_meta.extensions)
+        self.assertIn(Ext0.name, table_meta._extension_registry)
+        self.assertIn(Ext1.name, table_meta._extension_registry)
+        self.assertEqual(len(table_meta._extension_registry), 2)
+
+        self.cluster.refresh_table_metadata(ks, t)
+        table_meta = ks_meta.tables[t]
+
+        self.assertEqual(table_meta.export_as_string(), original_cql)
+
+        p = s.prepare('UPDATE system_schema.tables SET extensions=? WHERE keyspace_name=? AND table_name=?')  # for blob type coercing
+        # extensions registered, one present
+        # --------------------------------------
+        ext_map = {Ext0.name: six.b("THA VALUE")}
+        s.execute(p, (ext_map, ks, t))
+        self.cluster.refresh_table_metadata(ks, t)
+        table_meta = ks_meta.tables[t]
+
+        self.assertIn(Ext0.name, table_meta.extensions)
+        new_cql = table_meta.export_as_string()
+        self.assertNotEqual(new_cql, original_cql)
+        self.assertIn(Ext0.after_table_cql(table_meta, Ext0.name, ext_map[Ext0.name]), new_cql)
+        self.assertNotIn(Ext1.name, new_cql)
+
+        # extensions registered, one present
+        # --------------------------------------
+        ext_map = {Ext0.name: six.b("THA VALUE"),
+                   Ext1.name: six.b("OTHA VALUE")}
+        s.execute(p, (ext_map, ks, t))
+        self.cluster.refresh_table_metadata(ks, t)
+        table_meta = ks_meta.tables[t]
+
+        self.assertIn(Ext0.name, table_meta.extensions)
+        self.assertIn(Ext1.name, table_meta.extensions)
+        new_cql = table_meta.export_as_string()
+        self.assertNotEqual(new_cql, original_cql)
+        self.assertIn(Ext0.after_table_cql(table_meta, Ext0.name, ext_map[Ext0.name]), new_cql)
+        self.assertIn(Ext1.after_table_cql(table_meta, Ext1.name, ext_map[Ext1.name]), new_cql)
 
 
 class TestCodeCoverage(unittest.TestCase):
