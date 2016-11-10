@@ -274,8 +274,8 @@ class ContextQuery(object):
     A Context manager to allow a Model to switch context easily. Presently, the context only
     specifies a keyspace for model IO.
 
-    :param *args: One or more models. A model should be a class type, not an instance.
-    :param **kwargs: (optional) Context parameters: can be *keyspace* or *connection*
+    :param \*args: One or more models. A model should be a class type, not an instance.
+    :param \*\*kwargs: (optional) Context parameters: can be *keyspace* or *connection*
 
     For example:
 
