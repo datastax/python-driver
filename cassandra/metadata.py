@@ -1226,6 +1226,7 @@ class TableMetadata(object):
         actual_options.setdefault("class", value)
 
         compaction_option_strings = ["'%s': '%s'" % (k, v) for k, v in actual_options.items()]
+        ret.append('compaction = {%s}' % ', '.join(compaction_option_strings))
 
         for system_table_name in cls.compaction_options.keys():
             options_copy.pop(system_table_name, None)  # delete if present
