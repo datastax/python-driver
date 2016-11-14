@@ -249,6 +249,34 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
             return False
         return True
 
+    def test_query_by_id(self):
+        """
+        Test to ensure column_types are set as part of the result set
+
+        @since 3.8
+        @jira_ticket PYTHON-648
+        @expected_result column_names should be preset.
+
+        @test_category queries basic
+        """
+        create_table = "CREATE TABLE {0}.{1} (id int primary key, m map<int, text>)".format(self.keyspace_name, self.function_table_name)
+        self.session.execute(create_table)
+
+        self.session.execute("insert into "+self.keyspace_name+"."+self.function_table_name+" (id, m) VALUES ( 1, {1: 'one', 2: 'two', 3:'three'})")
+        results1 = self.session.execute("select id, m from {0}.{1}".format(self.keyspace_name, self.function_table_name))
+
+        self.assertIsNotNone(results1.column_types)
+        self.assertEqual(results1.column_types[0].typename, 'int')
+        self.assertEqual(results1.column_types[1].typename, 'map')
+        self.assertEqual(results1.column_types[0].cassname, 'Int32Type')
+        self.assertEqual(results1.column_types[1].cassname, 'MapType')
+        self.assertEqual(len(results1.column_types[0].subtypes), 0)
+        self.assertEqual(len(results1.column_types[1].subtypes), 2)
+        self.assertEqual(results1.column_types[1].subtypes[0].typename, "int")
+        self.assertEqual(results1.column_types[1].subtypes[1].typename, "varchar")
+        self.assertEqual(results1.column_types[1].subtypes[0].cassname, "Int32Type")
+        self.assertEqual(results1.column_types[1].subtypes[1].cassname, "VarcharType")
+
     def test_column_names(self):
         """
         Test to validate the columns are present on the result set.
@@ -269,8 +297,12 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
                         score INT,
                         PRIMARY KEY (user, game, year, month, day)
                         )""".format(self.keyspace_name, self.function_table_name)
+
+
         self.session.execute(create_table)
         result_set = self.session.execute("SELECT * FROM {0}.{1}".format(self.keyspace_name, self.function_table_name))
+        self.assertIsNotNone(result_set.column_types)
+
         self.assertEqual(result_set.column_names, [u'user', u'game', u'year', u'month', u'day', u'score'])
 
 
