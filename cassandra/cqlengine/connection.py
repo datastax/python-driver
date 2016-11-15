@@ -138,7 +138,7 @@ def register_connection(name, hosts, consistency=None, lazy_connect=False,
     if name in _connections:
         log.warning("Registering connection '{0}' when it already exists.".format(name))
 
-    conn = Connection(name, hosts, consistency=consistency,lazy_connect=lazy_connect,
+    conn = Connection(name, hosts, consistency=consistency, lazy_connect=lazy_connect,
                       retry_connect=retry_connect, cluster_options=cluster_options)
 
     _connections[name] = conn
