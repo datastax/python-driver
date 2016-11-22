@@ -651,7 +651,7 @@ class ResultMessage(_MessageType):
                 except Exception as e:
                     raise DriverException('Failed decoding result column "%s" of type %s: %s' % (colnames[i],
                                                                                                  coltypes[i].cql_parameterized_type(),
-                                                                                                 e.message))
+                                                                                                 str(e)))
         return paging_state, coltypes, (colnames, parsed_rows)
 
     @classmethod

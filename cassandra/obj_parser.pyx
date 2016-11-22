@@ -14,6 +14,7 @@
 
 include "ioutils.pyx"
 
+from cassandra import DriverException
 from cassandra.bytesio cimport BytesIOReader
 from cassandra.deserializers cimport Deserializer, from_binary
 from cassandra.parsing cimport ParseDesc, ColumnParser, RowParser
@@ -67,8 +68,12 @@ cdef class TupleRowParser(RowParser):
 
             # Deserialize bytes to python object
             deserializer = desc.deserializers[i]
-            val = from_binary(deserializer, &buf, desc.protocol_version)
-
+            try:
+                val = from_binary(deserializer, &buf, desc.protocol_version)
+            except Exception as e:
+                raise DriverException('Failed decoding result column "%s" of type %s: %s' % (desc.colnames[i],
+                                                                                             desc.coltypes[i].cql_parameterized_type(),
+                                                                                             str(e)))
             # Insert new object into tuple
             tuple_set(res, i, val)
 
