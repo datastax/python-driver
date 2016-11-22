@@ -18,6 +18,9 @@ except ImportError:
     import unittest  # noqa
 
 from cassandra.cqlengine import connection
+from cassandra.query import dict_factory
+
+from mock import Mock
 
 
 class ConnectionTest(unittest.TestCase):
@@ -26,13 +29,18 @@ class ConnectionTest(unittest.TestCase):
 
     def test_set_session_without_existing_connection(self):
         """
-        Users can't set the default session without having a default connection set.
+        Users can set the default session without having a default connection set.
         """
-        dummy_session = object()
+        self.assertFalse(
+            connection._connections,
+            'Test precondition not met: connections are registered: {cs}'.format(cs=connection._connections)
+        )
 
-        expected_msg_excerpt = 'no default connection'
-        with self.assertRaisesRegexp(connection.CQLEngineException, expected_msg_excerpt):
-            connection.set_session(dummy_session)
+        mock_session = Mock(
+            row_factory=dict_factory,
+            encoder=Mock(mapping={})
+        )
+        connection.set_session(mock_session)
 
     def test_get_session_fails_without_existing_connection(self):
         """
