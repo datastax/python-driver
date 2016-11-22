@@ -81,6 +81,13 @@ class Connection(object):
         self.cluster_options = cluster_options if cluster_options else {}
         self.lazy_connect_lock = threading.RLock()
 
+    @classmethod
+    def from_session(cls, name, session):
+        instance = cls(name=name, hosts=session.hosts)
+        instance.cluster, instance.session = session.cluster, session
+        instance.setup_session()
+        return instance
+
     def setup(self):
         """Setup the connection"""
         global cluster, session
@@ -138,15 +145,35 @@ def register_connection(name, hosts, consistency=None, lazy_connect=False,
     if name in _connections:
         log.warning("Registering connection '{0}' when it already exists.".format(name))
 
-    conn = Connection(name, hosts, consistency=consistency, lazy_connect=lazy_connect,
-                      retry_connect=retry_connect, cluster_options=cluster_options)
+    hosts_xor_session_passed = (hosts is None) ^ (session is None)
+    if not hosts_xor_session_passed:
+        raise CQLEngineException(
+            "Must pass exactly one of 'hosts' or 'session' arguments"
+        )
+    elif session is not None:
+        invalid_config_args = (consistency is not None or
+                               lazy_connect is not False or
+                               retry_connect is not False or
+                               cluster_options is not None)
+        if invalid_config_args:
+            raise CQLEngineException(
+                "Session configuration arguments and 'session' argument are mutually exclusive"
+            )
+        conn = Connection.from_session(name, session=session)
+        conn.setup_session()
+    elif hosts is not None:
+        conn = Connection(
+            name, hosts=hosts,
+            consistency=consistency, lazy_connect=lazy_connect,
+            retry_connect=retry_connect, cluster_options=cluster_options
+        )
+        conn.setup()
 
     _connections[name] = conn
 
     if default:
         set_default_connection(name)
 
-    conn.setup()
     return conn
 
 
@@ -222,7 +249,12 @@ def set_session(s):
     This may be relaxed in the future
     """
 
-    conn = get_connection()
+    try:
+        conn = get_connection()
+    except CQLEngineException:
+        # no default connection set; initalize one
+        register_connection('default', session=s, default=True)
+        conn = get_connection()
 
     if conn.session:
         log.warning("configuring new default connection for cqlengine when one was already set")
