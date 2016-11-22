@@ -222,9 +222,6 @@ def set_session(s):
     This may be relaxed in the future
     """
 
-    if DEFAULT_CONNECTION not in _connections:
-        raise CQLEngineException('Cannot set session on default connection; no default connection set.')
-
     conn = get_connection()
 
     if conn.session:
