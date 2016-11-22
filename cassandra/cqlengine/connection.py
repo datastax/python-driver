@@ -307,7 +307,11 @@ def get_cluster(connection=None):
 def register_udt(keyspace, type_name, klass, connection=None):
     udt_by_keyspace[keyspace][type_name] = klass
 
-    cluster = get_cluster(connection)
+    try:
+        cluster = get_cluster(connection)
+    except CQLEngineException:
+        cluster = None
+
     if cluster:
         try:
             cluster.register_user_type(keyspace, type_name, klass)
