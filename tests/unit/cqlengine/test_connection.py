@@ -22,6 +22,8 @@ from cassandra.cqlengine import connection
 
 class ConnectionTest(unittest.TestCase):
 
+    no_registered_connection_msg = "doesn't exist in the registry"
+
     def test_set_session_without_existing_connection(self):
         """
         Users can't set the default session without having a default connection set.
@@ -31,3 +33,17 @@ class ConnectionTest(unittest.TestCase):
         expected_msg_excerpt = 'no default connection'
         with self.assertRaisesRegexp(connection.CQLEngineException, expected_msg_excerpt):
             connection.set_session(dummy_session)
+
+    def test_get_session_fails_without_existing_connection(self):
+        """
+        Users can't get the default session without having a default connection set.
+        """
+        with self.assertRaisesRegexp(connection.CQLEngineException, self.no_registered_connection_msg):
+            connection.get_session(connection=None)
+
+    def test_get_cluster_fails_without_existing_connection(self):
+        """
+        Users can't get the default cluster without having a default connection set.
+        """
+        with self.assertRaisesRegexp(connection.CQLEngineException, self.no_registered_connection_msg):
+            connection.get_cluster(connection=None)
