@@ -139,8 +139,9 @@ class Connection(object):
                 self.setup()
 
 
-def register_connection(name, hosts, consistency=None, lazy_connect=False,
-                        retry_connect=False, cluster_options=None, default=False):
+def register_connection(name, hosts=None, consistency=None, lazy_connect=False,
+                        retry_connect=False, cluster_options=None, default=False,
+                        session=None):
 
     if name in _connections:
         log.warning("Registering connection '{0}' when it already exists.".format(name))
