@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from cassandra import InvalidRequest
+from cassandra.cluster import Cluster
 from cassandra.cluster import NoHostAvailable
 from cassandra.cqlengine import columns, CQLEngineException
 from cassandra.cqlengine import connection as conn
@@ -216,6 +217,12 @@ class ManagementConnectionTests(BaseCassEngTestCase):
         # Model connection
         for ks in self.keyspaces:
             drop_keyspace(ks, connections=self.conns)
+
+    def test_connection_creation_from_session(self):
+        session = Cluster(['127.0.0.1']).connect()
+        connection_name = 'from_session'
+        conn.register_connection(connection_name, session=session)
+        self.addCleanup(conn.unregister_connection, connection_name)
 
 
 class BatchQueryConnectionTests(BaseCassEngTestCase):
