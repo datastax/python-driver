@@ -900,7 +900,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         # extensions registered, one present
         # --------------------------------------
         ext_map = {Ext0.name: six.b("THA VALUE")}
-        s.execute(p, (ext_map, ks, t))
+        [s.execute(p, (ext_map, ks, t)) for _ in self.cluster.metadata.all_hosts()]  # we're manipulating metadata - do it on all hosts
         self.cluster.refresh_table_metadata(ks, t)
         table_meta = ks_meta.tables[t]
 
@@ -914,7 +914,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         # --------------------------------------
         ext_map = {Ext0.name: six.b("THA VALUE"),
                    Ext1.name: six.b("OTHA VALUE")}
-        s.execute(p, (ext_map, ks, t))
+        [s.execute(p, (ext_map, ks, t)) for _ in self.cluster.metadata.all_hosts()]  # we're manipulating metadata - do it on all hosts
         self.cluster.refresh_table_metadata(ks, t)
         table_meta = ks_meta.tables[t]
 
