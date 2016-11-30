@@ -645,13 +645,14 @@ class ResultMessage(_MessageType):
                       for ctype, val in zip(coltypes, row))
                 for row in rows]
         except Exception:
-            for i in range(len(row)):
-                try:
-                    coltypes[i].from_binary(row[i], protocol_version)
-                except Exception as e:
-                    raise DriverException('Failed decoding result column "%s" of type %s: %s' % (colnames[i],
-                                                                                                 coltypes[i].cql_parameterized_type(),
-                                                                                                 str(e)))
+            for row in rows:
+                for i in range(len(row)):
+                    try:
+                        coltypes[i].from_binary(row[i], protocol_version)
+                    except Exception as e:
+                        raise DriverException('Failed decoding result column "%s" of type %s: %s' % (colnames[i],
+                                                                                                     coltypes[i].cql_parameterized_type(),
+                                                                                                     str(e)))
         return paging_state, coltypes, (colnames, parsed_rows)
 
     @classmethod
