@@ -984,6 +984,8 @@ class ConnectionHeartbeat(Thread):
                             else:
                                 connection.reset_idle()
                         else:
+                            log.debug("Cannot send heartbeat message on connection (%s) to %s",
+                                      id(connection), connection.host)
                             # make sure the owner sees this defunt/closed connection
                             owner.return_connection(connection)
                     self._raise_if_stopped()
