@@ -775,6 +775,9 @@ class PrepareMessage(_MessageType):
 
     def send_body(self, f, protocol_version):
         write_longstring(f, self.query)
+        if protocol_version >= 5:
+            # Write the flags byte; with 0 value for now, but this should change in PYTHON-678
+            write_int(f, 0)
 
 
 class ExecuteMessage(_MessageType):
