@@ -561,7 +561,7 @@ class QueryMessage(_MessageType):
             flags |= _PROTOCOL_TIMESTAMP
 
         if protocol_version >= 5:
-            write_int(f, flags)
+            write_uint(f, flags)
         else:
             write_byte(f, flags)
 
@@ -777,7 +777,7 @@ class PrepareMessage(_MessageType):
         write_longstring(f, self.query)
         if protocol_version >= 5:
             # Write the flags byte; with 0 value for now, but this should change in PYTHON-678
-            write_int(f, 0)
+            write_uint(f, 0)
 
 
 class ExecuteMessage(_MessageType):
@@ -832,7 +832,7 @@ class ExecuteMessage(_MessageType):
                 flags |= _SKIP_METADATA_FLAG
 
             if protocol_version >= 5:
-                write_int(f, flags)
+                write_uint(f, flags)
             else:
                 write_byte(f, flags)
 
@@ -1165,6 +1165,10 @@ def read_int(f):
 
 def write_int(f, i):
     f.write(int32_pack(i))
+
+
+def write_uint(f, i):
+    f.write(uint32_pack(i))
 
 
 def write_long(f, i):
