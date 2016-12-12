@@ -27,15 +27,17 @@ class ConnectionTest(unittest.TestCase):
 
     no_registered_connection_msg = "doesn't exist in the registry"
 
-    def test_set_session_without_existing_connection(self):
-        """
-        Users can set the default session without having a default connection set.
-        """
+    def setUp(self):
+        super(ConnectionTest, self).setUp()
         self.assertFalse(
             connection._connections,
             'Test precondition not met: connections are registered: {cs}'.format(cs=connection._connections)
         )
 
+    def test_set_session_without_existing_connection(self):
+        """
+        Users can set the default session without having a default connection set.
+        """
         mock_session = Mock(
             row_factory=dict_factory,
             encoder=Mock(mapping={})
