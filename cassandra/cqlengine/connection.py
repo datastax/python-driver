@@ -142,6 +142,31 @@ class Connection(object):
 def register_connection(name, hosts=None, consistency=None, lazy_connect=False,
                         retry_connect=False, cluster_options=None, default=False,
                         session=None):
+    """
+    Add a connection to the connection registry. ``hosts`` and ``session`` are
+    mutually exclusive, and ``consistency``, ``lazy_connect``,
+    ``retry_connect``, and ``cluster_options`` only work with ``hosts``. Using
+    ``hosts`` will create a new :class:`cassandra.cluster.Cluster` and
+    :class:`cassandra.cluster.Session`.
+
+    :param list hosts: list of hosts, (``contact_points`` for :class:`cassandra.cluster.Cluster`).
+    :param int consistency: The default :class:`~.ConsistencyLevel` for the
+        registered connection's new session. Default is the same as
+        :attr:`.Session.default_consistency_level`. For use with ``hosts`` only;
+        will fail when used with ``session``.
+    :param bool lazy_connect: True if should not connect until first use. For
+        use with ``hosts`` only; will fail when used with ``session``.
+    :param bool retry_connect: True if we should retry to connect even if there
+        was a connection failure initially. For use with ``hosts`` only; will
+        fail when used with ``session``.
+    :param dict cluster_options: A dict of options to be used as keyword
+        arguments to :class:`cassandra.cluster.Cluster`. For use with ``hosts``
+        only; will fail when used with ``session``.
+    :param bool default: If True, set the new connection as the cqlengine
+        default
+    :param Session session: A :class:`cassandra.cluster.Session` to be used in
+        the created connection.
+    """
 
     if name in _connections:
         log.warning("Registering connection '{0}' when it already exists.".format(name))
