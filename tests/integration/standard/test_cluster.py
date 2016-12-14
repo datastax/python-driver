@@ -19,7 +19,7 @@ except ImportError:
 
 from collections import deque
 from copy import copy
-from mock import patch
+from mock import Mock, call, patch
 import time
 from uuid import uuid4
 import logging
@@ -1054,6 +1054,43 @@ class HostStateTest(unittest.TestCase):
                     break
                 time.sleep(.01)
             self.assertTrue(was_marked_down)
+
+
+class DontPrepareOnIgnoredHostsTest(unittest.TestCase):
+
+    ignored_addresses = ['127.0.0.3']
+    ignore_node_3_policy = IgnoredHostPolicy(ignored_addresses)
+
+    def test_prepare_on_ignored_hosts(self):
+
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION,
+                          load_balancing_policy=self.ignore_node_3_policy)
+        session = cluster.connect()
+        cluster.reprepare_on_up, cluster.prepare_on_all_hosts = True, False
+
+        hosts = cluster.metadata.all_hosts()
+        session.execute("CREATE KEYSPACE clustertests "
+                        "WITH replication = "
+                        "{'class': 'SimpleStrategy', 'replication_factor': '1'}")
+        session.execute("CREATE TABLE clustertests.tab (a text, PRIMARY KEY (a))")
+        # assign to an unused variable so cluster._prepared_statements retains
+        # reference
+        _ = session.prepare("INSERT INTO clustertests.tab (a) VALUES ('a')")  # noqa
+
+        cluster.connection_factory = Mock(wraps=cluster.connection_factory)
+
+        unignored_address = '127.0.0.1'
+        unignored_host = next(h for h in hosts if h.address == unignored_address)
+        ignored_host = next(h for h in hosts if h.address in self.ignored_addresses)
+        unignored_host.is_up = ignored_host.is_up = False
+
+        cluster.on_up(unignored_host)
+        cluster.on_up(ignored_host)
+
+        # the length of mock_calls will vary, but all should use the unignored
+        # address
+        for c in cluster.connection_factory.mock_calls:
+            self.assertEqual(call(unignored_address), c)
 
 
 class DuplicateRpcTest(unittest.TestCase):

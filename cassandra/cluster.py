@@ -1330,8 +1330,9 @@ class Cluster(object):
                 log.debug("Now that host %s is up, cancelling the reconnection handler", host)
                 reconnector.cancel()
 
-            self._prepare_all_queries(host)
-            log.debug("Done preparing all queries for host %s, ", host)
+            if self.profile_manager.distance(host) != HostDistance.IGNORED:
+                self._prepare_all_queries(host)
+                log.debug("Done preparing all queries for host %s, ", host)
 
             for session in self.sessions:
                 session.remove_pool(host)
