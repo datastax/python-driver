@@ -30,7 +30,7 @@ from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
                        UserAggregateDescriptor, SchemaTargetType)
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
                                int8_pack, int8_unpack, uint64_pack, header_pack,
-                               v3_header_pack, uint32_pack)
+                               v3_header_pack)
 from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 CounterColumnType, DateType, DecimalType,
                                 DoubleType, FloatType, Int32Type,
@@ -561,7 +561,7 @@ class QueryMessage(_MessageType):
             flags |= _PROTOCOL_TIMESTAMP
 
         if protocol_version >= 5:
-            write_uint(f, flags)
+            write_int(f, flags)
         else:
             write_byte(f, flags)
 
@@ -775,9 +775,6 @@ class PrepareMessage(_MessageType):
 
     def send_body(self, f, protocol_version):
         write_longstring(f, self.query)
-        if protocol_version >= 5:
-            # Write the flags byte; with 0 value for now, but this should change in PYTHON-678
-            write_uint(f, 0)
 
 
 class ExecuteMessage(_MessageType):
@@ -832,7 +829,7 @@ class ExecuteMessage(_MessageType):
                 flags |= _SKIP_METADATA_FLAG
 
             if protocol_version >= 5:
-                write_uint(f, flags)
+                write_int(f, flags)
             else:
                 write_byte(f, flags)
 
@@ -1165,10 +1162,6 @@ def read_int(f):
 
 def write_int(f, i):
     f.write(int32_pack(i))
-
-
-def write_uint(f, i):
-    f.write(uint32_pack(i))
 
 
 def write_long(f, i):
