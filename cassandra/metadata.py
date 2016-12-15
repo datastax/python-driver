@@ -1076,6 +1076,20 @@ class TableMetadata(object):
             return not incompatible
         return True
 
+    extensions = None
+    """
+    Metadata describing configuration for table extensions
+    """
+
+    _extension_registry = {}
+
+    class _RegisteredExtensionType(type):
+        def __new__(mcs, name, bases, dct):
+            cls = super(TableMetadata._RegisteredExtensionType, mcs).__new__(mcs, name, bases, dct)
+            if name != 'RegisteredTableExtension':
+                TableMetadata._extension_registry[cls.name] = cls
+            return cls
+
     def __init__(self, keyspace_name, name, partition_key=None, clustering_key=None, columns=None, triggers=None, options=None):
         self.keyspace_name = keyspace_name
         self.name = name
@@ -1123,6 +1137,13 @@ class TableMetadata(object):
 
         for view_meta in self.views.values():
             ret += "\n\n%s;" % (view_meta.as_cql_query(formatted=True),)
+
+        if self.extensions:  # None
+            for k in six.viewkeys(self._extension_registry) & self.extensions:  # no viewkeys on OrderedMapSerializeKey
+                ext = self._extension_registry[k]
+                cql = ext.after_table_cql(self, k, self.extensions[k])
+                if cql:
+                    ret += "\n\n%s" % (cql,)
 
         return ret
 
@@ -1223,6 +1244,31 @@ class TableMetadata(object):
                 ret.append("%s = %s" % (name, protect_value(value)))
 
         return list(sorted(ret))
+
+
+class TableExtensionInterface(object):
+    """
+    Defines CQL/DDL for Cassandra table extensions.
+    """
+    # limited API for now. Could be expanded as new extension types materialize -- "extend_option_strings", for example
+    @classmethod
+    def after_table_cql(cls, ext_key, ext_blob):
+        """
+        Called to produce CQL/DDL to follow the table definition.
+        Should contain requisite terminating semicolon(s).
+        """
+        pass
+
+
+@six.add_metaclass(TableMetadata._RegisteredExtensionType)
+class RegisteredTableExtension(TableExtensionInterface):
+    """
+    Extending this class registers it by name (associated by key in the `system_schema.tables.extensions` map).
+    """
+    name = None
+    """
+    Name of the extension (key in the map)
+    """
 
 
 def protect_name(name):
@@ -2222,6 +2268,8 @@ class SchemaParserV3(SchemaParserV22):
                 index_meta = self._build_index_metadata(table_meta, index_row)
                 if index_meta:
                     table_meta.indexes[index_meta.name] = index_meta
+
+            table_meta.extensions = row.get('extensions', {})
         except Exception:
             table_meta._exc_info = sys.exc_info()
             log.exception("Error while parsing metadata for table %s.%s row(%s) columns(%s)", keyspace_name, table_name, row, col_rows)

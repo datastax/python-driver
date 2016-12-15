@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from cassandra.parsing cimport ParseDesc, ColumnParser
+from cassandra.obj_parser import TupleRowParser
 from cassandra.deserializers import make_deserializers
 
 include "ioutils.pyx"
@@ -33,7 +34,16 @@ def make_recv_results_rows(ColumnParser colparser):
         desc = ParseDesc(colnames, coltypes, make_deserializers(coltypes),
                          protocol_version)
         reader = BytesIOReader(f.read())
-        parsed_rows = colparser.parse_rows(reader, desc)
+        try:
+            parsed_rows = colparser.parse_rows(reader, desc)
+        except Exception as e:
+            # Use explicitly the TupleRowParser to display better error messages for column decoding failures
+            rowparser = TupleRowParser()
+            reader.buf_ptr = reader.buf
+            reader.pos = 0
+            rowcount = read_int(reader)
+            for i in range(rowcount):
+                rowparser.unpack_row(reader, desc)
 
         return (paging_state, coltypes, (colnames, parsed_rows))
 

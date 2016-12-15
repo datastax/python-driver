@@ -176,7 +176,7 @@ def lookup_casstype(casstype):
     Example:
 
         >>> lookup_casstype('org.apache.cassandra.db.marshal.MapType(org.apache.cassandra.db.marshal.UTF8Type,org.apache.cassandra.db.marshal.Int32Type)')
-        <class 'cassandra.types.MapType(UTF8Type, Int32Type)'>
+        <class 'cassandra.cqltypes.MapType(UTF8Type, Int32Type)'>
 
     """
     if isinstance(casstype, (CassandraType, CassandraTypeType)):
@@ -296,7 +296,7 @@ class _CassandraType(object):
         using them as parameters. This is how composite types are constructed.
 
             >>> MapType.apply_parameters([DateType, BooleanType])
-            <class 'cassandra.types.MapType(DateType, BooleanType)'>
+            <class 'cassandra.cqltypes.MapType(DateType, BooleanType)'>
 
         `subtypes` will be a sequence of CassandraTypes.  If provided, `names`
         will be an equally long sequence of column names or Nones.
