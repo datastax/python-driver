@@ -8,7 +8,7 @@ Connections are experimental and aimed to ease the use of multiple sessions with
 Register a new connection
 =========================
 
-To use cqlengine, you need at least a default connection. This is currently done automatically under the hood with :func:`connection.setup <.connection.setup>`. If you want to use another cluster/session, you need to register a new cqlengine connection. You register a connection with :func:`~.connection.register_connection`
+To use cqlengine, you need at least a default connection. If you initialize cqlengine's connections with with :func:`connection.setup <.connection.setup>`, a connection will be created automatically. If you want to use another cluster/session, you need to register a new cqlengine connection. You register a connection with :func:`~.connection.register_connection`:
 
     .. code-block:: python
 
@@ -16,6 +16,17 @@ To use cqlengine, you need at least a default connection. This is currently done
 
         connection.setup(['127.0.0.1')
         connection.register_connection('cluster2', ['127.0.0.2'])
+
+:func:`~.connection.register_connection` can take a list of hosts, as shown above, in which case it will create a connection with a new session. It can also take a `session` argument if you've already created a session:
+
+    .. code-block:: python
+
+        from cassandra.cqlengine import connection
+        from cassandra.cluster import Cluster
+
+        session = Cluster(['127.0.0.1']).connect()
+        connection.register_connection('cluster3', session=session)
+
 
 Change the default connection
 =============================
