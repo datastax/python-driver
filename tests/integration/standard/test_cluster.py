@@ -1130,8 +1130,3 @@ class BetaProtocolTest(unittest.TestCase):
         session = cluster.connect()
         self.assertEqual(cluster.protocol_version, MAX_SUPPORTED_VERSION)
         self.assertTrue(session.execute("select release_version from system.local")[0])
-
-
-
-
-
