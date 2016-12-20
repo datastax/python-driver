@@ -25,8 +25,7 @@ from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
                              BatchStatement, BatchType, dict_factory, TraceUnavailable)
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.policies import HostDistance, RoundRobinPolicy
-from tests.unit.cython.utils import notcython
-from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions, notpy3
+from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions
 
 import time
 import re
@@ -70,8 +69,6 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         for event in trace.events:
             str(event)
 
-    @notcython
-    @notpy3
     def test_row_error_message(self):
         """
         Test to validate, new column deserialization message
