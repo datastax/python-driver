@@ -55,9 +55,6 @@ class InternalError(Exception):
 
 ColumnMetadata = namedtuple("ColumnMetadata", ['keyspace_name', 'table_name', 'name', 'type'])
 
-MIN_SUPPORTED_VERSION = 1
-MAX_SUPPORTED_VERSION = 5
-
 HEADER_DIRECTION_TO_CLIENT = 0x80
 HEADER_DIRECTION_MASK = 0x80
 

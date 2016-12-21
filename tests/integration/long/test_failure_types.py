@@ -14,9 +14,8 @@
 
 import sys,logging, traceback, time
 
-from cassandra import ConsistencyLevel, OperationTimedOut, ReadTimeout, WriteTimeout, ReadFailure, WriteFailure,\
-    FunctionFailure
-from cassandra.protocol import MAX_SUPPORTED_VERSION
+from cassandra import (ConsistencyLevel, OperationTimedOut, ReadTimeout, WriteTimeout, ReadFailure, WriteFailure,
+                       FunctionFailure, ProtocolVersion)
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.query import SimpleStatement
@@ -70,7 +69,7 @@ class ClientExceptionTests(unittest.TestCase):
                 "Native protocol 4,0+ is required for custom payloads, currently using %r"
                 % (PROTOCOL_VERSION,))
         try:
-            self.cluster = Cluster(protocol_version=MAX_SUPPORTED_VERSION, allow_beta_protocol_version=True)
+            self.cluster = Cluster(protocol_version=ProtocolVersion.MAX_SUPPORTED, allow_beta_protocol_version=True)
             self.session = self.cluster.connect()
         except NoHostAvailable:
             log.info("Protocol Version 5 not supported,")
