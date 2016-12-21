@@ -219,10 +219,39 @@ class ManagementConnectionTests(BaseCassEngTestCase):
             drop_keyspace(ks, connections=self.conns)
 
     def test_connection_creation_from_session(self):
+        """
+        Test to ensure that you can register a connection from a session
+        @since 3.8
+        @jira_ticket PYTHON-649
+        @expected_result queries should execute appropriately
+
+        @test_category object_mapper
+        """
         session = Cluster(['127.0.0.1']).connect()
         connection_name = 'from_session'
         conn.register_connection(connection_name, session=session)
         self.addCleanup(conn.unregister_connection, connection_name)
+
+    def test_connection_param_validation(self):
+        """
+        Test to validate that invalid parameter combinations for registering connections via session are not tolerated
+        @since 3.8
+        @jira_ticket PYTHON-649
+        @expected_result queries should execute appropriately
+
+        @test_category object_mapper
+        """
+        session = Cluster(['127.0.0.1']).connect()
+        with self.assertRaises(CQLEngineException):
+            conn.register_connection("bad_coonection1", session=session, consistency="not_null")
+        with self.assertRaises(CQLEngineException):
+            conn.register_connection("bad_coonection2", session=session, lazy_connect="not_null")
+        with self.assertRaises(CQLEngineException):
+            conn.register_connection("bad_coonection3", session=session, retry_connect="not_null")
+        with self.assertRaises(CQLEngineException):
+            conn.register_connection("bad_coonection4", session=session, cluster_options="not_null")
+        with self.assertRaises(CQLEngineException):
+            conn.register_connection("bad_coonection5", hosts="not_null", session=session)
 
 
 class BatchQueryConnectionTests(BaseCassEngTestCase):
@@ -398,7 +427,7 @@ class UsingDescriptorTests(BaseCassEngTestCase):
 
         for ks in self.keyspaces:
             drop_keyspace(ks, connections=self.conns)
-
+        import pdb; pdb.set_trace()
         for ks in self.keyspaces:
             create_keyspace_simple(ks, 1, connections=self.conns)
         sync_table(TestModel, keyspaces=self.keyspaces, connections=self.conns)
