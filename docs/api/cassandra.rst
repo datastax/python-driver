@@ -14,6 +14,9 @@
 .. autoclass:: ConsistencyLevel
    :members:
 
+.. autoclass:: ProtocolVersion
+   :members:
+
 .. autoclass:: UserFunctionDescriptor
    :members:
    :inherited-members:

@@ -125,6 +125,56 @@ def consistency_value_to_name(value):
     return ConsistencyLevel.value_to_name[value] if value is not None else "Not Set"
 
 
+class ProtocolVersion(object):
+    """
+    Defines native protocol versions supported by this driver.
+    """
+    V1 = 1
+    """
+    v1, supported in Cassandra 1.2-->2.2
+    """
+
+    V2 = 2
+    """
+    v2, supported in Cassandra 2.0-->2.2;
+    added support for lightweight transactions, batch operations, and automatic query paging.
+    """
+
+    V3 = 3
+    """
+    v3, supported in Cassandra 2.1-->3.x+;
+    added support for protocol-level client-side timestamps (see :attr:`.Session.use_client_timestamp`),
+    serial consistency levels for :class:`~.BatchStatement`, and an improved connection pool.
+    """
+
+    V4 = 4
+    """
+    v4, supported in Cassandra 2.2-->3.x+;
+    added a number of new types, server warnings, new failure messages, and custom payloads. Details in the
+    `project docs <https://github.com/apache/cassandra/blob/trunk/doc/native_protocol_v4.spec>`_
+    """
+
+    V5 = 5
+    """
+    v5, in beta from 3.x+
+    """
+
+    SUPPORTED_VERSIONS = (V5, V4, V3, V2, V1)
+    """
+    A tuple of all supported protocol versions
+    """
+
+    MIN_SUPPORTED = min(SUPPORTED_VERSIONS)
+    """
+    Minimum protocol version supported by this driver.
+    """
+
+    MAX_SUPPORTED = max(SUPPORTED_VERSIONS)
+    """
+    Maximum protocol versioni supported by this driver.
+    """
+
+
 class SchemaChangeType(object):
     DROPPED = 'DROPPED'
     CREATED = 'CREATED'
