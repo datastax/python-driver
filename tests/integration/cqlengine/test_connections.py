@@ -427,7 +427,6 @@ class UsingDescriptorTests(BaseCassEngTestCase):
 
         for ks in self.keyspaces:
             drop_keyspace(ks, connections=self.conns)
-        import pdb; pdb.set_trace()
         for ks in self.keyspaces:
             create_keyspace_simple(ks, 1, connections=self.conns)
         sync_table(TestModel, keyspaces=self.keyspaces, connections=self.conns)
