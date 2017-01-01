@@ -117,6 +117,7 @@ DEFAULT_MAX_CONNECTIONS_PER_REMOTE_HOST = 2
 
 
 _NOT_SET = object()
+_INVALID = object()
 
 
 class NoHostAvailable(Exception):
@@ -3216,7 +3217,7 @@ class ResponseFuture(object):
 
     coordinator_host = None
     """
-    The host from which we recieved a response
+    The host from which we received a response
     """
 
     attempted_hosts = None
@@ -3287,9 +3288,11 @@ class ResponseFuture(object):
             if self._time_remaining is not None:
                 self._timer = self.session.cluster.connection_class.create_timer(self._time_remaining, self._on_timeout)
 
-    def _cancel_timer(self):
+    def _finalize_timer(self):
         if self._timer:
             self._timer.cancel()
+        else:
+            self._timer = _INVALID
 
     def _on_timeout(self):
         errors = self._errors
@@ -3314,7 +3317,6 @@ class ResponseFuture(object):
                     return
             if not self.send_request(error_no_hosts=False):
                 self._start_timer()
-
 
     def _make_query_plan(self):
         # convert the list/generator/etc to an iterator so that subsequent
@@ -3669,7 +3671,7 @@ class ResponseFuture(object):
                 "statement on host %s: %s" % (host, response)))
 
     def _set_final_result(self, response):
-        self._cancel_timer()
+        self._finalize_timer()
         if self._metrics is not None:
             self._metrics.request_timer.addValue(time.time() - self._start_time)
 
@@ -3684,7 +3686,7 @@ class ResponseFuture(object):
             fn(response, *args, **kwargs)
 
     def _set_final_exception(self, response):
-        self._cancel_timer()
+        self._finalize_timer()
         if self._metrics is not None:
             self._metrics.request_timer.addValue(time.time() - self._start_time)
 
