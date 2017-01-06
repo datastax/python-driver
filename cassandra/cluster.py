@@ -117,7 +117,7 @@ DEFAULT_MAX_CONNECTIONS_PER_REMOTE_HOST = 2
 
 
 _NOT_SET = object()
-_INVALID = object()
+_FINALIZED = object()
 
 
 class NoHostAvailable(Exception):
@@ -3289,10 +3289,10 @@ class ResponseFuture(object):
                 self._timer = self.session.cluster.connection_class.create_timer(self._time_remaining, self._on_timeout)
 
     def _finalize_timer(self):
-        if self._timer:
+        if self._timer and self._timer is not _FINALIZED:
             self._timer.cancel()
         else:
-            self._timer = _INVALID
+            self._timer = _FINALIZED
 
     def _on_timeout(self):
         errors = self._errors

@@ -17,10 +17,10 @@ try:
 except ImportError:
     import unittest # noqa
 
-from mock import Mock, MagicMock, ANY
+from mock import Mock, MagicMock, ANY, DEFAULT
 
 from cassandra import ConsistencyLevel, Unavailable, SchemaTargetType, SchemaChangeType
-from cassandra.cluster import Session, ResponseFuture, NoHostAvailable
+from cassandra.cluster import Session, ResponseFuture, NoHostAvailable, _FINALIZED
 from cassandra.connection import Connection, ConnectionException
 from cassandra.protocol import (ReadTimeoutErrorMessage, WriteTimeoutErrorMessage,
                                 UnavailableErrorMessage, ResultMessage, QueryMessage,
@@ -73,6 +73,33 @@ class ResponseFutureTests(unittest.TestCase):
         result = rf.result()
         self.assertEqual(result, [{'col': 'val'}])
 
+    def test_timer_not_started_after_set_result(self):
+        session = self.make_basic_session()
+        session.cluster._default_load_balancing_policy.make_query_plan.return_value = ['ip1', 'ip2']
+        pool = session._pools.get.return_value
+        pool.is_shutdown = False
+
+        connection = Mock(spec=Connection)
+        pool.borrow_connection.return_value = (connection, 1)
+
+        rf = self.make_response_future(session)
+
+        def send_msg_wrapper(*args, **kwargs):
+            rf._set_result(None, None, None, self.make_mock_response([{'col': 'val'}]))
+            return DEFAULT
+
+        connection.send_msg.side_effect = send_msg_wrapper
+        rf.send_request()
+
+        rf.session._pools.get.assert_called_once_with('ip1')
+        pool.borrow_connection.assert_called_once_with(timeout=ANY)
+
+        connection.send_msg.assert_called_once_with(rf.message, 1, cb=ANY, encoder=ProtocolHandler.encode_message,
+                                                    decoder=ProtocolHandler.decode_message, result_metadata=[])
+
+        # rf._set_result(None, None, None, self.make_mock_response([{'col': 'val'}]))
+        self.assertEqual(rf._timer, _FINALIZED)
+
     def test_unknown_result_class(self):
         session = self.make_session()
         pool = session._pools.get.return_value
@@ -101,8 +128,8 @@ class ResponseFutureTests(unittest.TestCase):
         rf = self.make_response_future(session)
         rf.send_request()
 
-        event_results={'target_type': SchemaTargetType.TABLE, 'change_type': SchemaChangeType.CREATED,
-                       'keyspace': "keyspace1", "table": "table1"}
+        event_results = {'target_type': SchemaTargetType.TABLE, 'change_type': SchemaChangeType.CREATED,
+                         'keyspace': "keyspace1", "table": "table1"}
         result = Mock(spec=ResultMessage,
                       kind=RESULT_KIND_SCHEMA_CHANGE,
                       results=event_results)
