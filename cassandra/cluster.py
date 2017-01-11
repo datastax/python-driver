@@ -117,6 +117,7 @@ DEFAULT_MAX_CONNECTIONS_PER_REMOTE_HOST = 2
 
 
 _NOT_SET = object()
+_CANCELLED = object()
 
 
 class NoHostAvailable(Exception):
@@ -3279,7 +3280,7 @@ class ResponseFuture(object):
         self.attempted_hosts = []
 
     def _start_timer(self):
-        if self._timer is None:
+        if self._timer is None and self._timer is not _CANCELLED:
             spec_delay = self._spec_execution_plan.next_execution(self._current_host)
             if spec_delay >= 0:
                 if self._time_remaining is None or self._time_remaining > spec_delay:
@@ -3289,8 +3290,10 @@ class ResponseFuture(object):
                 self._timer = self.session.cluster.connection_class.create_timer(self._time_remaining, self._on_timeout)
 
     def _cancel_timer(self):
-        if self._timer:
+        if self._timer is not None and self._timer is not _CANCELLED:
             self._timer.cancel()
+        else:
+            self._timer = _CANCELLED
 
     def _on_timeout(self):
         errors = self._errors
@@ -3305,6 +3308,8 @@ class ResponseFuture(object):
         self._set_final_exception(OperationTimedOut(errors, self._current_host))
 
     def _on_speculative_execute(self):
+        if self._timer is _CANCELLED:
+            return
         self._timer = None
         if not self._event.is_set():
             if self._time_remaining is not None:
