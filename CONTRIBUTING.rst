@@ -22,7 +22,7 @@ Please include tests demonstrating the issue and fix. For examples of how to run
 
 Contribution License Agreement
 ------------------------------
-To protect the community, all contributors are required to [sign the DataStax Contribution License Agreement](http://cla.datastax.com/). The process is completely electronic and should only take a few minutes.
+To protect the community, all contributors are required to `sign the DataStax Contribution License Agreement <http://cla.datastax.com/>`_. The process is completely electronic and should only take a few minutes.
 
 Design and Implementation Guidelines
 ------------------------------------
