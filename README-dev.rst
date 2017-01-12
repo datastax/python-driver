@@ -134,7 +134,7 @@ Running the Benchmarks
 ======================
 There needs to be a version of cassandra running locally so before running the benchmarks, if ccm is installed:
 	
-	ccm create benchmark_cluster -v 3.0.1 && ccm populate -n 1 && ccm start
+	ccm create benchmark_cluster -v 3.0.1 -n 1 -s
 
 To run the benchmarks, pick one of the files under the ``benchmarks/`` dir and run it::
 
