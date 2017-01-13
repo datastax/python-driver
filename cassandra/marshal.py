@@ -91,11 +91,23 @@ def decode_zig_zag(n):
 
 
 def vints_unpack(term):  # noqa
-    first_byte = ord(term[0])
-    if (first_byte & 128) == 0:
-        val = first_byte
-    else:
-        extra_bytes = 8 - (~first_byte & 0xff).bit_length()
-        # takes (8-extra_bytes) bits + extra_bytes
+    values = []
+    n = 0
+    while n < len(term):
+        first_byte = ord(term[n])
 
-    return decode_zig_zag(val)
+        if (first_byte & 128) == 0:
+            val = first_byte
+        else:
+            num_extra_bytes = 8 - (~first_byte & 0xff).bit_length()
+            val = first_byte & (0xff >> num_extra_bytes)
+            end = n + num_extra_bytes
+            while n < end:
+                n += 1
+                val <<= 8
+                val |= ord(term[n]) & 0xff
+
+        n += 1
+        values.append(decode_zig_zag(val))
+
+    return tuple(values)
