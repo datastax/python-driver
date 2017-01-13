@@ -84,3 +84,18 @@ def varint_pack(big):
         revbytes.append(0)
     revbytes.reverse()
     return six.binary_type(revbytes)
+
+
+def decode_zig_zag(n):
+    return (n >> 1) ^ -(n & 1)
+
+
+def vints_unpack(term):  # noqa
+    first_byte = ord(term[0])
+    if (first_byte & 128) == 0:
+        val = first_byte
+    else:
+        extra_bytes = 8 - (~first_byte & 0xff).bit_length()
+        # takes (8-extra_bytes) bits + extra_bytes
+
+    return decode_zig_zag(val)
