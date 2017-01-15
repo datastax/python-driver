@@ -45,6 +45,10 @@ v3_header_unpack = v3_header_struct.unpack
 
 
 if six.PY3:
+    def byte2int(b):
+        return b
+
+
     def varint_unpack(term):
         val = int(''.join("%02x" % i for i in term), 16)
         if (term[0] & 128) != 0:
@@ -52,6 +56,10 @@ if six.PY3:
             val -= 1 << (len_term * 8)
         return val
 else:
+    def byte2int(b):
+        return ord(b)
+
+
     def varint_unpack(term):  # noqa
         val = int(term.encode('hex'), 16)
         if (ord(term[0]) & 128) != 0:
@@ -98,7 +106,7 @@ def vints_unpack(term):  # noqa
     values = []
     n = 0
     while n < len(term):
-        first_byte = ord(term[n])
+        first_byte = byte2int(term[n])
 
         if (first_byte & 128) == 0:
             val = first_byte
@@ -109,7 +117,7 @@ def vints_unpack(term):  # noqa
             while n < end:
                 n += 1
                 val <<= 8
-                val |= ord(term[n]) & 0xff
+                val |= byte2int(term[n]) & 0xff
 
         n += 1
         values.append(decode_zig_zag(val))
