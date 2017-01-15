@@ -86,6 +86,10 @@ def varint_pack(big):
     return six.binary_type(revbytes)
 
 
+def encode_zig_zag(n):
+    return (n << 1) ^ (n >> 63)
+
+
 def decode_zig_zag(n):
     return (n >> 1) ^ -(n & 1)
 
@@ -111,3 +115,30 @@ def vints_unpack(term):  # noqa
         values.append(decode_zig_zag(val))
 
     return tuple(values)
+
+
+def vints_pack(values):
+    revbytes = bytearray()
+    values.reverse()
+    for v in values:
+        v = encode_zig_zag(v)
+        if v < 128:
+            revbytes.append(v)
+        else:
+            num_extra_bytes = 0
+            num_bits = v.bit_length()
+            # We need to reserve (num_extra_bytes+1) bits in the first byte
+            # ie. with 1 extra byte, the first byte needs to be something like '10XXXXXX'
+            while num_bits > (8-(num_extra_bytes+1)):
+                num_extra_bytes += 1
+                num_bits -= 8
+                revbytes.append(v & 0xff)
+                v >>= 8
+
+            # We can now store the last bits in the first byte
+            n = 8 - num_extra_bytes
+            v |= (0xff >> n << n)
+            revbytes.append(abs(v))
+
+    revbytes.reverse()
+    return six.binary_type(revbytes)
