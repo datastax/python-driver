@@ -25,6 +25,11 @@ Type codes are repeated here from the Cassandra binary protocol specification:
             0x000E    Varint
             0x000F    Timeuuid
             0x0010    Inet
+            0x0011    SimpleDateType
+            0x0012    TimeType
+            0x0013    ShortType
+            0x0014    ByteType
+            0x0015    DurationType
             0x0020    List: the value is an [option], representing the type
                             of the elements of the list.
             0x0021    Map: the value is two [option], representing the types of the
@@ -54,6 +59,7 @@ SimpleDateType = 0x0011
 TimeType = 0x0012
 ShortType = 0x0013
 ByteType = 0x0014
+DurationType = 0x0015
 ListType = 0x0020
 MapType = 0x0021
 SetType = 0x0022

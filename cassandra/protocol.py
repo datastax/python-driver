@@ -38,7 +38,7 @@ from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 LongType, MapType, SetType, TimeUUIDType,
                                 UTF8Type, VarcharType, UUIDType, UserType,
                                 TupleType, lookup_casstype, SimpleDateType,
-                                TimeType, ByteType, ShortType)
+                                TimeType, ByteType, ShortType, DurationType)
 from cassandra.policies import WriteType
 from cassandra.cython_deps import HAVE_CYTHON, HAVE_NUMPY
 from cassandra import util
