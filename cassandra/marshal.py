@@ -127,7 +127,7 @@ def vints_unpack(term):  # noqa
 
 def vints_pack(values):
     revbytes = bytearray()
-    values.reverse()
+    values = [int(v) for v in values[::-1]]
     for v in values:
         v = encode_zig_zag(v)
         if v < 128:
