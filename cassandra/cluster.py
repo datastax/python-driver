@@ -3608,6 +3608,7 @@ class ResponseFuture(object):
                 # we got some other kind of response message
                 msg = "Got unexpected message: %r" % (response,)
                 exc = ConnectionException(msg, host)
+                self._cancel_timer()
                 self._connection.defunct(exc)
                 self._set_final_exception(exc)
         except Exception as exc:
