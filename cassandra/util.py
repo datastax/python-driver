@@ -1232,7 +1232,7 @@ class Duration(object):
         return "Duration({0}, {1}, {2})".format(self.months, self.days, self.nanoseconds)
 
     def __str__(self):
-        return '{0}{1}mo{2}d{3}ns'.format(
+        return '%s%dmo%dd%dns' % (
             '-' if self._has_negative_values else '',
             abs(self.months),
             abs(self.days),

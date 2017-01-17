@@ -30,7 +30,7 @@ from uuid import UUID
 import six
 
 from cassandra.util import (OrderedDict, OrderedMap, OrderedMapSerializedKey,
-                            sortedset, Time, Date, Duration)
+                            sortedset, Time, Date)
 
 if six.PY3:
     long = int
@@ -88,8 +88,7 @@ class Encoder(object):
             sortedset: self.cql_encode_set_collection,
             frozenset: self.cql_encode_set_collection,
             types.GeneratorType: self.cql_encode_list_collection,
-            ValueSequence: self.cql_encode_sequence,
-            Duration: self.cql_encode_duration
+            ValueSequence: self.cql_encode_sequence
         }
 
         if six.PY2:
@@ -226,9 +225,3 @@ class Encoder(object):
         if :attr:`~Encoder.mapping` does not contain an entry for the type.
         """
         return self.mapping.get(type(val), self.cql_encode_object)(val)
-
-    def cql_encode_duration(self, val):
-        """
-        Encodes a :class:`cassandra.util.Duration` object as a string.
-        """
-        return str(val)
