@@ -45,6 +45,10 @@ v3_header_unpack = v3_header_struct.unpack
 
 
 if six.PY3:
+    def byte2int(b):
+        return b
+
+
     def varint_unpack(term):
         val = int(''.join("%02x" % i for i in term), 16)
         if (term[0] & 128) != 0:
@@ -52,6 +56,10 @@ if six.PY3:
             val -= 1 << (len_term * 8)
         return val
 else:
+    def byte2int(b):
+        return ord(b)
+
+
     def varint_unpack(term):  # noqa
         val = int(term.encode('hex'), 16)
         if (ord(term[0]) & 128) != 0:
@@ -82,5 +90,63 @@ def varint_pack(big):
         big >>= 8
     if pos and revbytes[-1] & 0x80:
         revbytes.append(0)
+    revbytes.reverse()
+    return six.binary_type(revbytes)
+
+
+def encode_zig_zag(n):
+    return (n << 1) ^ (n >> 63)
+
+
+def decode_zig_zag(n):
+    return (n >> 1) ^ -(n & 1)
+
+
+def vints_unpack(term):  # noqa
+    values = []
+    n = 0
+    while n < len(term):
+        first_byte = byte2int(term[n])
+
+        if (first_byte & 128) == 0:
+            val = first_byte
+        else:
+            num_extra_bytes = 8 - (~first_byte & 0xff).bit_length()
+            val = first_byte & (0xff >> num_extra_bytes)
+            end = n + num_extra_bytes
+            while n < end:
+                n += 1
+                val <<= 8
+                val |= byte2int(term[n]) & 0xff
+
+        n += 1
+        values.append(decode_zig_zag(val))
+
+    return tuple(values)
+
+
+def vints_pack(values):
+    revbytes = bytearray()
+    values = [int(v) for v in values[::-1]]
+    for v in values:
+        v = encode_zig_zag(v)
+        if v < 128:
+            revbytes.append(v)
+        else:
+            num_extra_bytes = 0
+            num_bits = v.bit_length()
+            # We need to reserve (num_extra_bytes+1) bits in the first byte
+            # ie. with 1 extra byte, the first byte needs to be something like '10XXXXXX'
+            while num_bits > (8-(num_extra_bytes+1)):
+                num_extra_bytes += 1
+                num_bits -= 8
+                revbytes.append(v & 0xff)
+                v >>= 8
+
+            # We can now store the last bits in the first byte
+            n = 8 - num_extra_bytes
+            v |= (0xff >> n << n)
+            revbytes.append(abs(v))
+
     revbytes.reverse()
     return six.binary_type(revbytes)
