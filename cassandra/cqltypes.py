@@ -671,7 +671,6 @@ class DurationType(_CassandraType):
     @staticmethod
     def serialize(duration, protocol_version):
         try:
-            duration.validate()
             m, d, n = duration.months, duration.days, duration.nanoseconds
         except AttributeError:
             raise TypeError('DurationType arguments must be a Duration.')

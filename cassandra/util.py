@@ -1208,22 +1208,6 @@ class Duration(object):
         self.months = months
         self.days = days
         self.nanoseconds = nanoseconds
-        self.validate()
-
-    def validate(self):
-        """
-        A Duration is valid if its values are all positive or all negative. It cannot has mixed signs.
-        """
-        if self._has_negative_values and self._has_positive_values:
-            raise ValueError('Duration values cannot have mixed signs.')
-
-    @property
-    def _has_negative_values(self):
-        return self.months < 0 or self.days < 0 or self.nanoseconds < 0
-
-    @property
-    def _has_positive_values(self):
-        return self.months > 0 or self.days > 0 or self.nanoseconds > 0
 
     def __eq__(self, other):
         return isinstance(other, self.__class__) and self.months == other.months and self.days == other.days and self.nanoseconds == other.nanoseconds
@@ -1232,8 +1216,9 @@ class Duration(object):
         return "Duration({0}, {1}, {2})".format(self.months, self.days, self.nanoseconds)
 
     def __str__(self):
+        has_negative_values = self.months < 0 or self.days < 0 or self.nanoseconds < 0
         return '%s%dmo%dd%dns' % (
-            '-' if self._has_negative_values else '',
+            '-' if has_negative_values else '',
             abs(self.months),
             abs(self.days),
             abs(self.nanoseconds)
