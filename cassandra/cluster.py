@@ -2249,6 +2249,13 @@ class Session(object):
             else:
                 self.is_shutdown = True
 
+        # PYTHON-673. If shutdown was called shortly after session init, avoid
+        # a race by cancelling any initial connection attempts haven't started,
+        # then blocking on any that have.
+        for future in self._initial_connect_futures:
+            future.cancel()
+        wait_futures(self._initial_connect_futures)
+
         for pool in list(self._pools.values()):
             pool.shutdown()
 
