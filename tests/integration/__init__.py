@@ -107,6 +107,8 @@ def _get_cass_version_from_dse(dse_version):
         cass_ver = "2.1"
     elif dse_version.startswith('5.0'):
         cass_ver = "3.0"
+    elif dse_version.startswith("5.1"):
+        cass_ver = "3.10"
     else:
         log.error("Uknown dse version found {0}, defaulting to 2.1".format(dse_version))
         cass_ver = "2.1"

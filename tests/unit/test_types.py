@@ -67,6 +67,7 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(lookup_casstype_simple('CompositeType'), cassandra.cqltypes.CompositeType)
         self.assertEqual(lookup_casstype_simple('ColumnToCollectionType'), cassandra.cqltypes.ColumnToCollectionType)
         self.assertEqual(lookup_casstype_simple('ReversedType'), cassandra.cqltypes.ReversedType)
+        self.assertEqual(lookup_casstype_simple('DurationType'), cassandra.cqltypes.DurationType)
 
         self.assertEqual(str(lookup_casstype_simple('unknown')), str(cassandra.cqltypes.mkUnrecognizedType('unknown')))
 
@@ -100,6 +101,7 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(lookup_casstype('CompositeType'), cassandra.cqltypes.CompositeType)
         self.assertEqual(lookup_casstype('ColumnToCollectionType'), cassandra.cqltypes.ColumnToCollectionType)
         self.assertEqual(lookup_casstype('ReversedType'), cassandra.cqltypes.ReversedType)
+        self.assertEqual(lookup_casstype('DurationType'), cassandra.cqltypes.DurationType)
 
         self.assertEqual(str(lookup_casstype('unknown')), str(cassandra.cqltypes.mkUnrecognizedType('unknown')))
 
