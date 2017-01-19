@@ -117,7 +117,7 @@ it with the ``PROTOCOL_VERSION`` environment variable::
 
 Testing Multiple Python Versions
 --------------------------------
-If you want to test all of python 2.6, 2.7, and pypy, use tox (this is what
+If you want to test all of python 2.7, 3.3, 3.4 and pypy, use tox (this is what
 TravisCI runs)::
 
     tox

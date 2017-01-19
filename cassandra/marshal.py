@@ -68,20 +68,12 @@ else:
         return val
 
 
-def bitlength(n):
-    bitlen = 0
-    while n > 0:
-        n >>= 1
-        bitlen += 1
-    return bitlen
-
-
 def varint_pack(big):
     pos = True
     if big == 0:
         return b'\x00'
     if big < 0:
-        bytelength = bitlength(abs(big) - 1) // 8 + 1
+        bytelength = int.bit_length(abs(big) - 1) // 8 + 1
         big = (1 << bytelength * 8) + big
         pos = False
     revbytes = bytearray()
