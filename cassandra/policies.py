@@ -315,19 +315,21 @@ class TokenAwarePolicy(LoadBalancingPolicy):
     This alters the child policy's behavior so that it first attempts to
     send queries to :attr:`~.HostDistance.LOCAL` replicas (as determined
     by the child policy) based on the :class:`.Statement`'s
-    :attr:`~.Statement.routing_key`.  Once those hosts are exhausted, the
-    remaining hosts in the child policy's query plan will be used.
+    :attr:`~.Statement.routing_key`. If :attr:`.shuffle_replicas` is
+    truthy, these replicas will be yielded in a random order. Once those
+    hosts are exhausted, the remaining hosts in the child policy's query
+    plan will be used in the order provided by the child policy.
 
     If no :attr:`~.Statement.routing_key` is set on the query, the child
     policy's query plan will be used as is.
-
-    If :attr:`.shuffle_replicas` is truthy, :attr:`~.HostDistance.LOCAL`
-    replicas will be yielded in a random order, followed by the remaining 
-    hosts in the order provided child policy's query plan.
     """
 
     _child_policy = None
     _cluster_metadata = None
+    shuffle_replicas = False
+    """
+    Yield local replicas in a random order.
+    """
 
     def __init__(self, child_policy, shuffle_replicas=False):
         self._child_policy = child_policy
