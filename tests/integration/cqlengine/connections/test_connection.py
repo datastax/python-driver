@@ -95,3 +95,9 @@ class ConnectionTest(BaseCassEngTestCase):
         connection.set_session(self.session2)
         self.assertEqual(1, TestConnectModel.objects.count())
         self.assertEqual(TestConnectModel.objects.first(), TCM2)
+
+    def test_connection_setup_with_setup(self):
+        connection.setup(hosts=None, default_keyspace=None)
+
+    def test_connection_setup_with_default(self):
+        connection.default()
