@@ -66,3 +66,10 @@ class BatchStatementTest(unittest.TestCase):
         bound_statements = [t[1] for t in batch._statements_and_parameters]
         str_parameters = [str(i) for i in range(10)]
         self.assertEqual(bound_statements, str_parameters)
+
+    def test_len(self):
+        for n in 0, 10, 100:
+            batch = BatchStatement()
+            batch.add_all(statements=['%s'] * n,
+                          parameters=[(i,) for i in range(n)])
+            self.assertEqual(len(batch), n)
