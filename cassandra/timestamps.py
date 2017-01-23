@@ -95,8 +95,8 @@ class MonotonicTimestampGenerator(object):
         since_last_warn = now - self._last_warn
 
         warn = (self.warn_on_drift and
-                (diff >= self.warning_threshold) and
-                (since_last_warn >= self.warning_interval))
+                (diff > self.warning_threshold * 1e6) and
+                (since_last_warn >= self.warning_interval * 1e6))
         if warn:
             log.warn(
                 "Clock skew detected: current tick ({now}) was {diff} "

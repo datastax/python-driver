@@ -20,7 +20,8 @@ except ImportError:
 import mock
 
 from cassandra import timestamps
-
+import time
+from threading import Thread, Lock
 
 class _TimestampTestMixin(object):
 
@@ -60,11 +61,13 @@ class TestTimestampGeneratorOutput(unittest.TestCase, _TimestampTestMixin):
 
     def test_timestamps_during_and_after_same_system_time(self):
         """
-        Timestamps should increase monotonically over repeated system time.
-
         Test that MonotonicTimestampGenerator's output increases by 1 when the
         underlying system time is the same, then returns to normal when the
         system time increases again.
+
+        @since 3.8.0
+        @expected_result Timestamps should increase monotonically over repeated system time.
+        @test_category timing
         """
         self._call_and_check_results(
             system_time_expected_stamp_pairs=(
@@ -76,11 +79,13 @@ class TestTimestampGeneratorOutput(unittest.TestCase, _TimestampTestMixin):
 
     def test_timestamps_during_and_after_backwards_system_time(self):
         """
-        Timestamps should increase monotonically over system time going backwards.
-
         Test that MonotonicTimestampGenerator's output increases by 1 when the
         underlying system time goes backward, then returns to normal when the
         system time increases again.
+
+        @since 3.8.0
+        @expected_result Timestamps should increase monotonically over system time going backwards.
+        @test_category timing
         """
         self._call_and_check_results(
             system_time_expected_stamp_pairs=(
@@ -92,7 +97,7 @@ class TestTimestampGeneratorOutput(unittest.TestCase, _TimestampTestMixin):
         )
 
 
-class TestTimestampGeneratorLogging(unittest.TestCase, _TimestampTestMixin):
+class TestTimestampGeneratorLogging(unittest.TestCase):
 
     def setUp(self):
         self.log_patcher = mock.patch('cassandra.timestamps.log')
@@ -109,7 +114,17 @@ class TestTimestampGeneratorLogging(unittest.TestCase, _TimestampTestMixin):
         )
 
     def test_basic_log_content(self):
+        """
+        Tests there are logs
+
+        @since 3.8.0
+        @jira_ticket PYTHON-676
+        @expected_result logs
+
+        @test_category timing
+        """
         tsg = timestamps.MonotonicTimestampGenerator()
+        #The units of _last_warn is seconds
         tsg._last_warn = 12
 
         tsg._next_timestamp(20, tsg.last)
@@ -123,6 +138,15 @@ class TestTimestampGeneratorLogging(unittest.TestCase, _TimestampTestMixin):
         )
 
     def test_disable_logging(self):
+        """
+        Tests there are no logs when there is a clock skew if logging is disabled
+
+        @since 3.8.0
+        @jira_ticket PYTHON-676
+        @expected_result no logs
+
+        @test_category timing
+        """
         no_warn_tsg = timestamps.MonotonicTimestampGenerator(warn_on_drift=False)
 
         no_warn_tsg.last = 100
@@ -130,24 +154,51 @@ class TestTimestampGeneratorLogging(unittest.TestCase, _TimestampTestMixin):
         self.assertEqual(len(self.patched_timestamp_log.warn.call_args_list), 0)
 
     def test_warning_threshold_respected_no_logging(self):
+        """
+        Tests there are no logs if `warning_threshold` is not exceeded
+
+        @since 3.8.0
+        @jira_ticket PYTHON-676
+        @expected_result no logs
+
+        @test_category timing
+        """
         tsg = timestamps.MonotonicTimestampGenerator(
-            warning_threshold=2,
+            warning_threshold=2e-6,
         )
         tsg.last, tsg._last_warn = 100, 97
         tsg._next_timestamp(98, tsg.last)
         self.assertEqual(len(self.patched_timestamp_log.warn.call_args_list), 0)
 
     def test_warning_threshold_respected_logs(self):
+        """
+        Tests there are logs if `warning_threshold` is exceeded
+
+        @since 3.8.0
+        @jira_ticket PYTHON-676
+        @expected_result logs
+
+        @test_category timing
+        """
         tsg = timestamps.MonotonicTimestampGenerator(
-            warning_threshold=1
+            warning_threshold=1e-6
         )
         tsg.last, tsg._last_warn = 100, 97
         tsg._next_timestamp(98, tsg.last)
         self.assertEqual(len(self.patched_timestamp_log.warn.call_args_list), 1)
 
     def test_warning_interval_respected_no_logging(self):
+        """
+        Tests there is only one log in the interval `warning_interval`
+
+        @since 3.8.0
+        @jira_ticket PYTHON-676
+        @expected_result one log
+
+        @test_category timing
+        """
         tsg = timestamps.MonotonicTimestampGenerator(
-            warning_interval=2
+            warning_interval=2e-6
         )
         tsg.last = 100
         tsg._next_timestamp(70, tsg.last)
@@ -157,8 +208,18 @@ class TestTimestampGeneratorLogging(unittest.TestCase, _TimestampTestMixin):
         self.assertEqual(len(self.patched_timestamp_log.warn.call_args_list), 1)
 
     def test_warning_interval_respected_logs(self):
+        """
+        Tests there are logs again if the
+        clock skew happens after`warning_interval`
+
+        @since 3.8.0
+        @jira_ticket PYTHON-676
+        @expected_result logs
+
+        @test_category timing
+        """
         tsg = timestamps.MonotonicTimestampGenerator(
-            warning_interval=1
+            warning_interval=1e-6
         )
         tsg.last = 100
         tsg._next_timestamp(70, tsg.last)
@@ -166,3 +227,46 @@ class TestTimestampGeneratorLogging(unittest.TestCase, _TimestampTestMixin):
 
         tsg._next_timestamp(72, tsg.last)
         self.assertEqual(len(self.patched_timestamp_log.warn.call_args_list), 2)
+
+
+class TestTimestampGeneratorMultipleThreads(unittest.TestCase):
+
+    def test_should_generate_incrementing_timestamps_for_all_threads(self):
+        """
+        Tests when time is "stopped", values are assigned incrementally
+
+        @since 3.8.0
+        @jira_ticket PYTHON-676
+        @expected_result the returned values increase
+
+        @test_category timing
+        """
+        lock = Lock()
+
+        def request_time():
+            for _ in range(timestamp_to_generate):
+                timestamp = tsg()
+                with lock:
+                    generated_timestamps.append(timestamp)
+
+        tsg = timestamps.MonotonicTimestampGenerator(warning_threshold=1)
+        fixed_time = 1
+        num_threads = 5
+
+        timestamp_to_generate = 1000
+        generated_timestamps = []
+
+        with mock.patch('time.time', new=mock.Mock(return_value=fixed_time)):
+            threads = []
+            for _ in range(num_threads):
+                threads.append(Thread(target=request_time))
+
+            for t in threads:
+                t.start()
+
+            for t in threads:
+                t.join()
+
+            self.assertEqual(len(generated_timestamps), num_threads * timestamp_to_generate)
+            for i, timestamp in enumerate(sorted(generated_timestamps)):
+                self.assertEqual(int(i + 1e6), timestamp)
