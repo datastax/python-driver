@@ -520,6 +520,89 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         cluster.shutdown()
 
+    def test_token_aware_with_shuffle_rf2(self):
+        """
+        Test to validate the hosts are shuffled when the `shuffle_replicas` is truthy
+        @since 3.8
+        @jira_ticket PYTHON-676
+        @expected_result the request are spread across the replicas,
+        when one of them is down, the requests target the avaiable one
+
+        @test_category policy
+        """
+        use_singledc()
+        keyspace = 'test_token_aware_with_rf_2'
+        cluster, session = self._cluster_session_with_lbp(TokenAwarePolicy(RoundRobinPolicy(), shuffle_replicas=True))
+        self._wait_for_nodes_up(range(1, 4), cluster)
+
+        create_schema(cluster, session, keyspace, replication_factor=2)
+        self._insert(session, keyspace)
+        self._query(session, keyspace)
+
+        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
+        query_count_two = self.coordinator_stats.get_query_count(2)
+        query_count_three = self.coordinator_stats.get_query_count(3)
+        self.assertEqual(query_count_two + query_count_three, 12)
+
+        self.coordinator_stats.reset_counts()
+        stop(2)
+        self._wait_for_nodes_down([2], cluster)
+
+        self._query(session, keyspace)
+
+        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
+        self.coordinator_stats.assert_query_count_equals(self, 2, 0)
+        self.coordinator_stats.assert_query_count_equals(self, 3, 12)
+
+        cluster.shutdown()
+
+    def test_token_aware_with_shuffle_rf3(self):
+        """
+        Test to validate the hosts are shuffled when the `shuffle_replicas` is truthy
+        @since 3.8
+        @jira_ticket PYTHON-676
+        @expected_result the request are spread across the replicas,
+        when one of them is down, the requests target the other avaiable ones
+
+        @test_category policy
+        """
+        use_singledc()
+        keyspace = 'test_token_aware_with_rf_3'
+        cluster, session = self._cluster_session_with_lbp(TokenAwarePolicy(RoundRobinPolicy(), shuffle_replicas=True))
+        self._wait_for_nodes_up(range(1, 4), cluster)
+
+        create_schema(cluster, session, keyspace, replication_factor=3)
+        self._insert(session, keyspace)
+        self._query(session, keyspace)
+
+        query_count_one = self.coordinator_stats.get_query_count(1)
+        query_count_two = self.coordinator_stats.get_query_count(2)
+        query_count_three = self.coordinator_stats.get_query_count(3)
+        self.assertEqual(query_count_one + query_count_two + query_count_three, 12)
+
+        self.coordinator_stats.reset_counts()
+        stop(1)
+        self._wait_for_nodes_down([1], cluster)
+
+        self._query(session, keyspace)
+
+        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
+        query_count_two = self.coordinator_stats.get_query_count(2)
+        query_count_three = self.coordinator_stats.get_query_count(3)
+        self.assertEqual(query_count_two + query_count_three, 12)
+
+        self.coordinator_stats.reset_counts()
+        stop(2)
+        self._wait_for_nodes_down([2], cluster)
+
+        self._query(session, keyspace)
+
+        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
+        self.coordinator_stats.assert_query_count_equals(self, 2, 0)
+        self.coordinator_stats.assert_query_count_equals(self, 3, 12)
+
+        cluster.shutdown()
+
     def test_white_list(self):
         use_singledc()
         keyspace = 'test_white_list'

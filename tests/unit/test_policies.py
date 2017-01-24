@@ -731,6 +731,69 @@ class TokenAwarePolicyTest(unittest.TestCase):
         self.assertEqual(replicas + hosts[:2], qplan)
         cluster.metadata.get_replicas.assert_called_with(statement_keyspace, routing_key)
 
+    @patch('cassandra.policies.shuffle')
+    def test_shuffle(self, patched_shuffle):
+        """
+        Test to validate the hosts are shuffled when the `shuffle_replicas` is truthy
+        @since 3.8
+        @jira_ticket PYTHON-676
+        @expected_result shuffle should be called when the `shuffle_replicas` is truthy
+        if the keyspace and the routing key are set
+
+        @test_category policy
+        """
+        hosts = [Host(str(i), SimpleConvictionPolicy) for i in range(4)]
+        for host in hosts:
+            host.set_up()
+
+        cluster = Mock(spec=Cluster)
+        cluster.metadata = Mock(spec=Metadata)
+        replicas = hosts[2:]
+        cluster.metadata.get_replicas.return_value = replicas
+
+        child_policy = Mock()
+        child_policy.make_query_plan.return_value = hosts
+        child_policy.distance.return_value = HostDistance.LOCAL
+
+        policy = TokenAwarePolicy(child_policy, shuffle_replicas=True)
+        policy.populate(cluster, hosts)
+
+        # no keyspace, no shuffle happens
+        cluster.metadata.get_replicas.reset_mock()
+        child_policy.make_query_plan.reset_mock()
+        keyspace = None
+        routing_key = 'routing_key'
+        query = Statement(routing_key=routing_key)
+        qplan = list(policy.make_query_plan(keyspace, query))
+        self.assertEqual(hosts, qplan)
+        self.assertEqual(cluster.metadata.get_replicas.call_count, 0)
+        child_policy.make_query_plan.assert_called_once_with(keyspace, query)
+        self.assertEqual(patched_shuffle.call_count, 0)
+
+        # no routing_key, no shuffle happens
+        cluster.metadata.get_replicas.reset_mock()
+        child_policy.make_query_plan.reset_mock()
+        keyspace = "shuffle_keyspace"
+        routing_key = None
+        query = Statement(routing_key=routing_key)
+        qplan = list(policy.make_query_plan(keyspace, query))
+        self.assertEqual(hosts, qplan)
+        self.assertEqual(cluster.metadata.get_replicas.call_count, 0)
+        child_policy.make_query_plan.assert_called_once_with(keyspace, query)
+        self.assertEqual(patched_shuffle.call_count, 0)
+
+        #routing_key and keyspace set, shuffle should happen
+        cluster.metadata.get_replicas.reset_mock()
+        child_policy.make_query_plan.reset_mock()
+        keyspace = "shuffle_keyspace"
+        routing_key = 'routing_key'
+        query = Statement(routing_key=routing_key)
+        qplan = list(policy.make_query_plan(keyspace, query))
+        self.assertEqual(set(replicas), set(qplan[:2]))
+        self.assertEqual(hosts[:2], qplan[2:])
+        child_policy.make_query_plan.assert_called_once_with(keyspace, query)
+        self.assertEqual(patched_shuffle.call_count, 1)
+
 
 class ConvictionPolicyTest(unittest.TestCase):
     def test_not_implemented(self):
