@@ -879,7 +879,7 @@ class ClusterTests(unittest.TestCase):
             self.assertEqual(set(h.address for h in pools), set(('127.0.0.1',)))
 
             node2 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.2']))
-            self.assertRaises(cassandra.OperationTimedOut, cluster.add_execution_profile, 'node2', node2, pool_wait_timeout=0.0000001)
+            self.assertRaises(cassandra.OperationTimedOut, cluster.add_execution_profile, 'node2', node2, pool_wait_timeout=0.000000001)
 
 
 class LocalHostAdressTranslator(AddressTranslator):

@@ -83,7 +83,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         self.session.execute(ss)
         with self.assertRaises(DriverException) as context:
             self.session.execute("SELECT * FROM {0}.{1}".format(self.keyspace_name, self.function_table_name))
-        self.assertIn("Failed decoding result column", context.exception.message)
+        self.assertIn("Failed decoding result column", str(context.exception))
 
     def test_trace_id_to_resultset(self):
 
