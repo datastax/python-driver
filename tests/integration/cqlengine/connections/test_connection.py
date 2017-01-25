@@ -98,6 +98,8 @@ class ConnectionTest(BaseCassEngTestCase):
 
     def test_connection_setup_with_setup(self):
         connection.setup(hosts=None, default_keyspace=None)
+        self.assertIsNotNone(connection.get_connection("default").cluster.metadata.get_host("127.0.0.1"))
 
     def test_connection_setup_with_default(self):
         connection.default()
+        self.assertIsNotNone(connection.get_connection("default").cluster.metadata.get_host("127.0.0.1"))
