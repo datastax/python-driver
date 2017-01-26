@@ -37,6 +37,7 @@ from tests.integration import get_cluster, use_singledc, PROTOCOL_VERSION, get_s
     BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase, BasicExistingKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster, CASSANDRA_VERSION, \
     BasicExistingSegregatedKeyspaceUnitTestCase, dseonly, DSE_VERSION, get_supported_protocol_versions, greaterthanorequalcass30
 
+from tests.integration import greaterthancass21
 
 def setup_module():
     use_singledc()
@@ -1047,6 +1048,7 @@ CREATE TABLE export_udts.users (
 
         cluster.shutdown()
 
+    @greaterthancass21
     def test_case_sensitivity(self):
         """
         Test that names that need to be escaped in CREATE statements are
