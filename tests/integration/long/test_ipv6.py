@@ -65,7 +65,7 @@ def validate_host_viable():
     # this is something ccm does when starting, but preemptively check to avoid
     # spinning up the cluster if it's not going to work
     try:
-        common.check_socket_available(('::1', 9042))
+        common.assert_socket_available(('::1', 9042))
     except:
         raise unittest.SkipTest('failed binding ipv6 loopback ::1 on 9042')
 
