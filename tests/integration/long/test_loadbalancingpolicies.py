@@ -536,14 +536,28 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self._wait_for_nodes_up(range(1, 4), cluster)
 
         create_schema(cluster, session, keyspace, replication_factor=2)
-        self._insert(session, keyspace)
-        self._query(session, keyspace)
 
-        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-        query_count_two = self.coordinator_stats.get_query_count(2)
-        query_count_three = self.coordinator_stats.get_query_count(3)
-        self.assertEqual(query_count_two + query_count_three, 12)
+        LIMIT_TRIES = 20
+        previous_query_count_two, previous_query_count_three = None, None
+        for _ in range(LIMIT_TRIES):
+            self._insert(session, keyspace)
+            self._query(session, keyspace)
 
+            self.coordinator_stats.assert_query_count_equals(self, 1, 0)
+            query_count_two = self.coordinator_stats.get_query_count(2)
+            query_count_three = self.coordinator_stats.get_query_count(3)
+            self.assertEqual(query_count_two + query_count_three, 12)
+            self.coordinator_stats.reset_counts()
+
+            if previous_query_count_two is not None:
+                if query_count_two != previous_query_count_two or query_count_three != previous_query_count_three:
+                    break
+            previous_query_count_two, previous_query_count_three = query_count_two, query_count_three
+            self.coordinator_stats.reset_counts()
+        else:
+            raise Exception("After {0} tries shuffle returned the same output".format(LIMIT_TRIES))
+
+        #check TokenAwarePolicy still return the remaining replicas when one goes down
         self.coordinator_stats.reset_counts()
         stop(2)
         self._wait_for_nodes_down([2], cluster)
@@ -572,14 +586,30 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self._wait_for_nodes_up(range(1, 4), cluster)
 
         create_schema(cluster, session, keyspace, replication_factor=3)
-        self._insert(session, keyspace)
-        self._query(session, keyspace)
 
-        query_count_one = self.coordinator_stats.get_query_count(1)
-        query_count_two = self.coordinator_stats.get_query_count(2)
-        query_count_three = self.coordinator_stats.get_query_count(3)
-        self.assertEqual(query_count_one + query_count_two + query_count_three, 12)
+        LIMIT_TRIES = 20
+        previous_query_count_one, previous_query_count_two, previous_query_count_three = None, None, None
+        for _ in range(LIMIT_TRIES):
+            self._insert(session, keyspace)
+            self._query(session, keyspace)
 
+            query_count_one = self.coordinator_stats.get_query_count(1)
+            query_count_two = self.coordinator_stats.get_query_count(2)
+            query_count_three = self.coordinator_stats.get_query_count(3)
+            self.assertEqual(query_count_one + query_count_two + query_count_three, 12)
+
+            if previous_query_count_two is not None:
+                if query_count_one != previous_query_count_one \
+                        or query_count_two != previous_query_count_two \
+                        or query_count_three != previous_query_count_three:
+                    break
+            previous_query_count_one, previous_query_count_two, previous_query_count_three = \
+                query_count_one, query_count_two, query_count_three
+            self.coordinator_stats.reset_counts()
+        else:
+            raise Exception("After {0} tries shuffle returned the same output".format(LIMIT_TRIES))
+
+        # check TokenAwarePolicy still return the remaining replicas when one goes down
         self.coordinator_stats.reset_counts()
         stop(1)
         self._wait_for_nodes_down([1], cluster)
