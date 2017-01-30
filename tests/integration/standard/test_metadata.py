@@ -29,13 +29,15 @@ from cassandra.cluster import Cluster
 from cassandra.encoder import Encoder
 from cassandra.metadata import (Metadata, KeyspaceMetadata, IndexMetadata,
                                 Token, MD5Token, TokenMap, murmur3, Function, Aggregate, protect_name, protect_names,
-                                get_schema_parser, RegisteredTableExtension)
+                                get_schema_parser, RegisteredTableExtension, _RegisteredExtensionType)
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
-from tests.integration import get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass, \
-    BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase, BasicExistingKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster, CASSANDRA_VERSION, \
-    BasicExistingSegregatedKeyspaceUnitTestCase, dseonly, DSE_VERSION, get_supported_protocol_versions, greaterthanorequalcass30
+from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass,
+                               BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase,
+                               BasicExistingKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster, CASSANDRA_VERSION,
+                               BasicExistingSegregatedKeyspaceUnitTestCase, dseonly, DSE_VERSION,
+                               get_supported_protocol_versions, greaterthanorequalcass30)
 
 from tests.integration import greaterthancass21
 
@@ -865,15 +867,19 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         ks = self.keyspace_name
         ks_meta = s.cluster.metadata.keyspaces[ks]
         t = self.function_table_name
+        v = t + 'view'
 
         s.execute("CREATE TABLE %s.%s (k text PRIMARY KEY, v int)" % (ks, t))
+        s.execute("CREATE MATERIALIZED VIEW %s.%s AS SELECT * FROM %s.%s WHERE v IS NOT NULL PRIMARY KEY (v, k)" % (ks, v, ks, t))
 
         table_meta = ks_meta.tables[t]
+        view_meta = table_meta.views[v]
 
         self.assertFalse(table_meta.extensions)
-        self.assertNotIn(t, table_meta._extension_registry)
+        self.assertFalse(view_meta.extensions)
 
-        original_cql = table_meta.export_as_string()
+        original_table_cql = table_meta.export_as_string()
+        original_view_cql = view_meta.export_as_string()
 
         # extensions registered, not present
         # --------------------------------------
@@ -888,43 +894,66 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
             name = t + '##'
 
         self.assertFalse(table_meta.extensions)
-        self.assertIn(Ext0.name, table_meta._extension_registry)
-        self.assertIn(Ext1.name, table_meta._extension_registry)
-        self.assertEqual(len(table_meta._extension_registry), 2)
+        self.assertFalse(view_meta.extensions)
+        self.assertIn(Ext0.name, _RegisteredExtensionType._extension_registry)
+        self.assertIn(Ext1.name, _RegisteredExtensionType._extension_registry)
+        self.assertEqual(len(_RegisteredExtensionType._extension_registry), 2)
 
         self.cluster.refresh_table_metadata(ks, t)
         table_meta = ks_meta.tables[t]
+        view_meta = table_meta.views[v]
 
-        self.assertEqual(table_meta.export_as_string(), original_cql)
+        self.assertEqual(table_meta.export_as_string(), original_table_cql)
+        self.assertEqual(view_meta.export_as_string(), original_view_cql)
 
-        p = s.prepare('UPDATE system_schema.tables SET extensions=? WHERE keyspace_name=? AND table_name=?')  # for blob type coercing
+        update_t = s.prepare('UPDATE system_schema.tables SET extensions=? WHERE keyspace_name=? AND table_name=?')  # for blob type coercing
+        update_v = s.prepare('UPDATE system_schema.views SET extensions=? WHERE keyspace_name=? AND view_name=?')
         # extensions registered, one present
         # --------------------------------------
         ext_map = {Ext0.name: six.b("THA VALUE")}
-        [s.execute(p, (ext_map, ks, t)) for _ in self.cluster.metadata.all_hosts()]  # we're manipulating metadata - do it on all hosts
+        [(s.execute(update_t, (ext_map, ks, t)), s.execute(update_v, (ext_map, ks, v)))
+         for _ in self.cluster.metadata.all_hosts()]  # we're manipulating metadata - do it on all hosts
         self.cluster.refresh_table_metadata(ks, t)
+        self.cluster.refresh_materialized_view_metadata(ks, v)
         table_meta = ks_meta.tables[t]
+        view_meta = table_meta.views[v]
 
         self.assertIn(Ext0.name, table_meta.extensions)
         new_cql = table_meta.export_as_string()
-        self.assertNotEqual(new_cql, original_cql)
+        self.assertNotEqual(new_cql, original_table_cql)
         self.assertIn(Ext0.after_table_cql(table_meta, Ext0.name, ext_map[Ext0.name]), new_cql)
+        self.assertNotIn(Ext1.name, new_cql)
+
+        self.assertIn(Ext0.name, view_meta.extensions)
+        new_cql = view_meta.export_as_string()
+        self.assertNotEqual(new_cql, original_view_cql)
+        self.assertIn(Ext0.after_table_cql(view_meta, Ext0.name, ext_map[Ext0.name]), new_cql)
         self.assertNotIn(Ext1.name, new_cql)
 
         # extensions registered, one present
         # --------------------------------------
         ext_map = {Ext0.name: six.b("THA VALUE"),
                    Ext1.name: six.b("OTHA VALUE")}
-        [s.execute(p, (ext_map, ks, t)) for _ in self.cluster.metadata.all_hosts()]  # we're manipulating metadata - do it on all hosts
+        [(s.execute(update_t, (ext_map, ks, t)), s.execute(update_v, (ext_map, ks, v)))
+         for _ in self.cluster.metadata.all_hosts()]  # we're manipulating metadata - do it on all hosts
         self.cluster.refresh_table_metadata(ks, t)
+        self.cluster.refresh_materialized_view_metadata(ks, v)
         table_meta = ks_meta.tables[t]
+        view_meta = table_meta.views[v]
 
         self.assertIn(Ext0.name, table_meta.extensions)
         self.assertIn(Ext1.name, table_meta.extensions)
         new_cql = table_meta.export_as_string()
-        self.assertNotEqual(new_cql, original_cql)
+        self.assertNotEqual(new_cql, original_table_cql)
         self.assertIn(Ext0.after_table_cql(table_meta, Ext0.name, ext_map[Ext0.name]), new_cql)
         self.assertIn(Ext1.after_table_cql(table_meta, Ext1.name, ext_map[Ext1.name]), new_cql)
+
+        self.assertIn(Ext0.name, view_meta.extensions)
+        self.assertIn(Ext1.name, view_meta.extensions)
+        new_cql = view_meta.export_as_string()
+        self.assertNotEqual(new_cql, original_view_cql)
+        self.assertIn(Ext0.after_table_cql(view_meta, Ext0.name, ext_map[Ext0.name]), new_cql)
+        self.assertIn(Ext1.after_table_cql(view_meta, Ext1.name, ext_map[Ext1.name]), new_cql)
 
 
 class TestCodeCoverage(unittest.TestCase):
