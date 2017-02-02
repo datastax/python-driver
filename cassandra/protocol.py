@@ -22,6 +22,7 @@ import six
 from six.moves import range
 import io
 
+from cassandra import ProtocolVersion
 from cassandra import type_codes, DriverException
 from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
                        WriteFailure, ReadFailure, FunctionFailure,
@@ -260,7 +261,7 @@ class ReadFailureMessage(RequestExecutionException):
         received_responses = read_int(f)
         required_responses = read_int(f)
 
-        if protocol_version >= 5:
+        if ProtocolVersion.uses_error_code_map(protocol_version):
             error_code_map = read_error_code_map(f)
             failures = len(error_code_map)
         else:
@@ -308,7 +309,7 @@ class WriteFailureMessage(RequestExecutionException):
         received_responses = read_int(f)
         required_responses = read_int(f)
 
-        if protocol_version >= 5:
+        if ProtocolVersion.uses_error_code_map(protocol_version):
             error_code_map = read_error_code_map(f)
             failures = len(error_code_map)
         else:
@@ -557,7 +558,7 @@ class QueryMessage(_MessageType):
         if self.timestamp is not None:
             flags |= _PROTOCOL_TIMESTAMP
 
-        if protocol_version >= 5:
+        if ProtocolVersion.uses_int_query_flags(protocol_version):
             write_uint(f, flags)
         else:
             write_byte(f, flags)
@@ -772,7 +773,7 @@ class PrepareMessage(_MessageType):
 
     def send_body(self, f, protocol_version):
         write_longstring(f, self.query)
-        if protocol_version >= 5:
+        if ProtocolVersion.uses_prepare_flags(protocol_version):
             # Write the flags byte; with 0 value for now, but this should change in PYTHON-678
             write_uint(f, 0)
 
@@ -780,7 +781,6 @@ class PrepareMessage(_MessageType):
 class ExecuteMessage(_MessageType):
     opcode = 0x0A
     name = 'EXECUTE'
-
     def __init__(self, query_id, query_params, consistency_level,
                  serial_consistency_level=None, fetch_size=None,
                  paging_state=None, timestamp=None, skip_meta=False):
@@ -828,7 +828,7 @@ class ExecuteMessage(_MessageType):
             if self.skip_meta:
                 flags |= _SKIP_METADATA_FLAG
 
-            if protocol_version >= 5:
+            if ProtocolVersion.uses_int_query_flags(protocol_version):
                 write_uint(f, flags)
             else:
                 write_byte(f, flags)
@@ -882,7 +882,7 @@ class BatchMessage(_MessageType):
             if self.timestamp is not None:
                 flags |= _PROTOCOL_TIMESTAMP
 
-            if protocol_version >= 5:
+            if ProtocolVersion.uses_int_query_flags(protocol_version):
                 write_int(f, flags)
             else:
                 write_byte(f, flags)

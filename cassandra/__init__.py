@@ -164,6 +164,11 @@ class ProtocolVersion(object):
     A tuple of all supported protocol versions
     """
 
+    BETA_VERSIONS = (V5,)
+    """
+    A tuple of all beta protocol versions
+    """
+
     MIN_SUPPORTED = min(SUPPORTED_VERSIONS)
     """
     Minimum protocol version supported by this driver.
@@ -173,6 +178,31 @@ class ProtocolVersion(object):
     """
     Maximum protocol versioni supported by this driver.
     """
+
+    @classmethod
+    def get_lower_supported(cls, previous_version):
+        """
+        Return the lower supported protocol version. Beta versions are omitted.
+        """
+        try:
+            version = next(v for v in sorted(ProtocolVersion.SUPPORTED_VERSIONS, reverse=True) if
+                           v not in ProtocolVersion.BETA_VERSIONS and v < previous_version)
+        except StopIteration:
+            version = 0
+
+        return version
+
+    @classmethod
+    def uses_int_query_flags(cls, version):
+        return version >= cls.V5
+
+    @classmethod
+    def uses_prepare_flags(cls, version):
+        return version >= cls.V5
+
+    @classmethod
+    def uses_error_code_map(cls, version):
+        return version >= cls.V5
 
 
 class SchemaChangeType(object):
