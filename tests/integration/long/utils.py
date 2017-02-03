@@ -107,6 +107,7 @@ def bootstrap(node, data_center=None, token=None):
                          auto_bootstrap=False,
                          thrift_interface=(IP_FORMAT % node, 9160),
                          storage_interface=(IP_FORMAT % node, 7000),
+                         binary_interface=(IP_FORMAT % node, 9042),
                          jmx_port=str(7000 + 100 * node),
                          remote_debug_port=0,
                          initial_token=token if token else node * 10)
